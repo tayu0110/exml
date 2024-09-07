@@ -21,7 +21,7 @@ use crate::{
         xmlerror::{XmlError, XmlGenericErrorFunc, XmlStructuredErrorFunc},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
-    private::threads::{__xmlGlobalInitMutexDestroy, xmlCleanupMutex, xmlInitMutex},
+    private::threads::{__xml_global_init_mutex_destroy, xml_cleanup_mutex, xml_init_mutex},
 };
 
 use super::{
@@ -1592,7 +1592,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFilenameValue(
  * Additional initialisation for multi-threading
  */
 pub(crate) unsafe extern "C" fn xmlInitGlobalsInternal() {
-    xmlInitMutex(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_init_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
 /**
@@ -1603,6 +1603,6 @@ pub(crate) unsafe extern "C" fn xmlInitGlobalsInternal() {
 pub(crate) unsafe extern "C" fn xmlCleanupGlobalsInternal() {
     xmlResetError(xmlLastError());
 
-    xmlCleanupMutex(addr_of_mut!(XML_THR_DEF_MUTEX));
-    __xmlGlobalInitMutexDestroy();
+    xml_cleanup_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
+    __xml_global_init_mutex_destroy();
 }

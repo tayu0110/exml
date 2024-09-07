@@ -12,7 +12,7 @@ use std::{
 
 use libc::{memcpy, memset, rand, size_t, srand, strlen, time, INT_MAX};
 
-use crate::private::threads::{xmlCleanupMutex, xmlInitMutex};
+use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
 
 use super::{
     globals::{xml_free, xml_malloc},
@@ -1229,7 +1229,7 @@ pub unsafe extern "C" fn xmlDictCleanup() {}
  * Do the dictionary mutex initialization.
  */
 pub(crate) unsafe extern "C" fn __xmlInitializeDict() -> c_int {
-    xmlInitMutex(addr_of_mut!(XML_DICT_MUTEX));
+    xml_init_mutex(addr_of_mut!(XML_DICT_MUTEX));
 
     // #ifdef DICT_RANDOMIZATION
     // #ifdef HAVE_RAND_R
@@ -1248,7 +1248,7 @@ pub(crate) unsafe extern "C" fn __xmlInitializeDict() -> c_int {
  * Free the dictionary mutex.
  */
 pub(crate) unsafe extern "C" fn xmlCleanupDictInternal() {
-    xmlCleanupMutex(addr_of_mut!(XML_DICT_MUTEX));
+    xml_cleanup_mutex(addr_of_mut!(XML_DICT_MUTEX));
 }
 
 #[cfg(test)]

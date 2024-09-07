@@ -28,7 +28,7 @@ use crate::libxml::{
  * Makes sure that the global initialization mutex is initialized and
  * locks it.
  */
-pub(crate) unsafe extern "C" fn __xmlGlobalInitMutexLock() {
+pub(crate) unsafe extern "C" fn __xml_global_init_mutex_lock() {
     /* Make sure the global init lock is initialized and then lock it. */
     if !XML_IS_THREADED {
         return;
@@ -37,7 +37,7 @@ pub(crate) unsafe extern "C" fn __xmlGlobalInitMutexLock() {
     pthread_mutex_lock(addr_of_mut!(GLOBAL_INIT_LOCK));
 }
 
-pub(crate) unsafe extern "C" fn __xmlGlobalInitMutexUnlock() {
+pub(crate) unsafe extern "C" fn __xml_global_init_mutex_unlock() {
     if !XML_IS_THREADED {
         return;
     }
@@ -50,7 +50,7 @@ pub(crate) unsafe extern "C" fn __xmlGlobalInitMutexUnlock() {
  * Makes sure that the global initialization mutex is destroyed before
  * application termination.
  */
-pub(crate) unsafe extern "C" fn __xmlGlobalInitMutexDestroy() {}
+pub(crate) unsafe extern "C" fn __xml_global_init_mutex_destroy() {}
 
 /**
  * xmlFreeGlobalState:
@@ -59,7 +59,7 @@ pub(crate) unsafe extern "C" fn __xmlGlobalInitMutexDestroy() {}
  * xmlFreeGlobalState() is called when a thread terminates with a non-NULL
  * global state. It is is used here to reclaim memory resources.
  */
-unsafe extern "C" fn xmlFreeGlobalState(state: *mut c_void) {
+unsafe extern "C" fn xml_free_global_state(state: *mut c_void) {
     let gs: *mut XmlGlobalState = state as _;
 
     /* free any memory allocated in the thread's xmlLastError */
@@ -72,8 +72,8 @@ unsafe extern "C" fn xmlFreeGlobalState(state: *mut c_void) {
  *
  * Used to to initialize all the thread related data.
  */
-pub(crate) unsafe extern "C" fn xmlInitThreadsInternal() {
-    pthread_key_create(addr_of_mut!(GLOBALKEY), Some(xmlFreeGlobalState));
+pub(crate) unsafe extern "C" fn xml_init_threads_internal() {
+    pthread_key_create(addr_of_mut!(GLOBALKEY), Some(xml_free_global_state));
     MAINTHREAD = pthread_self();
 }
 
@@ -82,7 +82,7 @@ pub(crate) unsafe extern "C" fn xmlInitThreadsInternal() {
  *
  * Used to to cleanup all the thread related data.
  */
-pub(crate) unsafe extern "C" fn xmlCleanupThreadsInternal() {
+pub(crate) unsafe extern "C" fn xml_cleanup_threads_internal() {
     pthread_key_delete(GLOBALKEY);
 }
 
@@ -92,7 +92,7 @@ pub(crate) unsafe extern "C" fn xmlCleanupThreadsInternal() {
  *
  * Initialize a mutex.
  */
-pub(crate) unsafe extern "C" fn xmlInitMutex(mutex: XmlMutexPtr) {
+pub(crate) unsafe extern "C" fn xml_init_mutex(mutex: XmlMutexPtr) {
     if !XML_IS_NEVER_THREADED {
         pthread_mutex_init(&mut (*mutex).lock as _, null());
     }
@@ -104,7 +104,7 @@ pub(crate) unsafe extern "C" fn xmlInitMutex(mutex: XmlMutexPtr) {
  *
  * Reclaim resources associated with a mutex.
  */
-pub(crate) unsafe extern "C" fn xmlCleanupMutex(mutex: XmlMutexPtr) {
+pub(crate) unsafe extern "C" fn xml_cleanup_mutex(mutex: XmlMutexPtr) {
     if !XML_IS_NEVER_THREADED {
         pthread_mutex_destroy(&mut (*mutex).lock as _);
     }

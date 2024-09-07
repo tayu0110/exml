@@ -16,7 +16,7 @@ use crate::libxml::globals::{
     xmlGenericErrorContext, xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc,
 };
 use crate::libxml::parser::xml_init_parser;
-use crate::private::threads::{xmlCleanupMutex, xmlInitMutex};
+use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
 use crate::xml_generic_error;
 
 use super::globals::{_XML_FREE, _XML_MALLOC, _XML_MALLOC_ATOMIC, _XML_MEM_STRDUP, _XML_REALLOC};
@@ -1304,7 +1304,7 @@ pub(crate) unsafe extern "C" fn xml_init_memory_internal() {
     //      xmlGenericError(xmlGenericErrorContext,
     // 	     "xmlInitMemory()\n");
     // #endif
-    xmlInitMutex(addr_of_mut!(XML_MEM_MUTEX));
+    xml_init_mutex(addr_of_mut!(XML_MEM_MUTEX));
 
     breakpoint = getenv(c"XML_MEM_BREAKPOINT".as_ptr());
     if !breakpoint.is_null() {
@@ -1341,7 +1341,7 @@ pub(crate) unsafe extern "C" fn xml_cleanup_memory_internal() {
     // 	     "xmlCleanupMemory()\n");
     // #endif
 
-    xmlCleanupMutex(addr_of_mut!(XML_MEM_MUTEX));
+    xml_cleanup_mutex(addr_of_mut!(XML_MEM_MUTEX));
     // #ifdef DEBUG_MEMORY
     //      xmlGenericError(xmlGenericErrorContext,
     // 	     "xmlCleanupMemory() Ok\n");

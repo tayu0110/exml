@@ -112,8 +112,8 @@ use crate::{
             xml_parser_shrink, XML_VCTXT_USE_PCTXT,
         },
         threads::{
-            __xmlGlobalInitMutexLock, __xmlGlobalInitMutexUnlock, xmlCleanupThreadsInternal,
-            xmlInitThreadsInternal,
+            __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock,
+            xml_cleanup_threads_internal, xml_init_threads_internal,
         },
     },
     xml_generic_error, IS_BLANK_CH, IS_BYTE_CHAR, IS_CHAR, IS_COMBINING, IS_DIGIT, IS_EXTENDER,
@@ -1742,10 +1742,10 @@ pub unsafe extern "C" fn xml_init_parser() {
 
     #[cfg(feature = "thread")]
     {
-        __xmlGlobalInitMutexLock();
+        __xml_global_init_mutex_lock();
     }
     if !cfg!(feature = "thread") || !XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
-        xmlInitThreadsInternal();
+        xml_init_threads_internal();
         xmlInitGlobalsInternal();
         xml_init_memory_internal();
         __xmlInitializeDict();
@@ -1764,7 +1764,7 @@ pub unsafe extern "C" fn xml_init_parser() {
 
     #[cfg(feature = "thread")]
     {
-        __xmlGlobalInitMutexUnlock();
+        __xml_global_init_mutex_unlock();
     }
 }
 
@@ -1811,7 +1811,7 @@ pub unsafe extern "C" fn xml_cleanup_parser() {
         xml_relaxng_cleanup_types();
     }
     xmlCleanupGlobalsInternal();
-    xmlCleanupThreadsInternal();
+    xml_cleanup_threads_internal();
     xml_cleanup_memory_internal();
     XML_PARSER_INITIALIZED.store(false, Ordering::Release);
 }

@@ -17,7 +17,7 @@ use libc::{
 };
 
 use crate::libxml::globals::XmlGlobalStatePtr;
-use crate::private::threads::{xmlCleanupMutex, xmlInitMutex};
+use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
 
 use super::{globals::XmlGlobalState, parser::xml_init_parser};
 
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn xmlNewMutex() -> XmlMutexPtr {
     if tok.is_null() {
         return null_mut();
     }
-    xmlInitMutex(tok);
+    xml_init_mutex(tok);
     tok
 }
 
@@ -127,7 +127,7 @@ pub unsafe extern "C" fn xmlFreeMutex(tok: XmlMutexPtr) {
         return;
     }
 
-    xmlCleanupMutex(tok);
+    xml_cleanup_mutex(tok);
     free(tok as _);
 }
 
