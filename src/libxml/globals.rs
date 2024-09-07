@@ -12,10 +12,11 @@ use std::{
 
 use libc::{free, malloc, memset, realloc};
 
+#[cfg(feature = "legacy")]
+use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
-        sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler},
         xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr, __xmlOutputBufferCreateFilename},
         xmlerror::{XmlError, XmlGenericErrorFunc, XmlStructuredErrorFunc},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},

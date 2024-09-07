@@ -5,7 +5,7 @@
         "catalog",
         "sax1",
         "valid",
-        "legacy",
+        // "legacy",
         "push",
         "thread",
         // "thread_alloc",

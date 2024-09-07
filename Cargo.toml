@@ -17,7 +17,6 @@ default = [
     "catalog",
     "sax1",
     "valid",
-    "legacy",
     "push",
     "thread",
     "html",
