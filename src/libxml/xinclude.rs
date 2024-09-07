@@ -13,6 +13,8 @@ use std::{
 
 use libc::{memset, size_t, strcmp};
 
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
     __xml_raise_error,
     libxml::{
@@ -48,7 +50,7 @@ use crate::{
             xml_xpath_free_context, xml_xpath_free_object, XmlNodeSetPtr, XmlXPathContextPtr,
             XmlXPathObjectPtr, XmlXPathObjectType,
         },
-        xpointer::{xml_xptr_eval, xml_xptr_new_context, XmlLocationSetPtr},
+        xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     private::buf::xmlBufLength,
     IS_CHAR,

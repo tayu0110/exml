@@ -15,6 +15,12 @@ use std::{
 use libc::{fprintf, FILE};
 use libc::{memcpy, memset, ptrdiff_t, size_t, INT_MAX, INT_MIN};
 
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::libxml::xpointer::{
+    xml_xptr_free_location_set, xml_xptr_location_set_add, xml_xptr_location_set_create,
+    xml_xptr_new_range, xml_xptr_new_range_node_object, xml_xptr_wrap_location_set,
+    XmlLocationSetPtr,
+};
 use crate::{
     __xml_raise_error,
     libxml::{
@@ -61,11 +67,6 @@ use crate::{
             XmlXPathParserContext, XmlXPathParserContextPtr, XmlXPathStepOp, XmlXPathStepOpPtr,
             XmlXPathVariableLookupFunc, XML_XPATH_CHECKNS, XML_XPATH_NAN, XML_XPATH_NOVAR,
             XPATH_MAX_NODESET_LENGTH, XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
-        },
-        xpointer::{
-            xml_xptr_free_location_set, xml_xptr_location_set_add, xml_xptr_location_set_create,
-            xml_xptr_new_range, xml_xptr_new_range_node_object, xml_xptr_wrap_location_set,
-            XmlLocationSetPtr,
         },
     },
     private::buf::{xmlBufAdd, xmlBufCreate, xmlBufFree},

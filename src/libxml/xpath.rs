@@ -14,6 +14,10 @@ use std::{
 
 use libc::{memcpy, memmove, memset, ptrdiff_t, snprintf, strlen, INT_MAX, INT_MIN};
 
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::libxml::xpointer::{
+    xml_xptr_free_location_set, xml_xptr_location_set_merge, XmlLocationSetPtr,
+};
 use crate::{
     libxml::{
         dict::{xmlDictFree, XmlDictPtr},
@@ -38,7 +42,6 @@ use crate::{
             xml_xpath_wrap_string, xml_xpatherror, XmlPointerListPtr, XmlXpathContextCache,
             XmlXpathContextCachePtr, XML_NODESET_DEFAULT,
         },
-        xpointer::{xml_xptr_free_location_set, xml_xptr_location_set_merge, XmlLocationSetPtr},
     },
     xml_generic_error,
 };

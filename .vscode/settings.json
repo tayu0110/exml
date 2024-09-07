@@ -21,7 +21,7 @@
         "libxml_automata",
         "libxml_unicode",
         "libxml_c14n",
-        "libxml_xptr_locs",
+        // "libxml_xptr_locs",
         "libxml_pattern",
         "libxml_xptr",
         "libxml_reader",
