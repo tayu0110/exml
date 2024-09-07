@@ -1168,7 +1168,7 @@ pub unsafe extern "C" fn htmlNodeDumpFormatOutput(
             xml_io::xmlOutputBufferWriteString,
             xmlstring::xml_strcmp,
         },
-        private::save::xmlNsListDumpOutput,
+        private::save::xml_ns_list_dump_output,
     };
 
     use super::htmlparser::HtmlElemDesc;
@@ -1233,7 +1233,7 @@ pub unsafe extern "C" fn htmlNodeDumpFormatOutput(
                 }
                 xmlOutputBufferWriteString(buf, (*cur).name as _);
                 if !(*cur).ns_def.is_null() {
-                    xmlNsListDumpOutput(buf, (*cur).ns_def);
+                    xml_ns_list_dump_output(buf, (*cur).ns_def);
                 }
                 attr = (*cur).properties;
                 while !attr.is_null() {

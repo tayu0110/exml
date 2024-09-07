@@ -49,7 +49,8 @@ use crate::{
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
     private::{
-        buf::xml_buf_create_size, enc::xml_char_enc_output, save::xmlBufAttrSerializeTxtContent,
+        buf::xml_buf_create_size, enc::xml_char_enc_output,
+        save::xml_buf_attr_serialize_txt_content,
     },
 };
 
@@ -2432,7 +2433,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteString(
                 }
                 XmlTextWriterState::XmlTextwriterAttribute => {
                     buf = null_mut();
-                    xmlBufAttrSerializeTxtContent(
+                    xml_buf_attr_serialize_txt_content(
                         (*(*writer).out).buffer,
                         (*writer).doc,
                         null_mut(),

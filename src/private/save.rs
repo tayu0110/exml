@@ -31,7 +31,7 @@ use super::buf::xml_buf_add;
  *
  * Serialize text attribute values to an xmlBufPtr
  */
-pub(crate) unsafe extern "C" fn xmlBufAttrSerializeTxtContent(
+pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
     buf: XmlBufPtr,
     doc: XmlDocPtr,
     attr: XmlAttrPtr,
@@ -114,25 +114,25 @@ pub(crate) unsafe extern "C" fn xmlBufAttrSerializeTxtContent(
                 base = cur;
                 continue;
             } else if *cur < 0xE0 {
-                val = (*cur.add(0)) as i32 & 0x1F;
+                val = *cur.add(0) as i32 & 0x1F;
                 val <<= 6;
-                val |= (*cur.add(1)) as i32 & 0x3F;
+                val |= *cur.add(1) as i32 & 0x3F;
                 l = 2;
             } else if *cur < 0xF0 && *cur.add(2) != 0 {
-                val = (*cur.add(0)) as i32 & 0x0F;
+                val = *cur.add(0) as i32 & 0x0F;
                 val <<= 6;
-                val |= (*cur.add(1)) as i32 & 0x3F;
+                val |= *cur.add(1) as i32 & 0x3F;
                 val <<= 6;
-                val |= (*cur.add(2)) as i32 & 0x3F;
+                val |= *cur.add(2) as i32 & 0x3F;
                 l = 3;
             } else if *cur < 0xF8 && *cur.add(2) != 0 && *cur.add(3) != 0 {
-                val = (*cur.add(0)) as i32 & 0x07;
+                val = *cur.add(0) as i32 & 0x07;
                 val <<= 6;
-                val |= (*cur.add(1)) as i32 & 0x3F;
+                val |= *cur.add(1) as i32 & 0x3F;
                 val <<= 6;
-                val |= (*cur.add(2)) as i32 & 0x3F;
+                val |= *cur.add(2) as i32 & 0x3F;
                 val <<= 6;
-                val |= (*cur.add(3)) as i32 & 0x3F;
+                val |= *cur.add(3) as i32 & 0x3F;
                 l = 4;
             }
             if l == 1 || !IS_CHAR!(val) {
@@ -172,7 +172,10 @@ pub(crate) unsafe extern "C" fn xmlBufAttrSerializeTxtContent(
  * Dump a list of local Namespace definitions.
  * Should be called in the context of attributes dumps.
  */
-pub(crate) unsafe extern "C" fn xmlNsListDumpOutput(buf: XmlOutputBufferPtr, mut cur: XmlNsPtr) {
+pub(crate) unsafe extern "C" fn xml_ns_list_dump_output(
+    buf: XmlOutputBufferPtr,
+    mut cur: XmlNsPtr,
+) {
     while !cur.is_null() {
         xmlNsDumpOutput(buf, cur, null_mut());
         cur = (*cur).next.load(Ordering::Relaxed);

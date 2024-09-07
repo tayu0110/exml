@@ -9344,7 +9344,7 @@ pub unsafe extern "C" fn xmlAttrSerializeTxtContent(
     attr: XmlAttrPtr,
     string: *const XmlChar,
 ) {
-    use crate::private::save::xmlBufAttrSerializeTxtContent;
+    use crate::private::save::xml_buf_attr_serialize_txt_content;
 
     if buf.is_null() || string.is_null() {
         return;
@@ -9353,7 +9353,7 @@ pub unsafe extern "C" fn xmlAttrSerializeTxtContent(
     if buffer.is_null() {
         return;
     }
-    xmlBufAttrSerializeTxtContent(buffer, doc, attr, string);
+    xml_buf_attr_serialize_txt_content(buffer, doc, attr, string);
     xml_buf_back_to_buffer(buffer);
 }
 

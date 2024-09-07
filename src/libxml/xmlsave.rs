@@ -53,7 +53,7 @@ use crate::{
         },
         enc::xml_char_enc_output,
         error::__xml_simple_error,
-        save::xmlBufAttrSerializeTxtContent,
+        save::xml_buf_attr_serialize_txt_content,
     },
     xml_generic_error, IS_BYTE_CHAR, IS_CHAR,
 };
@@ -670,7 +670,7 @@ unsafe extern "C" fn xmlAttrSerializeContent(buf: XmlOutputBufferPtr, attr: XmlA
     while !children.is_null() {
         match (*children).typ {
             XmlElementType::XmlTextNode => {
-                xmlBufAttrSerializeTxtContent(
+                xml_buf_attr_serialize_txt_content(
                     (*buf).buffer,
                     (*attr).doc,
                     attr,
