@@ -62,11 +62,11 @@ use exml::{
             XmlSchematronValidCtxtPtr, XmlSchematronValidOptions,
         },
         tree::{
-            xmlCopyDoc, xmlDocDump, xmlDocDumpFormatMemory, xmlDocDumpFormatMemoryEnc,
-            xmlDocDumpMemory, xmlDocDumpMemoryEnc, xmlDocSetRootElement, xmlGetIntSubset,
-            xmlNewDoc, xmlNewDocNode, xmlNodeSetContent, xmlSaveFile, xmlSaveFileEnc,
-            xmlSaveFormatFile, xmlSaveFormatFileEnc, xmlSetCompressMode, xml_free_doc,
-            xml_free_dtd, xml_unlink_node, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+            xml_copy_doc, xml_doc_dump, xml_doc_dump_format_memory, xml_doc_dump_format_memory_enc,
+            xml_doc_dump_memory, xml_doc_dump_memory_enc, xml_doc_set_root_element, xml_free_doc,
+            xml_free_dtd, xml_get_int_subset, xml_new_doc, xml_new_doc_node, xml_node_set_content,
+            xml_save_file, xml_save_file_enc, xml_save_format_file, xml_save_format_file_enc,
+            xml_set_compress_mode, xml_unlink_node, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
             XmlEnumerationPtr, XmlNodePtr,
         },
         valid::{
@@ -1788,7 +1788,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
 unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
     use exml::libxml::{
         pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-        tree::xmlGetNodePath,
+        tree::xml_get_node_path,
         xmlreader::{
             xml_text_reader_const_local_name, xml_text_reader_const_name,
             xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
@@ -1840,7 +1840,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
             if is_match != 0 {
                 #[cfg(any(feature = "tree", feature = "libxml_debug"))]
                 {
-                    path = xmlGetNodePath(xml_text_reader_current_node(reader));
+                    path = xml_get_node_path(xml_text_reader_current_node(reader));
                     println!(
                         "Node {} matches pattern {}",
                         CStr::from_ptr(path as _).to_string_lossy(),
@@ -1873,7 +1873,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                 } else if ret != is_match {
                     #[cfg(any(feature = "tree", feature = "libxml_debug"))]
                     if path.is_null() {
-                        path = xmlGetNodePath(xml_text_reader_current_node(reader));
+                        path = xml_get_node_path(xml_text_reader_current_node(reader));
                     }
                     eprintln!("xmlPatternMatch and xmlStreamPush disagree");
                     if !path.is_null() {
@@ -2237,7 +2237,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
 #[cfg(feature = "xpath")]
 unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     use exml::libxml::{
-        tree::{xmlNodeDumpOutput, XmlNodePtr},
+        tree::{xml_node_dump_output, XmlNodePtr},
         xml_io::{
             xmlOutputBufferClose, xmlOutputBufferCreateFile, xmlOutputBufferWrite,
             XmlOutputBufferPtr,
@@ -2268,7 +2268,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     }
                     for i in 0..(*(*cur).nodesetval).node_nr {
                         node = *(*(*cur).nodesetval).node_tab.add(i as usize);
-                        xmlNodeDumpOutput(buf, null_mut(), node, 0, 0, null_mut());
+                        xml_node_dump_output(buf, null_mut(), node, 0, 0, null_mut());
                         xmlOutputBufferWrite(buf, 1, c"\n".as_ptr());
                     }
                     xmlOutputBufferClose(buf);
@@ -2365,10 +2365,10 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         #[cfg(feature = "tree")]
         {
             if GENERATE != 0 {
-                doc = xmlNewDoc(c"1.0".as_ptr() as _);
-                let n = xmlNewDocNode(doc, null_mut(), c"info".as_ptr() as _, null_mut());
-                xmlNodeSetContent(n, c"abc".as_ptr() as _);
-                xmlDocSetRootElement(doc, n);
+                doc = xml_new_doc(c"1.0".as_ptr() as _);
+                let n = xml_new_doc_node(doc, null_mut(), c"info".as_ptr() as _, null_mut());
+                xml_node_set_content(n, c"abc".as_ptr() as _);
+                xml_doc_set_root_element(doc, n);
             }
         }
     } else if cfg!(feature = "html") && cfg!(feature = "push") && HTML != 0 && PUSH != 0 {
@@ -2652,7 +2652,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
      * Remove DOCTYPE nodes
      */
     if DROPDTD != 0 {
-        let dtd: XmlDtdPtr = xmlGetIntSubset(doc);
+        let dtd: XmlDtdPtr = xml_get_int_subset(doc);
         if !dtd.is_null() {
             xml_unlink_node(dtd as XmlNodePtr);
             (*doc).int_subset = null_mut();
@@ -2700,7 +2700,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         if TIMING != 0 {
             start_timer();
         }
-        doc = xmlCopyDoc(doc, 1);
+        doc = xml_copy_doc(doc, 1);
         if TIMING != 0 {
             end_timer!("Copying");
         }
@@ -2893,7 +2893,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
 
                 if let Some(encoding) = ENCODING.lock().unwrap().as_ref() {
                     if FORMAT == 1 {
-                        xmlDocDumpFormatMemoryEnc(
+                        xml_doc_dump_format_memory_enc(
                             doc,
                             addr_of_mut!(result),
                             addr_of_mut!(len),
@@ -2901,7 +2901,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             1,
                         );
                     } else {
-                        xmlDocDumpMemoryEnc(
+                        xml_doc_dump_memory_enc(
                             doc,
                             addr_of_mut!(result),
                             addr_of_mut!(len),
@@ -2909,9 +2909,9 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         );
                     }
                 } else if FORMAT == 1 {
-                    xmlDocDumpFormatMemory(doc, addr_of_mut!(result), addr_of_mut!(len), 1);
+                    xml_doc_dump_format_memory(doc, addr_of_mut!(result), addr_of_mut!(len), 1);
                 } else {
-                    xmlDocDumpMemory(doc, addr_of_mut!(result), addr_of_mut!(len));
+                    xml_doc_dump_memory(doc, addr_of_mut!(result), addr_of_mut!(len));
                 }
                 if result.is_null() {
                     eprintln!("Failed to save");
@@ -2928,7 +2928,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                     .unwrap()
                     .as_ref()
                     .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                xmlSaveFile(o, doc);
+                xml_save_file(o, doc);
             } else if OLDOUT != 0 {
                 if let Some(encoding) = ENCODING.lock().unwrap().as_ref() {
                     if FORMAT == 1 {
@@ -2937,14 +2937,14 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             .unwrap()
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        ret = xmlSaveFormatFileEnc(o, doc, encoding.as_ptr(), 1);
+                        ret = xml_save_format_file_enc(o, doc, encoding.as_ptr(), 1);
                     } else {
                         let o = OUTPUT
                             .lock()
                             .unwrap()
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        ret = xmlSaveFileEnc(o, doc, encoding.as_ptr());
+                        ret = xml_save_file_enc(o, doc, encoding.as_ptr());
                     }
                     if ret < 0 {
                         let lock = OUTPUT.lock().unwrap();
@@ -2958,7 +2958,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         .unwrap()
                         .as_ref()
                         .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                    ret = xmlSaveFormatFile(o, doc, 1);
+                    ret = xml_save_format_file(o, doc, 1);
                     if ret < 0 {
                         let lock = OUTPUT.lock().unwrap();
                         let o = lock.as_ref().map_or(c"-", |o| o.as_c_str());
@@ -2972,7 +2972,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         .as_ref()
                         .map_or(stdout, |o| fopen(o.as_ptr(), c"wb".as_ptr()));
                     if !out.is_null() {
-                        if xmlDocDump(out, doc) < 0 {
+                        if xml_doc_dump(out, doc) < 0 {
                             PROGRESULT = XmllintReturnCode::ErrOut;
                         }
 
@@ -3893,7 +3893,7 @@ fn main() {
                 && (arg == "-compress" || arg == "--compress")
             {
                 COMPRESS += 1;
-                xmlSetCompressMode(9);
+                xml_set_compress_mode(9);
             } else if arg == "-nowarning" || arg == "--nowarning" {
                 OPTIONS |= XmlParserOption::XmlParseNowarning as i32;
                 OPTIONS &= !(XmlParserOption::XmlParsePedantic as i32);

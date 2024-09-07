@@ -43,10 +43,10 @@ use super::{
     parser_internals::{input_push, xml_new_input_stream, XML_MAX_NAMELEN},
     threads::{xmlFreeRMutex, xmlNewRMutex, xmlRMutexLock, xmlRMutexUnlock, XmlRMutex},
     tree::{
-        xmlAddChild, xmlFreeNs, xmlNewDoc, xmlNewDocNode, xmlNewNs, xmlSaveFormatFileTo,
-        xmlSearchNsByHref, xmlSetNsProp, xmlSetProp, xml_doc_get_root_element, xml_free_doc,
-        xml_get_ns_prop, xml_get_prop, xml_new_dtd, xml_node_get_base, XmlDocPtr, XmlDtdPtr,
-        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_ns, xml_get_ns_prop,
+        xml_get_prop, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns, xml_node_get_base,
+        xml_save_format_file_to, xml_search_ns_by_href, xml_set_ns_prop, xml_set_prop, XmlDocPtr,
+        XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::xml_canonic_path,
     xml_io::{
@@ -3175,80 +3175,80 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
                     }
                 }
                 XmlCatalogEntryType::XmlCataNextCatalog => {
-                    node = xmlNewDocNode(doc, ns, c"nextCatalog".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"catalog".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"nextCatalog".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"catalog".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataNone => {}
                 XmlCatalogEntryType::XmlCataGroup => {
-                    node = xmlNewDocNode(doc, ns, c"group".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"id".as_ptr() as _, (*cur).name);
+                    node = xml_new_doc_node(doc, ns, c"group".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"id".as_ptr() as _, (*cur).name);
                     if !(*cur).value.is_null() {
                         let xns: XmlNsPtr =
-                            xmlSearchNsByHref(doc, node, XML_XML_NAMESPACE.as_ptr() as _);
+                            xml_search_ns_by_href(doc, node, XML_XML_NAMESPACE.as_ptr() as _);
                         if !xns.is_null() {
-                            xmlSetNsProp(node, xns, c"base".as_ptr() as _, (*cur).value);
+                            xml_set_ns_prop(node, xns, c"base".as_ptr() as _, (*cur).value);
                         }
                     }
                     match (*cur).prefer {
                         XmlCatalogPrefer::None => {}
                         XmlCatalogPrefer::Public => {
-                            xmlSetProp(node, c"prefer".as_ptr() as _, c"public".as_ptr() as _);
+                            xml_set_prop(node, c"prefer".as_ptr() as _, c"public".as_ptr() as _);
                         }
                         XmlCatalogPrefer::System => {
-                            xmlSetProp(node, c"prefer".as_ptr() as _, c"system".as_ptr() as _);
+                            xml_set_prop(node, c"prefer".as_ptr() as _, c"system".as_ptr() as _);
                         }
                     }
                     xml_dump_xml_catalog_node((*cur).next, node, doc, ns, cur);
-                    xmlAddChild(catalog, node);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataPublic => {
-                    node = xmlNewDocNode(doc, ns, c"public".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"publicId".as_ptr() as _, (*cur).name);
-                    xmlSetProp(node, c"uri".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"public".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"publicId".as_ptr() as _, (*cur).name);
+                    xml_set_prop(node, c"uri".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataSystem => {
-                    node = xmlNewDocNode(doc, ns, c"system".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"systemId".as_ptr() as _, (*cur).name);
-                    xmlSetProp(node, c"uri".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"system".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"systemId".as_ptr() as _, (*cur).name);
+                    xml_set_prop(node, c"uri".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataRewriteSystem => {
-                    node = xmlNewDocNode(doc, ns, c"rewriteSystem".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"systemIdStartString".as_ptr() as _, (*cur).name);
-                    xmlSetProp(node, c"rewritePrefix".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"rewriteSystem".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"systemIdStartString".as_ptr() as _, (*cur).name);
+                    xml_set_prop(node, c"rewritePrefix".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataDelegatePublic => {
-                    node = xmlNewDocNode(doc, ns, c"delegatePublic".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"publicIdStartString".as_ptr() as _, (*cur).name);
-                    xmlSetProp(node, c"catalog".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"delegatePublic".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"publicIdStartString".as_ptr() as _, (*cur).name);
+                    xml_set_prop(node, c"catalog".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataDelegateSystem => {
-                    node = xmlNewDocNode(doc, ns, c"delegateSystem".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"systemIdStartString".as_ptr() as _, (*cur).name);
-                    xmlSetProp(node, c"catalog".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"delegateSystem".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"systemIdStartString".as_ptr() as _, (*cur).name);
+                    xml_set_prop(node, c"catalog".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataUri => {
-                    node = xmlNewDocNode(doc, ns, c"uri".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"name".as_ptr() as _, (*cur).name);
-                    xmlSetProp(node, c"uri".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"uri".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"name".as_ptr() as _, (*cur).name);
+                    xml_set_prop(node, c"uri".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataRewriteUri => {
-                    node = xmlNewDocNode(doc, ns, c"rewriteURI".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"uriStartString".as_ptr() as _, (*cur).name);
-                    xmlSetProp(node, c"rewritePrefix".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"rewriteURI".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"uriStartString".as_ptr() as _, (*cur).name);
+                    xml_set_prop(node, c"rewritePrefix".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::XmlCataDelegateUri => {
-                    node = xmlNewDocNode(doc, ns, c"delegateURI".as_ptr() as _, null_mut());
-                    xmlSetProp(node, c"uriStartString".as_ptr() as _, (*cur).name);
-                    xmlSetProp(node, c"catalog".as_ptr() as _, (*cur).value);
-                    xmlAddChild(catalog, node);
+                    node = xml_new_doc_node(doc, ns, c"delegateURI".as_ptr() as _, null_mut());
+                    xml_set_prop(node, c"uriStartString".as_ptr() as _, (*cur).name);
+                    xml_set_prop(node, c"catalog".as_ptr() as _, (*cur).value);
+                    xml_add_child(catalog, node);
                 }
                 XmlCatalogEntryType::SgmlCataSystem
                 | XmlCatalogEntryType::SgmlCataPublic
@@ -3273,7 +3273,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
     /*
      * Rebuild a catalog
      */
-    let doc: XmlDocPtr = xmlNewDoc(null_mut());
+    let doc: XmlDocPtr = xml_new_doc(null_mut());
     if doc.is_null() {
         return -1;
     }
@@ -3284,21 +3284,21 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
         c"http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd".as_ptr() as _,
     );
 
-    xmlAddChild(doc as _, dtd as _);
+    xml_add_child(doc as _, dtd as _);
 
-    let ns: XmlNsPtr = xmlNewNs(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, null_mut());
+    let ns: XmlNsPtr = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, null_mut());
     if ns.is_null() {
         xml_free_doc(doc);
         return -1;
     }
-    let catalog: XmlNodePtr = xmlNewDocNode(doc, ns, c"catalog".as_ptr() as _, null_mut());
+    let catalog: XmlNodePtr = xml_new_doc_node(doc, ns, c"catalog".as_ptr() as _, null_mut());
     if catalog.is_null() {
-        xmlFreeNs(ns);
+        xml_free_ns(ns);
         xml_free_doc(doc);
         return -1;
     }
     (*catalog).ns_def = ns;
-    xmlAddChild(doc as _, catalog);
+    xml_add_child(doc as _, catalog);
 
     xml_dump_xml_catalog_node(catal, catalog, doc, ns, null_mut());
 
@@ -3310,7 +3310,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
         xml_free_doc(doc);
         return -1;
     }
-    let ret: c_int = xmlSaveFormatFileTo(buf, doc, null_mut(), 1);
+    let ret: c_int = xml_save_format_file_to(buf, doc, null_mut(), 1);
 
     /*
      * Free it

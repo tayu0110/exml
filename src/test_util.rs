@@ -36,13 +36,12 @@ use crate::libxml::{
     schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
     schematron::XmlSchematronValidCtxtPtr,
     tree::{
-        xmlFreeNode, xmlNewDoc, xmlNewPI, xmlNewText, xmlSetProp, xml_buffer_create,
-        xml_buffer_create_static, xml_buffer_free, xml_free_doc, xml_new_dtd, xml_unlink_node,
-        XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlBuf,
-        XmlBuffer, XmlBufferAllocationScheme, XmlBufferPtr, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr,
-        XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementContentType, XmlElementPtr,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr,
-        XmlNs, XmlNsPtr,
+        xml_buffer_create, xml_buffer_create_static, xml_buffer_free, xml_free_doc, xml_free_node,
+        xml_new_doc, xml_new_dtd, xml_new_pi, xml_new_text, xml_set_prop, xml_unlink_node, XmlAttr,
+        XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlBuf, XmlBuffer,
+        XmlBufferAllocationScheme, XmlBufferPtr, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr, XmlDtd,
+        XmlDtdPtr, XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
+        XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNs, XmlNsPtr,
     },
     uri::XmlURIPtr,
     valid::{
@@ -950,7 +949,7 @@ pub(crate) unsafe extern "C" fn des_xml_dtd_ptr(no: c_int, val: XmlDtdPtr, _nr: 
         free_api_doc();
     } else if !val.is_null() {
         xml_unlink_node(val as XmlNodePtr);
-        xmlFreeNode(val as XmlNodePtr);
+        xml_free_node(val as XmlNodePtr);
     }
 }
 
@@ -1027,7 +1026,7 @@ unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
         snprintf(name.as_mut_ptr() as _, 20, c"foo%d".as_ptr() as _, NR);
         NR += 1;
         API_ATTR.store(
-            xmlSetProp(
+            xml_set_prop(
                 API_ROOT.load(Ordering::Relaxed),
                 name.as_ptr() as _,
                 c"bar".as_ptr() as _,
@@ -1052,10 +1051,10 @@ pub(crate) unsafe extern "C" fn des_xml_attr_ptr(no: c_int, _val: XmlAttrPtr, _n
 
 pub(crate) unsafe extern "C" fn gen_xml_node_ptr_in(no: c_int, _nr: c_int) -> XmlNodePtr {
     if no == 0 {
-        return xmlNewPI(c"test".as_ptr() as _, null_mut());
+        return xml_new_pi(c"test".as_ptr() as _, null_mut());
     }
     if no == 0 {
-        return xmlNewText(c"text".as_ptr() as _);
+        return xml_new_text(c"text".as_ptr() as _);
     }
     null_mut()
 }
@@ -1226,13 +1225,13 @@ pub(crate) unsafe extern "C" fn desret_xml_node_ptr(val: XmlNodePtr) {
         && val != API_DOC.load(Ordering::Relaxed) as XmlNodePtr
     {
         xml_unlink_node(val);
-        xmlFreeNode(val);
+        xml_free_node(val);
     }
 }
 pub(crate) unsafe extern "C" fn desret_xml_attr_ptr(val: XmlAttrPtr) {
     if !val.is_null() {
         xml_unlink_node(val as XmlNodePtr);
-        xmlFreeNode(val as XmlNodePtr);
+        xml_free_node(val as XmlNodePtr);
     }
 }
 
@@ -1672,7 +1671,7 @@ pub(crate) unsafe extern "C" fn desret_xml_parser_input_ptr(val: XmlParserInputP
 pub(crate) unsafe extern "C" fn desret_xml_entity_ptr(val: XmlEntityPtr) {
     if !val.is_null() {
         xml_unlink_node(val as XmlNodePtr);
-        xmlFreeNode(val as XmlNodePtr);
+        xml_free_node(val as XmlNodePtr);
     }
 }
 
@@ -1749,7 +1748,7 @@ unsafe extern "C" fn free_api_doc() {
 
 pub(crate) unsafe extern "C" fn gen_xml_node_ptr(no: c_int, _nr: c_int) -> XmlNodePtr {
     if no == 0 {
-        return xmlNewPI(c"test".as_ptr() as _, null_mut());
+        return xml_new_pi(c"test".as_ptr() as _, null_mut());
     }
     if no == 1 {
         return get_api_root();
@@ -1763,7 +1762,7 @@ pub(crate) unsafe extern "C" fn des_xml_node_ptr(no: c_int, val: XmlNodePtr, _nr
         free_api_doc();
     } else if !val.is_null() {
         xml_unlink_node(val);
-        xmlFreeNode(val);
+        xml_free_node(val);
     }
 }
 
@@ -2035,7 +2034,7 @@ pub(crate) unsafe extern "C" fn des_xml_output_buffer_ptr(
 
 pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: c_int, _nr: c_int) -> XmlDocPtr {
     if no == 0 {
-        return xmlNewDoc(c"1.0".as_ptr() as _);
+        return xml_new_doc(c"1.0".as_ptr() as _);
     }
     if no == 1 {
         return xmlReadMemory(

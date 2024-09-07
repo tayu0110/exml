@@ -43,9 +43,9 @@ use crate::{
             XmlStreamCtxtPtr,
         },
         tree::{
-            xmlGetNsList, xmlNodeGetContent, xmlNodeGetLang, xml_buf_content, xml_build_qname,
-            xml_doc_get_root_element, XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
-            XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+            xml_buf_content, xml_build_qname, xml_doc_get_root_element, xml_get_ns_list,
+            xml_node_get_content, xml_node_get_lang, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
+            XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
         },
         valid::xml_get_id,
         xmlerror::{xmlResetError, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
@@ -10742,10 +10742,12 @@ unsafe extern "C" fn xml_xpath_equal_node_sets(
                 }
             } else {
                 if (*values1.add(i as usize)).is_null() {
-                    *values1.add(i as usize) = xmlNodeGetContent(*(*ns1).node_tab.add(i as usize));
+                    *values1.add(i as usize) =
+                        xml_node_get_content(*(*ns1).node_tab.add(i as usize));
                 }
                 if (*values2.add(j as usize)).is_null() {
-                    *values2.add(j as usize) = xmlNodeGetContent(*(*ns2).node_tab.add(j as usize));
+                    *values2.add(j as usize) =
+                        xml_node_get_content(*(*ns2).node_tab.add(j as usize));
                 }
                 ret = xml_str_equal(*values1.add(i as usize), *values2.add(j as usize)) ^ neq;
                 if ret != 0 {
@@ -10900,7 +10902,7 @@ unsafe extern "C" fn xml_xpath_equal_node_set_string(
     let hash: c_uint = xml_xpath_string_hash(str);
     for i in 0..(*ns).node_nr {
         if xml_xpath_node_val_hash(*(*ns).node_tab.add(i as usize)) == hash {
-            str2 = xmlNodeGetContent(*(*ns).node_tab.add(i as usize));
+            str2 = xml_node_get_content(*(*ns).node_tab.add(i as usize));
             if !str2.is_null() && xml_str_equal(str, str2) != 0 {
                 xml_free(str2 as _);
                 if neq != 0 {
@@ -12426,7 +12428,7 @@ pub unsafe extern "C" fn xml_xpath_next_namespace(
             xml_free((*(*ctxt).context).tmp_ns_list as _);
         }
         (*(*ctxt).context).tmp_ns_list =
-            xmlGetNsList((*(*ctxt).context).doc, (*(*ctxt).context).node);
+            xml_get_ns_list((*(*ctxt).context).doc, (*(*ctxt).context).node);
         (*(*ctxt).context).tmp_ns_nr = 0;
         if !(*(*ctxt).context).tmp_ns_list.is_null() {
             while !(*(*(*ctxt).context)
@@ -13906,7 +13908,7 @@ pub unsafe extern "C" fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr,
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathString);
     let val = value_pop(ctxt);
     let lang: *const XmlChar = (*val).stringval;
-    let the_lang = xmlNodeGetLang((*(*ctxt).context).node);
+    let the_lang = xml_node_get_lang((*(*ctxt).context).node);
     'not_equal: {
         if !the_lang.is_null() && !lang.is_null() {
             let mut i = 0;
@@ -13974,7 +13976,7 @@ pub unsafe extern "C" fn xml_xpath_number_function(ctxt: XmlXPathParserContextPt
         if (*(*ctxt).context).node.is_null() {
             value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, 0.0));
         } else {
-            let content: *mut XmlChar = xmlNodeGetContent((*(*ctxt).context).node);
+            let content: *mut XmlChar = xml_node_get_content((*(*ctxt).context).node);
 
             res = xml_xpath_string_eval_number(content);
             value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, res));

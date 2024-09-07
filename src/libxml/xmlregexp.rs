@@ -18,7 +18,7 @@ use crate::{
         dict::{xmlDictLookup, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser_internals::xml_string_current_char,
-        tree::{xmlBufferWriteCHAR, xmlBufferWriteChar, XmlBufferPtr},
+        tree::{xml_buffer_write_xml_char, xml_buffer_write_char, XmlBufferPtr},
         xmlautomata::{
             xml_free_automata, xml_new_automata, XmlAutomata, XmlAutomataPtr, XmlAutomataState,
         },
@@ -8296,14 +8296,14 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, gl
         return;
     }
     if glob != 0 {
-        xmlBufferWriteChar(buf, c"(".as_ptr());
+        xml_buffer_write_char(buf, c"(".as_ptr());
     }
     if (*expr).typ == XmlExpNodeType::XmlExpEmpty as u8 {
-        xmlBufferWriteChar(buf, c"empty".as_ptr());
+        xml_buffer_write_char(buf, c"empty".as_ptr());
     } else if (*expr).typ == XmlExpNodeType::XmlExpForbid as u8 {
-        xmlBufferWriteChar(buf, c"forbidden".as_ptr());
+        xml_buffer_write_char(buf, c"forbidden".as_ptr());
     } else if (*expr).typ == XmlExpNodeType::XmlExpAtom as u8 {
-        xmlBufferWriteCHAR(buf, (*expr).field.f_str);
+        xml_buffer_write_xml_char(buf, (*expr).field.f_str);
     } else if (*expr).typ == XmlExpNodeType::XmlExpSeq as u8 {
         c = (*expr).exp_left;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
@@ -8312,7 +8312,7 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, gl
         } else {
             xml_exp_dump_int(buf, c, 0);
         }
-        xmlBufferWriteChar(buf, c" , ".as_ptr());
+        xml_buffer_write_char(buf, c" , ".as_ptr());
         c = (*expr).field.children.f_right;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
         {
@@ -8328,7 +8328,7 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, gl
         } else {
             xml_exp_dump_int(buf, c, 0);
         }
-        xmlBufferWriteChar(buf, c" | ".as_ptr());
+        xml_buffer_write_char(buf, c" | ".as_ptr());
         c = (*expr).field.children.f_right;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
         {
@@ -8379,13 +8379,13 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, gl
             );
         }
         rep[39] = 0;
-        xmlBufferWriteChar(buf, rep.as_ptr());
+        xml_buffer_write_char(buf, rep.as_ptr());
     } else {
         eprintln!("Error in tree");
         // fprintf(stderr, "Error in tree\n");
     }
     if glob != 0 {
-        xmlBufferWriteChar(buf, c")".as_ptr());
+        xml_buffer_write_char(buf, c")".as_ptr());
     }
 }
 

@@ -55,7 +55,7 @@ macro_rules! __xml_raise_error {
                 XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC,
             },
             tree::{
-                XmlElementType, xmlGetLineNo, xml_get_prop, XmlNodePtr,
+                XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr,
             },
             xmlerror::{
                 xmlCopyError, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr, xmlGenericErrorDefaultFunc, XmlGenericErrorFunc,
@@ -181,7 +181,7 @@ macro_rules! __xml_raise_error {
                         line = (*node).line as _;
                     }
                     if line == 0 || line == 65535 {
-                        line = xmlGetLineNo(node) as _;
+                        line = xml_get_line_no(node) as _;
                     }
                 }
 

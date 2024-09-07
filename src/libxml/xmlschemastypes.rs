@@ -28,7 +28,7 @@ use crate::{
             XML_SCHEMAS_TYPE_VARIETY_ATOMIC, XML_SCHEMAS_TYPE_VARIETY_LIST,
         },
         tree::{
-            xmlSearchNs, xml_split_qname2, xml_validate_name, xml_validate_ncname,
+            xml_search_ns, xml_split_qname2, xml_validate_name, xml_validate_ncname,
             xml_validate_nmtoken, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlElementType,
             XmlIDPtr, XmlNodePtr, XmlNsPtr,
         },
@@ -3127,7 +3127,7 @@ unsafe extern "C" fn xmlSchemaValAtomicType(
                                     let mut prefix: *mut XmlChar = null_mut();
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                    let ns: XmlNsPtr = xmlSearchNs((*node).doc, node, prefix);
+                                    let ns: XmlNsPtr = xml_search_ns((*node).doc, node, prefix);
                                     if ns.is_null() && !prefix.is_null() {
                                         xml_free(prefix as _);
                                         if !local.is_null() {
@@ -3343,7 +3343,7 @@ unsafe extern "C" fn xmlSchemaValAtomicType(
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
                                     if !prefix.is_null() {
-                                        let ns: XmlNsPtr = xmlSearchNs((*node).doc, node, prefix);
+                                        let ns: XmlNsPtr = xml_search_ns((*node).doc, node, prefix);
                                         if ns.is_null() {
                                             ret = 1;
                                         } else if !val.is_null() {

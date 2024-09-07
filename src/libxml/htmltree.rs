@@ -17,9 +17,10 @@ use super::{
     globals::{xmlRegisterNodeDefaultValue, xml_malloc},
     htmlparser::{html_err_memory, HtmlDocPtr, HtmlNodePtr},
     tree::{
-        xmlAddChild, xmlAddPrevSibling, xmlFreeNode, xmlNewDocNode, xmlNewProp, xmlSetProp,
-        xml_create_int_subset, xml_unlink_node, XmlAttrPtr, XmlBufPtr, XmlBufferPtr, XmlDoc,
-        XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
+        xml_add_child, xml_add_prev_sibling, xml_create_int_subset, xml_free_node,
+        xml_new_doc_node, xml_new_prop, xml_set_prop, xml_unlink_node, XmlAttrPtr, XmlBufPtr,
+        XmlBufferPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
+        __XML_REGISTER_CALLBACKS,
     },
     xml_io::XmlOutputBufferPtr,
     xmlstring::{xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strstr, XmlChar},
@@ -372,28 +373,28 @@ pub unsafe extern "C" fn htmlSetMetaEncoding(doc: HtmlDocPtr, encoding: *const X
                  * Create a new Meta element with the right attributes
                  */
 
-                meta = xmlNewDocNode(doc, null_mut(), c"meta".as_ptr() as _, null_mut());
+                meta = xml_new_doc_node(doc, null_mut(), c"meta".as_ptr() as _, null_mut());
                 if (*head).children.is_null() {
-                    xmlAddChild(head, meta);
+                    xml_add_child(head, meta);
                 } else {
-                    xmlAddPrevSibling((*head).children, meta);
+                    xml_add_prev_sibling((*head).children, meta);
                 }
-                xmlNewProp(
+                xml_new_prop(
                     meta,
                     c"http-equiv".as_ptr() as _,
                     c"Content-Type".as_ptr() as _,
                 );
-                xmlNewProp(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
+                xml_new_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
             }
         } else {
             /* remove the meta tag if NULL is passed */
             if encoding.is_null() {
                 xml_unlink_node(meta);
-                xmlFreeNode(meta);
+                xml_free_node(meta);
             }
             /* change the document only if there is a real encoding change */
             else if xml_strcasestr(content, encoding).is_null() {
-                xmlSetProp(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
+                xml_set_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
             }
         }
 
@@ -1070,7 +1071,7 @@ unsafe extern "C" fn htmlDtdDumpOutput(
 unsafe extern "C" fn htmlAttrDumpOutput(buf: XmlOutputBufferPtr, doc: XmlDocPtr, cur: XmlAttrPtr) {
     use crate::{
         libxml::{
-            globals::xml_free, tree::xmlNodeListGetString, uri::xml_uri_escape_str,
+            globals::xml_free, tree::xml_node_list_get_string, uri::xml_uri_escape_str,
             xml_io::xmlOutputBufferWriteString,
         },
         private::buf::xml_buf_write_quoted_string,
@@ -1096,7 +1097,7 @@ unsafe extern "C" fn htmlAttrDumpOutput(buf: XmlOutputBufferPtr, doc: XmlDocPtr,
     }
     xmlOutputBufferWriteString(buf, (*cur).name as _);
     if !(*cur).children.is_null() && htmlIsBooleanAttr((*cur).name as _) == 0 {
-        value = xmlNodeListGetString(doc, (*cur).children, 0);
+        value = xml_node_list_get_string(doc, (*cur).children, 0);
         if !value.is_null() {
             xmlOutputBufferWriteString(buf, c"=".as_ptr() as _);
             if (*cur).ns.is_null()

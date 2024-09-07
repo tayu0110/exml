@@ -37,7 +37,8 @@ use crate::{
         },
         sax2::{xmlSAX2EndElement, xmlSAX2InitDefaultSAXHandler, xmlSAX2StartElement},
         tree::{
-            xmlNewDoc, xmlSetDocCompressMode, xml_free_doc, XmlBufferPtr, XmlDocPtr, XmlNodePtr,
+            xml_free_doc, xml_new_doc, xml_set_doc_compress_mode, XmlBufferPtr, XmlDocPtr,
+            XmlNodePtr,
         },
         uri::xml_canonic_path,
         xml_io::{
@@ -344,7 +345,7 @@ pub unsafe extern "C" fn xmlNewTextWriter(out: XmlOutputBufferPtr) -> XmlTextWri
         return null_mut();
     }
 
-    (*ret).doc = xmlNewDoc(null_mut());
+    (*ret).doc = xml_new_doc(null_mut());
 
     (*ret).no_doc_free = 0;
 
@@ -652,7 +653,7 @@ unsafe extern "C" fn xmlTextWriterStartDocumentCallback(ctx: *mut c_void) {
     } else {
         doc = (*ctxt).my_doc;
         if doc.is_null() {
-            doc = xmlNewDoc((*ctxt).version);
+            doc = xml_new_doc((*ctxt).version);
             (*ctxt).my_doc = doc;
         }
         if !doc.is_null() {
@@ -735,7 +736,7 @@ pub unsafe extern "C" fn xmlNewTextWriterDoc(
      */
     (*ctxt).dict_names = 0;
 
-    (*ctxt).my_doc = xmlNewDoc(XML_DEFAULT_VERSION.as_ptr() as _);
+    (*ctxt).my_doc = xml_new_doc(XML_DEFAULT_VERSION.as_ptr() as _);
     if (*ctxt).my_doc.is_null() {
         xml_free_parser_ctxt(ctxt);
         xml_writer_err_msg(
@@ -758,7 +759,7 @@ pub unsafe extern "C" fn xmlNewTextWriterDoc(
         return null_mut();
     }
 
-    xmlSetDocCompressMode((*ctxt).my_doc, compression);
+    xml_set_doc_compress_mode((*ctxt).my_doc, compression);
 
     if !doc.is_null() {
         *doc = (*ctxt).my_doc;
@@ -841,7 +842,7 @@ pub unsafe extern "C" fn xmlNewTextWriterTree(
     (*ctxt).node = node;
     (*ret).no_doc_free = 1;
 
-    xmlSetDocCompressMode(doc, compression);
+    xml_set_doc_compress_mode(doc, compression);
 
     ret
 }

@@ -37,7 +37,9 @@ use crate::{
 use crate::{
     libxml::{
         globals::xml_realloc,
-        tree::{xmlAddChild, xmlCopyNode, xmlNewText, xmlNewTextLen, xml_add_next_sibling},
+        tree::{
+            xml_add_child, xml_add_next_sibling, xml_copy_node, xml_new_text, xml_new_text_len,
+        },
         xmlstring::{xml_strchr, xml_strncmp},
         xpath::{xml_xpath_cmp_nodes, xml_xpath_object_copy, XmlXPathObject},
         xpath_internals::{

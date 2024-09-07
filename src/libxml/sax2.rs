@@ -49,11 +49,12 @@ use super::{
         xml_switch_encoding, XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
     },
     tree::{
-        xmlAddChild, xmlAddSibling, xmlFreeNode, xmlGetIntSubset, xmlNewCDataBlock, xmlNewCharRef,
-        xmlNewDoc, xmlNewDocComment, xmlNewDocNode, xmlNewDocNodeEatName, xmlNewDocPI,
-        xmlNewDocText, xmlNewNs, xmlNewNsProp, xmlNewNsPropEatName, xmlNewReference, xmlSearchNs,
-        xmlSetNs, xmlStringGetNodeList, xmlStringLenGetNodeList, xmlTextConcat, xml_build_qname,
-        xml_create_int_subset, xml_free_dtd, xml_new_dtd, xml_unlink_node, XmlAttr, XmlAttrPtr,
+        xml_add_child, xml_add_sibling, xml_build_qname, xml_create_int_subset, xml_free_dtd,
+        xml_free_node, xml_get_int_subset, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_doc_node_eat_name, xml_new_doc_pi,
+        xml_new_doc_text, xml_new_dtd, xml_new_ns, xml_new_ns_prop, xml_new_ns_prop_eat_name,
+        xml_new_reference, xml_search_ns, xml_set_ns, xml_string_get_node_list,
+        xml_string_len_get_node_list, xml_text_concat, xml_unlink_node, XmlAttr, XmlAttrPtr,
         XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNotationPtr,
         __XML_REGISTER_CALLBACKS,
@@ -289,7 +290,7 @@ pub unsafe extern "C" fn xmlSAX2InternalSubset(
     if (*ctxt).my_doc.is_null() {
         return;
     }
-    let dtd: XmlDtdPtr = xmlGetIntSubset((*ctxt).my_doc);
+    let dtd: XmlDtdPtr = xml_get_int_subset((*ctxt).my_doc);
     if !dtd.is_null() {
         if (*ctxt).html != 0 {
             return;
@@ -1252,7 +1253,7 @@ pub unsafe extern "C" fn xmlSAX2StartDocument(ctx: *mut c_void) {
             return;
         }
     } else {
-        doc = xmlNewDoc((*ctxt).version);
+        doc = xml_new_doc((*ctxt).version);
         (*ctxt).my_doc = doc;
         if !doc.is_null() {
             (*doc).properties = 0;
@@ -1612,7 +1613,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
         }
 
         /* a default namespace definition */
-        let nsret: XmlNsPtr = xmlNewNs((*ctxt).node, val, null_mut());
+        let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, null_mut());
 
         #[cfg(feature = "valid")]
         {
@@ -1711,7 +1712,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
         }
 
         /* a standard namespace definition */
-        let nsret: XmlNsPtr = xmlNewNs((*ctxt).node, val, name);
+        let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, name);
         xml_free(ns as _);
         #[cfg(feature = "valid")]
         {
@@ -1748,7 +1749,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
     }
 
     if !ns.is_null() {
-        namespace = xmlSearchNs((*ctxt).my_doc, (*ctxt).node, ns);
+        namespace = xml_search_ns((*ctxt).my_doc, (*ctxt).node, ns);
 
         if namespace.is_null() {
             xml_ns_err_msg(
@@ -1801,7 +1802,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
     }
 
     /* !!!!!! <a toto:arg="" xmlns:toto="http://toto.com"> */
-    let ret: XmlAttrPtr = xmlNewNsPropEatName((*ctxt).node, namespace, name, null());
+    let ret: XmlAttrPtr = xml_new_ns_prop_eat_name((*ctxt).node, namespace, name, null());
     if ret.is_null() {
         // goto error;
         if !nval.is_null() {
@@ -1815,7 +1816,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
     if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
         let mut tmp: XmlNodePtr;
 
-        (*ret).children = xmlStringGetNodeList((*ctxt).my_doc, value);
+        (*ret).children = xml_string_get_node_list((*ctxt).my_doc, value);
         tmp = (*ret).children;
         while !tmp.is_null() {
             (*tmp).parent = ret as XmlNodePtr;
@@ -1825,7 +1826,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
             tmp = (*tmp).next;
         }
     } else if !value.is_null() {
-        (*ret).children = xmlNewDocText((*ctxt).my_doc, value);
+        (*ret).children = xml_new_doc_text((*ctxt).my_doc, value);
         (*ret).last = (*ret).children;
         if !(*ret).children.is_null() {
             (*(*ret).children).parent = ret as XmlNodePtr;
@@ -2219,7 +2220,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
      *        attributes parsing, since local namespace can be defined as
      *        an attribute at this level.
      */
-    let ret: XmlNodePtr = xmlNewDocNodeEatName((*ctxt).my_doc, null_mut(), name, null_mut());
+    let ret: XmlNodePtr = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), name, null_mut());
     if ret.is_null() {
         if !prefix.is_null() {
             xml_free(prefix as _);
@@ -2231,7 +2232,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
         // #ifdef DEBUG_SAX_TREE
         // 	xmlGenericError(xmlGenericErrorContext, c"Setting %s as root\n", name);
         // #endif
-        xmlAddChild((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
     } else if parent.is_null() {
         parent = (*(*ctxt).my_doc).children;
     }
@@ -2252,7 +2253,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
     // #endif
     if node_push(ctxt, ret) < 0 {
         xml_unlink_node(ret);
-        xmlFreeNode(ret);
+        xml_free_node(ret);
         if !prefix.is_null() {
             xml_free(prefix as _);
         }
@@ -2268,14 +2269,14 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
             // 	    xmlGenericError(xmlGenericErrorContext,
             // 		    "adding child %s to %s\n", name, (*parent).name);
             // #endif
-            xmlAddChild(parent, ret);
+            xml_add_child(parent, ret);
         } else {
             // #ifdef DEBUG_SAX_TREE
             // 	    xmlGenericError(xmlGenericErrorContext,
             // 		    "adding sibling %s to ", name);
             // 	    xmlDebugDumpOneNode(stderr, parent, 0);
             // #endif
-            xmlAddSibling(parent, ret);
+            xml_add_sibling(parent, ret);
         }
     }
 
@@ -2318,12 +2319,12 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
          * Search the namespace, note that since the attributes have been
          * processed, the local namespaces are available.
          */
-        ns = xmlSearchNs((*ctxt).my_doc, ret, prefix);
+        ns = xml_search_ns((*ctxt).my_doc, ret, prefix);
         if ns.is_null() && !parent.is_null() {
-            ns = xmlSearchNs((*ctxt).my_doc, parent, prefix);
+            ns = xml_search_ns((*ctxt).my_doc, parent, prefix);
         }
         if !prefix.is_null() && ns.is_null() {
-            ns = xmlNewNs(ret, null_mut(), prefix);
+            ns = xml_new_ns(ret, null_mut(), prefix);
             xml_ns_warn_msg(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
@@ -2342,7 +2343,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
             && (*(*ns).href.load(Ordering::Relaxed).add(0) != 0
                 || !(*ns).prefix.load(Ordering::Relaxed).is_null())
         {
-            xmlSetNs(ret, ns);
+            xml_set_ns(ret, ns);
         }
     }
 
@@ -2568,11 +2569,11 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
         }
     } else {
         if (*ctxt).dict_names != 0 {
-            ret = xmlNewDocNodeEatName((*ctxt).my_doc, null_mut(), localname as _, null_mut());
+            ret = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), localname as _, null_mut());
         } else if lname.is_null() {
-            ret = xmlNewDocNode((*ctxt).my_doc, null_mut(), localname, null_mut());
+            ret = xml_new_doc_node((*ctxt).my_doc, null_mut(), localname, null_mut());
         } else {
-            ret = xmlNewDocNodeEatName((*ctxt).my_doc, null_mut(), lname, null_mut());
+            ret = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), lname, null_mut());
         }
         if ret.is_null() {
             xml_sax2_err_memory(ctxt, c"xmlSAX2StartElementNs".as_ptr() as _);
@@ -2588,7 +2589,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
     }
 
     if parent.is_null() {
-        xmlAddChild((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
     }
     /*
      * Build the namespace list
@@ -2599,7 +2600,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
         i += 1;
         uri = *namespaces.add(i as usize);
         i += 1;
-        ns = xmlNewNs(null_mut(), uri, pref);
+        ns = xml_new_ns(null_mut(), uri, pref);
         if !ns.is_null() {
             if last.is_null() {
                 (*ret).ns_def = ns;
@@ -2645,7 +2646,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
      */
     if node_push(ctxt, ret) < 0 {
         xml_unlink_node(ret);
-        xmlFreeNode(ret);
+        xml_free_node(ret);
         return;
     }
 
@@ -2654,9 +2655,9 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
      */
     if !parent.is_null() {
         if matches!((*parent).typ, XmlElementType::XmlElementNode) {
-            xmlAddChild(parent, ret);
+            xml_add_child(parent, ret);
         } else {
-            xmlAddSibling(parent, ret);
+            xml_add_sibling(parent, ret);
         }
     }
 
@@ -2672,12 +2673,12 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
      * Note that, if prefix is NULL, this searches for the default Ns
      */
     if !orig_uri.is_null() && (*ret).ns.is_null() {
-        (*ret).ns = xmlSearchNs((*ctxt).my_doc, parent, prefix);
+        (*ret).ns = xml_search_ns((*ctxt).my_doc, parent, prefix);
         if (*ret).ns.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) != 0 {
-            (*ret).ns = xmlSearchNs((*ctxt).my_doc, ret, prefix);
+            (*ret).ns = xml_search_ns((*ctxt).my_doc, ret, prefix);
         }
         if (*ret).ns.is_null() {
-            ns = xmlNewNs(ret, null_mut(), prefix);
+            ns = xml_new_ns(ret, null_mut(), prefix);
             if ns.is_null() {
                 xml_sax2_err_memory(ctxt, c"xmlSAX2StartElementNs".as_ptr() as _);
                 return;
@@ -2948,7 +2949,7 @@ unsafe extern "C" fn xmlSAX2AttributeNs(
      * Note: if prefix.is_null(), the attribute is not in the default namespace
      */
     if !prefix.is_null() {
-        namespace = xmlSearchNs((*ctxt).my_doc, (*ctxt).node, prefix);
+        namespace = xml_search_ns((*ctxt).my_doc, (*ctxt).node, prefix);
     }
 
     /*
@@ -2991,9 +2992,9 @@ unsafe extern "C" fn xmlSAX2AttributeNs(
         }
     } else {
         if (*ctxt).dict_names != 0 {
-            ret = xmlNewNsPropEatName((*ctxt).node, namespace, localname as _, null_mut());
+            ret = xml_new_ns_prop_eat_name((*ctxt).node, namespace, localname as _, null_mut());
         } else {
-            ret = xmlNewNsProp((*ctxt).node, namespace, localname, null_mut());
+            ret = xml_new_ns_prop((*ctxt).node, namespace, localname, null_mut());
         }
         if ret.is_null() {
             xml_err_memory(ctxt, c"xmlSAX2AttributeNs".as_ptr() as _);
@@ -3018,8 +3019,11 @@ unsafe extern "C" fn xmlSAX2AttributeNs(
                 (*tmp).parent = ret as XmlNodePtr;
             }
         } else {
-            (*ret).children =
-                xmlStringLenGetNodeList((*ctxt).my_doc, value, valueend.offset_from(value) as _);
+            (*ret).children = xml_string_len_get_node_list(
+                (*ctxt).my_doc,
+                value,
+                valueend.offset_from(value) as _,
+            );
             tmp = (*ret).children;
             while !tmp.is_null() {
                 (*tmp).doc = (*ret).doc;
@@ -3273,16 +3277,16 @@ pub unsafe extern "C" fn xmlSAX2Reference(ctx: *mut c_void, name: *const XmlChar
     // 	    "SAX.xmlSAX2Reference(%s)\n", name);
     // #endif
     let ret = if *name.add(0) == b'#' {
-        xmlNewCharRef((*ctxt).my_doc, name)
+        xml_new_char_ref((*ctxt).my_doc, name)
     } else {
-        xmlNewReference((*ctxt).my_doc, name)
+        xml_new_reference((*ctxt).my_doc, name)
     };
     // #ifdef DEBUG_SAX_TREE
     //     xmlGenericError(xmlGenericErrorContext,
     // 	    "add xmlSAX2Reference %s to %s \n", name, (*(*ctxt).node).name);
     // #endif
-    if xmlAddChild((*ctxt).node, ret).is_null() {
-        xmlFreeNode(ret);
+    if xml_add_child((*ctxt).node, ret).is_null() {
+        xml_free_node(ret);
     }
 }
 
@@ -3340,7 +3344,7 @@ unsafe extern "C" fn xmlSAX2Text(
         if matches!(typ, XmlElementType::XmlTextNode) {
             last_child = xmlSAX2TextNode(ctxt, ch, len);
         } else {
-            last_child = xmlNewCDataBlock((*ctxt).my_doc, ch, len);
+            last_child = xml_new_cdata_block((*ctxt).my_doc, ch, len);
         }
         if !last_child.is_null() {
             (*(*ctxt).node).children = last_child;
@@ -3420,7 +3424,7 @@ unsafe extern "C" fn xmlSAX2Text(
             (*ctxt).nodelen += len;
             *(*last_child).content.add((*ctxt).nodelen as usize) = 0;
         } else if coalesce_text != 0 {
-            if xmlTextConcat(last_child, ch, len) != 0 {
+            if xml_text_concat(last_child, ch, len) != 0 {
                 xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
             }
             if !(*(*ctxt).node).children.is_null() {
@@ -3435,10 +3439,10 @@ unsafe extern "C" fn xmlSAX2Text(
                     (*last_child).doc = (*ctxt).my_doc;
                 }
             } else {
-                last_child = xmlNewCDataBlock((*ctxt).my_doc, ch, len);
+                last_child = xml_new_cdata_block((*ctxt).my_doc, ch, len);
             }
             if !last_child.is_null() {
-                xmlAddChild((*ctxt).node, last_child);
+                xml_add_child((*ctxt).node, last_child);
                 if !(*(*ctxt).node).children.is_null() {
                     (*ctxt).nodelen = len;
                     (*ctxt).nodemem = len + 1;
@@ -3510,7 +3514,7 @@ pub unsafe extern "C" fn xmlSAX2ProcessingInstruction(
     // 	    "SAX.xmlSAX2ProcessingInstruction(%s, %s)\n", target, data);
     // #endif
 
-    let ret: XmlNodePtr = xmlNewDocPI((*ctxt).my_doc, target, data);
+    let ret: XmlNodePtr = xml_new_doc_pi((*ctxt).my_doc, target, data);
     if ret.is_null() {
         return;
     }
@@ -3523,10 +3527,10 @@ pub unsafe extern "C" fn xmlSAX2ProcessingInstruction(
         }
     }
     if (*ctxt).in_subset == 1 {
-        xmlAddChild((*(*ctxt).my_doc).int_subset as XmlNodePtr, ret);
+        xml_add_child((*(*ctxt).my_doc).int_subset as XmlNodePtr, ret);
         return;
     } else if (*ctxt).in_subset == 2 {
-        xmlAddChild((*(*ctxt).my_doc).ext_subset as XmlNodePtr, ret);
+        xml_add_child((*(*ctxt).my_doc).ext_subset as XmlNodePtr, ret);
         return;
     }
     if parent.is_null() {
@@ -3534,7 +3538,7 @@ pub unsafe extern "C" fn xmlSAX2ProcessingInstruction(
         // 	    xmlGenericError(xmlGenericErrorContext,
         // 		    "Setting PI %s as root\n", target);
         // #endif
-        xmlAddChild((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
         return;
     }
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
@@ -3542,14 +3546,14 @@ pub unsafe extern "C" fn xmlSAX2ProcessingInstruction(
         // 	xmlGenericError(xmlGenericErrorContext,
         // 		"adding PI %s child to %s\n", target, (*parent).name);
         // #endif
-        xmlAddChild(parent, ret);
+        xml_add_child(parent, ret);
     } else {
         // #ifdef DEBUG_SAX_TREE
         // 	xmlGenericError(xmlGenericErrorContext,
         // 		"adding PI %s sibling to ", target);
         // 	xmlDebugDumpOneNode(stderr, parent, 0);
         // #endif
-        xmlAddSibling(parent, ret);
+        xml_add_sibling(parent, ret);
     }
 }
 
@@ -3570,7 +3574,7 @@ pub unsafe extern "C" fn xmlSAX2Comment(ctx: *mut c_void, value: *const XmlChar)
     // #ifdef DEBUG_SAX
     //     xmlGenericError(xmlGenericErrorContext, c"SAX.xmlSAX2Comment(%s)\n", value);
     // #endif
-    let ret: XmlNodePtr = xmlNewDocComment((*ctxt).my_doc, value);
+    let ret: XmlNodePtr = xml_new_doc_comment((*ctxt).my_doc, value);
     if ret.is_null() {
         return;
     }
@@ -3583,10 +3587,10 @@ pub unsafe extern "C" fn xmlSAX2Comment(ctx: *mut c_void, value: *const XmlChar)
     }
 
     if (*ctxt).in_subset == 1 {
-        xmlAddChild((*(*ctxt).my_doc).int_subset as XmlNodePtr, ret);
+        xml_add_child((*(*ctxt).my_doc).int_subset as XmlNodePtr, ret);
         return;
     } else if (*ctxt).in_subset == 2 {
-        xmlAddChild((*(*ctxt).my_doc).ext_subset as XmlNodePtr, ret);
+        xml_add_child((*(*ctxt).my_doc).ext_subset as XmlNodePtr, ret);
         return;
     }
     if parent.is_null() {
@@ -3594,7 +3598,7 @@ pub unsafe extern "C" fn xmlSAX2Comment(ctx: *mut c_void, value: *const XmlChar)
         // 	    xmlGenericError(xmlGenericErrorContext,
         // 		    "Setting xmlSAX2Comment as root\n".as_ptr() as _);
         // #endif
-        xmlAddChild((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
         return;
     }
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
@@ -3602,14 +3606,14 @@ pub unsafe extern "C" fn xmlSAX2Comment(ctx: *mut c_void, value: *const XmlChar)
         // 	xmlGenericError(xmlGenericErrorContext,
         // 		"adding xmlSAX2Comment child to %s\n", (*parent).name);
         // #endif
-        xmlAddChild(parent, ret);
+        xml_add_child(parent, ret);
     } else {
         // #ifdef DEBUG_SAX_TREE
         // 	xmlGenericError(xmlGenericErrorContext,
         // 		"adding xmlSAX2Comment sibling to ".as_ptr() as _);
         // 	xmlDebugDumpOneNode(stderr, parent, 0);
         // #endif
-        xmlAddSibling(parent, ret);
+        xml_add_sibling(parent, ret);
     }
 }
 

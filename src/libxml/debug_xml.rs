@@ -28,7 +28,7 @@ use super::{
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     tree::{
-        xmlAddChildList, xmlFreeNodeList, xmlGetNodePath, xml_validate_name, XmlAttrPtr,
+        xml_add_child_list, xml_free_node_list, xml_get_node_path, xml_validate_name, XmlAttrPtr,
         XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
         XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
     },
@@ -2286,7 +2286,7 @@ pub unsafe extern "C" fn xmlShellPrintXPathError(error_type: c_int, mut arg: *co
  */
 #[cfg(feature = "output")]
 unsafe extern "C" fn xmlShellPrintNodeCtxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
-    use crate::libxml::tree::{xmlDocDump, xmlElemDump};
+    use crate::libxml::tree::{xml_doc_dump, xml_elem_dump};
 
     if !node.is_null() {
         return;
@@ -2303,11 +2303,11 @@ unsafe extern "C" fn xmlShellPrintNodeCtxt(ctxt: XmlShellCtxtPtr, node: XmlNodeP
     };
 
     if (*node).typ == XmlElementType::XmlDocumentNode {
-        xmlDocDump(fp, node as XmlDocPtr);
+        xml_doc_dump(fp, node as XmlDocPtr);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
         xmlDebugDumpAttrList(fp, node as XmlAttrPtr, 0);
     } else {
-        xmlElemDump(fp, (*node).doc, node);
+        xml_elem_dump(fp, (*node).doc, node);
     }
 
     fprintf(fp, c"\n".as_ptr());
@@ -2619,7 +2619,7 @@ pub unsafe extern "C" fn xmlShellCat(
 ) -> c_int {
     use crate::libxml::{
         htmltree::{htmlDocDump, htmlNodeDumpFile},
-        tree::{xmlDocDump, xmlElemDump},
+        tree::{xml_doc_dump, xml_elem_dump},
     };
 
     use super::htmlparser::HtmlDocPtr;
@@ -2640,14 +2640,14 @@ pub unsafe extern "C" fn xmlShellCat(
         }
         #[cfg(not(feature = "html"))]
         if (*node).typ == XmlElementType::XmlDocumentNode {
-            xmlDocDump((*ctxt).output, node as XmlDocPtr);
+            xml_doc_dump((*ctxt).output, node as XmlDocPtr);
         } else {
-            xmlElemDump((*ctxt).output, (*ctxt).doc, node);
+            xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
         }
     } else if (*node).typ == XmlElementType::XmlDocumentNode {
-        xmlDocDump((*ctxt).output, node as XmlDocPtr);
+        xml_doc_dump((*ctxt).output, node as XmlDocPtr);
     } else {
-        xmlElemDump((*ctxt).output, (*ctxt).doc, node);
+        xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
     }
     fprintf((*ctxt).output, c"\n".as_ptr());
     0
@@ -2675,9 +2675,9 @@ pub unsafe extern "C" fn xmlShellWrite(
 ) -> c_int {
     use libc::{fclose, fopen};
 
-    use crate::libxml::{htmltree::htmlSaveFile, tree::xmlElemDump};
+    use crate::libxml::{htmltree::htmlSaveFile, tree::xml_elem_dump};
 
-    use super::tree::xmlSaveFile;
+    use super::tree::xml_save_file;
 
     if node.is_null() {
         return -1;
@@ -2693,7 +2693,7 @@ pub unsafe extern "C" fn xmlShellWrite(
     // #endif
     match (*node).typ {
         XmlElementType::XmlDocumentNode => {
-            if xmlSaveFile(filename as *mut c_char, (*ctxt).doc) < -1 {
+            if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
                 xml_generic_error!(
                     xmlGenericErrorContext(),
                     c"Failed to write to %s\n".as_ptr(),
@@ -2713,7 +2713,7 @@ pub unsafe extern "C" fn xmlShellWrite(
                 return -1;
             }
             #[cfg(not(feature = "html"))]
-            if xmlSaveFile(filename as *mut c_char, (*ctxt).doc) < -1 {
+            if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
                 xml_generic_error!(
                     xmlGenericErrorContext(),
                     c"Failed to write to %s\n".as_ptr(),
@@ -2732,7 +2732,7 @@ pub unsafe extern "C" fn xmlShellWrite(
                 );
                 return -1;
             }
-            xmlElemDump(f, (*ctxt).doc, node);
+            xml_elem_dump(f, (*ctxt).doc, node);
             fclose(f);
         }
     }
@@ -2760,7 +2760,7 @@ pub unsafe extern "C" fn xmlShellSave(
 ) -> c_int {
     use crate::libxml::htmltree::htmlSaveFile;
 
-    use super::tree::xmlSaveFile;
+    use super::tree::xml_save_file;
 
     if ctxt.is_null() || (*ctxt).doc.is_null() {
         return -1;
@@ -2779,7 +2779,7 @@ pub unsafe extern "C" fn xmlShellSave(
     // #endif
     match (*(*ctxt).doc).typ {
         XmlElementType::XmlDocumentNode => {
-            if xmlSaveFile(filename as *mut c_char, (*ctxt).doc) < 0 {
+            if xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
                 xml_generic_error!(
                     xmlGenericErrorContext(),
                     c"Failed to save to %s\n".as_ptr(),
@@ -2797,7 +2797,7 @@ pub unsafe extern "C" fn xmlShellSave(
                 );
             }
             #[cfg(not(feature = "html"))]
-            if (xmlSaveFile(filename as *mut c_char, (*ctxt).doc) < 0) {
+            if (xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0) {
                 xml_generic_error!(
                     xmlGenericErrorContext(),
                     c"Failed to save to %s\n".as_ptr(),
@@ -2997,7 +2997,7 @@ pub unsafe extern "C" fn xmlShellPwd(
         return -1;
     }
 
-    let path: *mut XmlChar = xmlGetNodePath(node);
+    let path: *mut XmlChar = xml_get_node_path(node);
     if path.is_null() {
         return -1;
     }
@@ -3136,7 +3136,7 @@ unsafe extern "C" fn xmlShellGrep(
     while !node.is_null() {
         if (*node).typ == XmlElementType::XmlCommentNode {
             if !xml_strstr((*node).content, arg as *mut XmlChar).is_null() {
-                fprintf((*ctxt).output, c"%s : ".as_ptr(), xmlGetNodePath(node));
+                fprintf((*ctxt).output, c"%s : ".as_ptr(), xml_get_node_path(node));
                 xmlShellList(ctxt, null_mut(), node, null_mut());
             }
         } else if (*node).typ == XmlElementType::XmlTextNode
@@ -3145,7 +3145,7 @@ unsafe extern "C" fn xmlShellGrep(
             fprintf(
                 (*ctxt).output,
                 c"%s : ".as_ptr(),
-                xmlGetNodePath((*node).parent),
+                xml_get_node_path((*node).parent),
             );
             xmlShellList(ctxt, null_mut(), (*node).parent, null_mut());
         }
@@ -3225,11 +3225,11 @@ unsafe extern "C" fn xmlShellSetContent(
     );
     if ret == XmlParserErrors::XmlErrOK {
         if !(*node).children.is_null() {
-            xmlFreeNodeList((*node).children);
+            xml_free_node_list((*node).children);
             (*node).children = null_mut();
             (*node).last = null_mut();
         }
-        xmlAddChildList(node, results);
+        xml_add_child_list(node, results);
     } else {
         fprintf((*ctxt).output, c"failed to parse content\n".as_ptr());
     }
@@ -3379,9 +3379,9 @@ unsafe extern "C" fn xmlShellSetBase(
     node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> c_int {
-    use super::tree::xmlNodeSetBase;
+    use super::tree::xml_node_set_base;
 
-    xmlNodeSetBase(node, arg as *mut XmlChar);
+    xml_node_set_base(node, arg as *mut XmlChar);
     0
 }
 

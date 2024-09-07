@@ -14,7 +14,7 @@ use libc::snprintf;
 
 use super::{
     globals::xml_free,
-    tree::{xmlSearchNs, xml_get_ns_prop, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
+    tree::{xml_get_ns_prop, xml_search_ns, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
     xmlstring::{xml_str_equal, XmlChar},
 };
 
@@ -278,7 +278,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
         } else if xml_str_equal(typ, c"extended".as_ptr() as _) != 0 {
             role = xml_get_ns_prop(node, c"role".as_ptr() as _, XLINK_NAMESPACE.as_ptr() as _);
             if !role.is_null() {
-                let xlink: XmlNsPtr = xmlSearchNs(doc, node, XLINK_NAMESPACE.as_ptr() as _);
+                let xlink: XmlNsPtr = xml_search_ns(doc, node, XLINK_NAMESPACE.as_ptr() as _);
                 if xlink.is_null() {
                     /* Humm, fallback method */
                     if xml_str_equal(role, c"xlink:external-linkset".as_ptr() as _) != 0 {

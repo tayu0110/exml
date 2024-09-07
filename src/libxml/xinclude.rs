@@ -32,12 +32,12 @@ use crate::{
         },
         parser_internals::{input_push, xml_free_input_stream, xml_string_current_char},
         tree::{
-            xmlAddPrevSibling, xmlDocCopyNode, xmlFreeNode, xmlFreeNodeList, xmlNewDocNode,
-            xmlNewDocText, xmlNodeAddContentLen, xmlNodeSetBase, xmlStaticCopyNode,
-            xmlStaticCopyNodeList, xmlUnsetProp, xml_add_next_sibling, xml_buf_content,
-            xml_create_int_subset, xml_doc_get_root_element, xml_free_doc, xml_get_ns_prop,
-            xml_get_prop, xml_node_get_base, xml_unlink_node, XmlDocPtr, XmlDtdPtr, XmlElementType,
-            XmlNodePtr, XML_XML_NAMESPACE,
+            xml_add_next_sibling, xml_add_prev_sibling, xml_buf_content, xml_create_int_subset,
+            xml_doc_copy_node, xml_doc_get_root_element, xml_free_doc, xml_free_node,
+            xml_free_node_list, xml_get_ns_prop, xml_get_prop, xml_new_doc_node, xml_new_doc_text,
+            xml_node_add_content_len, xml_node_get_base, xml_node_set_base, xml_static_copy_node,
+            xml_static_copy_node_list, xml_unlink_node, xml_unset_prop, XmlDocPtr, XmlDtdPtr,
+            XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
         },
         uri::{
             xmlBuildRelativeURI, xml_build_uri, xml_free_uri, xml_parse_uri, xml_save_uri,
@@ -1125,25 +1125,25 @@ unsafe extern "C" fn xml_xinclude_copy_node(
 
             if refe.is_null() {
                 // goto error;
-                xmlFreeNodeList(result);
+                xml_free_node_list(result);
                 return null_mut();
             }
             /*
              * TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
              */
             if !(*refe).inc.is_null() {
-                copy = xmlStaticCopyNodeList((*refe).inc, (*ctxt).doc, insert_parent);
+                copy = xml_static_copy_node_list((*refe).inc, (*ctxt).doc, insert_parent);
                 if copy.is_null() {
                     // goto error;
-                    xmlFreeNodeList(result);
+                    xml_free_node_list(result);
                     return null_mut();
                 }
             }
         } else {
-            copy = xmlStaticCopyNode(cur, (*ctxt).doc, insert_parent, 2);
+            copy = xml_static_copy_node(cur, (*ctxt).doc, insert_parent, 2);
             if copy.is_null() {
                 // goto error;
-                xmlFreeNodeList(result);
+                xml_free_node_list(result);
                 return null_mut();
             }
 
@@ -1250,7 +1250,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
     range: XmlXPathObjectPtr,
 ) -> XmlNodePtr {
     use crate::libxml::{
-        tree::{xmlAddChild, xmlNewDocText, xmlNewDocTextLen},
+        tree::{xml_add_child, xml_new_doc_text, xml_new_doc_text_len},
         xpointer::xml_xptr_advance_node,
     };
 
@@ -1283,7 +1283,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
     }
     end = (*range).user2 as _;
     if end.is_null() {
-        return xmlDocCopyNode(start, (*ctxt).doc, 1);
+        return xml_doc_copy_node(start, (*ctxt).doc, 1);
     }
     if (*end).typ == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -1307,7 +1307,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
         if level < 0 {
             while level < 0 {
                 /* copy must include namespaces and properties */
-                tmp2 = xmlDocCopyNode(list_parent, (*ctxt).doc, 2);
+                tmp2 = xml_doc_copy_node(list_parent, (*ctxt).doc, 2);
                 xmlAddChild(tmp2, list);
                 list = tmp2;
                 list_parent = (*list_parent).parent;
@@ -1357,7 +1357,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                 end_level = level; /* remember the level of the end node */
                 end_flag = 1;
                 /* last node - need to take care of properties + namespaces */
-                tmp = xmlDocCopyNode(cur, (*ctxt).doc, 2);
+                tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 if list.is_null() {
                     list = tmp;
                     list_parent = (*cur).parent;
@@ -1400,7 +1400,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                         content = content.add(index1 as usize - 1);
                         index1 = 0;
                     }
-                    tmp = xmlNewDocText((*ctxt).doc, content);
+                    tmp = xml_new_doc_text((*ctxt).doc, content);
                 }
                 last = tmp;
                 list = tmp;
@@ -1411,7 +1411,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                  * start of the range - need to take care of
                  * properties and namespaces
                  */
-                tmp = xmlDocCopyNode(cur, (*ctxt).doc, 2);
+                tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 list = tmp;
                 last = tmp;
                 list_parent = (*cur).parent;
@@ -1444,7 +1444,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                      * Middle of the range - need to take care of
                      * properties and namespaces
                      */
-                    tmp = xmlDocCopyNode(cur, (*ctxt).doc, 2);
+                    tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 }
             }
             if !tmp.is_null() {
@@ -1540,7 +1540,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                  */
                 copy = xml_xinclude_copy_node(ctxt, node, 0);
                 if copy.is_null() {
-                    xmlFreeNodeList(list);
+                    xml_free_node_list(list);
                     return null_mut();
                 }
                 if last.is_null() {
@@ -1794,7 +1794,7 @@ unsafe extern "C" fn xmlXIncludeLoadDoc(
             /*
              * Add the top children list as the replacement copy.
              */
-            (*refe).inc = xmlDocCopyNode(xml_doc_get_root_element(doc), (*ctxt).doc, 1);
+            (*refe).inc = xml_doc_copy_node(xml_doc_get_root_element(doc), (*ctxt).doc, 1);
         } else {
             #[cfg(feature = "libxml_xptr")]
             {
@@ -2003,7 +2003,7 @@ unsafe extern "C" fn xmlXIncludeLoadDoc(
                         cur_base = xml_node_get_base((*node).doc, node);
                         /* If no current base, set it */
                         if cur_base.is_null() {
-                            xmlNodeSetBase(node, base);
+                            xml_node_set_base(node, base);
                         } else {
                             /*
                              * If the current base is the same as the
@@ -2011,7 +2011,7 @@ unsafe extern "C" fn xmlXIncludeLoadDoc(
                              * the specified xml:base or the relative URI
                              */
                             if xml_str_equal(cur_base, (*(*node).doc).url) != 0 {
-                                xmlNodeSetBase(node, base);
+                                xml_node_set_base(node, base);
                             } else {
                                 /*
                                  * If the element already has an xml:base
@@ -2035,7 +2035,7 @@ unsafe extern "C" fn xmlXIncludeLoadDoc(
                                             xml_base,
                                         );
                                     } else {
-                                        xmlNodeSetBase(node, rel_base);
+                                        xml_node_set_base(node, rel_base);
                                         xml_free(rel_base as _);
                                     }
                                     xml_free(xml_base as _);
@@ -2099,7 +2099,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
             url,
         );
         // goto error;
-        xmlFreeNode(node);
+        xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
         xml_free(encoding as _);
@@ -2115,7 +2115,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
             (*uri).fragment as _,
         );
         // goto error;
-        xmlFreeNode(node);
+        xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
         xml_free(encoding as _);
@@ -2133,7 +2133,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
                 url,
             );
             // goto error;
-            xmlFreeNode(node);
+            xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
             xml_free(encoding as _);
@@ -2156,7 +2156,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
             null(),
         );
         // goto error;
-        xmlFreeNode(node);
+        xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
         xml_free(encoding as _);
@@ -2170,11 +2170,11 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
      */
     for i in 0..(*ctxt).txt_nr {
         if xml_str_equal(url, (*(*ctxt).txt_tab.add(i as usize)).url) != 0 {
-            node = xmlNewDocText((*ctxt).doc, (*(*ctxt).txt_tab.add(i as usize)).text);
+            node = xml_new_doc_text((*ctxt).doc, (*(*ctxt).txt_tab.add(i as usize)).text);
             // goto loaded;
             (*refe).inc = node;
             node = null_mut();
-            xmlFreeNode(node);
+            xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
             xml_free(encoding as _);
@@ -2207,7 +2207,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
                 encoding,
             );
             // goto error;
-            xmlFreeNode(node);
+            xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
             xml_free(encoding as _);
@@ -2225,7 +2225,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
     if input_stream.is_null() {
         // goto error;
         // return error(ret);
-        xmlFreeNode(node);
+        xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
         xml_free(encoding as _);
@@ -2236,7 +2236,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
     let buf: XmlParserInputBufferPtr = (*input_stream).buf;
     if buf.is_null() {
         // goto error;
-        xmlFreeNode(node);
+        xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
         xml_free(encoding as _);
@@ -2248,11 +2248,11 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
         xmlCharEncCloseFunc((*buf).encoder);
     }
     (*buf).encoder = xmlGetCharEncodingHandler(enc);
-    node = xmlNewDocText((*ctxt).doc, null_mut());
+    node = xml_new_doc_text((*ctxt).doc, null_mut());
     if node.is_null() {
         xml_xinclude_err_memory(ctxt, (*refe).elem, null());
         // goto error;
-        xmlFreeNode(node);
+        xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
         xml_free(encoding as _);
@@ -2283,7 +2283,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
                 url,
             );
             // goto error;
-            xmlFreeNode(node);
+            xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
             xml_free(encoding as _);
@@ -2295,7 +2295,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
         i += l;
     }
 
-    xmlNodeAddContentLen(node, content, len);
+    xml_node_add_content_len(node, content, len);
 
     if (*ctxt).txt_nr >= (*ctxt).txt_max {
         let new_size: size_t = if (*ctxt).txt_max != 0 {
@@ -2313,7 +2313,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
                 c"growing XInclude text table".as_ptr() as _,
             );
             // goto error;
-            xmlFreeNode(node);
+            xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
             xml_free(encoding as _);
@@ -2337,7 +2337,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
     ret = 0;
 
     // error:
-    xmlFreeNode(node);
+    xml_free_node(node);
     xml_free_input_stream(input_stream);
     xml_free_parser_ctxt(pctxt);
     xml_free(encoding as _);
@@ -2691,7 +2691,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
                 c"XInclude error: would result in multiple root nodes\n".as_ptr() as _,
                 null(),
             );
-            xmlFreeNodeList(list);
+            xml_free_node_list(list);
             return -1;
         }
     }
@@ -2704,13 +2704,13 @@ unsafe extern "C" fn xml_xinclude_include_node(
             end = list;
             list = (*list).next;
 
-            xmlAddPrevSibling(cur, end);
+            xml_add_prev_sibling(cur, end);
         }
         /*
          * FIXME: xmlUnlinkNode doesn't coalesce text nodes.
          */
         xml_unlink_node(cur);
-        xmlFreeNode(cur);
+        xml_free_node(cur);
     } else {
         let mut child: XmlNodePtr;
         let mut next: XmlNodePtr;
@@ -2720,7 +2720,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
          * XInclude end one
          */
         if (*refe).fallback != 0 {
-            xmlUnsetProp(cur, c"href".as_ptr() as _);
+            xml_unset_prop(cur, c"href".as_ptr() as _);
         }
         (*cur).typ = XmlElementType::XmlXincludeStart;
         /* Remove fallback children */
@@ -2728,11 +2728,11 @@ unsafe extern "C" fn xml_xinclude_include_node(
         while !child.is_null() {
             next = (*child).next;
             xml_unlink_node(child);
-            xmlFreeNode(child);
+            xml_free_node(child);
 
             child = next;
         }
-        end = xmlNewDocNode((*cur).doc, (*cur).ns, (*cur).name, null_mut());
+        end = xml_new_doc_node((*cur).doc, (*cur).ns, (*cur).name, null_mut());
         if end.is_null() {
             xml_xinclude_err(
                 ctxt,
@@ -2741,7 +2741,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
                 c"failed to build node\n".as_ptr() as _,
                 null(),
             );
-            xmlFreeNodeList(list);
+            xml_free_node_list(list);
             return -1;
         }
         (*end).typ = XmlElementType::XmlXincludeEnd;
@@ -2754,7 +2754,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
             cur = list;
             list = (*list).next;
 
-            xmlAddPrevSibling(end, cur);
+            xml_add_prev_sibling(end, cur);
         }
     }
 
@@ -2843,7 +2843,7 @@ unsafe extern "C" fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: Xml
              * inside xi:fallback elements.
              */
             if !(*(*(*ctxt).inc_tab.add(i as usize))).inc.is_null() {
-                xmlFreeNodeList((*(*(*ctxt).inc_tab.add(i as usize))).inc);
+                xml_free_node_list((*(*(*ctxt).inc_tab.add(i as usize))).inc);
                 (*(*(*ctxt).inc_tab.add(i as usize))).inc = null_mut();
             }
         }

@@ -40,14 +40,15 @@ use crate::{
         },
         sax2::xmlSAXVersion,
         tree::{
-            xmlBufGetNodeContent, xmlCopyDtd, xmlDocCopyNode, xmlFreeNode, xmlFreeNs,
-            xmlFreeNsList, xmlGetLineNo, xmlGetNoNsProp, xmlIsBlankNode, xmlNewDocText,
-            xmlNodeDump, xmlNodeGetLang, xmlNodeGetSpacePreserve, xmlNodeListGetString,
-            xmlSearchNs, xml_buf_content, xml_buf_shrink, xml_buf_use, xml_buffer_cat,
-            xml_buffer_create, xml_buffer_free, xml_buffer_set_allocation_scheme, xml_free_doc,
-            xml_free_dtd, xml_get_ns_prop, xml_node_get_base, xml_split_qname2, xml_unlink_node,
-            XmlAttrPtr, XmlBufPtr, XmlBufferAllocationScheme, XmlBufferPtr, XmlDocPtr, XmlDtdPtr,
-            XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+            xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_buffer_cat,
+            xml_buffer_create, xml_buffer_free, xml_buffer_set_allocation_scheme, xml_copy_dtd,
+            xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
+            xml_free_ns_list, xml_get_line_no, xml_get_no_ns_prop, xml_get_ns_prop,
+            xml_is_blank_node, xml_new_doc_text, xml_node_dump, xml_node_get_base,
+            xml_node_get_lang, xml_node_get_space_preserve, xml_node_list_get_string,
+            xml_search_ns, xml_split_qname2, xml_unlink_node, XmlAttrPtr, XmlBufPtr,
+            XmlBufferAllocationScheme, XmlBufferPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
+            XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
         },
         uri::xml_canonic_path,
         valid::{
@@ -1368,7 +1369,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
         return;
     }
     if (*cur).typ == XmlElementType::XmlNamespaceDecl {
-        xmlFreeNsList(cur as XmlNsPtr);
+        xml_free_ns_list(cur as XmlNsPtr);
         return;
     }
     if matches!(
@@ -1428,7 +1429,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
                     | XmlElementType::XmlXincludeEnd
             ) && !(*cur).ns_def.is_null()
             {
-                xmlFreeNsList((*cur).ns_def);
+                xml_free_ns_list((*cur).ns_def);
             }
 
             /*
@@ -1530,7 +1531,7 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
         return;
     }
     if (*cur).typ == XmlElementType::XmlNamespaceDecl {
-        xmlFreeNs(cur as XmlNsPtr);
+        xml_free_ns(cur as XmlNsPtr);
         return;
     }
     if (*cur).typ == XmlElementType::XmlAttributeNode {
@@ -1579,7 +1580,7 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
             | XmlElementType::XmlXincludeEnd
     ) && !(*cur).ns_def.is_null()
     {
-        xmlFreeNsList((*cur).ns_def);
+        xml_free_ns_list((*cur).ns_def);
     }
 
     /*
@@ -2361,18 +2362,18 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(reader: XmlTextReaderPtr
     cur_node = (*(*reader).node).children;
     while !cur_node.is_null() {
         /* XXX: Why is the node copied? */
-        node = xmlDocCopyNode(cur_node, doc, 1);
+        node = xml_doc_copy_node(cur_node, doc, 1);
         /* XXX: Why do we need a second buffer? */
         buff2 = xml_buffer_create();
         xml_buffer_set_allocation_scheme(buff2, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-        if xmlNodeDump(buff2, doc, node, 0, 0) == -1 {
-            xmlFreeNode(node);
+        if xml_node_dump(buff2, doc, node, 0, 0) == -1 {
+            xml_free_node(node);
             xml_buffer_free(buff2);
             xml_buffer_free(buff);
             return null_mut();
         }
         xml_buffer_cat(buff, (*buff2).content);
-        xmlFreeNode(node);
+        xml_free_node(node);
         xml_buffer_free(buff2);
         cur_node = (*cur_node).next;
     }
@@ -2404,14 +2405,14 @@ pub unsafe extern "C" fn xml_text_reader_read_outer_xml(reader: XmlTextReaderPtr
     let doc: XmlDocPtr = (*node).doc;
     /* XXX: Why is the node copied? */
     if (*node).typ == XmlElementType::XmlDtdNode {
-        node = xmlCopyDtd(node as XmlDtdPtr) as XmlNodePtr;
+        node = xml_copy_dtd(node as XmlDtdPtr) as XmlNodePtr;
     } else {
-        node = xmlDocCopyNode(node, doc, 1);
+        node = xml_doc_copy_node(node, doc, 1);
     }
     let buff: XmlBufferPtr = xml_buffer_create();
     xml_buffer_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    if xmlNodeDump(buff, doc, node, 0, 0) == -1 {
-        xmlFreeNode(node);
+    if xml_node_dump(buff, doc, node, 0, 0) == -1 {
+        xml_free_node(node);
         xml_buffer_free(buff);
         return null_mut();
     }
@@ -2419,7 +2420,7 @@ pub unsafe extern "C" fn xml_text_reader_read_outer_xml(reader: XmlTextReaderPtr
     let resbuf: *mut XmlChar = (*buff).content;
     (*buff).content = null_mut();
 
-    xmlFreeNode(node);
+    xml_free_node(node);
     xml_buffer_free(buff);
     resbuf
 }
@@ -2612,7 +2613,7 @@ pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: XmlTextRea
 
         if (*reader).faketext.is_null() {
             (*reader).faketext =
-                xmlNewDocText((*(*reader).node).doc, (*ns).href.load(Ordering::Relaxed));
+                xml_new_doc_text((*(*reader).node).doc, (*ns).href.load(Ordering::Relaxed));
         } else {
             if !(*(*reader).faketext).content.is_null()
                 && (*(*reader).faketext).content
@@ -2867,8 +2868,8 @@ pub unsafe extern "C" fn xml_text_reader_node_type(reader: XmlTextReaderPtr) -> 
             XmlReaderTypes::XmlReaderTypeAttribute as i32
         }
         XmlElementType::XmlTextNode => {
-            if xmlIsBlankNode((*reader).node) != 0 {
-                if xmlNodeGetSpacePreserve((*reader).node) != 0 {
+            if xml_is_blank_node((*reader).node) != 0 {
+                if xml_node_get_space_preserve((*reader).node) != 0 {
                     XmlReaderTypes::XmlReaderTypeSignificantWhitespace as i32
                 } else {
                     XmlReaderTypes::XmlReaderTypeWhitespace as i32
@@ -3193,7 +3194,7 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
     if (*reader).node.is_null() {
         return null_mut();
     }
-    let tmp: *mut XmlChar = xmlNodeGetLang((*reader).node);
+    let tmp: *mut XmlChar = xml_node_get_lang((*reader).node);
     if tmp.is_null() {
         return null_mut();
     }
@@ -3277,7 +3278,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -
                 } else {
                     xml_buf_empty((*reader).buffer);
                 }
-                xmlBufGetNodeContent((*reader).buffer, node);
+                xml_buf_get_node_content((*reader).buffer, node);
                 ret = xml_buf_content((*reader).buffer);
                 if ret.is_null() {
                     /* error on the buffer best to reallocate */
@@ -3516,7 +3517,7 @@ pub unsafe extern "C" fn xml_text_reader_xml_lang(reader: XmlTextReaderPtr) -> *
     if (*reader).node.is_null() {
         return null_mut();
     }
-    xmlNodeGetLang((*reader).node)
+    xml_node_get_lang((*reader).node)
 }
 
 /**
@@ -3550,9 +3551,9 @@ pub unsafe extern "C" fn xml_text_reader_value(reader: XmlTextReaderPtr) -> *mut
             let attr: XmlAttrPtr = node as XmlAttrPtr;
 
             if !(*attr).parent.is_null() {
-                return xmlNodeListGetString((*(*attr).parent).doc, (*attr).children, 1);
+                return xml_node_list_get_string((*(*attr).parent).doc, (*attr).children, 1);
             } else {
-                return xmlNodeListGetString(null_mut(), (*attr).children, 1);
+                return xml_node_list_get_string(null_mut(), (*attr).children, 1);
             }
         }
         XmlElementType::XmlTextNode
@@ -3631,7 +3632,7 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: XmlTextReaderPtr, cur: Xml
         xml_free((*cur).encoding as _);
     }
     if !(*cur).old_ns.is_null() {
-        xmlFreeNsList((*cur).old_ns);
+        xml_free_ns_list((*cur).old_ns);
     }
     if !(*cur).url.is_null() {
         xml_free((*cur).url as _);
@@ -3664,7 +3665,7 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: XmlTextReaderPtr) -> c_in
     (*reader).curnode = null_mut();
     (*reader).mode = XmlTextReaderMode::XmlTextreaderModeClosed as i32;
     if !(*reader).faketext.is_null() {
-        xmlFreeNode((*reader).faketext);
+        xml_free_node((*reader).faketext);
         (*reader).faketext = null_mut();
     }
     if !(*reader).ctxt.is_null() {
@@ -3754,7 +3755,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_no(
     }
     /* TODO walk the DTD if present */
 
-    let ret: *mut XmlChar = xmlNodeListGetString((*(*reader).node).doc, (*cur).children, 1);
+    let ret: *mut XmlChar = xml_node_list_get_string((*(*reader).node).doc, (*cur).children, 1);
     if ret.is_null() {
         return xml_strdup(c"".as_ptr() as _);
     }
@@ -3810,7 +3811,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
             }
             return null_mut();
         }
-        return xmlGetNoNsProp((*reader).node, name);
+        return xml_get_no_ns_prop((*reader).node, name);
     }
 
     /*
@@ -3828,7 +3829,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
             ns = (*ns).next.load(Ordering::Relaxed);
         }
     } else {
-        ns = xmlSearchNs((*(*reader).node).doc, (*reader).node, prefix);
+        ns = xml_search_ns((*(*reader).node).doc, (*reader).node, prefix);
         if !ns.is_null() {
             ret = xml_get_ns_prop(
                 (*reader).node,
@@ -3984,7 +3985,7 @@ pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
         return null_mut();
     }
 
-    let ns: XmlNsPtr = xmlSearchNs((*(*reader).node).doc, (*reader).node, prefix);
+    let ns: XmlNsPtr = xml_search_ns((*(*reader).node).doc, (*reader).node, prefix);
     if ns.is_null() {
         return null_mut();
     }
@@ -5385,7 +5386,7 @@ unsafe extern "C" fn xml_text_reader_locator(
         let mut ret: c_int = 0;
 
         if !line.is_null() {
-            res = xmlGetLineNo((*reader).node);
+            res = xml_get_line_no((*reader).node);
             if res > 0 {
                 *line = res as c_ulong;
             } else {
@@ -6267,7 +6268,7 @@ pub unsafe extern "C" fn xml_text_reader_locator_line_number(
         return -1;
     }
     if !(*ctx).node.is_null() {
-        ret = xmlGetLineNo((*ctx).node) as _;
+        ret = xml_get_line_no((*ctx).node) as _;
     } else {
         /* inspired from error.c */
         let mut input: XmlParserInputPtr;

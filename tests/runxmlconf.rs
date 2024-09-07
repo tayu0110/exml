@@ -24,7 +24,7 @@ use exml::libxml::{
     },
     parser_internals::xml_new_input_from_file,
     tree::{
-        xmlGetLineNo, xml_doc_get_root_element, xml_free_doc, xml_get_prop, xml_node_get_base,
+        xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop, xml_node_get_base,
         XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
     },
     xmlerror::{
@@ -380,7 +380,7 @@ unsafe extern "C" fn xmlconf_test_item(
     NB_FATAL = 0;
     let id: *mut XmlChar = xml_get_prop(cur, c"ID".as_ptr() as _);
     if id.is_null() {
-        test_log!(logfile, "test missing ID, line {}\n", xmlGetLineNo(cur));
+        test_log!(logfile, "test missing ID, line {}\n", xml_get_line_no(cur));
     // goto error;
     } else {
         for i in (0..).take_while(|&i| !SKIPPED_TESTS[i].is_null()) {

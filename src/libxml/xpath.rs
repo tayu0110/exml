@@ -26,7 +26,8 @@ use crate::{
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         tree::{
-            xmlFreeNodeList, xmlNodeGetContent, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
+            xml_free_node_list, xml_node_get_content, XmlDocPtr, XmlElementType, XmlNodePtr,
+            XmlNsPtr,
         },
         xmlerror::{xmlResetError, XmlError, XmlStructuredErrorFunc},
         xmlstring::{xml_strdup, xml_strlen, XmlChar},
@@ -674,7 +675,7 @@ pub unsafe extern "C" fn xml_xpath_free_value_tree(obj: XmlNodeSetPtr) {
                 ) {
                     xml_xpath_node_set_free_ns(*(*obj).node_tab.add(i as usize) as XmlNsPtr);
                 } else {
-                    xmlFreeNodeList(*(*obj).node_tab.add(i as usize));
+                    xml_free_node_list(*(*obj).node_tab.add(i as usize));
                 }
             }
         }
@@ -1500,7 +1501,7 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlCh
  */
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> *mut XmlChar {
-    let mut ret: *mut XmlChar = xmlNodeGetContent(node);
+    let mut ret: *mut XmlChar = xml_node_get_content(node);
     if ret.is_null() {
         ret = xml_strdup(c"".as_ptr() as *const XmlChar);
     }

@@ -31,8 +31,8 @@ use super::{
         xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternFlags, XmlPatternPtr,
     },
     tree::{
-        xmlGetLineNo, xmlGetNoNsProp, xmlGetNodePath, xmlNodeGetContent, xml_doc_get_root_element,
-        xml_free_doc, XmlBufferPtr, XmlDocPtr, XmlNodePtr,
+        xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_no_ns_prop,
+        xml_get_node_path, xml_node_get_content, XmlBufferPtr, XmlDocPtr, XmlNodePtr,
     },
     xml_io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     xmlerror::{XmlErrorDomain, XmlParserErrors, XmlStructuredErrorFunc},
@@ -769,7 +769,7 @@ unsafe extern "C" fn xmlSchematronParseTestReportMsg(
         } else if IS_SCHEMATRON!(child, c"name".as_ptr() as _) {
             /* Do Nothing */
         } else if IS_SCHEMATRON!(child, c"value-of".as_ptr() as _) {
-            let select: *mut XmlChar = xmlGetNoNsProp(child, c"select".as_ptr() as _);
+            let select: *mut XmlChar = xml_get_no_ns_prop(child, c"select".as_ptr() as _);
 
             if select.is_null() {
                 xml_schematron_perr(
@@ -897,7 +897,7 @@ unsafe extern "C" fn xmlSchematronParseRule(
         return;
     }
 
-    let context: *mut XmlChar = xmlGetNoNsProp(rule, c"context".as_ptr() as _);
+    let context: *mut XmlChar = xml_get_no_ns_prop(rule, c"context".as_ptr() as _);
     if context.is_null() {
         xml_schematron_perr(
             ctxt,
@@ -931,7 +931,7 @@ unsafe extern "C" fn xmlSchematronParseRule(
     NEXT_SCHEMATRON!(cur);
     while !cur.is_null() {
         if IS_SCHEMATRON!(cur, c"let".as_ptr() as _) {
-            name = xmlGetNoNsProp(cur, c"name".as_ptr() as _);
+            name = xml_get_no_ns_prop(cur, c"name".as_ptr() as _);
             if name.is_null() {
                 xml_schematron_perr(
                     ctxt,
@@ -954,7 +954,7 @@ unsafe extern "C" fn xmlSchematronParseRule(
                 xml_free(name as _);
                 return;
             }
-            value = xmlGetNoNsProp(cur, c"value".as_ptr() as _);
+            value = xml_get_no_ns_prop(cur, c"value".as_ptr() as _);
             if value.is_null() {
                 xml_schematron_perr(
                     ctxt,
@@ -1006,7 +1006,7 @@ unsafe extern "C" fn xmlSchematronParseRule(
             xml_free(value as _);
         } else if IS_SCHEMATRON!(cur, c"assert".as_ptr() as _) {
             nb_checks += 1;
-            test = xmlGetNoNsProp(cur, c"test".as_ptr() as _);
+            test = xml_get_no_ns_prop(cur, c"test".as_ptr() as _);
             if test.is_null() {
                 xml_schematron_perr(
                     ctxt,
@@ -1028,7 +1028,7 @@ unsafe extern "C" fn xmlSchematronParseRule(
                 xml_free(test as _);
             } else {
                 xmlSchematronParseTestReportMsg(ctxt, cur);
-                report = xmlNodeGetContent(cur);
+                report = xml_node_get_content(cur);
 
                 testptr = xmlSchematronAddTest(
                     ctxt,
@@ -1044,7 +1044,7 @@ unsafe extern "C" fn xmlSchematronParseRule(
             }
         } else if IS_SCHEMATRON!(cur, c"report".as_ptr() as _) {
             nb_checks += 1;
-            test = xmlGetNoNsProp(cur, c"test".as_ptr() as _);
+            test = xml_get_no_ns_prop(cur, c"test".as_ptr() as _);
             if test.is_null() {
                 xml_schematron_perr(
                     ctxt,
@@ -1066,7 +1066,7 @@ unsafe extern "C" fn xmlSchematronParseRule(
                 xml_free(test as _);
             } else {
                 xmlSchematronParseTestReportMsg(ctxt, cur);
-                report = xmlNodeGetContent(cur);
+                report = xml_node_get_content(cur);
 
                 testptr = xmlSchematronAddTest(
                     ctxt,
@@ -1122,9 +1122,9 @@ unsafe extern "C" fn xmlSchematronParsePattern(ctxt: XmlSchematronParserCtxtPtr,
         return;
     }
 
-    id = xmlGetNoNsProp(pat, c"id".as_ptr() as _);
+    id = xml_get_no_ns_prop(pat, c"id".as_ptr() as _);
     if id.is_null() {
-        id = xmlGetNoNsProp(pat, c"name".as_ptr() as _);
+        id = xml_get_no_ns_prop(pat, c"name".as_ptr() as _);
     }
     let pattern: XmlSchematronPatternPtr = xmlSchematronAddPattern(ctxt, (*ctxt).schema, pat, id);
     if pattern.is_null() {
@@ -1287,7 +1287,7 @@ pub unsafe extern "C" fn xmlSchematronParse(ctxt: XmlSchematronParserCtxtPtr) ->
             cur = (*root).children;
             NEXT_SCHEMATRON!(cur);
             if IS_SCHEMATRON!(cur, c"title".as_ptr() as _) {
-                let title: *mut XmlChar = xmlNodeGetContent(cur);
+                let title: *mut XmlChar = xml_node_get_content(cur);
                 if !title.is_null() {
                     (*ret).title = xmlDictLookup((*ret).dict, title, -1);
                     xml_free(title as _);
@@ -1296,8 +1296,8 @@ pub unsafe extern "C" fn xmlSchematronParse(ctxt: XmlSchematronParserCtxtPtr) ->
                 NEXT_SCHEMATRON!(cur);
             }
             while IS_SCHEMATRON!(cur, c"ns".as_ptr() as _) {
-                let prefix: *mut XmlChar = xmlGetNoNsProp(cur, c"prefix".as_ptr() as _);
-                let uri: *mut XmlChar = xmlGetNoNsProp(cur, c"uri".as_ptr() as _);
+                let prefix: *mut XmlChar = xml_get_no_ns_prop(cur, c"prefix".as_ptr() as _);
+                let uri: *mut XmlChar = xml_get_no_ns_prop(cur, c"uri".as_ptr() as _);
                 if uri.is_null() || *uri.add(0) == 0 {
                     xml_schematron_perr(
                         ctxt,
@@ -1745,7 +1745,7 @@ unsafe extern "C" fn xmlSchematronFormatReport(
         {
             ret = xml_strcat(ret, (*child).content);
         } else if IS_SCHEMATRON!(child, c"name".as_ptr() as _) {
-            let path: *mut XmlChar = xmlGetNoNsProp(child, c"path".as_ptr() as _);
+            let path: *mut XmlChar = xml_get_no_ns_prop(child, c"path".as_ptr() as _);
 
             node = cur;
             if !path.is_null() {
@@ -1764,7 +1764,7 @@ unsafe extern "C" fn xmlSchematronFormatReport(
                 ret = xml_strcat(ret, (*node).name);
             }
         } else if IS_SCHEMATRON!(child, c"value-of".as_ptr() as _) {
-            let select: *mut XmlChar = xmlGetNoNsProp(child, c"select".as_ptr() as _);
+            let select: *mut XmlChar = xml_get_no_ns_prop(child, c"select".as_ptr() as _);
             comp = xml_xpath_ctxt_compile((*ctxt).xctxt, select);
             let eval: XmlXPathObjectPtr = xml_xpath_compiled_eval(comp, (*ctxt).xctxt);
 
@@ -1910,8 +1910,8 @@ unsafe extern "C" fn xmlSchematronReportSuccess(
         {
             return;
         }
-        let line: c_long = xmlGetLineNo(cur);
-        path = xmlGetNodePath(cur);
+        let line: c_long = xml_get_line_no(cur);
+        path = xml_get_node_path(cur);
         if path.is_null() {
             path = (*cur).name as _;
         }

@@ -11,9 +11,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
-use libc::{
-    memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strcmp, strlen, strncmp, strstr,
-};
+use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen, strncmp, strstr};
 
 use crate::{
     __xml_raise_error,
@@ -63,14 +61,15 @@ use crate::{
         relaxng::xml_relaxng_cleanup_types,
         sax2::{xmlSAX2EntityDecl, xmlSAX2GetEntity, xmlSAX2IgnorableWhitespace, xmlSAXVersion},
         tree::{
-            xmlAddChild, xmlFreeNode, xmlFreeNodeList, xmlGetLastChild, xmlNewDoc,
-            xmlNewDocComment, xmlNewDocNode, xmlNodeIsText, xmlSearchNsByHref, xmlSetTreeDoc,
-            xml_buf_content, xml_buf_end, xml_buf_use, xml_buffer_add, xml_buffer_create,
-            xml_buffer_free, xml_buffer_set_allocation_scheme, xml_build_qname, xml_free_doc,
-            xml_new_dtd, xml_unlink_node, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType,
-            XmlBufferAllocationScheme, XmlBufferPtr, XmlDocProperties, XmlDocPtr, XmlDtdPtr,
-            XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-            XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+            xml_add_child, xml_buf_content, xml_buf_end, xml_buf_use, xml_buffer_add,
+            xml_buffer_create, xml_buffer_free, xml_buffer_set_allocation_scheme, xml_build_qname,
+            xml_free_doc, xml_free_node, xml_free_node_list, xml_get_last_child, xml_new_doc,
+            xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, xml_node_is_text,
+            xml_search_ns_by_href, xml_set_tree_doc, xml_unlink_node, XmlAttrPtr,
+            XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlBufferPtr,
+            XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
+            XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
+            XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
         },
         uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, XmlURIPtr},
         valid::{
@@ -3311,7 +3310,7 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
      * let's parse that entity knowing it's an external subset.
      */
     (*ctxt).in_subset = 2;
-    (*ctxt).my_doc = xmlNewDoc(c"1.0".as_ptr() as _);
+    (*ctxt).my_doc = xml_new_doc(c"1.0".as_ptr() as _);
     if (*ctxt).my_doc.is_null() {
         xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
         xml_free_parser_ctxt(ctxt);
@@ -3437,7 +3436,7 @@ pub unsafe extern "C" fn xml_io_parse_dtd(
      * let's parse that entity knowing it's an external subset.
      */
     (*ctxt).in_subset = 2;
-    (*ctxt).my_doc = xmlNewDoc(c"1.0".as_ptr() as _);
+    (*ctxt).my_doc = xml_new_doc(c"1.0".as_ptr() as _);
     if (*ctxt).my_doc.is_null() {
         xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
         return null_mut();
@@ -3774,12 +3773,12 @@ pub unsafe extern "C" fn xml_parse_in_node_context(
     (*ctxt).input_id = 2;
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
 
-    let fake: XmlNodePtr = xmlNewDocComment((*node).doc, null_mut());
+    let fake: XmlNodePtr = xml_new_doc_comment((*node).doc, null_mut());
     if fake.is_null() {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
     }
-    xmlAddChild(node, fake);
+    xml_add_child(node, fake);
 
     if (*node).typ == XmlElementType::XmlElementNode {
         node_push(ctxt, node);
@@ -3873,10 +3872,10 @@ pub unsafe extern "C" fn xml_parse_in_node_context(
     }
 
     xml_unlink_node(fake);
-    xmlFreeNode(fake);
+    xml_free_node(fake);
 
     if !matches!(ret, XmlParserErrors::XmlErrOK) {
-        xmlFreeNodeList(*lst);
+        xml_free_node_list(*lst);
         *lst = null_mut();
     }
 
@@ -3952,7 +3951,7 @@ pub unsafe extern "C" fn xml_parse_balanced_chunk_memory_recover(
             (*ctxt).user_data = user_data;
         }
     }
-    let new_doc: XmlDocPtr = xmlNewDoc(c"1.0".as_ptr() as _);
+    let new_doc: XmlDocPtr = xml_new_doc(c"1.0".as_ptr() as _);
     if new_doc.is_null() {
         xml_free_parser_ctxt(ctxt);
         return -1;
@@ -3975,7 +3974,7 @@ pub unsafe extern "C" fn xml_parse_balanced_chunk_memory_recover(
         (*new_doc).ext_subset = (*doc).ext_subset;
     }
     let new_root: XmlNodePtr =
-        xmlNewDocNode(new_doc, null_mut(), c"pseudoroot".as_ptr() as _, null());
+        xml_new_doc_node(new_doc, null_mut(), c"pseudoroot".as_ptr() as _, null());
     if new_root.is_null() {
         if !sax.is_null() {
             (*ctxt).sax = oldsax;
@@ -3986,7 +3985,7 @@ pub unsafe extern "C" fn xml_parse_balanced_chunk_memory_recover(
         xml_free_doc(new_doc);
         return -1;
     }
-    xmlAddChild(new_doc as XmlNodePtr, new_root);
+    xml_add_child(new_doc as XmlNodePtr, new_root);
     node_push(ctxt, new_root);
     /* doc.is_null() is only supported for historic reasons */
     if doc.is_null() {
@@ -3995,7 +3994,7 @@ pub unsafe extern "C" fn xml_parse_balanced_chunk_memory_recover(
         (*ctxt).my_doc = new_doc;
         (*(*new_doc).children).doc = doc;
         /* Ensure that doc has XML spec namespace */
-        xmlSearchNsByHref(doc, doc as _, XML_XML_NAMESPACE.as_ptr() as _);
+        xml_search_ns_by_href(doc, doc as _, XML_XML_NAMESPACE.as_ptr() as _);
         (*new_doc).old_ns = (*doc).old_ns;
     }
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -4046,7 +4045,7 @@ pub unsafe extern "C" fn xml_parse_balanced_chunk_memory_recover(
         cur = (*(*new_doc).children).children;
         *lst = cur;
         while !cur.is_null() {
-            xmlSetTreeDoc(cur, doc);
+            xml_set_tree_doc(cur, doc);
             (*cur).parent = null_mut();
             cur = (*cur).next;
         }
@@ -4137,7 +4136,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
     }
     xml_detect_sax2(ctxt);
 
-    let new_doc: XmlDocPtr = xmlNewDoc(c"1.0".as_ptr() as _);
+    let new_doc: XmlDocPtr = xml_new_doc(c"1.0".as_ptr() as _);
     if new_doc.is_null() {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrInternalError;
@@ -4155,7 +4154,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
         }
     }
     let new_root: XmlNodePtr =
-        xmlNewDocNode(new_doc, null_mut(), c"pseudoroot".as_ptr() as _, null());
+        xml_new_doc_node(new_doc, null_mut(), c"pseudoroot".as_ptr() as _, null());
     if new_root.is_null() {
         if !sax.is_null() {
             xml_free_parser_ctxt(ctxt);
@@ -4165,7 +4164,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
         xml_free_doc(new_doc);
         return XmlParserErrors::XmlErrInternalError;
     }
-    xmlAddChild(new_doc as XmlNodePtr, new_root);
+    xml_add_child(new_doc as XmlNodePtr, new_root);
     node_push(ctxt, (*new_doc).children);
     if doc.is_null() {
         (*ctxt).my_doc = new_doc;
@@ -8760,15 +8759,15 @@ unsafe extern "C" fn are_blanks(
         return 0;
     }
 
-    let last_child: XmlNodePtr = xmlGetLastChild((*ctxt).node);
+    let last_child: XmlNodePtr = xml_get_last_child((*ctxt).node);
     if last_child.is_null() {
         if (*(*ctxt).node).typ != XmlElementType::XmlElementNode
             && !(*(*ctxt).node).content.is_null()
         {
             return 0;
         }
-    } else if xmlNodeIsText(last_child) != 0
-        || (!(*(*ctxt).node).children.is_null() && xmlNodeIsText((*(*ctxt).node).children) != 0)
+    } else if xml_node_is_text(last_child) != 0
+        || (!(*(*ctxt).node).children.is_null() && xml_node_is_text((*(*ctxt).node).children) != 0)
     {
         return 0;
     }
@@ -12346,7 +12345,7 @@ pub(crate) unsafe extern "C" fn xmlParseEntityDecl(ctxt: XmlParserCtxtPtr) {
                 || xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _) != 0
             {
                 if (*ctxt).my_doc.is_null() {
-                    (*ctxt).my_doc = xmlNewDoc(SAX_COMPAT_MODE.as_ptr() as _);
+                    (*ctxt).my_doc = xml_new_doc(SAX_COMPAT_MODE.as_ptr() as _);
                     if (*ctxt).my_doc.is_null() {
                         xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
                         // goto done;
@@ -12455,7 +12454,7 @@ pub(crate) unsafe extern "C" fn xmlParseEntityDecl(ctxt: XmlParserCtxtPtr) {
                             != 0)
                 {
                     if (*ctxt).my_doc.is_null() {
-                        (*ctxt).my_doc = xmlNewDoc(SAX_COMPAT_MODE.as_ptr() as _);
+                        (*ctxt).my_doc = xml_new_doc(SAX_COMPAT_MODE.as_ptr() as _);
                         if (*ctxt).my_doc.is_null() {
                             xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
                             // goto done;

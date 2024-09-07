@@ -23,9 +23,9 @@ use super::{
         XmlListPtr,
     },
     tree::{
-        xmlFreePropList, xmlHasNsProp, xmlNewNsProp, xmlNodeListGetString, xmlSearchNs,
-        xml_buf_content, xml_buf_use, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs,
-        XmlNsPtr, XML_XML_NAMESPACE,
+        xml_buf_content, xml_buf_use, xml_free_prop_list, xml_has_ns_prop, xml_new_ns_prop,
+        xml_node_list_get_string, xml_search_ns, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
+        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::{xml_build_uri, xml_free_uri, xml_parse_uri, XmlURIPtr},
     xml_io::{
@@ -1034,7 +1034,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
     while !n.is_null() {
         ns = (*n).ns_def;
         while !ns.is_null() {
-            tmp = xmlSearchNs((*cur).doc, cur, (*ns).prefix.load(Ordering::Relaxed));
+            tmp = xml_search_ns((*cur).doc, cur, (*ns).prefix.load(Ordering::Relaxed));
 
             if tmp == ns && xml_c14n_is_xml_ns(ns) == 0 && xmlC14NIsVisible!(ctx, ns, cur) != 0 {
                 already_rendered = xml_c14n_visible_ns_stack_find((*ctx).ns_rendered, ns);
@@ -1223,7 +1223,7 @@ unsafe extern "C" fn xmlExcC14NProcessNamespacesAxis(
                 has_empty_ns_in_inclusive_list = 1;
             }
 
-            ns = xmlSearchNs((*cur).doc, cur, prefix);
+            ns = xml_search_ns((*cur).doc, cur, prefix);
             if !ns.is_null() && xml_c14n_is_xml_ns(ns) == 0 && xmlC14NIsVisible!(ctx, ns, cur) != 0
             {
                 already_rendered = xml_c14n_visible_ns_stack_find((*ctx).ns_rendered, ns);
@@ -1244,7 +1244,7 @@ unsafe extern "C" fn xmlExcC14NProcessNamespacesAxis(
     if !(*cur).ns.is_null() {
         ns = (*cur).ns;
     } else {
-        ns = xmlSearchNs((*cur).doc, cur, null_mut());
+        ns = xml_search_ns((*cur).doc, cur, null_mut());
         has_visibly_utilized_empty_ns = 1;
     }
     if !ns.is_null() && xml_c14n_is_xml_ns(ns) == 0 {
@@ -1425,7 +1425,7 @@ unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
 ) -> XmlAttrPtr {
     let mut res: XmlAttrPtr;
     while !cur.is_null() && xmlC14NIsVisible!(ctx, cur, (*cur).parent) == 0 {
-        res = xmlHasNsProp(cur, name, ns);
+        res = xml_has_ns_prop(cur, name, ns);
         if !res.is_null() {
             return res;
         }
@@ -1459,7 +1459,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     }
 
     /* start from current value */
-    let mut res: *mut XmlChar = xmlNodeListGetString((*ctx).doc, (*xml_base_attr).children, 1);
+    let mut res: *mut XmlChar = xml_node_list_get_string((*ctx).doc, (*xml_base_attr).children, 1);
     if res.is_null() {
         xml_c14n_err_internal(
             c"processing xml:base attribute - can't get attr value".as_ptr() as _,
@@ -1470,10 +1470,10 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     /* go up the stack until we find a node that we rendered already */
     cur = (*(*xml_base_attr).parent).parent;
     while !cur.is_null() && xmlC14NIsVisible!(ctx, cur, (*cur).parent) == 0 {
-        attr = xmlHasNsProp(cur, c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+        attr = xml_has_ns_prop(cur, c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
         if !attr.is_null() {
             /* get attr value */
-            tmp_str = xmlNodeListGetString((*ctx).doc, (*attr).children, 1);
+            tmp_str = xml_node_list_get_string((*ctx).doc, (*attr).children, 1);
             if tmp_str.is_null() {
                 xml_free(res as _);
 
@@ -1530,7 +1530,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     }
 
     /* create and return the new attribute node */
-    attr = xmlNewNsProp(null_mut(), (*xml_base_attr).ns, c"base".as_ptr() as _, res);
+    attr = xml_new_ns_prop(null_mut(), (*xml_base_attr).ns, c"base".as_ptr() as _, res);
     if attr.is_null() {
         xml_free(res as _);
 
@@ -1748,7 +1748,7 @@ unsafe extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void
     xmlOutputBufferWriteString((*ctx).buf, (*attr).name as _);
     xmlOutputBufferWriteString((*ctx).buf, c"=\"".as_ptr() as _);
 
-    let value: *mut XmlChar = xmlNodeListGetString((*ctx).doc, (*attr).children, 1);
+    let value: *mut XmlChar = xml_node_list_get_string((*ctx).doc, (*attr).children, 1);
     /* todo: should we log an error if value==NULL ? */
     if !value.is_null() {
         buffer = xml_c11n_normalize_attr(value);
@@ -2031,7 +2031,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
     /*
      * Cleanup
      */
-    xmlFreePropList(attrs_to_delete);
+    xml_free_prop_list(attrs_to_delete);
     xml_list_delete(list);
     0
 }

@@ -30,9 +30,10 @@ use exml::libxml::{
         xml_relaxng_validate_doc, XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr,
     },
     tree::{
-        xmlGetLineNo, xmlNodeDump, xml_buffer_add, xml_buffer_create, xml_buffer_empty,
-        xml_buffer_free, xml_buffer_set_allocation_scheme, xml_doc_get_root_element, xml_free_doc,
-        xml_get_prop, XmlBufferAllocationScheme, XmlBufferPtr, XmlDocPtr, XmlNodePtr,
+        xml_buffer_add, xml_buffer_create, xml_buffer_empty, xml_buffer_free,
+        xml_buffer_set_allocation_scheme, xml_doc_get_root_element, xml_free_doc, xml_get_line_no,
+        xml_get_prop, xml_node_dump, XmlBufferAllocationScheme, XmlBufferPtr, XmlDocPtr,
+        XmlNodePtr,
     },
     uri::xml_build_uri,
     xml_io::xmlNoNetExternalEntityLoader,
@@ -353,7 +354,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         test_log!(
             logfile,
             "Failed to find test in correct line {}\n",
-            xmlGetLineNo(cur)
+            xml_get_line_no(cur)
         );
         return 1;
     }
@@ -369,7 +370,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         fatal_error();
     }
     xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xmlNodeDump(buf, (*test).doc, test, 0, 0);
+    xml_node_dump(buf, (*test).doc, test, 0, 0);
     let pctxt: XmlRelaxNGParserCtxtPtr =
         xmlRelaxNGNewMemParserCtxt((*buf).content as *const c_char, (*buf).using as _);
     xml_relaxng_set_parser_errors(
@@ -384,7 +385,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         test_log!(
             logfile,
             "Failed to detect incorrect RNG line {}\n",
-            xmlGetLineNo(test)
+            xml_get_line_no(test)
         );
         ret = 1;
     }
@@ -400,7 +401,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         test_log!(
             logfile,
             "Validation of tests starting line {} leaked {}\n",
-            xmlGetLineNo(cur),
+            xml_get_line_no(cur),
             xml_mem_used() - memt
         );
         NB_LEAKS += 1;
@@ -420,13 +421,13 @@ unsafe extern "C" fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar
         fatal_error();
     }
     xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xmlNodeDump(buf, (*tst).doc, tst, 0, 0);
+    xml_node_dump(buf, (*tst).doc, tst, 0, 0);
 
     while !tst.is_null() {
         test = get_next(tst, c"./*".as_ptr() as _);
         if !test.is_null() {
             xml_buffer_empty(buf);
-            xmlNodeDump(buf, (*test).doc, test, 0, 0);
+            xml_node_dump(buf, (*test).doc, test, 0, 0);
             name = get_string(tst, c"string(@name)".as_ptr() as _);
             content = xml_strdup((*buf).content);
             if !name.is_null() && !content.is_null() {
@@ -505,7 +506,10 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
 
     test = get_next(cur, c"./*".as_ptr() as _);
     if test.is_null() {
-        eprintln!("Failed to find test in correct line {}", xmlGetLineNo(cur));
+        eprintln!(
+            "Failed to find test in correct line {}",
+            xml_get_line_no(cur)
+        );
         return 1;
     }
 
@@ -520,7 +524,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         fatal_error();
     }
     xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xmlNodeDump(buf, (*test).doc, test, 0, 0);
+    xml_node_dump(buf, (*test).doc, test, 0, 0);
     let pctxt: XmlRelaxNGParserCtxtPtr =
         xmlRelaxNGNewMemParserCtxt((*buf).content as *const c_char, (*buf).using as _);
     xml_relaxng_set_parser_errors(
@@ -539,7 +543,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         test_log!(
             logfile,
             "Failed to parse RNGtest line {}\n",
-            xmlGetLineNo(test)
+            xml_get_line_no(test)
         );
         NB_ERRORS += 1;
         ret = 1;
@@ -554,7 +558,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             test_log!(
                 logfile,
                 "Validation of tests starting line {} leaked {}\n",
-                xmlGetLineNo(cur),
+                xml_get_line_no(cur),
                 xml_mem_used() - memt
             );
             NB_LEAKS += 1;
@@ -571,14 +575,14 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         if test.is_null() {
             eprintln!(
                 "Failed to find test in <valid> line {}\n",
-                xmlGetLineNo(tmp),
+                xml_get_line_no(tmp),
             );
         } else {
             xml_buffer_empty(buf);
             if !dtd.is_null() {
                 xml_buffer_add(buf, dtd, -1);
             }
-            xmlNodeDump(buf, (*test).doc, test, 0, 0);
+            xml_node_dump(buf, (*test).doc, test, 0, 0);
 
             /*
              * We are ready to run the test
@@ -596,7 +600,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 test_log!(
                     logfile,
                     "Failed to parse valid instance line {}\n",
-                    xmlGetLineNo(tmp)
+                    xml_get_line_no(tmp)
                 );
                 NB_ERRORS += 1;
             } else {
@@ -615,7 +619,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                         test_log!(
                             logfile,
                             "Failed to validate valid instance line {}\n",
-                            xmlGetLineNo(tmp)
+                            xml_get_line_no(tmp)
                         );
                         NB_ERRORS += 1;
                     }
@@ -623,7 +627,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                         test_log!(
                             logfile,
                             "Internal error validating instance line {}\n",
-                            xmlGetLineNo(tmp)
+                            xml_get_line_no(tmp)
                         );
                         NB_ERRORS += 1;
                     }
@@ -636,7 +640,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 test_log!(
                     logfile,
                     "Validation of instance line {} leaked {}\n",
-                    xmlGetLineNo(tmp),
+                    xml_get_line_no(tmp),
                     xml_mem_used() - mem
                 );
                 xml_memory_dump();
@@ -657,11 +661,11 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         if test.is_null() {
             eprintln!(
                 "Failed to find test in <invalid> line {}",
-                xmlGetLineNo(tmp)
+                xml_get_line_no(tmp)
             );
         } else {
             xml_buffer_empty(buf);
-            xmlNodeDump(buf, (*test).doc, test, 0, 0);
+            xml_node_dump(buf, (*test).doc, test, 0, 0);
 
             /*
              * We are ready to run the test
@@ -679,7 +683,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 test_log!(
                     logfile,
                     "Failed to parse valid instance line {}\n",
-                    xmlGetLineNo(tmp)
+                    xml_get_line_no(tmp)
                 );
                 NB_ERRORS += 1;
             } else {
@@ -698,7 +702,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                         test_log!(
                             logfile,
                             "Failed to detect invalid instance line {}\n",
-                            xmlGetLineNo(tmp)
+                            xml_get_line_no(tmp)
                         );
                         NB_ERRORS += 1;
                     }
@@ -706,7 +710,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                         test_log!(
                             logfile,
                             "Internal error validating instance line {}\n",
-                            xmlGetLineNo(tmp)
+                            xml_get_line_no(tmp)
                         );
                         NB_ERRORS += 1;
                     }
@@ -719,7 +723,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 test_log!(
                     logfile,
                     "Validation of instance line {} leaked {}\n",
-                    xmlGetLineNo(tmp),
+                    xml_get_line_no(tmp),
                     xml_mem_used() - mem
                 );
                 xml_memory_dump();
@@ -740,7 +744,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         test_log!(
             logfile,
             "Validation of tests starting line {} leaked {}\n",
-            xmlGetLineNo(cur),
+            xml_get_line_no(cur),
             xml_mem_used() - memt
         );
         NB_LEAKS += 1;
@@ -962,7 +966,7 @@ unsafe extern "C" fn xstc_test_instance(
         test_log!(
             logfile,
             "testGroup line {} misses href for schemaDocument\n",
-            xmlGetLineNo(cur)
+            xml_get_line_no(cur)
         );
         ret = -1;
     // goto done;
@@ -971,7 +975,7 @@ unsafe extern "C" fn xstc_test_instance(
         if path.is_null() {
             eprintln!(
                 "Failed to build path to schemas testGroup line {} : {}",
-                xmlGetLineNo(cur),
+                xml_get_line_no(cur),
                 CStr::from_ptr(href as _).to_string_lossy()
             );
             ret = -1;
@@ -980,7 +984,7 @@ unsafe extern "C" fn xstc_test_instance(
             test_log!(
                 logfile,
                 "schemas for testGroup line {} is missing: {}\n",
-                xmlGetLineNo(cur),
+                xml_get_line_no(cur),
                 CStr::from_ptr(path as _).to_string_lossy()
             );
             ret = -1;
@@ -990,7 +994,7 @@ unsafe extern "C" fn xstc_test_instance(
             if validity.is_null() {
                 eprintln!(
                     "instanceDocument line {} misses expected validity",
-                    xmlGetLineNo(cur)
+                    xml_get_line_no(cur)
                 );
                 ret = -1;
                 // goto done;
@@ -1056,7 +1060,7 @@ unsafe extern "C" fn xstc_test_instance(
                         test_log!(
                             logfile,
                             "instanceDocument line {} has unexpected validity value{}\n",
-                            xmlGetLineNo(cur),
+                            xml_get_line_no(cur),
                             CStr::from_ptr(validity as _).to_string_lossy()
                         );
                         ret = -1;
@@ -1088,7 +1092,7 @@ unsafe extern "C" fn xstc_test_instance(
         test_log!(
             logfile,
             "Validation of tests starting line {} leaked {}\n",
-            xmlGetLineNo(cur),
+            xml_get_line_no(cur),
             xml_mem_used() - mem
         );
         NB_LEAKS += 1;
@@ -1120,7 +1124,7 @@ unsafe extern "C" fn xstc_test_group(
         test_log!(
             logfile,
             "testGroup line {} misses href for schemaDocument\n",
-            xmlGetLineNo(cur)
+            xml_get_line_no(cur)
         );
         ret = -1;
     // goto done;
@@ -1130,7 +1134,7 @@ unsafe extern "C" fn xstc_test_group(
             test_log!(
                 logfile,
                 "Failed to build path to schemas testGroup line {} : {}\n",
-                xmlGetLineNo(cur),
+                xml_get_line_no(cur),
                 CStr::from_ptr(href as _).to_string_lossy()
             );
             ret = -1;
@@ -1139,7 +1143,7 @@ unsafe extern "C" fn xstc_test_group(
             test_log!(
                 logfile,
                 "schemas for testGroup line {} is missing: {}\n",
-                xmlGetLineNo(cur),
+                xml_get_line_no(cur),
                 CStr::from_ptr(path as _).to_string_lossy()
             );
             ret = -1;
@@ -1153,7 +1157,7 @@ unsafe extern "C" fn xstc_test_group(
                 test_log!(
                     logfile,
                     "testGroup line {} misses expected validity\n",
-                    xmlGetLineNo(cur)
+                    xml_get_line_no(cur)
                 );
                 ret = -1;
                 // goto done;
@@ -1243,7 +1247,7 @@ unsafe extern "C" fn xstc_test_group(
                     test_log!(
                         logfile,
                         "testGroup line {} misses unexpected validity value{}\n",
-                        xmlGetLineNo(cur),
+                        xml_get_line_no(cur),
                         CStr::from_ptr(validity as _).to_string_lossy()
                     );
                     ret = -1;
@@ -1271,7 +1275,7 @@ unsafe extern "C" fn xstc_test_group(
         test_log!(
             logfile,
             "Processing test line {} {} leaked {}\n",
-            xmlGetLineNo(cur),
+            xml_get_line_no(cur),
             CStr::from_ptr(path as _).to_string_lossy(),
             xml_mem_used() - mem
         );

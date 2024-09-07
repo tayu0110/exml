@@ -79,13 +79,14 @@ use crate::{
             XML_SCHEMAS_TYPE_WHITESPACE_REPLACE,
         },
         tree::{
-            xmlAddChild, xmlFreeNode, xmlGetNoNsProp, xmlGetNsList, xmlNewDocText, xmlNewNs,
-            xmlNewNsProp, xmlNewProp, xmlNodeGetContent, xmlNodeGetSpacePreserve,
-            xmlNodeListGetString, xmlSearchNs, xmlSearchNsByHref, xml_doc_get_root_element,
-            xml_free_doc, xml_has_prop, xml_node_get_base, xml_split_qname2, xml_split_qname3,
-            xml_unlink_node, xml_validate_ncname, xml_validate_qname, XmlAttrPtr, XmlAttributeType,
-            XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr,
-            XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+            xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_node,
+            xml_get_no_ns_prop, xml_get_ns_list, xml_has_prop, xml_new_doc_text, xml_new_ns,
+            xml_new_ns_prop, xml_new_prop, xml_node_get_base, xml_node_get_content,
+            xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns,
+            xml_search_ns_by_href, xml_split_qname2, xml_split_qname3, xml_unlink_node,
+            xml_validate_ncname, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlDocPtr,
+            XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr,
+            XmlNsPtr, XML_XML_NAMESPACE,
         },
         uri::xml_build_uri,
         valid::{xml_add_id, xml_free_enumeration},
@@ -2617,7 +2618,7 @@ unsafe extern "C" fn xml_schema_lookup_namespace(
             );
             return null_mut();
         }
-        let ns: XmlNsPtr = xmlSearchNs(
+        let ns: XmlNsPtr = xml_search_ns(
             (*(*(*vctxt).inode).node).doc,
             (*(*vctxt).inode).node,
             prefix,
@@ -2707,7 +2708,7 @@ unsafe extern "C" fn xml_schema_validate_notation(
             if !vctxt.is_null() {
                 ns_name = xml_schema_lookup_namespace(vctxt, prefix);
             } else if !node.is_null() {
-                let ns: XmlNsPtr = xmlSearchNs((*node).doc, node, prefix);
+                let ns: XmlNsPtr = xml_search_ns((*node).doc, node, prefix);
                 if !ns.is_null() {
                     ns_name = (*ns).href.load(Ordering::Relaxed);
                 }
@@ -5021,12 +5022,12 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
     'main: while !cur.is_null() {
         if !delete.is_null() {
             xml_unlink_node(delete);
-            xmlFreeNode(delete);
+            xml_free_node(delete);
             delete = null_mut();
         }
         'skip_children: {
             if (*cur).typ == XmlElementType::XmlTextNode {
-                if IS_BLANK_NODE!(cur) && xmlNodeGetSpacePreserve(cur) != 1 {
+                if IS_BLANK_NODE!(cur) && xml_node_get_space_preserve(cur) != 1 {
                     delete = cur;
                 }
             } else if !matches!(
@@ -5080,7 +5081,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
     }
     if !delete.is_null() {
         xml_unlink_node(delete);
-        xmlFreeNode(delete);
+        xml_free_node(delete);
         // delete = null_mut();
     }
 }
@@ -5398,7 +5399,7 @@ unsafe extern "C" fn xml_schema_get_prop(
     node: XmlNodePtr,
     name: *const c_char,
 ) -> *const XmlChar {
-    let val: *mut XmlChar = xmlGetNoNsProp(node, name as _);
+    let val: *mut XmlChar = xml_get_no_ns_prop(node, name as _);
     if val.is_null() {
         return null_mut();
     }
@@ -6104,7 +6105,7 @@ unsafe extern "C" fn xml_schema_get_prop_node(node: XmlNodePtr, name: *const c_c
 }
 
 unsafe extern "C" fn xml_schema_get_node_content_no_dict(node: XmlNodePtr) -> *const XmlChar {
-    xmlNodeGetContent(node)
+    xml_node_get_content(node)
 }
 
 /**
@@ -6390,7 +6391,7 @@ unsafe extern "C" fn xml_schema_get_node_content(
 ) -> *const XmlChar {
     let mut val: *mut XmlChar;
 
-    val = xmlNodeGetContent(node);
+    val = xml_node_get_content(node);
     if val.is_null() {
         val = xml_strdup(c"".as_ptr() as _);
     }
@@ -7804,7 +7805,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     }
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
-        ns = xmlSearchNs((*attr).doc, (*attr).parent, null_mut());
+        ns = xml_search_ns((*attr).doc, (*attr).parent, null_mut());
         if !ns.is_null()
             && !(*ns).href.load(Ordering::Relaxed).is_null()
             && *(*ns).href.load(Ordering::Relaxed).add(0) != 0
@@ -7828,7 +7829,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     *local = xml_split_qname3(value, addr_of_mut!(len));
     *local = xmlDictLookup((*ctxt).dict, *local, -1);
     let pref: *const XmlChar = xmlDictLookup((*ctxt).dict, value, len);
-    ns = xmlSearchNs((*attr).doc, (*attr).parent, pref);
+    ns = xml_search_ns((*attr).doc, (*attr).parent, pref);
     if ns.is_null() {
         xml_schema_psimple_type_err(ctxt, XmlParserErrors::XmlSchemapS4sAttrInvalidValue, owner_item, attr as XmlNodePtr, xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname), null_mut(), value, c"The value '%s' of simple type 'xs:QName' has no corresponding namespace declaration in scope".as_ptr() as _, value, null_mut());
         return (*ctxt).err;
@@ -8595,7 +8596,7 @@ unsafe extern "C" fn xml_schema_pget_bool_node_value(
 ) -> c_int {
     let mut res: c_int = 0;
 
-    let value: *mut XmlChar = xmlNodeGetContent(node);
+    let value: *mut XmlChar = xml_node_get_content(node);
     /*
      * 3.2.2.1 Lexical representation
      * An instance of a datatype that is defined as `boolean`
@@ -10879,7 +10880,7 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
         let ns_list = if attr.is_null() {
             null_mut()
         } else {
-            xmlGetNsList((*attr).doc, (*attr).parent)
+            xml_get_ns_list((*attr).doc, (*attr).parent)
         };
         /*
          * Build an array of prefixes and namespaces.
@@ -24018,7 +24019,7 @@ unsafe extern "C" fn xml_schema_annot_dump(output: *mut FILE, annot: XmlSchemaAn
         return;
     }
 
-    let content: *mut XmlChar = xmlNodeGetContent((*annot).content);
+    let content: *mut XmlChar = xml_node_get_content((*annot).content);
     if !content.is_null() {
         fprintf(output, c"  Annot: %s\n".as_ptr() as _, content);
         xml_free(content as _);
@@ -28097,7 +28098,8 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                         }
 
                         if (*iattr).ns_name.is_null() {
-                            if xmlNewProp(def_attr_owner_elem, (*iattr).local_name, value).is_null()
+                            if xml_new_prop(def_attr_owner_elem, (*iattr).local_name, value)
+                                .is_null()
                             {
                                 VERROR_INT!(
                                     vctxt,
@@ -28112,7 +28114,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                         } else {
                             let mut ns: XmlNsPtr;
 
-                            ns = xmlSearchNsByHref(
+                            ns = xml_search_ns_by_href(
                                 (*def_attr_owner_elem).doc,
                                 def_attr_owner_elem,
                                 (*iattr).ns_name,
@@ -28133,7 +28135,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                                         counter,
                                     );
                                     counter += 1;
-                                    ns = xmlSearchNs(
+                                    ns = xml_search_ns(
                                         (*def_attr_owner_elem).doc,
                                         def_attr_owner_elem,
                                         prefix.as_ptr(),
@@ -28153,7 +28155,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
 
                                     !ns.is_null()
                                 } {}
-                                ns = xmlNewNs(
+                                ns = xml_new_ns(
                                     (*vctxt).validation_root,
                                     (*iattr).ns_name,
                                     prefix.as_ptr(),
@@ -28165,7 +28167,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                              * If we have QNames: do we need to ensure there's a
                              * prefix defined for the QName?
                              */
-                            xmlNewNsProp(def_attr_owner_elem, ns, (*iattr).local_name, value);
+                            xml_new_ns_prop(def_attr_owner_elem, ns, (*iattr).local_name, value);
                         }
                         if !norm_value.is_null() {
                             xml_free(norm_value as _);
@@ -30140,10 +30142,10 @@ unsafe extern "C" fn xmlSchemaValidatorPopElem(vctxt: XmlSchemaValidCtxtPtr) -> 
                     let norm_value =
                         xml_schema_normalize_value((*inode).type_def, (*(*inode).decl).value);
                     if !norm_value.is_null() {
-                        text_child = xmlNewDocText((*(*inode).node).doc, norm_value);
+                        text_child = xml_new_doc_text((*(*inode).node).doc, norm_value);
                         xml_free(norm_value as _);
                     } else {
-                        text_child = xmlNewDocText((*(*inode).node).doc, (*(*inode).decl).value);
+                        text_child = xml_new_doc_text((*(*inode).node).doc, (*(*inode).decl).value);
                     }
                     if text_child.is_null() {
                         VERROR_INT!(
@@ -30153,7 +30155,7 @@ unsafe extern "C" fn xmlSchemaValidatorPopElem(vctxt: XmlSchemaValidCtxtPtr) -> 
                         );
                         break 'internal_error;
                     } else {
-                        xmlAddChild((*inode).node, text_child);
+                        xml_add_child((*inode).node, text_child);
                     }
                 }
             } else if !INODE_NILLED!(inode) {
@@ -30464,7 +30466,7 @@ unsafe extern "C" fn xmlSchemaVDocWalk(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
                             (*attr).name,
                             ns_name,
                             0,
-                            xmlNodeListGetString((*attr).doc, (*attr).children, 1),
+                            xml_node_list_get_string((*attr).doc, (*attr).children, 1),
                             1,
                         );
                         if ret == -1 {

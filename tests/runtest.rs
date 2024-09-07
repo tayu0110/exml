@@ -50,8 +50,8 @@ use exml::{
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::{xml_relaxng_init_types, XmlRelaxNGPtr},
         tree::{
-            xmlDocDumpMemory, xmlSaveFile, xml_free_doc, XmlDoc, XmlDocPtr, XmlElementContentPtr,
-            XmlElementType, XmlEnumerationPtr, XmlNodePtr,
+            xml_doc_dump_memory, xml_free_doc, xml_save_file, XmlDoc, XmlDocPtr,
+            XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlNodePtr,
         },
         uri::{
             xml_build_uri, xml_create_uri, xml_free_uri, xml_normalize_uri_path,
@@ -2183,7 +2183,7 @@ unsafe extern "C" fn old_parse_test(
         eprintln!("out of memory");
         fatal_error();
     }
-    xmlSaveFile(temp, doc);
+    xml_save_file(temp, doc);
     if compare_files(temp, result) != 0 {
         res = 1;
     }
@@ -2203,7 +2203,7 @@ unsafe extern "C" fn old_parse_test(
     if doc.is_null() {
         return 1;
     }
-    xmlSaveFile(temp, doc);
+    xml_save_file(temp, doc);
     if compare_files(temp, result) != 0 {
         res = 1;
     }
@@ -2349,7 +2349,7 @@ unsafe extern "C" fn push_parse_test(
             addr_of_mut!(size),
         );
     } else {
-        xmlDocDumpMemory(
+        xml_doc_dump_memory(
             doc,
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
@@ -2357,7 +2357,7 @@ unsafe extern "C" fn push_parse_test(
     }
     #[cfg(not(feature = "html"))]
     {
-        xmlDocDumpMemory(
+        xml_doc_dump_memory(
             doc,
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
@@ -2557,7 +2557,7 @@ unsafe extern "C" fn push_boundary_test(
             xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
         },
         sax2::{xmlSAX2InitHtmlDefaultSAXHandler, xmlSAXVersion},
-        tree::xmlDocDumpMemory,
+        tree::xml_doc_dump_memory,
     };
     use libc::memset;
 
@@ -2795,7 +2795,7 @@ unsafe extern "C" fn push_boundary_test(
             addr_of_mut!(size),
         );
     } else {
-        xmlDocDumpMemory(
+        xml_doc_dump_memory(
             doc,
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
@@ -2803,7 +2803,7 @@ unsafe extern "C" fn push_boundary_test(
     }
     #[cfg(not(feature = "html"))]
     {
-        xmlDocDumpMemory(
+        xml_doc_dump_memory(
             doc,
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
@@ -2874,7 +2874,7 @@ unsafe extern "C" fn mem_parse_test(
     if doc.is_null() {
         return 1;
     }
-    xmlDocDumpMemory(
+    xml_doc_dump_memory(
         doc,
         addr_of_mut!(base) as *mut *mut XmlChar,
         addr_of_mut!(size),
@@ -2937,7 +2937,7 @@ unsafe extern "C" fn noent_parse_test(
         eprintln!("Out of memory");
         fatal_error();
     }
-    xmlSaveFile(temp, doc);
+    xml_save_file(temp, doc);
     if compare_files(temp, result) != 0 {
         res = 1;
     }
@@ -2950,7 +2950,7 @@ unsafe extern "C" fn noent_parse_test(
     if doc.is_null() {
         return 1;
     }
-    xmlSaveFile(temp, doc);
+    xml_save_file(temp, doc);
     if compare_files(temp, result) != 0 {
         res = 1;
     }
@@ -3016,7 +3016,7 @@ unsafe extern "C" fn err_parse_test(
                     addr_of_mut!(size),
                 );
             } else {
-                xmlDocDumpMemory(
+                xml_doc_dump_memory(
                     doc,
                     addr_of_mut!(base) as *mut *mut XmlChar,
                     addr_of_mut!(size),
@@ -3024,7 +3024,7 @@ unsafe extern "C" fn err_parse_test(
             }
             #[cfg(not(feature = "html"))]
             {
-                xmlDocDumpMemory(
+                xml_doc_dump_memory(
                     doc,
                     addr_of_mut!(base) as *mut *mut XmlChar,
                     addr_of_mut!(size),
@@ -3111,7 +3111,7 @@ unsafe extern "C" fn fd_parse_test(
                     addr_of_mut!(size),
                 );
             } else {
-                xmlDocDumpMemory(
+                xml_doc_dump_memory(
                     doc,
                     addr_of_mut!(base) as *mut *mut XmlChar,
                     addr_of_mut!(size),
@@ -3119,7 +3119,7 @@ unsafe extern "C" fn fd_parse_test(
             }
             #[cfg(not(feature = "html"))]
             {
-                xmlDocDumpMemory(
+                xml_doc_dump_memory(
                     doc,
                     addr_of_mut!(base) as *mut *mut XmlChar,
                     addr_of_mut!(size),
@@ -4968,7 +4968,7 @@ unsafe extern "C" fn pattern_node(
 ) {
     use exml::libxml::{
         pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-        tree::xmlGetNodePath,
+        tree::xml_get_node_path,
         xmlreader::{
             xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri,
             xml_text_reader_current_node, xml_text_reader_is_empty_element,
@@ -4987,7 +4987,7 @@ unsafe extern "C" fn pattern_node(
         is_match = xml_pattern_match(patternc, xml_text_reader_current_node(reader));
 
         if is_match != 0 {
-            path = xmlGetNodePath(xml_text_reader_current_node(reader));
+            path = xml_get_node_path(xml_text_reader_current_node(reader));
             writeln!(
                 out,
                 "Node {} matches pattern {}",
@@ -5012,7 +5012,7 @@ unsafe extern "C" fn pattern_node(
                 patstream = null_mut();
             } else if ret != is_match {
                 if path.is_null() {
-                    path = xmlGetNodePath(xml_text_reader_current_node(reader));
+                    path = xml_get_node_path(xml_text_reader_current_node(reader));
                 }
                 writeln!(out, "xmlPatternMatch and xmlStreamPush disagree").ok();
                 writeln!(
@@ -5264,7 +5264,7 @@ unsafe extern "C" fn load_xpath_expr(
         parser::{
             xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
         },
-        tree::{xmlNodeGetContent, xml_doc_get_root_element, XmlNsPtr},
+        tree::{xml_doc_get_root_element, xml_node_get_content, XmlNsPtr},
         xmlstring::xml_str_equal,
         xpath::{
             xml_xpath_eval_expression, xml_xpath_free_context, xml_xpath_new_context,
@@ -5321,7 +5321,7 @@ unsafe extern "C" fn load_xpath_expr(
         return null_mut();
     }
 
-    let expr: *mut XmlChar = xmlNodeGetContent(node);
+    let expr: *mut XmlChar = xml_node_get_content(node);
     if expr.is_null() {
         eprintln!(
             "Error: XPath content element is NULL \"{}\"",

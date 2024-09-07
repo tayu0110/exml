@@ -42,8 +42,8 @@ use crate::{
         },
         sax2::{xmlSAX2IgnorableWhitespace, xmlSAX2InitHtmlDefaultSAXHandler},
         tree::{
-            xmlGetIntSubset, xmlGetLastChild, xmlNodeIsText, xml_buf_shrink, xml_create_int_subset,
-            xml_free_doc, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
+            xml_buf_shrink, xml_create_int_subset, xml_free_doc, xml_get_int_subset,
+            xml_get_last_child, xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
         },
         uri::xml_canonic_path,
         xml_io::{
@@ -8875,7 +8875,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
 
     /* Only strip CDATA children of the body tag for strict HTML DTDs */
     if xml_str_equal((*ctxt).name, c"body".as_ptr() as _) != 0 && !(*ctxt).my_doc.is_null() {
-        dtd = xmlGetIntSubset((*ctxt).my_doc);
+        dtd = xml_get_int_subset((*ctxt).my_doc);
         if !dtd.is_null()
             && !(*dtd).external_id.is_null()
             && (xml_strcasecmp(
@@ -8891,7 +8891,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
     if (*ctxt).node.is_null() {
         return 0;
     }
-    last_child = xmlGetLastChild((*ctxt).node);
+    last_child = xml_get_last_child((*ctxt).node);
     while !last_child.is_null() && (*last_child).typ == XmlElementType::XmlCommentNode {
         last_child = (*last_child).prev;
     }
@@ -8908,7 +8908,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
                 return 0;
             }
         }
-    } else if xmlNodeIsText(last_child) != 0 {
+    } else if xml_node_is_text(last_child) != 0 {
         return 0;
     } else {
         /* keep ws in constructs like <p><b>xy</b> <i>z</i><p>
@@ -10077,7 +10077,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
     if (*ctxt).options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0
         && !(*ctxt).my_doc.is_null()
     {
-        dtd = xmlGetIntSubset((*ctxt).my_doc);
+        dtd = xml_get_int_subset((*ctxt).my_doc);
         if dtd.is_null() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,
@@ -11822,7 +11822,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
             ))
     {
-        let dtd: XmlDtdPtr = xmlGetIntSubset((*ctxt).my_doc);
+        let dtd: XmlDtdPtr = xml_get_int_subset((*ctxt).my_doc);
         if dtd.is_null() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,

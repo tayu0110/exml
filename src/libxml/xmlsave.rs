@@ -28,7 +28,7 @@ use crate::{
         parser::xml_init_parser,
         parser_internals::XML_STRING_TEXT_NOENC,
         tree::{
-            xmlGetIntSubset, xmlIsXHTML, xml_buffer_create, xml_buffer_set_allocation_scheme,
+            xml_buffer_create, xml_buffer_set_allocation_scheme, xml_get_int_subset, xml_is_xhtml,
             XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlBufferPtr,
             XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
             XML_LOCAL_NAMESPACE,
@@ -1119,7 +1119,7 @@ unsafe extern "C" fn xmlNsDumpOutputCtxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr) {
  */
 #[cfg(feature = "html")]
 unsafe extern "C" fn xhtmlAttrListDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr) {
-    use crate::libxml::tree::{xmlFreeNode, xmlNewDocText};
+    use crate::libxml::tree::{xml_free_node, xml_new_doc_text};
 
     use super::htmltree::htmlIsBooleanAttr;
 
@@ -1155,9 +1155,9 @@ unsafe extern "C" fn xhtmlAttrListDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlA
             && htmlIsBooleanAttr((*cur).name) != 0
         {
             if !(*cur).children.is_null() {
-                xmlFreeNode((*cur).children);
+                xml_free_node((*cur).children);
             }
-            (*cur).children = xmlNewDocText((*cur).doc, (*cur).name);
+            (*cur).children = xml_new_doc_text((*cur).doc, (*cur).name);
             if !(*cur).children.is_null() {
                 (*(*cur).children).parent = cur as _;
             }
@@ -1840,9 +1840,9 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
                 is_xhtml = 1;
             }
             if (*ctxt).options & XmlSaveOption::XmlSaveNoXhtml as i32 == 0 {
-                dtd = xmlGetIntSubset(cur);
+                dtd = xml_get_int_subset(cur);
                 if !dtd.is_null() {
-                    is_xhtml = xmlIsXHTML((*dtd).system_id, (*dtd).external_id);
+                    is_xhtml = xml_is_xhtml((*dtd).system_id, (*dtd).external_id);
                     if is_xhtml < 0 {
                         is_xhtml = 0;
                     }

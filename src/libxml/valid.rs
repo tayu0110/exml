@@ -14,7 +14,7 @@ use std::{
 use libc::{memset, size_t, strcat, strcmp, strlen};
 
 #[cfg(not(feature = "regexp"))]
-use crate::libxml::tree::xmlFreeNodeList;
+use crate::libxml::tree::xml_free_node_list;
 #[cfg(feature = "regexp")]
 use crate::libxml::xmlautomata::{
     xml_automata_compile, xml_automata_get_init_state, xml_automata_set_final_state,
@@ -46,14 +46,15 @@ use crate::{
         parser::{XmlParserCtxtPtr, XmlParserMode},
         parser_internals::xml_string_current_char,
         tree::{
-            xmlBufferWriteCHAR, xmlBufferWriteChar, xmlBufferWriteQuotedString, xmlFreeNode,
-            xmlGetLineNo, xmlIsBlankNode, xmlNewDocNode, xmlNodeListGetString, xml_build_qname,
-            xml_doc_get_root_element, xml_split_qname2, xml_split_qname3, xml_unlink_node,
-            XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType,
-            XmlBufferPtr, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent,
-            XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementPtr,
-            XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr,
-            XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
+            xml_buffer_write_char, xml_buffer_write_quoted_string, xml_buffer_write_xml_char,
+            xml_build_qname, xml_doc_get_root_element, xml_free_node, xml_get_line_no,
+            xml_is_blank_node, xml_new_doc_node, xml_node_list_get_string, xml_split_qname2,
+            xml_split_qname3, xml_unlink_node, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,
+            XmlAttributePtr, XmlAttributeType, XmlBufferPtr, XmlDocProperties, XmlDocPtr,
+            XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
+            XmlElementContentType, XmlElementPtr, XmlElementType, XmlElementTypeVal,
+            XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation,
+            XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
         },
         xmlautomata::{
             xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
@@ -519,20 +520,20 @@ pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufferPtr, nota: XmlNota
     if buf.is_null() || nota.is_null() {
         return;
     }
-    xmlBufferWriteChar(buf, c"<!NOTATION ".as_ptr() as _);
-    xmlBufferWriteCHAR(buf, (*nota).name as _);
+    xml_buffer_write_char(buf, c"<!NOTATION ".as_ptr() as _);
+    xml_buffer_write_xml_char(buf, (*nota).name as _);
     if !(*nota).public_id.is_null() {
-        xmlBufferWriteChar(buf, c" PUBLIC ".as_ptr() as _);
-        xmlBufferWriteQuotedString(buf, (*nota).public_id as _);
+        xml_buffer_write_char(buf, c" PUBLIC ".as_ptr() as _);
+        xml_buffer_write_quoted_string(buf, (*nota).public_id as _);
         if !(*nota).system_id.is_null() {
-            xmlBufferWriteChar(buf, c" ".as_ptr() as _);
-            xmlBufferWriteQuotedString(buf, (*nota).system_id as _);
+            xml_buffer_write_char(buf, c" ".as_ptr() as _);
+            xml_buffer_write_quoted_string(buf, (*nota).system_id as _);
         }
     } else {
-        xmlBufferWriteChar(buf, c" SYSTEM ".as_ptr() as _);
-        xmlBufferWriteQuotedString(buf, (*nota).system_id as _);
+        xml_buffer_write_char(buf, c" SYSTEM ".as_ptr() as _);
+        xml_buffer_write_quoted_string(buf, (*nota).system_id as _);
     }
-    xmlBufferWriteChar(buf, c" >\n".as_ptr() as _);
+    xml_buffer_write_char(buf, c" >\n".as_ptr() as _);
 }
 
 /**
@@ -1497,13 +1498,13 @@ unsafe extern "C" fn xml_dump_element_occur(buf: XmlBufferPtr, cur: XmlElementCo
     match (*cur).ocur {
         XmlElementContentOccur::XmlElementContentOnce => {}
         XmlElementContentOccur::XmlElementContentOpt => {
-            xmlBufferWriteChar(buf, c"?".as_ptr() as _);
+            xml_buffer_write_char(buf, c"?".as_ptr() as _);
         }
         XmlElementContentOccur::XmlElementContentMult => {
-            xmlBufferWriteChar(buf, c"*".as_ptr() as _);
+            xml_buffer_write_char(buf, c"*".as_ptr() as _);
         }
         XmlElementContentOccur::XmlElementContentPlus => {
-            xmlBufferWriteChar(buf, c"+".as_ptr() as _);
+            xml_buffer_write_char(buf, c"+".as_ptr() as _);
         }
     }
 }
@@ -1523,7 +1524,7 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufferPtr, content: XmlEle
         return;
     }
 
-    xmlBufferWriteChar(buf, c"(".as_ptr() as _);
+    xml_buffer_write_char(buf, c"(".as_ptr() as _);
     cur = content;
 
     while {
@@ -1534,14 +1535,14 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufferPtr, content: XmlEle
 
             match (*cur).typ {
                 XmlElementContentType::XmlElementContentPcdata => {
-                    xmlBufferWriteChar(buf, c"#PCDATA".as_ptr() as _);
+                    xml_buffer_write_char(buf, c"#PCDATA".as_ptr() as _);
                 }
                 XmlElementContentType::XmlElementContentElement => {
                     if !(*cur).prefix.is_null() {
-                        xmlBufferWriteCHAR(buf, (*cur).prefix);
-                        xmlBufferWriteChar(buf, c":".as_ptr() as _);
+                        xml_buffer_write_xml_char(buf, (*cur).prefix);
+                        xml_buffer_write_char(buf, c":".as_ptr() as _);
                     }
-                    xmlBufferWriteCHAR(buf, (*cur).name);
+                    xml_buffer_write_xml_char(buf, (*cur).name);
                 }
                 XmlElementContentType::XmlElementContentSeq
                 | XmlElementContentType::XmlElementContentOr => {
@@ -1553,7 +1554,7 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufferPtr, content: XmlEle
                                 XmlElementContentOccur::XmlElementContentOnce
                             ))
                     {
-                        xmlBufferWriteChar(buf, c"(".as_ptr() as _);
+                        xml_buffer_write_char(buf, c"(".as_ptr() as _);
                     }
                     cur = (*cur).c1;
                     break 'to_continue;
@@ -1582,15 +1583,15 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufferPtr, content: XmlEle
                 ) && ((*cur).typ != (*parent).typ
                     || !matches!((*cur).ocur, XmlElementContentOccur::XmlElementContentOnce))
                 {
-                    xmlBufferWriteChar(buf, c")".as_ptr() as _);
+                    xml_buffer_write_char(buf, c")".as_ptr() as _);
                 }
                 xml_dump_element_occur(buf, cur);
 
                 if cur == (*parent).c1 {
                     if (*parent).typ == XmlElementContentType::XmlElementContentSeq {
-                        xmlBufferWriteChar(buf, c" , ".as_ptr() as _);
+                        xml_buffer_write_char(buf, c" , ".as_ptr() as _);
                     } else if (*parent).typ == XmlElementContentType::XmlElementContentOr {
-                        xmlBufferWriteChar(buf, c" | ".as_ptr() as _);
+                        xml_buffer_write_char(buf, c" | ".as_ptr() as _);
                     }
 
                     cur = (*parent).c2;
@@ -1603,7 +1604,7 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufferPtr, content: XmlEle
         cur != content
     } {}
 
-    xmlBufferWriteChar(buf, c")".as_ptr() as _);
+    xml_buffer_write_char(buf, c")".as_ptr() as _);
     xml_dump_element_occur(buf, content);
 }
 
@@ -1622,44 +1623,44 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufferPtr, elem: XmlEleme
     }
     match (*elem).etype {
         XmlElementTypeVal::XmlElementTypeEmpty => {
-            xmlBufferWriteChar(buf, c"<!ELEMENT ".as_ptr() as _);
+            xml_buffer_write_char(buf, c"<!ELEMENT ".as_ptr() as _);
             if !(*elem).prefix.is_null() {
-                xmlBufferWriteCHAR(buf, (*elem).prefix);
-                xmlBufferWriteChar(buf, c":".as_ptr() as _);
+                xml_buffer_write_xml_char(buf, (*elem).prefix);
+                xml_buffer_write_char(buf, c":".as_ptr() as _);
             }
-            xmlBufferWriteCHAR(buf, (*elem).name);
-            xmlBufferWriteChar(buf, c" EMPTY>\n".as_ptr() as _);
+            xml_buffer_write_xml_char(buf, (*elem).name);
+            xml_buffer_write_char(buf, c" EMPTY>\n".as_ptr() as _);
         }
         XmlElementTypeVal::XmlElementTypeAny => {
-            xmlBufferWriteChar(buf, c"<!ELEMENT ".as_ptr() as _);
+            xml_buffer_write_char(buf, c"<!ELEMENT ".as_ptr() as _);
             if !(*elem).prefix.is_null() {
-                xmlBufferWriteCHAR(buf, (*elem).prefix);
-                xmlBufferWriteChar(buf, c":".as_ptr() as _);
+                xml_buffer_write_xml_char(buf, (*elem).prefix);
+                xml_buffer_write_char(buf, c":".as_ptr() as _);
             }
-            xmlBufferWriteCHAR(buf, (*elem).name);
-            xmlBufferWriteChar(buf, c" ANY>\n".as_ptr() as _);
+            xml_buffer_write_xml_char(buf, (*elem).name);
+            xml_buffer_write_char(buf, c" ANY>\n".as_ptr() as _);
         }
         XmlElementTypeVal::XmlElementTypeMixed => {
-            xmlBufferWriteChar(buf, c"<!ELEMENT ".as_ptr() as _);
+            xml_buffer_write_char(buf, c"<!ELEMENT ".as_ptr() as _);
             if !(*elem).prefix.is_null() {
-                xmlBufferWriteCHAR(buf, (*elem).prefix);
-                xmlBufferWriteChar(buf, c":".as_ptr() as _);
+                xml_buffer_write_xml_char(buf, (*elem).prefix);
+                xml_buffer_write_char(buf, c":".as_ptr() as _);
             }
-            xmlBufferWriteCHAR(buf, (*elem).name);
-            xmlBufferWriteChar(buf, c" ".as_ptr() as _);
+            xml_buffer_write_xml_char(buf, (*elem).name);
+            xml_buffer_write_char(buf, c" ".as_ptr() as _);
             xml_dump_element_content(buf, (*elem).content);
-            xmlBufferWriteChar(buf, c">\n".as_ptr() as _);
+            xml_buffer_write_char(buf, c">\n".as_ptr() as _);
         }
         XmlElementTypeVal::XmlElementTypeElement => {
-            xmlBufferWriteChar(buf, c"<!ELEMENT ".as_ptr() as _);
+            xml_buffer_write_char(buf, c"<!ELEMENT ".as_ptr() as _);
             if !(*elem).prefix.is_null() {
-                xmlBufferWriteCHAR(buf, (*elem).prefix);
-                xmlBufferWriteChar(buf, c":".as_ptr() as _);
+                xml_buffer_write_xml_char(buf, (*elem).prefix);
+                xml_buffer_write_char(buf, c":".as_ptr() as _);
             }
-            xmlBufferWriteCHAR(buf, (*elem).name);
-            xmlBufferWriteChar(buf, c" ".as_ptr() as _);
+            xml_buffer_write_xml_char(buf, (*elem).name);
+            xml_buffer_write_char(buf, c" ".as_ptr() as _);
             xml_dump_element_content(buf, (*elem).content);
-            xmlBufferWriteChar(buf, c">\n".as_ptr() as _);
+            xml_buffer_write_char(buf, c">\n".as_ptr() as _);
         }
         _ => {
             xml_err_valid(
@@ -2693,11 +2694,11 @@ unsafe extern "C" fn xml_dump_enumeration(buf: XmlBufferPtr, cur: XmlEnumeration
         return;
     }
 
-    xmlBufferWriteCHAR(buf, (*cur).name);
+    xml_buffer_write_xml_char(buf, (*cur).name);
     if (*cur).next.is_null() {
-        xmlBufferWriteChar(buf, c")".as_ptr() as _);
+        xml_buffer_write_char(buf, c")".as_ptr() as _);
     } else {
-        xmlBufferWriteChar(buf, c" | ".as_ptr() as _);
+        xml_buffer_write_char(buf, c" | ".as_ptr() as _);
         xml_dump_enumeration(buf, (*cur).next);
     }
 }
@@ -2715,45 +2716,45 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufferPtr, attr: XmlAtt
     if buf.is_null() || attr.is_null() {
         return;
     }
-    xmlBufferWriteChar(buf, c"<!ATTLIST ".as_ptr() as _);
-    xmlBufferWriteCHAR(buf, (*attr).elem);
-    xmlBufferWriteChar(buf, c" ".as_ptr() as _);
+    xml_buffer_write_char(buf, c"<!ATTLIST ".as_ptr() as _);
+    xml_buffer_write_xml_char(buf, (*attr).elem);
+    xml_buffer_write_char(buf, c" ".as_ptr() as _);
     if !(*attr).prefix.is_null() {
-        xmlBufferWriteCHAR(buf, (*attr).prefix);
-        xmlBufferWriteChar(buf, c":".as_ptr() as _);
+        xml_buffer_write_xml_char(buf, (*attr).prefix);
+        xml_buffer_write_char(buf, c":".as_ptr() as _);
     }
-    xmlBufferWriteCHAR(buf, (*attr).name);
+    xml_buffer_write_xml_char(buf, (*attr).name);
     match (*attr).atype {
         XmlAttributeType::XmlAttributeCdata => {
-            xmlBufferWriteChar(buf, c" CDATA".as_ptr() as _);
+            xml_buffer_write_char(buf, c" CDATA".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeId => {
-            xmlBufferWriteChar(buf, c" ID".as_ptr() as _);
+            xml_buffer_write_char(buf, c" ID".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeIdref => {
-            xmlBufferWriteChar(buf, c" IDREF".as_ptr() as _);
+            xml_buffer_write_char(buf, c" IDREF".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeIdrefs => {
-            xmlBufferWriteChar(buf, c" IDREFS".as_ptr() as _);
+            xml_buffer_write_char(buf, c" IDREFS".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeEntity => {
-            xmlBufferWriteChar(buf, c" ENTITY".as_ptr() as _);
+            xml_buffer_write_char(buf, c" ENTITY".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeEntities => {
-            xmlBufferWriteChar(buf, c" ENTITIES".as_ptr() as _);
+            xml_buffer_write_char(buf, c" ENTITIES".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeNmtoken => {
-            xmlBufferWriteChar(buf, c" NMTOKEN".as_ptr() as _);
+            xml_buffer_write_char(buf, c" NMTOKEN".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeNmtokens => {
-            xmlBufferWriteChar(buf, c" NMTOKENS".as_ptr() as _);
+            xml_buffer_write_char(buf, c" NMTOKENS".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeEnumeration => {
-            xmlBufferWriteChar(buf, c" (".as_ptr() as _);
+            xml_buffer_write_char(buf, c" (".as_ptr() as _);
             xml_dump_enumeration(buf, (*attr).tree);
         }
         XmlAttributeType::XmlAttributeNotation => {
-            xmlBufferWriteChar(buf, c" NOTATION (".as_ptr() as _);
+            xml_buffer_write_char(buf, c" NOTATION (".as_ptr() as _);
             xml_dump_enumeration(buf, (*attr).tree);
         }
         _ => {
@@ -2768,13 +2769,13 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufferPtr, attr: XmlAtt
     match (*attr).def {
         XmlAttributeDefault::XmlAttributeNone => {}
         XmlAttributeDefault::XmlAttributeRequired => {
-            xmlBufferWriteChar(buf, c" #REQUIRED".as_ptr() as _);
+            xml_buffer_write_char(buf, c" #REQUIRED".as_ptr() as _);
         }
         XmlAttributeDefault::XmlAttributeImplied => {
-            xmlBufferWriteChar(buf, c" #IMPLIED".as_ptr() as _);
+            xml_buffer_write_char(buf, c" #IMPLIED".as_ptr() as _);
         }
         XmlAttributeDefault::XmlAttributeFixed => {
-            xmlBufferWriteChar(buf, c" #FIXED".as_ptr() as _);
+            xml_buffer_write_char(buf, c" #FIXED".as_ptr() as _);
         }
         _ => {
             xml_err_valid(
@@ -2786,10 +2787,10 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufferPtr, attr: XmlAtt
         }
     }
     if !(*attr).default_value.is_null() {
-        xmlBufferWriteChar(buf, c" ".as_ptr() as _);
-        xmlBufferWriteQuotedString(buf, (*attr).default_value);
+        xml_buffer_write_char(buf, c" ".as_ptr() as _);
+        xml_buffer_write_quoted_string(buf, (*attr).default_value);
     }
-    xmlBufferWriteChar(buf, c">\n".as_ptr() as _);
+    xml_buffer_write_char(buf, c">\n".as_ptr() as _);
 }
 
 unsafe extern "C" fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> c_int {
@@ -2912,7 +2913,7 @@ pub unsafe extern "C" fn xml_add_id(
         (*ret).attr = attr;
         (*ret).name = null_mut();
     }
-    (*ret).lineno = xmlGetLineNo((*attr).parent) as _;
+    (*ret).lineno = xml_get_line_no((*attr).parent) as _;
 
     if xmlHashAddEntry(table, value, ret as _) < 0 {
         /*
@@ -3145,7 +3146,7 @@ pub unsafe extern "C" fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> c_in
         return -1;
     }
 
-    let id: *mut XmlChar = xmlNodeListGetString(doc, (*attr).children, 1);
+    let id: *mut XmlChar = xml_node_list_get_string(doc, (*attr).children, 1);
     if id.is_null() {
         return -1;
     }
@@ -3260,7 +3261,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
         (*ret).name = null_mut();
         (*ret).attr = attr;
     }
-    (*ret).lineno = xmlGetLineNo((*attr).parent) as _;
+    (*ret).lineno = xml_get_line_no((*attr).parent) as _;
 
     /* To add a reference :-
      * References are maintained as a list of references,
@@ -3453,7 +3454,7 @@ pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr)
         return -1;
     }
 
-    let id: *mut XmlChar = xmlNodeListGetString(doc, (*attr).children, 1);
+    let id: *mut XmlChar = xml_node_list_get_string(doc, (*attr).children, 1);
     if id.is_null() {
         return -1;
     }
@@ -4830,7 +4831,7 @@ pub unsafe extern "C" fn xml_validate_element(
         if matches!((*elem).typ, XmlElementType::XmlElementNode) {
             attr = (*elem).properties;
             while !attr.is_null() {
-                value = xmlNodeListGetString(doc, (*attr).children, 0);
+                value = xml_node_list_get_string(doc, (*attr).children, 0);
                 ret &= xml_validate_one_attribute(ctxt, doc, elem, attr, value);
                 if !value.is_null() {
                     xml_free(value as _);
@@ -5154,7 +5155,7 @@ unsafe extern "C" fn xmlSnprintfElements(
             ty @ XmlElementType::XmlTextNode
             | ty @ XmlElementType::XmlCdataSectionNode
             | ty @ XmlElementType::XmlEntityRefNode => 'to_break: {
-                if matches!(ty, XmlElementType::XmlTextNode) && xmlIsBlankNode(cur) != 0 {
+                if matches!(ty, XmlElementType::XmlTextNode) && xml_is_blank_node(cur) != 0 {
                     break 'to_break;
                 }
                 strcat(buf, c"CDATA".as_ptr() as _);
@@ -5796,7 +5797,7 @@ unsafe extern "C" fn xml_validate_element_content(
                                 }
                             }
                             XmlElementType::XmlTextNode => {
-                                if xmlIsBlankNode(cur) != 0 {
+                                if xml_is_blank_node(cur) != 0 {
                                     //  break;
                                 } else {
                                     ret = 0;
@@ -5925,7 +5926,8 @@ unsafe extern "C" fn xml_validate_element_content(
                         ty @ XmlElementType::XmlTextNode
                         | ty @ XmlElementType::XmlCdataSectionNode
                         | ty @ XmlElementType::XmlElementNode => {
-                            if matches!(ty, XmlElementType::XmlTextNode) && xmlIsBlankNode(cur) != 0
+                            if matches!(ty, XmlElementType::XmlTextNode)
+                                && xml_is_blank_node(cur) != 0
                             {
                                 // break;
                             } else {
@@ -7881,7 +7883,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     /*
      * Creates a dummy node and insert it into the tree
      */
-    let test_node: *mut XmlNode = xmlNewDocNode(
+    let test_node: *mut XmlNode = xml_new_doc_node(
         (*ref_node).doc,
         null_mut(),
         c"<!dummy?>".as_ptr() as _,
@@ -7951,7 +7953,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
      * Free up the dummy node
      */
     (*test_node).name = name;
-    xmlFreeNode(test_node);
+    xml_free_node(test_node);
 
     nb_valid_elements
 }
@@ -8852,7 +8854,7 @@ unsafe extern "C" fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodeP
                 child = (*child).next;
             }
             XmlElementType::XmlTextNode => {
-                if xmlIsBlankNode(child) != 0 {
+                if xml_is_blank_node(child) != 0 {
                     child = (*child).next;
                 } else {
                     return child;
