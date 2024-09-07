@@ -39,7 +39,7 @@ use crate::libxml::xml_io::XmlParserInputBufferPtr;
 use crate::libxml::xmlerror::XmlParserErrors;
 use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
 
-use crate::private::buf::{xmlBufCreate, xmlBufIsEmpty, xmlBufResetInput};
+use crate::private::buf::{xml_buf_create, xml_buf_is_empty, xml_buf_reset_input};
 use crate::private::enc::{xmlCharEncInput, xmlEncInputChunk};
 use crate::private::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
@@ -823,7 +823,7 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
 
     (*input).filename = null_mut();
     (*input).buf = buf;
-    xmlBufResetInput((*(*input).buf).buffer, input);
+    xml_buf_reset_input((*(*input).buf).buffer, input);
 
     input_push(ctxt, input);
     ctxt
@@ -1217,7 +1217,7 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
     /*
      * Is there already some content down the pipe to convert ?
      */
-    if xmlBufIsEmpty((*input_buf).buffer) == 0 {
+    if xml_buf_is_empty((*input_buf).buffer) == 0 {
         /*
          * FIXME: The BOM shouldn't be skipped here, but in the parsing code.
          */
@@ -1275,7 +1275,7 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
         xml_buf_shrink((*input_buf).buffer, processed);
         (*input).consumed += processed as u64;
         (*input_buf).raw = (*input_buf).buffer;
-        (*input_buf).buffer = xmlBufCreate();
+        (*input_buf).buffer = xml_buf_create();
         assert!(!(*input_buf).buffer.is_null());
         (*input_buf).rawconsumed = processed as u64;
         let using: size_t = xml_buf_use((*input_buf).raw);
@@ -1291,7 +1291,7 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
          * completely.
          */
         nbchars = xmlCharEncInput(input_buf, 1);
-        xmlBufResetInput((*input_buf).buffer, input);
+        xml_buf_reset_input((*input_buf).buffer, input);
         if nbchars < 0 {
             /* TODO: This could be an out of memory or an encoding error. */
             xml_err_internal(
@@ -1361,7 +1361,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
         return null_mut();
     }
     (*input).buf = buf;
-    xmlBufResetInput((*(*input).buf).buffer, input);
+    xml_buf_reset_input((*(*input).buf).buffer, input);
     input
 }
 
@@ -1820,7 +1820,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     }
     (*input_stream).directory = directory;
 
-    xmlBufResetInput((*(*input_stream).buf).buffer, input_stream);
+    xml_buf_reset_input((*(*input_stream).buf).buffer, input_stream);
     if (*ctxt).directory.is_null() && !directory.is_null() {
         (*ctxt).directory = xml_strdup(directory as *const XmlChar) as *mut c_char;
     }

@@ -25,7 +25,7 @@ use crate::{
         xmlerror::XmlParserErrors,
         xmlstring::xml_str_equal,
     },
-    private::buf::xmlBufResetInput,
+    private::buf::xml_buf_reset_input,
     xml_generic_error, XmlIsBlankCh, IS_BLANK_CH, IS_DIGIT, IS_LETTER, IS_PUBIDCHAR_CH, SYSCONFDIR,
 };
 
@@ -3930,7 +3930,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
 
     (*input_stream).filename = xml_canonic_path(filename as _) as _;
     (*input_stream).buf = buf;
-    xmlBufResetInput((*buf).buffer, input_stream);
+    xml_buf_reset_input((*buf).buffer, input_stream);
 
     input_push(ctxt, input_stream);
     if (*ctxt).directory.is_null() {

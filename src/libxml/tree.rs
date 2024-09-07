@@ -24,8 +24,9 @@ use crate::{
     },
     private::{
         buf::{
-            xmlBufAdd, xmlBufBackToBuffer, xmlBufCat, xmlBufCreate, xmlBufCreateSize, xmlBufDetach,
-            xmlBufFree, xmlBufFromBuffer, xmlBufIsEmpty, xmlBufSetAllocationScheme,
+            xml_buf_add, xml_buf_back_to_buffer, xml_buf_cat, xml_buf_create, xml_buf_create_size,
+            xml_buf_detach, xml_buf_free, xml_buf_from_buffer, xml_buf_is_empty,
+            xml_buf_set_allocation_scheme,
         },
         entities::{xmlEncodeAttributeEntities, XML_ENT_EXPANDING, XML_ENT_PARSED},
         error::__xml_simple_error,
@@ -7565,11 +7566,11 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
         return null_mut();
     }
 
-    let buf: XmlBufPtr = xmlBufCreateSize(0);
+    let buf: XmlBufPtr = xml_buf_create_size(0);
     if buf.is_null() {
         return null_mut();
     }
-    xmlBufSetAllocationScheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
 
     q = cur;
     while *cur != 0 {
@@ -7580,9 +7581,9 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
             /*
              * Save the current text.
              */
-            if cur != q && xmlBufAdd(buf, q, cur.offset_from(q) as _) != 0 {
+            if cur != q && xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
                 // goto out;
-                xmlBufFree(buf);
+                xml_buf_free(buf);
                 if !val.is_null() {
                     xml_free(val as _);
                 }
@@ -7660,7 +7661,7 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
                         q as _,
                     );
                     // goto out;
-                    xmlBufFree(buf);
+                    xml_buf_free(buf);
                     if !val.is_null() {
                         xml_free(val as _);
                     }
@@ -7681,9 +7682,9 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
                             Some(XmlEntityType::XmlInternalPredefinedEntity)
                         )
                     {
-                        if xmlBufCat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
+                        if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
                             // goto out;
-                            xmlBufFree(buf);
+                            xml_buf_free(buf);
                             if !val.is_null() {
                                 xml_free(val as _);
                             }
@@ -7696,11 +7697,11 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
                         /*
                          * Flush buffer so far
                          */
-                        if xmlBufIsEmpty(buf) == 0 {
+                        if xml_buf_is_empty(buf) == 0 {
                             node = xmlNewDocText(doc, null_mut());
                             if node.is_null() {
                                 // goto out;
-                                xmlBufFree(buf);
+                                xml_buf_free(buf);
                                 if !val.is_null() {
                                     xml_free(val as _);
                                 }
@@ -7709,7 +7710,7 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
                                 }
                                 return ret;
                             }
-                            (*node).content = xmlBufDetach(buf);
+                            (*node).content = xml_buf_detach(buf);
 
                             if last.is_null() {
                                 last = node;
@@ -7725,7 +7726,7 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
                         node = xmlNewReference(doc, val);
                         if node.is_null() {
                             // goto out;
-                            xmlBufFree(buf);
+                            xml_buf_free(buf);
                             if !val.is_null() {
                                 xml_free(val as _);
                             }
@@ -7778,9 +7779,9 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
                 let len: c_int = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
                 buffer[len as usize] = 0;
 
-                if xmlBufCat(buf, buffer.as_ptr() as _) != 0 {
+                if xml_buf_cat(buf, buffer.as_ptr() as _) != 0 {
                     // goto out;
-                    xmlBufFree(buf);
+                    xml_buf_free(buf);
                     if !val.is_null() {
                         xml_free(val as _);
                     }
@@ -7799,14 +7800,14 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
         /*
          * Handle the last piece of text.
          */
-        xmlBufAdd(buf, q, cur.offset_from(q) as _);
+        xml_buf_add(buf, q, cur.offset_from(q) as _);
     }
 
-    if xmlBufIsEmpty(buf) == 0 {
+    if xml_buf_is_empty(buf) == 0 {
         node = xmlNewDocText(doc, null_mut());
         if node.is_null() {
             // goto out;
-            xmlBufFree(buf);
+            xml_buf_free(buf);
             if !val.is_null() {
                 xml_free(val as _);
             }
@@ -7815,7 +7816,7 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
             }
             return ret;
         }
-        (*node).content = xmlBufDetach(buf);
+        (*node).content = xml_buf_detach(buf);
 
         if last.is_null() {
             head = node;
@@ -7828,7 +7829,7 @@ pub unsafe extern "C" fn xmlStringGetNodeList(
     head = null_mut();
 
     // out:
-    xmlBufFree(buf);
+    xml_buf_free(buf);
     if !val.is_null() {
         xml_free(val as _);
     }
@@ -7867,11 +7868,11 @@ pub unsafe extern "C" fn xmlStringLenGetNodeList(
     cur = value;
     let end: *const XmlChar = cur.add(len as usize);
 
-    let buf: XmlBufPtr = xmlBufCreateSize(0);
+    let buf: XmlBufPtr = xml_buf_create_size(0);
     if buf.is_null() {
         return null_mut();
     }
-    xmlBufSetAllocationScheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
 
     q = cur;
     while cur < end && *cur != 0 {
@@ -7882,9 +7883,9 @@ pub unsafe extern "C" fn xmlStringLenGetNodeList(
             /*
              * Save the current text.
              */
-            if cur != q && xmlBufAdd(buf, q, cur.offset_from(q) as _) != 0 {
+            if cur != q && xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
                 // goto out;
-                xmlBufFree(buf);
+                xml_buf_free(buf);
                 return ret;
             }
             // q = cur;
@@ -7981,7 +7982,7 @@ pub unsafe extern "C" fn xmlStringLenGetNodeList(
                         q as _,
                     );
                     // goto out;
-                    xmlBufFree(buf);
+                    xml_buf_free(buf);
                     return ret;
                 }
                 if cur != q {
@@ -7996,26 +7997,26 @@ pub unsafe extern "C" fn xmlStringLenGetNodeList(
                             Some(XmlEntityType::XmlInternalPredefinedEntity)
                         )
                     {
-                        if xmlBufCat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
+                        if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
                             // goto out;
-                            xmlBufFree(buf);
+                            xml_buf_free(buf);
                             return ret;
                         }
                     } else {
                         /*
                          * Flush buffer so far
                          */
-                        if xmlBufIsEmpty(buf) == 0 {
+                        if xml_buf_is_empty(buf) == 0 {
                             node = xmlNewDocText(doc, null_mut());
                             if node.is_null() {
                                 if !val.is_null() {
                                     xml_free(val as _);
                                 }
                                 // goto out;
-                                xmlBufFree(buf);
+                                xml_buf_free(buf);
                                 return ret;
                             }
-                            (*node).content = xmlBufDetach(buf);
+                            (*node).content = xml_buf_detach(buf);
 
                             if last.is_null() {
                                 last = node;
@@ -8034,7 +8035,7 @@ pub unsafe extern "C" fn xmlStringLenGetNodeList(
                                 xml_free(val as _);
                             }
                             // goto out;
-                            xmlBufFree(buf);
+                            xml_buf_free(buf);
                             return ret;
                         } else if !ent.is_null()
                             && (((*ent).flags & XML_ENT_PARSED as i32) == 0)
@@ -8079,9 +8080,9 @@ pub unsafe extern "C" fn xmlStringLenGetNodeList(
                 let l: c_int = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
                 buffer[l as usize] = 0;
 
-                if xmlBufCat(buf, buffer.as_ptr() as _) != 0 {
+                if xml_buf_cat(buf, buffer.as_ptr() as _) != 0 {
                     // goto out;
-                    xmlBufFree(buf);
+                    xml_buf_free(buf);
                     return ret;
                 }
                 // charval = 0;
@@ -8095,21 +8096,21 @@ pub unsafe extern "C" fn xmlStringLenGetNodeList(
         /*
          * Handle the last piece of text.
          */
-        if xmlBufAdd(buf, q, cur.offset_from(q) as _) != 0 {
+        if xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
             // goto out;
-            xmlBufFree(buf);
+            xml_buf_free(buf);
             return ret;
         }
     }
 
-    if xmlBufIsEmpty(buf) == 0 {
+    if xml_buf_is_empty(buf) == 0 {
         node = xmlNewDocText(doc, null_mut());
         if node.is_null() {
             // goto out;
-            xmlBufFree(buf);
+            xml_buf_free(buf);
             return ret;
         }
-        (*node).content = xmlBufDetach(buf);
+        (*node).content = xml_buf_detach(buf);
 
         if last.is_null() {
             ret = node;
@@ -8121,7 +8122,7 @@ pub unsafe extern "C" fn xmlStringLenGetNodeList(
     }
 
     // out:
-    xmlBufFree(buf);
+    xml_buf_free(buf);
     ret
 }
 
@@ -8565,14 +8566,14 @@ pub unsafe extern "C" fn xmlNodeGetContent(cur: *const XmlNode) -> *mut XmlChar 
     }
     match (*cur).typ {
         XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
-            let buf: XmlBufPtr = xmlBufCreateSize(64);
+            let buf: XmlBufPtr = xml_buf_create_size(64);
             if buf.is_null() {
                 return null_mut();
             }
-            xmlBufSetAllocationScheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+            xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
             xmlBufGetNodeContent(buf, cur);
-            let ret: *mut XmlChar = xmlBufDetach(buf);
-            xmlBufFree(buf);
+            let ret: *mut XmlChar = xml_buf_detach(buf);
+            xml_buf_free(buf);
             ret
         }
         XmlElementType::XmlAttributeNode => xml_get_prop_node_value_internal(cur as _),
@@ -8589,16 +8590,16 @@ pub unsafe extern "C" fn xmlNodeGetContent(cur: *const XmlNode) -> *mut XmlChar 
                 return null_mut();
             }
 
-            let buf: XmlBufPtr = xmlBufCreate();
+            let buf: XmlBufPtr = xml_buf_create();
             if buf.is_null() {
                 return null_mut();
             }
-            xmlBufSetAllocationScheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+            xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
 
             xmlBufGetNodeContent(buf, cur);
 
-            let ret: *mut XmlChar = xmlBufDetach(buf);
-            xmlBufFree(buf);
+            let ret: *mut XmlChar = xml_buf_detach(buf);
+            xml_buf_free(buf);
             ret
         }
         XmlElementType::XmlEntityNode
@@ -8608,16 +8609,16 @@ pub unsafe extern "C" fn xmlNodeGetContent(cur: *const XmlNode) -> *mut XmlChar 
         | XmlElementType::XmlXincludeStart
         | XmlElementType::XmlXincludeEnd => null_mut(),
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
-            let buf: XmlBufPtr = xmlBufCreate();
+            let buf: XmlBufPtr = xml_buf_create();
             if buf.is_null() {
                 return null_mut();
             }
-            xmlBufSetAllocationScheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+            xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
 
             xmlBufGetNodeContent(buf, cur);
 
-            let ret: *mut XmlChar = xmlBufDetach(buf);
-            xmlBufFree(buf);
+            let ret: *mut XmlChar = xml_buf_detach(buf);
+            xml_buf_free(buf);
             ret
         }
         XmlElementType::XmlNamespaceDecl => {
@@ -8667,9 +8668,9 @@ pub unsafe extern "C" fn xmlNodeBufGetContent(
     if cur.is_null() || buffer.is_null() {
         return -1;
     }
-    let buf: XmlBufPtr = xmlBufFromBuffer(buffer);
+    let buf: XmlBufPtr = xml_buf_from_buffer(buffer);
     let ret: c_int = xmlBufGetNodeContent(buf, cur);
-    buffer = xmlBufBackToBuffer(buf);
+    buffer = xml_buf_back_to_buffer(buf);
     if ret < 0 || buffer.is_null() {
         return -1;
     }
@@ -8695,7 +8696,7 @@ pub unsafe extern "C" fn xmlBufGetNodeContent(buf: XmlBufPtr, mut cur: *const Xm
     }
     match (*cur).typ {
         XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
-            xmlBufCat(buf, (*cur).content);
+            xml_buf_cat(buf, (*cur).content);
         }
         XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
             let mut tmp: *const XmlNode = cur;
@@ -8704,7 +8705,7 @@ pub unsafe extern "C" fn xmlBufGetNodeContent(buf: XmlBufPtr, mut cur: *const Xm
                 match (*tmp).typ {
                     XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
                         if !(*tmp).content.is_null() {
-                            xmlBufCat(buf, (*tmp).content);
+                            xml_buf_cat(buf, (*tmp).content);
                         }
                     }
                     XmlElementType::XmlEntityRefNode => {
@@ -8754,7 +8755,7 @@ pub unsafe extern "C" fn xmlBufGetNodeContent(buf: XmlBufPtr, mut cur: *const Xm
 
             while !tmp.is_null() {
                 if matches!((*tmp).typ, XmlElementType::XmlTextNode) {
-                    xmlBufCat(buf, (*tmp).content);
+                    xml_buf_cat(buf, (*tmp).content);
                 } else {
                     xmlBufGetNodeContent(buf, tmp);
                 }
@@ -8762,7 +8763,7 @@ pub unsafe extern "C" fn xmlBufGetNodeContent(buf: XmlBufPtr, mut cur: *const Xm
             }
         }
         XmlElementType::XmlCommentNode | XmlElementType::XmlPiNode => {
-            xmlBufCat(buf, (*cur).content);
+            xml_buf_cat(buf, (*cur).content);
         }
         XmlElementType::XmlEntityRefNode => {
             let mut tmp: XmlNodePtr;
@@ -8805,7 +8806,7 @@ pub unsafe extern "C" fn xmlBufGetNodeContent(buf: XmlBufPtr, mut cur: *const Xm
             }
         }
         XmlElementType::XmlNamespaceDecl => {
-            xmlBufCat(buf, (*(cur as XmlNsPtr)).href.load(Ordering::Relaxed));
+            xml_buf_cat(buf, (*(cur as XmlNsPtr)).href.load(Ordering::Relaxed));
         }
         XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
@@ -9348,12 +9349,12 @@ pub unsafe extern "C" fn xmlAttrSerializeTxtContent(
     if buf.is_null() || string.is_null() {
         return;
     }
-    let buffer: XmlBufPtr = xmlBufFromBuffer(buf);
+    let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
     if buffer.is_null() {
         return;
     }
     xmlBufAttrSerializeTxtContent(buffer, doc, attr, string);
-    xmlBufBackToBuffer(buffer);
+    xml_buf_back_to_buffer(buffer);
 }
 
 /*
@@ -9947,7 +9948,7 @@ pub unsafe extern "C" fn xmlBufNodeDump(
 ) -> size_t {
     use crate::{
         libxml::{xml_io::XmlOutputBufferPtr, xmlsave::xml_save_err_memory},
-        private::buf::xmlBufGetAllocationScheme,
+        private::buf::xml_buf_get_allocation_scheme,
     };
 
     use super::parser::xml_init_parser;
@@ -9982,10 +9983,10 @@ pub unsafe extern "C" fn xmlBufNodeDump(
     (*outbuf).written = 0;
 
     let using: size_t = xml_buf_use(buf);
-    let oldalloc: c_int = xmlBufGetAllocationScheme(buf);
-    xmlBufSetAllocationScheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    let oldalloc: c_int = xml_buf_get_allocation_scheme(buf);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xmlNodeDumpOutput(outbuf, doc, cur, level, format, null_mut());
-    xmlBufSetAllocationScheme(buf, oldalloc.try_into().unwrap());
+    xml_buf_set_allocation_scheme(buf, oldalloc.try_into().unwrap());
     xml_free(outbuf as _);
     let ret: c_int = (xml_buf_use(buf) - using) as i32;
     ret as _
@@ -10018,12 +10019,12 @@ pub unsafe extern "C" fn xmlNodeDump(
     if buf.is_null() || cur.is_null() {
         return -1;
     }
-    let buffer: XmlBufPtr = xmlBufFromBuffer(buf);
+    let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
     if buffer.is_null() {
         return -1;
     }
     let ret: size_t = xmlBufNodeDump(buffer, doc, cur, level, format);
-    xmlBufBackToBuffer(buffer);
+    xml_buf_back_to_buffer(buffer);
     if ret > i32::MAX as usize {
         return -1;
     }

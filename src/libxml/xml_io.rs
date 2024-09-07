@@ -36,8 +36,8 @@ use crate::{
     },
     private::{
         buf::{
-            xmlBufAdd, xmlBufAddLen, xmlBufAvail, xmlBufCreate, xmlBufCreateSize, xmlBufFree,
-            xmlBufGrow, xmlBufSetAllocationScheme,
+            xml_buf_add, xml_buf_add_len, xml_buf_avail, xml_buf_create, xml_buf_create_size,
+            xml_buf_free, xml_buf_grow, xml_buf_set_allocation_scheme,
         },
         enc::{xmlCharEncInput, xmlCharEncOutput},
         error::__xml_simple_error,
@@ -360,18 +360,18 @@ pub unsafe extern "C" fn xmlAllocParserInputBuffer(
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlParserInputBuffer>());
-    (*ret).buffer = xmlBufCreateSize(2 * *xmlDefaultBufferSize() as usize);
+    (*ret).buffer = xml_buf_create_size(2 * *xmlDefaultBufferSize() as usize);
     if (*ret).buffer.is_null() {
         xml_free(ret as _);
         return null_mut();
     }
-    xmlBufSetAllocationScheme(
+    xml_buf_set_allocation_scheme(
         (*ret).buffer,
         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
     );
     (*ret).encoder = xmlGetCharEncodingHandler(enc);
     if !(*ret).encoder.is_null() {
-        (*ret).raw = xmlBufCreateSize(2 * *xmlDefaultBufferSize() as usize);
+        (*ret).raw = xml_buf_create_size(2 * *xmlDefaultBufferSize() as usize);
     } else {
         (*ret).raw = null_mut();
     }
@@ -749,7 +749,7 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateMem(
         (*ret).context = mem as _;
         (*ret).readcallback = None;
         (*ret).closecallback = None;
-        errcode = xmlBufAdd((*ret).buffer as _, mem as _, size);
+        errcode = xml_buf_add((*ret).buffer as _, mem as _, size);
         if errcode != 0 {
             xmlFreeParserInputBuffer(ret);
             return null_mut();
@@ -881,7 +881,7 @@ pub unsafe extern "C" fn xmlParserInputBufferGrow(
         buf = (*input).buffer;
     } else {
         if (*input).raw.is_null() {
-            (*input).raw = xmlBufCreate();
+            (*input).raw = xml_buf_create();
         }
         buf = (*input).raw;
     }
@@ -890,7 +890,7 @@ pub unsafe extern "C" fn xmlParserInputBufferGrow(
      * Call the read method for this I/O type.
      */
     if let Some(callback) = (*input).readcallback {
-        if xmlBufGrow(buf, len + 1) < 0 {
+        if xml_buf_grow(buf, len + 1) < 0 {
             xml_ioerr_memory(c"growing input buffer".as_ptr() as _);
             (*input).error = XmlParserErrors::XmlErrNoMemory as i32;
             return -1;
@@ -904,7 +904,7 @@ pub unsafe extern "C" fn xmlParserInputBufferGrow(
             return -1;
         }
 
-        if xmlBufAddLen(buf, res as _) < 0 {
+        if xml_buf_add_len(buf, res as _) < 0 {
             return -1;
         }
     }
@@ -977,9 +977,9 @@ pub unsafe extern "C" fn xmlParserInputBufferPush(
          * Store the data in the incoming raw buffer
          */
         if (*input).raw.is_null() {
-            (*input).raw = xmlBufCreate();
+            (*input).raw = xml_buf_create();
         }
-        ret = xmlBufAdd((*input).raw, buf as _, len as _);
+        ret = xml_buf_add((*input).raw, buf as _, len as _);
         if ret != 0 {
             return -1;
         }
@@ -1002,7 +1002,7 @@ pub unsafe extern "C" fn xmlParserInputBufferPush(
         }
     } else {
         nbchars = len;
-        ret = xmlBufAdd((*input).buffer, buf as _, nbchars);
+        ret = xml_buf_add((*input).buffer, buf as _, nbchars);
         if ret != 0 {
             return -1;
         }
@@ -1027,7 +1027,7 @@ pub unsafe extern "C" fn xmlFreeParserInputBuffer(input: XmlParserInputBufferPtr
     }
 
     if !(*input).raw.is_null() {
-        xmlBufFree((*input).raw);
+        xml_buf_free((*input).raw);
         (*input).raw = null_mut();
     }
     if !(*input).encoder.is_null() {
@@ -1037,7 +1037,7 @@ pub unsafe extern "C" fn xmlFreeParserInputBuffer(input: XmlParserInputBufferPtr
         callback((*input).context);
     }
     if !(*input).buffer.is_null() {
-        xmlBufFree((*input).buffer);
+        xml_buf_free((*input).buffer);
         (*input).buffer = null_mut();
     }
 
@@ -1705,21 +1705,21 @@ pub unsafe extern "C" fn xmlAllocOutputBuffer(
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlOutputBuffer>());
-    (*ret).buffer = xmlBufCreate();
+    (*ret).buffer = xml_buf_create();
     if (*ret).buffer.is_null() {
         xml_free(ret as _);
         return null_mut();
     }
-    xmlBufSetAllocationScheme(
+    xml_buf_set_allocation_scheme(
         (*ret).buffer,
         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
     );
 
     (*ret).encoder = encoder;
     if !encoder.is_null() {
-        (*ret).conv = xmlBufCreateSize(4000);
+        (*ret).conv = xml_buf_create_size(4000);
         if (*ret).conv.is_null() {
-            xmlBufFree((*ret).buffer);
+            xml_buf_free((*ret).buffer);
             xml_free(ret as _);
             return null_mut();
         }
@@ -2016,9 +2016,9 @@ pub unsafe extern "C" fn xmlOutputBufferWrite(
              * Store the data in the incoming raw buffer
              */
             if (*out).conv.is_null() {
-                (*out).conv = xmlBufCreate();
+                (*out).conv = xml_buf_create();
             }
-            ret = xmlBufAdd((*out).buffer, buf as _, chunk);
+            ret = xml_buf_add((*out).buffer, buf as _, chunk);
             if ret != 0 {
                 return -1;
             }
@@ -2043,7 +2043,7 @@ pub unsafe extern "C" fn xmlOutputBufferWrite(
                 nbchars = if ret >= 0 { ret } else { 0 };
             }
         } else {
-            ret = xmlBufAdd((*out).buffer, buf as _, chunk);
+            ret = xml_buf_add((*out).buffer, buf as _, chunk);
             if ret != 0 {
                 return -1;
             }
@@ -2271,14 +2271,14 @@ pub unsafe extern "C" fn xmlOutputBufferWriteEscape(
          * how many bytes to consume and how many bytes to store.
          */
         cons = len;
-        chunk = xmlBufAvail((*out).buffer) as _;
+        chunk = xml_buf_avail((*out).buffer) as _;
 
         /*
          * make sure we have enough room to save first, if this is
          * not the case force a flush, but make sure we stay in the loop
          */
         if chunk < 40 {
-            if xmlBufGrow((*out).buffer, 100) < 0 {
+            if xml_buf_grow((*out).buffer, 100) < 0 {
                 return -1;
             }
             oldwritten = -1;
@@ -2296,7 +2296,7 @@ pub unsafe extern "C" fn xmlOutputBufferWriteEscape(
              * Store the data in the incoming raw buffer
              */
             if (*out).conv.is_null() {
-                (*out).conv = xmlBufCreate();
+                (*out).conv = xml_buf_create();
             }
             ret = escaping(
                 xml_buf_end((*out).buffer),
@@ -2309,7 +2309,7 @@ pub unsafe extern "C" fn xmlOutputBufferWriteEscape(
             {
                 return -1;
             }
-            xmlBufAddLen((*out).buffer, chunk as _);
+            xml_buf_add_len((*out).buffer, chunk as _);
 
             if (xml_buf_use((*out).buffer) < MINLEN) && (cons == len) {
                 // goto done;
@@ -2342,7 +2342,7 @@ pub unsafe extern "C" fn xmlOutputBufferWriteEscape(
             {
                 return -1;
             }
-            xmlBufAddLen((*out).buffer, chunk as _);
+            xml_buf_add_len((*out).buffer, chunk as _);
             if (*out).writecallback.is_some() {
                 nbchars = xml_buf_use((*out).buffer) as _;
             } else {
@@ -2390,8 +2390,8 @@ pub unsafe extern "C" fn xmlOutputBufferWriteEscape(
             } else {
                 (*out).written += ret;
             }
-        } else if xmlBufAvail((*out).buffer) < MINLEN {
-            xmlBufGrow((*out).buffer, MINLEN as _);
+        } else if xml_buf_avail((*out).buffer) < MINLEN {
+            xml_buf_grow((*out).buffer, MINLEN as _);
         }
         written += nbchars;
 
@@ -2507,14 +2507,14 @@ pub unsafe extern "C" fn xmlOutputBufferClose(out: XmlOutputBufferPtr) -> c_int 
     }
     let written: c_int = (*out).written;
     if !(*out).conv.is_null() {
-        xmlBufFree((*out).conv);
+        xml_buf_free((*out).conv);
         (*out).conv = null_mut();
     }
     if !(*out).encoder.is_null() {
         xmlCharEncCloseFunc((*out).encoder);
     }
     if !(*out).buffer.is_null() {
-        xmlBufFree((*out).buffer);
+        xml_buf_free((*out).buffer);
         (*out).buffer = null_mut();
     }
 
@@ -2578,7 +2578,7 @@ pub(crate) unsafe extern "C" fn xmlAllocOutputBufferInternal(
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlOutputBuffer>());
-    (*ret).buffer = xmlBufCreate();
+    (*ret).buffer = xml_buf_create();
     if (*ret).buffer.is_null() {
         xml_free(ret as _);
         return null_mut();
@@ -2587,13 +2587,13 @@ pub(crate) unsafe extern "C" fn xmlAllocOutputBufferInternal(
     /*
      * For conversion buffers we use the special IO handling
      */
-    xmlBufSetAllocationScheme((*ret).buffer, XmlBufferAllocationScheme::XmlBufferAllocIo);
+    xml_buf_set_allocation_scheme((*ret).buffer, XmlBufferAllocationScheme::XmlBufferAllocIo);
 
     (*ret).encoder = encoder;
     if !encoder.is_null() {
-        (*ret).conv = xmlBufCreateSize(4000);
+        (*ret).conv = xml_buf_create_size(4000);
         if (*ret).conv.is_null() {
-            xmlBufFree((*ret).buffer);
+            xml_buf_free((*ret).buffer);
             xml_free(ret as _);
             return null_mut();
         }

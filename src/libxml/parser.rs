@@ -98,7 +98,10 @@ use crate::{
         xpath::xml_init_xpath_internal,
     },
     private::{
-        buf::{xmlBufGetInputBase, xmlBufIsEmpty, xmlBufResetInput, xmlBufSetInputBaseCur},
+        buf::{
+            xml_buf_get_input_base, xml_buf_is_empty, xml_buf_reset_input,
+            xml_buf_set_input_base_cur,
+        },
         enc::{xmlCharEncInput, xmlInitEncodingInternal},
         entities::{
             XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -5285,7 +5288,7 @@ pub unsafe extern "C" fn xml_create_push_parser_ctxt(
         }
     }
     (*input_stream).buf = buf;
-    xmlBufResetInput((*(*input_stream).buf).buffer, input_stream);
+    xml_buf_reset_input((*(*input_stream).buf).buffer, input_stream);
     input_push(ctxt, input_stream);
 
     /*
@@ -5297,12 +5300,12 @@ pub unsafe extern "C" fn xml_create_push_parser_ctxt(
 
     if size != 0 && !chunk.is_null() && !(*ctxt).input.is_null() && !(*(*ctxt).input).buf.is_null()
     {
-        let base: size_t = xmlBufGetInputBase((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
+        let base: size_t = xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         xmlParserInputBufferPush((*(*ctxt).input).buf, size, chunk);
 
-        xmlBufSetInputBaseCur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
+        xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
         // #ifdef DEBUG_PUSH
         // 	xmlGenericError(xmlGenericErrorContext, c"PP: pushed %d\n".as_ptr() as _, size);
         // #endif
@@ -9640,15 +9643,15 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                  * buffer.
                  */
                 if !(*(*(*ctxt).input).buf).raw.is_null()
-                    && xmlBufIsEmpty((*(*(*ctxt).input).buf).raw) == 0
+                    && xml_buf_is_empty((*(*(*ctxt).input).buf).raw) == 0
                 {
                     let base: size_t =
-                        xmlBufGetInputBase((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
+                        xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
                     let current: size_t =
                         (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
                     xmlParserInputBufferPush((*(*ctxt).input).buf, 0, c"".as_ptr() as _);
-                    xmlBufSetInputBaseCur(
+                    xml_buf_set_input_base_cur(
                         (*(*(*ctxt).input).buf).buffer,
                         (*ctxt).input,
                         base,
@@ -10533,11 +10536,11 @@ pub unsafe extern "C" fn xml_parse_chunk(
         && !(*(*ctxt).input).buf.is_null()
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
-        let base: size_t = xmlBufGetInputBase((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
+        let base: size_t = xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         let res: c_int = xmlParserInputBufferPush((*(*ctxt).input).buf, size, chunk);
-        xmlBufSetInputBaseCur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
+        xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
         if res < 0 {
             (*ctxt).err_no = XmlParserInputState::XmlParserEOF as i32;
             xmlHaltParser(ctxt);
@@ -10551,11 +10554,11 @@ pub unsafe extern "C" fn xml_parse_chunk(
     {
         let input: XmlParserInputBufferPtr = (*(*ctxt).input).buf;
         if !(*input).encoder.is_null() && !(*input).buffer.is_null() && !(*input).raw.is_null() {
-            let base: size_t = xmlBufGetInputBase((*input).buffer, (*ctxt).input);
+            let base: size_t = xml_buf_get_input_base((*input).buffer, (*ctxt).input);
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
             let nbchars: c_int = xmlCharEncInput(input, terminate);
-            xmlBufSetInputBaseCur((*input).buffer, (*ctxt).input, base, current);
+            xml_buf_set_input_base_cur((*input).buffer, (*ctxt).input, base, current);
             if nbchars < 0 {
                 /* TODO 2.6.0 */
                 xml_generic_error!(
@@ -10591,12 +10594,12 @@ pub unsafe extern "C" fn xml_parse_chunk(
     }
 
     if end_in_lf == 1 && !(*ctxt).input.is_null() && !(*(*ctxt).input).buf.is_null() {
-        let base: size_t = xmlBufGetInputBase((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
+        let base: size_t = xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
         let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         xmlParserInputBufferPush((*(*ctxt).input).buf, 1, c"\r".as_ptr() as _);
 
-        xmlBufSetInputBaseCur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, current);
+        xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, current);
     }
     if terminate != 0 {
         /*
@@ -10712,7 +10715,7 @@ pub unsafe extern "C" fn xml_new_io_input_stream(
     }
     (*input_stream).filename = null_mut();
     (*input_stream).buf = input;
-    xmlBufResetInput((*(*input_stream).buf).buffer, input_stream);
+    xml_buf_reset_input((*(*input_stream).buf).buffer, input_stream);
 
     if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
         xml_switch_encoding(ctxt, enc);
@@ -11254,17 +11257,17 @@ pub unsafe extern "C" fn xmlCtxtResetPush(
         (*input_stream).filename = xml_canonic_path(filename as _) as _;
     }
     (*input_stream).buf = buf;
-    xmlBufResetInput((*buf).buffer, input_stream);
+    xml_buf_reset_input((*buf).buffer, input_stream);
 
     input_push(ctxt, input_stream);
 
     if size > 0 && !chunk.is_null() && !(*ctxt).input.is_null() && !(*(*ctxt).input).buf.is_null() {
-        let base: size_t = xmlBufGetInputBase((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
+        let base: size_t = xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         xmlParserInputBufferPush((*(*ctxt).input).buf, size, chunk);
 
-        xmlBufSetInputBaseCur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
+        xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
         // #ifdef DEBUG_PUSH
         //         xmlGenericError(xmlGenericErrorContext, c"PP: pushed %d\n".as_ptr() as _, size);
         // #endif

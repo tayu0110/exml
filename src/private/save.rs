@@ -20,7 +20,7 @@ use crate::{
     IS_CHAR,
 };
 
-use super::buf::xmlBufAdd;
+use super::buf::xml_buf_add;
 
 /**
  * xmlBufAttrSerializeTxtContent:
@@ -48,51 +48,51 @@ pub(crate) unsafe extern "C" fn xmlBufAttrSerializeTxtContent(
     while *cur != 0 {
         if *cur == b'\n' {
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
-            xmlBufAdd(buf, c"&#10;".as_ptr() as _, 5);
+            xml_buf_add(buf, c"&#10;".as_ptr() as _, 5);
             cur = cur.add(1);
             base = cur;
         } else if *cur == b'\r' {
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
-            xmlBufAdd(buf, c"&#13;".as_ptr() as _, 5);
+            xml_buf_add(buf, c"&#13;".as_ptr() as _, 5);
             cur = cur.add(1);
             base = cur;
         } else if *cur == b'\t' {
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
-            xmlBufAdd(buf, c"&#9;".as_ptr() as _, 4);
+            xml_buf_add(buf, c"&#9;".as_ptr() as _, 4);
             cur = cur.add(1);
             base = cur;
         } else if *cur == b'"' {
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
-            xmlBufAdd(buf, c"&quot;".as_ptr() as _, 6);
+            xml_buf_add(buf, c"&quot;".as_ptr() as _, 6);
             cur = cur.add(1);
             base = cur;
         } else if *cur == b'<' {
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
-            xmlBufAdd(buf, c"&lt;".as_ptr() as _, 4);
+            xml_buf_add(buf, c"&lt;".as_ptr() as _, 4);
             cur = cur.add(1);
             base = cur;
         } else if *cur == b'>' {
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
-            xmlBufAdd(buf, c"&gt;".as_ptr() as _, 4);
+            xml_buf_add(buf, c"&gt;".as_ptr() as _, 4);
             cur = cur.add(1);
             base = cur;
         } else if *cur == b'&' {
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
-            xmlBufAdd(buf, c"&amp;".as_ptr() as _, 5);
+            xml_buf_add(buf, c"&amp;".as_ptr() as _, 5);
             cur = cur.add(1);
             base = cur;
         } else if *cur >= 0x80 && *cur.add(1) != 0 && (doc.is_null() || (*doc).encoding.is_null()) {
@@ -104,12 +104,12 @@ pub(crate) unsafe extern "C" fn xmlBufAttrSerializeTxtContent(
             let mut l: c_int = 1;
 
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
             if *cur < 0xC0 {
                 xml_save_err(XmlParserErrors::XmlSaveNotUtf8 as _, attr as _, null_mut());
                 xmlSerializeHexCharRef(tmp.as_mut_ptr() as _, *cur as _);
-                xmlBufAdd(buf, tmp.as_ptr() as _, -1);
+                xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);
                 base = cur;
                 continue;
@@ -142,7 +142,7 @@ pub(crate) unsafe extern "C" fn xmlBufAttrSerializeTxtContent(
                     null_mut(),
                 );
                 xmlSerializeHexCharRef(tmp.as_mut_ptr() as _, *cur as _);
-                xmlBufAdd(buf, tmp.as_ptr() as _, -1);
+                xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);
                 base = cur;
                 continue;
@@ -152,7 +152,7 @@ pub(crate) unsafe extern "C" fn xmlBufAttrSerializeTxtContent(
              * as a c_char ref
              */
             xmlSerializeHexCharRef(tmp.as_mut_ptr() as _, val);
-            xmlBufAdd(buf, tmp.as_ptr() as _, -1);
+            xml_buf_add(buf, tmp.as_ptr() as _, -1);
             cur = cur.add(l as usize);
             base = cur;
         } else {
@@ -160,7 +160,7 @@ pub(crate) unsafe extern "C" fn xmlBufAttrSerializeTxtContent(
         }
     }
     if base != cur {
-        xmlBufAdd(buf, base, cur.offset_from(base) as _);
+        xml_buf_add(buf, base, cur.offset_from(base) as _);
     }
 }
 

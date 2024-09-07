@@ -79,7 +79,8 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, XmlChar},
     },
     private::buf::{
-        xmlBufCreateSize, xmlBufEmpty, xmlBufFree, xmlBufResetInput, xmlBufSetAllocationScheme,
+        xml_buf_create_size, xml_buf_empty, xml_buf_free, xml_buf_reset_input,
+        xml_buf_set_allocation_scheme,
     },
     xml_generic_error,
 };
@@ -547,7 +548,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
     (*ret).ent_max = 0;
     (*ret).ent_nr = 0;
     (*ret).input = input;
-    (*ret).buffer = xmlBufCreateSize(100);
+    (*ret).buffer = xml_buf_create_size(100);
     if (*ret).buffer.is_null() {
         xml_free(ret as _);
         xml_generic_error!(
@@ -557,13 +558,13 @@ pub unsafe extern "C" fn xml_new_text_reader(
         return null_mut();
     }
     /* no operation on a reader should require a huge buffer */
-    xmlBufSetAllocationScheme(
+    xml_buf_set_allocation_scheme(
         (*ret).buffer,
         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
     );
     (*ret).sax = xml_malloc(size_of::<XmlSAXHandler>()) as *mut XmlSAXHandler;
     if (*ret).sax.is_null() {
-        xmlBufFree((*ret).buffer);
+        xml_buf_free((*ret).buffer);
         xml_free(ret as _);
         xml_generic_error!(
             xmlGenericErrorContext(),
@@ -628,7 +629,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
             xmlGenericErrorContext(),
             c"xmlNewTextReader : malloc failed\n".as_ptr() as _
         );
-        xmlBufFree((*ret).buffer);
+        xml_buf_free((*ret).buffer);
         xml_free((*ret).sax as _);
         xml_free(ret as _);
         return null_mut();
@@ -758,7 +759,7 @@ pub unsafe extern "C" fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         xml_free((*reader).sax as _);
     }
     if !(*reader).buffer.is_null() {
-        xmlBufFree((*reader).buffer);
+        xml_buf_free((*reader).buffer);
     }
     if !(*reader).ent_tab.is_null() {
         xml_free((*reader).ent_tab as _);
@@ -822,7 +823,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         (*reader).allocs |= XML_TEXTREADER_INPUT;
     }
     if (*reader).buffer.is_null() {
-        (*reader).buffer = xmlBufCreateSize(100);
+        (*reader).buffer = xml_buf_create_size(100);
     }
     if (*reader).buffer.is_null() {
         xml_generic_error!(
@@ -832,7 +833,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         return -1;
     }
     /* no operation on a reader should require a huge buffer */
-    xmlBufSetAllocationScheme(
+    xml_buf_set_allocation_scheme(
         (*reader).buffer,
         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
     );
@@ -920,7 +921,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
                 (*input_stream).filename = xml_canonic_path(url as _) as _;
             }
             (*input_stream).buf = buf;
-            xmlBufResetInput((*buf).buffer, input_stream);
+            xml_buf_reset_input((*buf).buffer, input_stream);
 
             input_push((*reader).ctxt, input_stream);
             (*reader).cur = 0;
@@ -3261,7 +3262,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -
                 return (*(*attr).children).content;
             } else {
                 if (*reader).buffer.is_null() {
-                    (*reader).buffer = xmlBufCreateSize(100);
+                    (*reader).buffer = xml_buf_create_size(100);
                     if (*reader).buffer.is_null() {
                         xml_generic_error!(
                             xmlGenericErrorContext(),
@@ -3269,20 +3270,20 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -
                         );
                         return null_mut();
                     }
-                    xmlBufSetAllocationScheme(
+                    xml_buf_set_allocation_scheme(
                         (*reader).buffer,
                         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
                     );
                 } else {
-                    xmlBufEmpty((*reader).buffer);
+                    xml_buf_empty((*reader).buffer);
                 }
                 xmlBufGetNodeContent((*reader).buffer, node);
                 ret = xml_buf_content((*reader).buffer);
                 if ret.is_null() {
                     /* error on the buffer best to reallocate */
-                    xmlBufFree((*reader).buffer);
-                    (*reader).buffer = xmlBufCreateSize(100);
-                    xmlBufSetAllocationScheme(
+                    xml_buf_free((*reader).buffer);
+                    (*reader).buffer = xml_buf_create_size(100);
+                    xml_buf_set_allocation_scheme(
                         (*reader).buffer,
                         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
                     );

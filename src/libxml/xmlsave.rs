@@ -47,7 +47,10 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, XmlChar},
     },
     private::{
-        buf::{xmlBufAdd, xmlBufCreate, xmlBufFree, xmlBufMergeBuffer, xmlBufWriteQuotedString},
+        buf::{
+            xml_buf_add, xml_buf_create, xml_buf_free, xml_buf_merge_buffer,
+            xml_buf_write_quoted_string,
+        },
         enc::xmlCharEncOutput,
         error::__xml_simple_error,
         save::xmlBufAttrSerializeTxtContent,
@@ -472,7 +475,7 @@ unsafe extern "C" fn xmlSaveSwitchEncoding(ctxt: XmlSaveCtxtPtr, encoding: *cons
             );
             return -1;
         }
-        (*buf).conv = xmlBufCreate();
+        (*buf).conv = xml_buf_create();
         if (*buf).conv.is_null() {
             xmlCharEncCloseFunc((*buf).encoder);
             xml_save_err_memory(c"creating encoding buffer".as_ptr() as _);
@@ -551,7 +554,7 @@ pub(crate) unsafe extern "C" fn xmlNsDumpOutput(
             xmlOutputBufferWrite(buf, 5, c"xmlns".as_ptr() as _);
         }
         xmlOutputBufferWrite(buf, 1, c"=".as_ptr() as _);
-        xmlBufWriteQuotedString((*buf).buffer, (*cur).href.load(Ordering::Relaxed));
+        xml_buf_write_quoted_string((*buf).buffer, (*cur).href.load(Ordering::Relaxed));
     }
 }
 
@@ -572,7 +575,7 @@ unsafe extern "C" fn xmlBufDumpNotationTable(buf: XmlBufPtr, table: XmlNotationT
     }
     xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_notation_table(buffer, table);
-    xmlBufMergeBuffer(buf, buffer);
+    xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -593,7 +596,7 @@ unsafe extern "C" fn xmlBufDumpElementDecl(buf: XmlBufPtr, elem: XmlElementPtr) 
     }
     xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_element_decl(buffer, elem);
-    xmlBufMergeBuffer(buf, buffer);
+    xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -614,7 +617,7 @@ unsafe extern "C" fn xmlBufDumpAttributeDecl(buf: XmlBufPtr, attr: XmlAttributeP
     }
     xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_attribute_decl(buffer, attr);
-    xmlBufMergeBuffer(buf, buffer);
+    xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -634,7 +637,7 @@ unsafe extern "C" fn xmlBufDumpEntityDecl(buf: XmlBufPtr, ent: XmlEntityPtr) {
     }
     xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_entity_decl(buffer, ent);
-    xmlBufMergeBuffer(buf, buffer);
+    xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -675,13 +678,13 @@ unsafe extern "C" fn xmlAttrSerializeContent(buf: XmlOutputBufferPtr, attr: XmlA
                 );
             }
             XmlElementType::XmlEntityRefNode => {
-                xmlBufAdd((*buf).buffer, c"&".as_ptr() as _, 1);
-                xmlBufAdd(
+                xml_buf_add((*buf).buffer, c"&".as_ptr() as _, 1);
+                xml_buf_add(
                     (*buf).buffer,
                     (*children).name,
                     xml_strlen((*children).name),
                 );
-                xmlBufAdd((*buf).buffer, c";".as_ptr() as _, 1);
+                xml_buf_add((*buf).buffer, c";".as_ptr() as _, 1);
             }
             _ => { /* should not happen unless we have a badly built tree */ }
         }
@@ -1058,12 +1061,12 @@ unsafe extern "C" fn xmlDtdDumpOutput(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     xmlOutputBufferWriteString(buf, (*dtd).name as _);
     if !(*dtd).external_id.is_null() {
         xmlOutputBufferWrite(buf, 8, c" PUBLIC ".as_ptr() as _);
-        xmlBufWriteQuotedString((*buf).buffer, (*dtd).external_id);
+        xml_buf_write_quoted_string((*buf).buffer, (*dtd).external_id);
         xmlOutputBufferWrite(buf, 1, c" ".as_ptr() as _);
-        xmlBufWriteQuotedString((*buf).buffer, (*dtd).system_id);
+        xml_buf_write_quoted_string((*buf).buffer, (*dtd).system_id);
     } else if !(*dtd).system_id.is_null() {
         xmlOutputBufferWrite(buf, 8, c" SYSTEM ".as_ptr() as _);
-        xmlBufWriteQuotedString((*buf).buffer, (*dtd).system_id);
+        xml_buf_write_quoted_string((*buf).buffer, (*dtd).system_id);
     }
     if (*dtd).entities.is_null()
         && (*dtd).elements.is_null()
@@ -1686,7 +1689,7 @@ unsafe extern "C" fn xmlSaveClearEncoding(ctxt: XmlSaveCtxtPtr) -> c_int {
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     xmlOutputBufferFlush(buf);
     xmlCharEncCloseFunc((*buf).encoder);
-    xmlBufFree((*buf).conv);
+    xml_buf_free((*buf).conv);
     (*buf).encoder = null_mut();
     (*buf).conv = null_mut();
     0
@@ -1811,13 +1814,13 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
         if (*ctxt).options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
             xmlOutputBufferWrite(buf, 14, c"<?xml version=".as_ptr() as _);
             if !(*cur).version.is_null() {
-                xmlBufWriteQuotedString((*buf).buffer, (*cur).version);
+                xml_buf_write_quoted_string((*buf).buffer, (*cur).version);
             } else {
                 xmlOutputBufferWrite(buf, 5, c"\"1.0\"".as_ptr() as _);
             }
             if !encoding.is_null() {
                 xmlOutputBufferWrite(buf, 10, c" encoding=".as_ptr() as _);
-                xmlBufWriteQuotedString((*buf).buffer, encoding);
+                xml_buf_write_quoted_string((*buf).buffer, encoding);
             }
             match (*cur).standalone {
                 0 => {

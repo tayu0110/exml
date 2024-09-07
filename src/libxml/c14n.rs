@@ -14,7 +14,7 @@ use std::{
 
 use libc::{memcpy, memset};
 
-use crate::{__xml_raise_error, private::buf::xmlBufWriteQuotedString};
+use crate::{__xml_raise_error, private::buf::xml_buf_write_quoted_string};
 
 use super::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -951,7 +951,7 @@ unsafe extern "C" fn xml_c14n_print_namespaces(ns: XmlNsPtr, ctx: XmlC14NCtxPtr)
         xmlOutputBufferWriteString((*ctx).buf, c" xmlns=".as_ptr() as _);
     }
     if !(*ns).href.load(Ordering::Relaxed).is_null() {
-        xmlBufWriteQuotedString((*(*ctx).buf).buffer, (*ns).href.load(Ordering::Relaxed));
+        xml_buf_write_quoted_string((*(*ctx).buf).buffer, (*ns).href.load(Ordering::Relaxed));
     } else {
         xmlOutputBufferWriteString((*ctx).buf, c"\"\"".as_ptr() as _);
     }

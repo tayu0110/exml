@@ -48,7 +48,9 @@ use crate::{
         xmlerror::XmlParserErrors,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
-    private::{buf::xmlBufCreateSize, enc::xmlCharEncOutput, save::xmlBufAttrSerializeTxtContent},
+    private::{
+        buf::xml_buf_create_size, enc::xmlCharEncOutput, save::xmlBufAttrSerializeTxtContent,
+    },
 };
 
 /*
@@ -947,7 +949,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDocument(
     (*(*writer).out).encoder = encoder;
     if !encoder.is_null() {
         if (*(*writer).out).conv.is_null() {
-            (*(*writer).out).conv = xmlBufCreateSize(4000);
+            (*(*writer).out).conv = xml_buf_create_size(4000);
         }
         xmlCharEncOutput((*writer).out, 1);
         if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_null() {

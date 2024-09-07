@@ -52,7 +52,7 @@ use crate::{
         },
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
-    private::buf::xmlBufLength,
+    private::buf::xml_buf_length,
     IS_CHAR,
 };
 
@@ -2267,7 +2267,7 @@ unsafe extern "C" fn xmlXIncludeLoadTxt(
     while xmlParserInputBufferRead(buf, 4096) > 0 {}
 
     let content: *const XmlChar = xml_buf_content((*buf).buffer);
-    let len: c_int = xmlBufLength((*buf).buffer) as _;
+    let len: c_int = xml_buf_length((*buf).buffer) as _;
     i = 0;
     while i < len {
         let mut l: c_int = 0;

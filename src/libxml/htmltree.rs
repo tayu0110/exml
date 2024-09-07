@@ -801,7 +801,7 @@ unsafe extern "C" fn htmlBufNodeDumpFormat(
 pub unsafe extern "C" fn htmlNodeDump(buf: XmlBufferPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
     use crate::{
         libxml::parser::xml_init_parser,
-        private::buf::{xmlBufBackToBuffer, xmlBufFromBuffer},
+        private::buf::{xml_buf_back_to_buffer, xml_buf_from_buffer},
     };
 
     if buf.is_null() || cur.is_null() {
@@ -809,14 +809,14 @@ pub unsafe extern "C" fn htmlNodeDump(buf: XmlBufferPtr, doc: XmlDocPtr, cur: Xm
     }
 
     xml_init_parser();
-    let buffer: XmlBufPtr = xmlBufFromBuffer(buf);
+    let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
     if buffer.is_null() {
         return -1;
     }
 
     let ret: size_t = htmlBufNodeDumpFormat(buffer, doc, cur, 1);
 
-    xmlBufBackToBuffer(buffer);
+    xml_buf_back_to_buffer(buffer);
 
     if ret > i32::MAX as usize {
         return -1;
@@ -1025,7 +1025,7 @@ unsafe extern "C" fn htmlDtdDumpOutput(
         libxml::{
             xml_io::xmlOutputBufferWriteString, xmlerror::XmlParserErrors, xmlstring::xml_strcmp,
         },
-        private::buf::xmlBufWriteQuotedString,
+        private::buf::xml_buf_write_quoted_string,
     };
 
     use super::tree::XmlDtdPtr;
@@ -1044,16 +1044,16 @@ unsafe extern "C" fn htmlDtdDumpOutput(
     xmlOutputBufferWriteString(buf, (*cur).name as _);
     if !(*cur).external_id.is_null() {
         xmlOutputBufferWriteString(buf, c" PUBLIC ".as_ptr() as _);
-        xmlBufWriteQuotedString((*buf).buffer, (*cur).external_id);
+        xml_buf_write_quoted_string((*buf).buffer, (*cur).external_id);
         if !(*cur).system_id.is_null() {
             xmlOutputBufferWriteString(buf, c" ".as_ptr() as _);
-            xmlBufWriteQuotedString((*buf).buffer, (*cur).system_id);
+            xml_buf_write_quoted_string((*buf).buffer, (*cur).system_id);
         }
     } else if !(*cur).system_id.is_null()
         && xml_strcmp((*cur).system_id, c"about:legacy-compat".as_ptr() as _) != 0
     {
         xmlOutputBufferWriteString(buf, c" SYSTEM ".as_ptr() as _);
-        xmlBufWriteQuotedString((*buf).buffer, (*cur).system_id);
+        xml_buf_write_quoted_string((*buf).buffer, (*cur).system_id);
     }
     xmlOutputBufferWriteString(buf, c">\n".as_ptr() as _);
 }
@@ -1073,7 +1073,7 @@ unsafe extern "C" fn htmlAttrDumpOutput(buf: XmlOutputBufferPtr, doc: XmlDocPtr,
             globals::xml_free, tree::xmlNodeListGetString, uri::xml_uri_escape_str,
             xml_io::xmlOutputBufferWriteString,
         },
-        private::buf::xmlBufWriteQuotedString,
+        private::buf::xml_buf_write_quoted_string,
         IS_BLANK_CH,
     };
 
@@ -1125,13 +1125,13 @@ unsafe extern "C" fn htmlAttrDumpOutput(buf: XmlOutputBufferPtr, doc: XmlDocPtr,
                 let escaped: *mut XmlChar =
                     xml_uri_escape_str(tmp, c"\"#$%&+,/:;<=>?@[\\]^`{|}".as_ptr() as _);
                 if !escaped.is_null() {
-                    xmlBufWriteQuotedString((*buf).buffer, escaped);
+                    xml_buf_write_quoted_string((*buf).buffer, escaped);
                     xml_free(escaped as _);
                 } else {
-                    xmlBufWriteQuotedString((*buf).buffer, value);
+                    xml_buf_write_quoted_string((*buf).buffer, value);
                 }
             } else {
-                xmlBufWriteQuotedString((*buf).buffer, value);
+                xml_buf_write_quoted_string((*buf).buffer, value);
             }
             xml_free(value as _);
         } else {

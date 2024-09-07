@@ -19,7 +19,7 @@ use crate::libxml::{
     xmlstring::{xml_get_utf8_char, XmlChar},
 };
 
-use super::buf::{xmlBufAddLen, xmlBufAvail, xmlBufGrow};
+use super::buf::{xml_buf_add_len, xml_buf_avail, xml_buf_grow};
 
 /**
  * xmlInitEncodingInternal:
@@ -136,12 +136,12 @@ pub(crate) unsafe extern "C" fn xmlCharEncInput(
     if toconv > 64 * 1024 && flush == 0 {
         toconv = 64 * 1024;
     }
-    written = xmlBufAvail(out);
+    written = xml_buf_avail(out);
     if toconv * 2 >= written {
-        if xmlBufGrow(out, toconv as i32 * 2) < 0 {
+        if xml_buf_grow(out, toconv as i32 * 2) < 0 {
             return -1;
         }
-        written = xmlBufAvail(out);
+        written = xml_buf_avail(out);
     }
     if written > 128 * 1024 && flush == 0 {
         written = 128 * 1024;
@@ -158,7 +158,7 @@ pub(crate) unsafe extern "C" fn xmlCharEncInput(
         flush,
     );
     xml_buf_shrink(bufin, c_in as usize);
-    xmlBufAddLen(out, c_out as usize);
+    xml_buf_add_len(out, c_out as usize);
     if ret == -1 {
         ret = -3;
     }
@@ -258,7 +258,7 @@ pub(crate) unsafe extern "C" fn xmlCharEncOutput(output: XmlOutputBufferPtr, ini
 
     // retry:
     'retry: loop {
-        written = xmlBufAvail(out);
+        written = xml_buf_avail(out);
 
         /*
          * First specific handling of the initialization call
@@ -274,7 +274,7 @@ pub(crate) unsafe extern "C" fn xmlCharEncOutput(output: XmlOutputBufferPtr, ini
                 null_mut(),
                 addr_of_mut!(c_in) as _,
             );
-            xmlBufAddLen(out, c_out as _);
+            xml_buf_add_len(out, c_out as _);
             // #ifdef DEBUG_ENCODING
             // 	xmlGenericError(xmlGenericErrorContext,
             // 		"initialized encoder\n");
@@ -293,8 +293,8 @@ pub(crate) unsafe extern "C" fn xmlCharEncOutput(output: XmlOutputBufferPtr, ini
             toconv = 64 * 1024;
         }
         if toconv * 4 >= written {
-            xmlBufGrow(out, toconv as i32 * 4);
-            written = xmlBufAvail(out);
+            xml_buf_grow(out, toconv as i32 * 4);
+            written = xml_buf_avail(out);
         }
         if written > 256 * 1024 {
             written = 256 * 1024;
@@ -310,7 +310,7 @@ pub(crate) unsafe extern "C" fn xmlCharEncOutput(output: XmlOutputBufferPtr, ini
             addr_of_mut!(c_in) as _,
         );
         xml_buf_shrink(bufin, c_in as usize);
-        xmlBufAddLen(out, c_out as usize);
+        xml_buf_add_len(out, c_out as usize);
         writtentot += c_out;
         if ret == -1 {
             if c_out > 0 {
@@ -386,8 +386,8 @@ pub(crate) unsafe extern "C" fn xmlCharEncOutput(output: XmlOutputBufferPtr, ini
                         cur,
                     );
                     xml_buf_shrink(bufin, len as usize);
-                    xmlBufGrow(out, charref_len * 4);
-                    c_out = xmlBufAvail(out) as _;
+                    xml_buf_grow(out, charref_len * 4);
+                    c_out = xml_buf_avail(out) as _;
                     c_in = charref_len;
                     ret = xmlEncOutputChunk(
                         (*output).encoder,
@@ -419,7 +419,7 @@ pub(crate) unsafe extern "C" fn xmlCharEncOutput(output: XmlOutputBufferPtr, ini
                         break;
                     }
 
-                    xmlBufAddLen(out, c_out as _);
+                    xml_buf_add_len(out, c_out as _);
                     writtentot += c_out;
                     // goto retry;
                 }

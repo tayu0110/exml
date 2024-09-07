@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-use super::buf::xmlBufSetInputBaseCur;
+use super::buf::xml_buf_set_input_base_cur;
 
 /**
  * XML_VCTXT_DTD_VALIDATED:
@@ -231,7 +231,7 @@ pub unsafe extern "C" fn xmlParserGrow(ctxt: XmlParserCtxtPtr) -> c_int {
     }
 
     let ret: c_int = xmlParserInputBufferGrow(buf, INPUT_CHUNK as _);
-    xmlBufSetInputBaseCur((*buf).buffer, input, 0, cur_base as _);
+    xml_buf_set_input_base_cur((*buf).buffer, input, 0, cur_base as _);
 
     /* TODO: Get error code from xmlParserInputBufferGrow */
     if ret < 0 {
@@ -277,5 +277,5 @@ pub unsafe extern "C" fn xmlParserShrink(ctxt: XmlParserCtxtPtr) {
         }
     }
 
-    xmlBufSetInputBaseCur((*buf).buffer, input, 0, used);
+    xml_buf_set_input_base_cur((*buf).buffer, input, 0, used);
 }

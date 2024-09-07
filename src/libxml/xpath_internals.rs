@@ -69,7 +69,7 @@ use crate::{
             XPATH_MAX_NODESET_LENGTH, XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
         },
     },
-    private::buf::{xmlBufAdd, xmlBufCreate, xmlBufFree},
+    private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_generic_error,
     xml_str_printf, IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH,
     IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
@@ -10069,7 +10069,7 @@ unsafe extern "C" fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPt
     CAST_TO_STRING!(ctxt);
     let str: XmlXPathObjectPtr = value_pop(ctxt);
 
-    let target: XmlBufPtr = xmlBufCreate();
+    let target: XmlBufPtr = xml_buf_create();
 
     escape[0] = b'%';
     escape[3] = 0;
@@ -10108,7 +10108,7 @@ unsafe extern "C" fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPt
                         || *cptr == b'$'
                         || *cptr == b','))
             {
-                xmlBufAdd(target, cptr, 1);
+                xml_buf_add(target, cptr, 1);
             } else {
                 if *cptr >> 4 < 10 {
                     escape[1] = b'0' + (*cptr >> 4);
@@ -10121,7 +10121,7 @@ unsafe extern "C" fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPt
                     escape[2] = b'A' - 10 + (*cptr & 0xF);
                 }
 
-                xmlBufAdd(target, &escape[0], 3);
+                xml_buf_add(target, &escape[0], 3);
             }
             cptr = cptr.add(1);
         }
@@ -10130,7 +10130,7 @@ unsafe extern "C" fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPt
         ctxt,
         xml_xpath_cache_new_string((*ctxt).context, xml_buf_content(target)),
     );
-    xmlBufFree(target);
+    xml_buf_free(target);
     xmlXPathReleaseObject((*ctxt).context, str);
 }
 
@@ -13593,18 +13593,18 @@ pub unsafe extern "C" fn xml_xpath_substring_before_function(
     CAST_TO_STRING!(ctxt);
     let str: XmlXPathObjectPtr = value_pop(ctxt);
 
-    let target: XmlBufPtr = xmlBufCreate();
+    let target: XmlBufPtr = xml_buf_create();
     if !target.is_null() {
         point = xml_strstr((*str).stringval, (*find).stringval);
         if !point.is_null() {
             offset = point.offset_from((*str).stringval) as _;
-            xmlBufAdd(target, (*str).stringval, offset);
+            xml_buf_add(target, (*str).stringval, offset);
         }
         value_push(
             ctxt,
             xml_xpath_cache_new_string((*ctxt).context, xml_buf_content(target)),
         );
-        xmlBufFree(target);
+        xml_buf_free(target);
     }
     xmlXPathReleaseObject((*ctxt).context, str);
     xmlXPathReleaseObject((*ctxt).context, find);
@@ -13637,13 +13637,13 @@ pub unsafe extern "C" fn xml_xpath_substring_after_function(
     CAST_TO_STRING!(ctxt);
     let str: XmlXPathObjectPtr = value_pop(ctxt);
 
-    let target: XmlBufPtr = xmlBufCreate();
+    let target: XmlBufPtr = xml_buf_create();
     if !target.is_null() {
         point = xml_strstr((*str).stringval, (*find).stringval);
         if !point.is_null() {
             offset = (point.offset_from((*str).stringval) + xml_strlen((*find).stringval) as isize)
                 as i32;
-            xmlBufAdd(
+            xml_buf_add(
                 target,
                 (*str).stringval.add(offset as usize),
                 xml_strlen((*str).stringval) - offset,
@@ -13653,7 +13653,7 @@ pub unsafe extern "C" fn xml_xpath_substring_after_function(
             ctxt,
             xml_xpath_cache_new_string((*ctxt).context, xml_buf_content(target)),
         );
-        xmlBufFree(target);
+        xml_buf_free(target);
     }
     xmlXPathReleaseObject((*ctxt).context, str);
     xmlXPathReleaseObject((*ctxt).context, find);
@@ -13769,7 +13769,7 @@ pub unsafe extern "C" fn xml_xpath_translate_function(
     CAST_TO_STRING!(ctxt);
     let str: XmlXPathObjectPtr = value_pop(ctxt);
 
-    let target: XmlBufPtr = xmlBufCreate();
+    let target: XmlBufPtr = xml_buf_create();
     if !target.is_null() {
         max = xml_utf8_strlen((*to).stringval);
         cptr = (*str).stringval;
@@ -13782,11 +13782,11 @@ pub unsafe extern "C" fn xml_xpath_translate_function(
                 if offset < max {
                     point = xml_utf8_strpos((*to).stringval, offset);
                     if !point.is_null() {
-                        xmlBufAdd(target, point, xml_utf8_strsize(point, 1));
+                        xml_buf_add(target, point, xml_utf8_strsize(point, 1));
                     }
                 }
             } else {
-                xmlBufAdd(target, cptr, xml_utf8_strsize(cptr, 1));
+                xml_buf_add(target, cptr, xml_utf8_strsize(cptr, 1));
             }
 
             /* Step to next character in input */
@@ -13828,7 +13828,7 @@ pub unsafe extern "C" fn xml_xpath_translate_function(
         ctxt,
         xml_xpath_cache_new_string((*ctxt).context, xml_buf_content(target)),
     );
-    xmlBufFree(target);
+    xml_buf_free(target);
     xmlXPathReleaseObject((*ctxt).context, str);
     xmlXPathReleaseObject((*ctxt).context, from);
     xmlXPathReleaseObject((*ctxt).context, to);

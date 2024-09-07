@@ -98,7 +98,7 @@ unsafe extern "C" fn xml_buf_memory_error(buf: XmlBufPtr, extra: *const c_char) 
  * routine to create an XML buffer.
  * returns the new structure.
  */
-pub(crate) unsafe extern "C" fn xmlBufCreate() -> XmlBufPtr {
+pub(crate) unsafe extern "C" fn xml_buf_create() -> XmlBufPtr {
     let ret: XmlBufPtr = xml_malloc(size_of::<XmlBuf>()) as XmlBufPtr;
     if ret.is_null() {
         xml_buf_memory_error(null_mut(), c"creating buffer".as_ptr() as _);
@@ -128,7 +128,7 @@ pub(crate) unsafe extern "C" fn xmlBufCreate() -> XmlBufPtr {
  * routine to create an XML buffer.
  * returns the new structure.
  */
-pub(crate) unsafe extern "C" fn xmlBufCreateSize(size: size_t) -> XmlBufPtr {
+pub(crate) unsafe extern "C" fn xml_buf_create_size(size: size_t) -> XmlBufPtr {
     if size == SIZE_MAX {
         return null_mut();
     }
@@ -167,7 +167,7 @@ pub(crate) unsafe extern "C" fn xmlBufCreateSize(size: size_t) -> XmlBufPtr {
  *
  * returns 0 in case of success and -1 in case of failure
  */
-pub(crate) unsafe extern "C" fn xmlBufSetAllocationScheme(
+pub(crate) unsafe extern "C" fn xml_buf_set_allocation_scheme(
     buf: XmlBufPtr,
     scheme: XmlBufferAllocationScheme,
 ) -> c_int {
@@ -181,11 +181,13 @@ pub(crate) unsafe extern "C" fn xmlBufSetAllocationScheme(
     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo) {
         return -1;
     }
-    if matches!(scheme, XmlBufferAllocationScheme::XmlBufferAllocDoubleit)
-        || matches!(scheme, XmlBufferAllocationScheme::XmlBufferAllocExact)
-        || matches!(scheme, XmlBufferAllocationScheme::XmlBufferAllocHybrid)
-        || matches!(scheme, XmlBufferAllocationScheme::XmlBufferAllocBounded)
-    {
+    if matches!(
+        scheme,
+        XmlBufferAllocationScheme::XmlBufferAllocDoubleit
+            | XmlBufferAllocationScheme::XmlBufferAllocExact
+            | XmlBufferAllocationScheme::XmlBufferAllocHybrid
+            | XmlBufferAllocationScheme::XmlBufferAllocBounded
+    ) {
         (*buf).alloc = scheme;
         if !(*buf).buffer.is_null() {
             (*(*buf).buffer).alloc = scheme;
@@ -211,7 +213,7 @@ pub(crate) unsafe extern "C" fn xmlBufSetAllocationScheme(
  *
  * Returns the scheme or -1 in case of error
  */
-pub(crate) unsafe extern "C" fn xmlBufGetAllocationScheme(buf: XmlBufPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_buf_get_allocation_scheme(buf: XmlBufPtr) -> c_int {
     if buf.is_null() {
         // #ifdef DEBUG_BUFFER
         //         xmlGenericError(xmlGenericErrorContext,
@@ -229,7 +231,7 @@ pub(crate) unsafe extern "C" fn xmlBufGetAllocationScheme(buf: XmlBufPtr) -> c_i
  * Frees an XML buffer. It frees both the content and the structure which
  * encapsulate it.
  */
-pub(crate) unsafe extern "C" fn xmlBufFree(buf: XmlBufPtr) {
+pub(crate) unsafe extern "C" fn xml_buf_free(buf: XmlBufPtr) {
     if buf.is_null() {
         // #ifdef DEBUG_BUFFER
         //         xmlGenericError(xmlGenericErrorContext,
@@ -254,8 +256,8 @@ pub(crate) unsafe extern "C" fn xmlBufFree(buf: XmlBufPtr) {
  *
  * empty a buffer.
  */
-pub(crate) unsafe extern "C" fn xmlBufEmpty(buf: XmlBufPtr) {
-    if (buf.is_null()) || ((*buf).error != 0) {
+pub(crate) unsafe extern "C" fn xml_buf_empty(buf: XmlBufPtr) {
+    if buf.is_null() || (*buf).error != 0 {
         return;
     }
     if (*buf).content.is_null() {
@@ -372,7 +374,7 @@ unsafe extern "C" fn xml_buf_grow_internal(buf: XmlBufPtr, len: size_t) -> size_
  *
  * Returns -1 in case of error or the length made available otherwise
  */
-pub(crate) unsafe extern "C" fn xmlBufGrow(buf: XmlBufPtr, len: c_int) -> c_int {
+pub(crate) unsafe extern "C" fn xml_buf_grow(buf: XmlBufPtr, len: c_int) -> c_int {
     if buf.is_null() || len < 0 {
         return -1;
     }
@@ -399,7 +401,7 @@ pub(crate) unsafe extern "C" fn xmlBufGrow(buf: XmlBufPtr, len: c_int) -> c_int 
  *
  * Returns  0 in case of problems, 1 otherwise
  */
-pub(crate) unsafe extern "C" fn xmlBufResize(buf: XmlBufPtr, size: size_t) -> c_int {
+pub(crate) unsafe extern "C" fn xml_buf_resize(buf: XmlBufPtr, size: size_t) -> c_int {
     let mut new_size: size_t;
     let rebuf: *mut XmlChar;
     let start_buf: size_t;
@@ -488,7 +490,7 @@ pub(crate) unsafe extern "C" fn xmlBufResize(buf: XmlBufPtr, size: size_t) -> c_
             /* move data back to start */
             memmove((*buf).content_io as _, (*buf).content as _, (*buf).using);
             (*buf).content = (*buf).content_io;
-            (*(*buf).content.add((*buf).using)) = 0;
+            *(*buf).content.add((*buf).using) = 0;
             (*buf).size += start_buf;
         } else {
             rebuf = xml_realloc((*buf).content_io as _, start_buf + new_size) as *mut XmlChar;
@@ -545,7 +547,7 @@ pub(crate) unsafe extern "C" fn xmlBufResize(buf: XmlBufPtr, size: size_t) -> c_
  * Returns 0 successful, a positive error code number otherwise
  *         and -1 in case of internal or API error.
  */
-pub(crate) unsafe extern "C" fn xmlBufAdd(
+pub(crate) unsafe extern "C" fn xml_buf_add(
     buf: XmlBufPtr,
     str: *const XmlChar,
     mut len: c_int,
@@ -580,8 +582,8 @@ pub(crate) unsafe extern "C" fn xmlBufAdd(
     }
 
     /* Note that both (*buf).size and (*buf).using can be zero here. */
-    if (len as size_t) >= (*buf).size - (*buf).using {
-        if (len as size_t) >= SIZE_MAX - (*buf).using {
+    if len as size_t >= (*buf).size - (*buf).using {
+        if len as size_t >= SIZE_MAX - (*buf).using {
             xml_buf_memory_error(buf, c"growing buffer past SIZE_MAX".as_ptr() as _);
             return -1;
         }
@@ -598,7 +600,7 @@ pub(crate) unsafe extern "C" fn xmlBufAdd(
                 return -1;
             }
         }
-        if xmlBufResize(buf, need_size) == 0 {
+        if xml_buf_resize(buf, need_size) == 0 {
             xml_buf_memory_error(buf, c"growing buffer".as_ptr() as _);
             return XmlParserErrors::XmlErrNoMemory as _;
         }
@@ -621,7 +623,7 @@ pub(crate) unsafe extern "C" fn xmlBufAdd(
  * Returns 0 successful, a positive error code number otherwise
  *         and -1 in case of internal or API error.
  */
-pub(crate) unsafe extern "C" fn xmlBufCat(buf: XmlBufPtr, str: *const XmlChar) -> c_int {
+pub(crate) unsafe extern "C" fn xml_buf_cat(buf: XmlBufPtr, str: *const XmlChar) -> c_int {
     if buf.is_null() || (*buf).error != 0 {
         return -1;
     }
@@ -629,7 +631,7 @@ pub(crate) unsafe extern "C" fn xmlBufCat(buf: XmlBufPtr, str: *const XmlChar) -
     if str.is_null() {
         return -1;
     }
-    xmlBufAdd(buf, str, -1)
+    xml_buf_add(buf, str, -1)
 }
 
 /**
@@ -642,8 +644,8 @@ pub(crate) unsafe extern "C" fn xmlBufCat(buf: XmlBufPtr, str: *const XmlChar) -
  * Returns 0 successful, a positive error code number otherwise
  *         and -1 in case of internal or API error.
  */
-pub(crate) unsafe extern "C" fn xmlBufCCat(buf: XmlBufPtr, str: *const c_char) -> c_int {
-    xmlBufCat(buf, str as _)
+pub(crate) unsafe extern "C" fn xml_buf_ccat(buf: XmlBufPtr, str: *const c_char) -> c_int {
+    xml_buf_cat(buf, str as _)
 }
 
 /**
@@ -658,7 +660,7 @@ pub(crate) unsafe extern "C" fn xmlBufCCat(buf: XmlBufPtr, str: *const c_char) -
  * Returns 0 if successful, a positive error code number otherwise
  *         and -1 in case of internal or API error.
  */
-pub(crate) unsafe extern "C" fn xmlBufWriteQuotedString(
+pub(crate) unsafe extern "C" fn xml_buf_write_quoted_string(
     buf: XmlBufPtr,
     string: *const XmlChar,
 ) -> c_int {
@@ -674,15 +676,15 @@ pub(crate) unsafe extern "C" fn xmlBufWriteQuotedString(
             // 	    xmlGenericError(xmlGenericErrorContext,
             //  "xmlBufWriteQuotedString: string contains quote and double-quotes !\n");
             // #endif
-            xmlBufCCat(buf, c"\"".as_ptr() as _);
+            xml_buf_ccat(buf, c"\"".as_ptr() as _);
             base = string;
             cur = string;
             while *cur != 0 {
                 if *cur == b'"' {
                     if base != cur {
-                        xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                        xml_buf_add(buf, base, cur.offset_from(base) as _);
                     }
-                    xmlBufAdd(buf, c"&quot;".as_ptr() as _, 6);
+                    xml_buf_add(buf, c"&quot;".as_ptr() as _, 6);
                     cur = cur.add(1);
                     base = cur;
                 } else {
@@ -690,18 +692,18 @@ pub(crate) unsafe extern "C" fn xmlBufWriteQuotedString(
                 }
             }
             if base != cur {
-                xmlBufAdd(buf, base, cur.offset_from(base) as _);
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
-            xmlBufCCat(buf, c"\"".as_ptr() as _);
+            xml_buf_ccat(buf, c"\"".as_ptr() as _);
         } else {
-            xmlBufCCat(buf, c"\'".as_ptr() as _);
-            xmlBufCat(buf, string);
-            xmlBufCCat(buf, c"\'".as_ptr() as _);
+            xml_buf_ccat(buf, c"\'".as_ptr() as _);
+            xml_buf_cat(buf, string);
+            xml_buf_ccat(buf, c"\'".as_ptr() as _);
         }
     } else {
-        xmlBufCCat(buf, c"\"".as_ptr() as _);
-        xmlBufCat(buf, string);
-        xmlBufCCat(buf, c"\"".as_ptr() as _);
+        xml_buf_ccat(buf, c"\"".as_ptr() as _);
+        xml_buf_cat(buf, string);
+        xml_buf_ccat(buf, c"\"".as_ptr() as _);
     }
     0
 }
@@ -717,7 +719,7 @@ pub(crate) unsafe extern "C" fn xmlBufWriteQuotedString(
  *
  * Returns the amount, or 0 if none or if an error occurred.
  */
-pub(crate) unsafe extern "C" fn xmlBufAvail(buf: XmlBufPtr) -> size_t {
+pub(crate) unsafe extern "C" fn xml_buf_avail(buf: XmlBufPtr) -> size_t {
     if buf.is_null() || (*buf).error != 0 {
         return 0;
     }
@@ -738,7 +740,7 @@ pub(crate) unsafe extern "C" fn xmlBufAvail(buf: XmlBufPtr) -> size_t {
  *
  * Returns the length of data in the internal content
  */
-pub(crate) unsafe extern "C" fn xmlBufLength(buf: XmlBufPtr) -> size_t {
+pub(crate) unsafe extern "C" fn xml_buf_length(buf: XmlBufPtr) -> size_t {
     if buf.is_null() || (*buf).error != 0 {
         return 0;
     }
@@ -757,7 +759,7 @@ pub(crate) unsafe extern "C" fn xmlBufLength(buf: XmlBufPtr) -> size_t {
  *
  * Returns 0 if no, 1 if yes and -1 in case of error
  */
-pub(crate) unsafe extern "C" fn xmlBufIsEmpty(buf: XmlBufPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_buf_is_empty(buf: XmlBufPtr) -> c_int {
     if buf.is_null() || (*buf).error != 0 {
         return -1;
     }
@@ -777,12 +779,12 @@ pub(crate) unsafe extern "C" fn xmlBufIsEmpty(buf: XmlBufPtr) -> c_int {
  *
  * Returns -1 in case of error and 0 otherwise
  */
-pub(crate) unsafe extern "C" fn xmlBufAddLen(buf: XmlBufPtr, len: size_t) -> c_int {
+pub(crate) unsafe extern "C" fn xml_buf_add_len(buf: XmlBufPtr, len: size_t) -> c_int {
     if buf.is_null() || (*buf).error != 0 {
         return -1;
     }
     CHECK_COMPAT!(buf);
-    if len >= ((*buf).size - (*buf).using) {
+    if len >= (*buf).size - (*buf).using {
         return -1;
     }
     (*buf).using += len;
@@ -804,7 +806,7 @@ pub(crate) unsafe extern "C" fn xmlBufAddLen(buf: XmlBufPtr, len: size_t) -> c_i
  *
  * Returns the previous string contained by the buffer.
  */
-pub(crate) unsafe extern "C" fn xmlBufDetach(buf: XmlBufPtr) -> *mut XmlChar {
+pub(crate) unsafe extern "C" fn xml_buf_detach(buf: XmlBufPtr) -> *mut XmlChar {
     if buf.is_null() {
         return null_mut();
     }
@@ -832,7 +834,7 @@ pub(crate) unsafe extern "C" fn xmlBufDetach(buf: XmlBufPtr) -> *mut XmlChar {
  * Dumps an XML buffer to  a FILE *.
  * Returns the number of #xmlChar written
  */
-pub(crate) unsafe extern "C" fn xmlBufDump(mut file: *mut FILE, buf: XmlBufPtr) -> size_t {
+pub(crate) unsafe extern "C" fn xml_buf_dump(mut file: *mut FILE, buf: XmlBufPtr) -> size_t {
     if buf.is_null() || (*buf).error != 0 {
         // #ifdef DEBUG_BUFFER
         //         xmlGenericError(xmlGenericErrorContext,
@@ -851,6 +853,7 @@ pub(crate) unsafe extern "C" fn xmlBufDump(mut file: *mut FILE, buf: XmlBufPtr) 
     if file.is_null() {
         extern "C" {
             // Does it work ???
+            #[allow(unused)]
             static stdout: *mut FILE;
         }
         file = stdout;
@@ -870,7 +873,7 @@ pub(crate) unsafe extern "C" fn xmlBufDump(mut file: *mut FILE, buf: XmlBufPtr) 
  *
  * Returns a new xmlBufPtr unless the call failed and NULL is returned
  */
-pub(crate) unsafe extern "C" fn xmlBufFromBuffer(buffer: XmlBufferPtr) -> XmlBufPtr {
+pub(crate) unsafe extern "C" fn xml_buf_from_buffer(buffer: XmlBufferPtr) -> XmlBufPtr {
     if buffer.is_null() {
         return null_mut();
     }
@@ -924,13 +927,13 @@ unsafe extern "C" fn xml_buf_overflow_error(buf: XmlBufPtr, extra: *const c_char
  *
  * Returns the old xmlBufferPtr unless the call failed and NULL is returned
  */
-pub(crate) unsafe extern "C" fn xmlBufBackToBuffer(buf: XmlBufPtr) -> XmlBufferPtr {
+pub(crate) unsafe extern "C" fn xml_buf_back_to_buffer(buf: XmlBufPtr) -> XmlBufferPtr {
     if buf.is_null() {
         return null_mut();
     }
     CHECK_COMPAT!(buf);
     if (*buf).error != 0 || (*buf).buffer.is_null() {
-        xmlBufFree(buf);
+        xml_buf_free(buf);
         return null_mut();
     }
 
@@ -977,7 +980,10 @@ pub(crate) unsafe extern "C" fn xmlBufBackToBuffer(buf: XmlBufPtr) -> XmlBufferP
  *
  * Returns -1 in case of error, 0 otherwise, in any case @buffer is freed
  */
-pub(crate) unsafe extern "C" fn xmlBufMergeBuffer(buf: XmlBufPtr, buffer: XmlBufferPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_buf_merge_buffer(
+    buf: XmlBufPtr,
+    buffer: XmlBufferPtr,
+) -> c_int {
     let mut ret: c_int = 0;
 
     if buf.is_null() || (*buf).error != 0 {
@@ -986,7 +992,7 @@ pub(crate) unsafe extern "C" fn xmlBufMergeBuffer(buf: XmlBufPtr, buffer: XmlBuf
     }
     CHECK_COMPAT!(buf);
     if !buffer.is_null() && !(*buffer).content.is_null() && (*buffer).using > 0 {
-        ret = xmlBufAdd(buf, (*buffer).content, (*buffer).using as _);
+        ret = xml_buf_add(buf, (*buffer).content, (*buffer).using as _);
     }
     xml_buffer_free(buffer);
     ret
@@ -1001,7 +1007,7 @@ pub(crate) unsafe extern "C" fn xmlBufMergeBuffer(buf: XmlBufPtr, buffer: XmlBuf
  *
  * Returns -1 in case of error, 0 otherwise
  */
-pub(crate) unsafe extern "C" fn xmlBufResetInput(
+pub(crate) unsafe extern "C" fn xml_buf_reset_input(
     buf: XmlBufPtr,
     input: XmlParserInputPtr,
 ) -> c_int {
@@ -1024,7 +1030,7 @@ pub(crate) unsafe extern "C" fn xmlBufResetInput(
  *
  * Returns the size_t corresponding to the displacement
  */
-pub(crate) unsafe extern "C" fn xmlBufGetInputBase(
+pub(crate) unsafe extern "C" fn xml_buf_get_input_base(
     buf: XmlBufPtr,
     input: XmlParserInputPtr,
 ) -> size_t {
@@ -1058,7 +1064,7 @@ pub(crate) unsafe extern "C" fn xmlBufGetInputBase(
  *
  * Returns -1 in case of error, 0 otherwise
  */
-pub(crate) unsafe extern "C" fn xmlBufSetInputBaseCur(
+pub(crate) unsafe extern "C" fn xml_buf_set_input_base_cur(
     buf: XmlBufPtr,
     input: XmlParserInputPtr,
     base: size_t,
