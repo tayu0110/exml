@@ -1,0 +1,104 @@
+[package]
+name = "exml"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.86"
+const_format = { version = "0.2.32" }
+libc = "0.2.155"
+
+[features]
+default = [
+    "xpath",
+    "schema",
+    "catalog",
+    "sax1",
+    "valid",
+    "legacy",
+    "push",
+    "thread",
+    "html",
+    "writer",
+    "regexp",
+    "tree",
+    "xinclude",
+    "output",
+    "http",
+    "ftp",
+    "libxml_expr",
+    "libxml_automata",
+    "libxml_unicode",
+    "libxml_c14n",
+    "libxml_xptr_locs",
+    "libxml_pattern",
+    "libxml_xptr",
+    "libxml_reader",
+    "libxml_schematron",
+    "libxml_modules",
+    "libxml_debug",
+    "libxml_iso8859x",
+]
+xpath = []
+schema = []
+catalog = []
+sax1 = []
+valid = []
+legacy = []
+push = []
+thread = []
+thread_alloc = []
+html = []
+writer = []
+regexp = []
+tree = []
+xinclude = []
+output = []
+http = []
+ftp = []
+libxml_expr = []
+libxml_automata = []
+libxml_unicode = []
+libxml_c14n = []
+libxml_xptr_locs = []
+libxml_pattern = []
+libxml_xptr = []
+libxml_schematron = []
+libxml_reader = []
+libxml_modules = []
+libxml_debug = []
+libxml_iso8859x = []
+
+[[test]]
+name = "runxmlconf"
+required-features = ["xpath"]
+
+[[test]]
+name = "runsuite"
+required-features = ["schema", "xpath"]
+
+[[test]]
+name = "runtest"
+required-features = ["output"]
+
+[[test]]
+name = "testchar"
+
+[[test]]
+name = "testdict"
+
+[[test]]
+name = "testlimits"
+
+[[test]]
+name = "testrecurse"
+
+[[test]]
+name = "test_threads"
+required-features = ["catalog", "thread"]
+
+[[bin]]
+name = "xmllint"
+path = "src/bin/xmllint.rs"

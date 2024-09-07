@@ -1,0 +1,15 @@
+/target
+# Source codes of libxml2
+/libxml2-*
+# Test data in libxml2
+/test
+# Test result data in libxml2
+/result
+# Test data in xmlconf
+/xmlconf
+
+libxml2-*
+*.xml
+*.tar.gz
+*.out
+*.log

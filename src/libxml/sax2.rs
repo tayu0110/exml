@@ -1,0 +1,5153 @@
+//! Provide methods and data structures for SAX2 handlers.  
+//! This module is based on `libxml/SAX2.h`, `SAX2.c`, and so on in `libxml2-v2.11.8`.
+//!
+//! Please refer to original libxml2 documents also.
+
+use std::{
+    ffi::{c_char, c_int, c_uint, c_ulong, c_void},
+    mem::size_of,
+    ptr::{addr_of_mut, null, null_mut},
+    sync::atomic::Ordering,
+};
+
+use libc::{memcpy, memset, ptrdiff_t, size_t, INT_MAX};
+
+use crate::{
+    __xml_raise_error,
+    libxml::{
+        encoding::XmlCharEncoding,
+        entities::XmlEntityPtr,
+        htmltree::htmlNewDocNoDtD,
+        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlSaxlocatorPtr},
+        tree::{
+            xml_validate_ncname, XmlAttributePtr, XmlDocProperties, XmlElementPtr, XmlNode,
+            XmlNsPtr,
+        },
+        valid::{xmlValidateOneElement, xml_validate_attribute_decl, xml_validate_document_final},
+        xmlerror::XmlStructuredErrorFunc,
+        xmlstring::XmlChar,
+    },
+    private::parser::{xml_err_memory, XML_VCTXT_DTD_VALIDATED},
+    xml_error_with_format, IS_BLANK_CH,
+};
+
+use super::{
+    dict::{xmlDictLookup, xmlDictOwns, xmlDictQLookup, xmlDictReference},
+    encoding::xmlDetectCharEncoding,
+    entities::{
+        xml_add_doc_entity, xml_add_dtd_entity, xml_get_doc_entity, xml_get_parameter_entity,
+        xml_get_predefined_entity, XmlEntityType,
+    },
+    globals::{xmlRegisterNodeDefaultValue, xml_free, xml_malloc, xml_realloc},
+    parser::{
+        xml_load_external_entity, xml_pop_input, XmlParserOption, XmlSAXHandler,
+        XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS,
+    },
+    parser_internals::{
+        node_pop, node_push, xml_free_input_stream, xml_parse_external_subset, xml_push_input,
+        xml_split_qname, xml_string_decode_entities, xml_string_len_decode_entities,
+        xml_switch_encoding, XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
+    },
+    tree::{
+        xmlAddChild, xmlAddSibling, xmlFreeNode, xmlGetIntSubset, xmlNewCDataBlock, xmlNewCharRef,
+        xmlNewDoc, xmlNewDocComment, xmlNewDocNode, xmlNewDocNodeEatName, xmlNewDocPI,
+        xmlNewDocText, xmlNewNs, xmlNewNsProp, xmlNewNsPropEatName, xmlNewReference, xmlSearchNs,
+        xmlSetNs, xmlStringGetNodeList, xmlStringLenGetNodeList, xmlTextConcat, xml_build_qname,
+        xml_create_int_subset, xml_free_dtd, xml_new_dtd, xml_unlink_node, XmlAttr, XmlAttrPtr,
+        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNotationPtr,
+        __XML_REGISTER_CALLBACKS,
+    },
+    uri::{
+        xml_build_uri, xml_canonic_path, xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr,
+    },
+    valid::{
+        xml_add_attribute_decl, xml_add_element_decl, xml_add_id, xml_add_notation_decl,
+        xml_add_ref, xml_free_enumeration, xml_get_dtd_qattr_desc, xml_get_dtd_qelement_desc,
+        xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,
+        xml_valid_normalize_attribute_value, xml_validate_dtd_final, xml_validate_element_decl,
+        xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
+        xml_validate_root,
+    },
+    xmlerror::{xmlParserError, xmlParserWarning, XmlParserErrors},
+    xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strndup},
+};
+
+/**
+ * xmlSAX2GetPublicId:
+ * @ctx: the user data (XML parser context)
+ *
+ * Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
+ *
+ * Returns a xmlChar *
+ */
+pub unsafe extern "C" fn xmlSAX2GetPublicId(_ctx: *mut c_void) -> *const XmlChar {
+    /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
+    null()
+}
+
+/**
+ * xmlSAX2GetSystemId:
+ * @ctx: the user data (XML parser context)
+ *
+ * Provides the system ID, basically URL or filename e.g.
+ * http://www.sgmlsource.com/dtds/memo.dtd
+ *
+ * Returns a xmlChar *
+ */
+pub unsafe extern "C" fn xmlSAX2GetSystemId(ctx: *mut c_void) -> *const XmlChar {
+    let ctxt: XmlParserCtxtPtr = ctx as _;
+    if ctx.is_null() || (*ctxt).input.is_null() {
+        return null();
+    };
+    (*(*ctxt).input).filename as _
+}
+
+/**
+ * xmlSAX2SetDocumentLocator:
+ * @ctx: the user data (XML parser context)
+ * @loc: A SAX Locator
+ *
+ * Receive the document locator at startup, actually xmlDefaultSAXLocator
+ * Everything is available on the context, so this is useless in our case.
+ */
+pub unsafe extern "C" fn xmlSAX2SetDocumentLocator(_ctx: *mut c_void, _loc: XmlSaxlocatorPtr) {
+    /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2SetDocumentLocator()\n".as_ptr() as _);
+    // #endif
+}
+
+/**
+ * xmlSAX2GetLineNumber:
+ * @ctx: the user data (XML parser context)
+ *
+ * Provide the line number of the current parsing point.
+ *
+ * Returns an c_int
+ */
+pub unsafe extern "C" fn xmlSAX2GetLineNumber(ctx: *mut c_void) -> c_int {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    if ctx.is_null() || (*ctxt).input.is_null() {
+        return 0;
+    }
+    (*(*ctxt).input).line
+}
+
+/**
+ * xmlSAX2GetColumnNumber:
+ * @ctx: the user data (XML parser context)
+ *
+ * Provide the column number of the current parsing point.
+ *
+ * Returns an c_int
+ */
+pub unsafe extern "C" fn xmlSAX2GetColumnNumber(ctx: *mut c_void) -> c_int {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    if ctx.is_null() || (*ctxt).input.is_null() {
+        return 0;
+    }
+    (*(*ctxt).input).col
+}
+
+/**
+ * xmlSAX2IsStandalone:
+ * @ctx: the user data (XML parser context)
+ *
+ * Is this document tagged standalone ?
+ *
+ * Returns 1 if true
+ */
+pub unsafe extern "C" fn xmlSAX2IsStandalone(ctx: *mut c_void) -> c_int {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    if ctx.is_null() || (*ctxt).my_doc.is_null() {
+        return 0;
+    }
+    ((*(*ctxt).my_doc).standalone == 1) as i32
+}
+
+/**
+ * xmlSAX2HasInternalSubset:
+ * @ctx: the user data (XML parser context)
+ *
+ * Does this document has an internal subset
+ *
+ * Returns 1 if true
+ */
+pub unsafe extern "C" fn xmlSAX2HasInternalSubset(ctx: *mut c_void) -> c_int {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    if ctxt.is_null() || (*ctxt).my_doc.is_null() {
+        return 0;
+    }
+    (!(*(*ctxt).my_doc).int_subset.is_null()) as i32
+}
+
+/**
+ * xmlSAX2HasExternalSubset:
+ * @ctx: the user data (XML parser context)
+ *
+ * Does this document has an external subset
+ *
+ * Returns 1 if true
+ */
+pub unsafe extern "C" fn xmlSAX2HasExternalSubset(ctx: *mut c_void) -> c_int {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    if ctxt.is_null() || (*ctxt).my_doc.is_null() {
+        return 0;
+    }
+    (!(*(*ctxt).my_doc).ext_subset.is_null()) as i32
+}
+
+/*
+ * xmlSAX2ErrMemory:
+ * @ctxt:  an XML validation parser context
+ * @msg:   a string to accompany the error message
+ */
+unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_char) {
+    let mut schannel: Option<XmlStructuredErrorFunc> = None;
+    let str1: *const c_char = c"out of memory\n".as_ptr() as _;
+
+    if !ctxt.is_null() {
+        (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
+        if !(*ctxt).sax.is_null() && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
+            schannel = (*(*ctxt).sax).serror;
+        }
+        __xml_raise_error!(
+            schannel,
+            (*ctxt).vctxt.error,
+            (*ctxt).vctxt.user_data,
+            ctxt as _,
+            null_mut(),
+            XmlErrorDomain::XmlFromParser as i32,
+            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorLevel::XmlErrError,
+            null_mut(),
+            0,
+            str1,
+            null_mut(),
+            null_mut(),
+            0,
+            0,
+            msg,
+            str1,
+            null::<c_char>()
+        );
+        (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
+        (*ctxt).instate = XmlParserInputState::XmlParserEOF;
+        (*ctxt).disable_sax = 1;
+    } else {
+        __xml_raise_error!(
+            schannel,
+            None,
+            null_mut(),
+            ctxt as _,
+            null_mut(),
+            XmlErrorDomain::XmlFromParser as i32,
+            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorLevel::XmlErrError,
+            null_mut(),
+            0,
+            str1,
+            null_mut(),
+            null_mut(),
+            0,
+            0,
+            msg,
+            str1,
+            null::<c_char>()
+        );
+    }
+}
+
+/**
+ * xmlSAX2InternalSubset:
+ * @ctx:  the user data (XML parser context)
+ * @name:  the root element name
+ * @ExternalID:  the external ID
+ * @SystemID:  the SYSTEM ID (e.g. filename or URL)
+ *
+ * Callback on internal subset declaration.
+ */
+pub unsafe extern "C" fn xmlSAX2InternalSubset(
+    ctx: *mut c_void,
+    name: *const XmlChar,
+    external_id: *const XmlChar,
+    system_id: *const XmlChar,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    if ctx.is_null() {
+        return;
+    }
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2InternalSubset(%s, %s, %s)\n",
+    //             name, ExternalID, SystemID);
+    // #endif
+
+    if (*ctxt).my_doc.is_null() {
+        return;
+    }
+    let dtd: XmlDtdPtr = xmlGetIntSubset((*ctxt).my_doc);
+    if !dtd.is_null() {
+        if (*ctxt).html != 0 {
+            return;
+        }
+        xml_unlink_node(dtd as XmlNodePtr);
+        xml_free_dtd(dtd);
+        (*(*ctxt).my_doc).int_subset = null_mut();
+    }
+    (*(*ctxt).my_doc).int_subset =
+        xml_create_int_subset((*ctxt).my_doc, name, external_id, system_id);
+    if (*(*ctxt).my_doc).int_subset.is_null() {
+        xml_sax2_err_memory(ctxt, c"xmlSAX2InternalSubset".as_ptr() as _);
+    }
+}
+
+/**
+ * xmlSAX2ExternalSubset:
+ * @ctx: the user data (XML parser context)
+ * @name:  the root element name
+ * @ExternalID:  the external ID
+ * @SystemID:  the SYSTEM ID (e.g. filename or URL)
+ *
+ * Callback on external subset declaration.
+ */
+pub unsafe extern "C" fn xmlSAX2ExternalSubset(
+    ctx: *mut c_void,
+    name: *const XmlChar,
+    external_id: *const XmlChar,
+    system_id: *const XmlChar,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    if ctx.is_null() {
+        return;
+    }
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2ExternalSubset(%s, %s, %s)\n",
+    //             name, ExternalID, SystemID);
+    // #endif
+    if (!external_id.is_null() || !system_id.is_null())
+        && (((*ctxt).validate != 0 || (*ctxt).loadsubset != 0)
+            && ((*ctxt).well_formed != 0 && !(*ctxt).my_doc.is_null()))
+    {
+        let mut input: XmlParserInputPtr = null_mut();
+        let enc: XmlCharEncoding;
+        let mut consumed: c_ulong;
+
+        /*
+         * Ask the Entity resolver to load the damn thing
+         */
+        if !(*ctxt).sax.is_null() && (*(*ctxt).sax).resolve_entity.is_some() {
+            input =
+                ((*(*ctxt).sax).resolve_entity.unwrap())((*ctxt).user_data, external_id, system_id);
+        }
+        if input.is_null() {
+            return;
+        }
+
+        xml_new_dtd((*ctxt).my_doc, name, external_id, system_id);
+
+        /*
+         * make sure we won't destroy the main document context
+         */
+        /*
+         * Try to fetch and parse the external subset.
+         */
+        let oldinput: XmlParserInputPtr = (*ctxt).input;
+        let oldinput_nr: c_int = (*ctxt).input_nr;
+        let oldinput_max: c_int = (*ctxt).input_max;
+        let oldinput_tab: *mut XmlParserInputPtr = (*ctxt).input_tab;
+        let oldcharset: c_int = (*ctxt).charset;
+        let oldencoding: *const XmlChar = (*ctxt).encoding;
+        let oldprogressive: c_int = (*ctxt).progressive;
+        (*ctxt).encoding = null();
+        (*ctxt).progressive = 0;
+
+        (*ctxt).input_tab = xml_malloc(5 * size_of::<XmlParserInputPtr>()) as _;
+        if (*ctxt).input_tab.is_null() {
+            xml_sax2_err_memory(ctxt, c"xmlSAX2ExternalSubset".as_ptr() as _);
+            xml_free_input_stream(input);
+            (*ctxt).input = oldinput;
+            (*ctxt).input_nr = oldinput_nr;
+            (*ctxt).input_max = oldinput_max;
+            (*ctxt).input_tab = oldinput_tab;
+            (*ctxt).charset = oldcharset;
+            (*ctxt).encoding = oldencoding;
+            (*ctxt).progressive = oldprogressive;
+            return;
+        }
+        (*ctxt).input_nr = 0;
+        (*ctxt).input_max = 5;
+        (*ctxt).input = null_mut();
+        xml_push_input(ctxt, input);
+
+        /*
+         * On the fly encoding conversion if needed
+         */
+        if (*(*ctxt).input).length >= 4 {
+            enc = xmlDetectCharEncoding((*(*ctxt).input).cur, 4);
+            xml_switch_encoding(ctxt, enc);
+        }
+
+        if (*input).filename.is_null() {
+            (*input).filename = xml_canonic_path(system_id) as _;
+        }
+        (*input).line = 1;
+        (*input).col = 1;
+        (*input).base = (*(*ctxt).input).cur;
+        (*input).cur = (*(*ctxt).input).cur;
+        (*input).free = None;
+
+        /*
+         * let's parse that entity knowing it's an external subset.
+         */
+        xml_parse_external_subset(ctxt, external_id, system_id);
+
+        /*
+         * Free up the external entities
+         */
+        #[allow(clippy::while_immutable_condition)]
+        while (*ctxt).input_nr > 1 {
+            xml_pop_input(ctxt);
+        }
+
+        consumed = (*(*ctxt).input).consumed;
+        let buffered: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+        if buffered as u64 > u64::MAX - consumed {
+            consumed = u64::MAX;
+        } else {
+            consumed += buffered as u64;
+        }
+        if consumed > u64::MAX - (*ctxt).sizeentities {
+            (*ctxt).sizeentities = u64::MAX;
+        } else {
+            (*ctxt).sizeentities += consumed;
+        }
+
+        xml_free_input_stream((*ctxt).input);
+        xml_free((*ctxt).input_tab as _);
+
+        /*
+         * Restore the parsing context of the main entity
+         */
+        (*ctxt).input = oldinput;
+        (*ctxt).input_nr = oldinput_nr;
+        (*ctxt).input_max = oldinput_max;
+        (*ctxt).input_tab = oldinput_tab;
+        (*ctxt).charset = oldcharset;
+        if !(*ctxt).encoding.is_null()
+            && ((*ctxt).dict.is_null() || xmlDictOwns((*ctxt).dict, (*ctxt).encoding) == 0)
+        {
+            xml_free((*ctxt).encoding as _);
+        }
+        (*ctxt).encoding = oldencoding;
+        (*ctxt).progressive = oldprogressive;
+        /* (*ctxt).wellFormed = oldwellFormed; */
+    }
+}
+
+/**
+ * xmlFatalErrMsg:
+ * @ctxt:  an XML parser context
+ * @error:  the error number
+ * @msg:  the error message
+ * @str1:  an error string
+ * @str2:  an error string
+ *
+ * Handle a fatal parser error, i.e. violating Well-Formedness constraints
+ */
+unsafe extern "C" fn xml_fatal_err_msg(
+    ctxt: XmlParserCtxtPtr,
+    error: XmlParserErrors,
+    msg: *const c_char,
+    str1: *const XmlChar,
+    str2: *const XmlChar,
+) {
+    if !ctxt.is_null()
+        && ((*ctxt).disable_sax != 0)
+        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
+        return;
+    }
+    if !ctxt.is_null() {
+        (*ctxt).err_no = error as i32;
+    }
+    __xml_raise_error!(
+        None,
+        None,
+        null_mut(),
+        ctxt as _,
+        null_mut(),
+        XmlErrorDomain::XmlFromParser as i32,
+        error as i32,
+        XmlErrorLevel::XmlErrFatal,
+        null_mut(),
+        0,
+        str1 as _,
+        str2 as _,
+        null_mut(),
+        0,
+        0,
+        msg,
+        str1,
+        str2
+    );
+    if !ctxt.is_null() {
+        (*ctxt).well_formed = 0;
+        (*ctxt).valid = 0;
+        if (*ctxt).recovery == 0 {
+            (*ctxt).disable_sax = 1;
+        }
+    }
+}
+
+/**
+ * xmlSAX2GetEntity:
+ * @ctx: the user data (XML parser context)
+ * @name: The entity name
+ *
+ * Get an entity by name
+ *
+ * Returns the xmlEntityPtr if found.
+ */
+pub unsafe extern "C" fn xmlSAX2GetEntity(ctx: *mut c_void, name: *const XmlChar) -> XmlEntityPtr {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    let mut ret: XmlEntityPtr;
+
+    if ctx.is_null() {
+        return null_mut();
+    }
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2GetEntity(%s)\n", name);
+    // #endif
+
+    if (*ctxt).in_subset == 0 {
+        ret = xml_get_predefined_entity(name);
+        if !ret.is_null() {
+            return ret;
+        }
+    }
+    if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).standalone == 1 {
+        if (*ctxt).in_subset == 2 {
+            (*(*ctxt).my_doc).standalone = 0;
+            ret = xml_get_doc_entity((*ctxt).my_doc, name);
+            (*(*ctxt).my_doc).standalone = 1;
+        } else {
+            ret = xml_get_doc_entity((*ctxt).my_doc, name);
+            if ret.is_null() {
+                (*(*ctxt).my_doc).standalone = 0;
+                ret = xml_get_doc_entity((*ctxt).my_doc, name);
+                if !ret.is_null() {
+                    xml_fatal_err_msg(
+                        ctxt,
+                        XmlParserErrors::XmlErrNotStandalone,
+                        c"Entity(%s) document marked standalone but requires external subset\n"
+                            .as_ptr() as _,
+                        name,
+                        null(),
+                    );
+                }
+                (*(*ctxt).my_doc).standalone = 1;
+            }
+        }
+    } else {
+        ret = xml_get_doc_entity((*ctxt).my_doc, name);
+    }
+    ret
+}
+
+/**
+ * xmlSAX2GetParameterEntity:
+ * @ctx: the user data (XML parser context)
+ * @name: The entity name
+ *
+ * Get a parameter entity by name
+ *
+ * Returns the xmlEntityPtr if found.
+ */
+pub unsafe extern "C" fn xmlSAX2GetParameterEntity(
+    ctx: *mut c_void,
+    name: *const XmlChar,
+) -> XmlEntityPtr {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    if ctx.is_null() {
+        return null_mut();
+    }
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2GetParameterEntity(%s)\n", name);
+    // #endif
+
+    xml_get_parameter_entity((*ctxt).my_doc, name)
+}
+
+/**
+ * xmlSAX2ResolveEntity:
+ * @ctx: the user data (XML parser context)
+ * @publicId: The public ID of the entity
+ * @systemId: The system ID of the entity
+ *
+ * The entity loader, to control the loading of external entities,
+ * the application can either:
+ *    - override this xmlSAX2ResolveEntity() callback in the SAX block
+ *    - or better use the xmlSetExternalEntityLoader() function to
+ *      set up it's own entity resolution routine
+ *
+ * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+ */
+pub unsafe extern "C" fn xmlSAX2ResolveEntity(
+    ctx: *mut c_void,
+    public_id: *const XmlChar,
+    system_id: *const XmlChar,
+) -> XmlParserInputPtr {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    let mut base: *const c_char = null();
+
+    if ctx.is_null() {
+        return null_mut();
+    }
+    if !(*ctxt).input.is_null() {
+        base = (*(*ctxt).input).filename;
+    }
+    if base.is_null() {
+        base = (*ctxt).directory;
+    }
+
+    let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
+
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2ResolveEntity(%s, %s)\n", publicId, systemId);
+    // #endif
+
+    let ret: XmlParserInputPtr = xml_load_external_entity(uri as _, public_id as _, ctxt);
+    if !uri.is_null() {
+        xml_free(uri as _);
+    }
+    ret
+}
+
+/**
+ * xmlWarnMsg:
+ * @ctxt:  an XML parser context
+ * @error:  the error number
+ * @msg:  the error message
+ * @str1:  an error string
+ * @str2:  an error string
+ *
+ * Handle a parser warning
+ */
+unsafe extern "C" fn xml_warn_msg(
+    ctxt: XmlParserCtxtPtr,
+    error: XmlParserErrors,
+    msg: *const c_char,
+    str1: *const XmlChar,
+) {
+    if !ctxt.is_null()
+        && (*ctxt).disable_sax != 0
+        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
+        return;
+    }
+    if !ctxt.is_null() {
+        (*ctxt).err_no = error as i32;
+    }
+    __xml_raise_error!(
+        None,
+        None,
+        null_mut(),
+        ctxt as _,
+        null_mut(),
+        XmlErrorDomain::XmlFromParser as i32,
+        error as i32,
+        XmlErrorLevel::XmlErrWarning,
+        null_mut(),
+        0,
+        str1 as _,
+        null_mut(),
+        null_mut(),
+        0,
+        0,
+        msg,
+        str1
+    );
+}
+
+/**
+ * xmlSAX2EntityDecl:
+ * @ctx: the user data (XML parser context)
+ * @name:  the entity name
+ * @type:  the entity type
+ * @publicId: The public ID of the entity
+ * @systemId: The system ID of the entity
+ * @content: the entity value (without processing).
+ *
+ * An entity definition has been parsed
+ */
+pub unsafe extern "C" fn xmlSAX2EntityDecl(
+    ctx: *mut c_void,
+    name: *const XmlChar,
+    typ: c_int,
+    public_id: *const XmlChar,
+    system_id: *const XmlChar,
+    content: *mut XmlChar,
+) {
+    let ent: XmlEntityPtr;
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    if ctx.is_null() {
+        return;
+    }
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2EntityDecl(%s, %d, %s, %s, %s)\n".as_ptr() as _,
+    //             name, type, publicId, systemId, content);
+    // #endif
+    if (*ctxt).in_subset == 1 {
+        ent = xml_add_doc_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
+        if ent.is_null() && (*ctxt).pedantic != 0 {
+            xml_warn_msg(
+                ctxt,
+                XmlParserErrors::XmlWarEntityRedefined,
+                c"Entity(%s) already defined in the internal subset\n".as_ptr() as _,
+                name,
+            );
+        }
+        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
+            let mut base: *const c_char = null();
+
+            if !(*ctxt).input.is_null() {
+                base = (*(*ctxt).input).filename;
+            }
+            if base.is_null() {
+                base = (*ctxt).directory;
+            }
+
+            let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
+            (*ent).uri.store(uri, Ordering::Relaxed);
+        }
+    } else if (*ctxt).in_subset == 2 {
+        ent = xml_add_dtd_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
+        if ent.is_null()
+            && (*ctxt).pedantic != 0
+            && !(*ctxt).sax.is_null()
+            && (*(*ctxt).sax).warning.is_some()
+        {
+            xml_error_with_format!(
+                (*(*ctxt).sax).warning.unwrap(),
+                (*ctxt).user_data as _,
+                c"Entity(%s) already defined in the external subset\n".as_ptr() as _,
+                name
+            );
+        }
+        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
+            let mut base: *const c_char = null();
+
+            if !(*ctxt).input.is_null() {
+                base = (*(*ctxt).input).filename;
+            }
+            if base.is_null() {
+                base = (*ctxt).directory;
+            }
+
+            let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
+            (*ent).uri.store(uri, Ordering::Relaxed);
+        }
+    } else {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrEntityProcessing,
+            c"SAX.xmlSAX2EntityDecl(%s) called while not in subset\n".as_ptr() as _,
+            name,
+            null(),
+        );
+    }
+}
+
+/**
+ * xmlValidError:
+ * @ctxt:  an XML validation parser context
+ * @error:  the error number
+ * @msg:  the error message
+ * @str1:  extra data
+ * @str2:  extra data
+ *
+ * Handle a validation error
+ */
+unsafe extern "C" fn xml_err_valid(
+    ctxt: XmlParserCtxtPtr,
+    error: XmlParserErrors,
+    msg: *const c_char,
+    str1: *const c_char,
+    str2: *const c_char,
+) {
+    let mut schannel: Option<XmlStructuredErrorFunc> = None;
+
+    if !ctxt.is_null()
+        && (*ctxt).disable_sax != 0
+        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
+        return;
+    }
+    if !ctxt.is_null() {
+        (*ctxt).err_no = error as i32;
+        if !(*ctxt).sax.is_null() && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
+            schannel = (*(*ctxt).sax).serror;
+        }
+        __xml_raise_error!(
+            schannel,
+            (*ctxt).vctxt.error,
+            (*ctxt).vctxt.user_data,
+            ctxt as _,
+            null_mut(),
+            XmlErrorDomain::XmlFromDtd as i32,
+            error as i32,
+            XmlErrorLevel::XmlErrError,
+            null_mut(),
+            0,
+            str1,
+            str2,
+            null_mut(),
+            0,
+            0,
+            msg,
+            str1,
+            str2
+        );
+        (*ctxt).valid = 0;
+    } else {
+        __xml_raise_error!(
+            schannel,
+            None,
+            null_mut(),
+            ctxt as _,
+            null_mut(),
+            XmlErrorDomain::XmlFromDtd as i32,
+            error as i32,
+            XmlErrorLevel::XmlErrError,
+            null_mut(),
+            0,
+            str1,
+            str2,
+            null_mut(),
+            0,
+            0,
+            msg,
+            str1,
+            str2
+        );
+    }
+}
+
+/**
+ * xmlSAX2AttributeDecl:
+ * @ctx: the user data (XML parser context)
+ * @elem:  the name of the element
+ * @fullname:  the attribute name
+ * @type:  the attribute type
+ * @def:  the type of default value
+ * @defaultValue: the attribute default value
+ * @tree:  the tree of enumerated value set
+ *
+ * An attribute definition has been parsed
+ */
+pub unsafe extern "C" fn xmlSAX2AttributeDecl(
+    ctx: *mut c_void,
+    elem: *const XmlChar,
+    fullname: *const XmlChar,
+    typ: c_int,
+    def: c_int,
+    default_value: *const XmlChar,
+    tree: XmlEnumerationPtr,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    let attr: XmlAttributePtr;
+
+    let mut prefix: *mut XmlChar = null_mut();
+
+    if ctxt.is_null() || (*ctxt).my_doc.is_null() {
+        return;
+    }
+
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2AttributeDecl(%s, %s, %d, %d, %s, ...)\n".as_ptr() as _,
+    //             elem, fullname, type, def, defaultValue);
+    // #endif
+    if xml_str_equal(fullname, c"xml:id".as_ptr() as _) != 0
+        && typ != XmlAttributeType::XmlAttributeId as i32
+    {
+        /*
+         * Raise the error but keep the validity flag
+         */
+        let tmp: c_int = (*ctxt).valid;
+        xml_err_valid(
+            ctxt,
+            XmlParserErrors::XmlDtdXmlidType,
+            c"xml:id : attribute type should be ID\n".as_ptr() as _,
+            null(),
+            null(),
+        );
+        (*ctxt).valid = tmp;
+    }
+    /* TODO: optimize name/prefix allocation */
+    let name: *mut XmlChar = xml_split_qname(ctxt, fullname, addr_of_mut!(prefix) as _);
+    (*ctxt).vctxt.valid = 1;
+    if (*ctxt).in_subset == 1 {
+        attr = xml_add_attribute_decl(
+            addr_of_mut!((*ctxt).vctxt) as _,
+            (*(*ctxt).my_doc).int_subset,
+            elem,
+            name,
+            prefix,
+            XmlAttributeType::try_from(typ).unwrap(),
+            XmlAttributeDefault::try_from(def).unwrap(),
+            default_value,
+            tree,
+        );
+    } else if (*ctxt).in_subset == 2 {
+        attr = xml_add_attribute_decl(
+            addr_of_mut!((*ctxt).vctxt) as _,
+            (*(*ctxt).my_doc).ext_subset,
+            elem,
+            name,
+            prefix,
+            XmlAttributeType::try_from(typ).unwrap(),
+            XmlAttributeDefault::try_from(def).unwrap(),
+            default_value,
+            tree,
+        );
+    } else {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrInternalError,
+            c"SAX.xmlSAX2AttributeDecl(%s) called while not in subset\n".as_ptr() as _,
+            name,
+            null(),
+        );
+        xml_free(name as _);
+        xml_free_enumeration(tree);
+        return;
+    }
+    #[cfg(feature = "valid")]
+    {
+        if (*ctxt).vctxt.valid == 0 {
+            (*ctxt).valid = 0;
+        }
+        if !attr.is_null()
+            && (*ctxt).validate != 0
+            && (*ctxt).well_formed != 0
+            && !(*(*ctxt).my_doc).int_subset.is_null()
+        {
+            (*ctxt).valid &=
+                xml_validate_attribute_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, attr);
+        }
+    }
+    if !prefix.is_null() {
+        xml_free(prefix as _);
+    }
+    if !name.is_null() {
+        xml_free(name as _);
+    }
+}
+
+/**
+ * xmlSAX2ElementDecl:
+ * @ctx: the user data (XML parser context)
+ * @name:  the element name
+ * @type:  the element type
+ * @content: the element value tree
+ *
+ * An element definition has been parsed
+ */
+pub unsafe extern "C" fn xmlSAX2ElementDecl(
+    ctx: *mut c_void,
+    name: *const XmlChar,
+    typ: c_int,
+    content: XmlElementContentPtr,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    let elem: XmlElementPtr;
+
+    if ctxt.is_null() || (*ctxt).my_doc.is_null() {
+        return;
+    }
+
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    //                     c"SAX.xmlSAX2ElementDecl(%s, %d, ...)\n", name, type);
+    // #endif
+
+    if (*ctxt).in_subset == 1 {
+        elem = xml_add_element_decl(
+            addr_of_mut!((*ctxt).vctxt) as _,
+            (*(*ctxt).my_doc).int_subset,
+            name,
+            XmlElementTypeVal::try_from(typ).unwrap(),
+            content,
+        );
+    } else if (*ctxt).in_subset == 2 {
+        elem = xml_add_element_decl(
+            addr_of_mut!((*ctxt).vctxt) as _,
+            (*(*ctxt).my_doc).ext_subset,
+            name,
+            XmlElementTypeVal::try_from(typ).unwrap(),
+            content,
+        );
+    } else {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrInternalError,
+            c"SAX.xmlSAX2ElementDecl(%s) called while not in subset\n".as_ptr() as _,
+            name,
+            null(),
+        );
+        return;
+    }
+    #[cfg(feature = "valid")]
+    {
+        if elem.is_null() {
+            (*ctxt).valid = 0;
+        }
+        if (*ctxt).validate != 0
+            && (*ctxt).well_formed != 0
+            && !(*ctxt).my_doc.is_null()
+            && !(*(*ctxt).my_doc).int_subset.is_null()
+        {
+            (*ctxt).valid &=
+                xml_validate_element_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, elem);
+        }
+    }
+}
+
+/**
+ * xmlSAX2NotationDecl:
+ * @ctx: the user data (XML parser context)
+ * @name: The name of the notation
+ * @publicId: The public ID of the entity
+ * @systemId: The system ID of the entity
+ *
+ * What to do when a notation declaration has been parsed.
+ */
+pub unsafe extern "C" fn xmlSAX2NotationDecl(
+    ctx: *mut c_void,
+    name: *const XmlChar,
+    public_id: *const XmlChar,
+    system_id: *const XmlChar,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    let nota: XmlNotationPtr;
+
+    if ctxt.is_null() || (*ctxt).my_doc.is_null() {
+        return;
+    }
+
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2NotationDecl(%s, %s, %s)\n", name, publicId, systemId);
+    // #endif
+
+    if public_id.is_null() && system_id.is_null() {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrNotationProcessing,
+            c"SAX.xmlSAX2NotationDecl(%s) externalID or PublicID missing\n".as_ptr() as _,
+            name,
+            null(),
+        );
+        return;
+    } else if (*ctxt).in_subset == 1 {
+        nota = xml_add_notation_decl(
+            addr_of_mut!((*ctxt).vctxt) as _,
+            (*(*ctxt).my_doc).int_subset,
+            name,
+            public_id,
+            system_id,
+        );
+    } else if (*ctxt).in_subset == 2 {
+        nota = xml_add_notation_decl(
+            addr_of_mut!((*ctxt).vctxt) as _,
+            (*(*ctxt).my_doc).ext_subset,
+            name,
+            public_id,
+            system_id,
+        );
+    } else {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrNotationProcessing,
+            c"SAX.xmlSAX2NotationDecl(%s) called while not in subset\n".as_ptr() as _,
+            name,
+            null(),
+        );
+        return;
+    }
+    #[cfg(feature = "valid")]
+    {
+        if nota.is_null() {
+            (*ctxt).valid = 0;
+        }
+        if (*ctxt).validate != 0
+            && (*ctxt).well_formed != 0
+            && !(*(*ctxt).my_doc).int_subset.is_null()
+        {
+            (*ctxt).valid &=
+                xml_validate_notation_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, nota);
+        }
+    }
+}
+
+/**
+ * xmlSAX2UnparsedEntityDecl:
+ * @ctx: the user data (XML parser context)
+ * @name: The name of the entity
+ * @publicId: The public ID of the entity
+ * @systemId: The system ID of the entity
+ * @notationName: the name of the notation
+ *
+ * What to do when an unparsed entity declaration is parsed
+ */
+pub unsafe extern "C" fn xmlSAX2UnparsedEntityDecl(
+    ctx: *mut c_void,
+    name: *const XmlChar,
+    public_id: *const XmlChar,
+    system_id: *const XmlChar,
+    notation_name: *const XmlChar,
+) {
+    let ent: XmlEntityPtr;
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    if ctx.is_null() {
+        return;
+    }
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2UnparsedEntityDecl(%s, %s, %s, %s)\n",
+    //             name, publicId, systemId, notationName);
+    // #endif
+    if (*ctxt).in_subset == 1 {
+        ent = xml_add_doc_entity(
+            (*ctxt).my_doc,
+            name,
+            XmlEntityType::XmlExternalGeneralUnparsedEntity as i32,
+            public_id,
+            system_id,
+            notation_name,
+        );
+        if ent.is_null()
+            && (*ctxt).pedantic != 0
+            && !(*ctxt).sax.is_null()
+            && (*(*ctxt).sax).warning.is_some()
+        {
+            xml_error_with_format!(
+                (*(*ctxt).sax).warning.unwrap(),
+                (*ctxt).user_data,
+                c"Entity(%s) already defined in the internal subset\n".as_ptr() as _,
+                name
+            )
+        }
+        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
+            let mut base: *const c_char = null();
+
+            if !(*ctxt).input.is_null() {
+                base = (*(*ctxt).input).filename;
+            }
+            if base.is_null() {
+                base = (*ctxt).directory;
+            }
+
+            let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
+            (*ent).uri.store(uri, Ordering::Relaxed);
+        }
+    } else if (*ctxt).in_subset == 2 {
+        ent = xml_add_dtd_entity(
+            (*ctxt).my_doc,
+            name,
+            XmlEntityType::XmlExternalGeneralUnparsedEntity as i32,
+            public_id,
+            system_id,
+            notation_name,
+        );
+        if ent.is_null()
+            && (*ctxt).pedantic != 0
+            && !(*ctxt).sax.is_null()
+            && (*(*ctxt).sax).warning.is_some()
+        {
+            xml_error_with_format!(
+                (*(*ctxt).sax).warning.unwrap(),
+                (*ctxt).user_data,
+                c"Entity(%s) already defined in the external subset\n".as_ptr() as _,
+                name
+            )
+        }
+        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
+            let mut base: *const c_char = null();
+
+            if !(*ctxt).input.is_null() {
+                base = (*(*ctxt).input).filename;
+            }
+            if base.is_null() {
+                base = (*ctxt).directory;
+            }
+
+            let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
+            (*ent).uri.store(uri, Ordering::Relaxed);
+        }
+    } else {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrInternalError,
+            c"SAX.xmlSAX2UnparsedEntityDecl(%s) called while not in subset\n".as_ptr() as _,
+            name,
+            null(),
+        );
+    }
+}
+
+/**
+ * xmlSAX2StartDocument:
+ * @ctx: the user data (XML parser context)
+ *
+ * called when the document start being processed.
+ */
+pub unsafe extern "C" fn xmlSAX2StartDocument(ctx: *mut c_void) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    let doc: XmlDocPtr;
+
+    if ctx.is_null() {
+        return;
+    }
+
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2StartDocument()\n".as_ptr() as _);
+    // #endif
+    if (*ctxt).html != 0 {
+        #[cfg(feature = "html")]
+        {
+            if (*ctxt).my_doc.is_null() {
+                (*ctxt).my_doc = htmlNewDocNoDtD(null(), null());
+            }
+            if (*ctxt).my_doc.is_null() {
+                xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
+                return;
+            }
+            (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocHtml as i32;
+            (*(*ctxt).my_doc).parse_flags = (*ctxt).options;
+        }
+        #[cfg(not(feature = "html"))]
+        {
+            xmlGenericError(
+                xmlGenericErrorContext,
+                c"libxml2 built without HTML support\n",
+            );
+            (*ctxt).errNo = XmlParserErrors::XmlErrInternalError as i32;
+            (*ctxt).instate = XmlParserInputState::XmlParserEOF;
+            (*ctxt).disableSAX = 1;
+            return;
+        }
+    } else {
+        doc = xmlNewDoc((*ctxt).version);
+        (*ctxt).my_doc = doc;
+        if !doc.is_null() {
+            (*doc).properties = 0;
+            if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 != 0 {
+                (*doc).properties |= XmlDocProperties::XmlDocOld10 as i32;
+            }
+            (*doc).parse_flags = (*ctxt).options;
+            if !(*ctxt).encoding.is_null() {
+                (*doc).encoding = xml_strdup((*ctxt).encoding);
+            } else {
+                (*doc).encoding = null_mut();
+            }
+            (*doc).standalone = (*ctxt).standalone;
+        } else {
+            xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
+            return;
+        }
+        if (*ctxt).dict_names != 0 && !doc.is_null() {
+            (*doc).dict = (*ctxt).dict;
+            xmlDictReference((*doc).dict);
+        }
+    }
+    if !(*ctxt).my_doc.is_null()
+        && (*(*ctxt).my_doc).url.is_null()
+        && !(*ctxt).input.is_null()
+        && !(*(*ctxt).input).filename.is_null()
+    {
+        (*(*ctxt).my_doc).url = xml_path_to_uri((*(*ctxt).input).filename as _);
+        if (*(*ctxt).my_doc).url.is_null() {
+            xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
+        }
+    }
+}
+
+/**
+ * xmlSAX2EndDocument:
+ * @ctx: the user data (XML parser context)
+ *
+ * called when the document end has been detected.
+ */
+pub unsafe extern "C" fn xmlSAX2EndDocument(ctx: *mut c_void) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2EndDocument()\n".as_ptr() as _);
+    // #endif
+    if ctx.is_null() {
+        return;
+    }
+    #[cfg(feature = "valid")]
+    {
+        if (*ctxt).validate != 0
+            && (*ctxt).well_formed != 0
+            && !(*ctxt).my_doc.is_null()
+            && !(*(*ctxt).my_doc).int_subset.is_null()
+        {
+            (*ctxt).valid &=
+                xml_validate_document_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+        }
+    }
+
+    /*
+     * Grab the encoding if it was added on-the-fly
+     */
+    if !(*ctxt).encoding.is_null()
+        && !(*ctxt).my_doc.is_null()
+        && (*(*ctxt).my_doc).encoding.is_null()
+    {
+        (*(*ctxt).my_doc).encoding = (*ctxt).encoding;
+        (*ctxt).encoding = null();
+    }
+    if !(*ctxt).input_tab.is_null()
+        && (*ctxt).input_nr > 0
+        && !(*(*ctxt).input_tab.add(0)).is_null()
+        && !(*(*(*ctxt).input_tab.add(0))).encoding.is_null()
+        && !(*ctxt).my_doc.is_null()
+        && (*(*ctxt).my_doc).encoding.is_null()
+    {
+        (*(*ctxt).my_doc).encoding = xml_strdup((*(*(*ctxt).input_tab.add(0))).encoding);
+    }
+    if (*ctxt).charset != XmlCharEncoding::XmlCharEncodingNone as i32
+        && !(*ctxt).my_doc.is_null()
+        && (*(*ctxt).my_doc).charset == XmlCharEncoding::XmlCharEncodingNone as i32
+    {
+        (*(*ctxt).my_doc).charset = (*ctxt).charset;
+    }
+}
+
+/**
+ * xmlNsWarnMsg:
+ * @ctxt:  an XML parser context
+ * @error:  the error number
+ * @msg:  the error message
+ * @str1:  an error string
+ *
+ * Handle a namespace warning
+ */
+unsafe extern "C" fn xml_ns_warn_msg(
+    ctxt: XmlParserCtxtPtr,
+    error: XmlParserErrors,
+    msg: *const c_char,
+    str1: *const XmlChar,
+    str2: *const XmlChar,
+) {
+    if !ctxt.is_null()
+        && (*ctxt).disable_sax != 0
+        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
+        return;
+    }
+    if !ctxt.is_null() {
+        (*ctxt).err_no = error as i32;
+    }
+    __xml_raise_error!(
+        None,
+        None,
+        null_mut(),
+        ctxt as _,
+        null_mut(),
+        XmlErrorDomain::XmlFromNamespace as i32,
+        error as i32,
+        XmlErrorLevel::XmlErrWarning,
+        null_mut(),
+        0,
+        str1 as _,
+        str2 as _,
+        null_mut(),
+        0,
+        0,
+        msg,
+        str1,
+        str2
+    );
+}
+
+/**
+ * xmlNsErrMsg:
+ * @ctxt:  an XML parser context
+ * @error:  the error number
+ * @msg:  the error message
+ * @str1:  an error string
+ * @str2:  an error string
+ *
+ * Handle a namespace error
+ */
+#[cfg(any(
+    feature = "sax1",
+    feature = "html",
+    feature = "writer",
+    feature = "legacy"
+))]
+unsafe extern "C" fn xml_ns_err_msg(
+    ctxt: XmlParserCtxtPtr,
+    error: XmlParserErrors,
+    msg: *const c_char,
+    str1: *const XmlChar,
+    str2: *const XmlChar,
+) {
+    if !ctxt.is_null()
+        && (*ctxt).disable_sax != 0
+        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
+        return;
+    }
+    if !ctxt.is_null() {
+        (*ctxt).err_no = error as i32;
+    }
+    __xml_raise_error!(
+        None,
+        None,
+        null_mut(),
+        ctxt as _,
+        null_mut(),
+        XmlErrorDomain::XmlFromNamespace as i32,
+        error as i32,
+        XmlErrorLevel::XmlErrError,
+        null_mut(),
+        0,
+        str1 as _,
+        str2 as _,
+        null_mut(),
+        0,
+        0,
+        msg,
+        str1,
+        str2
+    );
+}
+
+/**
+ * xmlSAX2AttributeInternal:
+ * @ctx: the user data (XML parser context)
+ * @fullname:  The attribute name, including namespace prefix
+ * @value:  The attribute value
+ * @prefix: the prefix on the element node
+ *
+ * Handle an attribute that has been read by the parser.
+ * The default handling is to convert the attribute into an
+ * DOM subtree and past it in a new xmlAttr element added to
+ * the element.
+ */
+#[cfg(any(
+    feature = "sax1",
+    feature = "html",
+    feature = "writer",
+    feature = "legacy"
+))]
+unsafe extern "C" fn xmlSAX2AttributeInternal(
+    ctx: *mut c_void,
+    fullname: *const XmlChar,
+    mut value: *const XmlChar,
+    prefix: *const XmlChar,
+) {
+    use super::htmltree::htmlIsBooleanAttr;
+
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    let mut name: *mut XmlChar;
+    let mut ns: *mut XmlChar = null_mut();
+    let nval: *mut XmlChar;
+    let namespace: XmlNsPtr;
+
+    if (*ctxt).html != 0 {
+        name = xml_strdup(fullname);
+        ns = null_mut();
+        // namespace = null_mut();
+    } else {
+        /*
+         * Split the full name into a namespace prefix and the tag name
+         */
+        name = xml_split_qname(ctxt, fullname, addr_of_mut!(ns));
+        if !name.is_null() && *name.add(0) == 0 {
+            if xml_str_equal(ns, c"xmlns".as_ptr() as _) != 0 {
+                xml_ns_err_msg(
+                    ctxt,
+                    XmlParserErrors::XmlErrNsDeclError,
+                    c"invalid namespace declaration '%s'\n".as_ptr() as _,
+                    fullname,
+                    null(),
+                );
+            } else {
+                xml_ns_warn_msg(
+                    ctxt,
+                    XmlParserErrors::XmlWarNsColumn,
+                    c"Avoid attribute ending with ':' like '%s'\n".as_ptr() as _,
+                    fullname,
+                    null(),
+                );
+            }
+            if !ns.is_null() {
+                xml_free(ns as _);
+            }
+            ns = null_mut();
+            xml_free(name as _);
+            name = xml_strdup(fullname);
+        }
+    }
+    if name.is_null() {
+        xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+        if !ns.is_null() {
+            xml_free(ns as _);
+        }
+        return;
+    }
+
+    #[cfg(not(feature = "html"))]
+    let f = false;
+    #[cfg(feature = "html")]
+    let f = (*ctxt).html != 0 && value.is_null() && htmlIsBooleanAttr(fullname) != 0;
+    if f {
+        nval = xml_strdup(fullname);
+        value = nval;
+    } else {
+        #[cfg(feature = "valid")]
+        {
+            /*
+             * Do the last stage of the attribute normalization
+             * Needed for HTML too:
+             *   http://www.w3.org/TR/html4/types.html#h-6.2
+             */
+            (*ctxt).vctxt.valid = 1;
+            nval = xml_valid_ctxt_normalize_attribute_value(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                (*ctxt).node,
+                fullname,
+                value,
+            );
+            if (*ctxt).vctxt.valid != 1 {
+                (*ctxt).valid = 0;
+            }
+            if !nval.is_null() {
+                value = nval;
+            }
+        }
+        #[cfg(not(feature = "valid"))]
+        {
+            nval = null_mut();
+        }
+    }
+
+    /*
+     * Check whether it's a namespace definition
+     */
+    if (*ctxt).html == 0
+        && ns.is_null()
+        && *name.add(0) == b'x'
+        && *name.add(1) == b'm'
+        && *name.add(2) == b'l'
+        && *name.add(3) == b'n'
+        && *name.add(4) == b's'
+        && *name.add(5) == 0
+    {
+        let val: *mut XmlChar;
+
+        if (*ctxt).replace_entities == 0 {
+            (*ctxt).depth += 1;
+            val = xml_string_decode_entities(ctxt, value, XML_SUBSTITUTE_REF as _, 0, 0, 0);
+            (*ctxt).depth -= 1;
+            if val.is_null() {
+                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+                if !name.is_null() {
+                    xml_free(name as _);
+                }
+                if !nval.is_null() {
+                    xml_free(nval as _);
+                }
+                return;
+            }
+        } else {
+            val = value as _;
+        }
+
+        if *val.add(0) != 0 {
+            let uri: XmlURIPtr = xml_parse_uri(val as _);
+            if uri.is_null() {
+                if !(*ctxt).sax.is_null() && (*(*ctxt).sax).warning.is_some() {
+                    xml_error_with_format!(
+                        (*(*ctxt).sax).warning.unwrap(),
+                        (*ctxt).user_data,
+                        c"xmlns: %s not a valid URI\n".as_ptr() as _,
+                        val
+                    );
+                }
+            } else {
+                if (*uri).scheme.is_null()
+                    && (!(*ctxt).sax.is_null() && (*(*ctxt).sax).warning.is_some())
+                {
+                    xml_error_with_format!(
+                        (*(*ctxt).sax).warning.unwrap(),
+                        (*ctxt).user_data,
+                        c"xmlns: URI %s is not absolute\n".as_ptr() as _,
+                        val
+                    );
+                }
+                xml_free_uri(uri);
+            }
+        }
+
+        /* a default namespace definition */
+        let nsret: XmlNsPtr = xmlNewNs((*ctxt).node, val, null_mut());
+
+        #[cfg(feature = "valid")]
+        {
+            /*
+             * Validate also for namespace decls, they are attributes from
+             * an XML-1.0 perspective
+             */
+            if !nsret.is_null()
+                && (*ctxt).validate != 0
+                && (*ctxt).well_formed != 0
+                && !(*ctxt).my_doc.is_null()
+                && !(*(*ctxt).my_doc).int_subset.is_null()
+            {
+                (*ctxt).valid &= xml_validate_one_namespace(
+                    addr_of_mut!((*ctxt).vctxt) as _,
+                    (*ctxt).my_doc,
+                    (*ctxt).node,
+                    prefix,
+                    nsret,
+                    val,
+                );
+            }
+        }
+        if !name.is_null() {
+            xml_free(name as _);
+        }
+        if !nval.is_null() {
+            xml_free(nval as _);
+        }
+        if val != value as _ {
+            xml_free(val as _);
+        }
+        return;
+    }
+    if (*ctxt).html != 0
+        && !ns.is_null()
+        && *ns.add(0) == b'x'
+        && *ns.add(1) == b'm'
+        && *ns.add(2) == b'l'
+        && *ns.add(3) == b'n'
+        && *ns.add(4) == b's'
+        && *ns.add(5) == 0
+    {
+        let val: *mut XmlChar;
+
+        if !(*ctxt).replace_entities != 0 {
+            (*ctxt).depth += 1;
+            val = xml_string_decode_entities(ctxt, value, XML_SUBSTITUTE_REF as _, 0, 0, 0);
+            (*ctxt).depth -= 1;
+            if val.is_null() {
+                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+                xml_free(ns as _);
+                if !name.is_null() {
+                    xml_free(name as _);
+                }
+                if !nval.is_null() {
+                    xml_free(nval as _);
+                }
+                return;
+            }
+        } else {
+            val = value as _;
+        }
+
+        if *val.add(0) == 0 {
+            xml_ns_err_msg(
+                ctxt,
+                XmlParserErrors::XmlNsErrEmpty,
+                c"Empty namespace name for prefix %s\n".as_ptr() as _,
+                name,
+                null(),
+            );
+        }
+        if (*ctxt).pedantic != 0 && (*val.add(0) != 0) {
+            let uri: XmlURIPtr = xml_parse_uri(val as _);
+            if uri.is_null() {
+                xml_ns_warn_msg(
+                    ctxt,
+                    XmlParserErrors::XmlWarNsUri,
+                    c"xmlns:%s: %s not a valid URI\n".as_ptr() as _,
+                    name,
+                    value,
+                );
+            } else {
+                if (*uri).scheme.is_null() {
+                    xml_ns_warn_msg(
+                        ctxt,
+                        XmlParserErrors::XmlWarNsUriRelative,
+                        "xmlns:%s: URI %s is not absolute\n".as_ptr() as _,
+                        name,
+                        value,
+                    );
+                }
+                xml_free_uri(uri);
+            }
+        }
+
+        /* a standard namespace definition */
+        let nsret: XmlNsPtr = xmlNewNs((*ctxt).node, val, name);
+        xml_free(ns as _);
+        #[cfg(feature = "valid")]
+        {
+            /*
+             * Validate also for namespace decls, they are attributes from
+             * an XML-1.0 perspective
+             */
+            if !nsret.is_null()
+                && (*ctxt).validate != 0
+                && (*ctxt).well_formed != 0
+                && !(*ctxt).my_doc.is_null()
+                && !(*(*ctxt).my_doc).int_subset.is_null()
+            {
+                (*ctxt).valid &= xml_validate_one_namespace(
+                    addr_of_mut!((*ctxt).vctxt) as _,
+                    (*ctxt).my_doc,
+                    (*ctxt).node,
+                    prefix,
+                    nsret,
+                    value,
+                );
+            }
+        }
+        if !name.is_null() {
+            xml_free(name as _);
+        }
+        if !nval.is_null() {
+            xml_free(nval as _);
+        }
+        if val != value as _ {
+            xml_free(val as _);
+        }
+        return;
+    }
+
+    if !ns.is_null() {
+        namespace = xmlSearchNs((*ctxt).my_doc, (*ctxt).node, ns);
+
+        if namespace.is_null() {
+            xml_ns_err_msg(
+                ctxt,
+                XmlParserErrors::XmlNsErrUndefinedNamespace,
+                "Namespace prefix %s of attribute %s is not defined\n".as_ptr() as _,
+                ns,
+                name,
+            );
+        } else {
+            let mut prop: XmlAttrPtr;
+
+            prop = (*(*ctxt).node).properties;
+            while !prop.is_null() {
+                if !(*prop).ns.is_null()
+                    && (xml_str_equal(name, (*prop).name) != 0
+                        && (namespace == (*prop).ns
+                            || xml_str_equal(
+                                (*namespace).href.load(Ordering::Relaxed) as _,
+                                (*(*prop).ns).href.load(Ordering::Relaxed) as _,
+                            ) != 0))
+                {
+                    xml_ns_err_msg(
+                        ctxt,
+                        XmlParserErrors::XmlErrAttributeRedefined,
+                        c"Attribute %s in %s redefined\n".as_ptr() as _,
+                        name,
+                        (*namespace).href.load(Ordering::Relaxed) as _,
+                    );
+                    (*ctxt).well_formed = 0;
+                    if (*ctxt).recovery == 0 {
+                        (*ctxt).disable_sax = 1;
+                    }
+                    if !name.is_null() {
+                        xml_free(name as _);
+                    }
+                    // goto error;
+                    if !nval.is_null() {
+                        xml_free(nval as _);
+                    }
+                    if !ns.is_null() {
+                        xml_free(ns as _);
+                    }
+                }
+                prop = (*prop).next;
+            }
+        }
+    } else {
+        namespace = null_mut();
+    }
+
+    /* !!!!!! <a toto:arg="" xmlns:toto="http://toto.com"> */
+    let ret: XmlAttrPtr = xmlNewNsPropEatName((*ctxt).node, namespace, name, null());
+    if ret.is_null() {
+        // goto error;
+        if !nval.is_null() {
+            xml_free(nval as _);
+        }
+        if !ns.is_null() {
+            xml_free(ns as _);
+        }
+    }
+
+    if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
+        let mut tmp: XmlNodePtr;
+
+        (*ret).children = xmlStringGetNodeList((*ctxt).my_doc, value);
+        tmp = (*ret).children;
+        while !tmp.is_null() {
+            (*tmp).parent = ret as XmlNodePtr;
+            if (*tmp).next.is_null() {
+                (*ret).last = tmp;
+            }
+            tmp = (*tmp).next;
+        }
+    } else if !value.is_null() {
+        (*ret).children = xmlNewDocText((*ctxt).my_doc, value);
+        (*ret).last = (*ret).children;
+        if !(*ret).children.is_null() {
+            (*(*ret).children).parent = ret as XmlNodePtr;
+        }
+    }
+
+    #[cfg(not(feature = "valid"))]
+    let f = false;
+    #[cfg(feature = "valid")]
+    let f = (*ctxt).html == 0
+        && (*ctxt).validate != 0
+        && (*ctxt).well_formed != 0
+        && !(*ctxt).my_doc.is_null()
+        && !(*(*ctxt).my_doc).int_subset.is_null();
+    if f {
+        /*
+         * If we don't substitute entities, the validation should be
+         * done on a value with replaced entities anyway.
+         */
+        if (*ctxt).replace_entities == 0 {
+            let mut val: *mut XmlChar;
+
+            (*ctxt).depth += 1;
+            val = xml_string_decode_entities(ctxt, value, XML_SUBSTITUTE_REF as _, 0, 0, 0);
+            (*ctxt).depth -= 1;
+
+            if val.is_null() {
+                (*ctxt).valid &= xml_validate_one_attribute(
+                    addr_of_mut!((*ctxt).vctxt) as _,
+                    (*ctxt).my_doc,
+                    (*ctxt).node,
+                    ret,
+                    value,
+                );
+            } else {
+                /*
+                 * Do the last stage of the attribute normalization
+                 * It need to be done twice ... it's an extra burden related
+                 * to the ability to keep xmlSAX2References in attributes
+                 */
+                let nvalnorm: *mut XmlChar = xml_valid_normalize_attribute_value(
+                    (*ctxt).my_doc,
+                    (*ctxt).node,
+                    fullname,
+                    val,
+                );
+                if !nvalnorm.is_null() {
+                    xml_free(val as _);
+                    val = nvalnorm;
+                }
+
+                (*ctxt).valid &= xml_validate_one_attribute(
+                    addr_of_mut!((*ctxt).vctxt) as _,
+                    (*ctxt).my_doc,
+                    (*ctxt).node,
+                    ret,
+                    val,
+                );
+                xml_free(val as _);
+            }
+        } else {
+            (*ctxt).valid &= xml_validate_one_attribute(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                (*ctxt).node,
+                ret,
+                value,
+            );
+        }
+    } else if (*ctxt).loadsubset & XML_SKIP_IDS as i32 == 0 &&
+	       (((*ctxt).replace_entities == 0 && (*ctxt).external != 2) ||
+	        ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0)) &&
+               /* Don't create IDs containing entity references */
+               !(*ret).children.is_null() &&
+               matches!((*(*ret).children).typ, XmlElementType::XmlTextNode) &&
+               (*(*ret).children).next.is_null()
+    {
+        let content: *mut XmlChar = (*(*ret).children).content;
+        /*
+         * when validating, the ID registration is done at the attribute
+         * validation level. Otherwise we have to do specific handling here.
+         */
+        if xml_str_equal(fullname, c"xml:id".as_ptr() as _) != 0 {
+            /*
+             * Add the xml:id value
+             *
+             * Open issue: normalization of the value.
+             */
+            if xml_validate_ncname(content, 1) != 0 {
+                xml_err_valid(
+                    ctxt,
+                    XmlParserErrors::XmlDtdXmlidValue,
+                    c"xml:id : attribute value %s is not an NCName\n".as_ptr() as _,
+                    content as _,
+                    null(),
+                );
+            }
+            xml_add_id(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                content,
+                ret,
+            );
+        } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
+            xml_add_id(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                content,
+                ret,
+            );
+        } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
+            xml_add_ref(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                content,
+                ret,
+            );
+        }
+    }
+
+    // error:
+    if !nval.is_null() {
+        xml_free(nval as _);
+    }
+    if !ns.is_null() {
+        xml_free(ns as _);
+    }
+}
+
+/*
+ * xmlCheckDefaultedAttributes:
+ *
+ * Check defaulted attributes from the DTD
+ */
+#[cfg(any(
+    feature = "sax1",
+    feature = "html",
+    feature = "writer",
+    feature = "legacy"
+))]
+unsafe extern "C" fn xmlCheckDefaultedAttributes(
+    ctxt: XmlParserCtxtPtr,
+    name: *const XmlChar,
+    prefix: *const XmlChar,
+    atts: *mut *const XmlChar,
+) {
+    let mut elem_decl: XmlElementPtr;
+    let mut att: *const XmlChar;
+    let mut internal: c_int = 1;
+    let mut i: c_int;
+
+    elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).int_subset, name, prefix);
+    if elem_decl.is_null() {
+        elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).ext_subset, name, prefix);
+        internal = 0;
+    }
+
+    // process_external_subset:
+    'process_external_subset: loop {
+        if !elem_decl.is_null() {
+            let mut attr: XmlAttributePtr = (*elem_decl).attributes;
+            /*
+             * Check against defaulted attributes from the external subset
+             * if the document is stamped as standalone
+             */
+            if (*(*ctxt).my_doc).standalone == 1
+                && !(*(*ctxt).my_doc).ext_subset.is_null()
+                && (*ctxt).validate != 0
+            {
+                while !attr.is_null() {
+                    if !(*attr).default_value.is_null()
+                        && xml_get_dtd_qattr_desc(
+                            (*(*ctxt).my_doc).ext_subset,
+                            (*attr).elem,
+                            (*attr).name,
+                            (*attr).prefix,
+                        ) == attr
+                        && xml_get_dtd_qattr_desc(
+                            (*(*ctxt).my_doc).int_subset,
+                            (*attr).elem,
+                            (*attr).name,
+                            (*attr).prefix,
+                        )
+                        .is_null()
+                    {
+                        let mut fulln: *mut XmlChar;
+
+                        if !(*attr).prefix.is_null() {
+                            fulln = xml_strdup((*attr).prefix);
+                            fulln = xml_strcat(fulln, c":".as_ptr() as _);
+                            fulln = xml_strcat(fulln, (*attr).name);
+                        } else {
+                            fulln = xml_strdup((*attr).name);
+                        }
+                        if fulln.is_null() {
+                            xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+                            break;
+                        }
+
+                        /*
+                         * Check that the attribute is not declared in the
+                         * serialization
+                         */
+                        att = null_mut();
+                        if !atts.is_null() {
+                            i = 0;
+                            att = *atts.add(i as usize);
+                            while !att.is_null() {
+                                if xml_str_equal(att, fulln) != 0 {
+                                    break;
+                                }
+                                i += 2;
+                                att = *atts.add(i as usize);
+                            }
+                        }
+                        if att.is_null() {
+                            xml_err_valid(
+                                ctxt,
+                                XmlParserErrors::XmlDtdStandaloneDefaulted,
+                                c"standalone: attribute %s on %s defaulted from external subset\n"
+                                    .as_ptr() as _,
+                                fulln as _,
+                                (*attr).elem as _,
+                            );
+                        }
+                        xml_free(fulln as _);
+                    }
+                    attr = (*attr).nexth;
+                }
+            }
+
+            /*
+             * Actually insert defaulted values when needed
+             */
+            attr = (*elem_decl).attributes;
+            while !attr.is_null() {
+                /*
+                 * Make sure that attributes redefinition occurring in the
+                 * internal subset are not overridden by definitions in the
+                 * external subset.
+                 */
+                if !(*attr).default_value.is_null() {
+                    /*
+                     * the element should be instantiated in the tree if:
+                     *  - this is a namespace prefix
+                     *  - the user required for completion in the tree
+                     *    like XSLT
+                     *  - there isn't already an attribute definition
+                     *    in the internal subset overriding it.
+                     */
+                    if (!(*attr).prefix.is_null()
+                        && xml_str_equal((*attr).prefix, c"xmlns".as_ptr() as _) != 0)
+                        || ((*attr).prefix.is_null()
+                            && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) != 0)
+                        || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
+                    {
+                        let tst: XmlAttributePtr = xml_get_dtd_qattr_desc(
+                            (*(*ctxt).my_doc).int_subset,
+                            (*attr).elem,
+                            (*attr).name,
+                            (*attr).prefix,
+                        );
+                        if tst == attr || tst.is_null() {
+                            let mut fname: [XmlChar; 50] = [0; 50];
+
+                            let fulln: *mut XmlChar = xml_build_qname(
+                                (*attr).name,
+                                (*attr).prefix,
+                                fname.as_mut_ptr() as _,
+                                50,
+                            );
+                            if fulln.is_null() {
+                                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+                                return;
+                            }
+
+                            /*
+                             * Check that the attribute is not declared in the
+                             * serialization
+                             */
+                            att = null_mut();
+                            if !atts.is_null() {
+                                i = 0;
+                                att = *atts.add(i as usize);
+                                while !att.is_null() {
+                                    if xml_str_equal(att, fulln) != 0 {
+                                        break;
+                                    }
+                                    i += 2;
+                                    att = *atts.add(i as usize);
+                                }
+                            }
+                            if att.is_null() {
+                                xmlSAX2AttributeInternal(
+                                    ctxt as _,
+                                    fulln,
+                                    (*attr).default_value,
+                                    prefix,
+                                );
+                            }
+                            if fulln != fname.as_ptr() as _ && fulln != (*attr).name as _ {
+                                xml_free(fulln as _);
+                            }
+                        }
+                    }
+                }
+                attr = (*attr).nexth;
+            }
+            if internal == 1 {
+                elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).ext_subset, name, prefix);
+                internal = 0;
+                // goto process_external_subset;
+                continue 'process_external_subset;
+            }
+        }
+
+        break;
+    }
+}
+
+/**
+ * xmlSAX2StartElement:
+ * @ctx: the user data (XML parser context)
+ * @fullname:  The element name, including namespace prefix
+ * @atts:  An array of name/value attributes pairs, NULL terminated
+ *
+ * called when an opening tag has been processed.
+ */
+#[cfg(any(
+    feature = "sax1",
+    feature = "html",
+    feature = "writer",
+    feature = "legacy"
+))]
+pub unsafe extern "C" fn xmlSAX2StartElement(
+    ctx: *mut c_void,
+    fullname: *const XmlChar,
+    atts: *mut *const XmlChar,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    let mut parent: XmlNodePtr;
+    let mut ns: XmlNsPtr;
+    let name: *mut XmlChar;
+    let mut prefix: *mut XmlChar = null_mut();
+    let mut att: *const XmlChar;
+    let mut value: *const XmlChar;
+    let mut i: c_int;
+
+    if ctx.is_null() || fullname.is_null() || (*ctxt).my_doc.is_null() {
+        return;
+    }
+    parent = (*ctxt).node;
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2StartElement(%s)\n", fullname);
+    // #endif
+
+    /*
+     * First check on validity:
+     */
+    if (*ctxt).validate != 0
+        && (*(*ctxt).my_doc).ext_subset.is_null()
+        && ((*(*ctxt).my_doc).int_subset.is_null()
+            || ((*(*(*ctxt).my_doc).int_subset).notations.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).elements.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).attributes.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).entities.is_null()))
+    {
+        xml_err_valid(
+            ctxt,
+            XmlParserErrors::XmlErrNoDtd,
+            c"Validation failed: no DTD found !".as_ptr() as _,
+            null(),
+            null(),
+        );
+        (*ctxt).validate = 0;
+    }
+
+    if (*ctxt).html != 0 {
+        prefix = null_mut();
+        name = xml_strdup(fullname);
+    } else {
+        /*
+         * Split the full name into a namespace prefix and the tag name
+         */
+        name = xml_split_qname(ctxt, fullname, addr_of_mut!(prefix));
+    }
+
+    /*
+     * Note : the namespace resolution is deferred until the end of the
+     *        attributes parsing, since local namespace can be defined as
+     *        an attribute at this level.
+     */
+    let ret: XmlNodePtr = xmlNewDocNodeEatName((*ctxt).my_doc, null_mut(), name, null_mut());
+    if ret.is_null() {
+        if !prefix.is_null() {
+            xml_free(prefix as _);
+        }
+        xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+        return;
+    }
+    if (*(*ctxt).my_doc).children.is_null() {
+        // #ifdef DEBUG_SAX_TREE
+        // 	xmlGenericError(xmlGenericErrorContext, c"Setting %s as root\n", name);
+        // #endif
+        xmlAddChild((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+    } else if parent.is_null() {
+        parent = (*(*ctxt).my_doc).children;
+    }
+    (*ctxt).nodemem = -1;
+    if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
+        if ((*(*ctxt).input).line as c_uint) < u16::MAX as c_uint {
+            (*ret).line = (*(*ctxt).input).line as _;
+        } else {
+            (*ret).line = u16::MAX;
+        }
+    }
+
+    /*
+     * We are parsing a new node.
+     */
+    // #ifdef DEBUG_SAX_TREE
+    //     xmlGenericError(xmlGenericErrorContext, c"pushing(%s)\n", name);
+    // #endif
+    if node_push(ctxt, ret) < 0 {
+        xml_unlink_node(ret);
+        xmlFreeNode(ret);
+        if !prefix.is_null() {
+            xml_free(prefix as _);
+        }
+        return;
+    }
+
+    /*
+     * Link the child element
+     */
+    if !parent.is_null() {
+        if matches!((*parent).typ, XmlElementType::XmlElementNode) {
+            // #ifdef DEBUG_SAX_TREE
+            // 	    xmlGenericError(xmlGenericErrorContext,
+            // 		    "adding child %s to %s\n", name, (*parent).name);
+            // #endif
+            xmlAddChild(parent, ret);
+        } else {
+            // #ifdef DEBUG_SAX_TREE
+            // 	    xmlGenericError(xmlGenericErrorContext,
+            // 		    "adding sibling %s to ", name);
+            // 	    xmlDebugDumpOneNode(stderr, parent, 0);
+            // #endif
+            xmlAddSibling(parent, ret);
+        }
+    }
+
+    if (*ctxt).html == 0 {
+        /*
+         * Insert all the defaulted attributes from the DTD especially
+         * namespaces
+         */
+        if !(*(*ctxt).my_doc).int_subset.is_null() || !(*(*ctxt).my_doc).ext_subset.is_null() {
+            xmlCheckDefaultedAttributes(ctxt, name, prefix, atts);
+        }
+
+        /*
+         * process all the attributes whose name start with "xmlns"
+         */
+        if !atts.is_null() {
+            i = 0;
+            att = *atts.add(i as usize);
+            i += 1;
+            value = *atts.add(i as usize);
+            i += 1;
+            while !att.is_null() && !value.is_null() {
+                if (*att.add(0) == b'x')
+                    && (*att.add(1) == b'm')
+                    && (*att.add(2) == b'l')
+                    && (*att.add(3) == b'n')
+                    && (*att.add(4) == b's')
+                {
+                    xmlSAX2AttributeInternal(ctxt as _, att, value, prefix);
+                }
+
+                att = *atts.add(i as usize);
+                i += 1;
+                value = *atts.add(i as usize);
+                i += 1;
+            }
+        }
+
+        /*
+         * Search the namespace, note that since the attributes have been
+         * processed, the local namespaces are available.
+         */
+        ns = xmlSearchNs((*ctxt).my_doc, ret, prefix);
+        if ns.is_null() && !parent.is_null() {
+            ns = xmlSearchNs((*ctxt).my_doc, parent, prefix);
+        }
+        if !prefix.is_null() && ns.is_null() {
+            ns = xmlNewNs(ret, null_mut(), prefix);
+            xml_ns_warn_msg(
+                ctxt,
+                XmlParserErrors::XmlNsErrUndefinedNamespace,
+                c"Namespace prefix %s is not defined\n".as_ptr() as _,
+                prefix,
+                null(),
+            );
+        }
+
+        /*
+         * set the namespace node, making sure that if the default namespace
+         * is unbound on a parent we simply keep it NULL
+         */
+        if !ns.is_null()
+            && !(*ns).href.load(Ordering::Relaxed).is_null()
+            && (*(*ns).href.load(Ordering::Relaxed).add(0) != 0
+                || !(*ns).prefix.load(Ordering::Relaxed).is_null())
+        {
+            xmlSetNs(ret, ns);
+        }
+    }
+
+    /*
+     * process all the other attributes
+     */
+    if !atts.is_null() {
+        i = 0;
+        att = *atts.add(i as usize);
+        i += 1;
+        value = *atts.add(i as usize);
+        i += 1;
+        if (*ctxt).html != 0 {
+            while !att.is_null() {
+                xmlSAX2AttributeInternal(ctxt as _, att, value, null_mut());
+                att = *atts.add(i as usize);
+                i += 1;
+                value = *atts.add(i as usize);
+                i += 1;
+            }
+        } else {
+            while !att.is_null() && !value.is_null() {
+                if (*att.add(0) != b'x')
+                    || (*att.add(1) != b'm')
+                    || (*att.add(2) != b'l')
+                    || (*att.add(3) != b'n')
+                    || (*att.add(4) != b's')
+                {
+                    xmlSAX2AttributeInternal(ctxt as _, att, value, null_mut());
+                }
+
+                /*
+                 * Next ones
+                 */
+                att = *atts.add(i as usize);
+                i += 1;
+                value = *atts.add(i as usize);
+                i += 1;
+            }
+        }
+    }
+
+    #[cfg(feature = "valid")]
+    {
+        /*
+         * If it's the Document root, finish the DTD validation and
+         * check the document root element for validity
+         */
+        if (*ctxt).validate != 0 && (*ctxt).vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
+            let chk: c_int =
+                xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            if chk <= 0 {
+                (*ctxt).valid = 0;
+            }
+            if chk < 0 {
+                (*ctxt).well_formed = 0;
+            }
+            (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            (*ctxt).vctxt.flags |= XML_VCTXT_DTD_VALIDATED as u32;
+        }
+    }
+
+    if !prefix.is_null() {
+        xml_free(prefix as _);
+    }
+}
+
+/**
+ * xmlSAX2EndElement:
+ * @ctx: the user data (XML parser context)
+ * @name:  The element name
+ *
+ * called when the end of an element has been detected.
+ */
+#[cfg(any(
+    feature = "sax1",
+    feature = "html",
+    feature = "writer",
+    feature = "legacy"
+))]
+pub unsafe extern "C" fn xmlSAX2EndElement(ctx: *mut c_void, _name: *const XmlChar) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    if ctx.is_null() {
+        return;
+    }
+    let cur: XmlNodePtr = (*ctxt).node;
+    // #ifdef DEBUG_SAX
+    //     if (name.is_null())
+    //         xmlGenericError(xmlGenericErrorContext, c"SAX.xmlSAX2EndElement(NULL)\n".as_ptr() as _);
+    //     else
+    // 	xmlGenericError(xmlGenericErrorContext, c"SAX.xmlSAX2EndElement(%s)\n", name);
+    // #endif
+
+    (*ctxt).nodemem = -1;
+
+    #[cfg(feature = "valid")]
+    {
+        if (*ctxt).validate != 0
+            && (*ctxt).well_formed != 0
+            && !(*ctxt).my_doc.is_null()
+            && !(*(*ctxt).my_doc).int_subset.is_null()
+        {
+            (*ctxt).valid &=
+                xmlValidateOneElement(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, cur);
+        }
+    }
+
+    /*
+     * end of parsing of this node.
+     */
+    // #ifdef DEBUG_SAX_TREE
+    //     xmlGenericError(xmlGenericErrorContext, c"popping(%s)\n", cur->name);
+    // #endif
+    node_pop(ctxt);
+}
+
+/**
+ * xmlSAX2StartElementNs:
+ * @ctx:  the user data (XML parser context)
+ * @localname:  the local name of the element
+ * @prefix:  the element namespace prefix if available
+ * @URI:  the element namespace name if available
+ * @nb_namespaces:  number of namespace definitions on that node
+ * @namespaces:  pointer to the array of prefix/URI pairs namespace definitions
+ * @nb_attributes:  the number of attributes on that node
+ * @nb_defaulted:  the number of defaulted attributes.
+ * @attributes:  pointer to the array of (localname/prefix/URI/value/end)
+ *               attribute values.
+ *
+ * SAX2 callback when an element start has been detected by the parser.
+ * It provides the namespace information for the element, as well as
+ * the new namespace declarations on the element.
+ */
+pub unsafe extern "C" fn xmlSAX2StartElementNs(
+    ctx: *mut c_void,
+    mut localname: *const XmlChar,
+    prefix: *const XmlChar,
+    // I want to rename to `uri`, but it also appears as a local variable....
+    orig_uri: *const XmlChar,
+    nb_namespaces: c_int,
+    namespaces: *mut *const XmlChar,
+    mut nb_attributes: c_int,
+    nb_defaulted: c_int,
+    attributes: *mut *const XmlChar,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    let ret: XmlNodePtr;
+    let mut last: XmlNsPtr = null_mut();
+    let mut ns: XmlNsPtr;
+    let mut uri: *const XmlChar;
+    let mut pref: *const XmlChar;
+    let mut lname: *mut XmlChar = null_mut();
+    let mut i: c_int;
+
+    if ctx.is_null() {
+        return;
+    }
+    let parent: XmlNodePtr = (*ctxt).node;
+    /*
+     * First check on validity:
+     */
+    if (*ctxt).validate != 0
+        && (*(*ctxt).my_doc).ext_subset.is_null()
+        && ((*(*ctxt).my_doc).int_subset.is_null()
+            || ((*(*(*ctxt).my_doc).int_subset).notations.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).elements.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).attributes.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).entities.is_null()))
+    {
+        xml_err_valid(
+            ctxt,
+            XmlParserErrors::XmlDtdNoDtd,
+            c"Validation failed: no DTD found !".as_ptr() as _,
+            null(),
+            null(),
+        );
+        (*ctxt).validate = 0;
+    }
+
+    /*
+     * Take care of the rare case of an undefined namespace prefix
+     */
+    if !prefix.is_null() && orig_uri.is_null() {
+        if (*ctxt).dict_names != 0 {
+            let fullname: *const XmlChar = xmlDictQLookup((*ctxt).dict, prefix, localname);
+            if !fullname.is_null() {
+                localname = fullname;
+            }
+        } else {
+            lname = xml_build_qname(localname, prefix, null_mut(), 0);
+        }
+    }
+    /*
+     * allocate the node
+     */
+    if !(*ctxt).free_elems.is_null() {
+        ret = (*ctxt).free_elems;
+        (*ctxt).free_elems = (*ret).next;
+        (*ctxt).free_elems_nr -= 1;
+        memset(ret as _, 0, size_of::<XmlNode>());
+        (*ret).doc = (*ctxt).my_doc;
+        (*ret).typ = XmlElementType::XmlElementNode;
+
+        if (*ctxt).dict_names != 0 {
+            (*ret).name = localname;
+        } else {
+            if lname.is_null() {
+                (*ret).name = xml_strdup(localname);
+            } else {
+                (*ret).name = lname;
+            }
+            if (*ret).name.is_null() {
+                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElementNs".as_ptr() as _);
+                xml_free(ret as _);
+                return;
+            }
+        }
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        // && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xmlRegisterNodeDefaultValue(ret);
+        }
+    } else {
+        if (*ctxt).dict_names != 0 {
+            ret = xmlNewDocNodeEatName((*ctxt).my_doc, null_mut(), localname as _, null_mut());
+        } else if lname.is_null() {
+            ret = xmlNewDocNode((*ctxt).my_doc, null_mut(), localname, null_mut());
+        } else {
+            ret = xmlNewDocNodeEatName((*ctxt).my_doc, null_mut(), lname, null_mut());
+        }
+        if ret.is_null() {
+            xml_sax2_err_memory(ctxt, c"xmlSAX2StartElementNs".as_ptr() as _);
+            return;
+        }
+    }
+    if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
+        if ((*(*ctxt).input).line as c_uint) < u16::MAX as c_uint {
+            (*ret).line = (*(*ctxt).input).line as _;
+        } else {
+            (*ret).line = u16::MAX;
+        }
+    }
+
+    if parent.is_null() {
+        xmlAddChild((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+    }
+    /*
+     * Build the namespace list
+     */
+    i = 0;
+    for _ in 0..nb_namespaces {
+        pref = *namespaces.add(i as usize);
+        i += 1;
+        uri = *namespaces.add(i as usize);
+        i += 1;
+        ns = xmlNewNs(null_mut(), uri, pref);
+        if !ns.is_null() {
+            if last.is_null() {
+                (*ret).ns_def = ns;
+                last = ns;
+            } else {
+                (*last).next.store(ns, Ordering::Relaxed);
+                last = ns;
+            }
+            if !orig_uri.is_null() && prefix == pref {
+                (*ret).ns = ns;
+            }
+        } else {
+            /*
+             * any out of memory error would already have been raised
+             * but we can't be guaranteed it's the actual error due to the
+             * API, best is to skip in this case
+             */
+            continue;
+        }
+        #[cfg(feature = "valid")]
+        {
+            if (*ctxt).html == 0
+                && (*ctxt).validate != 0
+                && (*ctxt).well_formed != 0
+                && !(*ctxt).my_doc.is_null()
+                && !(*(*ctxt).my_doc).int_subset.is_null()
+            {
+                (*ctxt).valid &= xml_validate_one_namespace(
+                    addr_of_mut!((*ctxt).vctxt) as _,
+                    (*ctxt).my_doc,
+                    ret,
+                    prefix,
+                    ns,
+                    uri,
+                );
+            }
+        }
+    }
+    (*ctxt).nodemem = -1;
+
+    /*
+     * We are parsing a new node.
+     */
+    if node_push(ctxt, ret) < 0 {
+        xml_unlink_node(ret);
+        xmlFreeNode(ret);
+        return;
+    }
+
+    /*
+     * Link the child element
+     */
+    if !parent.is_null() {
+        if matches!((*parent).typ, XmlElementType::XmlElementNode) {
+            xmlAddChild(parent, ret);
+        } else {
+            xmlAddSibling(parent, ret);
+        }
+    }
+
+    /*
+     * Insert the defaulted attributes from the DTD only if requested:
+     */
+    if nb_defaulted != 0 && (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 == 0 {
+        nb_attributes -= nb_defaulted;
+    }
+
+    /*
+     * Search the namespace if it wasn't already found
+     * Note that, if prefix is NULL, this searches for the default Ns
+     */
+    if !orig_uri.is_null() && (*ret).ns.is_null() {
+        (*ret).ns = xmlSearchNs((*ctxt).my_doc, parent, prefix);
+        if (*ret).ns.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) != 0 {
+            (*ret).ns = xmlSearchNs((*ctxt).my_doc, ret, prefix);
+        }
+        if (*ret).ns.is_null() {
+            ns = xmlNewNs(ret, null_mut(), prefix);
+            if ns.is_null() {
+                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElementNs".as_ptr() as _);
+                return;
+            }
+            if !prefix.is_null() {
+                xml_ns_warn_msg(
+                    ctxt,
+                    XmlParserErrors::XmlNsErrUndefinedNamespace,
+                    c"Namespace prefix %s was not found\n".as_ptr() as _,
+                    prefix,
+                    null(),
+                );
+            } else {
+                xml_ns_warn_msg(
+                    ctxt,
+                    XmlParserErrors::XmlNsErrUndefinedNamespace,
+                    c"Namespace default prefix was not found\n".as_ptr() as _,
+                    null(),
+                    null(),
+                );
+            }
+        }
+    }
+
+    /*
+     * process all the other attributes
+     */
+    if nb_attributes > 0 {
+        for (_, j) in (0..nb_attributes as usize).zip((0..).step_by(5)) {
+            /*
+             * Handle the rare case of an undefined attribute prefix
+             */
+            if !(*attributes.add(j + 1)).is_null() && (*attributes.add(j + 2)).is_null() {
+                if (*ctxt).dict_names != 0 {
+                    let fullname: *const XmlChar =
+                        xmlDictQLookup((*ctxt).dict, *attributes.add(j + 1), *attributes.add(j));
+                    if !fullname.is_null() {
+                        xmlSAX2AttributeNs(
+                            ctxt,
+                            fullname,
+                            null_mut(),
+                            *attributes.add(j + 3),
+                            *attributes.add(j + 4),
+                        );
+                        continue;
+                    }
+                } else {
+                    lname =
+                        xml_build_qname(*attributes.add(j), *attributes.add(j + 1), null_mut(), 0);
+                    if !lname.is_null() {
+                        xmlSAX2AttributeNs(
+                            ctxt,
+                            lname,
+                            null_mut(),
+                            *attributes.add(j + 3),
+                            *attributes.add(j + 4),
+                        );
+                        xml_free(lname as _);
+                        continue;
+                    }
+                }
+            }
+            xmlSAX2AttributeNs(
+                ctxt,
+                *attributes.add(j),
+                *attributes.add(j + 1),
+                *attributes.add(j + 3),
+                *attributes.add(j + 4),
+            );
+        }
+    }
+
+    #[cfg(feature = "valid")]
+    {
+        /*
+         * If it's the Document root, finish the DTD validation and
+         * check the document root element for validity
+         */
+        if (*ctxt).validate != 0 && (*ctxt).vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
+            let chk: c_int =
+                xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            if chk <= 0 {
+                (*ctxt).valid = 0;
+            }
+            if chk < 0 {
+                (*ctxt).well_formed = 0;
+            }
+            (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            (*ctxt).vctxt.flags |= XML_VCTXT_DTD_VALIDATED as u32;
+        }
+    }
+}
+
+/*
+ * xmlSAX2TextNode:
+ * @ctxt:  the parser context
+ * @str:  the input string
+ * @len: the string length
+ *
+ * Callback for a text node
+ *
+ * Returns the newly allocated string or NULL if not needed or error
+ */
+unsafe extern "C" fn xmlSAX2TextNode(
+    ctxt: XmlParserCtxtPtr,
+    str: *const XmlChar,
+    len: c_int,
+) -> XmlNodePtr {
+    let mut intern: *const XmlChar = null();
+
+    /*
+     * Allocate
+     */
+    let ret: XmlNodePtr = if !(*ctxt).free_elems.is_null() {
+        let ret = (*ctxt).free_elems;
+        (*ctxt).free_elems = (*ret).next;
+        (*ctxt).free_elems_nr -= 1;
+        ret
+    } else {
+        xml_malloc(size_of::<XmlNode>()) as XmlNodePtr
+    };
+    if ret.is_null() {
+        xml_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
+        return null_mut();
+    }
+    memset(ret as _, 0, size_of::<XmlNode>());
+    /*
+     * intern the formatting blanks found between tags, or the
+     * very short strings
+     */
+    if (*ctxt).dict_names != 0 {
+        let cur: XmlChar = *str.add(len as usize);
+
+        if len < 2 * size_of::<*mut c_void>() as c_int
+            && (*ctxt).options & XmlParserOption::XmlParseCompact as i32 != 0
+        {
+            /* store the string in the node overriding properties and nsDef */
+            let tmp: *mut XmlChar = addr_of_mut!((*ret).properties) as _;
+            memcpy(tmp as _, str as _, len as _);
+            *tmp.add(len as usize) = 0;
+            intern = tmp;
+        } else if len <= 3
+            && (cur == b'"' || cur == b'\'' || (cur == b'<' && *str.add(len as usize + 1) != b'!'))
+        {
+            intern = xmlDictLookup((*ctxt).dict, str, len);
+        } else if IS_BLANK_CH!(*str)
+            && len < 60
+            && cur == b'<'
+            && *str.add(len as usize + 1) != b'!'
+        {
+            let mut skip = false;
+            for i in 1..len {
+                if !IS_BLANK_CH!(*str.add(i as usize)) {
+                    // goto skip;
+                    skip = true;
+                    break;
+                }
+            }
+            if !skip {
+                intern = xmlDictLookup((*ctxt).dict, str, len);
+            }
+        }
+    }
+    // skip:
+    (*ret).typ = XmlElementType::XmlTextNode;
+
+    (*ret).name = XML_STRING_TEXT.as_ptr() as _;
+    if intern.is_null() {
+        (*ret).content = xml_strndup(str, len);
+        if (*ret).content.is_null() {
+            xml_sax2_err_memory(ctxt, c"xmlSAX2TextNode".as_ptr() as _);
+            xml_free(ret as _);
+            return null_mut();
+        }
+    } else {
+        (*ret).content = intern as _;
+    }
+
+    if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
+        if ((*(*ctxt).input).line as u32) < u32::MAX {
+            (*ret).line = (*(*ctxt).input).line as _;
+        } else {
+            (*ret).line = u16::MAX;
+            if (*ctxt).options & XmlParserOption::XmlParseBigLines as i32 != 0 {
+                (*ret).psvi = (*(*ctxt).input).line as ptrdiff_t as *mut c_void;
+            }
+        }
+    }
+
+    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+    //  && xmlRegisterNodeDefaultValue.is_some()
+    {
+        xmlRegisterNodeDefaultValue(ret);
+    }
+    ret
+}
+
+/*
+ * xmlSAX2DecodeAttrEntities:
+ * @ctxt:  the parser context
+ * @str:  the input string
+ * @len: the string length
+ *
+ * Remove the entities from an attribute value
+ *
+ * Returns the newly allocated string or NULL if not needed or error
+ */
+#[cfg(feature = "valid")]
+unsafe extern "C" fn xmlSAX2DecodeAttrEntities(
+    ctxt: XmlParserCtxtPtr,
+    str: *const XmlChar,
+    end: *const XmlChar,
+) -> *mut XmlChar {
+    let mut input: *const XmlChar;
+    let ret: *mut XmlChar;
+
+    input = str;
+    while input < end {
+        let res = {
+            let f = *input == b'&';
+            input = input.add(1);
+            f
+        };
+        if res {
+            (*ctxt).depth += 1;
+            ret = xml_string_len_decode_entities(
+                ctxt,
+                str,
+                end.offset_from(str) as _,
+                XML_SUBSTITUTE_REF as _,
+                0,
+                0,
+                0,
+            );
+            (*ctxt).depth -= 1;
+            return ret;
+        }
+    }
+    null_mut()
+}
+
+/**
+ * xmlSAX2AttributeNs:
+ * @ctx: the user data (XML parser context)
+ * @localname:  the local name of the attribute
+ * @prefix:  the attribute namespace prefix if available
+ * @URI:  the attribute namespace name if available
+ * @value:  Start of the attribute value
+ * @valueend: end of the attribute value
+ *
+ * Handle an attribute that has been read by the parser.
+ * The default handling is to convert the attribute into an
+ * DOM subtree and past it in a new xmlAttr element added to
+ * the element.
+ */
+unsafe extern "C" fn xmlSAX2AttributeNs(
+    ctxt: XmlParserCtxtPtr,
+    localname: *const XmlChar,
+    prefix: *const XmlChar,
+    value: *const XmlChar,
+    valueend: *const XmlChar,
+) {
+    let ret: XmlAttrPtr;
+    let mut namespace: XmlNsPtr = null_mut();
+    let mut dup: *mut XmlChar = null_mut();
+
+    /*
+     * Note: if prefix.is_null(), the attribute is not in the default namespace
+     */
+    if !prefix.is_null() {
+        namespace = xmlSearchNs((*ctxt).my_doc, (*ctxt).node, prefix);
+    }
+
+    /*
+     * allocate the node
+     */
+    if !(*ctxt).free_attrs.is_null() {
+        ret = (*ctxt).free_attrs;
+        (*ctxt).free_attrs = (*ret).next;
+        (*ctxt).free_attrs_nr -= 1;
+        memset(ret as _, 0, size_of::<XmlAttr>());
+        (*ret).typ = XmlElementType::XmlAttributeNode;
+
+        (*ret).parent = (*ctxt).node;
+        (*ret).doc = (*ctxt).my_doc;
+        (*ret).ns = namespace;
+
+        if (*ctxt).dict_names != 0 {
+            (*ret).name = localname;
+        } else {
+            (*ret).name = xml_strdup(localname);
+        }
+
+        /* link at the end to preserve order, TODO speed up with a last */
+        if (*(*ctxt).node).properties.is_null() {
+            (*(*ctxt).node).properties = ret;
+        } else {
+            let mut prev: XmlAttrPtr = (*(*ctxt).node).properties;
+
+            while !(*prev).next.is_null() {
+                prev = (*prev).next;
+            }
+            (*prev).next = ret;
+            (*ret).prev = prev;
+        }
+
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        // && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xmlRegisterNodeDefaultValue(ret as XmlNodePtr);
+        }
+    } else {
+        if (*ctxt).dict_names != 0 {
+            ret = xmlNewNsPropEatName((*ctxt).node, namespace, localname as _, null_mut());
+        } else {
+            ret = xmlNewNsProp((*ctxt).node, namespace, localname, null_mut());
+        }
+        if ret.is_null() {
+            xml_err_memory(ctxt, c"xmlSAX2AttributeNs".as_ptr() as _);
+            return;
+        }
+    }
+
+    if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
+        let mut tmp: XmlNodePtr;
+
+        /*
+         * We know that if there is an entity reference, then
+         * the string has been dup'ed and terminates with 0
+         * otherwise with ' or "
+         */
+        if *valueend != 0 {
+            tmp = xmlSAX2TextNode(ctxt, value, valueend.offset_from(value) as _);
+            (*ret).children = tmp;
+            (*ret).last = tmp;
+            if !tmp.is_null() {
+                (*tmp).doc = (*ret).doc;
+                (*tmp).parent = ret as XmlNodePtr;
+            }
+        } else {
+            (*ret).children =
+                xmlStringLenGetNodeList((*ctxt).my_doc, value, valueend.offset_from(value) as _);
+            tmp = (*ret).children;
+            while !tmp.is_null() {
+                (*tmp).doc = (*ret).doc;
+                (*tmp).parent = ret as XmlNodePtr;
+                if (*tmp).next.is_null() {
+                    (*ret).last = tmp;
+                }
+                tmp = (*tmp).next;
+            }
+        }
+    } else if !value.is_null() {
+        let tmp: XmlNodePtr = xmlSAX2TextNode(ctxt, value, valueend.offset_from(value) as _);
+        (*ret).children = tmp;
+        (*ret).last = tmp;
+        if !tmp.is_null() {
+            (*tmp).doc = (*ret).doc;
+            (*tmp).parent = ret as XmlNodePtr;
+        }
+    }
+
+    #[cfg(not(feature = "valid"))]
+    let f = false;
+    #[cfg(feature = "valid")]
+    let f = (*ctxt).html == 0
+        && (*ctxt).validate != 0
+        && (*ctxt).well_formed != 0
+        && !(*ctxt).my_doc.is_null()
+        && !(*(*ctxt).my_doc).int_subset.is_null();
+    if f {
+        #[cfg(feature = "valid")]
+        {
+            /*
+             * If we don't substitute entities, the validation should be
+             * done on a value with replaced entities anyway.
+             */
+            if (*ctxt).replace_entities == 0 {
+                dup = xmlSAX2DecodeAttrEntities(ctxt, value, valueend);
+                if dup.is_null() {
+                    if *valueend == 0 {
+                        (*ctxt).valid &= xml_validate_one_attribute(
+                            addr_of_mut!((*ctxt).vctxt) as _,
+                            (*ctxt).my_doc,
+                            (*ctxt).node,
+                            ret,
+                            value,
+                        );
+                    } else {
+                        /*
+                         * That should already be normalized.
+                         * cheaper to finally allocate here than duplicate
+                         * entry points in the full validation code
+                         */
+                        dup = xml_strndup(value, valueend.offset_from(value) as _);
+
+                        (*ctxt).valid &= xml_validate_one_attribute(
+                            addr_of_mut!((*ctxt).vctxt) as _,
+                            (*ctxt).my_doc,
+                            (*ctxt).node,
+                            ret,
+                            dup,
+                        );
+                    }
+                } else {
+                    /*
+                     * dup now contains a string of the flattened attribute
+                     * content with entities substituted. Check if we need to
+                     * apply an extra layer of normalization.
+                     * It need to be done twice ... it's an extra burden related
+                     * to the ability to keep references in attributes
+                     */
+                    if !(*ctxt).atts_special.is_null() {
+                        let nvalnorm: *mut XmlChar;
+                        let mut fname: [XmlChar; 50] = [0; 50];
+
+                        let fullname: *mut XmlChar =
+                            xml_build_qname(localname, prefix, fname.as_mut_ptr() as _, 50);
+                        if !fullname.is_null() {
+                            (*ctxt).vctxt.valid = 1;
+                            nvalnorm = xml_valid_ctxt_normalize_attribute_value(
+                                addr_of_mut!((*ctxt).vctxt) as _,
+                                (*ctxt).my_doc,
+                                (*ctxt).node,
+                                fullname,
+                                dup,
+                            );
+                            if (*ctxt).vctxt.valid != 1 {
+                                (*ctxt).valid = 0;
+                            }
+
+                            if fullname != fname.as_mut_ptr() && fullname != localname as _ {
+                                xml_free(fullname as _);
+                            }
+                            if !nvalnorm.is_null() {
+                                xml_free(dup as _);
+                                dup = nvalnorm;
+                            }
+                        }
+                    }
+
+                    (*ctxt).valid &= xml_validate_one_attribute(
+                        addr_of_mut!((*ctxt).vctxt) as _,
+                        (*ctxt).my_doc,
+                        (*ctxt).node,
+                        ret,
+                        dup,
+                    );
+                }
+            } else {
+                /*
+                 * if entities already have been substituted, then
+                 * the attribute as passed is already normalized
+                 */
+                dup = xml_strndup(value, valueend.offset_from(value) as _);
+
+                (*ctxt).valid &= xml_validate_one_attribute(
+                    addr_of_mut!((*ctxt).vctxt) as _,
+                    (*ctxt).my_doc,
+                    (*ctxt).node,
+                    ret,
+                    dup,
+                );
+            }
+        }
+    } else if (*ctxt).loadsubset & XML_SKIP_IDS as i32 == 0 &&
+	       (((*ctxt).replace_entities == 0 && (*ctxt).external != 2) ||
+	        ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0)) &&
+               /* Don't create IDs containing entity references */
+               !(*ret).children.is_null() &&
+               matches!((*(*ret).children).typ, XmlElementType::XmlTextNode) &&
+               (*(*ret).children).next.is_null()
+    {
+        let content: *mut XmlChar = (*(*ret).children).content;
+        /*
+         * when validating, the ID registration is done at the attribute
+         * validation level. Otherwise we have to do specific handling here.
+         */
+        if prefix == (*ctxt).str_xml
+            && *localname.add(0) == b'i'
+            && *localname.add(1) == b'd'
+            && *localname.add(2) == 0
+        {
+            /*
+             * Add the xml:id value
+             *
+             * Open issue: normalization of the value.
+             */
+            #[cfg(any(
+                feature = "sax1",
+                feature = "html",
+                feature = "writer",
+                feature = "legacy"
+            ))]
+            {
+                #[cfg(feature = "valid")]
+                if xml_validate_ncname(content, 1) != 0 {
+                    xml_err_valid(
+                        ctxt,
+                        XmlParserErrors::XmlDtdXmlidValue,
+                        c"xml:id : attribute value %s is not an NCName\n".as_ptr() as _,
+                        content as _,
+                        null(),
+                    );
+                }
+            }
+            xml_add_id(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                content,
+                ret,
+            );
+        } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
+            xml_add_id(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                content,
+                ret,
+            );
+        } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
+            xml_add_ref(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                content,
+                ret,
+            );
+        }
+    }
+    if !dup.is_null() {
+        xml_free(dup as _);
+    }
+}
+
+/**
+ * xmlSAX2EndElementNs:
+ * @ctx:  the user data (XML parser context)
+ * @localname:  the local name of the element
+ * @prefix:  the element namespace prefix if available
+ * @URI:  the element namespace name if available
+ *
+ * SAX2 callback when an element end has been detected by the parser.
+ * It provides the namespace information for the element.
+ */
+pub unsafe extern "C" fn xmlSAX2EndElementNs(
+    ctx: *mut c_void,
+    _localname: *const XmlChar,
+    _prefix: *const XmlChar,
+    _uri: *const XmlChar,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    if ctx.is_null() {
+        return;
+    }
+    (*ctxt).nodemem = -1;
+
+    #[cfg(feature = "valid")]
+    {
+        if (*ctxt).validate != 0
+            && (*ctxt).well_formed != 0
+            && !(*ctxt).my_doc.is_null()
+            && !(*(*ctxt).my_doc).int_subset.is_null()
+        {
+            (*ctxt).valid &= xmlValidateOneElement(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                (*ctxt).my_doc,
+                (*ctxt).node,
+            );
+        }
+    }
+
+    /*
+     * end of parsing of this node.
+     */
+    node_pop(ctxt);
+}
+
+/**
+ * xmlSAX2Reference:
+ * @ctx: the user data (XML parser context)
+ * @name:  The entity name
+ *
+ * called when an entity xmlSAX2Reference is detected.
+ */
+pub unsafe extern "C" fn xmlSAX2Reference(ctx: *mut c_void, name: *const XmlChar) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    if ctx.is_null() {
+        return;
+    }
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2Reference(%s)\n", name);
+    // #endif
+    let ret = if *name.add(0) == b'#' {
+        xmlNewCharRef((*ctxt).my_doc, name)
+    } else {
+        xmlNewReference((*ctxt).my_doc, name)
+    };
+    // #ifdef DEBUG_SAX_TREE
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "add xmlSAX2Reference %s to %s \n", name, (*(*ctxt).node).name);
+    // #endif
+    if xmlAddChild((*ctxt).node, ret).is_null() {
+        xmlFreeNode(ret);
+    }
+}
+
+/**
+ * xmlSAX2Text:
+ * @ctx: the user data (XML parser context)
+ * @ch:  a xmlChar string
+ * @len: the number of xmlChar
+ * @type: text or cdata
+ *
+ * Append characters.
+ */
+// static void
+// xmlSAX2Text(xmlParserCtxtPtr ctxt, const xmlChar *ch, c_int len,
+//             xmlElementType type)
+unsafe extern "C" fn xmlSAX2Text(
+    ctxt: XmlParserCtxtPtr,
+    ch: *const XmlChar,
+    len: c_int,
+    typ: XmlElementType,
+) {
+    let mut last_child: XmlNodePtr;
+
+    if ctxt.is_null() {
+        return;
+    }
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2Characters(%.30s, %d)\n", ch, len);
+    // #endif
+    /*
+     * Handle the data if any. If there is no child
+     * add it as content, otherwise if the last child is text,
+     * concatenate it, else create a new node of type text.
+     */
+
+    if (*ctxt).node.is_null() {
+        // #ifdef DEBUG_SAX_TREE
+        // 	xmlGenericError(xmlGenericErrorContext,
+        // 		"add chars: (*ctxt).node.is_null() !\n".as_ptr() as _);
+        // #endif
+        return;
+    }
+    last_child = (*(*ctxt).node).last;
+    // #ifdef DEBUG_SAX_TREE
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "add chars to %s \n", (*(*ctxt).node).name);
+    // #endif
+
+    /*
+     * Here we needed an accelerator mechanism in case of very large
+     * elements. Use an attribute in the structure !!!
+     */
+    if last_child.is_null() {
+        if matches!(typ, XmlElementType::XmlTextNode) {
+            last_child = xmlSAX2TextNode(ctxt, ch, len);
+        } else {
+            last_child = xmlNewCDataBlock((*ctxt).my_doc, ch, len);
+        }
+        if !last_child.is_null() {
+            (*(*ctxt).node).children = last_child;
+            (*(*ctxt).node).last = last_child;
+            (*last_child).parent = (*ctxt).node;
+            (*last_child).doc = (*(*ctxt).node).doc;
+            (*ctxt).nodelen = len;
+            (*ctxt).nodemem = len + 1;
+        } else {
+            xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
+        }
+    } else {
+        let coalesce_text: c_int = (!last_child.is_null()
+            && (*last_child).typ == typ
+            && (!matches!(typ, XmlElementType::XmlTextNode)
+                || ((*last_child).name == XML_STRING_TEXT.as_ptr() as _)))
+            as i32;
+        if coalesce_text != 0 && (*ctxt).nodemem != 0 {
+            /*
+             * The whole point of maintaining nodelen and nodemem,
+             * xmlTextConcat is too costly, i.e. compute length,
+             * reallocate a new buffer, move data, append ch. Here
+             * We try to minimize realloc() uses and avoid copying
+             * and recomputing length over and over.
+             */
+            if (*last_child).content == addr_of_mut!((*last_child).properties) as *mut XmlChar {
+                (*last_child).content = xml_strdup((*last_child).content);
+                (*last_child).properties = null_mut();
+            } else if (*ctxt).nodemem == (*ctxt).nodelen + 1
+                && xmlDictOwns((*ctxt).dict, (*last_child).content) != 0
+            {
+                (*last_child).content = xml_strdup((*last_child).content);
+            }
+            if (*last_child).content.is_null() {
+                xml_sax2_err_memory(
+                    ctxt,
+                    c"xmlSAX2Characters: xmlStrdup returned NULL".as_ptr() as _,
+                );
+                return;
+            }
+            if (*ctxt).nodelen > INT_MAX - len {
+                xml_sax2_err_memory(ctxt, c"xmlSAX2Characters overflow prevented".as_ptr() as _);
+                return;
+            }
+            if (*ctxt).nodelen + len > XML_MAX_TEXT_LENGTH as i32
+                && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
+            {
+                xml_sax2_err_memory(ctxt, c"xmlSAX2Characters: huge text node".as_ptr() as _);
+                return;
+            }
+            if (*ctxt).nodelen + len >= (*ctxt).nodemem {
+                let mut size: c_int;
+
+                size = if (*ctxt).nodemem > INT_MAX - len {
+                    INT_MAX
+                } else {
+                    (*ctxt).nodemem + len
+                };
+                size = if size > INT_MAX / 2 {
+                    INT_MAX
+                } else {
+                    size * 2
+                };
+                let newbuf: *mut XmlChar = xml_realloc((*last_child).content as _, size as _) as _;
+                if newbuf.is_null() {
+                    xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
+                    return;
+                }
+                (*ctxt).nodemem = size;
+                (*last_child).content = newbuf;
+            }
+            memcpy(
+                (*last_child).content.add((*ctxt).nodelen as usize) as _,
+                ch as _,
+                len as _,
+            );
+            (*ctxt).nodelen += len;
+            *(*last_child).content.add((*ctxt).nodelen as usize) = 0;
+        } else if coalesce_text != 0 {
+            if xmlTextConcat(last_child, ch, len) != 0 {
+                xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
+            }
+            if !(*(*ctxt).node).children.is_null() {
+                (*ctxt).nodelen = xml_strlen((*last_child).content);
+                (*ctxt).nodemem = (*ctxt).nodelen + 1;
+            }
+        } else {
+            /* Mixed content, first time */
+            if matches!(typ, XmlElementType::XmlTextNode) {
+                last_child = xmlSAX2TextNode(ctxt, ch, len);
+                if !last_child.is_null() {
+                    (*last_child).doc = (*ctxt).my_doc;
+                }
+            } else {
+                last_child = xmlNewCDataBlock((*ctxt).my_doc, ch, len);
+            }
+            if !last_child.is_null() {
+                xmlAddChild((*ctxt).node, last_child);
+                if !(*(*ctxt).node).children.is_null() {
+                    (*ctxt).nodelen = len;
+                    (*ctxt).nodemem = len + 1;
+                }
+            }
+        }
+    }
+}
+
+/**
+ * xmlSAX2Characters:
+ * @ctx: the user data (XML parser context)
+ * @ch:  a xmlChar string
+ * @len: the number of xmlChar
+ *
+ * receiving some chars from the parser.
+ */
+pub unsafe extern "C" fn xmlSAX2Characters(ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+    xmlSAX2Text(
+        ctx as XmlParserCtxtPtr,
+        ch,
+        len,
+        XmlElementType::XmlTextNode,
+    );
+}
+
+/**
+ * xmlSAX2IgnorableWhitespace:
+ * @ctx: the user data (XML parser context)
+ * @ch:  a xmlChar string
+ * @len: the number of xmlChar
+ *
+ * receiving some ignorable whitespaces from the parser.
+ * UNUSED: by default the DOM building will use xmlSAX2Characters
+ */
+pub unsafe extern "C" fn xmlSAX2IgnorableWhitespace(
+    _ctx: *mut c_void,
+    _ch: *const XmlChar,
+    _len: c_int,
+) {
+    /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2IgnorableWhitespace(%.30s, %d)\n", ch, len);
+    // #endif
+}
+
+/**
+ * xmlSAX2ProcessingInstruction:
+ * @ctx: the user data (XML parser context)
+ * @target:  the target name
+ * @data: the PI data's
+ *
+ * A processing instruction has been parsed.
+ */
+pub unsafe extern "C" fn xmlSAX2ProcessingInstruction(
+    ctx: *mut c_void,
+    target: *const XmlChar,
+    data: *const XmlChar,
+) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    if ctx.is_null() {
+        return;
+    }
+    let parent: XmlNodePtr = (*ctxt).node;
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext,
+    // 	    "SAX.xmlSAX2ProcessingInstruction(%s, %s)\n", target, data);
+    // #endif
+
+    let ret: XmlNodePtr = xmlNewDocPI((*ctxt).my_doc, target, data);
+    if ret.is_null() {
+        return;
+    }
+
+    if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
+        if ((*(*ctxt).input).line as c_uint) < u16::MAX as c_uint {
+            (*ret).line = (*(*ctxt).input).line as _;
+        } else {
+            (*ret).line = u16::MAX;
+        }
+    }
+    if (*ctxt).in_subset == 1 {
+        xmlAddChild((*(*ctxt).my_doc).int_subset as XmlNodePtr, ret);
+        return;
+    } else if (*ctxt).in_subset == 2 {
+        xmlAddChild((*(*ctxt).my_doc).ext_subset as XmlNodePtr, ret);
+        return;
+    }
+    if parent.is_null() {
+        // #ifdef DEBUG_SAX_TREE
+        // 	    xmlGenericError(xmlGenericErrorContext,
+        // 		    "Setting PI %s as root\n", target);
+        // #endif
+        xmlAddChild((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        return;
+    }
+    if matches!((*parent).typ, XmlElementType::XmlElementNode) {
+        // #ifdef DEBUG_SAX_TREE
+        // 	xmlGenericError(xmlGenericErrorContext,
+        // 		"adding PI %s child to %s\n", target, (*parent).name);
+        // #endif
+        xmlAddChild(parent, ret);
+    } else {
+        // #ifdef DEBUG_SAX_TREE
+        // 	xmlGenericError(xmlGenericErrorContext,
+        // 		"adding PI %s sibling to ", target);
+        // 	xmlDebugDumpOneNode(stderr, parent, 0);
+        // #endif
+        xmlAddSibling(parent, ret);
+    }
+}
+
+/**
+ * xmlSAX2Comment:
+ * @ctx: the user data (XML parser context)
+ * @value:  the xmlSAX2Comment content
+ *
+ * A xmlSAX2Comment has been parsed.
+ */
+pub unsafe extern "C" fn xmlSAX2Comment(ctx: *mut c_void, value: *const XmlChar) {
+    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+
+    if ctx.is_null() {
+        return;
+    }
+    let parent: XmlNodePtr = (*ctxt).node;
+    // #ifdef DEBUG_SAX
+    //     xmlGenericError(xmlGenericErrorContext, c"SAX.xmlSAX2Comment(%s)\n", value);
+    // #endif
+    let ret: XmlNodePtr = xmlNewDocComment((*ctxt).my_doc, value);
+    if ret.is_null() {
+        return;
+    }
+    if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
+        if ((*(*ctxt).input).line as c_uint) < u16::MAX as c_uint {
+            (*ret).line = (*(*ctxt).input).line as _;
+        } else {
+            (*ret).line = u16::MAX;
+        }
+    }
+
+    if (*ctxt).in_subset == 1 {
+        xmlAddChild((*(*ctxt).my_doc).int_subset as XmlNodePtr, ret);
+        return;
+    } else if (*ctxt).in_subset == 2 {
+        xmlAddChild((*(*ctxt).my_doc).ext_subset as XmlNodePtr, ret);
+        return;
+    }
+    if parent.is_null() {
+        // #ifdef DEBUG_SAX_TREE
+        // 	    xmlGenericError(xmlGenericErrorContext,
+        // 		    "Setting xmlSAX2Comment as root\n".as_ptr() as _);
+        // #endif
+        xmlAddChild((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        return;
+    }
+    if matches!((*parent).typ, XmlElementType::XmlElementNode) {
+        // #ifdef DEBUG_SAX_TREE
+        // 	xmlGenericError(xmlGenericErrorContext,
+        // 		"adding xmlSAX2Comment child to %s\n", (*parent).name);
+        // #endif
+        xmlAddChild(parent, ret);
+    } else {
+        // #ifdef DEBUG_SAX_TREE
+        // 	xmlGenericError(xmlGenericErrorContext,
+        // 		"adding xmlSAX2Comment sibling to ".as_ptr() as _);
+        // 	xmlDebugDumpOneNode(stderr, parent, 0);
+        // #endif
+        xmlAddSibling(parent, ret);
+    }
+}
+
+/**
+ * xmlSAX2CDataBlock:
+ * @ctx: the user data (XML parser context)
+ * @value:  The pcdata content
+ * @len:  the block length
+ *
+ * called when a pcdata block has been parsed
+ */
+pub unsafe extern "C" fn xmlSAX2CDataBlock(ctx: *mut c_void, value: *const XmlChar, len: c_int) {
+    xmlSAX2Text(
+        ctx as XmlParserCtxtPtr,
+        value,
+        len,
+        XmlElementType::XmlCdataSectionNode,
+    );
+}
+
+static mut XML_SAX2_DEFAULT_VERSION_VALUE: c_int = 2;
+
+/**
+ * xmlSAXDefaultVersion:
+ * @version:  the version, 1 or 2
+ *
+ * DEPRECATED: Use parser option XML_PARSE_SAX1.
+ *
+ * Set the default version of SAX used globally by the library.
+ * By default, during initialization the default is set to 2.
+ * Note that it is generally a better coding style to use
+ * xmlSAXVersion() to set up the version explicitly for a given
+ * parsing context.
+ *
+ * Returns the previous value in case of success and -1 in case of error.
+ */
+#[deprecated]
+#[cfg(feature = "sax1")]
+pub unsafe extern "C" fn xmlSAXDefaultVersion(version: c_int) -> c_int {
+    let ret: c_int = XML_SAX2_DEFAULT_VERSION_VALUE;
+
+    if version != 1 && version != 2 {
+        return -1;
+    }
+    XML_SAX2_DEFAULT_VERSION_VALUE = version;
+    ret
+}
+
+/**
+ * xmlSAXVersion:
+ * @hdlr:  the SAX handler
+ * @version:  the version, 1 or 2
+ *
+ * Initialize the default XML SAX handler according to the version
+ *
+ * Returns 0 in case of success and -1 in case of error.
+ */
+pub unsafe extern "C" fn xmlSAXVersion(hdlr: *mut XmlSAXHandler, version: c_int) -> c_int {
+    if hdlr.is_null() {
+        return -1;
+    }
+    if version == 2 {
+        (*hdlr).start_element = None;
+        (*hdlr).end_element = None;
+        (*hdlr).start_element_ns = Some(xmlSAX2StartElementNs);
+        (*hdlr).end_element_ns = Some(xmlSAX2EndElementNs);
+        (*hdlr).serror = None;
+        (*hdlr).initialized = XML_SAX2_MAGIC as _;
+    } else if cfg!(feature = "sax1") && version == 1 {
+        #[cfg(feature = "sax1")]
+        {
+            (*hdlr).start_element = Some(xmlSAX2StartElement);
+            (*hdlr).end_element = Some(xmlSAX2EndElement);
+            (*hdlr).initialized = 1;
+        }
+    } else {
+        return -1;
+    }
+    (*hdlr).internal_subset = Some(xmlSAX2InternalSubset);
+    (*hdlr).external_subset = Some(xmlSAX2ExternalSubset);
+    (*hdlr).is_standalone = Some(xmlSAX2IsStandalone);
+    (*hdlr).has_internal_subset = Some(xmlSAX2HasInternalSubset);
+    (*hdlr).has_external_subset = Some(xmlSAX2HasExternalSubset);
+    (*hdlr).resolve_entity = Some(xmlSAX2ResolveEntity);
+    (*hdlr).get_entity = Some(xmlSAX2GetEntity);
+    (*hdlr).get_parameter_entity = Some(xmlSAX2GetParameterEntity);
+    (*hdlr).entity_decl = Some(xmlSAX2EntityDecl);
+    (*hdlr).attribute_decl = Some(xmlSAX2AttributeDecl);
+    (*hdlr).element_decl = Some(xmlSAX2ElementDecl);
+    (*hdlr).notation_decl = Some(xmlSAX2NotationDecl);
+    (*hdlr).unparsed_entity_decl = Some(xmlSAX2UnparsedEntityDecl);
+    (*hdlr).set_document_locator = Some(xmlSAX2SetDocumentLocator);
+    (*hdlr).start_document = Some(xmlSAX2StartDocument);
+    (*hdlr).end_document = Some(xmlSAX2EndDocument);
+    (*hdlr).reference = Some(xmlSAX2Reference);
+    (*hdlr).characters = Some(xmlSAX2Characters);
+    (*hdlr).cdata_block = Some(xmlSAX2CDataBlock);
+    (*hdlr).ignorable_whitespace = Some(xmlSAX2Characters);
+    (*hdlr).processing_instruction = Some(xmlSAX2ProcessingInstruction);
+    (*hdlr).comment = Some(xmlSAX2Comment);
+    (*hdlr).warning = Some(xmlParserWarning);
+    (*hdlr).error = Some(xmlParserError);
+    (*hdlr).fatal_error = Some(xmlParserError);
+
+    0
+}
+
+/**
+ * xmlSAX2InitDefaultSAXHandler:
+ * @hdlr:  the SAX handler
+ * @warning:  flag if non-zero sets the handler warning procedure
+ *
+ * Initialize the default XML SAX2 handler
+ */
+pub unsafe extern "C" fn xmlSAX2InitDefaultSAXHandler(hdlr: *mut XmlSAXHandler, warning: c_int) {
+    if hdlr.is_null() || (*hdlr).initialized != 0 {
+        return;
+    }
+
+    xmlSAXVersion(hdlr, XML_SAX2_DEFAULT_VERSION_VALUE);
+    if warning == 0 {
+        (*hdlr).warning = None;
+    } else {
+        (*hdlr).warning = Some(xmlParserWarning);
+    }
+}
+
+/**
+ * xmlSAX2InitHtmlDefaultSAXHandler:
+ * @hdlr:  the SAX handler
+ *
+ * Initialize the default HTML SAX2 handler
+ */
+#[cfg(feature = "html")]
+pub unsafe extern "C" fn xmlSAX2InitHtmlDefaultSAXHandler(hdlr: *mut XmlSAXHandler) {
+    if hdlr.is_null() || (*hdlr).initialized != 0 {
+        return;
+    }
+
+    (*hdlr).internal_subset = Some(xmlSAX2InternalSubset);
+    (*hdlr).external_subset = None;
+    (*hdlr).is_standalone = None;
+    (*hdlr).has_internal_subset = None;
+    (*hdlr).has_external_subset = None;
+    (*hdlr).resolve_entity = None;
+    (*hdlr).get_entity = Some(xmlSAX2GetEntity);
+    (*hdlr).get_parameter_entity = None;
+    (*hdlr).entity_decl = None;
+    (*hdlr).attribute_decl = None;
+    (*hdlr).element_decl = None;
+    (*hdlr).notation_decl = None;
+    (*hdlr).unparsed_entity_decl = None;
+    (*hdlr).set_document_locator = Some(xmlSAX2SetDocumentLocator);
+    (*hdlr).start_document = Some(xmlSAX2StartDocument);
+    (*hdlr).end_document = Some(xmlSAX2EndDocument);
+    (*hdlr).start_element = Some(xmlSAX2StartElement);
+    (*hdlr).end_element = Some(xmlSAX2EndElement);
+    (*hdlr).reference = None;
+    (*hdlr).characters = Some(xmlSAX2Characters);
+    (*hdlr).cdata_block = Some(xmlSAX2CDataBlock);
+    (*hdlr).ignorable_whitespace = Some(xmlSAX2IgnorableWhitespace);
+    (*hdlr).processing_instruction = Some(xmlSAX2ProcessingInstruction);
+    (*hdlr).comment = Some(xmlSAX2Comment);
+    (*hdlr).warning = Some(xmlParserWarning);
+    (*hdlr).error = Some(xmlParserError);
+    (*hdlr).fatal_error = Some(xmlParserError);
+
+    (*hdlr).initialized = 1;
+}
+
+/**
+ * htmlDefaultSAXHandlerInit:
+ *
+ * DEPRECATED: This function is a no-op. Call xmlInitParser to
+ * initialize the library.
+ */
+#[deprecated]
+#[cfg(feature = "html")]
+pub unsafe extern "C" fn htmlDefaultSAXHandlerInit() {}
+
+/**
+ * xmlDefaultSAXHandlerInit:
+ *
+ * DEPRECATED: This function is a no-op. Call xmlInitParser to
+ * initialize the library.
+ *
+ * Initialize the default SAX2 handler
+ */
+#[deprecated]
+pub unsafe extern "C" fn xmlDefaultSAXHandlerInit() {}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        test_util::*,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_html_default_saxhandler_init() {
+        #[cfg(feature = "html")]
+        unsafe {
+            let mut leaks = 0;
+            #[cfg(feature = "html")]
+            {
+                let mem_base = xml_mem_blocks();
+
+                htmlDefaultSAXHandlerInit();
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprintln!(
+                        "Leak of {} blocks found in htmlDefaultSAXHandlerInit",
+                        xml_mem_blocks() - mem_base
+                    );
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in htmlDefaultSAXHandlerInit()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_default_saxhandler_init() {
+        unsafe {
+            let mut leaks = 0;
+            let mem_base = xml_mem_blocks();
+
+            xmlDefaultSAXHandlerInit();
+            xmlResetLastError();
+            if mem_base != xml_mem_blocks() {
+                leaks += 1;
+                eprintln!(
+                    "Leak of {} blocks found in xmlDefaultSAXHandlerInit",
+                    xml_mem_blocks() - mem_base
+                );
+                assert!(
+                    leaks == 0,
+                    "{leaks} Leaks are found in xmlDefaultSAXHandlerInit()"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_attribute_decl() {
+        unsafe {
+            let mut leaks = 0;
+
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_elem in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_fullname in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_type in 0..GEN_NB_INT {
+                            for n_def in 0..GEN_NB_INT {
+                                for n_default_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                                    for n_tree in 0..GEN_NB_XML_ENUMERATION_PTR {
+                                        let mem_base = xml_mem_blocks();
+                                        let ctx = gen_void_ptr(n_ctx, 0);
+                                        let elem = gen_const_xml_char_ptr(n_elem, 1);
+                                        let fullname = gen_const_xml_char_ptr(n_fullname, 2);
+                                        let typ = gen_int(n_type, 3);
+                                        let def = gen_int(n_def, 4);
+                                        let default_value =
+                                            gen_const_xml_char_ptr(n_default_value, 5);
+                                        let tree = gen_xml_enumeration_ptr(n_tree, 6);
+
+                                        xmlSAX2AttributeDecl(
+                                            ctx,
+                                            elem,
+                                            fullname,
+                                            typ,
+                                            def,
+                                            default_value,
+                                            tree,
+                                        );
+                                        des_void_ptr(n_ctx, ctx, 0);
+                                        des_const_xml_char_ptr(n_elem, elem, 1);
+                                        des_const_xml_char_ptr(n_fullname, fullname, 2);
+                                        des_int(n_type, typ, 3);
+                                        des_int(n_def, def, 4);
+                                        des_const_xml_char_ptr(n_default_value, default_value, 5);
+                                        des_xml_enumeration_ptr(n_tree, tree, 6);
+                                        xmlResetLastError();
+                                        if mem_base != xml_mem_blocks() {
+                                            leaks += 1;
+                                            eprint!(
+                                                "Leak of {} blocks found in xmlSAX2AttributeDecl",
+                                                xml_mem_blocks() - mem_base
+                                            );
+                                            eprint!(" {}", n_ctx);
+                                            eprint!(" {}", n_elem);
+                                            eprint!(" {}", n_fullname);
+                                            eprint!(" {}", n_type);
+                                            eprint!(" {}", n_def);
+                                            eprint!(" {}", n_default_value);
+                                            eprintln!(" {}", n_tree);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2AttributeDecl()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_cdata_block() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_len in 0..GEN_NB_INT {
+                        let mem_base = xml_mem_blocks();
+                        let ctx = gen_void_ptr(n_ctx, 0);
+                        let value = gen_const_xml_char_ptr(n_value, 1);
+                        let mut len = gen_int(n_len, 2);
+                        if !value.is_null() && len > xml_strlen(value) {
+                            len = 0;
+                        }
+
+                        xmlSAX2CDataBlock(ctx, value, len);
+                        des_void_ptr(n_ctx, ctx, 0);
+                        des_const_xml_char_ptr(n_value, value, 1);
+                        des_int(n_len, len, 2);
+                        xmlResetLastError();
+                        if mem_base != xml_mem_blocks() {
+                            leaks += 1;
+                            eprint!(
+                                "Leak of {} blocks found in xmlSAX2CDataBlock",
+                                xml_mem_blocks() - mem_base
+                            );
+                            eprint!(" {}", n_ctx);
+                            eprint!(" {}", n_value);
+                            eprintln!(" {}", n_len);
+                        }
+                    }
+                }
+            }
+            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2CDataBlock()");
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_characters() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_ch in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_len in 0..GEN_NB_INT {
+                        let mem_base = xml_mem_blocks();
+                        let ctx = gen_void_ptr(n_ctx, 0);
+                        let ch = gen_const_xml_char_ptr(n_ch, 1);
+                        let mut len = gen_int(n_len, 2);
+                        if !ch.is_null() && len > xml_strlen(ch) {
+                            len = 0;
+                        }
+
+                        xmlSAX2Characters(ctx, ch, len);
+                        des_void_ptr(n_ctx, ctx, 0);
+                        des_const_xml_char_ptr(n_ch, ch, 1);
+                        des_int(n_len, len, 2);
+                        xmlResetLastError();
+                        if mem_base != xml_mem_blocks() {
+                            leaks += 1;
+                            eprint!(
+                                "Leak of {} blocks found in xmlSAX2Characters",
+                                xml_mem_blocks() - mem_base
+                            );
+                            eprint!(" {}", n_ctx);
+                            eprint!(" {}", n_ch);
+                            eprintln!(" {}", n_len);
+                        }
+                    }
+                }
+            }
+            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2Characters()");
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_comment() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    let mem_base = xml_mem_blocks();
+                    let ctx = gen_void_ptr(n_ctx, 0);
+                    let value = gen_const_xml_char_ptr(n_value, 1);
+
+                    xmlSAX2Comment(ctx, value);
+                    des_void_ptr(n_ctx, ctx, 0);
+                    des_const_xml_char_ptr(n_value, value, 1);
+                    xmlResetLastError();
+                    if mem_base != xml_mem_blocks() {
+                        leaks += 1;
+                        eprint!(
+                            "Leak of {} blocks found in xmlSAX2Comment",
+                            xml_mem_blocks() - mem_base
+                        );
+                        eprint!(" {}", n_ctx);
+                        eprintln!(" {}", n_value);
+                    }
+                }
+            }
+            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2Comment()");
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_element_decl() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_type in 0..GEN_NB_INT {
+                        for n_content in 0..GEN_NB_XML_ELEMENT_CONTENT_PTR {
+                            let mem_base = xml_mem_blocks();
+                            let ctx = gen_void_ptr(n_ctx, 0);
+                            let name = gen_const_xml_char_ptr(n_name, 1);
+                            let typ = gen_int(n_type, 2);
+                            let content = gen_xml_element_content_ptr(n_content, 3);
+
+                            xmlSAX2ElementDecl(ctx, name, typ, content);
+                            des_void_ptr(n_ctx, ctx, 0);
+                            des_const_xml_char_ptr(n_name, name, 1);
+                            des_int(n_type, typ, 2);
+                            des_xml_element_content_ptr(n_content, content, 3);
+                            xmlResetLastError();
+                            if mem_base != xml_mem_blocks() {
+                                leaks += 1;
+                                eprint!(
+                                    "Leak of {} blocks found in xmlSAX2ElementDecl",
+                                    xml_mem_blocks() - mem_base
+                                );
+                                eprint!(" {}", n_ctx);
+                                eprint!(" {}", n_name);
+                                eprint!(" {}", n_type);
+                                eprintln!(" {}", n_content);
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2ElementDecl()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_end_document() {
+        let mut leaks = 0;
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                xmlSAX2EndDocument(ctx);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2EndDocument",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2EndDocument()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_end_element() {
+        #[cfg(any(
+            feature = "sax1",
+            feature = "html",
+            feature = "writer",
+            feature = "legacy"
+        ))]
+        unsafe {
+            #[cfg(feature = "sax1")]
+            {
+                let mut leaks = 0;
+                for n_ctx in 0..GEN_NB_VOID_PTR {
+                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        let mem_base = xml_mem_blocks();
+                        let ctx = gen_void_ptr(n_ctx, 0);
+                        let name = gen_const_xml_char_ptr(n_name, 1);
+
+                        xmlSAX2EndElement(ctx, name);
+                        des_void_ptr(n_ctx, ctx, 0);
+                        des_const_xml_char_ptr(n_name, name, 1);
+                        xmlResetLastError();
+                        if mem_base != xml_mem_blocks() {
+                            leaks += 1;
+                            eprint!(
+                                "Leak of {} blocks found in xmlSAX2EndElement",
+                                xml_mem_blocks() - mem_base
+                            );
+                            eprint!(" {}", n_ctx);
+                            eprintln!(" {}", n_name);
+                        }
+                    }
+                }
+                assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2EndElement()");
+            }
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_end_element_ns() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_localname in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                            let mem_base = xml_mem_blocks();
+                            let ctx = gen_void_ptr(n_ctx, 0);
+                            let localname = gen_const_xml_char_ptr(n_localname, 1);
+                            let prefix = gen_const_xml_char_ptr(n_prefix, 2);
+                            let uri = gen_const_xml_char_ptr(n_uri, 3);
+
+                            xmlSAX2EndElementNs(ctx, localname, prefix, uri);
+                            des_void_ptr(n_ctx, ctx, 0);
+                            des_const_xml_char_ptr(n_localname, localname, 1);
+                            des_const_xml_char_ptr(n_prefix, prefix, 2);
+                            des_const_xml_char_ptr(n_uri, uri, 3);
+                            xmlResetLastError();
+                            if mem_base != xml_mem_blocks() {
+                                leaks += 1;
+                                eprint!(
+                                    "Leak of {} blocks found in xmlSAX2EndElementNs",
+                                    xml_mem_blocks() - mem_base
+                                );
+                                eprint!(" {}", n_ctx);
+                                eprint!(" {}", n_localname);
+                                eprint!(" {}", n_prefix);
+                                eprintln!(" {}", n_uri);
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2EndElementNs()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_entity_decl() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_type in 0..GEN_NB_INT {
+                        for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                            for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                                for n_content in 0..GEN_NB_XML_CHAR_PTR {
+                                    let mem_base = xml_mem_blocks();
+                                    let ctx = gen_void_ptr(n_ctx, 0);
+                                    let name = gen_const_xml_char_ptr(n_name, 1);
+                                    let typ = gen_int(n_type, 2);
+                                    let public_id = gen_const_xml_char_ptr(n_public_id, 3);
+                                    let system_id = gen_const_xml_char_ptr(n_system_id, 4);
+                                    let content = gen_xml_char_ptr(n_content, 5);
+
+                                    xmlSAX2EntityDecl(
+                                        ctx, name, typ, public_id, system_id, content,
+                                    );
+                                    des_void_ptr(n_ctx, ctx, 0);
+                                    des_const_xml_char_ptr(n_name, name, 1);
+                                    des_int(n_type, typ, 2);
+                                    des_const_xml_char_ptr(n_public_id, public_id, 3);
+                                    des_const_xml_char_ptr(n_system_id, system_id, 4);
+                                    des_xml_char_ptr(n_content, content, 5);
+                                    xmlResetLastError();
+                                    if mem_base != xml_mem_blocks() {
+                                        leaks += 1;
+                                        eprint!(
+                                            "Leak of {} blocks found in xmlSAX2EntityDecl",
+                                            xml_mem_blocks() - mem_base
+                                        );
+                                        eprint!(" {}", n_ctx);
+                                        eprint!(" {}", n_name);
+                                        eprint!(" {}", n_type);
+                                        eprint!(" {}", n_public_id);
+                                        eprint!(" {}", n_system_id);
+                                        eprintln!(" {}", n_content);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2EntityDecl()");
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_external_subset() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                            let mem_base = xml_mem_blocks();
+                            let ctx = gen_void_ptr(n_ctx, 0);
+                            let name = gen_const_xml_char_ptr(n_name, 1);
+                            let external_id = gen_const_xml_char_ptr(n_external_id, 2);
+                            let system_id = gen_const_xml_char_ptr(n_system_id, 3);
+
+                            xmlSAX2ExternalSubset(ctx, name, external_id, system_id);
+                            des_void_ptr(n_ctx, ctx, 0);
+                            des_const_xml_char_ptr(n_name, name, 1);
+                            des_const_xml_char_ptr(n_external_id, external_id, 2);
+                            des_const_xml_char_ptr(n_system_id, system_id, 3);
+                            xmlResetLastError();
+                            if mem_base != xml_mem_blocks() {
+                                leaks += 1;
+                                eprint!(
+                                    "Leak of {} blocks found in xmlSAX2ExternalSubset",
+                                    xml_mem_blocks() - mem_base
+                                );
+                                eprint!(" {}", n_ctx);
+                                eprint!(" {}", n_name);
+                                eprint!(" {}", n_external_id);
+                                eprintln!(" {}", n_system_id);
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2ExternalSubset()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_get_column_number() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                let ret_val = xmlSAX2GetColumnNumber(ctx);
+                desret_int(ret_val);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2GetColumnNumber",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2GetColumnNumber()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_get_entity() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    let mem_base = xml_mem_blocks();
+                    let ctx = gen_void_ptr(n_ctx, 0);
+                    let name = gen_const_xml_char_ptr(n_name, 1);
+
+                    let ret_val = xmlSAX2GetEntity(ctx, name);
+                    desret_xml_entity_ptr(ret_val);
+                    des_void_ptr(n_ctx, ctx, 0);
+                    des_const_xml_char_ptr(n_name, name, 1);
+                    xmlResetLastError();
+                    if mem_base != xml_mem_blocks() {
+                        leaks += 1;
+                        eprint!(
+                            "Leak of {} blocks found in xmlSAX2GetEntity",
+                            xml_mem_blocks() - mem_base
+                        );
+                        eprint!(" {}", n_ctx);
+                        eprintln!(" {}", n_name);
+                    }
+                }
+            }
+            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2GetEntity()");
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_get_line_number() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                let ret_val = xmlSAX2GetLineNumber(ctx);
+                desret_int(ret_val);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2GetLineNumber",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2GetLineNumber()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_get_parameter_entity() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    let mem_base = xml_mem_blocks();
+                    let ctx = gen_void_ptr(n_ctx, 0);
+                    let name = gen_const_xml_char_ptr(n_name, 1);
+
+                    let ret_val = xmlSAX2GetParameterEntity(ctx, name);
+                    desret_xml_entity_ptr(ret_val);
+                    des_void_ptr(n_ctx, ctx, 0);
+                    des_const_xml_char_ptr(n_name, name, 1);
+                    xmlResetLastError();
+                    if mem_base != xml_mem_blocks() {
+                        leaks += 1;
+                        eprint!(
+                            "Leak of {} blocks found in xmlSAX2GetParameterEntity",
+                            xml_mem_blocks() - mem_base
+                        );
+                        eprint!(" {}", n_ctx);
+                        eprintln!(" {}", n_name);
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2GetParameterEntity()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_get_public_id() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                let ret_val = xmlSAX2GetPublicId(ctx);
+                desret_const_xml_char_ptr(ret_val);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2GetPublicId",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2GetPublicId()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_get_system_id() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                let ret_val = xmlSAX2GetSystemId(ctx);
+                desret_const_xml_char_ptr(ret_val);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2GetSystemId",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2GetSystemId()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_has_external_subset() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                let ret_val = xmlSAX2HasExternalSubset(ctx);
+                desret_int(ret_val);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2HasExternalSubset",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2HasExternalSubset()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_has_internal_subset() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                let ret_val = xmlSAX2HasInternalSubset(ctx);
+                desret_int(ret_val);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2HasInternalSubset",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2HasInternalSubset()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_ignorable_whitespace() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_ch in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_len in 0..GEN_NB_INT {
+                        let mem_base = xml_mem_blocks();
+                        let ctx = gen_void_ptr(n_ctx, 0);
+                        let ch = gen_const_xml_char_ptr(n_ch, 1);
+                        let mut len = gen_int(n_len, 2);
+                        if !ch.is_null() && len > xml_strlen(ch) {
+                            len = 0;
+                        }
+
+                        xmlSAX2IgnorableWhitespace(ctx, ch, len);
+                        des_void_ptr(n_ctx, ctx, 0);
+                        des_const_xml_char_ptr(n_ch, ch, 1);
+                        des_int(n_len, len, 2);
+                        xmlResetLastError();
+                        if mem_base != xml_mem_blocks() {
+                            leaks += 1;
+                            eprint!(
+                                "Leak of {} blocks found in xmlSAX2IgnorableWhitespace",
+                                xml_mem_blocks() - mem_base
+                            );
+                            eprint!(" {}", n_ctx);
+                            eprint!(" {}", n_ch);
+                            eprintln!(" {}", n_len);
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2IgnorableWhitespace()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_init_default_saxhandler() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_hdlr in 0..GEN_NB_XML_SAXHANDLER_PTR {
+                for n_warning in 0..GEN_NB_INT {
+                    let mem_base = xml_mem_blocks();
+                    let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
+                    let warning = gen_int(n_warning, 1);
+
+                    xmlSAX2InitDefaultSAXHandler(hdlr, warning);
+                    des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
+                    des_int(n_warning, warning, 1);
+                    xmlResetLastError();
+                    if mem_base != xml_mem_blocks() {
+                        leaks += 1;
+                        eprint!(
+                            "Leak of {} blocks found in xmlSAX2InitDefaultSAXHandler",
+                            xml_mem_blocks() - mem_base
+                        );
+                        eprint!(" {}", n_hdlr);
+                        eprintln!(" {}", n_warning);
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2InitDefaultSAXHandler()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_init_html_default_saxhandler() {
+        #[cfg(feature = "html")]
+        let mut leaks = 0;
+
+        unsafe {
+            for n_hdlr in 0..GEN_NB_XML_SAXHANDLER_PTR {
+                let mem_base = xml_mem_blocks();
+                let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
+
+                xmlSAX2InitHtmlDefaultSAXHandler(hdlr);
+                des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2InitHtmlDefaultSAXHandler",
+                        xml_mem_blocks() - mem_base
+                    );
+                    assert!(
+                        leaks == 0,
+                        "{leaks} Leaks are found in xmlSAX2InitHtmlDefaultSAXHandler()"
+                    );
+                    eprintln!(" {}", n_hdlr);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_internal_subset() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                            let mem_base = xml_mem_blocks();
+                            let ctx = gen_void_ptr(n_ctx, 0);
+                            let name = gen_const_xml_char_ptr(n_name, 1);
+                            let external_id = gen_const_xml_char_ptr(n_external_id, 2);
+                            let system_id = gen_const_xml_char_ptr(n_system_id, 3);
+
+                            xmlSAX2InternalSubset(ctx, name, external_id, system_id);
+                            des_void_ptr(n_ctx, ctx, 0);
+                            des_const_xml_char_ptr(n_name, name, 1);
+                            des_const_xml_char_ptr(n_external_id, external_id, 2);
+                            des_const_xml_char_ptr(n_system_id, system_id, 3);
+                            xmlResetLastError();
+                            if mem_base != xml_mem_blocks() {
+                                leaks += 1;
+                                eprint!(
+                                    "Leak of {} blocks found in xmlSAX2InternalSubset",
+                                    xml_mem_blocks() - mem_base
+                                );
+                                eprint!(" {}", n_ctx);
+                                eprint!(" {}", n_name);
+                                eprint!(" {}", n_external_id);
+                                eprintln!(" {}", n_system_id);
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2InternalSubset()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_is_standalone() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                let ret_val = xmlSAX2IsStandalone(ctx);
+                desret_int(ret_val);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2IsStandalone",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2IsStandalone()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_notation_decl() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                            let mem_base = xml_mem_blocks();
+                            let ctx = gen_void_ptr(n_ctx, 0);
+                            let name = gen_const_xml_char_ptr(n_name, 1);
+                            let public_id = gen_const_xml_char_ptr(n_public_id, 2);
+                            let system_id = gen_const_xml_char_ptr(n_system_id, 3);
+
+                            xmlSAX2NotationDecl(ctx, name, public_id, system_id);
+                            des_void_ptr(n_ctx, ctx, 0);
+                            des_const_xml_char_ptr(n_name, name, 1);
+                            des_const_xml_char_ptr(n_public_id, public_id, 2);
+                            des_const_xml_char_ptr(n_system_id, system_id, 3);
+                            xmlResetLastError();
+                            if mem_base != xml_mem_blocks() {
+                                leaks += 1;
+                                eprint!(
+                                    "Leak of {} blocks found in xmlSAX2NotationDecl",
+                                    xml_mem_blocks() - mem_base
+                                );
+                                eprint!(" {}", n_ctx);
+                                eprint!(" {}", n_name);
+                                eprint!(" {}", n_public_id);
+                                eprintln!(" {}", n_system_id);
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2NotationDecl()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_processing_instruction() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_target in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_data in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        let mem_base = xml_mem_blocks();
+                        let ctx = gen_void_ptr(n_ctx, 0);
+                        let target = gen_const_xml_char_ptr(n_target, 1);
+                        let data = gen_const_xml_char_ptr(n_data, 2);
+
+                        xmlSAX2ProcessingInstruction(ctx, target, data);
+                        des_void_ptr(n_ctx, ctx, 0);
+                        des_const_xml_char_ptr(n_target, target, 1);
+                        des_const_xml_char_ptr(n_data, data, 2);
+                        xmlResetLastError();
+                        if mem_base != xml_mem_blocks() {
+                            leaks += 1;
+                            eprint!(
+                                "Leak of {} blocks found in xmlSAX2ProcessingInstruction",
+                                xml_mem_blocks() - mem_base
+                            );
+                            eprint!(" {}", n_ctx);
+                            eprint!(" {}", n_target);
+                            eprintln!(" {}", n_data);
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2ProcessingInstruction()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_reference() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    let mem_base = xml_mem_blocks();
+                    let ctx = gen_void_ptr(n_ctx, 0);
+                    let name = gen_const_xml_char_ptr(n_name, 1);
+
+                    xmlSAX2Reference(ctx, name);
+                    des_void_ptr(n_ctx, ctx, 0);
+                    des_const_xml_char_ptr(n_name, name, 1);
+                    xmlResetLastError();
+                    if mem_base != xml_mem_blocks() {
+                        leaks += 1;
+                        eprint!(
+                            "Leak of {} blocks found in xmlSAX2Reference",
+                            xml_mem_blocks() - mem_base
+                        );
+                        eprint!(" {}", n_ctx);
+                        eprintln!(" {}", n_name);
+                    }
+                }
+            }
+            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2Reference()");
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_resolve_entity() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        let mem_base = xml_mem_blocks();
+                        let ctx = gen_void_ptr(n_ctx, 0);
+                        let public_id = gen_const_xml_char_ptr(n_public_id, 1);
+                        let system_id = gen_const_xml_char_ptr(n_system_id, 2);
+
+                        let ret_val = xmlSAX2ResolveEntity(ctx, public_id, system_id);
+                        desret_xml_parser_input_ptr(ret_val);
+                        des_void_ptr(n_ctx, ctx, 0);
+                        des_const_xml_char_ptr(n_public_id, public_id, 1);
+                        des_const_xml_char_ptr(n_system_id, system_id, 2);
+                        xmlResetLastError();
+                        if mem_base != xml_mem_blocks() {
+                            leaks += 1;
+                            eprint!(
+                                "Leak of {} blocks found in xmlSAX2ResolveEntity",
+                                xml_mem_blocks() - mem_base
+                            );
+                            eprint!(" {}", n_ctx);
+                            eprint!(" {}", n_public_id);
+                            eprintln!(" {}", n_system_id);
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2ResolveEntity()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_set_document_locator() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_loc in 0..GEN_NB_XML_SAXLOCATOR_PTR {
+                    let mem_base = xml_mem_blocks();
+                    let ctx = gen_void_ptr(n_ctx, 0);
+                    let loc = gen_xml_saxlocator_ptr(n_loc, 1);
+
+                    xmlSAX2SetDocumentLocator(ctx, loc);
+                    des_void_ptr(n_ctx, ctx, 0);
+                    des_xml_saxlocator_ptr(n_loc, loc, 1);
+                    xmlResetLastError();
+                    if mem_base != xml_mem_blocks() {
+                        leaks += 1;
+                        eprint!(
+                            "Leak of {} blocks found in xmlSAX2SetDocumentLocator",
+                            xml_mem_blocks() - mem_base
+                        );
+                        eprint!(" {}", n_ctx);
+                        eprintln!(" {}", n_loc);
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2SetDocumentLocator()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_start_document() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                let mem_base = xml_mem_blocks();
+                let ctx = gen_void_ptr(n_ctx, 0);
+
+                xmlSAX2StartDocument(ctx);
+                des_void_ptr(n_ctx, ctx, 0);
+                xmlResetLastError();
+                if mem_base != xml_mem_blocks() {
+                    leaks += 1;
+                    eprint!(
+                        "Leak of {} blocks found in xmlSAX2StartDocument",
+                        xml_mem_blocks() - mem_base
+                    );
+                    eprintln!(" {}", n_ctx);
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2StartDocument()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_start_element() {
+        #[cfg(any(
+            feature = "sax1",
+            feature = "html",
+            feature = "writer",
+            feature = "legacy"
+        ))]
+        unsafe {
+            let mut leaks = 0;
+            #[cfg(feature = "sax1")]
+            {
+                for n_ctx in 0..GEN_NB_VOID_PTR {
+                    for n_fullname in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_atts in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
+                            let mem_base = xml_mem_blocks();
+                            let ctx = gen_void_ptr(n_ctx, 0);
+                            let fullname = gen_const_xml_char_ptr(n_fullname, 1);
+                            let atts = gen_const_xml_char_ptr_ptr(n_atts, 2);
+
+                            xmlSAX2StartElement(ctx, fullname, atts as *mut *const XmlChar);
+                            des_void_ptr(n_ctx, ctx, 0);
+                            des_const_xml_char_ptr(n_fullname, fullname, 1);
+                            des_const_xml_char_ptr_ptr(n_atts, atts as *mut *const XmlChar, 2);
+                            xmlResetLastError();
+                            if mem_base != xml_mem_blocks() {
+                                leaks += 1;
+                                eprint!(
+                                    "Leak of {} blocks found in xmlSAX2StartElement",
+                                    xml_mem_blocks() - mem_base
+                                );
+                                eprint!(" {}", n_ctx);
+                                eprint!(" {}", n_fullname);
+                                eprintln!(" {}", n_atts);
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2StartElement()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_start_element_ns() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_localname in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                            for n_nb_namespaces in 0..GEN_NB_INT {
+                                for n_namespaces in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
+                                    for n_nb_attributes in 0..GEN_NB_INT {
+                                        for n_nb_defaulted in 0..GEN_NB_INT {
+                                            for n_attributes in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
+                                                let mem_base = xml_mem_blocks();
+                                                let ctx = gen_void_ptr(n_ctx, 0);
+                                                let localname =
+                                                    gen_const_xml_char_ptr(n_localname, 1);
+                                                let prefix = gen_const_xml_char_ptr(n_prefix, 2);
+                                                let uri = gen_const_xml_char_ptr(n_uri, 3);
+                                                let nb_namespaces = gen_int(n_nb_namespaces, 4);
+                                                let namespaces =
+                                                    gen_const_xml_char_ptr_ptr(n_namespaces, 5);
+                                                let nb_attributes = gen_int(n_nb_attributes, 6);
+                                                let nb_defaulted = gen_int(n_nb_defaulted, 7);
+                                                let attributes =
+                                                    gen_const_xml_char_ptr_ptr(n_attributes, 8);
+
+                                                xmlSAX2StartElementNs(
+                                                    ctx,
+                                                    localname,
+                                                    prefix,
+                                                    uri,
+                                                    nb_namespaces,
+                                                    namespaces as *mut *const XmlChar,
+                                                    nb_attributes,
+                                                    nb_defaulted,
+                                                    attributes as *mut *const XmlChar,
+                                                );
+                                                des_void_ptr(n_ctx, ctx, 0);
+                                                des_const_xml_char_ptr(n_localname, localname, 1);
+                                                des_const_xml_char_ptr(n_prefix, prefix, 2);
+                                                des_const_xml_char_ptr(n_uri, uri, 3);
+                                                des_int(n_nb_namespaces, nb_namespaces, 4);
+                                                des_const_xml_char_ptr_ptr(
+                                                    n_namespaces,
+                                                    namespaces as *mut *const XmlChar,
+                                                    5,
+                                                );
+                                                des_int(n_nb_attributes, nb_attributes, 6);
+                                                des_int(n_nb_defaulted, nb_defaulted, 7);
+                                                des_const_xml_char_ptr_ptr(
+                                                    n_attributes,
+                                                    attributes as *mut *const XmlChar,
+                                                    8,
+                                                );
+                                                xmlResetLastError();
+                                                if mem_base != xml_mem_blocks() {
+                                                    leaks += 1;
+                                                    eprint!("Leak of {} blocks found in xmlSAX2StartElementNs", xml_mem_blocks() - mem_base);
+                                                    eprint!(" {}", n_ctx);
+                                                    eprint!(" {}", n_localname);
+                                                    eprint!(" {}", n_prefix);
+                                                    eprint!(" {}", n_uri);
+                                                    eprint!(" {}", n_nb_namespaces);
+                                                    eprint!(" {}", n_namespaces);
+                                                    eprint!(" {}", n_nb_attributes);
+                                                    eprint!(" {}", n_nb_defaulted);
+                                                    eprintln!(" {}", n_attributes);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2StartElementNs()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_sax2_unparsed_entity_decl() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_ctx in 0..GEN_NB_VOID_PTR {
+                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                    for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                            for n_notation_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                                let mem_base = xml_mem_blocks();
+                                let ctx = gen_void_ptr(n_ctx, 0);
+                                let name = gen_const_xml_char_ptr(n_name, 1);
+                                let public_id = gen_const_xml_char_ptr(n_public_id, 2);
+                                let system_id = gen_const_xml_char_ptr(n_system_id, 3);
+                                let notation_name = gen_const_xml_char_ptr(n_notation_name, 4);
+
+                                xmlSAX2UnparsedEntityDecl(
+                                    ctx,
+                                    name,
+                                    public_id,
+                                    system_id,
+                                    notation_name,
+                                );
+                                des_void_ptr(n_ctx, ctx, 0);
+                                des_const_xml_char_ptr(n_name, name, 1);
+                                des_const_xml_char_ptr(n_public_id, public_id, 2);
+                                des_const_xml_char_ptr(n_system_id, system_id, 3);
+                                des_const_xml_char_ptr(n_notation_name, notation_name, 4);
+                                xmlResetLastError();
+                                if mem_base != xml_mem_blocks() {
+                                    leaks += 1;
+                                    eprint!(
+                                        "Leak of {} blocks found in xmlSAX2UnparsedEntityDecl",
+                                        xml_mem_blocks() - mem_base
+                                    );
+                                    eprint!(" {}", n_ctx);
+                                    eprint!(" {}", n_name);
+                                    eprint!(" {}", n_public_id);
+                                    eprint!(" {}", n_system_id);
+                                    eprintln!(" {}", n_notation_name);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAX2UnparsedEntityDecl()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_saxdefault_version() {
+        #[cfg(feature = "sax1")]
+        unsafe {
+            let mut leaks = 0;
+            #[cfg(feature = "sax1")]
+            {
+                for n_version in 0..GEN_NB_INT {
+                    let mem_base = xml_mem_blocks();
+                    let version = gen_int(n_version, 0);
+
+                    let ret_val = xmlSAXDefaultVersion(version);
+                    desret_int(ret_val);
+                    des_int(n_version, version, 0);
+                    xmlResetLastError();
+                    if mem_base != xml_mem_blocks() {
+                        leaks += 1;
+                        eprint!(
+                            "Leak of {} blocks found in xmlSAXDefaultVersion",
+                            xml_mem_blocks() - mem_base
+                        );
+                        eprintln!(" {}", n_version);
+                    }
+                }
+            }
+            assert!(
+                leaks == 0,
+                "{leaks} Leaks are found in xmlSAXDefaultVersion()"
+            );
+        }
+    }
+
+    #[test]
+    fn test_xml_saxversion() {
+        let mut leaks = 0;
+
+        unsafe {
+            for n_hdlr in 0..GEN_NB_XML_SAXHANDLER_PTR {
+                for n_version in 0..GEN_NB_INT {
+                    let mem_base = xml_mem_blocks();
+                    let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
+                    let version = gen_int(n_version, 1);
+
+                    let ret_val = xmlSAXVersion(hdlr, version);
+                    desret_int(ret_val);
+                    des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
+                    des_int(n_version, version, 1);
+                    xmlResetLastError();
+                    if mem_base != xml_mem_blocks() {
+                        leaks += 1;
+                        eprint!(
+                            "Leak of {} blocks found in xmlSAXVersion",
+                            xml_mem_blocks() - mem_base
+                        );
+                        eprint!(" {}", n_hdlr);
+                        eprintln!(" {}", n_version);
+                    }
+                }
+            }
+            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAXVersion()");
+        }
+    }
+}
