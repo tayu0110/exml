@@ -40,7 +40,7 @@ use crate::libxml::xmlerror::XmlParserErrors;
 use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
 
 use crate::private::buf::{xml_buf_create, xml_buf_is_empty, xml_buf_reset_input};
-use crate::private::enc::{xmlCharEncInput, xmlEncInputChunk};
+use crate::private::enc::{xml_char_enc_input, xml_enc_input_chunk};
 use crate::private::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
@@ -943,7 +943,7 @@ unsafe extern "C" fn xml_detect_ebcdic(input: XmlParserInputPtr) -> XmlCharEncod
     }
     outlen = out.len() - 1;
     inlen = (*input).end.offset_from((*input).cur) as _;
-    let res: c_int = xmlEncInputChunk(
+    let res: c_int = xml_enc_input_chunk(
         handler,
         out.as_mut_ptr() as _,
         addr_of_mut!(outlen) as _,
@@ -1290,7 +1290,7 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
          * It's probably even possible to remove this whole if-block
          * completely.
          */
-        nbchars = xmlCharEncInput(input_buf, 1);
+        nbchars = xml_char_enc_input(input_buf, 1);
         xml_buf_reset_input((*input_buf).buffer, input);
         if nbchars < 0 {
             /* TODO: This could be an out of memory or an encoding error. */

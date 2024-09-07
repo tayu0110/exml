@@ -15,7 +15,7 @@ use libc::{memcpy, memmove, memset, snprintf, strcmp};
 use crate::{
     __xml_raise_error,
     libxml::xmlerror::XmlErrorDomain,
-    private::{enc::xmlEncInputChunk, error::__xml_simple_error},
+    private::{enc::xml_enc_input_chunk, error::__xml_simple_error},
 };
 
 use super::{
@@ -2435,7 +2435,7 @@ pub unsafe extern "C" fn xmlCharEncInFunc(
         xml_buffer_grow(out, (*out).size + toconv as u32 * 2);
         written = (*out).size as i32 - (*out).using as i32 - 1;
     }
-    ret = xmlEncInputChunk(
+    ret = xml_enc_input_chunk(
         handler,
         (*out).content.add((*out).using as usize) as _,
         addr_of_mut!(written),

@@ -49,7 +49,7 @@ use crate::{
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
     private::{
-        buf::xml_buf_create_size, enc::xmlCharEncOutput, save::xmlBufAttrSerializeTxtContent,
+        buf::xml_buf_create_size, enc::xml_char_enc_output, save::xmlBufAttrSerializeTxtContent,
     },
 };
 
@@ -951,7 +951,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDocument(
         if (*(*writer).out).conv.is_null() {
             (*(*writer).out).conv = xml_buf_create_size(4000);
         }
-        xmlCharEncOutput((*writer).out, 1);
+        xml_char_enc_output((*writer).out, 1);
         if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_null() {
             (*(*writer).doc).encoding =
                 xml_strdup((*(*(*writer).out).encoder).name.load(Ordering::Relaxed) as _);

@@ -26,7 +26,7 @@ use super::buf::{xml_buf_add_len, xml_buf_avail, xml_buf_grow};
  *
  * Initialize the c_char encoding support.
  */
-pub(crate) unsafe extern "C" fn xmlInitEncodingInternal() {
+pub(crate) unsafe extern "C" fn xml_init_encoding_internal() {
     let mut tst: c_ushort = 0x1234;
     let ptr: *mut c_uchar = addr_of_mut!(tst) as _;
 
@@ -62,7 +62,7 @@ pub(crate) unsafe extern "C" fn xmlInitEncodingInternal() {
  *     as the return value is 0, else unpredictable.
  * The value of @outlen after return is the number of octets produced.
  */
-pub(crate) unsafe extern "C" fn xmlEncInputChunk(
+pub(crate) unsafe extern "C" fn xml_enc_input_chunk(
     handler: *mut XmlCharEncodingHandler,
     out: *mut c_uchar,
     outlen: *mut c_int,
@@ -109,7 +109,7 @@ pub(crate) unsafe extern "C" fn xmlEncInputChunk(
  *     -2 if the transcoding fails (for *in is not valid utf8 string or
  *        the result of transformation can't fit into the encoding we want), or
  */
-pub(crate) unsafe extern "C" fn xmlCharEncInput(
+pub(crate) unsafe extern "C" fn xml_char_enc_input(
     input: XmlParserInputBufferPtr,
     flush: c_int,
 ) -> c_int {
@@ -149,7 +149,7 @@ pub(crate) unsafe extern "C" fn xmlCharEncInput(
 
     c_in = toconv as _;
     c_out = written as _;
-    ret = xmlEncInputChunk(
+    ret = xml_enc_input_chunk(
         (*input).encoder,
         xml_buf_end(out),
         addr_of_mut!(c_out),
@@ -237,8 +237,11 @@ pub(crate) unsafe extern "C" fn xmlCharEncInput(
  *     -2 if the transcoding fails (for *in is not valid utf8 string or
  *        the result of transformation can't fit into the encoding we want), or
  */
-// #[cfg(feature = "output")]
-pub(crate) unsafe extern "C" fn xmlCharEncOutput(output: XmlOutputBufferPtr, init: c_int) -> c_int {
+#[cfg(feature = "output")]
+pub(crate) unsafe extern "C" fn xml_char_enc_output(
+    output: XmlOutputBufferPtr,
+    init: c_int,
+) -> c_int {
     let mut ret: c_int;
     let mut written: size_t;
     let mut writtentot: c_int = 0;
@@ -397,7 +400,7 @@ pub(crate) unsafe extern "C" fn xmlCharEncOutput(output: XmlOutputBufferPtr, ini
                         addr_of_mut!(c_in) as _,
                     );
 
-                    if ret < 0 || (c_in != charref_len) {
+                    if ret < 0 || c_in != charref_len {
                         let mut buf: [c_char; 50] = [0; 50];
 
                         snprintf(

@@ -51,7 +51,7 @@ use crate::{
             xml_buf_add, xml_buf_create, xml_buf_free, xml_buf_merge_buffer,
             xml_buf_write_quoted_string,
         },
-        enc::xmlCharEncOutput,
+        enc::xml_char_enc_output,
         error::__xml_simple_error,
         save::xmlBufAttrSerializeTxtContent,
     },
@@ -484,7 +484,7 @@ unsafe extern "C" fn xmlSaveSwitchEncoding(ctxt: XmlSaveCtxtPtr, encoding: *cons
         /*
          * initialize the state, e.g. if outputting a BOM
          */
-        xmlCharEncOutput(buf, 1);
+        xml_char_enc_output(buf, 1);
     }
     0
 }

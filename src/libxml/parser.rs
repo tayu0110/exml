@@ -102,7 +102,7 @@ use crate::{
             xml_buf_get_input_base, xml_buf_is_empty, xml_buf_reset_input,
             xml_buf_set_input_base_cur,
         },
-        enc::{xmlCharEncInput, xmlInitEncodingInternal},
+        enc::{xml_char_enc_input, xml_init_encoding_internal},
         entities::{
             XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
             XML_ENT_PARSED,
@@ -1749,7 +1749,7 @@ pub unsafe extern "C" fn xml_init_parser() {
         xmlInitGlobalsInternal();
         xml_init_memory_internal();
         __xmlInitializeDict();
-        xmlInitEncodingInternal();
+        xml_init_encoding_internal();
         xmlRegisterDefaultInputCallbacks();
         #[cfg(feature = "output")]
         {
@@ -10557,7 +10557,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
             let base: size_t = xml_buf_get_input_base((*input).buffer, (*ctxt).input);
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-            let nbchars: c_int = xmlCharEncInput(input, terminate);
+            let nbchars: c_int = xml_char_enc_input(input, terminate);
             xml_buf_set_input_base_cur((*input).buffer, (*ctxt).input, base, current);
             if nbchars < 0 {
                 /* TODO 2.6.0 */
