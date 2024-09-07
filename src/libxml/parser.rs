@@ -108,8 +108,8 @@ use crate::{
             XML_ENT_PARSED,
         },
         parser::{
-            __xml_err_encoding, xmlHaltParser, xmlParserGrow, xmlParserShrink, xml_err_memory,
-            XML_VCTXT_USE_PCTXT,
+            __xml_err_encoding, xml_err_memory, xml_halt_parser, xml_parser_grow,
+            xml_parser_shrink, XML_VCTXT_USE_PCTXT,
         },
         threads::{
             __xmlGlobalInitMutexLock, __xmlGlobalInitMutexUnlock, xmlCleanupThreadsInternal,
@@ -1107,7 +1107,7 @@ macro_rules! SKIP {
         (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add($val as usize);
         (*(*$ctxt).input).col += $val;
         if *(*(*$ctxt).input).cur == 0 {
-            crate::private::parser::xmlParserGrow($ctxt);
+            crate::private::parser::xml_parser_grow($ctxt);
         }
     };
 }
@@ -1117,7 +1117,7 @@ macro_rules! NEXT1 {
         (*(*$ctxt).input).col += 1;
         (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add(1);
         if *(*(*$ctxt).input).cur == 0 {
-            crate::private::parser::xmlParserGrow($ctxt);
+            crate::private::parser::xml_parser_grow($ctxt);
         }
     };
 }
@@ -1134,7 +1134,7 @@ macro_rules! SKIPL {
             (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add(1);
         }
         if *(*(*$ctxt).input).cur == 0 {
-            crate::private::parser::xmlParserGrow($ctxt);
+            crate::private::parser::xml_parser_grow($ctxt);
         }
     };
 }
@@ -1145,7 +1145,7 @@ macro_rules! SHRINK {
             && (*(*$ctxt).input).cur.offset_from((*(*$ctxt).input).base) > 2 * INPUT_CHUNK as isize
             && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur) < 2 * INPUT_CHUNK as isize
         {
-            xmlParserShrink($ctxt);
+            xml_parser_shrink($ctxt);
         }
     };
 }
@@ -1155,7 +1155,7 @@ macro_rules! GROW {
         if (*$ctxt).progressive == 0
             && ((*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur) as usize) < INPUT_CHUNK
         {
-            crate::private::parser::xmlParserGrow($ctxt);
+            crate::private::parser::xml_parser_grow($ctxt);
         }
     };
 }
@@ -2019,7 +2019,7 @@ pub unsafe extern "C" fn xml_stop_parser(ctxt: XmlParserCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
-    xmlHaltParser(ctxt);
+    xml_halt_parser(ctxt);
 
     (*ctxt).err_no = XmlParserErrors::XmlErrUserStop as i32;
 }
@@ -2190,7 +2190,7 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
                 SKIP_BLANKS!(ctxt);
                 if RAW!(ctxt) != b'[' {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrCondsecInvalid, null());
-                    xmlHaltParser(ctxt);
+                    xml_halt_parser(ctxt);
                     //  goto error;
                     xml_free(input_ids as _);
                     return;
@@ -2231,7 +2231,7 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
                 SKIP_BLANKS!(ctxt);
                 if RAW!(ctxt) != b'[' {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrCondsecInvalid, null());
-                    xmlHaltParser(ctxt);
+                    xml_halt_parser(ctxt);
                     //  goto error;
                     xml_free(input_ids as _);
                     return;
@@ -2285,7 +2285,7 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
                 SKIP!(ctxt, 3);
             } else {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrCondsecInvalidKeyword, null());
-                xmlHaltParser(ctxt);
+                xml_halt_parser(ctxt);
                 //  goto error;
                 xml_free(input_ids as _);
                 return;
@@ -2306,7 +2306,7 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
             xml_parse_markup_decl(ctxt);
         } else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, null());
-            xmlHaltParser(ctxt);
+            xml_halt_parser(ctxt);
             //  goto error;
             xml_free(input_ids as _);
             return;
@@ -2372,7 +2372,7 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
                     XmlParserErrors::XmlErrInternalError,
                     c"xmlParseInternalSubset: error detected in Markup declaration\n".as_ptr() as _,
                 );
-                xmlHaltParser(ctxt);
+                xml_halt_parser(ctxt);
                 return;
             }
             SKIP_BLANKS!(ctxt);
@@ -5811,7 +5811,7 @@ pub(crate) unsafe extern "C" fn xml_parser_entity_check(
             XmlParserErrors::XmlErrEntityLoop,
             c"Maximum entity amplification factor exceeded".as_ptr() as _,
         );
-        xmlHaltParser(ctxt);
+        xml_halt_parser(ctxt);
         return 1;
     }
 
@@ -6437,7 +6437,7 @@ pub unsafe extern "C" fn xml_pop_input(ctxt: XmlParserCtxtPtr) -> XmlChar {
     }
     xml_free_input_stream(input);
     if *(*(*ctxt).input).cur == 0 {
-        xmlParserGrow(ctxt);
+        xml_parser_grow(ctxt);
     }
     CUR!(ctxt)
 }
@@ -6705,7 +6705,7 @@ pub(crate) unsafe extern "C" fn xmlStringDecodeEntitiesInt(
 
                         if (*ent).flags & XML_ENT_EXPANDING as i32 != 0 {
                             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, null());
-                            xmlHaltParser(ctxt);
+                            xml_halt_parser(ctxt);
                             *(*ent).content.load(Ordering::Relaxed).add(0) = 0;
                             break 'int_error;
                         }
@@ -6811,7 +6811,7 @@ pub(crate) unsafe extern "C" fn xmlStringDecodeEntitiesInt(
 
                         if (*ent).flags & XML_ENT_EXPANDING as i32 != 0 {
                             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, null());
-                            xmlHaltParser(ctxt);
+                            xml_halt_parser(ctxt);
                             if !(*ent).content.load(Ordering::Relaxed).is_null() {
                                 *(*ent).content.load(Ordering::Relaxed).add(0) = 0;
                             }
@@ -9624,7 +9624,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
     // #endif
 
     if !(*ctxt).input.is_null() && (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) > 4096 {
-        xmlParserShrink(ctxt);
+        xml_parser_shrink(ctxt);
     }
 
     'encoding_error: {
@@ -9724,7 +9724,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             );
                         }
                         xml_fatal_err(ctxt, XmlParserErrors::XmlErrDocumentEmpty, null());
-                        xmlHaltParser(ctxt);
+                        xml_halt_parser(ctxt);
                         // #ifdef DEBUG_PUSH
                         // 		    xmlGenericError(xmlGenericErrorContext,
                         // 			    c"PP: entering EOF\n".as_ptr() as _);
@@ -9769,7 +9769,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                                  * The XML REC instructs us to stop parsing right
                                  * here
                                  */
-                                xmlHaltParser(ctxt);
+                                xml_halt_parser(ctxt);
                                 return 0;
                             }
                             (*ctxt).standalone = (*(*ctxt).input).standalone;
@@ -9840,7 +9840,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     cur = *(*(*ctxt).input).cur.add(0);
                     if cur != b'<' {
                         xml_fatal_err(ctxt, XmlParserErrors::XmlErrDocumentEmpty, null());
-                        xmlHaltParser(ctxt);
+                        xml_halt_parser(ctxt);
                         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_document.is_some() {
                             ((*(*ctxt).sax).end_document.unwrap())((*ctxt).user_data);
                         }
@@ -9884,7 +9884,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     }
                     if name.is_null() {
                         space_pop(ctxt);
-                        xmlHaltParser(ctxt);
+                        xml_halt_parser(ctxt);
                         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_document.is_some() {
                             ((*(*ctxt).sax).end_document.unwrap())((*ctxt).user_data);
                         }
@@ -10301,7 +10301,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         return ret;
                     } else if matches!((*ctxt).instate, XmlParserInputState::XmlParserEpilog) {
                         xml_fatal_err(ctxt, XmlParserErrors::XmlErrDocumentEnd, null());
-                        xmlHaltParser(ctxt);
+                        xml_halt_parser(ctxt);
                         // #ifdef DEBUG_PUSH
                         // 		    xmlGenericError(xmlGenericErrorContext,
                         // 			    c"PP: entering EOF\n".as_ptr() as _);
@@ -10543,7 +10543,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
         xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
         if res < 0 {
             (*ctxt).err_no = XmlParserInputState::XmlParserEOF as i32;
-            xmlHaltParser(ctxt);
+            xml_halt_parser(ctxt);
             return XmlParserInputState::XmlParserEOF as i32;
         }
     // #ifdef DEBUG_PUSH
@@ -10565,7 +10565,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
                     xmlGenericErrorContext(),
                     c"xmlParseChunk: encoder error\n".as_ptr() as _
                 );
-                xmlHaltParser(ctxt);
+                xml_halt_parser(ctxt);
                 return XmlParserErrors::XmlErrInvalidEncoding as i32;
             }
         }
@@ -10587,7 +10587,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
             XmlParserErrors::XmlErrInternalError,
             c"Huge input lookup".as_ptr() as _,
         );
-        xmlHaltParser(ctxt);
+        xml_halt_parser(ctxt);
     }
     if (*ctxt).err_no != XmlParserErrors::XmlErrOK as i32 && (*ctxt).disable_sax == 1 {
         return (*ctxt).err_no;
@@ -12515,7 +12515,7 @@ pub(crate) unsafe extern "C" fn xmlParseEntityDecl(ctxt: XmlParserCtxtPtr) {
                 c"xmlParseEntityDecl: entity %s not terminated\n".as_ptr() as _,
                 name,
             );
-            xmlHaltParser(ctxt);
+            xml_halt_parser(ctxt);
         } else {
             if inputid != (*(*ctxt).input).id {
                 xml_fatal_err_msg(
@@ -14065,7 +14065,7 @@ pub(crate) unsafe extern "C" fn xmlSkipBlankChars(ctxt: XmlParserCtxtPtr) -> c_i
             res = res.saturating_add(1);
             if *cur == 0 {
                 (*(*ctxt).input).cur = cur;
-                xmlParserGrow(ctxt);
+                xml_parser_grow(ctxt);
                 cur = (*(*ctxt).input).cur;
             }
         }

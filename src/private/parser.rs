@@ -165,7 +165,7 @@ pub unsafe extern "C" fn __xml_err_encoding(
  * for internal use
  */
 #[doc(hidden)]
-pub unsafe extern "C" fn xmlHaltParser(ctxt: XmlParserCtxtPtr) {
+pub unsafe extern "C" fn xml_halt_parser(ctxt: XmlParserCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -180,8 +180,8 @@ pub unsafe extern "C" fn xmlHaltParser(ctxt: XmlParserCtxtPtr) {
          * in case there was a specific allocation deallocate before
          * overriding base
          */
-        if (*(*ctxt).input).free.is_some() {
-            ((*(*ctxt).input).free.unwrap())((*(*ctxt).input).base as *mut XmlChar);
+        if let Some(free) = (*(*ctxt).input).free {
+            free((*(*ctxt).input).base as *mut XmlChar);
             (*(*ctxt).input).free = None;
         }
         if !(*(*ctxt).input).buf.is_null() {
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn xmlHaltParser(ctxt: XmlParserCtxtPtr) {
  * @ctxt:  an XML parser context
  */
 #[doc(hidden)]
-pub unsafe extern "C" fn xmlParserGrow(ctxt: XmlParserCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
     let input: XmlParserInputPtr = (*ctxt).input;
     let buf: XmlParserInputBufferPtr = (*input).buf;
     let cur_end: ptrdiff_t = (*input).end.offset_from((*input).cur);
@@ -222,7 +222,7 @@ pub unsafe extern "C" fn xmlParserGrow(ctxt: XmlParserCtxtPtr) -> c_int {
         && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
     {
         xml_err_internal(ctxt, c"Huge input lookup".as_ptr() as _, null());
-        xmlHaltParser(ctxt);
+        xml_halt_parser(ctxt);
         return -1;
     }
 
@@ -236,7 +236,7 @@ pub unsafe extern "C" fn xmlParserGrow(ctxt: XmlParserCtxtPtr) -> c_int {
     /* TODO: Get error code from xmlParserInputBufferGrow */
     if ret < 0 {
         xml_err_internal(ctxt, c"Growing input buffer".as_ptr() as _, null());
-        xmlHaltParser(ctxt);
+        xml_halt_parser(ctxt);
     }
 
     ret
@@ -247,7 +247,7 @@ pub unsafe extern "C" fn xmlParserGrow(ctxt: XmlParserCtxtPtr) -> c_int {
  * @ctxt:  an XML parser context
  */
 #[doc(hidden)]
-pub unsafe extern "C" fn xmlParserShrink(ctxt: XmlParserCtxtPtr) {
+pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
     let input: XmlParserInputPtr = (*ctxt).input;
     let buf: XmlParserInputBufferPtr = (*input).buf;
     let mut used: size_t;
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn xmlParserShrink(ctxt: XmlParserCtxtPtr) {
 
         if res > 0 {
             used -= res;
-            if res > c_ulong::MAX as size_t || ((*input).consumed > c_ulong::MAX - res as c_ulong) {
+            if res > c_ulong::MAX as size_t || (*input).consumed > c_ulong::MAX - res as c_ulong {
                 (*input).consumed = c_ulong::MAX;
             } else {
                 (*input).consumed += res as u64;
