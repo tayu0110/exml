@@ -29,7 +29,7 @@ pub(crate) const XML_ENT_CONTAINS_LT: usize = 1 << 4;
  *
  * Returns A newly allocated string with the substitution done.
  */
-pub(crate) unsafe extern "C" fn xmlEncodeAttributeEntities(
+pub(crate) unsafe extern "C" fn xml_encode_attribute_entities(
     doc: XmlDocPtr,
     input: *const XmlChar,
 ) -> *mut XmlChar {

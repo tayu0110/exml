@@ -28,7 +28,7 @@ use crate::{
             xml_buf_detach, xml_buf_free, xml_buf_from_buffer, xml_buf_is_empty,
             xml_buf_set_allocation_scheme,
         },
-        entities::{xmlEncodeAttributeEntities, XML_ENT_EXPANDING, XML_ENT_PARSED},
+        entities::{xml_encode_attribute_entities, XML_ENT_EXPANDING, XML_ENT_PARSED},
         error::__xml_simple_error,
     },
     CHECK_COMPAT, IS_BLANK_CH, UPDATE_COMPAT,
@@ -8165,7 +8165,7 @@ pub unsafe extern "C" fn xmlNodeListGetString(
                 ret = xml_strcat(ret, (*node).content);
             } else {
                 let buffer = if attr != 0 {
-                    xmlEncodeAttributeEntities(doc, (*node).content)
+                    xml_encode_attribute_entities(doc, (*node).content)
                 } else {
                     xml_encode_entities_reentrant(doc, (*node).content)
                 };
