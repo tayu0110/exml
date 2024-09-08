@@ -526,7 +526,9 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
         tree::{xml_buf_content, xml_buf_use},
-        xml_io::{xmlAllocOutputBufferInternal, xmlOutputBufferClose, xmlOutputBufferFlush},
+        xml_io::{
+            xml_alloc_output_buffer_internal, xml_output_buffer_close, xml_output_buffer_flush,
+        },
         xmlerror::XmlParserErrors,
         xmlstring::xml_strndup,
     };
@@ -572,7 +574,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         }
     }
 
-    let buf: XmlOutputBufferPtr = xmlAllocOutputBufferInternal(handler);
+    let buf: XmlOutputBufferPtr = xml_alloc_output_buffer_internal(handler);
     if buf.is_null() {
         *mem = null_mut();
         *size = 0;
@@ -581,7 +583,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
 
     html_doc_content_dump_format_output(buf, cur, null_mut(), format);
 
-    xmlOutputBufferFlush(buf);
+    xml_output_buffer_flush(buf);
     if !(*buf).conv.is_null() {
         *size = xml_buf_use((*buf).conv) as _;
         *mem = xml_strndup(xml_buf_content((*buf).conv), *size);
@@ -589,7 +591,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         *size = xml_buf_use((*buf).buffer) as _;
         *mem = xml_strndup(xml_buf_content((*buf).buffer), *size);
     }
-    xmlOutputBufferClose(buf);
+    xml_output_buffer_close(buf);
 }
 
 /**
@@ -606,7 +608,7 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
-        xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFile},
+        xml_io::{xml_output_buffer_close, xml_output_buffer_create_file},
         xmlerror::XmlParserErrors,
     };
 
@@ -646,13 +648,13 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
         }
     }
 
-    let buf: XmlOutputBufferPtr = xmlOutputBufferCreateFile(f, handler);
+    let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, handler);
     if buf.is_null() {
         return -1;
     }
     html_doc_content_dump_output(buf, cur, null_mut());
 
-    xmlOutputBufferClose(buf)
+    xml_output_buffer_close(buf)
 }
 
 /**
@@ -669,7 +671,7 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
-        xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFilename},
+        xml_io::{xml_output_buffer_close, xml_output_buffer_create_filename},
         xmlerror::XmlParserErrors,
     };
 
@@ -713,14 +715,14 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
      * save the content to a temp buffer.
      */
     let buf: XmlOutputBufferPtr =
-        xmlOutputBufferCreateFilename(filename, handler, (*cur).compression);
+        xml_output_buffer_create_filename(filename, handler, (*cur).compression);
     if buf.is_null() {
         return 0;
     }
 
     html_doc_content_dump_output(buf, cur, null_mut());
 
-    xmlOutputBufferClose(buf)
+    xml_output_buffer_close(buf)
 }
 
 /**
@@ -871,7 +873,7 @@ pub unsafe extern "C" fn html_node_dump_file_format(
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
-        xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFile},
+        xml_io::{xml_output_buffer_close, xml_output_buffer_create_file},
         xmlerror::XmlParserErrors,
     };
 
@@ -908,14 +910,14 @@ pub unsafe extern "C" fn html_node_dump_file_format(
     /*
      * save the content to a temp buffer.
      */
-    let buf: XmlOutputBufferPtr = xmlOutputBufferCreateFile(out, handler);
+    let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(out, handler);
     if buf.is_null() {
         return 0;
     }
 
     html_node_dump_format_output(buf, doc, cur, null_mut(), format);
 
-    xmlOutputBufferClose(buf)
+    xml_output_buffer_close(buf)
 }
 
 /**
@@ -959,7 +961,7 @@ pub unsafe extern "C" fn html_save_file_format(
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
-        xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFilename},
+        xml_io::{xml_output_buffer_close, xml_output_buffer_create_filename},
         xmlerror::XmlParserErrors,
     };
 
@@ -1003,14 +1005,14 @@ pub unsafe extern "C" fn html_save_file_format(
     /*
      * save the content to a temp buffer.
      */
-    let buf: XmlOutputBufferPtr = xmlOutputBufferCreateFilename(filename, handler, 0);
+    let buf: XmlOutputBufferPtr = xml_output_buffer_create_filename(filename, handler, 0);
     if buf.is_null() {
         return 0;
     }
 
     html_doc_content_dump_format_output(buf, cur, encoding, format);
 
-    xmlOutputBufferClose(buf)
+    xml_output_buffer_close(buf)
 }
 
 /**
@@ -1031,7 +1033,8 @@ unsafe extern "C" fn html_dtd_dump_output(
 ) {
     use crate::{
         libxml::{
-            xml_io::xmlOutputBufferWriteString, xmlerror::XmlParserErrors, xmlstring::xml_strcmp,
+            xml_io::xml_output_buffer_write_string, xmlerror::XmlParserErrors,
+            xmlstring::xml_strcmp,
         },
         private::buf::xml_buf_write_quoted_string,
     };
@@ -1048,22 +1051,22 @@ unsafe extern "C" fn html_dtd_dump_output(
         );
         return;
     }
-    xmlOutputBufferWriteString(buf, c"<!DOCTYPE ".as_ptr() as _);
-    xmlOutputBufferWriteString(buf, (*cur).name as _);
+    xml_output_buffer_write_string(buf, c"<!DOCTYPE ".as_ptr() as _);
+    xml_output_buffer_write_string(buf, (*cur).name as _);
     if !(*cur).external_id.is_null() {
-        xmlOutputBufferWriteString(buf, c" PUBLIC ".as_ptr() as _);
+        xml_output_buffer_write_string(buf, c" PUBLIC ".as_ptr() as _);
         xml_buf_write_quoted_string((*buf).buffer, (*cur).external_id);
         if !(*cur).system_id.is_null() {
-            xmlOutputBufferWriteString(buf, c" ".as_ptr() as _);
+            xml_output_buffer_write_string(buf, c" ".as_ptr() as _);
             xml_buf_write_quoted_string((*buf).buffer, (*cur).system_id);
         }
     } else if !(*cur).system_id.is_null()
         && xml_strcmp((*cur).system_id, c"about:legacy-compat".as_ptr() as _) != 0
     {
-        xmlOutputBufferWriteString(buf, c" SYSTEM ".as_ptr() as _);
+        xml_output_buffer_write_string(buf, c" SYSTEM ".as_ptr() as _);
         xml_buf_write_quoted_string((*buf).buffer, (*cur).system_id);
     }
-    xmlOutputBufferWriteString(buf, c">\n".as_ptr() as _);
+    xml_output_buffer_write_string(buf, c">\n".as_ptr() as _);
 }
 
 /**
@@ -1083,7 +1086,7 @@ unsafe extern "C" fn html_attr_dump_output(
     use crate::{
         libxml::{
             globals::xml_free, tree::xml_node_list_get_string, uri::xml_uri_escape_str,
-            xml_io::xmlOutputBufferWriteString,
+            xml_io::xml_output_buffer_write_string,
         },
         private::buf::xml_buf_write_quoted_string,
         IS_BLANK_CH,
@@ -1101,16 +1104,16 @@ unsafe extern "C" fn html_attr_dump_output(
     if cur.is_null() {
         return;
     }
-    xmlOutputBufferWriteString(buf, c" ".as_ptr() as _);
+    xml_output_buffer_write_string(buf, c" ".as_ptr() as _);
     if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
-        xmlOutputBufferWriteString(buf, (*(*cur).ns).prefix.load(Ordering::Relaxed) as _);
-        xmlOutputBufferWriteString(buf, c":".as_ptr() as _);
+        xml_output_buffer_write_string(buf, (*(*cur).ns).prefix.load(Ordering::Relaxed) as _);
+        xml_output_buffer_write_string(buf, c":".as_ptr() as _);
     }
-    xmlOutputBufferWriteString(buf, (*cur).name as _);
+    xml_output_buffer_write_string(buf, (*cur).name as _);
     if !(*cur).children.is_null() && html_is_boolean_attr((*cur).name as _) == 0 {
         value = xml_node_list_get_string(doc, (*cur).children, 0);
         if !value.is_null() {
-            xmlOutputBufferWriteString(buf, c"=".as_ptr() as _);
+            xml_output_buffer_write_string(buf, c"=".as_ptr() as _);
             if (*cur).ns.is_null()
                 && !(*cur).parent.is_null()
                 && (*(*cur).parent).ns.is_null()
@@ -1147,7 +1150,7 @@ unsafe extern "C" fn html_attr_dump_output(
             }
             xml_free(value as _);
         } else {
-            xmlOutputBufferWriteString(buf, c"=\"\"".as_ptr() as _);
+            xml_output_buffer_write_string(buf, c"=\"\"".as_ptr() as _);
         }
     }
 }
@@ -1177,7 +1180,7 @@ pub unsafe extern "C" fn html_node_dump_format_output(
             htmlparser::html_tag_lookup,
             parser::xml_init_parser,
             parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-            xml_io::xmlOutputBufferWriteString,
+            xml_io::xml_output_buffer_write_string,
             xmlstring::xml_strcmp,
         },
         private::save::xml_ns_list_dump_output,
@@ -1211,7 +1214,7 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                         continue;
                     }
                 } else {
-                    xmlOutputBufferWriteString(buf, c"\n".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c"\n".as_ptr() as _);
                 }
             }
 
@@ -1235,15 +1238,15 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                     info = null_mut();
                 }
 
-                xmlOutputBufferWriteString(buf, c"<".as_ptr() as _);
+                xml_output_buffer_write_string(buf, c"<".as_ptr() as _);
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
-                    xmlOutputBufferWriteString(
+                    xml_output_buffer_write_string(
                         buf,
                         (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                     );
-                    xmlOutputBufferWriteString(buf, c":".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c":".as_ptr() as _);
                 }
-                xmlOutputBufferWriteString(buf, (*cur).name as _);
+                xml_output_buffer_write_string(buf, (*cur).name as _);
                 if !(*cur).ns_def.is_null() {
                     xml_ns_list_dump_output(buf, (*cur).ns_def);
                 }
@@ -1254,30 +1257,30 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                 }
 
                 if !info.is_null() && (*info).empty != 0 {
-                    xmlOutputBufferWriteString(buf, c">".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c">".as_ptr() as _);
                 } else if (*cur).children.is_null() {
                     if !info.is_null()
                         && (*info).save_end_tag != 0
                         && xml_strcmp((*info).name as _, c"html".as_ptr() as _) != 0
                         && xml_strcmp((*info).name as _, c"body".as_ptr() as _) != 0
                     {
-                        xmlOutputBufferWriteString(buf, c">".as_ptr() as _);
+                        xml_output_buffer_write_string(buf, c">".as_ptr() as _);
                     } else {
-                        xmlOutputBufferWriteString(buf, c"></".as_ptr() as _);
+                        xml_output_buffer_write_string(buf, c"></".as_ptr() as _);
                         if !(*cur).ns.is_null()
                             && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null()
                         {
-                            xmlOutputBufferWriteString(
+                            xml_output_buffer_write_string(
                                 buf,
                                 (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                             );
-                            xmlOutputBufferWriteString(buf, c":".as_ptr() as _);
+                            xml_output_buffer_write_string(buf, c":".as_ptr() as _);
                         }
-                        xmlOutputBufferWriteString(buf, (*cur).name as _);
-                        xmlOutputBufferWriteString(buf, c">".as_ptr() as _);
+                        xml_output_buffer_write_string(buf, (*cur).name as _);
+                        xml_output_buffer_write_string(buf, c">".as_ptr() as _);
                     }
                 } else {
-                    xmlOutputBufferWriteString(buf, c">".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c">".as_ptr() as _);
                     if format != 0
                         && !info.is_null()
                         && (*info).isinline == 0
@@ -1290,7 +1293,7 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                         && *(*cur).name.add(0) != b'p'
                     /* p, pre, param */
                     {
-                        xmlOutputBufferWriteString(buf, c"\n".as_ptr() as _);
+                        xml_output_buffer_write_string(buf, c"\n".as_ptr() as _);
                     }
                     parent = cur;
                     cur = (*cur).children;
@@ -1306,7 +1309,7 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                         && !(*parent).name.is_null()
                         && *(*parent).name.add(0) != b'p')
                 {
-                    xmlOutputBufferWriteString(buf, c"\n".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c"\n".as_ptr() as _);
                 }
             }
             XmlElementType::XmlAttributeNode => {
@@ -1325,41 +1328,41 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                 {
                     let buffer: *mut XmlChar = xml_encode_entities_reentrant(doc, (*cur).content);
                     if !buffer.is_null() {
-                        xmlOutputBufferWriteString(buf, buffer as _);
+                        xml_output_buffer_write_string(buf, buffer as _);
                         xml_free(buffer as _);
                     }
                 } else {
-                    xmlOutputBufferWriteString(buf, (*cur).content as _);
+                    xml_output_buffer_write_string(buf, (*cur).content as _);
                 }
             }
 
             HTML_COMMENT_NODE => {
                 if !(*cur).content.is_null() {
-                    xmlOutputBufferWriteString(buf, c"<!--".as_ptr() as _);
-                    xmlOutputBufferWriteString(buf, (*cur).content as _);
-                    xmlOutputBufferWriteString(buf, c"-->".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c"<!--".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, (*cur).content as _);
+                    xml_output_buffer_write_string(buf, c"-->".as_ptr() as _);
                 }
             }
 
             HTML_PI_NODE => {
                 if !(*cur).name.is_null() {
-                    xmlOutputBufferWriteString(buf, c"<?".as_ptr() as _);
-                    xmlOutputBufferWriteString(buf, (*cur).name as _);
+                    xml_output_buffer_write_string(buf, c"<?".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, (*cur).name as _);
                     if !(*cur).content.is_null() {
-                        xmlOutputBufferWriteString(buf, c" ".as_ptr() as _);
-                        xmlOutputBufferWriteString(buf, (*cur).content as _);
+                        xml_output_buffer_write_string(buf, c" ".as_ptr() as _);
+                        xml_output_buffer_write_string(buf, (*cur).content as _);
                     }
-                    xmlOutputBufferWriteString(buf, c">".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c">".as_ptr() as _);
                 }
             }
             HTML_ENTITY_REF_NODE => {
-                xmlOutputBufferWriteString(buf, c"&".as_ptr() as _);
-                xmlOutputBufferWriteString(buf, (*cur).name as _);
-                xmlOutputBufferWriteString(buf, c";".as_ptr() as _);
+                xml_output_buffer_write_string(buf, c"&".as_ptr() as _);
+                xml_output_buffer_write_string(buf, (*cur).name as _);
+                xml_output_buffer_write_string(buf, c";".as_ptr() as _);
             }
             HTML_PRESERVE_NODE => {
                 if !(*cur).content.is_null() {
-                    xmlOutputBufferWriteString(buf, (*cur).content as _);
+                    xml_output_buffer_write_string(buf, (*cur).content as _);
                 }
             }
             _ => {}
@@ -1382,7 +1385,7 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                 (*cur).typ,
                 XmlElementType::XmlHtmlDocumentNode | XmlElementType::XmlDocumentNode
             ) {
-                xmlOutputBufferWriteString(buf, c"\n".as_ptr() as _);
+                xml_output_buffer_write_string(buf, c"\n".as_ptr() as _);
             } else {
                 if format != 0 && (*cur).ns.is_null() {
                     info = html_tag_lookup((*cur).name);
@@ -1399,19 +1402,19 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                     && *(*cur).name.add(0) != b'p'
                 /* p, pre, param */
                 {
-                    xmlOutputBufferWriteString(buf, c"\n".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c"\n".as_ptr() as _);
                 }
 
-                xmlOutputBufferWriteString(buf, c"</".as_ptr() as _);
+                xml_output_buffer_write_string(buf, c"</".as_ptr() as _);
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
-                    xmlOutputBufferWriteString(
+                    xml_output_buffer_write_string(
                         buf,
                         (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                     );
-                    xmlOutputBufferWriteString(buf, c":".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c":".as_ptr() as _);
                 }
-                xmlOutputBufferWriteString(buf, (*cur).name as _);
-                xmlOutputBufferWriteString(buf, c">".as_ptr() as _);
+                xml_output_buffer_write_string(buf, (*cur).name as _);
+                xml_output_buffer_write_string(buf, c">".as_ptr() as _);
 
                 if (format != 0
                     && !info.is_null()
@@ -1422,7 +1425,7 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                         && !(*parent).name.is_null()
                         && *(*parent).name.add(0) != b'p')
                 {
-                    xmlOutputBufferWriteString(buf, c"\n".as_ptr() as _);
+                    xml_output_buffer_write_string(buf, c"\n".as_ptr() as _);
                 }
             }
         }

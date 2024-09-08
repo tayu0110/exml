@@ -30,7 +30,7 @@ use exml::{
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
         },
         tree::{xml_free_doc, XmlDocPtr, XmlElementType, XmlNodePtr},
-        xml_io::{xmlNoNetExternalEntityLoader, xmlRegisterInputCallbacks},
+        xml_io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
         xmlerror::{
             xmlResetLastError, xmlSetStructuredErrorFunc, XmlErrorDomain, XmlErrorLevel,
             XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors,
@@ -235,10 +235,10 @@ unsafe extern "C" fn test_external_entity_loader(
     let ret: XmlParserInputPtr;
 
     if check_test_file(url) != 0 {
-        ret = xmlNoNetExternalEntityLoader(url, id, ctxt);
+        ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
         let memused: c_int = xml_mem_used();
-        ret = xmlNoNetExternalEntityLoader(url, id, ctxt);
+        ret = xml_no_net_external_entity_loader(url, id, ctxt);
         EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
     }
 
@@ -564,7 +564,7 @@ unsafe extern "C" fn initialize_libxml2() {
     /*
      * register the new I/O handlers
      */
-    if xmlRegisterInputCallbacks(
+    if xml_register_input_callbacks(
         Some(huge_match),
         Some(huge_open),
         Some(huge_read),

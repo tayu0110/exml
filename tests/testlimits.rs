@@ -34,7 +34,7 @@ use exml::{
             xml_free_doc, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
             XmlNodePtr,
         },
-        xml_io::{xmlNoNetExternalEntityLoader, xmlRegisterInputCallbacks},
+        xml_io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
         xmlerror::{
             xmlSetStructuredErrorFunc, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr,
             XmlGenericErrorFunc, XmlParserErrors,
@@ -450,7 +450,7 @@ unsafe extern "C" fn test_external_entity_loader(
 ) -> XmlParserInputPtr {
     let memused: c_int = xml_mem_used();
 
-    let ret: XmlParserInputPtr = xmlNoNetExternalEntityLoader(url, id, ctxt);
+    let ret: XmlParserInputPtr = xml_no_net_external_entity_loader(url, id, ctxt);
     EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
 
     ret
@@ -768,7 +768,7 @@ unsafe extern "C" fn initialize_libxml2() {
     /*
      * register the new I/O handlers
      */
-    if xmlRegisterInputCallbacks(
+    if xml_register_input_callbacks(
         Some(huge_match),
         Some(huge_open),
         Some(huge_read),
@@ -777,7 +777,7 @@ unsafe extern "C" fn initialize_libxml2() {
     {
         panic!("failed to register Huge handlers");
     }
-    if xmlRegisterInputCallbacks(
+    if xml_register_input_callbacks(
         Some(crazy_match),
         Some(crazy_open),
         Some(crazy_read),

@@ -83,8 +83,9 @@ use super::tree::{
 };
 use super::uri::{xml_build_uri, xml_canonic_path};
 use super::xml_io::{
-    __xml_loader_err, xmlCheckHTTPInput, xmlFreeParserInputBuffer, xmlParserGetDirectory,
-    xmlParserInputBufferCreateFilename, xmlParserInputBufferCreateMem, xmlParserInputBufferRead,
+    __xml_loader_err, xml_check_http_input, xml_free_parser_input_buffer, xml_parser_get_directory,
+    xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_mem,
+    xml_parser_input_buffer_read,
 };
 use super::xmlerror::xmlCopyError;
 use super::xmlstring::{
@@ -775,7 +776,7 @@ pub unsafe extern "C" fn xml_create_url_parser_ctxt(
 
     input_push(ctxt, input_stream);
     if (*ctxt).directory.is_null() && directory.is_null() {
-        directory = xmlParserGetDirectory(filename);
+        directory = xml_parser_get_directory(filename);
     }
     if (*ctxt).directory.is_null() && !directory.is_null() {
         (*ctxt).directory = directory;
@@ -810,7 +811,7 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
     }
 
     let buf: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateMem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
     if buf.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -818,7 +819,7 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
 
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -883,7 +884,7 @@ pub(crate) unsafe extern "C" fn xml_create_entity_parser_ctxt_internal(
         input_push(ctxt, input_stream);
 
         if (*ctxt).directory.is_null() && directory.is_null() {
-            directory = xmlParserGetDirectory(url as _);
+            directory = xml_parser_get_directory(url as _);
         }
         if (*ctxt).directory.is_null() && !directory.is_null() {
             (*ctxt).directory = directory;
@@ -899,7 +900,7 @@ pub(crate) unsafe extern "C" fn xml_create_entity_parser_ctxt_internal(
         input_push(ctxt, input_stream);
 
         if (*ctxt).directory.is_null() && directory.is_null() {
-            directory = xmlParserGetDirectory(uri as _);
+            directory = xml_parser_get_directory(uri as _);
         }
         if (*ctxt).directory.is_null() && !directory.is_null() {
             (*ctxt).directory = directory;
@@ -1344,7 +1345,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
             buffer
         );
     }
-    let buf: XmlParserInputBufferPtr = xmlParserInputBufferCreateMem(
+    let buf: XmlParserInputBufferPtr = xml_parser_input_buffer_create_mem(
         buffer as *const c_char,
         xml_strlen(buffer),
         XmlCharEncoding::XmlCharEncodingNone,
@@ -1359,7 +1360,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
             ctxt,
             c"couldn't allocate a new input stream\n".as_ptr() as _,
         );
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         return null_mut();
     }
     (*input).buf = buf;
@@ -1746,7 +1747,7 @@ pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
         }
     }
     if !(*input).buf.is_null() {
-        xmlFreeParserInputBuffer((*input).buf);
+        xml_free_parser_input_buffer((*input).buf);
     }
     xml_free(input as _);
 }
@@ -1777,7 +1778,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
         return null_mut();
     }
     let buf: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFilename(filename, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::XmlCharEncodingNone);
     if buf.is_null() {
         if filename.is_null() {
             __xml_loader_err(
@@ -1797,12 +1798,12 @@ pub unsafe extern "C" fn xml_new_input_from_file(
 
     input_stream = xml_new_input_stream(ctxt);
     if input_stream.is_null() {
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         return null_mut();
     }
 
     (*input_stream).buf = buf;
-    input_stream = xmlCheckHTTPInput(ctxt, input_stream);
+    input_stream = xml_check_http_input(ctxt, input_stream);
     if input_stream.is_null() {
         return null_mut();
     }
@@ -1812,7 +1813,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     } else {
         xml_strdup((*input_stream).filename as *mut XmlChar)
     };
-    let directory: *mut c_char = xmlParserGetDirectory(uri as *const c_char);
+    let directory: *mut c_char = xml_parser_get_directory(uri as *const c_char);
     if !(*input_stream).filename.is_null() {
         xml_free((*input_stream).filename as _);
     }
@@ -8034,7 +8035,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     }
 
     if xml_buf_use((*(*input).buf).buffer) <= INPUT_CHUNK {
-        xmlParserInputBufferRead((*input).buf, 2 * INPUT_CHUNK as i32);
+        xml_parser_input_buffer_read((*input).buf, 2 * INPUT_CHUNK as i32);
     }
 
     (*input).base = xml_buf_content((*(*input).buf).buffer);

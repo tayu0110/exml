@@ -62,10 +62,11 @@ use crate::{
             xml_xinclude_set_streaming_mode, XmlXincludeCtxtPtr,
         },
         xml_io::{
-            xmlAllocParserInputBuffer, xmlFreeParserInputBuffer, xmlParserGetDirectory,
-            xmlParserInputBufferCreateFd, xmlParserInputBufferCreateFilename,
-            xmlParserInputBufferCreateIO, xmlParserInputBufferCreateMem, xmlParserInputBufferRead,
-            XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
+            xml_alloc_parser_input_buffer, xml_free_parser_input_buffer, xml_parser_get_directory,
+            xml_parser_input_buffer_create_fd, xml_parser_input_buffer_create_filename,
+            xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
+            xml_parser_input_buffer_read, XmlInputCloseCallback, XmlInputReadCallback,
+            XmlParserInputBufferPtr,
         },
         xmlerror::{
             xmlParserError, xmlParserValidityError, xmlParserValidityWarning, xmlParserWarning,
@@ -609,7 +610,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
     (*ret).node = null_mut();
     (*ret).curnode = null_mut();
     if xml_buf_use((*(*ret).input).buffer) < 4 {
-        xmlParserInputBufferRead(input, 4);
+        xml_parser_input_buffer_read(input, 4);
     }
     if xml_buf_use((*(*ret).input).buffer) >= 4 {
         (*ret).ctxt = xml_create_push_parser_ctxt(
@@ -672,18 +673,18 @@ pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> Xml
     let mut directory: *mut c_char = null_mut();
 
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFilename(uri, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_filename(uri, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return null_mut();
     }
     let ret: XmlTextReaderPtr = xml_new_text_reader(input, uri);
     if ret.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         return null_mut();
     }
     (*ret).allocs |= XML_TEXTREADER_INPUT;
     if (*(*ret).ctxt).directory.is_null() {
-        directory = xmlParserGetDirectory(uri);
+        directory = xml_parser_get_directory(uri);
     }
     if (*(*ret).ctxt).directory.is_null() && !directory.is_null() {
         (*(*ret).ctxt).directory = xml_strdup(directory as _) as _;
@@ -798,7 +799,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
 
     if reader.is_null() {
         if !input.is_null() {
-            xmlFreeParserInputBuffer(input);
+            xml_free_parser_input_buffer(input);
         }
         return -1;
     }
@@ -817,7 +818,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         && !(*reader).input.is_null()
         && (*reader).allocs & XML_TEXTREADER_INPUT != 0
     {
-        xmlFreeParserInputBuffer((*reader).input);
+        xml_free_parser_input_buffer((*reader).input);
         (*reader).input = null_mut();
         (*reader).allocs -= XML_TEXTREADER_INPUT;
     }
@@ -885,7 +886,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
     (*reader).curnode = null_mut();
     if !input.is_null() {
         if xml_buf_use((*(*reader).input).buffer) < 4 {
-            xmlParserInputBufferRead(input, 4);
+            xml_parser_input_buffer_read(input, 4);
         }
         if (*reader).ctxt.is_null() {
             if xml_buf_use((*(*reader).input).buffer) >= 4 {
@@ -908,13 +909,13 @@ pub unsafe extern "C" fn xml_text_reader_setup(
             let enc: XmlCharEncoding = XmlCharEncoding::XmlCharEncodingNone;
 
             xml_ctxt_reset((*reader).ctxt);
-            let buf: XmlParserInputBufferPtr = xmlAllocParserInputBuffer(enc);
+            let buf: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
             if buf.is_null() {
                 return -1;
             }
             let input_stream: XmlParserInputPtr = xml_new_input_stream((*reader).ctxt);
             if input_stream.is_null() {
-                xmlFreeParserInputBuffer(buf);
+                xml_free_parser_input_buffer(buf);
                 return -1;
             }
 
@@ -1146,7 +1147,7 @@ unsafe extern "C" fn xml_text_reader_push_data(reader: XmlTextReaderPtr) -> c_in
              * Refill the buffer unless we are at the end of the stream
              */
             if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeEof as i32 {
-                val = xmlParserInputBufferRead((*reader).input, 4096);
+                val = xml_parser_input_buffer_read((*reader).input, 4096);
                 if val == 0 && (*(*reader).input).readcallback.is_none() {
                     if xml_buf_use(inbuf) == (*reader).cur as _ {
                         (*reader).mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
@@ -3695,7 +3696,7 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: XmlTextReaderPtr) -> c_in
         }
     }
     if !(*reader).input.is_null() && (*reader).allocs & XML_TEXTREADER_INPUT != 0 {
-        xmlFreeParserInputBuffer((*reader).input);
+        xml_free_parser_input_buffer((*reader).input);
         (*reader).allocs -= XML_TEXTREADER_INPUT;
     }
     0
@@ -5889,13 +5890,13 @@ pub unsafe extern "C" fn xml_reader_for_memory(
     options: c_int,
 ) -> XmlTextReaderPtr {
     let buf: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateMem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
     if buf.is_null() {
         return null_mut();
     }
     let reader: XmlTextReaderPtr = xml_new_text_reader(buf, url);
     if reader.is_null() {
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         return null_mut();
     }
     (*reader).allocs |= XML_TEXTREADER_INPUT;
@@ -5929,14 +5930,14 @@ pub unsafe extern "C" fn xml_reader_for_fd(
     }
 
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFd(fd, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return null_mut();
     }
     (*input).closecallback = None;
     let reader: XmlTextReaderPtr = xml_new_text_reader(input, url);
     if reader.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         return null_mut();
     }
     (*reader).allocs |= XML_TEXTREADER_INPUT;
@@ -5971,8 +5972,12 @@ pub unsafe extern "C" fn xml_reader_for_io(
         return null_mut();
     }
 
-    let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateIO(ioread, ioclose, ioctx, XmlCharEncoding::XmlCharEncodingNone);
+    let input: XmlParserInputBufferPtr = xml_parser_input_buffer_create_io(
+        ioread,
+        ioclose,
+        ioctx,
+        XmlCharEncoding::XmlCharEncodingNone,
+    );
     if input.is_null() {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
@@ -5981,7 +5986,7 @@ pub unsafe extern "C" fn xml_reader_for_io(
     }
     let reader: XmlTextReaderPtr = xml_new_text_reader(input, url);
     if reader.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         return null_mut();
     }
     (*reader).allocs |= XML_TEXTREADER_INPUT;
@@ -6009,7 +6014,7 @@ pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: Xm
     }
 
     if !(*reader).input.is_null() {
-        xmlFreeParserInputBuffer((*reader).input);
+        xml_free_parser_input_buffer((*reader).input);
     }
     if !(*reader).ctxt.is_null() {
         xml_ctxt_reset((*reader).ctxt);
@@ -6096,7 +6101,7 @@ pub unsafe extern "C" fn xml_reader_new_file(
     }
 
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFilename(filename, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return -1;
     }
@@ -6135,7 +6140,7 @@ pub unsafe extern "C" fn xml_reader_new_memory(
     }
 
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateMem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return -1;
     }
@@ -6174,7 +6179,7 @@ pub unsafe extern "C" fn xml_reader_new_fd(
     }
 
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFd(fd, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return -1;
     }
@@ -6216,8 +6221,12 @@ pub unsafe extern "C" fn xml_reader_new_io(
         return -1;
     }
 
-    let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateIO(ioread, ioclose, ioctx, XmlCharEncoding::XmlCharEncodingNone);
+    let input: XmlParserInputBufferPtr = xml_parser_input_buffer_create_io(
+        ioread,
+        ioclose,
+        ioctx,
+        XmlCharEncoding::XmlCharEncodingNone,
+    );
     if input.is_null() {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);

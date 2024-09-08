@@ -44,7 +44,7 @@ use crate::{
             xml_build_relative_uri, xml_build_uri, xml_free_uri, xml_parse_uri, xml_save_uri,
             xml_uri_escape, XmlURIPtr,
         },
-        xml_io::{xmlParserGetDirectory, xmlParserInputBufferRead, XmlParserInputBufferPtr},
+        xml_io::{xml_parser_get_directory, xml_parser_input_buffer_read, XmlParserInputBufferPtr},
         xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, XmlChar},
         xpath::{
@@ -803,7 +803,7 @@ unsafe extern "C" fn xml_xinclude_parse_file(
     input_push(pctxt, input_stream);
 
     if (*pctxt).directory.is_null() {
-        (*pctxt).directory = xmlParserGetDirectory(url);
+        (*pctxt).directory = xml_parser_get_directory(url);
     }
 
     (*pctxt).loadsubset |= XML_DETECT_IDS as i32;
@@ -2265,7 +2265,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     /*
      * Scan all chars from the resource and add the to the node
      */
-    while xmlParserInputBufferRead(buf, 4096) > 0 {}
+    while xml_parser_input_buffer_read(buf, 4096) > 0 {}
 
     let content: *const XmlChar = xml_buf_content((*buf).buffer);
     let len: c_int = xml_buf_length((*buf).buffer) as _;

@@ -92,7 +92,7 @@ use crate::{
         },
         uri::xml_build_uri,
         valid::{xml_add_id, xml_free_enumeration},
-        xml_io::{xmlParserInputBufferCreateFilename, XmlParserInputBufferPtr},
+        xml_io::{xml_parser_input_buffer_create_filename, XmlParserInputBufferPtr},
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_new_all_trans,
             xml_automata_new_count_trans2, xml_automata_new_counted_trans,
@@ -31074,7 +31074,7 @@ pub unsafe extern "C" fn xml_schema_validate_file(
     }
 
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFilename(filename, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return -1;
     }

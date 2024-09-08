@@ -47,10 +47,10 @@ use crate::{
         },
         uri::xml_canonic_path,
         xml_io::{
-            xmlAllocParserInputBuffer, xmlFreeParserInputBuffer, xmlParserGetDirectory,
-            xmlParserInputBufferCreateFd, xmlParserInputBufferCreateIO,
-            xmlParserInputBufferCreateMem, xmlParserInputBufferPush, XmlInputCloseCallback,
-            XmlInputReadCallback, XmlParserInputBufferPtr,
+            xml_alloc_parser_input_buffer, xml_free_parser_input_buffer, xml_parser_get_directory,
+            xml_parser_input_buffer_create_fd, xml_parser_input_buffer_create_io,
+            xml_parser_input_buffer_create_mem, xml_parser_input_buffer_push,
+            XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
         },
         xmlerror::{
             xmlParserValidityError, xmlParserValidityWarning, xmlResetError, XmlParserErrors,
@@ -9540,7 +9540,7 @@ pub unsafe extern "C" fn html_create_memory_parser_ctxt(
     }
 
     let buf: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateMem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
     if buf.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -9548,7 +9548,7 @@ pub unsafe extern "C" fn html_create_memory_parser_ctxt(
 
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -10736,14 +10736,14 @@ pub unsafe extern "C" fn html_create_push_parser_ctxt(
 ) -> HtmlParserCtxtPtr {
     xml_init_parser();
 
-    let buf: XmlParserInputBufferPtr = xmlAllocParserInputBuffer(enc);
+    let buf: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
     if buf.is_null() {
         return null_mut();
     }
 
     let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(sax, user_data);
     if ctxt.is_null() {
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         return null_mut();
     }
     if matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) || !(*buf).encoder.is_null() {
@@ -10752,13 +10752,13 @@ pub unsafe extern "C" fn html_create_push_parser_ctxt(
     if filename.is_null() {
         (*ctxt).directory = null_mut();
     } else {
-        (*ctxt).directory = xmlParserGetDirectory(filename);
+        (*ctxt).directory = xml_parser_get_directory(filename);
     }
 
     let input_stream: HtmlParserInputPtr = html_new_input_stream(ctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         return null_mut();
     }
 
@@ -10776,7 +10776,7 @@ pub unsafe extern "C" fn html_create_push_parser_ctxt(
         let base: size_t = xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xmlParserInputBufferPush((*(*ctxt).input).buf, size, chunk);
+        xml_parser_input_buffer_push((*(*ctxt).input).buf, size, chunk);
 
         xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
         // #ifdef DEBUG_PUSH
@@ -11878,7 +11878,7 @@ pub unsafe extern "C" fn html_parse_chunk(
         let base: size_t = xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        let res: c_int = xmlParserInputBufferPush((*(*ctxt).input).buf, size, chunk);
+        let res: c_int = xml_parser_input_buffer_push((*(*ctxt).input).buf, size, chunk);
         xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
         if res < 0 {
             html_err_memory(ctxt, null());
@@ -12312,20 +12312,20 @@ pub unsafe extern "C" fn html_read_fd(
 
     xml_init_parser();
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFd(fd, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return null_mut();
     }
     (*input).closecallback = None;
     let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
     if ctxt.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         return null_mut();
     }
     let stream: HtmlParserInputPtr =
         xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
     if stream.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         html_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -12359,8 +12359,12 @@ pub unsafe extern "C" fn html_read_io(
     }
     xml_init_parser();
 
-    let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateIO(ioread, ioclose, ioctx, XmlCharEncoding::XmlCharEncodingNone);
+    let input: XmlParserInputBufferPtr = xml_parser_input_buffer_create_io(
+        ioread,
+        ioclose,
+        ioctx,
+        XmlCharEncoding::XmlCharEncodingNone,
+    );
     if input.is_null() {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
@@ -12369,13 +12373,13 @@ pub unsafe extern "C" fn html_read_io(
     }
     let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
     if ctxt.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         return null_mut();
     }
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
     if stream.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -12478,7 +12482,7 @@ pub unsafe extern "C" fn html_ctxt_read_memory(
     html_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateMem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return null_mut();
     }
@@ -12486,7 +12490,7 @@ pub unsafe extern "C" fn html_ctxt_read_memory(
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
     if stream.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         return null_mut();
     }
 
@@ -12525,14 +12529,14 @@ pub unsafe extern "C" fn html_ctxt_read_fd(
     html_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFd(fd, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::XmlCharEncodingNone);
     if input.is_null() {
         return null_mut();
     }
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
     if stream.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         return null_mut();
     }
     input_push(ctxt, stream);
@@ -12573,8 +12577,12 @@ pub unsafe extern "C" fn html_ctxt_read_io(
 
     html_ctxt_reset(ctxt);
 
-    let input: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateIO(ioread, ioclose, ioctx, XmlCharEncoding::XmlCharEncodingNone);
+    let input: XmlParserInputBufferPtr = xml_parser_input_buffer_create_io(
+        ioread,
+        ioclose,
+        ioctx,
+        XmlCharEncoding::XmlCharEncodingNone,
+    );
     if input.is_null() {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
@@ -12584,7 +12592,7 @@ pub unsafe extern "C" fn html_ctxt_read_io(
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
     if stream.is_null() {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         return null_mut();
     }
     input_push(ctxt, stream);

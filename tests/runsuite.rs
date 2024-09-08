@@ -36,7 +36,7 @@ use exml::libxml::{
         XmlNodePtr,
     },
     uri::xml_build_uri,
-    xml_io::xmlNoNetExternalEntityLoader,
+    xml_io::xml_no_net_external_entity_loader,
     xmlerror::{xmlResetLastError, xmlSetGenericErrorFunc},
     xmlmemory::{
         xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -165,10 +165,10 @@ unsafe extern "C" fn test_external_entity_loader(
         }
     }
     if check_test_file(url) != 0 {
-        ret = xmlNoNetExternalEntityLoader(url, id, ctxt);
+        ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
         let memused: c_int = xml_mem_used();
-        ret = xmlNoNetExternalEntityLoader(url, id, ctxt);
+        ret = xml_no_net_external_entity_loader(url, id, ctxt);
         EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
     }
     // #if 0

@@ -51,8 +51,8 @@ use super::{
     },
     uri::xml_canonic_path,
     xml_io::{
-        xmlFreeParserInputBuffer, xmlOutputBufferCreateFile, xmlParserGetDirectory,
-        xmlParserInputBufferCreateFilename, XmlOutputBufferPtr,
+        xml_free_parser_input_buffer, xml_output_buffer_create_file, xml_parser_get_directory,
+        xml_parser_input_buffer_create_filename, XmlOutputBufferPtr,
     },
     xmlstring::{xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar},
 };
@@ -3306,7 +3306,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
     /*
      * reserialize it
      */
-    let buf: XmlOutputBufferPtr = xmlOutputBufferCreateFile(out, null_mut());
+    let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(out, null_mut());
     if buf.is_null() {
         xml_free_doc(doc);
         return -1;
@@ -3916,7 +3916,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
     }
 
     let buf: XmlParserInputBufferPtr =
-        xmlParserInputBufferCreateFilename(filename, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::XmlCharEncodingNone);
     if buf.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -3924,7 +3924,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input_stream.is_null() {
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -3935,7 +3935,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
 
     input_push(ctxt, input_stream);
     if (*ctxt).directory.is_null() {
-        directory = xmlParserGetDirectory(filename);
+        directory = xml_parser_get_directory(filename);
     }
     if (*ctxt).directory.is_null() && !directory.is_null() {
         (*ctxt).directory = directory;

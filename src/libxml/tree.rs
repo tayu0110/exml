@@ -9686,7 +9686,8 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     use crate::libxml::{
         encoding::{xml_char_enc_close_func, xml_find_char_encoding_handler},
         xml_io::{
-            xmlAllocOutputBuffer, xmlOutputBufferClose, xmlOutputBufferFlush, XmlOutputBufferPtr,
+            xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_flush,
+            XmlOutputBufferPtr,
         },
         xmlsave::{
             xmlDocContentDumpOutput, xmlSaveCtxtInit, xml_save_err, xml_save_err_memory,
@@ -9738,7 +9739,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
         }
     }
 
-    let out_buff: XmlOutputBufferPtr = xmlAllocOutputBuffer(conv_hdlr);
+    let out_buff: XmlOutputBufferPtr = xml_alloc_output_buffer(conv_hdlr);
     if out_buff.is_null() {
         xml_save_err_memory(c"creating buffer".as_ptr() as _);
         xml_char_enc_close_func(conv_hdlr);
@@ -9753,7 +9754,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     xmlSaveCtxtInit(addr_of_mut!(ctxt));
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xmlDocContentDumpOutput(addr_of_mut!(ctxt), out_doc);
-    xmlOutputBufferFlush(out_buff);
+    xml_output_buffer_flush(out_buff);
     if !(*out_buff).conv.is_null() {
         *doc_txt_len = xml_buf_use((*out_buff).conv) as _;
         *doc_txt_ptr = xml_strndup(xml_buf_content((*out_buff).conv), *doc_txt_len);
@@ -9761,7 +9762,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
         *doc_txt_len = xml_buf_use((*out_buff).buffer) as _;
         *doc_txt_ptr = xml_strndup(xml_buf_content((*out_buff).buffer), *doc_txt_len);
     }
-    xmlOutputBufferClose(out_buff);
+    xml_output_buffer_close(out_buff);
 
     if (*doc_txt_ptr).is_null() && *doc_txt_len > 0 {
         *doc_txt_len = 0;
@@ -9787,7 +9788,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
 
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
-        xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFile, XmlOutputBufferPtr},
+        xml_io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
         xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
     };
 
@@ -9815,7 +9816,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
             encoding = null_mut();
         }
     }
-    let buf: XmlOutputBufferPtr = xmlOutputBufferCreateFile(f, handler);
+    let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, handler);
     if buf.is_null() {
         return -1;
     }
@@ -9828,7 +9829,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xmlDocContentDumpOutput(addr_of_mut!(ctxt) as _, cur);
 
-    let ret: c_int = xmlOutputBufferClose(buf);
+    let ret: c_int = xml_output_buffer_close(buf);
     ret
 }
 
@@ -9859,7 +9860,7 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
     use crate::libxml::{
         htmltree::html_node_dump_output,
         parser::xml_init_parser,
-        xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFile, XmlOutputBufferPtr},
+        xml_io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
     };
 
     xml_init_parser();
@@ -9878,7 +9879,7 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
     //     }
     // #endif
 
-    let outbuf: XmlOutputBufferPtr = xmlOutputBufferCreateFile(f, null_mut());
+    let outbuf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, null_mut());
     if outbuf.is_null() {
         return;
     }
@@ -9898,7 +9899,7 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
     } else {
         xml_node_dump_output(outbuf, doc, cur, 0, 1, null_mut());
     }
-    xmlOutputBufferClose(outbuf);
+    xml_output_buffer_close(outbuf);
 }
 
 /**
@@ -10068,7 +10069,7 @@ pub unsafe extern "C" fn xml_save_file_to(
     use std::mem::{size_of_val, zeroed};
 
     use crate::libxml::{
-        xml_io::xmlOutputBufferClose,
+        xml_io::xml_output_buffer_close,
         xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
     };
 
@@ -10080,7 +10081,7 @@ pub unsafe extern "C" fn xml_save_file_to(
         return -1;
     }
     if cur.is_null() {
-        xmlOutputBufferClose(buf);
+        xml_output_buffer_close(buf);
         return -1;
     }
     memset(addr_of_mut!(ctxt) as _, 0, size_of_val(&ctxt));
@@ -10091,7 +10092,7 @@ pub unsafe extern "C" fn xml_save_file_to(
     xmlSaveCtxtInit(addr_of_mut!(ctxt) as _);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xmlDocContentDumpOutput(addr_of_mut!(ctxt) as _, cur);
-    let ret: c_int = xmlOutputBufferClose(buf);
+    let ret: c_int = xml_output_buffer_close(buf);
     ret
 }
 
@@ -10118,7 +10119,7 @@ pub unsafe extern "C" fn xml_save_format_file_to(
     use std::mem::{size_of_val, zeroed};
 
     use crate::libxml::{
-        xml_io::xmlOutputBufferClose,
+        xml_io::xml_output_buffer_close,
         xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
     };
 
@@ -10133,7 +10134,7 @@ pub unsafe extern "C" fn xml_save_format_file_to(
         || (!matches!((*cur).typ, XmlElementType::XmlDocumentNode)
             && !matches!((*cur).typ, XmlElementType::XmlHtmlDocumentNode))
     {
-        xmlOutputBufferClose(buf);
+        xml_output_buffer_close(buf);
         return -1;
     }
     memset(addr_of_mut!(ctxt) as _, 0, size_of_val(&ctxt));
@@ -10144,7 +10145,7 @@ pub unsafe extern "C" fn xml_save_format_file_to(
     xmlSaveCtxtInit(addr_of_mut!(ctxt) as _);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xmlDocContentDumpOutput(addr_of_mut!(ctxt) as _, cur);
-    let ret: c_int = xmlOutputBufferClose(buf);
+    let ret: c_int = xml_output_buffer_close(buf);
     ret
 }
 
@@ -10249,7 +10250,7 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
 
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
-        xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFilename},
+        xml_io::{xml_output_buffer_close, xml_output_buffer_create_filename},
         xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
     };
 
@@ -10281,7 +10282,7 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
      * save the content to a temp buffer.
      */
     let buf: XmlOutputBufferPtr =
-        xmlOutputBufferCreateFilename(filename, handler, (*cur).compression);
+        xml_output_buffer_create_filename(filename, handler, (*cur).compression);
     if buf.is_null() {
         return -1;
     }
@@ -10295,7 +10296,7 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
 
     xmlDocContentDumpOutput(addr_of_mut!(ctxt) as _, cur);
 
-    let ret: c_int = xmlOutputBufferClose(buf);
+    let ret: c_int = xml_output_buffer_close(buf);
     ret
 }
 

@@ -29,8 +29,8 @@ use super::{
     },
     uri::{xml_build_uri, xml_free_uri, xml_parse_uri, XmlURIPtr},
     xml_io::{
-        xmlAllocOutputBuffer, xmlOutputBufferClose, xmlOutputBufferCreateFilename,
-        xmlOutputBufferFlush, xmlOutputBufferWriteString, XmlOutputBufferPtr,
+        xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_create_filename,
+        xml_output_buffer_flush, xml_output_buffer_write_string, XmlOutputBufferPtr,
     },
     xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcat, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
@@ -317,7 +317,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     /*
      * create memory buffer with UTF8 (default) encoding
      */
-    let buf: XmlOutputBufferPtr = xmlAllocOutputBuffer(null_mut());
+    let buf: XmlOutputBufferPtr = xml_alloc_output_buffer(null_mut());
     if buf.is_null() {
         xml_c14n_err_memory(c"creating output buffer".as_ptr() as _);
         return -1;
@@ -329,7 +329,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     ret = xml_c14n_doc_save_to(doc, nodes, mode, inclusive_ns_prefixes, with_comments, buf);
     if ret < 0 {
         xml_c14n_err_internal(c"saving doc to output buffer".as_ptr() as _);
-        xmlOutputBufferClose(buf);
+        xml_output_buffer_close(buf);
         return -1;
     }
 
@@ -337,7 +337,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     if ret >= 0 {
         *doc_txt_ptr = xml_strndup(xml_buf_content((*buf).buffer), ret);
     }
-    xmlOutputBufferClose(buf);
+    xml_output_buffer_close(buf);
 
     if (*doc_txt_ptr).is_null() && ret >= 0 {
         xml_c14n_err_memory(c"copying canonicalized document".as_ptr() as _);
@@ -392,7 +392,8 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
     /*
      * save the content to a temp buffer, use default UTF8 encoding.
      */
-    let buf: XmlOutputBufferPtr = xmlOutputBufferCreateFilename(filename, null_mut(), compression);
+    let buf: XmlOutputBufferPtr =
+        xml_output_buffer_create_filename(filename, null_mut(), compression);
     if buf.is_null() {
         xml_c14n_err_internal(c"creating temporary filename".as_ptr() as _);
         return -1;
@@ -404,14 +405,14 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
     ret = xml_c14n_doc_save_to(doc, nodes, mode, inclusive_ns_prefixes, with_comments, buf);
     if ret < 0 {
         xml_c14n_err_internal(c"canonize document to buffer".as_ptr() as _);
-        xmlOutputBufferClose(buf);
+        xml_output_buffer_close(buf);
         return -1;
     }
 
     /*
      * get the numbers of bytes written
      */
-    ret = xmlOutputBufferClose(buf);
+    ret = xml_output_buffer_close(buf);
     ret
 }
 
@@ -944,16 +945,16 @@ unsafe extern "C" fn xml_c14n_print_namespaces(ns: XmlNsPtr, ctx: XmlC14NCtxPtr)
     }
 
     if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
-        xmlOutputBufferWriteString((*ctx).buf, c" xmlns:".as_ptr() as _);
-        xmlOutputBufferWriteString((*ctx).buf, (*ns).prefix.load(Ordering::Relaxed) as _);
-        xmlOutputBufferWriteString((*ctx).buf, c"=".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, c" xmlns:".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, (*ns).prefix.load(Ordering::Relaxed) as _);
+        xml_output_buffer_write_string((*ctx).buf, c"=".as_ptr() as _);
     } else {
-        xmlOutputBufferWriteString((*ctx).buf, c" xmlns=".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, c" xmlns=".as_ptr() as _);
     }
     if !(*ns).href.load(Ordering::Relaxed).is_null() {
         xml_buf_write_quoted_string((*(*ctx).buf).buffer, (*ns).href.load(Ordering::Relaxed));
     } else {
-        xmlOutputBufferWriteString((*ctx).buf, c"\"\"".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, c"\"\"".as_ptr() as _);
     }
     1
 }
@@ -1736,16 +1737,16 @@ unsafe extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void
         return 0;
     }
 
-    xmlOutputBufferWriteString((*ctx).buf, c" ".as_ptr() as _);
+    xml_output_buffer_write_string((*ctx).buf, c" ".as_ptr() as _);
     if !(*attr).ns.is_null() && xml_strlen((*(*attr).ns).prefix.load(Ordering::Relaxed)) > 0 {
-        xmlOutputBufferWriteString(
+        xml_output_buffer_write_string(
             (*ctx).buf,
             (*(*attr).ns).prefix.load(Ordering::Relaxed) as _,
         );
-        xmlOutputBufferWriteString((*ctx).buf, c":".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, c":".as_ptr() as _);
     }
-    xmlOutputBufferWriteString((*ctx).buf, (*attr).name as _);
-    xmlOutputBufferWriteString((*ctx).buf, c"=\"".as_ptr() as _);
+    xml_output_buffer_write_string((*ctx).buf, (*attr).name as _);
+    xml_output_buffer_write_string((*ctx).buf, c"=\"".as_ptr() as _);
 
     let value: *mut XmlChar = xml_node_list_get_string((*ctx).doc, (*attr).children, 1);
     /* todo: should we log an error if value==NULL ? */
@@ -1753,14 +1754,14 @@ unsafe extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void
         buffer = xml_c11n_normalize_attr(value);
         xml_free(value as _);
         if !buffer.is_null() {
-            xmlOutputBufferWriteString((*ctx).buf, buffer as _);
+            xml_output_buffer_write_string((*ctx).buf, buffer as _);
             xml_free(buffer as _);
         } else {
             xml_c14n_err_internal(c"normalizing attributes axis".as_ptr() as _);
             return 0;
         }
     }
-    xmlOutputBufferWriteString((*ctx).buf, c"\"".as_ptr() as _);
+    xml_output_buffer_write_string((*ctx).buf, c"\"".as_ptr() as _);
     1
 }
 
@@ -2108,17 +2109,17 @@ unsafe extern "C" fn xml_c14n_process_element_node(
             (*ctx).parent_is_doc = 0;
             (*ctx).pos = XmlC14NPosition::XmlC14NInsideDocumentElement;
         }
-        xmlOutputBufferWriteString((*ctx).buf, c"<".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, c"<".as_ptr() as _);
 
         if !(*cur).ns.is_null() && xml_strlen((*(*cur).ns).prefix.load(Ordering::Relaxed) as _) > 0
         {
-            xmlOutputBufferWriteString(
+            xml_output_buffer_write_string(
                 (*ctx).buf,
                 (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
             );
-            xmlOutputBufferWriteString((*ctx).buf, c":".as_ptr() as _);
+            xml_output_buffer_write_string((*ctx).buf, c":".as_ptr() as _);
         }
-        xmlOutputBufferWriteString((*ctx).buf, (*cur).name as _);
+        xml_output_buffer_write_string((*ctx).buf, (*cur).name as _);
     }
 
     if !xmlC14NIsExclusive!(ctx) {
@@ -2142,7 +2143,7 @@ unsafe extern "C" fn xml_c14n_process_element_node(
     }
 
     if visible != 0 {
-        xmlOutputBufferWriteString((*ctx).buf, c">".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, c">".as_ptr() as _);
     }
     if !(*cur).children.is_null() {
         ret = xml_c14n_process_node_list(ctx, (*cur).children);
@@ -2152,16 +2153,16 @@ unsafe extern "C" fn xml_c14n_process_element_node(
         }
     }
     if visible != 0 {
-        xmlOutputBufferWriteString((*ctx).buf, c"</".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, c"</".as_ptr() as _);
         if !(*cur).ns.is_null() && xml_strlen((*(*cur).ns).prefix.load(Ordering::Relaxed)) > 0 {
-            xmlOutputBufferWriteString(
+            xml_output_buffer_write_string(
                 (*ctx).buf,
                 (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
             );
-            xmlOutputBufferWriteString((*ctx).buf, c":".as_ptr() as _);
+            xml_output_buffer_write_string((*ctx).buf, c":".as_ptr() as _);
         }
-        xmlOutputBufferWriteString((*ctx).buf, (*cur).name as _);
-        xmlOutputBufferWriteString((*ctx).buf, c">".as_ptr() as _);
+        xml_output_buffer_write_string((*ctx).buf, (*cur).name as _);
+        xml_output_buffer_write_string((*ctx).buf, c">".as_ptr() as _);
         if parent_is_doc != 0 {
             /* restore this flag from the stack for next node */
             (*ctx).parent_is_doc = parent_is_doc;
@@ -2281,7 +2282,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
             if visible != 0 && !(*cur).content.is_null() {
                 let buffer: *mut XmlChar = xml_c11n_normalize_text((*cur).content);
                 if !buffer.is_null() {
-                    xmlOutputBufferWriteString((*ctx).buf, buffer as _);
+                    xml_output_buffer_write_string((*ctx).buf, buffer as _);
                     xml_free(buffer as _);
                 } else {
                     xml_c14n_err_internal(c"normalizing text node".as_ptr() as _);
@@ -2304,19 +2305,19 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
              */
             if visible != 0 {
                 if matches!((*ctx).pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
-                    xmlOutputBufferWriteString((*ctx).buf, c"\x0A<?".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c"\x0A<?".as_ptr() as _);
                 } else {
-                    xmlOutputBufferWriteString((*ctx).buf, c"<?".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c"<?".as_ptr() as _);
                 }
 
-                xmlOutputBufferWriteString((*ctx).buf, (*cur).name as _);
+                xml_output_buffer_write_string((*ctx).buf, (*cur).name as _);
                 if !(*cur).content.is_null() && *(*cur).content != b'\0' {
-                    xmlOutputBufferWriteString((*ctx).buf, c" ".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c" ".as_ptr() as _);
 
                     /* todo: do we need to normalize pi? */
                     let buffer: *mut XmlChar = xml_c11n_normalize_pi((*cur).content);
                     if !buffer.is_null() {
-                        xmlOutputBufferWriteString((*ctx).buf, buffer as _);
+                        xml_output_buffer_write_string((*ctx).buf, buffer as _);
                         xml_free(buffer as _);
                     } else {
                         xml_c14n_err_internal(c"normalizing pi node".as_ptr() as _);
@@ -2325,9 +2326,9 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
                 }
 
                 if matches!((*ctx).pos, XmlC14NPosition::XmlC14NBeforeDocumentElement) {
-                    xmlOutputBufferWriteString((*ctx).buf, c"?>\x0A".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c"?>\x0A".as_ptr() as _);
                 } else {
-                    xmlOutputBufferWriteString((*ctx).buf, c"?>".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c"?>".as_ptr() as _);
                 }
             }
         }
@@ -2349,16 +2350,16 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
              */
             if visible != 0 && (*ctx).with_comments != 0 {
                 if matches!((*ctx).pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
-                    xmlOutputBufferWriteString((*ctx).buf, c"\x0A<!--".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c"\x0A<!--".as_ptr() as _);
                 } else {
-                    xmlOutputBufferWriteString((*ctx).buf, c"<!--".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c"<!--".as_ptr() as _);
                 }
 
                 if !(*cur).content.is_null() {
                     /* todo: do we need to normalize comment? */
                     let buffer: *mut XmlChar = xml_c11n_normalize_comment((*cur).content);
                     if !buffer.is_null() {
-                        xmlOutputBufferWriteString((*ctx).buf, buffer as _);
+                        xml_output_buffer_write_string((*ctx).buf, buffer as _);
                         xml_free(buffer as _);
                     } else {
                         xml_c14n_err_internal(c"normalizing comment node".as_ptr() as _);
@@ -2367,9 +2368,9 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
                 }
 
                 if matches!((*ctx).pos, XmlC14NPosition::XmlC14NBeforeDocumentElement) {
-                    xmlOutputBufferWriteString((*ctx).buf, c"-->\x0A".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c"-->\x0A".as_ptr() as _);
                 } else {
-                    xmlOutputBufferWriteString((*ctx).buf, c"-->".as_ptr() as _);
+                    xml_output_buffer_write_string((*ctx).buf, c"-->".as_ptr() as _);
                 }
             }
         }
@@ -2574,7 +2575,7 @@ pub unsafe extern "C" fn xml_c14n_execute(
     /*
      * Flush buffer to get number of bytes written
      */
-    ret = xmlOutputBufferFlush(buf);
+    ret = xml_output_buffer_flush(buf);
     if ret < 0 {
         xml_c14n_err_internal(c"flushing output buffer".as_ptr() as _);
         xml_c14n_free_ctx(ctx);

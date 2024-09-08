@@ -19,7 +19,9 @@ use crate::{
             XML_MAX_LOOKUP_LIMIT,
         },
         tree::xml_buf_shrink,
-        xml_io::{xmlFreeParserInputBuffer, xmlParserInputBufferGrow, XmlParserInputBufferPtr},
+        xml_io::{
+            xml_free_parser_input_buffer, xml_parser_input_buffer_grow, XmlParserInputBufferPtr,
+        },
         xmlerror::XmlParserErrors,
         xmlstring::XmlChar,
     },
@@ -185,7 +187,7 @@ pub unsafe extern "C" fn xml_halt_parser(ctxt: XmlParserCtxtPtr) {
             (*(*ctxt).input).free = None;
         }
         if !(*(*ctxt).input).buf.is_null() {
-            xmlFreeParserInputBuffer((*(*ctxt).input).buf);
+            xml_free_parser_input_buffer((*(*ctxt).input).buf);
             (*(*ctxt).input).buf = null_mut();
         }
         (*(*ctxt).input).cur = c"".as_ptr() as _;
@@ -230,7 +232,7 @@ pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
         return 0;
     }
 
-    let ret: c_int = xmlParserInputBufferGrow(buf, INPUT_CHUNK as _);
+    let ret: c_int = xml_parser_input_buffer_grow(buf, INPUT_CHUNK as _);
     xml_buf_set_input_base_cur((*buf).buffer, input, 0, cur_base as _);
 
     /* TODO: Get error code from xmlParserInputBufferGrow */

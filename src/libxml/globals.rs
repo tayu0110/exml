@@ -17,7 +17,9 @@ use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
-        xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr, __xmlOutputBufferCreateFilename},
+        xml_io::{
+            XmlOutputBufferPtr, XmlParserInputBufferPtr, __xml_output_buffer_create_filename,
+        },
         xmlerror::{XmlError, XmlGenericErrorFunc, XmlStructuredErrorFunc},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
@@ -40,7 +42,7 @@ use super::{
     },
     threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
-    xml_io::__xmlParserInputBufferCreateFilename,
+    xml_io::__xml_parser_input_buffer_create_filename,
     xmlerror::{
         xmlGenericErrorDefaultFunc, xmlParserError, xmlParserWarning, xmlResetError, XmlErrorPtr,
     },
@@ -113,7 +115,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_default(
 ) -> XmlParserInputBufferCreateFilenameFunc {
     let old: XmlParserInputBufferCreateFilenameFunc =
         _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
-            .unwrap_or(__xmlParserInputBufferCreateFilename);
+            .unwrap_or(__xml_parser_input_buffer_create_filename);
 
     _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE = func;
     old
@@ -613,7 +615,7 @@ pub unsafe extern "C" fn xml_thr_def_output_buffer_create_filename_default(
     #[cfg(feature = "output")]
     {
         if old.is_none() {
-            old = Some(__xmlOutputBufferCreateFilename);
+            old = Some(__xml_output_buffer_create_filename);
         }
     }
     XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = Some(func);
@@ -627,7 +629,7 @@ pub unsafe extern "C" fn xml_thr_def_parser_input_buffer_create_filename_default
 ) -> XmlParserInputBufferCreateFilenameFunc {
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let old = XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF
-        .unwrap_or(__xmlParserInputBufferCreateFilename);
+        .unwrap_or(__xml_parser_input_buffer_create_filename);
 
     XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = func;
     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));

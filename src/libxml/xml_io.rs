@@ -233,7 +233,7 @@ static XML_INPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
  * clears the entire input callback table. this includes the
  * compiled-in I/O.
  */
-pub unsafe extern "C" fn xmlCleanupInputCallbacks() {
+pub unsafe extern "C" fn xml_cleanup_input_callbacks() {
     let is_initialized = XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         return;
@@ -260,7 +260,7 @@ pub unsafe extern "C" fn xmlCleanupInputCallbacks() {
  *
  * Returns the number of input callback registered or -1 in case of error.
  */
-pub unsafe extern "C" fn xmlPopInputCallbacks() -> c_int {
+pub unsafe extern "C" fn xml_pop_input_callbacks() -> c_int {
     let is_initialized = XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         return -1;
@@ -286,16 +286,16 @@ pub unsafe extern "C" fn xmlPopInputCallbacks() -> c_int {
  *
  * Registers the default compiled-in I/O handlers.
  */
-pub unsafe extern "C" fn xmlRegisterDefaultInputCallbacks() {
+pub unsafe extern "C" fn xml_register_default_input_callbacks() {
     if XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return;
     }
 
-    xmlRegisterInputCallbacks(
-        Some(xmlFileMatch),
-        Some(xmlFileOpen),
-        Some(xmlFileRead),
-        Some(xmlFileClose),
+    xml_register_input_callbacks(
+        Some(xml_file_match),
+        Some(xml_file_open),
+        Some(xml_file_read),
+        Some(xml_file_close),
     );
     // #ifdef LIBXML_ZLIB_ENABLED
     //     xmlRegisterInputCallbacks(xmlGzfileMatch, xmlGzfileOpen,
@@ -307,20 +307,20 @@ pub unsafe extern "C" fn xmlRegisterDefaultInputCallbacks() {
     // #endif /* LIBXML_LZMA_ENABLED */
     #[cfg(feature = "http")]
     {
-        xmlRegisterInputCallbacks(
-            Some(xmlIOHTTPMatch),
-            Some(xmlIOHTTPOpen),
-            Some(xmlIOHTTPRead),
-            Some(xmlIOHTTPClose),
+        xml_register_input_callbacks(
+            Some(xml_io_http_match),
+            Some(xml_io_http_open),
+            Some(xml_io_http_read),
+            Some(xml_io_http_close),
         );
     }
     #[cfg(feature = "ftp")]
     {
-        xmlRegisterInputCallbacks(
-            Some(xmlIOFTPMatch),
-            Some(xmlIOFTPOpen),
-            Some(xmlIOFTPRead),
-            Some(xmlIOFTPClose),
+        xml_register_input_callbacks(
+            Some(xml_io_ftp_match),
+            Some(xml_io_ftp_open),
+            Some(xml_io_ftp_read),
+            Some(xml_io_ftp_close),
         );
     }
     XML_INPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
@@ -350,7 +350,7 @@ pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
  *
  * Returns the new parser input or NULL
  */
-pub unsafe extern "C" fn xmlAllocParserInputBuffer(
+pub unsafe extern "C" fn xml_alloc_parser_input_buffer(
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     let ret: XmlParserInputBufferPtr =
@@ -397,14 +397,14 @@ pub unsafe extern "C" fn xmlAllocParserInputBuffer(
  *
  * Returns the new parser input or NULL
  */
-pub unsafe extern "C" fn xmlParserInputBufferCreateFilename(
+pub unsafe extern "C" fn xml_parser_input_buffer_create_filename(
     uri: *const c_char,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
         return f(uri, enc);
     }
-    __xmlParserInputBufferCreateFilename(uri, enc)
+    __xml_parser_input_buffer_create_filename(uri, enc)
 }
 
 const IOERR: &[*const c_char] = &[
@@ -610,7 +610,7 @@ unsafe extern "C" fn xml_ioerr(code: c_int, extra: *const c_char) {
  *
  * Flush an I/O channel
  */
-unsafe extern "C" fn xmlFileFlush(context: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
     if context.is_null() {
         return -1;
     }
@@ -635,23 +635,23 @@ unsafe extern "C" fn xmlFileFlush(context: *mut c_void) -> c_int {
  *
  * Returns the new parser input or NULL
  */
-pub unsafe extern "C" fn xmlParserInputBufferCreateFile(
+pub unsafe extern "C" fn xml_parser_input_buffer_create_file(
     file: *mut FILE,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
-        xmlRegisterDefaultInputCallbacks();
+        xml_register_default_input_callbacks();
     }
 
     if file.is_null() {
         return null_mut();
     }
 
-    let ret: XmlParserInputBufferPtr = xmlAllocParserInputBuffer(enc);
+    let ret: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
     if !ret.is_null() {
         (*ret).context = file as _;
-        (*ret).readcallback = Some(xmlFileRead);
-        (*ret).closecallback = Some(xmlFileFlush);
+        (*ret).readcallback = Some(xml_file_read);
+        (*ret).closecallback = Some(xml_file_flush);
     }
 
     ret
@@ -667,7 +667,7 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateFile(
  *
  * Returns the number of bytes written
  */
-unsafe extern "C" fn xmlFdRead(context: *mut c_void, buffer: *mut c_char, len: c_int) -> c_int {
+unsafe extern "C" fn xml_fd_read(context: *mut c_void, buffer: *mut c_char, len: c_int) -> c_int {
     let ret: c_int = read(context as ptrdiff_t as c_int, buffer.add(0) as _, len as _) as _;
     if ret < 0 {
         xml_ioerr(0, c"read()".as_ptr() as _);
@@ -683,7 +683,7 @@ unsafe extern "C" fn xmlFdRead(context: *mut c_void, buffer: *mut c_char, len: c
  *
  * Returns 0 in case of success and error code otherwise
  */
-unsafe extern "C" fn xmlFdClose(context: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_fd_close(context: *mut c_void) -> c_int {
     let ret: c_int = close(context as ptrdiff_t as c_int);
     if ret < 0 {
         xml_ioerr(0, c"close()".as_ptr() as _);
@@ -701,7 +701,7 @@ unsafe extern "C" fn xmlFdClose(context: *mut c_void) -> c_int {
  *
  * Returns the new parser input or NULL
  */
-pub unsafe extern "C" fn xmlParserInputBufferCreateFd(
+pub unsafe extern "C" fn xml_parser_input_buffer_create_fd(
     fd: c_int,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
@@ -709,11 +709,11 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateFd(
         return null_mut();
     }
 
-    let ret: XmlParserInputBufferPtr = xmlAllocParserInputBuffer(enc);
+    let ret: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
     if !ret.is_null() {
         (*ret).context = fd as ptrdiff_t as *mut c_void;
-        (*ret).readcallback = Some(xmlFdRead);
-        (*ret).closecallback = Some(xmlFdClose);
+        (*ret).readcallback = Some(xml_fd_read);
+        (*ret).closecallback = Some(xml_fd_close);
     }
 
     ret
@@ -730,7 +730,7 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateFd(
  *
  * Returns the new parser input or NULL
  */
-pub unsafe extern "C" fn xmlParserInputBufferCreateMem(
+pub unsafe extern "C" fn xml_parser_input_buffer_create_mem(
     mem: *const c_char,
     size: c_int,
     enc: XmlCharEncoding,
@@ -744,14 +744,14 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateMem(
         return null_mut();
     }
 
-    let ret: XmlParserInputBufferPtr = xmlAllocParserInputBuffer(enc);
+    let ret: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
     if !ret.is_null() {
         (*ret).context = mem as _;
         (*ret).readcallback = None;
         (*ret).closecallback = None;
         errcode = xml_buf_add((*ret).buffer as _, mem as _, size);
         if errcode != 0 {
-            xmlFreeParserInputBuffer(ret);
+            xml_free_parser_input_buffer(ret);
             return null_mut();
         }
     }
@@ -770,12 +770,12 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateMem(
  * Returns the new parser input or NULL
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlParserInputBufferCreateStatic(
+pub unsafe extern "C" fn xml_parser_input_buffer_create_static(
     mem: *const c_char,
     size: c_int,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
-    xmlParserInputBufferCreateMem(mem, size, enc)
+    xml_parser_input_buffer_create_mem(mem, size, enc)
 }
 
 /**
@@ -790,7 +790,7 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateStatic(
  *
  * Returns the new parser input or NULL
  */
-pub unsafe extern "C" fn xmlParserInputBufferCreateIO(
+pub unsafe extern "C" fn xml_parser_input_buffer_create_io(
     ioread: Option<XmlInputReadCallback>,
     ioclose: Option<XmlInputCloseCallback>,
     ioctx: *mut c_void,
@@ -800,7 +800,7 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateIO(
         return null_mut();
     }
 
-    let ret: XmlParserInputBufferPtr = xmlAllocParserInputBuffer(enc);
+    let ret: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
     if !ret.is_null() {
         (*ret).context = ioctx as _;
         (*ret).readcallback = ioread;
@@ -822,11 +822,11 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateIO(
  * Returns the number of chars read and stored in the buffer, or -1
  *         in case of error.
  */
-pub unsafe extern "C" fn xmlParserInputBufferRead(
+pub unsafe extern "C" fn xml_parser_input_buffer_read(
     input: XmlParserInputBufferPtr,
     len: c_int,
 ) -> c_int {
-    xmlParserInputBufferGrow(input, len)
+    xml_parser_input_buffer_grow(input, len)
 }
 
 const MINLEN: usize = 4000;
@@ -837,7 +837,7 @@ const MINLEN: usize = 4000;
  * When reading from an Input channel indicated end of file or error
  * don't reread from it again.
  */
-unsafe extern "C" fn endOfInput(
+unsafe extern "C" fn end_of_input(
     _context: *mut c_void,
     _bufferr: *mut c_char,
     _len: c_int,
@@ -860,7 +860,7 @@ unsafe extern "C" fn endOfInput(
  * Returns the number of chars read and stored in the buffer, or -1
  *         in case of error.
  */
-pub unsafe extern "C" fn xmlParserInputBufferGrow(
+pub unsafe extern "C" fn xml_parser_input_buffer_grow(
     input: XmlParserInputBufferPtr,
     mut len: c_int,
 ) -> c_int {
@@ -898,7 +898,7 @@ pub unsafe extern "C" fn xmlParserInputBufferGrow(
 
         res = callback((*input).context, xml_buf_end(buf) as _, len);
         if res <= 0 {
-            (*input).readcallback = Some(endOfInput);
+            (*input).readcallback = Some(end_of_input);
         }
         if res < 0 {
             return -1;
@@ -958,7 +958,7 @@ pub unsafe extern "C" fn xmlParserInputBufferGrow(
  * Returns the number of chars read and stored in the buffer, or -1
  *         in case of error.
  */
-pub unsafe extern "C" fn xmlParserInputBufferPush(
+pub unsafe extern "C" fn xml_parser_input_buffer_push(
     input: XmlParserInputBufferPtr,
     len: c_int,
     buf: *const c_char,
@@ -1021,7 +1021,7 @@ pub unsafe extern "C" fn xmlParserInputBufferPush(
  *
  * Free up the memory used by a buffered parser input
  */
-pub unsafe extern "C" fn xmlFreeParserInputBuffer(input: XmlParserInputBufferPtr) {
+pub unsafe extern "C" fn xml_free_parser_input_buffer(input: XmlParserInputBufferPtr) {
     if input.is_null() {
         return;
     }
@@ -1052,13 +1052,13 @@ pub unsafe extern "C" fn xmlFreeParserInputBuffer(input: XmlParserInputBufferPtr
  *
  * Returns a new allocated string containing the directory, or NULL.
  */
-pub unsafe extern "C" fn xmlParserGetDirectory(filename: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *mut c_char {
     let mut ret: *mut c_char = null_mut();
     let mut dir: [c_char; 1024] = [0; 1024];
     let mut cur: *mut c_char;
 
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
-        xmlRegisterDefaultInputCallbacks();
+        xml_register_default_input_callbacks();
     }
 
     if filename.is_null() {
@@ -1108,7 +1108,7 @@ pub unsafe extern "C" fn xmlParserGetDirectory(filename: *const c_char) -> *mut 
  *
  * Returns the registered handler number or -1 in case of error
  */
-pub unsafe extern "C" fn xmlRegisterInputCallbacks(
+pub unsafe extern "C" fn xml_register_input_callbacks(
     match_func: Option<XmlInputMatchCallback>,
     open_func: Option<XmlInputOpenCallback>,
     read_func: Option<XmlInputReadCallback>,
@@ -1127,7 +1127,7 @@ pub unsafe extern "C" fn xmlRegisterInputCallbacks(
     num_callbacks as _
 }
 
-pub(crate) unsafe extern "C" fn __xmlParserInputBufferCreateFilename(
+pub(crate) unsafe extern "C" fn __xml_parser_input_buffer_create_filename(
     uri: *const c_char,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
@@ -1135,7 +1135,7 @@ pub(crate) unsafe extern "C" fn __xmlParserInputBufferCreateFilename(
     let mut context: *mut c_void = null_mut();
 
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-        xmlRegisterDefaultInputCallbacks();
+        xml_register_default_input_callbacks();
     }
 
     if uri.is_null() {
@@ -1159,7 +1159,7 @@ pub(crate) unsafe extern "C" fn __xmlParserInputBufferCreateFilename(
                     /*
                      * Allocate the Input buffer front-end.
                      */
-                    ret = xmlAllocParserInputBuffer(enc);
+                    ret = xml_alloc_parser_input_buffer(enc);
                     if !ret.is_null() {
                         (*ret).context = context;
                         (*ret).readcallback = XML_INPUT_CALLBACK_TABLE[i].readcallback;
@@ -1242,7 +1242,7 @@ static XML_OUTPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
  * compiled-in I/O callbacks.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlCleanupOutputCallbacks() {
+pub unsafe extern "C" fn xml_cleanup_output_callbacks() {
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         return;
@@ -1269,7 +1269,7 @@ pub unsafe extern "C" fn xmlCleanupOutputCallbacks() {
  * Returns the number of output callback registered or -1 in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlPopOutputCallbacks() -> c_int {
+pub unsafe extern "C" fn xml_pop_output_callbacks() -> c_int {
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return -1;
     }
@@ -1299,7 +1299,7 @@ pub unsafe extern "C" fn xmlPopOutputCallbacks() -> c_int {
  * Returns an I/O context or NULL in case of error
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xmlFileOpenW(filename: *const c_char) -> *mut c_void {
+unsafe extern "C" fn xml_file_open_w(filename: *const c_char) -> *mut c_void {
     let path: *const c_char;
     let fd: *mut FILE;
 
@@ -1363,7 +1363,7 @@ unsafe extern "C" fn xmlFileOpenW(filename: *const c_char) -> *mut c_void {
  * Returns the number of bytes written
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xmlFileWrite(
+unsafe extern "C" fn xml_file_write(
     context: *mut c_void,
     buffer: *const c_char,
     len: c_int,
@@ -1390,8 +1390,8 @@ unsafe extern "C" fn xmlFileWrite(
  * Returns a poc_inter to the new IO context.
  */
 #[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xmlIOHTTPDfltOpenW(post_uri: *const c_char) -> *mut c_void {
-    xmlIOHTTPOpenW(post_uri, 0)
+unsafe extern "C" fn xml_io_http_dflt_open_w(post_uri: *const c_char) -> *mut c_void {
+    xml_io_http_open_w(post_uri, 0)
 }
 
 #[cfg(all(feature = "output", feature = "http"))]
@@ -1416,7 +1416,7 @@ pub struct XmlIOHTTPWriteCtxt {
  * Returns number of bytes written.
  */
 #[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xmlIOHTTPWrite(
+unsafe extern "C" fn xml_io_http_write(
     context: *mut c_void,
     buffer: *const c_char,
     mut len: c_int,
@@ -1436,7 +1436,7 @@ unsafe extern "C" fn xmlIOHTTPWrite(
 
         //      else
         //  #endif
-        len = xmlOutputBufferWrite((*ctxt).doc_buff as _, len, buffer);
+        len = xml_output_buffer_write((*ctxt).doc_buff as _, len, buffer);
 
         if len < 0 {
             let mut msg: [XmlChar; 500] = [0; 500];
@@ -1464,7 +1464,7 @@ unsafe extern "C" fn xmlIOHTTPWrite(
  * No return value.
  */
 #[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xmlFreeHTTPWriteCtxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
+unsafe extern "C" fn xml_free_http_write_ctxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
     if !(*ctxt).uri.is_null() {
         xml_free((*ctxt).uri as _);
     }
@@ -1477,7 +1477,7 @@ unsafe extern "C" fn xmlFreeHTTPWriteCtxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
         // 	else
         // #endif
         {
-            xmlOutputBufferClose((*ctxt).doc_buff as _);
+            xml_output_buffer_close((*ctxt).doc_buff as _);
         }
     }
 
@@ -1492,7 +1492,10 @@ unsafe extern "C" fn xmlFreeHTTPWriteCtxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
  * Close the transmit HTTP I/O channel and actually send the data.
  */
 #[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xmlIOHTTPCloseWrite(context: *mut c_void, http_mthd: *const c_char) -> c_int {
+unsafe extern "C" fn xml_io_http_close_write(
+    context: *mut c_void,
+    http_mthd: *const c_char,
+) -> c_int {
     let mut close_rc: c_int = -1;
     let http_rtn: c_int;
     let content_lgth: c_int;
@@ -1622,7 +1625,7 @@ unsafe extern "C" fn xmlIOHTTPCloseWrite(context: *mut c_void, http_mthd: *const
 
     /*  Final cleanups  */
 
-    xmlFreeHTTPWriteCtxt(ctxt);
+    xml_free_http_write_ctxt(ctxt);
 
     close_rc
 }
@@ -1636,8 +1639,8 @@ unsafe extern "C" fn xmlIOHTTPCloseWrite(context: *mut c_void, http_mthd: *const
  * HTTP method.
  */
 #[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xmlIOHTTPClosePut(ctxt: *mut c_void) -> c_int {
-    xmlIOHTTPCloseWrite(ctxt, c"PUT".as_ptr() as _)
+unsafe extern "C" fn xml_io_http_close_put(ctxt: *mut c_void) -> c_int {
+    xml_io_http_close_write(ctxt, c"PUT".as_ptr() as _)
 }
 
 /**
@@ -1646,25 +1649,25 @@ unsafe extern "C" fn xmlIOHTTPClosePut(ctxt: *mut c_void) -> c_int {
  * Registers the default compiled-in I/O handlers.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlRegisterDefaultOutputCallbacks() {
+pub unsafe extern "C" fn xml_register_default_output_callbacks() {
     if XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return;
     }
 
-    xmlRegisterOutputCallbacks(
-        Some(xmlFileMatch),
-        Some(xmlFileOpenW),
-        Some(xmlFileWrite),
-        Some(xmlFileClose),
+    xml_register_output_callbacks(
+        Some(xml_file_match),
+        Some(xml_file_open_w),
+        Some(xml_file_write),
+        Some(xml_file_close),
     );
 
     #[cfg(feature = "http")]
     {
-        xmlRegisterOutputCallbacks(
-            Some(xmlIOHTTPMatch),
-            Some(xmlIOHTTPDfltOpenW),
-            Some(xmlIOHTTPWrite),
-            Some(xmlIOHTTPClosePut),
+        xml_register_output_callbacks(
+            Some(xml_io_http_match),
+            Some(xml_io_http_dflt_open_w),
+            Some(xml_io_http_write),
+            Some(xml_io_http_close_put),
         );
     }
 
@@ -1696,7 +1699,7 @@ pub unsafe extern "C" fn xmlRegisterDefaultOutputCallbacks() {
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlAllocOutputBuffer(
+pub unsafe extern "C" fn xml_alloc_output_buffer(
     encoder: XmlCharEncodingHandlerPtr,
 ) -> XmlOutputBufferPtr {
     let ret: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as XmlOutputBufferPtr;
@@ -1755,7 +1758,7 @@ pub unsafe extern "C" fn xmlAllocOutputBuffer(
  * Returns the new output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferCreateFilename(
+pub unsafe extern "C" fn xml_output_buffer_create_filename(
     uri: *const c_char,
     encoder: XmlCharEncodingHandlerPtr,
     compression: c_int,
@@ -1764,7 +1767,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFilename(
     //     return f(uri, encoder, compression);
     // }
     xml_output_buffer_create_filename_value(uri, encoder, compression);
-    __xmlOutputBufferCreateFilename(uri, encoder, compression)
+    __xml_output_buffer_create_filename(uri, encoder, compression)
 }
 
 /**
@@ -1778,23 +1781,23 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFilename(
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferCreateFile(
+pub unsafe extern "C" fn xml_output_buffer_create_file(
     file: *mut FILE,
     encoder: XmlCharEncodingHandlerPtr,
 ) -> XmlOutputBufferPtr {
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-        xmlRegisterDefaultOutputCallbacks();
+        xml_register_default_output_callbacks();
     }
 
     if file.is_null() {
         return null_mut();
     }
 
-    let ret: XmlOutputBufferPtr = xmlAllocOutputBufferInternal(encoder);
+    let ret: XmlOutputBufferPtr = xml_alloc_output_buffer_internal(encoder);
     if !ret.is_null() {
         (*ret).context = file as _;
-        (*ret).writecallback = Some(xmlFileWrite);
-        (*ret).closecallback = Some(xmlFileFlush);
+        (*ret).writecallback = Some(xml_file_write);
+        (*ret).closecallback = Some(xml_file_flush);
     }
 
     ret
@@ -1811,7 +1814,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFile(
  * Returns the number of bytes written
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xmlBufferWrite(
+unsafe extern "C" fn xml_buffer_write(
     context: *mut c_void,
     buffer: *const c_char,
     len: c_int,
@@ -1833,7 +1836,7 @@ unsafe extern "C" fn xmlBufferWrite(
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferCreateBuffer(
+pub unsafe extern "C" fn xml_output_buffer_create_buffer(
     buffer: XmlBufferPtr,
     encoder: XmlCharEncodingHandlerPtr,
 ) -> XmlOutputBufferPtr {
@@ -1842,7 +1845,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateBuffer(
     }
 
     let ret: XmlOutputBufferPtr =
-        xmlOutputBufferCreateIO(Some(xmlBufferWrite), None, buffer as _, encoder);
+        xml_output_buffer_create_io(Some(xml_buffer_write), None, buffer as _, encoder);
 
     ret
 }
@@ -1858,7 +1861,11 @@ pub unsafe extern "C" fn xmlOutputBufferCreateBuffer(
  * Returns the number of bytes written
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xmlFdWrite(context: *mut c_void, buffer: *const c_char, len: c_int) -> c_int {
+unsafe extern "C" fn xml_fd_write(
+    context: *mut c_void,
+    buffer: *const c_char,
+    len: c_int,
+) -> c_int {
     let mut ret: c_int = 0;
 
     if len > 0 {
@@ -1881,7 +1888,7 @@ unsafe extern "C" fn xmlFdWrite(context: *mut c_void, buffer: *const c_char, len
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferCreateFd(
+pub unsafe extern "C" fn xml_output_buffer_create_fd(
     fd: c_int,
     encoder: XmlCharEncodingHandlerPtr,
 ) -> XmlOutputBufferPtr {
@@ -1889,10 +1896,10 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFd(
         return null_mut();
     }
 
-    let ret: XmlOutputBufferPtr = xmlAllocOutputBufferInternal(encoder);
+    let ret: XmlOutputBufferPtr = xml_alloc_output_buffer_internal(encoder);
     if !ret.is_null() {
         (*ret).context = fd as ptrdiff_t as *mut c_void;
-        (*ret).writecallback = Some(xmlFdWrite);
+        (*ret).writecallback = Some(xml_fd_write);
         (*ret).closecallback = None;
     }
 
@@ -1912,7 +1919,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFd(
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferCreateIO(
+pub unsafe extern "C" fn xml_output_buffer_create_io(
     iowrite: Option<XmlOutputWriteCallback>,
     ioclose: Option<XmlOutputCloseCallback>,
     ioctx: *mut c_void,
@@ -1922,7 +1929,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateIO(
         return null_mut();
     }
 
-    let ret: XmlOutputBufferPtr = xmlAllocOutputBufferInternal(encoder);
+    let ret: XmlOutputBufferPtr = xml_alloc_output_buffer_internal(encoder);
     if !ret.is_null() {
         (*ret).context = ioctx;
         (*ret).writecallback = iowrite;
@@ -1942,7 +1949,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateIO(
  * Returns a poc_inter to the data or NULL in case of error
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferGetContent(out: XmlOutputBufferPtr) -> *const XmlChar {
+pub unsafe extern "C" fn xml_output_buffer_get_content(out: XmlOutputBufferPtr) -> *const XmlChar {
     if out.is_null() || (*out).buffer.is_null() {
         return null_mut();
     }
@@ -1959,7 +1966,7 @@ pub unsafe extern "C" fn xmlOutputBufferGetContent(out: XmlOutputBufferPtr) -> *
  * Returns 0 in case or error or no data is held, the size otherwise
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferGetSize(out: XmlOutputBufferPtr) -> size_t {
+pub unsafe extern "C" fn xml_output_buffer_get_size(out: XmlOutputBufferPtr) -> size_t {
     if out.is_null() || (*out).buffer.is_null() {
         return 0;
     }
@@ -1982,7 +1989,7 @@ pub unsafe extern "C" fn xmlOutputBufferGetSize(out: XmlOutputBufferPtr) -> size
  *         in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferWrite(
+pub unsafe extern "C" fn xml_output_buffer_write(
     out: XmlOutputBufferPtr,
     mut len: c_int,
     mut buf: *const c_char,
@@ -2114,7 +2121,7 @@ pub unsafe extern "C" fn xmlOutputBufferWrite(
  *         in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferWriteString(
+pub unsafe extern "C" fn xml_output_buffer_write_string(
     out: XmlOutputBufferPtr,
     str: *const c_char,
 ) -> c_int {
@@ -2127,7 +2134,7 @@ pub unsafe extern "C" fn xmlOutputBufferWriteString(
     let len: c_int = strlen(str) as _;
 
     if len > 0 {
-        return xmlOutputBufferWrite(out, len, str);
+        return xml_output_buffer_write(out, len, str);
     }
     len
 }
@@ -2146,7 +2153,7 @@ pub unsafe extern "C" fn xmlOutputBufferWriteString(
  * The value of @outlen after return is the number of octets consumed.
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xmlEscapeContent(
+unsafe extern "C" fn xml_escape_content(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const XmlChar,
@@ -2238,7 +2245,7 @@ unsafe extern "C" fn xmlEscapeContent(
  *         in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferWriteEscape(
+pub unsafe extern "C" fn xml_output_buffer_write_escape(
     out: XmlOutputBufferPtr,
     mut str: *const XmlChar,
     escaping: Option<XmlCharEncodingOutputFunc>,
@@ -2262,7 +2269,7 @@ pub unsafe extern "C" fn xmlOutputBufferWriteEscape(
         return -1;
     }
 
-    let escaping = escaping.unwrap_or(xmlEscapeContent);
+    let escaping = escaping.unwrap_or(xml_escape_content);
 
     loop {
         oldwritten = written;
@@ -2417,7 +2424,7 @@ pub unsafe extern "C" fn xmlOutputBufferWriteEscape(
  * Returns the number of byte written or -1 in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferFlush(out: XmlOutputBufferPtr) -> c_int {
+pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_int {
     let mut nbchars: c_int;
     let mut ret: c_int = 0;
 
@@ -2493,14 +2500,14 @@ pub unsafe extern "C" fn xmlOutputBufferFlush(out: XmlOutputBufferPtr) -> c_int 
  * Returns the number of byte written or -1 in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlOutputBufferClose(out: XmlOutputBufferPtr) -> c_int {
+pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_int {
     let mut err_rc: c_int = 0;
 
     if out.is_null() {
         return -1;
     }
     if (*out).writecallback.is_some() {
-        xmlOutputBufferFlush(out);
+        xml_output_buffer_flush(out);
     }
     if let Some(closecallback) = (*out).closecallback {
         err_rc = closecallback((*out).context);
@@ -2541,7 +2548,7 @@ pub unsafe extern "C" fn xmlOutputBufferClose(out: XmlOutputBufferPtr) -> c_int 
  * Returns the registered handler number or -1 in case of error
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlRegisterOutputCallbacks(
+pub unsafe extern "C" fn xml_register_output_callbacks(
     match_func: Option<XmlOutputMatchCallback>,
     open_func: Option<XmlOutputOpenCallback>,
     write_func: Option<XmlOutputWriteCallback>,
@@ -2569,7 +2576,7 @@ pub unsafe extern "C" fn xmlRegisterOutputCallbacks(
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub(crate) unsafe extern "C" fn xmlAllocOutputBufferInternal(
+pub(crate) unsafe extern "C" fn xml_alloc_output_buffer_internal(
     encoder: XmlCharEncodingHandlerPtr,
 ) -> XmlOutputBufferPtr {
     let ret: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as XmlOutputBufferPtr;
@@ -2614,7 +2621,7 @@ pub(crate) unsafe extern "C" fn xmlAllocOutputBufferInternal(
 }
 
 #[cfg(feature = "output")]
-pub(crate) unsafe extern "C" fn __xmlOutputBufferCreateFilename(
+pub(crate) unsafe extern "C" fn __xml_output_buffer_create_filename(
     uri: *const c_char,
     encoder: XmlCharEncodingHandlerPtr,
     _compression: c_int,
@@ -2629,7 +2636,7 @@ pub(crate) unsafe extern "C" fn __xmlOutputBufferCreateFilename(
 
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
-        xmlRegisterDefaultOutputCallbacks();
+        xml_register_default_output_callbacks();
     }
 
     if uri.is_null() {
@@ -2697,7 +2704,7 @@ pub(crate) unsafe extern "C" fn __xmlOutputBufferCreateFilename(
                     /*
                      * Allocate the Output buffer front-end.
                      */
-                    ret = xmlAllocOutputBufferInternal(encoder);
+                    ret = xml_alloc_output_buffer_internal(encoder);
                     if !ret.is_null() {
                         (*ret).context = context;
                         (*ret).writecallback = XML_OUTPUT_CALLBACK_TABLE[i].writecallback;
@@ -2750,7 +2757,7 @@ pub(crate) unsafe extern "C" fn __xmlOutputBufferCreateFilename(
                     /*
                      * Allocate the Output buffer front-end.
                      */
-                    ret = xmlAllocOutputBufferInternal(encoder);
+                    ret = xml_alloc_output_buffer_internal(encoder);
                     if !ret.is_null() {
                         (*ret).context = context;
                         (*ret).writecallback = XML_OUTPUT_CALLBACK_TABLE[i].writecallback;
@@ -2774,8 +2781,8 @@ pub(crate) unsafe extern "C" fn __xmlOutputBufferCreateFilename(
  * HTTP method.
  */
 #[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xmlIOHTTPClosePost(ctxt: *mut c_void) -> c_int {
-    xmlIOHTTPCloseWrite(ctxt, c"POST".as_ptr() as _)
+unsafe extern "C" fn xml_io_http_close_post(ctxt: *mut c_void) -> c_int {
+    xml_io_http_close_write(ctxt, c"POST".as_ptr() as _)
 }
 
 /*  This function only exists if HTTP support built into the library  */
@@ -2788,18 +2795,18 @@ unsafe extern "C" fn xmlIOHTTPClosePost(ctxt: *mut c_void) -> c_int {
  *
  */
 #[cfg(all(feature = "output", feature = "http"))]
-pub unsafe extern "C" fn xmlRegisterHTTPPostCallbacks() {
+pub unsafe extern "C" fn xml_register_http_post_callbacks() {
     /*  Register defaults if not done previously  */
 
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-        xmlRegisterDefaultOutputCallbacks();
+        xml_register_default_output_callbacks();
     }
 
-    xmlRegisterOutputCallbacks(
-        Some(xmlIOHTTPMatch),
-        Some(xmlIOHTTPDfltOpenW),
-        Some(xmlIOHTTPWrite),
-        Some(xmlIOHTTPClosePost),
+    xml_register_output_callbacks(
+        Some(xml_io_http_match),
+        Some(xml_io_http_dflt_open_w),
+        Some(xml_io_http_write),
+        Some(xml_io_http_close_post),
     );
 }
 
@@ -2873,7 +2880,7 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
  *
  * Returns the input or NULL in case of HTTP error.
  */
-pub unsafe extern "C" fn xmlCheckHTTPInput(
+pub unsafe extern "C" fn xml_check_http_input(
     ctxt: XmlParserCtxtPtr,
     mut ret: XmlParserInputPtr,
 ) -> XmlParserInputPtr {
@@ -2881,7 +2888,7 @@ pub unsafe extern "C" fn xmlCheckHTTPInput(
     {
         if !ret.is_null()
             && !(*ret).buf.is_null()
-            && (*(*ret).buf).readcallback == Some(xmlIOHTTPRead)
+            && (*(*ret).buf).readcallback == Some(xml_io_http_read)
             && !(*(*ret).buf).context.is_null()
         {
             let encoding: *const c_char;
@@ -2961,7 +2968,7 @@ pub unsafe extern "C" fn xmlCheckHTTPInput(
  *
  * Returns a new allocated xmlParserInputPtr, or NULL.
  */
-pub(crate) unsafe extern "C" fn xmlDefaultExternalEntityLoader(
+pub(crate) unsafe extern "C" fn xml_default_external_entity_loader(
     url: *const c_char,
     mut id: *const c_char,
     ctxt: XmlParserCtxtPtr,
@@ -2977,13 +2984,13 @@ pub(crate) unsafe extern "C" fn xmlDefaultExternalEntityLoader(
         let options: c_int = (*ctxt).options;
 
         (*ctxt).options -= XmlParserOption::XmlParseNonet as i32;
-        ret = xmlNoNetExternalEntityLoader(url, id, ctxt);
+        ret = xml_no_net_external_entity_loader(url, id, ctxt);
         (*ctxt).options = options;
         return ret;
     }
     #[cfg(feature = "catalog")]
     {
-        resource = xmlResolveResourceFromCatalog(url, id, ctxt);
+        resource = xml_resolve_resource_from_catalog(url, id, ctxt);
     }
 
     if resource.is_null() {
@@ -3008,7 +3015,7 @@ pub(crate) unsafe extern "C" fn xmlDefaultExternalEntityLoader(
     ret
 }
 
-pub(crate) unsafe extern "C" fn xmlNoNetExists(url: *const c_char) -> c_int {
+pub(crate) unsafe extern "C" fn xml_no_net_exists(url: *const c_char) -> c_int {
     let path: *const c_char;
 
     if url.is_null() {
@@ -3037,7 +3044,7 @@ pub(crate) unsafe extern "C" fn xmlNoNetExists(url: *const c_char) -> c_int {
         path = url;
     }
 
-    xmlCheckFilename(path)
+    xml_check_filename(path)
 }
 
 /**
@@ -3053,7 +3060,7 @@ pub(crate) unsafe extern "C" fn xmlNoNetExists(url: *const c_char) -> c_int {
  * Returns a new allocated URL, or NULL.
  */
 #[cfg(feature = "catalog")]
-unsafe extern "C" fn xmlResolveResourceFromCatalog(
+unsafe extern "C" fn xml_resolve_resource_from_catalog(
     url: *const c_char,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
@@ -3066,7 +3073,7 @@ unsafe extern "C" fn xmlResolveResourceFromCatalog(
      */
     let pref: XmlCatalogAllow = xml_catalog_get_defaults();
 
-    if !matches!(pref, XmlCatalogAllow::None) && xmlNoNetExists(url) == 0 {
+    if !matches!(pref, XmlCatalogAllow::None) && xml_no_net_exists(url) == 0 {
         /*
          * Do a local lookup
          */
@@ -3089,7 +3096,7 @@ unsafe extern "C" fn xmlResolveResourceFromCatalog(
         /*
          * TODO: do an URI lookup on the reference
          */
-        if !resource.is_null() && xmlNoNetExists(resource as _) == 0 {
+        if !resource.is_null() && xml_no_net_exists(resource as _) == 0 {
             let mut tmp: *mut XmlChar = null_mut();
 
             if !ctxt.is_null()
@@ -3126,7 +3133,7 @@ unsafe extern "C" fn xmlResolveResourceFromCatalog(
  *
  * Returns a new allocated xmlParserInputPtr, or NULL.
  */
-pub unsafe extern "C" fn xmlNoNetExternalEntityLoader(
+pub unsafe extern "C" fn xml_no_net_external_entity_loader(
     url: *const c_char,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
@@ -3135,7 +3142,7 @@ pub unsafe extern "C" fn xmlNoNetExternalEntityLoader(
 
     #[cfg(feature = "catalog")]
     {
-        resource = xmlResolveResourceFromCatalog(url, id, ctxt);
+        resource = xml_resolve_resource_from_catalog(url, id, ctxt);
     }
     #[cfg(not(feature = "catalog"))]
     {
@@ -3156,7 +3163,7 @@ pub unsafe extern "C" fn xmlNoNetExternalEntityLoader(
         }
         return null_mut();
     }
-    let input: XmlParserInputPtr = xmlDefaultExternalEntityLoader(resource as _, id, ctxt);
+    let input: XmlParserInputPtr = xml_default_external_entity_loader(resource as _, id, ctxt);
     if resource != url as _ {
         xml_free(resource as _);
     }
@@ -3176,7 +3183,7 @@ pub unsafe extern "C" fn xmlNoNetExternalEntityLoader(
  *
  * Returns a canonicalized version of the path
  */
-pub unsafe extern "C" fn xmlNormalizeWindowsPath(path: *const XmlChar) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_normalize_windows_path(path: *const XmlChar) -> *mut XmlChar {
     xml_canonic_path(path)
 }
 
@@ -3249,7 +3256,7 @@ macro_rules! S_ISDIR {
  * if stat succeeds and the file is a directory,
  * returns 2.  otherwise returns 1.
  */
-pub unsafe extern "C" fn xmlCheckFilename(path: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_check_filename(path: *const c_char) -> c_int {
     let mut stat_buffer: stat = unsafe { zeroed() };
     if path.is_null() {
         return 0;
@@ -3296,7 +3303,7 @@ pub unsafe extern "C" fn xmlCheckFilename(path: *const c_char) -> c_int {
  *
  * Returns 1 if matches, 0 otherwise
  */
-pub unsafe extern "C" fn xmlFileMatch(_filename: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_file_match(_filename: *const c_char) -> c_int {
     1
 }
 
@@ -3309,7 +3316,7 @@ pub unsafe extern "C" fn xmlFileMatch(_filename: *const c_char) -> c_int {
  *
  * Returns an I/O context or NULL in case of error
  */
-unsafe extern "C" fn xmlFileOpen_real(filename: *const c_char) -> *mut c_void {
+unsafe extern "C" fn xml_file_open_real(filename: *const c_char) -> *mut c_void {
     let mut path: *const c_char = filename;
     let fd: *mut FILE;
 
@@ -3358,7 +3365,7 @@ unsafe extern "C" fn xmlFileOpen_real(filename: *const c_char) -> *mut c_void {
 
     /* Do not check DDNAME on zOS ! */
     // #if !defined(__MVS__)
-    if xmlCheckFilename(path) == 0 {
+    if xml_check_filename(path) == 0 {
         return null_mut();
     }
     // #endif
@@ -3386,15 +3393,15 @@ unsafe extern "C" fn xmlFileOpen_real(filename: *const c_char) -> *mut c_void {
  *
  * Returns a handler or NULL in case or failure
  */
-pub unsafe extern "C" fn xmlFileOpen(filename: *const c_char) -> *mut c_void {
+pub unsafe extern "C" fn xml_file_open(filename: *const c_char) -> *mut c_void {
     let unescaped: *mut c_char;
     let mut retval: *mut c_void;
 
-    retval = xmlFileOpen_real(filename);
+    retval = xml_file_open_real(filename);
     if retval.is_null() {
         unescaped = xml_uri_unescape_string(filename, 0, null_mut());
         if !unescaped.is_null() {
-            retval = xmlFileOpen_real(unescaped);
+            retval = xml_file_open_real(unescaped);
             xml_free(unescaped as _);
         }
     }
@@ -3412,7 +3419,7 @@ pub unsafe extern "C" fn xmlFileOpen(filename: *const c_char) -> *mut c_void {
  *
  * Returns the number of bytes written or < 0 in case of failure
  */
-pub unsafe extern "C" fn xmlFileRead(
+pub unsafe extern "C" fn xml_file_read(
     context: *mut c_void,
     buffer: *mut c_char,
     len: c_int,
@@ -3435,7 +3442,7 @@ pub unsafe extern "C" fn xmlFileRead(
  *
  * Returns 0 or -1 in case of error
  */
-pub unsafe extern "C" fn xmlFileClose(context: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_file_close(context: *mut c_void) -> c_int {
     let ret: c_int;
 
     if context.is_null() {
@@ -3481,7 +3488,7 @@ pub unsafe extern "C" fn xmlFileClose(context: *mut c_void) -> c_int {
  * Returns 1 if matches, 0 otherwise
  */
 #[cfg(feature = "http")]
-pub unsafe extern "C" fn xmlIOHTTPMatch(filename: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_io_http_match(filename: *const c_char) -> c_int {
     if xml_strncasecmp(filename as _, c"http://".as_ptr() as _, 7) == 0 {
         return 1;
     }
@@ -3497,7 +3504,7 @@ pub unsafe extern "C" fn xmlIOHTTPMatch(filename: *const c_char) -> c_int {
  * Returns an I/O context or NULL in case of error
  */
 #[cfg(feature = "http")]
-pub unsafe extern "C" fn xmlIOHTTPOpen(filename: *const c_char) -> *mut c_void {
+pub unsafe extern "C" fn xml_io_http_open(filename: *const c_char) -> *mut c_void {
     xml_nanohttp_open(filename as _, null_mut())
 }
 
@@ -3512,7 +3519,7 @@ pub unsafe extern "C" fn xmlIOHTTPOpen(filename: *const c_char) -> *mut c_void {
  * Returns an I/O context or NULL in case of error.
  */
 #[cfg(all(feature = "http", feature = "output"))]
-pub unsafe extern "C" fn xmlIOHTTPOpenW(
+pub unsafe extern "C" fn xml_io_http_open_w(
     post_uri: *const c_char,
     _compression: c_int,
 ) -> *mut c_void {
@@ -3533,7 +3540,7 @@ pub unsafe extern "C" fn xmlIOHTTPOpenW(
     (*ctxt).uri = xml_strdup(post_uri as _) as _;
     if (*ctxt).uri.is_null() {
         xml_ioerr_memory(c"copying URI".as_ptr() as _);
-        xmlFreeHTTPWriteCtxt(ctxt);
+        xml_free_http_write_ctxt(ctxt);
         return null_mut();
     }
 
@@ -3552,11 +3559,11 @@ pub unsafe extern "C" fn xmlIOHTTPOpenW(
     {
         /*  Any character conversions should have been done before this  */
 
-        (*ctxt).doc_buff = xmlAllocOutputBufferInternal(null_mut()) as _;
+        (*ctxt).doc_buff = xml_alloc_output_buffer_internal(null_mut()) as _;
     }
 
     if (*ctxt).doc_buff.is_null() {
-        xmlFreeHTTPWriteCtxt(ctxt);
+        xml_free_http_write_ctxt(ctxt);
         ctxt = null_mut();
     }
 
@@ -3574,7 +3581,7 @@ pub unsafe extern "C" fn xmlIOHTTPOpenW(
  * Returns the number of bytes written
  */
 #[cfg(feature = "http")]
-pub unsafe extern "C" fn xmlIOHTTPRead(
+pub unsafe extern "C" fn xml_io_http_read(
     context: *mut c_void,
     buffer: *mut c_char,
     len: c_int,
@@ -3594,7 +3601,7 @@ pub unsafe extern "C" fn xmlIOHTTPRead(
  * Returns 0
  */
 #[cfg(feature = "http")]
-pub unsafe extern "C" fn xmlIOHTTPClose(context: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_io_http_close(context: *mut c_void) -> c_int {
     xml_nanohttp_close(context);
     0
 }
@@ -3611,7 +3618,7 @@ pub unsafe extern "C" fn xmlIOHTTPClose(context: *mut c_void) -> c_int {
  * Returns 1 if matches, 0 otherwise
  */
 #[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xmlIOFTPMatch(filename: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_io_ftp_match(filename: *const c_char) -> c_int {
     if xml_strncasecmp(filename as _, c"ftp://".as_ptr() as _, 6) == 0 {
         return 1;
     }
@@ -3626,7 +3633,7 @@ pub unsafe extern "C" fn xmlIOFTPMatch(filename: *const c_char) -> c_int {
  * Returns an I/O context or NULL in case of error
  */
 #[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xmlIOFTPOpen(filename: *const c_char) -> *mut c_void {
+pub unsafe extern "C" fn xml_io_ftp_open(filename: *const c_char) -> *mut c_void {
     xml_nanoftp_open(filename)
 }
 
@@ -3641,7 +3648,7 @@ pub unsafe extern "C" fn xmlIOFTPOpen(filename: *const c_char) -> *mut c_void {
  * Returns the number of bytes written
  */
 #[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xmlIOFTPRead(
+pub unsafe extern "C" fn xml_io_ftp_read(
     context: *mut c_void,
     buffer: *mut c_char,
     len: c_int,
@@ -3661,7 +3668,7 @@ pub unsafe extern "C" fn xmlIOFTPRead(
  * Returns 0
  */
 #[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xmlIOFTPClose(context: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_io_ftp_close(context: *mut c_void) -> c_int {
     xml_nanoftp_close(context)
 }
 
@@ -3684,7 +3691,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 0);
 
-                let ret_val = xmlAllocOutputBuffer(encoder);
+                let ret_val = xml_alloc_output_buffer(encoder);
                 desret_xml_output_buffer_ptr(ret_val);
                 des_xml_char_encoding_handler_ptr(n_encoder, encoder, 0);
                 xmlResetLastError();
@@ -3713,7 +3720,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let enc = gen_xml_char_encoding(n_enc, 0);
 
-                let ret_val = xmlAllocParserInputBuffer(enc);
+                let ret_val = xml_alloc_parser_input_buffer(enc);
                 desret_xml_parser_input_buffer_ptr(ret_val);
                 des_xml_char_encoding(n_enc, enc, 0);
                 xmlResetLastError();
@@ -3742,7 +3749,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let path = gen_const_char_ptr(n_path, 0);
 
-                let ret_val = xmlCheckFilename(path);
+                let ret_val = xml_check_filename(path);
                 desret_int(ret_val);
                 des_const_char_ptr(n_path, path, 0);
                 xmlResetLastError();
@@ -3770,7 +3777,7 @@ mod tests {
                     let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
                     let ret = gen_xml_parser_input_ptr(n_ret, 1);
 
-                    let ret_val = xmlCheckHTTPInput(ctxt, ret);
+                    let ret_val = xml_check_http_input(ctxt, ret);
                     desret_xml_parser_input_ptr(ret_val);
                     des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_parser_input_ptr(n_ret, ret, 1);
@@ -3796,7 +3803,7 @@ mod tests {
             let mut leaks = 0;
             let mem_base = xml_mem_blocks();
 
-            xmlCleanupInputCallbacks();
+            xml_cleanup_input_callbacks();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -3820,7 +3827,7 @@ mod tests {
 
             let mem_base = xml_mem_blocks();
 
-            xmlCleanupOutputCallbacks();
+            xml_cleanup_output_callbacks();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -3845,7 +3852,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let context = gen_void_ptr(n_context, 0);
 
-                let ret_val = xmlFileClose(context);
+                let ret_val = xml_file_close(context);
                 desret_int(ret_val);
                 des_void_ptr(n_context, context, 0);
                 xmlResetLastError();
@@ -3871,7 +3878,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let filename = gen_filepath(n_filename, 0);
 
-                let ret_val = xmlFileMatch(filename);
+                let ret_val = xml_file_match(filename);
                 desret_int(ret_val);
                 des_filepath(n_filename, filename, 0);
                 xmlResetLastError();
@@ -3897,7 +3904,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let filename = gen_filepath(n_filename, 0);
 
-                let ret_val = xmlFileOpen(filename);
+                let ret_val = xml_file_open(filename);
                 desret_void_ptr(ret_val);
                 des_filepath(n_filename, filename, 0);
                 xmlResetLastError();
@@ -3927,7 +3934,7 @@ mod tests {
                         let buffer = gen_char_ptr(n_buffer, 1);
                         let len = gen_int(n_len, 2);
 
-                        let ret_val = xmlFileRead(context, buffer, len);
+                        let ret_val = xml_file_read(context, buffer, len);
                         desret_int(ret_val);
                         des_void_ptr(n_context, context, 0);
                         des_char_ptr(n_buffer, buffer, 1);
@@ -3960,7 +3967,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let context = gen_void_ptr(n_context, 0);
 
-                let ret_val = xmlIOFTPClose(context);
+                let ret_val = xml_io_ftp_close(context);
                 desret_int(ret_val);
                 des_void_ptr(n_context, context, 0);
                 xmlResetLastError();
@@ -3987,7 +3994,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let filename = gen_filepath(n_filename, 0);
 
-                let ret_val = xmlIOFTPMatch(filename);
+                let ret_val = xml_io_ftp_match(filename);
                 desret_int(ret_val);
                 des_filepath(n_filename, filename, 0);
                 xmlResetLastError();
@@ -4014,7 +4021,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let filename = gen_filepath(n_filename, 0);
 
-                let ret_val = xmlIOFTPOpen(filename);
+                let ret_val = xml_io_ftp_open(filename);
                 desret_void_ptr(ret_val);
                 des_filepath(n_filename, filename, 0);
                 xmlResetLastError();
@@ -4045,7 +4052,7 @@ mod tests {
                         let buffer = gen_char_ptr(n_buffer, 1);
                         let len = gen_int(n_len, 2);
 
-                        let ret_val = xmlIOFTPRead(context, buffer, len);
+                        let ret_val = xml_io_ftp_read(context, buffer, len);
                         desret_int(ret_val);
                         des_void_ptr(n_context, context, 0);
                         des_char_ptr(n_buffer, buffer, 1);
@@ -4078,7 +4085,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let context = gen_void_ptr(n_context, 0);
 
-                let ret_val = xmlIOHTTPClose(context);
+                let ret_val = xml_io_http_close(context);
                 desret_int(ret_val);
                 des_void_ptr(n_context, context, 0);
                 xmlResetLastError();
@@ -4105,7 +4112,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let filename = gen_filepath(n_filename, 0);
 
-                let ret_val = xmlIOHTTPMatch(filename);
+                let ret_val = xml_io_http_match(filename);
                 desret_int(ret_val);
                 des_filepath(n_filename, filename, 0);
                 xmlResetLastError();
@@ -4132,7 +4139,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let filename = gen_filepath(n_filename, 0);
 
-                let ret_val = xmlIOHTTPOpen(filename);
+                let ret_val = xml_io_http_open(filename);
                 desret_xml_nano_httpctxt_ptr(ret_val);
                 des_filepath(n_filename, filename, 0);
                 xmlResetLastError();
@@ -4163,7 +4170,7 @@ mod tests {
                         let buffer = gen_char_ptr(n_buffer, 1);
                         let len = gen_int(n_len, 2);
 
-                        let ret_val = xmlIOHTTPRead(context, buffer, len);
+                        let ret_val = xml_io_http_read(context, buffer, len);
                         desret_int(ret_val);
                         des_void_ptr(n_context, context, 0);
                         des_char_ptr(n_buffer, buffer, 1);
@@ -4199,7 +4206,7 @@ mod tests {
                         let id = gen_const_char_ptr(n_id, 1);
                         let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 2);
 
-                        let ret_val = xmlNoNetExternalEntityLoader(url, id, ctxt);
+                        let ret_val = xml_no_net_external_entity_loader(url, id, ctxt);
                         desret_xml_parser_input_ptr(ret_val);
                         des_filepath(n_url, url, 0);
                         des_const_char_ptr(n_id, id, 1);
@@ -4234,7 +4241,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let path = gen_const_xml_char_ptr(n_path, 0);
 
-                let ret_val = xmlNormalizeWindowsPath(path as *const XmlChar);
+                let ret_val = xml_normalize_windows_path(path as *const XmlChar);
                 desret_xml_char_ptr(ret_val);
                 des_const_xml_char_ptr(n_path, path, 0);
                 xmlResetLastError();
@@ -4266,7 +4273,7 @@ mod tests {
                     let buffer = gen_xml_buffer_ptr(n_buffer, 0);
                     let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
 
-                    let ret_val = xmlOutputBufferCreateBuffer(buffer, encoder);
+                    let ret_val = xml_output_buffer_create_buffer(buffer, encoder);
                     desret_xml_output_buffer_ptr(ret_val);
                     des_xml_buffer_ptr(n_buffer, buffer, 0);
                     des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
@@ -4301,7 +4308,7 @@ mod tests {
                     let fd = gen_int(n_fd, 0);
                     let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
 
-                    let ret_val = xmlOutputBufferCreateFd(fd, encoder);
+                    let ret_val = xml_output_buffer_create_fd(fd, encoder);
                     desret_xml_output_buffer_ptr(ret_val);
                     des_int(n_fd, fd, 0);
                     des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
@@ -4336,7 +4343,7 @@ mod tests {
                     let file = gen_file_ptr(n_file, 0);
                     let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
 
-                    let ret_val = xmlOutputBufferCreateFile(file, encoder);
+                    let ret_val = xml_output_buffer_create_file(file, encoder);
                     desret_xml_output_buffer_ptr(ret_val);
                     des_file_ptr(n_file, file, 0);
                     des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
@@ -4373,7 +4380,7 @@ mod tests {
                         let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
                         let compression = gen_int(n_compression, 2);
 
-                        let ret_val = xmlOutputBufferCreateFilename(uri, encoder, compression);
+                        let ret_val = xml_output_buffer_create_filename(uri, encoder, compression);
                         desret_xml_output_buffer_ptr(ret_val);
                         des_fileoutput(n_uri, uri, 0);
                         des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
@@ -4409,7 +4416,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let out = gen_xml_output_buffer_ptr(n_out, 0);
 
-                let ret_val = xmlOutputBufferFlush(out);
+                let ret_val = xml_output_buffer_flush(out);
                 desret_int(ret_val);
                 des_xml_output_buffer_ptr(n_out, out, 0);
                 xmlResetLastError();
@@ -4439,7 +4446,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let out = gen_xml_output_buffer_ptr(n_out, 0);
 
-                let ret_val = xmlOutputBufferGetContent(out);
+                let ret_val = xml_output_buffer_get_content(out);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_output_buffer_ptr(n_out, out, 0);
                 xmlResetLastError();
@@ -4482,7 +4489,7 @@ mod tests {
                             len = 0;
                         }
 
-                        let ret_val = xmlOutputBufferWrite(out, len, buf);
+                        let ret_val = xml_output_buffer_write(out, len, buf);
                         desret_int(ret_val);
                         des_xml_output_buffer_ptr(n_out, out, 0);
                         des_int(n_len, len, 1);
@@ -4526,7 +4533,7 @@ mod tests {
                     let out = gen_xml_output_buffer_ptr(n_out, 0);
                     let str = gen_const_char_ptr(n_str, 1);
 
-                    let ret_val = xmlOutputBufferWriteString(out, str);
+                    let ret_val = xml_output_buffer_write_string(out, str);
                     desret_int(ret_val);
                     des_xml_output_buffer_ptr(n_out, out, 0);
                     des_const_char_ptr(n_str, str, 1);
@@ -4569,7 +4576,7 @@ mod tests {
                         fd = -1;
                     }
 
-                    let ret_val = xmlParserInputBufferCreateFd(fd, enc);
+                    let ret_val = xml_parser_input_buffer_create_fd(fd, enc);
                     desret_xml_parser_input_buffer_ptr(ret_val);
                     des_int(n_fd, fd, 0);
                     des_xml_char_encoding(n_enc, enc, 1);
@@ -4603,7 +4610,7 @@ mod tests {
                     let file = gen_file_ptr(n_file, 0);
                     let enc = gen_xml_char_encoding(n_enc, 1);
 
-                    let ret_val = xmlParserInputBufferCreateFile(file, enc);
+                    let ret_val = xml_parser_input_buffer_create_file(file, enc);
                     desret_xml_parser_input_buffer_ptr(ret_val);
                     des_file_ptr(n_file, file, 0);
                     des_xml_char_encoding(n_enc, enc, 1);
@@ -4637,7 +4644,7 @@ mod tests {
                     let uri = gen_fileoutput(n_uri, 0);
                     let enc = gen_xml_char_encoding(n_enc, 1);
 
-                    let ret_val = xmlParserInputBufferCreateFilename(uri, enc);
+                    let ret_val = xml_parser_input_buffer_create_filename(uri, enc);
                     desret_xml_parser_input_buffer_ptr(ret_val);
                     des_fileoutput(n_uri, uri, 0);
                     des_xml_char_encoding(n_enc, enc, 1);
@@ -4676,7 +4683,7 @@ mod tests {
                             size = 0;
                         }
 
-                        let ret_val = xmlParserInputBufferCreateMem(mem, size, enc);
+                        let ret_val = xml_parser_input_buffer_create_mem(mem, size, enc);
                         desret_xml_parser_input_buffer_ptr(ret_val);
                         des_const_char_ptr(n_mem, mem, 0);
                         des_int(n_size, size, 1);
@@ -4718,7 +4725,7 @@ mod tests {
                             size = 0;
                         }
 
-                        let ret_val = xmlParserInputBufferCreateStatic(mem, size, enc);
+                        let ret_val = xml_parser_input_buffer_create_static(mem, size, enc);
                         desret_xml_parser_input_buffer_ptr(ret_val);
                         des_const_char_ptr(n_mem, mem, 0);
                         des_int(n_size, size, 1);
@@ -4755,7 +4762,7 @@ mod tests {
                     let input = gen_xml_parser_input_buffer_ptr(n_in, 0);
                     let len = gen_int(n_len, 1);
 
-                    let ret_val = xmlParserInputBufferGrow(input, len);
+                    let ret_val = xml_parser_input_buffer_grow(input, len);
                     desret_int(ret_val);
                     des_xml_parser_input_buffer_ptr(n_in, input, 0);
                     des_int(n_len, len, 1);
@@ -4794,7 +4801,7 @@ mod tests {
                             len = 0;
                         }
 
-                        let ret_val = xmlParserInputBufferPush(input, len, buf);
+                        let ret_val = xml_parser_input_buffer_push(input, len, buf);
                         desret_int(ret_val);
                         des_xml_parser_input_buffer_ptr(n_in, input, 0);
                         des_int(n_len, len, 1);
@@ -4831,7 +4838,7 @@ mod tests {
                     let input = gen_xml_parser_input_buffer_ptr(n_in, 0);
                     let len = gen_int(n_len, 1);
 
-                    let ret_val = xmlParserInputBufferRead(input, len);
+                    let ret_val = xml_parser_input_buffer_read(input, len);
                     desret_int(ret_val);
                     des_xml_parser_input_buffer_ptr(n_in, input, 0);
                     des_int(n_len, len, 1);
@@ -4860,7 +4867,7 @@ mod tests {
             let mut leaks = 0;
             let mem_base = xml_mem_blocks();
 
-            let ret_val = xmlPopInputCallbacks();
+            let ret_val = xml_pop_input_callbacks();
             desret_int(ret_val);
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
@@ -4885,7 +4892,7 @@ mod tests {
 
             let mem_base = xml_mem_blocks();
 
-            let ret_val = xmlPopOutputCallbacks();
+            let ret_val = xml_pop_output_callbacks();
             desret_int(ret_val);
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
@@ -4908,7 +4915,7 @@ mod tests {
             let mut leaks = 0;
             let mem_base = xml_mem_blocks();
 
-            xmlRegisterDefaultInputCallbacks();
+            xml_register_default_input_callbacks();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -4932,7 +4939,7 @@ mod tests {
 
             let mem_base = xml_mem_blocks();
 
-            xmlRegisterDefaultOutputCallbacks();
+            xml_register_default_output_callbacks();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -4956,7 +4963,7 @@ mod tests {
 
             let mem_base = xml_mem_blocks();
 
-            xmlRegisterHTTPPostCallbacks();
+            xml_register_http_post_callbacks();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;

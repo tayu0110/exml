@@ -13,7 +13,9 @@ use exml::libxml::{
     },
     parser_internals::{input_push, xml_current_char, xml_new_input_stream},
     tree::{xml_buf_content, xml_free_doc, XmlDocPtr},
-    xml_io::{xmlFreeParserInputBuffer, xmlParserInputBufferCreateMem, XmlParserInputBufferPtr},
+    xml_io::{
+        xml_free_parser_input_buffer, xml_parser_input_buffer_create_mem, XmlParserInputBufferPtr,
+    },
     xmlerror::{xmlSetStructuredErrorFunc, XmlErrorPtr, XmlParserErrors},
     xmlmemory::xml_memory_dump,
     xmlstring::XmlChar,
@@ -735,7 +737,7 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
      */
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     assert!(!ctxt.is_null(), "Failed to allocate parser context");
-    let buf: XmlParserInputBufferPtr = xmlParserInputBufferCreateMem(
+    let buf: XmlParserInputBufferPtr = xml_parser_input_buffer_create_mem(
         data.as_mut_ptr(),
         data.len() as i32,
         XmlCharEncoding::XmlCharEncodingNone,
@@ -746,7 +748,7 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
     }
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
-        xmlFreeParserInputBuffer(buf);
+        xml_free_parser_input_buffer(buf);
         test_ret = 1;
         // goto error;
         xml_free_parser_ctxt(ctxt);

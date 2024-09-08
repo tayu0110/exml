@@ -76,8 +76,8 @@ use exml::{
         },
         xinclude::xml_xinclude_process_flags,
         xml_io::{
-            xmlFreeParserInputBuffer, xmlNoNetExternalEntityLoader,
-            xmlParserInputBufferCreateFilename, XmlParserInputBufferPtr,
+            xml_free_parser_input_buffer, xml_no_net_external_entity_loader,
+            xml_parser_input_buffer_create_filename, XmlParserInputBufferPtr,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
@@ -1707,8 +1707,10 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
     if f {
         #[cfg(feature = "schema")]
         {
-            let buf: XmlParserInputBufferPtr =
-                xmlParserInputBufferCreateFilename(filename, XmlCharEncoding::XmlCharEncodingNone);
+            let buf: XmlParserInputBufferPtr = xml_parser_input_buffer_create_filename(
+                filename,
+                XmlCharEncoding::XmlCharEncodingNone,
+            );
             if buf.is_null() {
                 return;
             }
@@ -1717,7 +1719,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
                 xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
             if vctxt.is_null() {
                 PROGRESULT = XmllintReturnCode::ErrMem;
-                xmlFreeParserInputBuffer(buf);
+                xml_free_parser_input_buffer(buf);
                 return;
             }
             xml_schema_set_valid_errors(
@@ -2114,7 +2116,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         PATSTREAM.store(null_mut(), Ordering::Relaxed);
     }
     if MEMORY != 0 {
-        xmlFreeParserInputBuffer(input);
+        xml_free_parser_input_buffer(input);
         munmap(base as _, info.st_size as _);
         close(fd);
     }
@@ -2240,7 +2242,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     use exml::libxml::{
         tree::{xml_node_dump_output, XmlNodePtr},
         xml_io::{
-            xmlOutputBufferClose, xmlOutputBufferCreateFile, xmlOutputBufferWrite,
+            xml_output_buffer_close, xml_output_buffer_create_file, xml_output_buffer_write,
             XmlOutputBufferPtr,
         },
         xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
@@ -2261,7 +2263,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     extern "C" {
                         static stdout: *mut FILE;
                     }
-                    buf = xmlOutputBufferCreateFile(stdout, null_mut());
+                    buf = xml_output_buffer_create_file(stdout, null_mut());
                     if buf.is_null() {
                         eprintln!("Out of memory for XPath");
                         PROGRESULT = XmllintReturnCode::ErrMem;
@@ -2270,9 +2272,9 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     for i in 0..(*(*cur).nodesetval).node_nr {
                         node = *(*(*cur).nodesetval).node_tab.add(i as usize);
                         xml_node_dump_output(buf, null_mut(), node, 0, 0, null_mut());
-                        xmlOutputBufferWrite(buf, 1, c"\n".as_ptr());
+                        xml_output_buffer_write(buf, 1, c"\n".as_ptr());
                     }
-                    xmlOutputBufferClose(buf);
+                    xml_output_buffer_close(buf);
                 }
             }
             #[cfg(not(feature = "output"))]
@@ -3982,7 +3984,7 @@ fn main() {
                 NOENT = 1;
             } else if arg == "-nonet" || arg == "--nonet" {
                 OPTIONS |= XmlParserOption::XmlParseNonet as i32;
-                xml_set_external_entity_loader(xmlNoNetExternalEntityLoader);
+                xml_set_external_entity_loader(xml_no_net_external_entity_loader);
             } else if arg == "-nocompact" || arg == "--nocompact" {
                 OPTIONS &= !(XmlParserOption::XmlParseCompact as i32);
             } else if arg == "-load-trace" || arg == "--load-trace" {

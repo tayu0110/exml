@@ -59,7 +59,10 @@ use exml::{
         },
         valid::xml_free_enumeration,
         xinclude::xml_xinclude_process_flags,
-        xml_io::{xmlNoNetExternalEntityLoader, xmlPopInputCallbacks, xmlRegisterInputCallbacks},
+        xml_io::{
+            xml_no_net_external_entity_loader, xml_pop_input_callbacks,
+            xml_register_input_callbacks,
+        },
         xmlerror::{
             xmlResetLastError, xmlSetGenericErrorFunc, xmlSetStructuredErrorFunc, XmlErrorDomain,
             XmlErrorLevel, XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors,
@@ -143,10 +146,10 @@ unsafe extern "C" fn test_external_entity_loader(
     let ret: XmlParserInputPtr;
 
     if check_test_file(url) != 0 {
-        ret = xmlNoNetExternalEntityLoader(url, id, ctxt);
+        ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
         let memused: c_int = xml_mem_used();
-        ret = xmlNoNetExternalEntityLoader(url, id, ctxt);
+        ret = xml_no_net_external_entity_loader(url, id, ctxt);
         EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
     }
 
@@ -4263,7 +4266,7 @@ unsafe extern "C" fn uri_path_test(
     /*
      * register the new I/O handlers
      */
-    if xmlRegisterInputCallbacks(
+    if xml_register_input_callbacks(
         Some(urip_match),
         Some(urip_open),
         Some(urip_read),
@@ -4295,7 +4298,7 @@ unsafe extern "C" fn uri_path_test(
         URIP_CURRENT += 1;
     }
 
-    xmlPopInputCallbacks();
+    xml_pop_input_callbacks();
     failures
 }
 

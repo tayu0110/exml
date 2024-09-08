@@ -50,7 +50,7 @@ use crate::libxml::{
     },
     xinclude::XmlXincludeCtxtPtr,
     xml_io::{
-        xmlFreeParserInputBuffer, xmlParserInputBufferCreateFilename, XmlOutputBufferPtr,
+        xml_free_parser_input_buffer, xml_parser_input_buffer_create_filename, XmlOutputBufferPtr,
         XmlParserInputBufferPtr,
     },
     xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
@@ -730,9 +730,9 @@ pub(crate) fn des_xml_automata_state_ptr(_no: i32, _val: XmlAutomataStatePtr, _n
 
 #[cfg(feature = "output")]
 pub(crate) unsafe extern "C" fn desret_xml_output_buffer_ptr(val: XmlOutputBufferPtr) {
-    use crate::libxml::xml_io::xmlOutputBufferClose;
+    use crate::libxml::xml_io::xml_output_buffer_close;
 
-    xmlOutputBufferClose(val);
+    xml_output_buffer_close(val);
 }
 
 #[cfg(feature = "xinclude")]
@@ -1258,43 +1258,43 @@ pub(crate) unsafe extern "C" fn gen_xml_parser_input_buffer_ptr(
     _nr: c_int,
 ) -> XmlParserInputBufferPtr {
     if no == 0 {
-        return xmlParserInputBufferCreateFilename(
+        return xml_parser_input_buffer_create_filename(
             c"missing.xml".as_ptr(),
             XmlCharEncoding::XmlCharEncodingNone,
         );
     }
     if no == 1 {
-        return xmlParserInputBufferCreateFilename(
+        return xml_parser_input_buffer_create_filename(
             c"<foo/>".as_ptr(),
             XmlCharEncoding::XmlCharEncodingNone,
         );
     }
     if no == 2 {
-        return xmlParserInputBufferCreateFilename(
+        return xml_parser_input_buffer_create_filename(
             c"test/ent2".as_ptr(),
             XmlCharEncoding::XmlCharEncodingNone,
         );
     }
     if no == 3 {
-        return xmlParserInputBufferCreateFilename(
+        return xml_parser_input_buffer_create_filename(
             c"test/valid/REC-xml-19980210.xml".as_ptr(),
             XmlCharEncoding::XmlCharEncodingNone,
         );
     }
     if no == 4 {
-        return xmlParserInputBufferCreateFilename(
+        return xml_parser_input_buffer_create_filename(
             c"test/valid/dtds/xhtml1-strict.dtd".as_ptr(),
             XmlCharEncoding::XmlCharEncodingNone,
         );
     }
     if no == 5 {
-        return xmlParserInputBufferCreateFilename(
+        return xml_parser_input_buffer_create_filename(
             REMOTE1GOOD.as_ptr(),
             XmlCharEncoding::XmlCharEncodingNone,
         );
     }
     if no == 6 {
-        return xmlParserInputBufferCreateFilename(
+        return xml_parser_input_buffer_create_filename(
             REMOTE1BAD.as_ptr(),
             XmlCharEncoding::XmlCharEncodingNone,
         );
@@ -1306,7 +1306,7 @@ pub(crate) unsafe extern "C" fn des_xml_parser_input_buffer_ptr(
     val: XmlParserInputBufferPtr,
     _nr: c_int,
 ) {
-    xmlFreeParserInputBuffer(val);
+    xml_free_parser_input_buffer(val);
 }
 
 pub(crate) fn gen_xml_feature(no: c_int, _nr: c_int) -> Option<XmlFeature> {
@@ -1345,7 +1345,7 @@ pub(crate) unsafe extern "C" fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr
 }
 
 pub(crate) unsafe extern "C" fn desret_xml_parser_input_buffer_ptr(val: XmlParserInputBufferPtr) {
-    xmlFreeParserInputBuffer(val);
+    xml_free_parser_input_buffer(val);
 }
 
 pub(crate) fn gen_xml_parser_node_info_seq_ptr(_no: c_int, _nr: c_int) -> XmlParserNodeInfoSeqPtr {
@@ -2011,10 +2011,10 @@ pub(crate) unsafe extern "C" fn gen_xml_output_buffer_ptr(
     no: c_int,
     _nr: c_int,
 ) -> XmlOutputBufferPtr {
-    use crate::libxml::xml_io::xmlOutputBufferCreateFilename;
+    use crate::libxml::xml_io::xml_output_buffer_create_filename;
 
     if no == 0 {
-        return xmlOutputBufferCreateFilename(c"test.out".as_ptr() as _, null_mut(), 0);
+        return xml_output_buffer_create_filename(c"test.out".as_ptr() as _, null_mut(), 0);
     }
     null_mut()
 }
@@ -2025,10 +2025,10 @@ pub(crate) unsafe extern "C" fn des_xml_output_buffer_ptr(
     val: XmlOutputBufferPtr,
     _nr: c_int,
 ) {
-    use crate::libxml::xml_io::xmlOutputBufferClose;
+    use crate::libxml::xml_io::xml_output_buffer_close;
 
     if !val.is_null() {
-        xmlOutputBufferClose(val);
+        xml_output_buffer_close(val);
     }
 }
 
