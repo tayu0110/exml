@@ -61,8 +61,8 @@ use super::{
     },
     nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
     nanohttp::{
-        xmlNanoHTTPClose, xmlNanoHTTPEncoding, xmlNanoHTTPMethod, xmlNanoHTTPMimeType,
-        xmlNanoHTTPOpen, xmlNanoHTTPRead, xmlNanoHTTPRedir, xmlNanoHTTPReturnCode,
+        xml_nanohttp_close, xml_nanohttp_encoding, xml_nanohttp_method, xml_nanohttp_mime_type,
+        xml_nanohttp_open, xml_nanohttp_read, xml_nanohttp_redir, xml_nanohttp_return_code,
     },
     parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption},
     parser_internals::xml_new_input_from_file,
@@ -1538,7 +1538,7 @@ unsafe extern "C" fn xmlIOHTTPCloseWrite(context: *mut c_void, http_mthd: *const
         );
         xml_ioerr(XmlParserErrors::XmlIoWrite as i32, msg.as_ptr() as _);
     } else {
-        http_ctxt = xmlNanoHTTPMethod(
+        http_ctxt = xml_nanohttp_method(
             (*ctxt).uri,
             http_mthd,
             http_content,
@@ -1596,7 +1596,7 @@ unsafe extern "C" fn xmlIOHTTPCloseWrite(context: *mut c_void, http_mthd: *const
             // 		free( dump_name );
             // 	    }
             // #endif  /*  DEBUG_HTTP  */
-            http_rtn = xmlNanoHTTPReturnCode(http_ctxt);
+            http_rtn = xml_nanohttp_return_code(http_ctxt);
             if (200..300).contains(&http_rtn) {
                 close_rc = 0;
             } else {
@@ -1615,7 +1615,7 @@ unsafe extern "C" fn xmlIOHTTPCloseWrite(context: *mut c_void, http_mthd: *const
                 xml_ioerr(XmlParserErrors::XmlIoWrite as i32, msg.as_ptr() as _);
             }
 
-            xmlNanoHTTPClose(http_ctxt);
+            xml_nanohttp_close(http_ctxt);
             xml_free(content_type as _);
         }
     }
@@ -2888,7 +2888,7 @@ pub unsafe extern "C" fn xmlCheckHTTPInput(
             let redir: *const c_char;
             let mime: *const c_char;
 
-            let code: c_int = xmlNanoHTTPReturnCode((*(*ret).buf).context);
+            let code: c_int = xml_nanohttp_return_code((*(*ret).buf).context);
             if code >= 400 {
                 /* fatal error */
                 if !(*ret).filename.is_null() {
@@ -2907,11 +2907,11 @@ pub unsafe extern "C" fn xmlCheckHTTPInput(
                 xml_free_input_stream(ret);
                 ret = null_mut();
             } else {
-                mime = xmlNanoHTTPMimeType((*(*ret).buf).context);
+                mime = xml_nanohttp_mime_type((*(*ret).buf).context);
                 if !xml_strstr(mime as _, c"/xml".as_ptr() as _).is_null()
                     || !xml_strstr(mime as _, c"+xml".as_ptr() as _).is_null()
                 {
-                    encoding = xmlNanoHTTPEncoding((*(*ret).buf).context);
+                    encoding = xml_nanohttp_encoding((*(*ret).buf).context);
                     if !encoding.is_null() {
                         let handler: XmlCharEncodingHandlerPtr =
                             xml_find_char_encoding_handler(encoding);
@@ -2934,7 +2934,7 @@ pub unsafe extern "C" fn xmlCheckHTTPInput(
                     //             } else if (xmlStrstr(mime, "html")) {
                     // #endif
                 }
-                redir = xmlNanoHTTPRedir((*(*ret).buf).context);
+                redir = xml_nanohttp_redir((*(*ret).buf).context);
                 if !redir.is_null() {
                     if !(*ret).filename.is_null() {
                         xml_free((*ret).filename as _);
@@ -3498,7 +3498,7 @@ pub unsafe extern "C" fn xmlIOHTTPMatch(filename: *const c_char) -> c_int {
  */
 #[cfg(feature = "http")]
 pub unsafe extern "C" fn xmlIOHTTPOpen(filename: *const c_char) -> *mut c_void {
-    xmlNanoHTTPOpen(filename as _, null_mut())
+    xml_nanohttp_open(filename as _, null_mut())
 }
 
 /**
@@ -3582,7 +3582,7 @@ pub unsafe extern "C" fn xmlIOHTTPRead(
     if buffer.is_null() || len < 0 {
         return -1;
     }
-    xmlNanoHTTPRead(context, buffer.add(0) as _, len)
+    xml_nanohttp_read(context, buffer.add(0) as _, len)
 }
 
 /**
@@ -3595,7 +3595,7 @@ pub unsafe extern "C" fn xmlIOHTTPRead(
  */
 #[cfg(feature = "http")]
 pub unsafe extern "C" fn xmlIOHTTPClose(context: *mut c_void) -> c_int {
-    xmlNanoHTTPClose(context);
+    xml_nanohttp_close(context);
     0
 }
 

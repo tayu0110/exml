@@ -1438,23 +1438,23 @@ pub(crate) fn des_const_xml_saxhandler_ptr(_no: i32, _val: *const XmlSAXHandler,
 
 #[cfg(feature = "http")]
 pub(crate) unsafe extern "C" fn desret_xml_nano_httpctxt_ptr(val: *mut c_void) {
-    use crate::libxml::nanohttp::xmlNanoHTTPClose;
+    use crate::libxml::nanohttp::xml_nanohttp_close;
 
-    xmlNanoHTTPClose(val);
+    xml_nanohttp_close(val);
 }
 
 #[cfg(feature = "http")]
 pub(crate) unsafe extern "C" fn gen_xml_nano_httpctxt_ptr(no: c_int, _nr: c_int) -> *mut c_void {
-    use crate::libxml::nanohttp::xmlNanoHTTPOpen;
+    use crate::libxml::nanohttp::xml_nanohttp_open;
 
     if no == 0 {
-        return xmlNanoHTTPOpen(REMOTE1GOOD.as_ptr() as _, null_mut());
+        return xml_nanohttp_open(REMOTE1GOOD.as_ptr() as _, null_mut());
     }
     if no == 1 {
-        return xmlNanoHTTPOpen(REMOTE2GOOD.as_ptr() as _, null_mut());
+        return xml_nanohttp_open(REMOTE2GOOD.as_ptr() as _, null_mut());
     }
     if no == 2 {
-        return xmlNanoHTTPOpen(REMOTE1BAD.as_ptr() as _, null_mut());
+        return xml_nanohttp_open(REMOTE1BAD.as_ptr() as _, null_mut());
     }
     null_mut()
 }
@@ -1465,10 +1465,10 @@ pub(crate) unsafe extern "C" fn des_xml_nano_httpctxt_ptr(
     val: *mut c_void,
     _nr: c_int,
 ) {
-    use crate::libxml::nanohttp::xmlNanoHTTPClose;
+    use crate::libxml::nanohttp::xml_nanohttp_close;
 
     if !val.is_null() {
-        xmlNanoHTTPClose(val);
+        xml_nanohttp_close(val);
     }
 }
 

@@ -97,7 +97,7 @@ static TIMEOUT: c_uint = 60; /* the select() timeout in seconds */
  * Initialize the HTTP protocol layer.
  * Currently it just checks for proxy information
  */
-pub unsafe extern "C" fn xmlNanoHTTPInit() {
+pub unsafe extern "C" fn xml_nanohttp_init() {
     let mut env: *const c_char;
     // #ifdef _WINSOCKAPI_
     //     WSADATA wsaData;
@@ -121,12 +121,12 @@ pub unsafe extern "C" fn xmlNanoHTTPInit() {
         }
         env = getenv(c"http_proxy".as_ptr() as _);
         if !env.is_null() {
-            xmlNanoHTTPScanProxy(env);
+            xml_nanohttp_scan_proxy(env);
             INITIALIZED.store(true, Ordering::Release);
         }
         env = getenv(c"HTTP_PROXY".as_ptr() as _);
         if !env.is_null() {
-            xmlNanoHTTPScanProxy(env);
+            xml_nanohttp_scan_proxy(env);
             INITIALIZED.store(true, Ordering::Release);
         }
     }
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn xmlNanoHTTPInit() {
  *
  * Cleanup the HTTP protocol layer.
  */
-pub unsafe extern "C" fn xmlNanoHTTPCleanup() {
+pub unsafe extern "C" fn xml_nanohttp_cleanup() {
     let p = PROXY.load(Ordering::Acquire);
     if !p.is_null() {
         xml_free(p as _);
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn xmlNanoHTTPCleanup() {
  * Should be like http://myproxy/ or http://myproxy:3128/
  * A NULL URL cleans up proxy information.
  */
-pub unsafe extern "C" fn xmlNanoHTTPScanProxy(url: *const c_char) {
+pub unsafe extern "C" fn xml_nanohttp_scan_proxy(url: *const c_char) {
     let p = PROXY.load(Ordering::Acquire);
     if !p.is_null() {
         xml_free(p as _);
@@ -234,7 +234,7 @@ unsafe extern "C" fn xml_http_err_memory(extra: *const c_char) {
  * Returns the number of byte read or -1 in case of error.
  */
 
-unsafe extern "C" fn xmlNanoHTTPRecv(ctxt: XmlNanoHttpctxtPtr) -> c_int {
+unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHttpctxtPtr) -> c_int {
     let mut p: pollfd = unsafe { zeroed() };
 
     while (*ctxt).state & XML_NANO_HTTP_READ as i32 != 0 {
@@ -324,7 +324,7 @@ unsafe extern "C" fn xmlNanoHTTPRecv(ctxt: XmlNanoHttpctxtPtr) -> c_int {
  * -1 if received content length was less than specified or an error
  * occurred.
  */
-unsafe extern "C" fn xmlNanoHTTPFetchContent(
+unsafe extern "C" fn xml_nanohttp_fetch_content(
     ctx: *mut c_void,
     mut ptr: *mut *mut c_char,
     mut len: *mut c_int,
@@ -358,7 +358,7 @@ unsafe extern "C" fn xmlNanoHTTPFetchContent(
     rcvd_lgth = (*ctxt).inptr.offset_from((*ctxt).content) as _;
 
     while {
-        cur_lgth = xmlNanoHTTPRecv(ctxt);
+        cur_lgth = xml_nanohttp_recv(ctxt);
         cur_lgth > 0
     } {
         rcvd_lgth += cur_lgth;
@@ -392,7 +392,7 @@ unsafe extern "C" fn xmlNanoHTTPFetchContent(
  * Returns -1 in case of failure, 0 in case of success. The contentType,
  *     if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xmlNanoHTTPFetch(
+pub unsafe extern "C" fn xml_nanohttp_fetch(
     url: *const c_char,
     filename: *const c_char,
     content_type: *mut *mut c_char,
@@ -405,7 +405,7 @@ pub unsafe extern "C" fn xmlNanoHTTPFetch(
     if filename.is_null() {
         return -1;
     }
-    let ctxt: *mut c_void = xmlNanoHTTPOpen(url, content_type);
+    let ctxt: *mut c_void = xml_nanohttp_open(url, content_type);
     if ctxt.is_null() {
         return -1;
     }
@@ -415,7 +415,7 @@ pub unsafe extern "C" fn xmlNanoHTTPFetch(
     } else {
         fd = open(filename, O_CREAT | O_WRONLY, 0o0644);
         if fd < 0 {
-            xmlNanoHTTPClose(ctxt);
+            xml_nanohttp_close(ctxt);
             if !content_type.is_null() && !(*content_type).is_null() {
                 xml_free(*content_type as _);
                 *content_type = null_mut();
@@ -424,12 +424,12 @@ pub unsafe extern "C" fn xmlNanoHTTPFetch(
         }
     }
 
-    xmlNanoHTTPFetchContent(ctxt, addr_of_mut!(buf), addr_of_mut!(len));
+    xml_nanohttp_fetch_content(ctxt, addr_of_mut!(buf), addr_of_mut!(len));
     if len > 0 && write(fd, buf as _, len as _) == -1 {
         ret = -1;
     }
 
-    xmlNanoHTTPClose(ctxt);
+    xml_nanohttp_close(ctxt);
     close(fd);
     ret
 }
@@ -450,7 +450,7 @@ pub unsafe extern "C" fn xmlNanoHTTPFetch(
  * Returns NULL in case of failure, otherwise a request handler.
  *     The contentType, if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xmlNanoHTTPMethod(
+pub unsafe extern "C" fn xml_nanohttp_method(
     url: *const c_char,
     method: *const c_char,
     input: *const c_char,
@@ -458,7 +458,7 @@ pub unsafe extern "C" fn xmlNanoHTTPMethod(
     headers: *const c_char,
     ilen: c_int,
 ) -> *mut c_void {
-    xmlNanoHTTPMethodRedir(url, method, input, content_type, null_mut(), headers, ilen)
+    xml_nanohttp_method_redir(url, method, input, content_type, null_mut(), headers, ilen)
 }
 
 /**
@@ -469,7 +469,7 @@ pub unsafe extern "C" fn xmlNanoHTTPMethod(
  * (Re)Initialize an HTTP context by parsing the URL and finding
  * the protocol host port and path it indicates.
  */
-unsafe extern "C" fn xmlNanoHTTPScanURL(ctxt: XmlNanoHttpctxtPtr, url: *const c_char) {
+unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHttpctxtPtr, url: *const c_char) {
     let len: usize;
 
     /*
@@ -540,7 +540,7 @@ unsafe extern "C" fn xmlNanoHTTPScanURL(ctxt: XmlNanoHttpctxtPtr, url: *const c_
  *
  * Returns an HTTP context or NULL in case of error.
  */
-unsafe extern "C" fn xmlNanoHTTPNewCtxt(url: *const c_char) -> XmlNanoHttpctxtPtr {
+unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHttpctxtPtr {
     let ret: XmlNanoHttpctxtPtr = xml_malloc(size_of::<XmlNanoHttpctxt>()) as XmlNanoHttpctxtPtr;
     if ret.is_null() {
         xml_http_err_memory(c"allocating context".as_ptr() as _);
@@ -553,7 +553,7 @@ unsafe extern "C" fn xmlNanoHTTPNewCtxt(url: *const c_char) -> XmlNanoHttpctxtPt
     (*ret).fd = INVALID_SOCKET;
     (*ret).content_length = -1;
 
-    xmlNanoHTTPScanURL(ret, url);
+    xml_nanohttp_scan_url(ret, url);
 
     ret
 }
@@ -564,7 +564,7 @@ unsafe extern "C" fn xmlNanoHTTPNewCtxt(url: *const c_char) -> XmlNanoHttpctxtPt
  *
  * Frees the context after closing the connection.
  */
-unsafe extern "C" fn xmlNanoHTTPFreeCtxt(ctxt: XmlNanoHttpctxtPtr) {
+unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHttpctxtPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -627,7 +627,7 @@ unsafe extern "C" fn xmlNanoHTTPFreeCtxt(ctxt: XmlNanoHttpctxtPtr) {
  *
  * Returns true, iff hostname matches the pattern.
  */
-unsafe extern "C" fn xmlNanoHTTPHostnameMatch(
+unsafe extern "C" fn xml_nanohttp_hostname_match(
     pattern: *const c_char,
     hostname: *const c_char,
 ) -> c_int {
@@ -670,7 +670,7 @@ unsafe extern "C" fn xmlNanoHTTPHostnameMatch(
  *
  * Returns true, iff a proxy server should be bypassed for the given hostname.
  */
-unsafe extern "C" fn xmlNanoHTTPBypassProxy(hostname: *const c_char) -> c_int {
+unsafe extern "C" fn xml_nanohttp_bypass_proxy(hostname: *const c_char) -> c_int {
     let mut env: *mut c_char = getenv(c"no_proxy".as_ptr() as _);
     let mut p: *mut c_char;
 
@@ -702,7 +702,7 @@ unsafe extern "C" fn xmlNanoHTTPBypassProxy(hostname: *const c_char) -> c_int {
 
         *(env) = b'\0' as i8;
         env = env.add(1);
-        if xmlNanoHTTPHostnameMatch(p, hostname) != 0 {
+        if xml_nanohttp_hostname_match(p, hostname) != 0 {
             xml_free(cpy as _);
             return 1;
         }
@@ -712,7 +712,7 @@ unsafe extern "C" fn xmlNanoHTTPBypassProxy(hostname: *const c_char) -> c_int {
         }
         p = env;
     }
-    if xmlNanoHTTPHostnameMatch(p, hostname) != 0 {
+    if xml_nanohttp_hostname_match(p, hostname) != 0 {
         xml_free(cpy as _);
         return 1;
     }
@@ -734,7 +734,7 @@ pub type XmlSocklenT = c_uint;
  * Returns -1 in case of failure, the file descriptor number otherwise
  */
 
-unsafe extern "C" fn xmlNanoHTTPConnectAttempt(addr: *mut sockaddr) -> Socket {
+unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket {
     let mut p: pollfd = unsafe { zeroed() };
     let mut status: c_int;
 
@@ -881,7 +881,7 @@ unsafe extern "C" fn xmlNanoHTTPConnectAttempt(addr: *mut sockaddr) -> Socket {
  * Returns -1 in case of failure, the file descriptor number otherwise
  */
 
-unsafe extern "C" fn xmlNanoHTTPConnectHost(host: *const c_char, port: c_int) -> Socket {
+unsafe extern "C" fn xml_nanohttp_connect_host(host: *const c_char, port: c_int) -> Socket {
     let mut addr: *mut sockaddr;
     let mut sockin: sockaddr_in = unsafe { zeroed() };
 
@@ -959,7 +959,7 @@ unsafe extern "C" fn xmlNanoHTTPConnectHost(host: *const c_char, port: c_int) ->
                 continue; /* for */
             }
 
-            s = xmlNanoHTTPConnectAttempt(addr);
+            s = xml_nanohttp_connect_attempt(addr);
             if s != INVALID_SOCKET {
                 freeaddrinfo(result);
                 return s;
@@ -987,7 +987,7 @@ unsafe extern "C" fn xmlNanoHTTPConnectHost(host: *const c_char, port: c_int) ->
  * Send the input needed to initiate the processing on the server side
  * Returns number of bytes sent or -1 on error.
  */
-unsafe extern "C" fn xmlNanoHTTPSend(
+unsafe extern "C" fn xml_nanohttp_send(
     ctxt: XmlNanoHttpctxtPtr,
     xmt_ptr: *const c_char,
     outlen: c_int,
@@ -1046,14 +1046,14 @@ unsafe extern "C" fn xmlNanoHTTPSend(
  * Returns a newly allocated string with a copy of the line, or NULL
  *         which indicate the end of the input.
  */
-unsafe extern "C" fn xmlNanoHTTPReadLine(ctxt: XmlNanoHttpctxtPtr) -> *mut c_char {
+unsafe extern "C" fn xml_nanohttp_read_line(ctxt: XmlNanoHttpctxtPtr) -> *mut c_char {
     let mut buf: [c_char; 4096] = [0; 4096];
     let mut bp: *mut c_char = buf.as_mut_ptr();
     let mut rc: c_int;
 
     while bp.offset_from(buf.as_mut_ptr()) < 4095 {
         if (*ctxt).inrptr == (*ctxt).inptr {
-            rc = xmlNanoHTTPRecv(ctxt);
+            rc = xml_nanohttp_recv(ctxt);
             if rc == 0 {
                 if bp == buf.as_mut_ptr() {
                     return null_mut();
@@ -1092,7 +1092,7 @@ unsafe extern "C" fn xmlNanoHTTPReadLine(ctxt: XmlNanoHttpctxtPtr) -> *mut c_cha
  *
  * Returns -1 in case of failure, the file descriptor number otherwise
  */
-unsafe extern "C" fn xmlNanoHTTPScanAnswer(ctxt: XmlNanoHttpctxtPtr, line: *const c_char) {
+unsafe extern "C" fn xml_nanohttp_scan_answer(ctxt: XmlNanoHttpctxtPtr, line: *const c_char) {
     let mut cur: *const c_char = line;
 
     if line.is_null() {
@@ -1285,7 +1285,7 @@ unsafe extern "C" fn xmlNanoHTTPScanAnswer(ctxt: XmlNanoHttpctxtPtr, line: *cons
  * Returns NULL in case of failure, otherwise a request handler.
  *     The contentType, or redir, if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
+pub unsafe extern "C" fn xml_nanohttp_method_redir(
     url: *const c_char,
     mut method: *const c_char,
     input: *const c_char,
@@ -1312,17 +1312,17 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
     if method.is_null() {
         method = c"GET".as_ptr() as _;
     }
-    xmlNanoHTTPInit();
+    xml_nanohttp_init();
 
     // retry:
     'retry: loop {
         if redir_url.is_null() {
-            ctxt = xmlNanoHTTPNewCtxt(url);
+            ctxt = xml_nanohttp_new_ctxt(url);
             if ctxt.is_null() {
                 return null_mut();
             }
         } else {
-            ctxt = xmlNanoHTTPNewCtxt(redir_url);
+            ctxt = xml_nanohttp_new_ctxt(redir_url);
             if ctxt.is_null() {
                 return null_mut();
             }
@@ -1335,7 +1335,7 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
                 XmlParserErrors::XmlHttpUrlSyntax as i32,
                 c"Not a valid HTTP URI".as_ptr() as _,
             );
-            xmlNanoHTTPFreeCtxt(ctxt);
+            xml_nanohttp_free_ctxt(ctxt);
             if !redir_url.is_null() {
                 xml_free(redir_url as _);
             }
@@ -1347,26 +1347,26 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
                 XmlParserErrors::XmlHttpUnknownHost as i32,
                 c"Failed to identify host in URI".as_ptr() as _,
             );
-            xmlNanoHTTPFreeCtxt(ctxt);
+            xml_nanohttp_free_ctxt(ctxt);
             if !redir_url.is_null() {
                 xml_free(redir_url as _);
             }
             return null_mut();
         }
         use_proxy = (!PROXY.load(Ordering::Relaxed).is_null()
-            && xmlNanoHTTPBypassProxy((*ctxt).hostname) == 0) as i32;
+            && xml_nanohttp_bypass_proxy((*ctxt).hostname) == 0) as i32;
         if use_proxy != 0 {
             blen = strlen((*ctxt).hostname) * 2 + 16;
-            ret = xmlNanoHTTPConnectHost(
+            ret = xml_nanohttp_connect_host(
                 PROXY.load(Ordering::Relaxed) as _,
                 PROXY_PORT.load(Ordering::Relaxed) as _,
             );
         } else {
             blen = strlen((*ctxt).hostname);
-            ret = xmlNanoHTTPConnectHost((*ctxt).hostname, (*ctxt).port);
+            ret = xml_nanohttp_connect_host((*ctxt).hostname, (*ctxt).port);
         }
         if ret == INVALID_SOCKET {
-            xmlNanoHTTPFreeCtxt(ctxt);
+            xml_nanohttp_free_ctxt(ctxt);
             if !redir_url.is_null() {
                 xml_free(redir_url as _);
             }
@@ -1406,7 +1406,7 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
         }
         bp = xml_malloc_atomic(blen) as _;
         if bp.is_null() {
-            xmlNanoHTTPFreeCtxt(ctxt);
+            xml_nanohttp_free_ctxt(ctxt);
             xml_http_err_memory(c"allocating header buffer".as_ptr() as _);
             return null_mut();
         }
@@ -1523,7 +1523,7 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
         // 			"bytes of HTTP headers sent to host".as_ptr() as _,
         // 			(*ctxt).hostname );
         // #else
-        xmlNanoHTTPSend(ctxt, (*ctxt).out, blen as _);
+        xml_nanohttp_send(ctxt, (*ctxt).out, blen as _);
         // #endif
 
         if !input.is_null() {
@@ -1537,14 +1537,14 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
             // 			"bytes of HTTP content sent to host".as_ptr() as _,
             // 			(*ctxt).hostname );
             // #else
-            xmlNanoHTTPSend(ctxt, input, ilen);
+            xml_nanohttp_send(ctxt, input, ilen);
             // #endif
         }
 
         (*ctxt).state = XML_NANO_HTTP_READ as _;
 
         while {
-            p = xmlNanoHTTPReadLine(ctxt);
+            p = xml_nanohttp_read_line(ctxt);
             !p.is_null()
         } {
             if *p == 0 {
@@ -1552,7 +1552,7 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
                 xml_free(p as _);
                 break;
             }
-            xmlNanoHTTPScanAnswer(ctxt, p);
+            xml_nanohttp_scan_answer(ctxt, p);
 
             // #ifdef DEBUG_HTTP
             // 	xml_generic_error!(xmlGenericErrorContext, c"<- %s\n".as_ptr() as _, p);
@@ -1568,20 +1568,20 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
             // 	xml_generic_error!(xmlGenericErrorContext,
             // 		"\nRedirect to: %s\n".as_ptr() as _, (*ctxt).location);
             // #endif
-            while xmlNanoHTTPRecv(ctxt) > 0 {}
+            while xml_nanohttp_recv(ctxt) > 0 {}
             if nb_redirects < XML_NANO_HTTP_MAX_REDIR as i32 {
                 nb_redirects += 1;
                 if !redir_url.is_null() {
                     xml_free(redir_url as _);
                 }
                 redir_url = xml_mem_strdup((*ctxt).location as _) as _;
-                xmlNanoHTTPFreeCtxt(ctxt);
+                xml_nanohttp_free_ctxt(ctxt);
                 continue 'retry;
             }
 
             break;
         }
-        xmlNanoHTTPFreeCtxt(ctxt);
+        xml_nanohttp_free_ctxt(ctxt);
         if !redir_url.is_null() {
             xml_free(redir_url as _);
         }
@@ -1637,14 +1637,14 @@ pub unsafe extern "C" fn xmlNanoHTTPMethodRedir(
  * Returns NULL in case of failure, otherwise a request handler.
  *     The contentType, if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xmlNanoHTTPOpen(
+pub unsafe extern "C" fn xml_nanohttp_open(
     url: *const c_char,
     content_type: *mut *mut c_char,
 ) -> *mut c_void {
     if !content_type.is_null() {
         *content_type = null_mut();
     }
-    xmlNanoHTTPMethod(url, null_mut(), null_mut(), content_type, null_mut(), 0)
+    xml_nanohttp_method(url, null_mut(), null_mut(), content_type, null_mut(), 0)
 }
 
 /**
@@ -1660,7 +1660,7 @@ pub unsafe extern "C" fn xmlNanoHTTPOpen(
  * Returns NULL in case of failure, otherwise a request handler.
  *     The contentType, if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xmlNanoHTTPOpenRedir(
+pub unsafe extern "C" fn xml_nanohttp_open_redir(
     url: *const c_char,
     content_type: *mut *mut c_char,
     redir: *mut *mut c_char,
@@ -1671,7 +1671,7 @@ pub unsafe extern "C" fn xmlNanoHTTPOpenRedir(
     if !redir.is_null() {
         *redir = null_mut();
     }
-    xmlNanoHTTPMethodRedir(
+    xml_nanohttp_method_redir(
         url,
         null_mut(),
         null_mut(),
@@ -1690,7 +1690,7 @@ pub unsafe extern "C" fn xmlNanoHTTPOpenRedir(
  *
  * Returns the HTTP return code for the request.
  */
-pub unsafe extern "C" fn xmlNanoHTTPReturnCode(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_nanohttp_return_code(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
     if ctxt.is_null() {
@@ -1709,7 +1709,7 @@ pub unsafe extern "C" fn xmlNanoHTTPReturnCode(ctx: *mut c_void) -> c_int {
  * Returns the stashed value of the WWW-Authenticate or Proxy-Authenticate
  * header.
  */
-pub unsafe extern "C" fn xmlNanoHTTPAuthHeader(ctx: *mut c_void) -> *const c_char {
+pub unsafe extern "C" fn xml_nanohttp_auth_header(ctx: *mut c_void) -> *const c_char {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
     if ctxt.is_null() {
@@ -1727,7 +1727,7 @@ pub unsafe extern "C" fn xmlNanoHTTPAuthHeader(ctx: *mut c_void) -> *const c_cha
  *
  * Return the specified redirection URL or NULL if not redirected.
  */
-pub unsafe extern "C" fn xmlNanoHTTPRedir(ctx: *mut c_void) -> *const c_char {
+pub unsafe extern "C" fn xml_nanohttp_redir(ctx: *mut c_void) -> *const c_char {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
     if ctxt.is_null() {
@@ -1747,7 +1747,7 @@ pub unsafe extern "C" fn xmlNanoHTTPRedir(ctx: *mut c_void) -> *const c_char {
  * a value of -1 indicates that the content length element was not included in
  * the response header.
  */
-pub unsafe extern "C" fn xmlNanoHTTPContentLength(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_nanohttp_content_length(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
     if ctxt.is_null() {
@@ -1765,7 +1765,7 @@ pub unsafe extern "C" fn xmlNanoHTTPContentLength(ctx: *mut c_void) -> c_int {
  *
  * Return the specified encoding or NULL if not available
  */
-pub unsafe extern "C" fn xmlNanoHTTPEncoding(ctx: *mut c_void) -> *const c_char {
+pub unsafe extern "C" fn xml_nanohttp_encoding(ctx: *mut c_void) -> *const c_char {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
     if ctxt.is_null() {
@@ -1783,7 +1783,7 @@ pub unsafe extern "C" fn xmlNanoHTTPEncoding(ctx: *mut c_void) -> *const c_char 
  *
  * Return the specified Mime-Type or NULL if not available
  */
-pub unsafe extern "C" fn xmlNanoHTTPMimeType(ctx: *mut c_void) -> *const c_char {
+pub unsafe extern "C" fn xml_nanohttp_mime_type(ctx: *mut c_void) -> *const c_char {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
     if ctxt.is_null() {
@@ -1805,7 +1805,7 @@ pub unsafe extern "C" fn xmlNanoHTTPMimeType(ctx: *mut c_void) -> *const c_char 
  * Returns the number of byte read. 0 is an indication of an end of connection.
  *         -1 indicates a parameter error.
  */
-pub unsafe extern "C" fn xmlNanoHTTPRead(
+pub unsafe extern "C" fn xml_nanohttp_read(
     ctx: *mut c_void,
     dest: *mut c_void,
     mut len: c_int,
@@ -1857,7 +1857,7 @@ pub unsafe extern "C" fn xmlNanoHTTPRead(
     // #endif
 
     while (*ctxt).inptr.offset_from((*ctxt).inrptr) < len as isize {
-        if xmlNanoHTTPRecv(ctxt) <= 0 {
+        if xml_nanohttp_recv(ctxt) <= 0 {
             break;
         }
     }
@@ -1880,7 +1880,7 @@ pub unsafe extern "C" fn xmlNanoHTTPRead(
  * Returns -1 in case of failure, 0 in case of success.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xmlNanoHTTPSave(ctxt: *mut c_void, filename: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: *const c_char) -> c_int {
     let mut buf: *mut c_char = null_mut();
     let fd: c_int;
     let mut len: c_int = 0;
@@ -1895,17 +1895,17 @@ pub unsafe extern "C" fn xmlNanoHTTPSave(ctxt: *mut c_void, filename: *const c_c
     } else {
         fd = open(filename, O_CREAT | O_WRONLY, 0o666);
         if fd < 0 {
-            xmlNanoHTTPClose(ctxt);
+            xml_nanohttp_close(ctxt);
             return -1;
         }
     }
 
-    xmlNanoHTTPFetchContent(ctxt, addr_of_mut!(buf) as _, addr_of_mut!(len));
+    xml_nanohttp_fetch_content(ctxt, addr_of_mut!(buf) as _, addr_of_mut!(len));
     if len > 0 && write(fd, buf as _, len as _) == -1 {
         ret = -1;
     }
 
-    xmlNanoHTTPClose(ctxt);
+    xml_nanohttp_close(ctxt);
     close(fd);
     ret
 }
@@ -1917,14 +1917,14 @@ pub unsafe extern "C" fn xmlNanoHTTPSave(ctxt: *mut c_void, filename: *const c_c
  * This function closes an HTTP context, it ends up the connection and
  * free all data related to it.
  */
-pub unsafe extern "C" fn xmlNanoHTTPClose(ctx: *mut c_void) {
+pub unsafe extern "C" fn xml_nanohttp_close(ctx: *mut c_void) {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
     if ctx.is_null() {
         return;
     }
 
-    xmlNanoHTTPFreeCtxt(ctxt);
+    xml_nanohttp_free_ctxt(ctxt);
 }
 
 #[cfg(test)]
@@ -1946,7 +1946,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
 
-                let ret_val = xmlNanoHTTPAuthHeader(ctx);
+                let ret_val = xml_nanohttp_auth_header(ctx);
                 desret_const_char_ptr(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -1974,7 +1974,7 @@ mod tests {
 
             let mem_base = xml_mem_blocks();
 
-            xmlNanoHTTPCleanup();
+            xml_nanohttp_cleanup();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -2000,7 +2000,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
 
-                let ret_val = xmlNanoHTTPContentLength(ctx);
+                let ret_val = xml_nanohttp_content_length(ctx);
                 desret_int(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -2030,7 +2030,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
 
-                let ret_val = xmlNanoHTTPEncoding(ctx);
+                let ret_val = xml_nanohttp_encoding(ctx);
                 desret_const_char_ptr(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -2064,7 +2064,7 @@ mod tests {
                         let filename = gen_fileoutput(n_filename, 1);
                         let content_type = gen_char_ptr_ptr(n_content_type, 2);
 
-                        let ret_val = xmlNanoHTTPFetch(url, filename, content_type);
+                        let ret_val = xml_nanohttp_fetch(url, filename, content_type);
                         desret_int(ret_val);
                         des_fileoutput(n_url, url, 0);
                         des_fileoutput(n_filename, filename, 1);
@@ -2095,7 +2095,7 @@ mod tests {
 
             let mem_base = xml_mem_blocks();
 
-            xmlNanoHTTPInit();
+            xml_nanohttp_init();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -2118,7 +2118,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
 
-                let ret_val = xmlNanoHTTPMimeType(ctx);
+                let ret_val = xml_nanohttp_mime_type(ctx);
                 desret_const_char_ptr(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -2150,7 +2150,7 @@ mod tests {
                     let url = gen_filepath(n_url, 0);
                     let content_type = gen_char_ptr_ptr(n_content_type, 1);
 
-                    let ret_val = xmlNanoHTTPOpen(url, content_type);
+                    let ret_val = xml_nanohttp_open(url, content_type);
                     desret_xml_nano_httpctxt_ptr(ret_val);
                     des_filepath(n_url, url, 0);
                     des_char_ptr_ptr(n_content_type, content_type, 1);
@@ -2184,7 +2184,7 @@ mod tests {
                         let content_type = gen_char_ptr_ptr(n_content_type, 1);
                         let redir = gen_char_ptr_ptr(n_redir, 2);
 
-                        let ret_val = xmlNanoHTTPOpenRedir(url, content_type, redir);
+                        let ret_val = xml_nanohttp_open_redir(url, content_type, redir);
                         desret_xml_nano_httpctxt_ptr(ret_val);
                         des_filepath(n_url, url, 0);
                         des_char_ptr_ptr(n_content_type, content_type, 1);
@@ -2224,7 +2224,7 @@ mod tests {
                         let dest = gen_void_ptr(n_dest, 1);
                         let len = gen_int(n_len, 2);
 
-                        let ret_val = xmlNanoHTTPRead(ctx, dest, len);
+                        let ret_val = xml_nanohttp_read(ctx, dest, len);
                         desret_int(ret_val);
                         des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
                         des_void_ptr(n_dest, dest, 1);
@@ -2263,7 +2263,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
 
-                let ret_val = xmlNanoHTTPReturnCode(ctx);
+                let ret_val = xml_nanohttp_return_code(ctx);
                 desret_int(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -2295,7 +2295,7 @@ mod tests {
                     let ctxt = gen_void_ptr(n_ctxt, 0);
                     let filename = gen_fileoutput(n_filename, 1);
 
-                    let ret_val = xmlNanoHTTPSave(ctxt, filename);
+                    let ret_val = xml_nanohttp_save(ctxt, filename);
                     desret_int(ret_val);
                     des_void_ptr(n_ctxt, ctxt, 0);
                     des_fileoutput(n_filename, filename, 1);
@@ -2322,7 +2322,7 @@ mod tests {
             for n_url in 0..GEN_NB_FILEPATH {
                 let url = gen_filepath(n_url, 0);
 
-                xmlNanoHTTPScanProxy(url);
+                xml_nanohttp_scan_proxy(url);
                 des_filepath(n_url, url, 0);
                 xmlResetLastError();
             }
