@@ -19,8 +19,8 @@ use crate::{
     libxml::{
         globals::{xmlGenericErrorContext, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
-            xmlHashAddEntry, xmlHashAddEntry2, xmlHashCreate, xmlHashFree, xmlHashLookup,
-            xmlHashLookup2, xmlHashScan, XmlHashTable, XmlHashTablePtr,
+            xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_free,
+            xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTable, XmlHashTablePtr,
         },
         parser::{xmlReadFile, xmlReadMemory},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
@@ -1298,7 +1298,7 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     if registered_types.is_null() || namespace.is_null() || check.is_none() || comp.is_none() {
         return -1;
     }
-    if !xmlHashLookup(registered_types, namespace).is_null() {
+    if !xml_hash_lookup(registered_types, namespace).is_null() {
         xml_generic_error!(
             xmlGenericErrorContext(),
             c"Relax-NG types library '%s' already registered\n".as_ptr() as _,
@@ -1319,7 +1319,7 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     (*lib).check = check;
     (*lib).facet = facet;
     (*lib).freef = freef;
-    let ret: c_int = xmlHashAddEntry(registered_types, namespace, lib as _);
+    let ret: c_int = xml_hash_add_entry(registered_types, namespace, lib as _);
     if ret < 0 {
         xml_generic_error!(
             xmlGenericErrorContext(),
@@ -1758,7 +1758,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> c_int {
         return 0;
     }
 
-    let registered_types = xmlHashCreate(10);
+    let registered_types = xml_hash_create(10);
     if registered_types.is_null() {
         xml_generic_error!(
             xmlGenericErrorContext(),
@@ -1826,7 +1826,7 @@ pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
     if !XML_RELAX_NGTYPE_INITIALIZED.load(Ordering::Acquire) {
         return;
     }
-    xmlHashFree(
+    xml_hash_free(
         XML_RELAX_NGREGISTERED_TYPES.load(Ordering::Relaxed),
         Some(xml_relaxng_free_type_library),
     );
@@ -2047,7 +2047,7 @@ unsafe extern "C" fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionP
             xml_free((*partitions).groups as _);
         }
         if !(*partitions).triage.is_null() {
-            xmlHashFree((*partitions).triage, None);
+            xml_hash_free((*partitions).triage, None);
         }
         xml_free(partitions as _);
     }
@@ -2076,7 +2076,7 @@ unsafe extern "C" fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
         xml_relaxng_free_partition((*define).data as XmlRelaxNGPartitionPtr);
     }
     if !(*define).data.is_null() && (*define).typ == XmlRelaxNGType::Choice {
-        xmlHashFree((*define).data as XmlHashTablePtr, None);
+        xml_hash_free((*define).data as XmlHashTablePtr, None);
     }
     if !(*define).name.is_null() {
         xml_free((*define).name as _);
@@ -2212,7 +2212,7 @@ pub unsafe extern "C" fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxt
         xml_relaxng_free_document((*ctxt).doc);
     }
     if !(*ctxt).interleaves.is_null() {
-        xmlHashFree((*ctxt).interleaves, None);
+        xml_hash_free((*ctxt).interleaves, None);
     }
     if !(*ctxt).documents.is_null() {
         xml_relaxng_free_document_list((*ctxt).documents);
@@ -2908,7 +2908,7 @@ unsafe extern "C" fn xml_relaxng_compute_interleaves(
         }
         memset(partitions as _, 0, size_of::<XmlRelaxNGPartition>());
         (*partitions).nbgroups = nbgroups;
-        (*partitions).triage = xmlHashCreate(nbgroups);
+        (*partitions).triage = xml_hash_create(nbgroups);
         for i in 0..nbgroups {
             group = *groups.add(i as usize);
             for j in i + 1..nbgroups {
@@ -2951,7 +2951,7 @@ unsafe extern "C" fn xml_relaxng_compute_interleaves(
             if !tmp.is_null() && !(*tmp).is_null() {
                 while !(*tmp).is_null() {
                     if (*(*tmp)).typ == XmlRelaxNGType::Text {
-                        res = xmlHashAddEntry2(
+                        res = xml_hash_add_entry2(
                             (*partitions).triage,
                             c"#text".as_ptr() as _,
                             null_mut(),
@@ -2963,14 +2963,14 @@ unsafe extern "C" fn xml_relaxng_compute_interleaves(
                     } else if (*(*tmp)).typ == XmlRelaxNGType::Element && !(*(*tmp)).name.is_null()
                     {
                         if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
-                            res = xmlHashAddEntry2(
+                            res = xml_hash_add_entry2(
                                 (*partitions).triage,
                                 (*(*tmp)).name,
                                 null_mut(),
                                 (i + 1) as _,
                             );
                         } else {
-                            res = xmlHashAddEntry2(
+                            res = xml_hash_add_entry2(
                                 (*partitions).triage,
                                 (*(*tmp)).name,
                                 (*(*tmp)).ns,
@@ -2982,14 +2982,14 @@ unsafe extern "C" fn xml_relaxng_compute_interleaves(
                         }
                     } else if (*(*tmp)).typ == XmlRelaxNGType::Element {
                         if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
-                            res = xmlHashAddEntry2(
+                            res = xml_hash_add_entry2(
                                 (*partitions).triage,
                                 c"#any".as_ptr() as _,
                                 null_mut(),
                                 (i + 1) as _,
                             );
                         } else {
-                            res = xmlHashAddEntry2(
+                            res = xml_hash_add_entry2(
                                 (*partitions).triage,
                                 c"#any".as_ptr() as _,
                                 (*(*tmp)).ns,
@@ -4572,7 +4572,7 @@ unsafe extern "C" fn xml_relaxng_check_combine(
     (*define).content = cur;
     if choice_or_interleave == 0 {
         if (*ctxt).interleaves.is_null() {
-            (*ctxt).interleaves = xmlHashCreate(10);
+            (*ctxt).interleaves = xml_hash_create(10);
         }
         if (*ctxt).interleaves.is_null() {
             xml_rng_perr(
@@ -4593,7 +4593,7 @@ unsafe extern "C" fn xml_relaxng_check_combine(
                 (*ctxt).nb_interleaves,
             );
             (*ctxt).nb_interleaves += 1;
-            if xmlHashAddEntry((*ctxt).interleaves, tmpname.as_ptr() as _, cur as _) < 0 {
+            if xml_hash_add_entry((*ctxt).interleaves, tmpname.as_ptr() as _, cur as _) < 0 {
                 xml_rng_perr(
                     ctxt,
                     (*define).node,
@@ -4657,7 +4657,7 @@ unsafe extern "C" fn xml_relaxng_check_reference(
         return;
     }
     if !(*grammar).defs.is_null() {
-        def = xmlHashLookup((*grammar).defs, name) as _;
+        def = xml_hash_lookup((*grammar).defs, name) as _;
         if !def.is_null() {
             cur = refe;
             while !cur.is_null() {
@@ -5107,7 +5107,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
     (*def).name = typ;
     (*def).ns = library;
 
-    let lib: XmlRelaxNGTypeLibraryPtr = xmlHashLookup(
+    let lib: XmlRelaxNGTypeLibraryPtr = xml_hash_lookup(
         XML_RELAX_NGREGISTERED_TYPES.load(Ordering::Relaxed),
         library,
     ) as _;
@@ -5414,7 +5414,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
         (*def).name = typ;
         (*def).ns = library;
 
-        lib = xmlHashLookup(
+        lib = xml_hash_lookup(
             XML_RELAX_NGREGISTERED_TYPES.load(Ordering::Relaxed),
             library,
         ) as _;
@@ -5531,7 +5531,7 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
     (*def).typ = XmlRelaxNGType::Interleave;
 
     if (*ctxt).interleaves.is_null() {
-        (*ctxt).interleaves = xmlHashCreate(10);
+        (*ctxt).interleaves = xml_hash_create(10);
     }
     if (*ctxt).interleaves.is_null() {
         xml_rng_perr_memory(ctxt, c"create interleaves\n".as_ptr() as _);
@@ -5545,7 +5545,7 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
             (*ctxt).nb_interleaves,
         );
         (*ctxt).nb_interleaves += 1;
-        if xmlHashAddEntry((*ctxt).interleaves, name.as_ptr() as _, def as _) < 0 {
+        if xml_hash_add_entry((*ctxt).interleaves, name.as_ptr() as _, def as _) < 0 {
             xml_rng_perr(
                 ctxt,
                 node,
@@ -5607,9 +5607,9 @@ unsafe extern "C" fn xml_relaxng_parse_import_ref(
 
     (*def).dflags |= IS_EXTERNAL_REF as i16;
 
-    let tmp: c_int = xmlHashAddEntry((*(*ctxt).grammar).refs, name, def as _);
+    let tmp: c_int = xml_hash_add_entry((*(*ctxt).grammar).refs, name, def as _);
     if tmp < 0 {
-        let prev: XmlRelaxNGDefinePtr = xmlHashLookup((*(*ctxt).grammar).refs, (*def).name) as _;
+        let prev: XmlRelaxNGDefinePtr = xml_hash_lookup((*(*ctxt).grammar).refs, (*def).name) as _;
         if prev.is_null() {
             if !(*def).name.is_null() {
                 xml_rng_perr(
@@ -5657,7 +5657,7 @@ unsafe extern "C" fn xml_relaxng_parse_import_refs(
         return 0;
     }
     if (*(*ctxt).grammar).refs.is_null() {
-        (*(*ctxt).grammar).refs = xmlHashCreate(10);
+        (*(*ctxt).grammar).refs = xml_hash_create(10);
     }
     if (*(*ctxt).grammar).refs.is_null() {
         xml_rng_perr(
@@ -5670,7 +5670,7 @@ unsafe extern "C" fn xml_relaxng_parse_import_refs(
         );
         return -1;
     }
-    xmlHashScan((*grammar).refs, xml_relaxng_parse_import_ref, ctxt as _);
+    xml_hash_scan((*grammar).refs, xml_relaxng_parse_import_ref, ctxt as _);
     0
 }
 
@@ -5953,7 +5953,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
             );
         }
         if (*(*ctxt).grammar).refs.is_null() {
-            (*(*ctxt).grammar).refs = xmlHashCreate(10);
+            (*(*ctxt).grammar).refs = xml_hash_create(10);
         }
         if (*(*ctxt).grammar).refs.is_null() {
             xml_rng_perr(
@@ -5966,10 +5966,10 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
             );
             def = null_mut();
         } else {
-            let tmp: c_int = xmlHashAddEntry((*(*ctxt).grammar).refs, (*def).name, def as _);
+            let tmp: c_int = xml_hash_add_entry((*(*ctxt).grammar).refs, (*def).name, def as _);
             if tmp < 0 {
                 let prev: XmlRelaxNGDefinePtr =
-                    xmlHashLookup((*(*ctxt).grammar).refs, (*def).name) as _;
+                    xml_hash_lookup((*(*ctxt).grammar).refs, (*def).name) as _;
                 if prev.is_null() {
                     if !(*def).name.is_null() {
                         xml_rng_perr(
@@ -6115,7 +6115,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
             );
         }
         if (*(*ctxt).parentgrammar).refs.is_null() {
-            (*(*ctxt).parentgrammar).refs = xmlHashCreate(10);
+            (*(*ctxt).parentgrammar).refs = xml_hash_create(10);
         }
         if (*(*ctxt).parentgrammar).refs.is_null() {
             xml_rng_perr(
@@ -6128,10 +6128,11 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
             );
             def = null_mut();
         } else if !(*def).name.is_null() {
-            let tmp: c_int = xmlHashAddEntry((*(*ctxt).parentgrammar).refs, (*def).name, def as _);
+            let tmp: c_int =
+                xml_hash_add_entry((*(*ctxt).parentgrammar).refs, (*def).name, def as _);
             if tmp < 0 {
                 let prev: XmlRelaxNGDefinePtr =
-                    xmlHashLookup((*(*ctxt).parentgrammar).refs, (*def).name) as _;
+                    xml_hash_lookup((*(*ctxt).parentgrammar).refs, (*def).name) as _;
                 if prev.is_null() {
                     xml_rng_perr(
                         ctxt,
@@ -6550,7 +6551,7 @@ unsafe extern "C" fn xml_relaxng_parse_define(
             (*ctxt).define = olddefine;
         }
         if (*(*ctxt).grammar).defs.is_null() {
-            (*(*ctxt).grammar).defs = xmlHashCreate(10);
+            (*(*ctxt).grammar).defs = xml_hash_create(10);
         }
         if (*(*ctxt).grammar).defs.is_null() {
             xml_rng_perr(
@@ -6563,11 +6564,11 @@ unsafe extern "C" fn xml_relaxng_parse_define(
             );
             ret = -1;
         } else {
-            tmp = xmlHashAddEntry((*(*ctxt).grammar).defs, name, def as _);
+            tmp = xml_hash_add_entry((*(*ctxt).grammar).defs, name, def as _);
             if tmp < 0 {
                 let mut prev: XmlRelaxNGDefinePtr;
 
-                prev = xmlHashLookup((*(*ctxt).grammar).defs, name) as _;
+                prev = xml_hash_lookup((*(*ctxt).grammar).defs, name) as _;
                 if prev.is_null() {
                     xml_rng_perr(
                         ctxt,
@@ -6844,7 +6845,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
     (*grammar).start = cur;
     if choice_or_interleave == 0 {
         if (*ctxt).interleaves.is_null() {
-            (*ctxt).interleaves = xmlHashCreate(10);
+            (*ctxt).interleaves = xml_hash_create(10);
         }
         if (*ctxt).interleaves.is_null() {
             xml_rng_perr(
@@ -6865,7 +6866,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                 (*ctxt).nb_interleaves,
             );
             (*ctxt).nb_interleaves += 1;
-            if xmlHashAddEntry((*ctxt).interleaves, tmpname.as_ptr() as _, cur as _) < 0 {
+            if xml_hash_add_entry((*ctxt).interleaves, tmpname.as_ptr() as _, cur as _) < 0 {
                 xml_rng_perr(
                     ctxt,
                     (*cur).node,
@@ -6949,14 +6950,14 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
      */
     xml_relaxng_combine_start(ctxt, ret);
     if !(*ret).defs.is_null() {
-        xmlHashScan((*ret).defs, xml_relaxng_check_combine, ctxt as _);
+        xml_hash_scan((*ret).defs, xml_relaxng_check_combine, ctxt as _);
     }
 
     /*
      * link together defines and refs in this grammar
      */
     if !(*ret).refs.is_null() {
-        xmlHashScan((*ret).refs, xml_relaxng_check_reference, ctxt as _);
+        xml_hash_scan((*ret).refs, xml_relaxng_check_reference, ctxt as _);
     }
 
     /* @@@@ */
@@ -7577,7 +7578,7 @@ unsafe extern "C" fn xml_relaxng_check_choice_determinism(
      * a bit strong but safe
      */
     if is_nullable == 0 {
-        triage = xmlHashCreate(10);
+        triage = xml_hash_create(10);
     } else {
         is_triable = 0;
     }
@@ -7593,25 +7594,34 @@ unsafe extern "C" fn xml_relaxng_check_choice_determinism(
             tmp = *list.add(i as usize);
             while !(*tmp).is_null() && is_triable == 1 {
                 if (*(*tmp)).typ == XmlRelaxNGType::Text {
-                    res = xmlHashAddEntry2(triage, c"#text".as_ptr() as _, null_mut(), cur as _);
+                    res = xml_hash_add_entry2(triage, c"#text".as_ptr() as _, null_mut(), cur as _);
                     if res != 0 {
                         is_triable = -1;
                     }
                 } else if (*(*tmp)).typ == XmlRelaxNGType::Element && !(*(*tmp)).name.is_null() {
                     if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
-                        res = xmlHashAddEntry2(triage, (*(*tmp)).name, null_mut(), cur as _);
+                        res = xml_hash_add_entry2(triage, (*(*tmp)).name, null_mut(), cur as _);
                     } else {
-                        res = xmlHashAddEntry2(triage, (*(*tmp)).name, (*(*tmp)).ns, cur as _);
+                        res = xml_hash_add_entry2(triage, (*(*tmp)).name, (*(*tmp)).ns, cur as _);
                     }
                     if res != 0 {
                         is_triable = -1;
                     }
                 } else if (*(*tmp)).typ == XmlRelaxNGType::Element {
                     if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
-                        res = xmlHashAddEntry2(triage, c"#any".as_ptr() as _, null_mut(), cur as _);
+                        res = xml_hash_add_entry2(
+                            triage,
+                            c"#any".as_ptr() as _,
+                            null_mut(),
+                            cur as _,
+                        );
                     } else {
-                        res =
-                            xmlHashAddEntry2(triage, c"#any".as_ptr() as _, (*(*tmp)).ns, cur as _);
+                        res = xml_hash_add_entry2(
+                            triage,
+                            c"#any".as_ptr() as _,
+                            (*(*tmp)).ns,
+                            cur as _,
+                        );
                     }
                     if res != 0 {
                         is_triable = -1;
@@ -7658,7 +7668,7 @@ unsafe extern "C" fn xml_relaxng_check_choice_determinism(
         (*def).dflags |= IS_TRIABLE as i16;
         (*def).data = triage as _;
     } else if !triage.is_null() {
-        xmlHashFree(triage, None);
+        xml_hash_free(triage, None);
     }
     (*def).dflags |= IS_PROCESSED as i16;
 }
@@ -8878,7 +8888,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
      * try to preprocess interleaves
      */
     if !(*ctxt).interleaves.is_null() {
-        xmlHashScan(
+        xml_hash_scan(
             (*ctxt).interleaves,
             xml_relaxng_compute_interleaves,
             ctxt as _,
@@ -8948,10 +8958,10 @@ unsafe extern "C" fn xml_relaxng_free_grammar(grammar: XmlRelaxNGGrammarPtr) {
         xml_relaxng_free_grammar((*grammar).next);
     }
     if !(*grammar).refs.is_null() {
-        xmlHashFree((*grammar).refs, None);
+        xml_hash_free((*grammar).refs, None);
     }
     if !(*grammar).defs.is_null() {
-        xmlHashFree((*grammar).defs, None);
+        xml_hash_free((*grammar).defs, None);
     }
 
     xml_free(grammar as _);
@@ -11073,26 +11083,26 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                 (*cur).typ,
                 XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
             ) {
-                tmp = xmlHashLookup2((*partitions).triage, c"#text".as_ptr() as _, null_mut());
+                tmp = xml_hash_lookup2((*partitions).triage, c"#text".as_ptr() as _, null_mut());
             } else if (*cur).typ == XmlElementType::XmlElementNode {
                 if !(*cur).ns.is_null() {
-                    tmp = xmlHashLookup2(
+                    tmp = xml_hash_lookup2(
                         (*partitions).triage,
                         (*cur).name,
                         (*(*cur).ns).href.load(Ordering::Relaxed),
                     );
                     if tmp.is_null() {
-                        tmp = xmlHashLookup2(
+                        tmp = xml_hash_lookup2(
                             (*partitions).triage,
                             c"#any".as_ptr() as _,
                             (*(*cur).ns).href.load(Ordering::Relaxed),
                         );
                     }
                 } else {
-                    tmp = xmlHashLookup2((*partitions).triage, (*cur).name, null_mut());
+                    tmp = xml_hash_lookup2((*partitions).triage, (*cur).name, null_mut());
                 }
                 if tmp.is_null() {
-                    tmp = xmlHashLookup2((*partitions).triage, c"#any".as_ptr() as _, null_mut());
+                    tmp = xml_hash_lookup2((*partitions).triage, c"#any".as_ptr() as _, null_mut());
                 }
             }
 
@@ -11885,26 +11895,26 @@ unsafe extern "C" fn xmlRelaxNGValidateState(
                     (*node).typ,
                     XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
                 ) {
-                    list = xmlHashLookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
+                    list = xml_hash_lookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
                 } else if (*node).typ == XmlElementType::XmlElementNode {
                     if !(*node).ns.is_null() {
-                        list = xmlHashLookup2(
+                        list = xml_hash_lookup2(
                             triage,
                             (*node).name,
                             (*(*node).ns).href.load(Ordering::Relaxed),
                         ) as _;
                         if list.is_null() {
-                            list = xmlHashLookup2(
+                            list = xml_hash_lookup2(
                                 triage,
                                 c"#any".as_ptr() as _,
                                 (*(*node).ns).href.load(Ordering::Relaxed),
                             ) as _;
                         }
                     } else {
-                        list = xmlHashLookup2(triage, (*node).name, null_mut()) as _;
+                        list = xml_hash_lookup2(triage, (*node).name, null_mut()) as _;
                     }
                     if list.is_null() {
-                        list = xmlHashLookup2(triage, c"#any".as_ptr() as _, null_mut()) as _;
+                        list = xml_hash_lookup2(triage, c"#any".as_ptr() as _, null_mut()) as _;
                     }
                 }
                 if list.is_null() {

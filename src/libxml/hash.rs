@@ -137,7 +137,7 @@ pub type XmlHashScannerFull = unsafe extern "C" fn(
  *
  * Returns the newly created object, or NULL if an error occurred.
  */
-pub unsafe extern "C" fn xmlHashCreate(mut size: c_int) -> XmlHashTablePtr {
+pub unsafe extern "C" fn xml_hash_create(mut size: c_int) -> XmlHashTablePtr {
     xml_init_parser();
 
     if size <= 0 {
@@ -173,8 +173,8 @@ pub unsafe extern "C" fn xmlHashCreate(mut size: c_int) -> XmlHashTablePtr {
  *
  * Returns the newly created object, or NULL if an error occurred.
  */
-pub unsafe extern "C" fn xmlHashCreateDict(size: c_int, dict: XmlDictPtr) -> XmlHashTablePtr {
-    let table: XmlHashTablePtr = xmlHashCreate(size);
+pub unsafe extern "C" fn xml_hash_create_dict(size: c_int, dict: XmlDictPtr) -> XmlHashTablePtr {
+    let table: XmlHashTablePtr = xml_hash_create(size);
     if !table.is_null() {
         (*table).dict = dict;
         xml_dict_reference(dict);
@@ -190,7 +190,7 @@ pub unsafe extern "C" fn xmlHashCreateDict(size: c_int, dict: XmlDictPtr) -> Xml
  * Free the hash @table and its contents. The userdata is
  * deallocated with @f if provided.
  */
-pub unsafe extern "C" fn xmlHashFree(table: XmlHashTablePtr, f: Option<XmlHashDeallocator>) {
+pub unsafe extern "C" fn xml_hash_free(table: XmlHashTablePtr, f: Option<XmlHashDeallocator>) {
     let mut iter: XmlHashEntryPtr;
     let mut next: XmlHashEntryPtr;
     let mut inside_table: c_int;
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn xmlHashFree(table: XmlHashTablePtr, f: Option<XmlHashDe
  *
  * Free a hash table entry with xmlFree.
  */
-pub unsafe extern "C" fn xmlHashDefaultDeallocator(entry: *mut c_void, _name: *const XmlChar) {
+pub unsafe extern "C" fn xml_hash_default_deallocator(entry: *mut c_void, _name: *const XmlChar) {
     xml_free(entry);
 }
 
@@ -271,12 +271,12 @@ pub unsafe extern "C" fn xmlHashDefaultDeallocator(entry: *mut c_void, _name: *c
  *
  * Returns 0 the addition succeeded and -1 in case of error.
  */
-pub unsafe extern "C" fn xmlHashAddEntry(
+pub unsafe extern "C" fn xml_hash_add_entry(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     userdata: *mut c_void,
 ) -> c_int {
-    xmlHashAddEntry3(table, name, null(), null(), userdata)
+    xml_hash_add_entry3(table, name, null(), null(), userdata)
 }
 
 /**
@@ -292,13 +292,13 @@ pub unsafe extern "C" fn xmlHashAddEntry(
  *
  * Returns 0 the addition succeeded and -1 in case of error.
  */
-pub unsafe extern "C" fn xmlHashUpdateEntry(
+pub unsafe extern "C" fn xml_hash_update_entry(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     userdata: *mut c_void,
     f: Option<XmlHashDeallocator>,
 ) -> c_int {
-    xmlHashUpdateEntry3(table, name, null(), null(), userdata, f)
+    xml_hash_update_entry3(table, name, null(), null(), userdata, f)
 }
 
 /**
@@ -313,13 +313,13 @@ pub unsafe extern "C" fn xmlHashUpdateEntry(
  *
  * Returns 0 the addition succeeded and -1 in case of error.
  */
-pub unsafe extern "C" fn xmlHashAddEntry2(
+pub unsafe extern "C" fn xml_hash_add_entry2(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     name2: *const XmlChar,
     userdata: *mut c_void,
 ) -> c_int {
-    xmlHashAddEntry3(table, name, name2, null(), userdata)
+    xml_hash_add_entry3(table, name, name2, null(), userdata)
 }
 
 /**
@@ -336,25 +336,21 @@ pub unsafe extern "C" fn xmlHashAddEntry2(
  *
  * Returns 0 the addition succeeded and -1 in case of error.
  */
-pub unsafe extern "C" fn xmlHashUpdateEntry2(
+pub unsafe extern "C" fn xml_hash_update_entry2(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     name2: *const XmlChar,
     userdata: *mut c_void,
     f: Option<XmlHashDeallocator>,
 ) -> c_int {
-    xmlHashUpdateEntry3(table, name, name2, null(), userdata, f)
+    xml_hash_update_entry3(table, name, name2, null(), userdata, f)
 }
 
 /*
  * xmlHashComputeKey:
  * Calculate the hash key
  */
-// #ifdef __clang__
-// ATTRIBUTE_NO_SANITIZE("unsigned-integer-overflow")
-// ATTRIBUTE_NO_SANITIZE("unsigned-shift-base")
-// #endif
-unsafe extern "C" fn xmlHashComputeKey(
+unsafe extern "C" fn xml_hash_compute_key(
     table: XmlHashTablePtr,
     mut name: *const XmlChar,
     mut name2: *const XmlChar,
@@ -415,7 +411,7 @@ unsafe extern "C" fn xmlHashComputeKey(
  *
  * Returns 0 in case of success, -1 in case of failure
  */
-unsafe extern "C" fn xmlHashGrow(table: XmlHashTablePtr, size: c_int) -> c_int {
+unsafe extern "C" fn xml_hash_grow(table: XmlHashTablePtr, size: c_int) -> c_int {
     let mut key: c_ulong;
     let mut next: XmlHashEntryPtr;
     let mut iter: XmlHashEntryPtr;
@@ -462,7 +458,7 @@ unsafe extern "C" fn xmlHashGrow(table: XmlHashTablePtr, size: c_int) -> c_int {
         if (*oldtable.add(i as usize)).valid == 0 {
             continue;
         }
-        key = xmlHashComputeKey(
+        key = xml_hash_compute_key(
             table,
             (*oldtable.add(i as usize)).name,
             (*oldtable.add(i as usize)).name2,
@@ -485,7 +481,7 @@ unsafe extern "C" fn xmlHashGrow(table: XmlHashTablePtr, size: c_int) -> c_int {
              * put back the entry in the new table
              */
 
-            key = xmlHashComputeKey(table, (*iter).name, (*iter).name2, (*iter).name3);
+            key = xml_hash_compute_key(table, (*iter).name, (*iter).name2, (*iter).name3);
             if (*(*table).table.add(key as usize)).valid == 0 {
                 memcpy(
                     (*table).table.add(key as usize) as _,
@@ -531,7 +527,7 @@ unsafe extern "C" fn xmlHashGrow(table: XmlHashTablePtr, size: c_int) -> c_int {
  *
  * Returns 0 the addition succeeded and -1 in case of error.
  */
-pub unsafe extern "C" fn xmlHashAddEntry3(
+pub unsafe extern "C" fn xml_hash_add_entry3(
     table: XmlHashTablePtr,
     mut name: *const XmlChar,
     mut name2: *const XmlChar,
@@ -573,7 +569,7 @@ pub unsafe extern "C" fn xmlHashAddEntry3(
     /*
      * Check for duplicate and insertion location.
      */
-    let key: c_ulong = xmlHashComputeKey(table, name, name2, name3);
+    let key: c_ulong = xml_hash_compute_key(table, name, name2, name3);
     if (*(*table).table.add(key as usize)).valid == 0 {
         insert = null_mut();
     } else if !(*table).dict.is_null() {
@@ -623,74 +619,58 @@ pub unsafe extern "C" fn xmlHashAddEntry3(
         }
     }
 
-    if !(*table).dict.is_null() {
-        (*entry).name = name as *mut XmlChar;
-        (*entry).name2 = name2 as *mut XmlChar;
-        (*entry).name3 = name3 as *mut XmlChar;
-    } else {
-        (*entry).name = xml_strdup(name);
-        if (*entry).name.is_null() {
-            (*entry).name2 = null_mut();
-            // goto error;
-            xml_free((*entry).name2 as _);
-            xml_free((*entry).name as _);
-            if !insert.is_null() {
-                xml_free(entry as _);
-            }
-            return -1;
-        }
-        if name2.is_null() {
-            (*entry).name2 = null_mut();
+    'error: {
+        if !(*table).dict.is_null() {
+            (*entry).name = name as *mut XmlChar;
+            (*entry).name2 = name2 as *mut XmlChar;
+            (*entry).name3 = name3 as *mut XmlChar;
         } else {
-            (*entry).name2 = xml_strdup(name2);
-            if (*entry).name2.is_null() {
-                // goto error;
-                xml_free((*entry).name2 as _);
-                xml_free((*entry).name as _);
-                if !insert.is_null() {
-                    xml_free(entry as _);
+            (*entry).name = xml_strdup(name);
+            if (*entry).name.is_null() {
+                (*entry).name2 = null_mut();
+                break 'error;
+            }
+            if name2.is_null() {
+                (*entry).name2 = null_mut();
+            } else {
+                (*entry).name2 = xml_strdup(name2);
+                if (*entry).name2.is_null() {
+                    break 'error;
                 }
-                return -1;
+            }
+            if name3.is_null() {
+                (*entry).name3 = null_mut();
+            } else {
+                (*entry).name3 = xml_strdup(name3);
+                if (*entry).name3.is_null() {
+                    break 'error;
+                }
             }
         }
-        if name3.is_null() {
-            (*entry).name3 = null_mut();
-        } else {
-            (*entry).name3 = xml_strdup(name3);
-            if (*entry).name3.is_null() {
-                // goto error;
-                xml_free((*entry).name2 as _);
-                xml_free((*entry).name as _);
-                if !insert.is_null() {
-                    xml_free(entry as _);
-                }
-                return -1;
-            }
+        (*entry).payload = userdata;
+        (*entry).next = null_mut();
+        (*entry).valid = 1;
+
+        if !insert.is_null() {
+            (*insert).next = entry;
         }
+
+        (*table).nb_elems += 1;
+
+        if len > MAX_HASH_LEN as u64 {
+            xml_hash_grow(table, MAX_HASH_LEN as i32 * (*table).size);
+        }
+
+        return 0;
     }
-    (*entry).payload = userdata;
-    (*entry).next = null_mut();
-    (*entry).valid = 1;
-
-    if !insert.is_null() {
-        (*insert).next = entry;
-    }
-
-    (*table).nb_elems += 1;
-
-    if len > MAX_HASH_LEN as u64 {
-        xmlHashGrow(table, MAX_HASH_LEN as i32 * (*table).size);
-    }
-
-    0
 
     // error:
-    //     xmlFree((*entry).name2);
-    //     xmlFree((*entry).name);
-    //     if (!insert.is_null()) {
-    //         xmlFree(entry);
-    // 	}
-    //     return(-1);
+    xml_free((*entry).name2 as _);
+    xml_free((*entry).name as _);
+    if !insert.is_null() {
+        xml_free(entry as _);
+    }
+    -1
 }
 
 /**
@@ -708,7 +688,7 @@ pub unsafe extern "C" fn xmlHashAddEntry3(
  *
  * Returns 0 the addition succeeded and -1 in case of error.
  */
-pub unsafe extern "C" fn xmlHashUpdateEntry3(
+pub unsafe extern "C" fn xml_hash_update_entry3(
     table: XmlHashTablePtr,
     mut name: *const XmlChar,
     mut name2: *const XmlChar,
@@ -750,7 +730,7 @@ pub unsafe extern "C" fn xmlHashUpdateEntry3(
     /*
      * Check for duplicate and insertion location.
      */
-    let key: c_ulong = xmlHashComputeKey(table, name, name2, name3);
+    let key: c_ulong = xml_hash_compute_key(table, name, name2, name3);
     if (*(*table).table.add(key as usize)).valid == 0 {
         insert = null_mut();
     } else if !(*table).dict.is_null() {
@@ -814,68 +794,52 @@ pub unsafe extern "C" fn xmlHashUpdateEntry3(
         }
     }
 
-    if !(*table).dict.is_null() {
-        (*entry).name = name as *mut XmlChar;
-        (*entry).name2 = name2 as *mut XmlChar;
-        (*entry).name3 = name3 as *mut XmlChar;
-    } else {
-        (*entry).name = xml_strdup(name);
-        if (*entry).name.is_null() {
-            (*entry).name2 = null_mut();
-            // goto error;
-            xml_free((*entry).name2 as _);
-            xml_free((*entry).name as _);
-            if !insert.is_null() {
-                xml_free(entry as _);
-            }
-            return -1;
-        }
-        if name2.is_null() {
-            (*entry).name2 = null_mut();
+    'error: {
+        if !(*table).dict.is_null() {
+            (*entry).name = name as *mut XmlChar;
+            (*entry).name2 = name2 as *mut XmlChar;
+            (*entry).name3 = name3 as *mut XmlChar;
         } else {
-            (*entry).name2 = xml_strdup(name2);
-            if (*entry).name2.is_null() {
-                // goto error;
-                xml_free((*entry).name2 as _);
-                xml_free((*entry).name as _);
-                if !insert.is_null() {
-                    xml_free(entry as _);
+            (*entry).name = xml_strdup(name);
+            if (*entry).name.is_null() {
+                (*entry).name2 = null_mut();
+                break 'error;
+            }
+            if name2.is_null() {
+                (*entry).name2 = null_mut();
+            } else {
+                (*entry).name2 = xml_strdup(name2);
+                if (*entry).name2.is_null() {
+                    break 'error;
                 }
-                return -1;
+            }
+            if name3.is_null() {
+                (*entry).name3 = null_mut();
+            } else {
+                (*entry).name3 = xml_strdup(name3);
+                if (*entry).name3.is_null() {
+                    break 'error;
+                }
             }
         }
-        if name3.is_null() {
-            (*entry).name3 = null_mut();
-        } else {
-            (*entry).name3 = xml_strdup(name3);
-            if (*entry).name3.is_null() {
-                // goto error;
-                xml_free((*entry).name2 as _);
-                xml_free((*entry).name as _);
-                if !insert.is_null() {
-                    xml_free(entry as _);
-                }
-                return -1;
-            }
-        }
-    }
-    (*entry).payload = userdata;
-    (*entry).next = null_mut();
-    (*entry).valid = 1;
-    (*table).nb_elems += 1;
+        (*entry).payload = userdata;
+        (*entry).next = null_mut();
+        (*entry).valid = 1;
+        (*table).nb_elems += 1;
 
-    if !insert.is_null() {
-        (*insert).next = entry;
+        if !insert.is_null() {
+            (*insert).next = entry;
+        }
+        return 0;
     }
-    0
 
     // error:
-    //     xmlFree((*entry).name2);
-    //     xmlFree((*entry).name);
-    //     if (!insert.is_null()) {
-    //         xmlFree(entry);
-    // 	}
-    //     return(-1);
+    xml_free((*entry).name2 as _);
+    xml_free((*entry).name as _);
+    if !insert.is_null() {
+        xml_free(entry as _);
+    }
+    -1
 }
 
 /*
@@ -893,12 +857,12 @@ pub unsafe extern "C" fn xmlHashUpdateEntry3(
  *
  * Returns 0 if the removal succeeded and -1 in case of error or not found.
  */
-pub unsafe extern "C" fn xmlHashRemoveEntry(
+pub unsafe extern "C" fn xml_hash_remove_entry(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     f: Option<XmlHashDeallocator>,
 ) -> c_int {
-    xmlHashRemoveEntry3(table, name, null(), null(), f)
+    xml_hash_remove_entry3(table, name, null(), null(), f)
 }
 
 /**
@@ -914,13 +878,13 @@ pub unsafe extern "C" fn xmlHashRemoveEntry(
  *
  * Returns 0 if the removal succeeded and -1 in case of error or not found.
  */
-pub unsafe extern "C" fn xmlHashRemoveEntry2(
+pub unsafe extern "C" fn xml_hash_remove_entry2(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     name2: *const XmlChar,
     f: Option<XmlHashDeallocator>,
 ) -> c_int {
-    xmlHashRemoveEntry3(table, name, name2, null(), f)
+    xml_hash_remove_entry3(table, name, name2, null(), f)
 }
 
 /**
@@ -937,7 +901,7 @@ pub unsafe extern "C" fn xmlHashRemoveEntry2(
  *
  * Returns 0 if the removal succeeded and -1 in case of error or not found.
  */
-pub unsafe extern "C" fn xmlHashRemoveEntry3(
+pub unsafe extern "C" fn xml_hash_remove_entry3(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     name2: *const XmlChar,
@@ -951,7 +915,7 @@ pub unsafe extern "C" fn xmlHashRemoveEntry3(
         return -1;
     }
 
-    let key: c_ulong = xmlHashComputeKey(table, name, name2, name3);
+    let key: c_ulong = xml_hash_compute_key(table, name, name2, name3);
     if (*(*table).table.add(key as usize)).valid == 0 {
         -1
     } else {
@@ -1014,11 +978,11 @@ pub unsafe extern "C" fn xmlHashRemoveEntry3(
  *
  * Returns the pointer to the userdata
  */
-pub unsafe extern "C" fn xmlHashLookup(
+pub unsafe extern "C" fn xml_hash_lookup(
     table: XmlHashTablePtr,
     name: *const XmlChar,
 ) -> *mut c_void {
-    xmlHashLookup3(table, name, null(), null())
+    xml_hash_lookup3(table, name, null(), null())
 }
 
 /**
@@ -1031,12 +995,12 @@ pub unsafe extern "C" fn xmlHashLookup(
  *
  * Returns the pointer to the userdata
  */
-pub unsafe extern "C" fn xmlHashLookup2(
+pub unsafe extern "C" fn xml_hash_lookup2(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     name2: *const XmlChar,
 ) -> *mut c_void {
-    xmlHashLookup3(table, name, name2, null())
+    xml_hash_lookup3(table, name, name2, null())
 }
 
 /**
@@ -1050,7 +1014,7 @@ pub unsafe extern "C" fn xmlHashLookup2(
  *
  * Returns the a pointer to the userdata
  */
-pub unsafe extern "C" fn xmlHashLookup3(
+pub unsafe extern "C" fn xml_hash_lookup3(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     name2: *const XmlChar,
@@ -1064,7 +1028,7 @@ pub unsafe extern "C" fn xmlHashLookup3(
     if name.is_null() {
         return null_mut();
     }
-    let key: c_ulong = xmlHashComputeKey(table, name, name2, name3);
+    let key: c_ulong = xml_hash_compute_key(table, name, name2, name3);
     if (*(*table).table.add(key as usize)).valid == 0 {
         return null_mut();
     }
@@ -1103,12 +1067,12 @@ pub unsafe extern "C" fn xmlHashLookup3(
  *
  * Returns the pointer to the userdata
  */
-pub unsafe extern "C" fn xmlHashQLookup(
+pub unsafe extern "C" fn xml_hash_qlookup(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     prefix: *const XmlChar,
 ) -> *mut c_void {
-    xmlHashQLookup3(table, prefix, name, null(), null(), null(), null())
+    xml_hash_qlookup3(table, prefix, name, null(), null(), null(), null())
 }
 
 /**
@@ -1123,21 +1087,17 @@ pub unsafe extern "C" fn xmlHashQLookup(
  *
  * Returns the pointer to the userdata
  */
-pub unsafe extern "C" fn xmlHashQLookup2(
+pub unsafe extern "C" fn xml_hash_qlookup2(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     prefix: *const XmlChar,
     name2: *const XmlChar,
     prefix2: *const XmlChar,
 ) -> *mut c_void {
-    xmlHashQLookup3(table, prefix, name, prefix2, name2, null(), null())
+    xml_hash_qlookup3(table, prefix, name, prefix2, name2, null(), null())
 }
 
-// #ifdef __clang__
-// ATTRIBUTE_NO_SANITIZE("unsigned-integer-overflow")
-// ATTRIBUTE_NO_SANITIZE("unsigned-shift-base")
-// #endif
-unsafe extern "C" fn xmlHashComputeQKey(
+unsafe extern "C" fn xml_hash_compute_qkey(
     table: XmlHashTablePtr,
     mut prefix: *const XmlChar,
     mut name: *const XmlChar,
@@ -1259,7 +1219,7 @@ unsafe extern "C" fn xmlHashComputeQKey(
  *
  * Returns the a pointer to the userdata
  */
-pub unsafe extern "C" fn xmlHashQLookup3(
+pub unsafe extern "C" fn xml_hash_qlookup3(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     prefix: *const XmlChar,
@@ -1276,7 +1236,7 @@ pub unsafe extern "C" fn xmlHashQLookup3(
     if name.is_null() {
         return null_mut();
     }
-    let key: c_ulong = xmlHashComputeQKey(table, prefix, name, prefix2, name2, prefix3, name3);
+    let key: c_ulong = xml_hash_compute_qkey(table, prefix, name, prefix2, name2, prefix3, name3);
     if (*(*table).table.add(key as usize)).valid == 0 {
         return null_mut();
     }
@@ -1305,7 +1265,7 @@ pub unsafe extern "C" fn xmlHashQLookup3(
  *
  * Returns the new table or NULL in case of error.
  */
-pub unsafe extern "C" fn xmlHashCopy(
+pub unsafe extern "C" fn xml_hash_copy(
     table: XmlHashTablePtr,
     f: Option<XmlHashCopier>,
 ) -> XmlHashTablePtr {
@@ -1320,7 +1280,7 @@ pub unsafe extern "C" fn xmlHashCopy(
     }
     let f = f.unwrap();
 
-    let ret: XmlHashTablePtr = xmlHashCreate((*table).size);
+    let ret: XmlHashTablePtr = xml_hash_create((*table).size);
     if ret.is_null() {
         return null_mut();
     }
@@ -1333,7 +1293,7 @@ pub unsafe extern "C" fn xmlHashCopy(
             iter = (*table).table.add(i as usize);
             while !iter.is_null() {
                 next = (*iter).next;
-                xmlHashAddEntry3(
+                xml_hash_add_entry3(
                     ret,
                     (*iter).name,
                     (*iter).name2,
@@ -1357,7 +1317,7 @@ pub unsafe extern "C" fn xmlHashCopy(
  * Returns the number of elements in the hash table or
  * -1 in case of error
  */
-pub unsafe extern "C" fn xmlHashSize(table: XmlHashTablePtr) -> c_int {
+pub unsafe extern "C" fn xml_hash_size(table: XmlHashTablePtr) -> c_int {
     if table.is_null() {
         return -1;
     }
@@ -1369,7 +1329,7 @@ struct StubData {
     data: *mut c_void,
 }
 
-unsafe extern "C" fn stubHashScannerFull(
+unsafe extern "C" fn stub_hash_scanner_full(
     payload: *mut c_void,
     data: *mut c_void,
     name: *const XmlChar,
@@ -1388,13 +1348,17 @@ unsafe extern "C" fn stubHashScannerFull(
  *
  * Scan the hash @table and applied @f to each value.
  */
-pub unsafe extern "C" fn xmlHashScan(table: XmlHashTablePtr, f: XmlHashScanner, data: *mut c_void) {
+pub unsafe extern "C" fn xml_hash_scan(
+    table: XmlHashTablePtr,
+    f: XmlHashScanner,
+    data: *mut c_void,
+) {
     let mut stubdata: StubData = unsafe { zeroed() };
     stubdata.data = data;
     stubdata.hashscanner = Some(f);
-    xmlHashScanFull(
+    xml_hash_scan_full(
         table,
-        Some(stubHashScannerFull),
+        Some(stub_hash_scanner_full),
         addr_of_mut!(stubdata) as _,
     );
 }
@@ -1412,7 +1376,7 @@ pub unsafe extern "C" fn xmlHashScan(table: XmlHashTablePtr, f: XmlHashScanner, 
  * (@name, @name2, @name3) tuple. If one of the names is null,
  * the comparison is considered to match.
  */
-pub unsafe extern "C" fn xmlHashScan3(
+pub unsafe extern "C" fn xml_hash_scan3(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     name2: *const XmlChar,
@@ -1423,12 +1387,12 @@ pub unsafe extern "C" fn xmlHashScan3(
     let mut stubdata: StubData = unsafe { zeroed() };
     stubdata.data = data;
     stubdata.hashscanner = Some(f);
-    xmlHashScanFull3(
+    xml_hash_scan_full3(
         table,
         name,
         name2,
         name3,
-        Some(stubHashScannerFull),
+        Some(stub_hash_scanner_full),
         addr_of_mut!(stubdata) as _,
     );
 }
@@ -1441,7 +1405,7 @@ pub unsafe extern "C" fn xmlHashScan3(
  *
  * Scan the hash @table and applied @f to each value.
  */
-pub unsafe extern "C" fn xmlHashScanFull(
+pub unsafe extern "C" fn xml_hash_scan_full(
     table: XmlHashTablePtr,
     f: Option<XmlHashScannerFull>,
     data: *mut c_void,
@@ -1466,7 +1430,7 @@ pub unsafe extern "C" fn xmlHashScanFull(
             while !iter.is_null() {
                 next = (*iter).next;
                 nb = (*table).nb_elems;
-                if let Some(f) = f.as_ref() {
+                if let Some(f) = f {
                     if !(*iter).payload.is_null() {
                         f(
                             (*iter).payload,
@@ -1510,7 +1474,7 @@ pub unsafe extern "C" fn xmlHashScanFull(
  * (@name, @name2, @name3) tuple. If one of the names is null,
  * the comparison is considered to match.
  */
-pub unsafe extern "C" fn xmlHashScanFull3(
+pub unsafe extern "C" fn xml_hash_scan_full3(
     table: XmlHashTablePtr,
     name: *const XmlChar,
     name2: *const XmlChar,
@@ -1578,7 +1542,7 @@ mod tests {
                         let name = gen_const_xml_char_ptr(n_name, 1);
                         let userdata = gen_userdata(n_userdata, 2);
 
-                        let ret_val = xmlHashAddEntry(table, name, userdata);
+                        let ret_val = xml_hash_add_entry(table, name, userdata);
                         desret_int(ret_val);
                         des_xml_hash_table_ptr(n_table, table, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -1616,7 +1580,7 @@ mod tests {
                             let name2 = gen_const_xml_char_ptr(n_name2, 2);
                             let userdata = gen_userdata(n_userdata, 3);
 
-                            let ret_val = xmlHashAddEntry2(table, name, name2, userdata);
+                            let ret_val = xml_hash_add_entry2(table, name, name2, userdata);
                             desret_int(ret_val);
                             des_xml_hash_table_ptr(n_table, table, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
@@ -1659,7 +1623,8 @@ mod tests {
                                 let name3 = gen_const_xml_char_ptr(n_name3, 3);
                                 let userdata = gen_userdata(n_userdata, 4);
 
-                                let ret_val = xmlHashAddEntry3(table, name, name2, name3, userdata);
+                                let ret_val =
+                                    xml_hash_add_entry3(table, name, name2, name3, userdata);
                                 desret_int(ret_val);
                                 des_xml_hash_table_ptr(n_table, table, 0);
                                 des_const_xml_char_ptr(n_name, name, 1);
@@ -1716,7 +1681,7 @@ mod tests {
                     let entry = gen_void_ptr(n_entry, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    xmlHashDefaultDeallocator(entry, name);
+                    xml_hash_default_deallocator(entry, name);
                     des_void_ptr(n_entry, entry, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
                     xmlResetLastError();
@@ -1748,7 +1713,7 @@ mod tests {
                     let table = gen_xml_hash_table_ptr(n_table, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    let ret_val = xmlHashLookup(table, name);
+                    let ret_val = xml_hash_lookup(table, name);
                     desret_void_ptr(ret_val);
                     des_xml_hash_table_ptr(n_table, table, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
@@ -1780,7 +1745,7 @@ mod tests {
                         let name = gen_const_xml_char_ptr(n_name, 1);
                         let name2 = gen_const_xml_char_ptr(n_name2, 2);
 
-                        let ret_val = xmlHashLookup2(table, name, name2);
+                        let ret_val = xml_hash_lookup2(table, name, name2);
                         desret_void_ptr(ret_val);
                         des_xml_hash_table_ptr(n_table, table, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -1818,7 +1783,7 @@ mod tests {
                             let name2 = gen_const_xml_char_ptr(n_name2, 2);
                             let name3 = gen_const_xml_char_ptr(n_name3, 3);
 
-                            let ret_val = xmlHashLookup3(table, name, name2, name3);
+                            let ret_val = xml_hash_lookup3(table, name, name2, name3);
                             desret_void_ptr(ret_val);
                             des_xml_hash_table_ptr(n_table, table, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
@@ -1857,7 +1822,7 @@ mod tests {
                         let prefix = gen_const_xml_char_ptr(n_prefix, 1);
                         let name = gen_const_xml_char_ptr(n_name, 2);
 
-                        let ret_val = xmlHashQLookup(table, prefix, name);
+                        let ret_val = xml_hash_qlookup(table, prefix, name);
                         desret_void_ptr(ret_val);
                         des_xml_hash_table_ptr(n_table, table, 0);
                         des_const_xml_char_ptr(n_prefix, prefix, 1);
@@ -1897,7 +1862,8 @@ mod tests {
                                 let prefix2 = gen_const_xml_char_ptr(n_prefix2, 3);
                                 let name2 = gen_const_xml_char_ptr(n_name2, 4);
 
-                                let ret_val = xmlHashQLookup2(table, prefix, name, prefix2, name2);
+                                let ret_val =
+                                    xml_hash_qlookup2(table, prefix, name, prefix2, name2);
                                 desret_void_ptr(ret_val);
                                 des_xml_hash_table_ptr(n_table, table, 0);
                                 des_const_xml_char_ptr(n_prefix, prefix, 1);
@@ -1947,7 +1913,7 @@ mod tests {
                                         let prefix3 = gen_const_xml_char_ptr(n_prefix3, 5);
                                         let name3 = gen_const_xml_char_ptr(n_name3, 6);
 
-                                        let ret_val = xmlHashQLookup3(
+                                        let ret_val = xml_hash_qlookup3(
                                             table, prefix, name, prefix2, name2, prefix3, name3,
                                         );
                                         desret_void_ptr(ret_val);
@@ -1996,7 +1962,7 @@ mod tests {
                         let name = gen_const_xml_char_ptr(n_name, 1);
                         let f = gen_xml_hash_deallocator(n_f, 2);
 
-                        let ret_val = xmlHashRemoveEntry(table, name, f);
+                        let ret_val = xml_hash_remove_entry(table, name, f);
                         desret_int(ret_val);
                         des_xml_hash_table_ptr(n_table, table, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -2036,7 +2002,7 @@ mod tests {
                             let name2 = gen_const_xml_char_ptr(n_name2, 2);
                             let f = gen_xml_hash_deallocator(n_f, 3);
 
-                            let ret_val = xmlHashRemoveEntry2(table, name, name2, f);
+                            let ret_val = xml_hash_remove_entry2(table, name, name2, f);
                             desret_int(ret_val);
                             des_xml_hash_table_ptr(n_table, table, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
@@ -2081,7 +2047,7 @@ mod tests {
                                 let name3 = gen_const_xml_char_ptr(n_name3, 3);
                                 let f = gen_xml_hash_deallocator(n_f, 4);
 
-                                let ret_val = xmlHashRemoveEntry3(table, name, name2, name3, f);
+                                let ret_val = xml_hash_remove_entry3(table, name, name2, name3, f);
                                 desret_int(ret_val);
                                 des_xml_hash_table_ptr(n_table, table, 0);
                                 des_const_xml_char_ptr(n_name, name, 1);
@@ -2146,7 +2112,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let table = gen_xml_hash_table_ptr(n_table, 0);
 
-                let ret_val = xmlHashSize(table);
+                let ret_val = xml_hash_size(table);
                 desret_int(ret_val);
                 des_xml_hash_table_ptr(n_table, table, 0);
                 xmlResetLastError();
@@ -2177,7 +2143,7 @@ mod tests {
                             let userdata = gen_userdata(n_userdata, 2);
                             let f = gen_xml_hash_deallocator(n_f, 3);
 
-                            let ret_val = xmlHashUpdateEntry(table, name, userdata, f);
+                            let ret_val = xml_hash_update_entry(table, name, userdata, f);
                             desret_int(ret_val);
                             des_xml_hash_table_ptr(n_table, table, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
@@ -2222,7 +2188,8 @@ mod tests {
                                 let userdata = gen_userdata(n_userdata, 3);
                                 let f = gen_xml_hash_deallocator(n_f, 4);
 
-                                let ret_val = xmlHashUpdateEntry2(table, name, name2, userdata, f);
+                                let ret_val =
+                                    xml_hash_update_entry2(table, name, name2, userdata, f);
                                 desret_int(ret_val);
                                 des_xml_hash_table_ptr(n_table, table, 0);
                                 des_const_xml_char_ptr(n_name, name, 1);
@@ -2272,8 +2239,9 @@ mod tests {
                                     let userdata = gen_userdata(n_userdata, 4);
                                     let f = gen_xml_hash_deallocator(n_f, 5);
 
-                                    let ret_val =
-                                        xmlHashUpdateEntry3(table, name, name2, name3, userdata, f);
+                                    let ret_val = xml_hash_update_entry3(
+                                        table, name, name2, name3, userdata, f,
+                                    );
                                     desret_int(ret_val);
                                     des_xml_hash_table_ptr(n_table, table, 0);
                                     des_const_xml_char_ptr(n_name, name, 1);

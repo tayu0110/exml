@@ -24,7 +24,7 @@ use super::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr};
 use super::{
     dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
     entities::{xml_get_doc_entity, XmlEntitiesTablePtr, XmlEntityType},
-    hash::xmlHashScan,
+    hash::xml_hash_scan,
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     tree::{
@@ -1885,7 +1885,7 @@ unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"Entities in internal subset\n".as_ptr());
         }
-        xmlHashScan(table, xml_ctxt_dump_entity_callback, ctxt as _);
+        xml_hash_scan(table, xml_ctxt_dump_entity_callback, ctxt as _);
     } else {
         fprintf((*ctxt).output, c"No entities in internal subset\n".as_ptr());
     }
@@ -1895,7 +1895,7 @@ unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"Entities in external subset\n".as_ptr());
         }
-        xmlHashScan(table, xml_ctxt_dump_entity_callback, ctxt as _);
+        xml_hash_scan(table, xml_ctxt_dump_entity_callback, ctxt as _);
     } else if (*ctxt).check == 0 {
         fprintf((*ctxt).output, c"No entities in external subset\n".as_ptr());
     }

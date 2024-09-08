@@ -45,7 +45,7 @@ use super::{
         xmlBufferAllocScheme, xmlDefaultBufferSize, xmlDeregisterNodeDefaultValue,
         xmlRegisterNodeDefaultValue, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc,
     },
-    hash::{xmlHashLookup, xmlHashRemoveEntry},
+    hash::{xml_hash_lookup, xml_hash_remove_entry},
     parser_internals::{
         xml_copy_char_multi_byte, XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC,
     },
@@ -3838,7 +3838,7 @@ unsafe extern "C" fn xml_get_entity_from_dtd(
 
     if !dtd.is_null() && !(*dtd).entities.is_null() {
         table = (*dtd).entities as _;
-        return xmlHashLookup(table, name) as _;
+        return xml_hash_lookup(table, name) as _;
         /* return(xmlGetEntityFromTable(table, name)); */
     }
     null_mut()
@@ -3863,7 +3863,7 @@ unsafe extern "C" fn xml_get_parameter_entity_from_dtd(
 
     if !dtd.is_null() && !(*dtd).pentities.is_null() {
         table = (*dtd).pentities as _;
-        return xmlHashLookup(table, name) as _;
+        return xml_hash_lookup(table, name) as _;
         /* return(xmlGetEntityFromTable(table, name)); */
     }
     null_mut()
@@ -6170,19 +6170,19 @@ pub unsafe extern "C" fn xml_unlink_node(cur: XmlNodePtr) {
         let doc: XmlDocPtr = (*cur).doc;
         if !doc.is_null() {
             if !(*doc).int_subset.is_null() {
-                if xmlHashLookup((*(*doc).int_subset).entities as _, (*cur).name) == cur as _ {
-                    xmlHashRemoveEntry((*(*doc).int_subset).entities as _, (*cur).name, None);
+                if xml_hash_lookup((*(*doc).int_subset).entities as _, (*cur).name) == cur as _ {
+                    xml_hash_remove_entry((*(*doc).int_subset).entities as _, (*cur).name, None);
                 }
-                if xmlHashLookup((*(*doc).int_subset).pentities as _, (*cur).name) == cur as _ {
-                    xmlHashRemoveEntry((*(*doc).int_subset).pentities as _, (*cur).name, None);
+                if xml_hash_lookup((*(*doc).int_subset).pentities as _, (*cur).name) == cur as _ {
+                    xml_hash_remove_entry((*(*doc).int_subset).pentities as _, (*cur).name, None);
                 }
             }
             if !(*doc).ext_subset.is_null() {
-                if xmlHashLookup((*(*doc).ext_subset).entities as _, (*cur).name) == cur as _ {
-                    xmlHashRemoveEntry((*(*doc).ext_subset).entities as _, (*cur).name, None);
+                if xml_hash_lookup((*(*doc).ext_subset).entities as _, (*cur).name) == cur as _ {
+                    xml_hash_remove_entry((*(*doc).ext_subset).entities as _, (*cur).name, None);
                 }
-                if xmlHashLookup((*(*doc).ext_subset).pentities as _, (*cur).name) == cur as _ {
-                    xmlHashRemoveEntry((*(*doc).ext_subset).pentities as _, (*cur).name, None);
+                if xml_hash_lookup((*(*doc).ext_subset).pentities as _, (*cur).name) == cur as _ {
+                    xml_hash_remove_entry((*(*doc).ext_subset).pentities as _, (*cur).name, None);
                 }
             }
         }

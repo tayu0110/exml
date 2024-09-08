@@ -59,7 +59,9 @@ use super::entities::XmlEntityType;
 use super::globals::{
     xmlParserDebugEntities, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc,
 };
-use super::hash::{xmlHashAddEntry2, xmlHashCreateDict, xmlHashLookup2, xmlHashUpdateEntry2};
+use super::hash::{
+    xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
+};
 use super::parser::{
     name_ns_push, ns_push, space_pop, space_push, xmlParseCharRef,
     xmlParseElementChildrenContentDeclPriv, xml_detect_sax2, xml_fatal_err_msg_str,
@@ -3934,14 +3936,14 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
      * Allows to detect attribute redefinitions
      */
     if !(*ctxt).atts_special.is_null()
-        && !xmlHashLookup2((*ctxt).atts_special, fullname, fullattr).is_null()
+        && !xml_hash_lookup2((*ctxt).atts_special, fullname, fullattr).is_null()
     {
         return;
     }
 
     'mem_error: {
         if (*ctxt).atts_default.is_null() {
-            (*ctxt).atts_default = xmlHashCreateDict(10, (*ctxt).dict);
+            (*ctxt).atts_default = xml_hash_create_dict(10, (*ctxt).dict);
             if (*ctxt).atts_default.is_null() {
                 break 'mem_error;
             }
@@ -3963,7 +3965,7 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
         /*
          * make sure there is some storage
          */
-        defaults = xmlHashLookup2((*ctxt).atts_default, name, prefix) as _;
+        defaults = xml_hash_lookup2((*ctxt).atts_default, name, prefix) as _;
         if defaults.is_null() {
             defaults =
                 xml_malloc(size_of::<XmlDefAttrs>() + (4 * 5) * size_of::<*const XmlChar>()) as _;
@@ -3972,7 +3974,7 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
             }
             (*defaults).nb_attrs = 0;
             (*defaults).max_attrs = 4;
-            if xmlHashUpdateEntry2((*ctxt).atts_default, name, prefix, defaults as _, None) < 0 {
+            if xml_hash_update_entry2((*ctxt).atts_default, name, prefix, defaults as _, None) < 0 {
                 xml_free(defaults as _);
                 break 'mem_error;
             }
@@ -3987,7 +3989,7 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
             }
             defaults = temp;
             (*defaults).max_attrs *= 2;
-            if xmlHashUpdateEntry2((*ctxt).atts_default, name, prefix, defaults as _, None) < 0 {
+            if xml_hash_update_entry2((*ctxt).atts_default, name, prefix, defaults as _, None) < 0 {
                 xml_free(defaults as _);
                 break 'mem_error;
             }
@@ -4062,7 +4064,7 @@ pub(crate) unsafe extern "C" fn xml_add_special_attr(
     typ: c_int,
 ) {
     if (*ctxt).atts_special.is_null() {
-        (*ctxt).atts_special = xmlHashCreateDict(10, (*ctxt).dict);
+        (*ctxt).atts_special = xml_hash_create_dict(10, (*ctxt).dict);
         if (*ctxt).atts_special.is_null() {
             // goto mem_error;
             xml_err_memory(ctxt, null());
@@ -4070,11 +4072,11 @@ pub(crate) unsafe extern "C" fn xml_add_special_attr(
         }
     }
 
-    if !xmlHashLookup2((*ctxt).atts_special, fullname, fullattr).is_null() {
+    if !xml_hash_lookup2((*ctxt).atts_special, fullname, fullattr).is_null() {
         return;
     }
 
-    xmlHashAddEntry2((*ctxt).atts_special, fullname, fullattr, typ as isize as _);
+    xml_hash_add_entry2((*ctxt).atts_special, fullname, fullattr, typ as isize as _);
 
     // mem_error:
     // xmlErrMemory(ctxt, null());

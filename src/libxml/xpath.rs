@@ -22,7 +22,7 @@ use crate::{
     libxml::{
         dict::{xml_dict_free, XmlDictPtr},
         globals::{xmlGenericErrorContext, xml_free, xml_malloc},
-        hash::{xmlHashCreate, XmlHashTablePtr},
+        hash::{xml_hash_create, XmlHashTablePtr},
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         tree::{
@@ -1693,7 +1693,7 @@ pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContex
     (*ret).max_types = 0;
     (*ret).types = null_mut();
 
-    (*ret).func_hash = xmlHashCreate(0);
+    (*ret).func_hash = xml_hash_create(0);
 
     (*ret).nb_axis = 0;
     (*ret).max_axis = 0;

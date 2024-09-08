@@ -20,8 +20,8 @@ use crate::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         globals::{xmlGenericErrorContext, xml_free, xml_malloc},
         hash::{
-            xmlHashAddEntry, xmlHashCopy, xmlHashCreate, xmlHashCreateDict, xmlHashFree,
-            xmlHashLookup, xmlHashScan, XmlHashTable,
+            xml_hash_add_entry, xml_hash_copy, xml_hash_create, xml_hash_create_dict,
+            xml_hash_free, xml_hash_lookup, xml_hash_scan, XmlHashTable,
         },
         tree::{
             xml_buffer_add, xml_buffer_ccat, xml_buffer_write_char, xml_buffer_write_quoted_string,
@@ -405,14 +405,14 @@ unsafe extern "C" fn xml_add_entity(
                 }
             }
             if (*dtd).entities.is_null() {
-                (*dtd).entities = xmlHashCreateDict(0, dict) as _;
+                (*dtd).entities = xml_hash_create_dict(0, dict) as _;
             }
             table = (*dtd).entities as _;
         }
         Ok(XmlEntityType::XmlInternalParameterEntity)
         | Ok(XmlEntityType::XmlExternalParameterEntity) => {
             if (*dtd).pentities.is_null() {
-                (*dtd).pentities = xmlHashCreateDict(0, dict) as _;
+                (*dtd).pentities = xml_hash_create_dict(0, dict) as _;
             }
             table = (*dtd).pentities as _;
         }
@@ -430,7 +430,7 @@ unsafe extern "C" fn xml_add_entity(
     }
     (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
 
-    if xmlHashAddEntry(table, name, ret as _) != 0 {
+    if xml_hash_add_entry(table, name, ret as _) != 0 {
         /*
          * entity was already defined at another level.
          */
@@ -725,7 +725,7 @@ unsafe extern "C" fn xml_get_entity_from_table(
     table: XmlEntitiesTablePtr,
     name: *const XmlChar,
 ) -> XmlEntityPtr {
-    xmlHashLookup(table, name) as XmlEntityPtr
+    xml_hash_lookup(table, name) as XmlEntityPtr
 }
 
 /**
@@ -1333,7 +1333,7 @@ pub unsafe extern "C" fn xml_encode_special_chars(
  * Returns the xmlEntitiesTablePtr just created or NULL in case of error.
  */
 pub unsafe extern "C" fn xml_create_entities_table() -> XmlEntitiesTablePtr {
-    xmlHashCreate(0) as XmlEntitiesTablePtr
+    xml_hash_create(0) as XmlEntitiesTablePtr
 }
 
 /**
@@ -1392,7 +1392,7 @@ unsafe extern "C" fn xml_copy_entity(payload: *mut c_void, _name: *const XmlChar
 pub unsafe extern "C" fn xml_copy_entities_table(
     table: XmlEntitiesTablePtr,
 ) -> XmlEntitiesTablePtr {
-    xmlHashCopy(table, Some(xml_copy_entity))
+    xml_hash_copy(table, Some(xml_copy_entity))
 }
 
 /**
@@ -1415,7 +1415,7 @@ unsafe extern "C" fn xml_free_entity_wrapper(entity: *mut c_void, _name: *const 
  * Deallocate the memory used by an entities hash table.
  */
 pub unsafe extern "C" fn xml_free_entities_table(table: XmlEntitiesTablePtr) {
-    xmlHashFree(table, Some(xml_free_entity_wrapper));
+    xml_hash_free(table, Some(xml_free_entity_wrapper));
 }
 
 /**
@@ -1443,7 +1443,7 @@ unsafe extern "C" fn xml_dump_entity_decl_scan(
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufferPtr, table: XmlEntitiesTablePtr) {
-    xmlHashScan(table, xml_dump_entity_decl_scan, buf as _);
+    xml_hash_scan(table, xml_dump_entity_decl_scan, buf as _);
 }
 
 /**

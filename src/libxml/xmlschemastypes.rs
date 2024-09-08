@@ -17,7 +17,9 @@ use crate::{
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
-        hash::{xmlHashAddEntry2, xmlHashCreate, xmlHashFree, xmlHashLookup2, XmlHashTable},
+        hash::{
+            xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2, XmlHashTable,
+        },
         schemas_internals::{
             xml_schema_free_annot, xml_schema_free_type, xml_schema_free_wildcard,
             XmlSchemaContentType, XmlSchemaFacet, XmlSchemaFacetPtr, XmlSchemaType,
@@ -395,7 +397,7 @@ unsafe extern "C" fn xml_schema_cleanup_types_internal() {
         XML_SCHEMA_TYPE_ANY_TYPE_DEF.store(null_mut(), Ordering::Release);
     }
 
-    xmlHashFree(
+    xml_hash_free(
         XML_SCHEMA_TYPES_BANK.load(Ordering::Acquire),
         Some(xml_schema_free_type_entry),
     );
@@ -521,7 +523,7 @@ unsafe extern "C" fn xml_schema_init_basic_type(
             (*ret).flags |= XML_SCHEMAS_TYPE_VARIETY_ATOMIC;
         }
     }
-    xmlHashAddEntry2(
+    xml_hash_add_entry2(
         XML_SCHEMA_TYPES_BANK.load(Ordering::Relaxed),
         (*ret).name,
         XML_SCHEMAS_NAMESPACE_NAME.as_ptr() as _,
@@ -558,7 +560,7 @@ pub unsafe extern "C" fn xmlSchemaInitTypes() -> c_int {
     }
 
     'error: {
-        XML_SCHEMA_TYPES_BANK.store(xmlHashCreate(40), Ordering::Release);
+        XML_SCHEMA_TYPES_BANK.store(xml_hash_create(40), Ordering::Release);
         if XML_SCHEMA_TYPES_BANK.load(Ordering::Acquire).is_null() {
             xml_schema_type_err_memory(null_mut(), null());
             break 'error;
@@ -1280,7 +1282,7 @@ pub unsafe extern "C" fn xml_schema_get_predefined_type(
     if name.is_null() {
         return null_mut();
     }
-    xmlHashLookup2(XML_SCHEMA_TYPES_BANK.load(Ordering::Acquire), name, ns) as XmlSchemaTypePtr
+    xml_hash_lookup2(XML_SCHEMA_TYPES_BANK.load(Ordering::Acquire), name, ns) as XmlSchemaTypePtr
 }
 
 /**

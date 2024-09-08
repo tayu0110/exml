@@ -15,7 +15,7 @@ use crate::libxml::{
     encoding::{XmlCharEncoding, XmlCharEncodingHandlerPtr},
     entities::{XmlEntitiesTablePtr, XmlEntityPtr},
     globals::xml_free,
-    hash::{xmlHashCreate, xmlHashFree, XmlHashDeallocator, XmlHashTablePtr},
+    hash::{xml_hash_create, xml_hash_free, XmlHashDeallocator, XmlHashTablePtr},
     htmlparser::{
         html_free_parser_ctxt, HtmlDocPtr, HtmlElemDesc, HtmlEntityDesc, HtmlNodePtr,
         HtmlParserCtxtPtr, HtmlSaxhandlerPtr, HtmlStatus,
@@ -1521,7 +1521,7 @@ pub(crate) fn desret_unsigned_long(_val: c_ulong) {}
 
 pub(crate) unsafe extern "C" fn gen_xml_hash_table_ptr(no: c_int, _nr: c_int) -> XmlHashTablePtr {
     if no == 0 {
-        return xmlHashCreate(10);
+        return xml_hash_create(10);
     }
     null_mut()
 }
@@ -1531,7 +1531,7 @@ pub(crate) unsafe extern "C" fn des_xml_hash_table_ptr(
     _nr: c_int,
 ) {
     if !val.is_null() {
-        xmlHashFree(val, None);
+        xml_hash_free(val, None);
     }
 }
 

@@ -21,8 +21,8 @@ use crate::{
         entities::XmlEntityPtr,
         globals::{xmlGenericErrorContext, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
-            xmlHashAddEntry, xmlHashAddEntry2, xmlHashCreate, xmlHashCreateDict, xmlHashFree,
-            xmlHashLookup, xmlHashLookup2, xmlHashScan, XmlHashTablePtr,
+            xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_create_dict,
+            xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTablePtr,
         },
         parser::{
             xmlCtxtReadFile, xmlCtxtReadMemory, xml_free_parser_ctxt, xml_new_io_input_stream,
@@ -2633,26 +2633,26 @@ unsafe extern "C" fn xml_schema_lookup_namespace(
 macro_rules! WXS_FIND_GLOBAL_ITEM {
     ($schema:expr, $slot:ident, $ns_name:expr, $name:expr, $ret:expr) => {
         if xml_str_equal($ns_name, (*$schema).target_namespace) != 0 {
-            $ret = $crate::libxml::hash::xmlHashLookup((*$schema).$slot, $name) as _;
+            $ret = $crate::libxml::hash::xml_hash_lookup((*$schema).$slot, $name) as _;
             if !$ret.is_null() {
                 return $ret;
             }
         }
-        if $crate::libxml::hash::xmlHashSize((*$schema).schemas_imports) > 1 {
+        if $crate::libxml::hash::xml_hash_size((*$schema).schemas_imports) > 1 {
             let import: XmlSchemaImportPtr;
             if $ns_name.is_null() {
-                import = $crate::libxml::hash::xmlHashLookup(
+                import = $crate::libxml::hash::xml_hash_lookup(
                     (*$schema).schemas_imports,
                     XML_SCHEMAS_NO_NAMESPACE.as_ptr() as _,
                 ) as _;
             } else {
-                import =
-                    $crate::libxml::hash::xmlHashLookup((*$schema).schemas_imports, $ns_name) as _;
+                import = $crate::libxml::hash::xml_hash_lookup((*$schema).schemas_imports, $ns_name)
+                    as _;
             }
             if import.is_null() {
                 return $ret;
             }
-            $ret = $crate::libxml::hash::xmlHashLookup((*(*import).schema).$slot, $name) as _;
+            $ret = $crate::libxml::hash::xml_hash_lookup((*(*import).schema).$slot, $name) as _;
         }
     };
 }
@@ -4706,7 +4706,7 @@ unsafe extern "C" fn xml_schema_construction_ctxt_free(con: XmlSchemaConstructio
         xml_schema_item_list_free((*con).pending);
     }
     if !(*con).subst_groups.is_null() {
-        xmlHashFree((*con).subst_groups, Some(xml_schema_subst_group_free_entry));
+        xml_hash_free((*con).subst_groups, Some(xml_schema_subst_group_free_entry));
     }
     if !(*con).redefs.is_null() {
         xml_schema_redef_list_free((*con).redefs);
@@ -5528,20 +5528,21 @@ unsafe extern "C" fn xml_schema_bucket_create(
          * even if there's only one schema, we'll get an import.
          */
         if (*main_schema).schemas_imports.is_null() {
-            (*main_schema).schemas_imports = xmlHashCreateDict(5, (*WXS_CONSTRUCTOR!(pctxt)).dict);
+            (*main_schema).schemas_imports =
+                xml_hash_create_dict(5, (*WXS_CONSTRUCTOR!(pctxt)).dict);
             if (*main_schema).schemas_imports.is_null() {
                 xml_schema_bucket_free(ret);
                 return null_mut();
             }
         }
         let res = if target_namespace.is_null() {
-            xmlHashAddEntry(
+            xml_hash_add_entry(
                 (*main_schema).schemas_imports,
                 XML_SCHEMAS_NO_NAMESPACE.as_ptr() as _,
                 ret as _,
             )
         } else {
-            xmlHashAddEntry((*main_schema).schemas_imports, target_namespace, ret as _)
+            xml_hash_add_entry((*main_schema).schemas_imports, target_namespace, ret as _)
         };
         if res != 0 {
             PERROR_INT!(
@@ -15195,7 +15196,7 @@ unsafe extern "C" fn xml_schema_add_components(
             }
         }
         if (*table).is_null() {
-            *table = xmlHashCreateDict(10, (*pctxt).dict);
+            *table = xml_hash_create_dict(10, (*pctxt).dict);
             if (*table).is_null() {
                 PERROR_INT!(
                     pctxt,
@@ -15205,7 +15206,7 @@ unsafe extern "C" fn xml_schema_add_components(
                 return -1;
             }
         }
-        err = xmlHashAddEntry(*table, name, item as _);
+        err = xml_hash_add_entry(*table, name, item as _);
         if err != 0 {
             let mut str: *mut XmlChar = null_mut();
 
@@ -22225,7 +22226,7 @@ unsafe extern "C" fn xml_schema_subst_group_get(
     if WXS_SUBST_GROUPS!(pctxt).is_null() {
         return null_mut();
     }
-    xmlHashLookup2(
+    xml_hash_lookup2(
         WXS_SUBST_GROUPS!(pctxt),
         (*head).name,
         (*head).target_namespace,
@@ -22238,7 +22239,7 @@ unsafe extern "C" fn xml_schema_subst_group_add(
 ) -> XmlSchemaSubstGroupPtr {
     /* Init subst group hash. */
     if WXS_SUBST_GROUPS!(pctxt).is_null() {
-        WXS_SUBST_GROUPS!(pctxt) = xmlHashCreateDict(10, (*pctxt).dict);
+        WXS_SUBST_GROUPS!(pctxt) = xml_hash_create_dict(10, (*pctxt).dict);
         if WXS_SUBST_GROUPS!(pctxt).is_null() {
             return null_mut();
         }
@@ -22263,7 +22264,7 @@ unsafe extern "C" fn xml_schema_subst_group_add(
         return null_mut();
     }
     /* Add subst group to hash. */
-    if xmlHashAddEntry2(
+    if xml_hash_add_entry2(
         WXS_SUBST_GROUPS!(pctxt),
         (*head).name,
         (*head).target_namespace,
@@ -23723,7 +23724,7 @@ unsafe extern "C" fn xml_schema_fixup_components(
     (*con).bucket = oldbucket;
     (*(*con).pending).nb_items = 0;
     if !(*con).subst_groups.is_null() {
-        xmlHashFree((*con).subst_groups, Some(xml_schema_subst_group_free_entry));
+        xml_hash_free((*con).subst_groups, Some(xml_schema_subst_group_free_entry));
         (*con).subst_groups = null_mut();
     }
     if !(*con).redefs.is_null() {
@@ -23916,29 +23917,29 @@ pub unsafe extern "C" fn xml_schema_free(schema: XmlSchemaPtr) {
      * the schema buckets.
      */
     if !(*schema).nota_decl.is_null() {
-        xmlHashFree((*schema).nota_decl, None);
+        xml_hash_free((*schema).nota_decl, None);
     }
     if !(*schema).attr_decl.is_null() {
-        xmlHashFree((*schema).attr_decl, None);
+        xml_hash_free((*schema).attr_decl, None);
     }
     if !(*schema).attrgrp_decl.is_null() {
-        xmlHashFree((*schema).attrgrp_decl, None);
+        xml_hash_free((*schema).attrgrp_decl, None);
     }
     if !(*schema).elem_decl.is_null() {
-        xmlHashFree((*schema).elem_decl, None);
+        xml_hash_free((*schema).elem_decl, None);
     }
     if !(*schema).type_decl.is_null() {
-        xmlHashFree((*schema).type_decl, None);
+        xml_hash_free((*schema).type_decl, None);
     }
     if !(*schema).group_decl.is_null() {
-        xmlHashFree((*schema).group_decl, None);
+        xml_hash_free((*schema).group_decl, None);
     }
     if !(*schema).idc_def.is_null() {
-        xmlHashFree((*schema).idc_def, None);
+        xml_hash_free((*schema).idc_def, None);
     }
 
     if !(*schema).schemas_imports.is_null() {
-        xmlHashFree(
+        xml_hash_free(
             (*schema).schemas_imports,
             Some(xml_schema_bucket_free_entry),
         );
@@ -24344,7 +24345,7 @@ unsafe extern "C" fn xml_schema_element_dump(
 pub unsafe extern "C" fn xml_schema_dump(output: *mut FILE, schema: XmlSchemaPtr) {
     use libc::fprintf;
 
-    use crate::libxml::hash::{xmlHashScan, xmlHashScanFull};
+    use crate::libxml::hash::{xml_hash_scan, xml_hash_scan_full};
 
     if output.is_null() {
         return;
@@ -24368,8 +24369,8 @@ pub unsafe extern "C" fn xml_schema_dump(output: *mut FILE, schema: XmlSchemaPtr
     if !(*schema).annot.is_null() {
         xml_schema_annot_dump(output, (*schema).annot);
     }
-    xmlHashScan((*schema).type_decl, xml_schema_type_dump_entry, output as _);
-    xmlHashScanFull(
+    xml_hash_scan((*schema).type_decl, xml_schema_type_dump_entry, output as _);
+    xml_hash_scan_full(
         (*schema).elem_decl,
         Some(xml_schema_element_dump),
         output as _,
@@ -24701,7 +24702,7 @@ unsafe extern "C" fn xml_schema_idc_release_matcher_list(
             (*matcher).targets = null_mut();
         }
         if !(*matcher).htab.is_null() {
-            xmlHashFree((*matcher).htab, Some(xml_free_idc_hash_entry));
+            xml_hash_free((*matcher).htab, Some(xml_free_idc_hash_entry));
             (*matcher).htab = null_mut();
         }
         (*matcher).next = null_mut();
@@ -24959,7 +24960,7 @@ unsafe extern "C" fn xml_schema_augment_imported_idc(
     let imported: XmlSchemaImportPtr = payload as XmlSchemaImportPtr;
     let vctxt: XmlSchemaValidCtxtPtr = data as XmlSchemaValidCtxtPtr;
     if !(*(*imported).schema).idc_def.is_null() {
-        xmlHashScan(
+        xml_hash_scan(
             (*(*imported).schema).idc_def,
             xml_schema_augment_idc,
             vctxt as _,
@@ -25049,7 +25050,7 @@ unsafe extern "C" fn xml_schema_pre_run(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
      * Augment the IDC definitions for the main schema and all imported ones
      * NOTE: main schema if the first in the imported list
      */
-    xmlHashScan(
+    xml_hash_scan(
         (*(*vctxt).schema).schemas_imports,
         xml_schema_augment_imported_idc,
         vctxt as _,
@@ -27411,7 +27412,7 @@ unsafe extern "C" fn xmlSchemaXPathProcessHistory(
                                     *key_seq,
                                     nb_keys,
                                 );
-                                e = xmlHashLookup((*matcher).htab, value) as _;
+                                e = xml_hash_lookup((*matcher).htab, value) as _;
                                 FREE_AND_NULL!(value);
                             }
 
@@ -27541,7 +27542,7 @@ unsafe extern "C" fn xmlSchemaXPathProcessHistory(
                             let mut value: *mut XmlChar = null_mut();
 
                             if (*matcher).htab.is_null() {
-                                (*matcher).htab = xmlHashCreate(4);
+                                (*matcher).htab = xml_hash_create(4);
                             }
                             xml_schema_hash_key_sequence(
                                 vctxt,
@@ -27552,13 +27553,14 @@ unsafe extern "C" fn xmlSchemaXPathProcessHistory(
                             let e: XmlIDCHashEntryPtr =
                                 xml_malloc(size_of::<XmlIDCHashEntry>()) as _;
                             (*e).index = (*targets).nb_items - 1;
-                            let r: XmlIDCHashEntryPtr = xmlHashLookup((*matcher).htab, value) as _;
+                            let r: XmlIDCHashEntryPtr =
+                                xml_hash_lookup((*matcher).htab, value) as _;
                             if !r.is_null() {
                                 (*e).next = (*r).next;
                                 (*r).next = e;
                             } else {
                                 (*e).next = null_mut();
-                                xmlHashAddEntry((*matcher).htab, value, e as _);
+                                xml_hash_add_entry((*matcher).htab, value, e as _);
                             }
                             FREE_AND_NULL!(value);
                         }
@@ -28483,7 +28485,7 @@ unsafe extern "C" fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> c
          * Augment the IDC definitions for the main schema and all imported ones
          * NOTE: main schema is the first in the imported list
          */
-        xmlHashScan(
+        xml_hash_scan(
             (*(*vctxt).schema).schemas_imports,
             xml_schema_augment_imported_idc,
             vctxt as _,
@@ -29128,7 +29130,7 @@ unsafe extern "C" fn xmlSchemaIDCFillNodeTables(
             (*(*matcher).targets).size_items = 0;
             (*(*matcher).targets).nb_items = 0;
             if !(*matcher).htab.is_null() {
-                xmlHashFree((*matcher).htab, Some(xml_free_idc_hash_entry));
+                xml_hash_free((*matcher).htab, Some(xml_free_idc_hash_entry));
                 (*matcher).htab = null_mut();
             }
         } else {
@@ -29369,7 +29371,7 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
              * Search for a matching key-sequences.
              */
             if !bind.is_null() {
-                table = xmlHashCreate((*bind).nb_nodes * 2);
+                table = xml_hash_create((*bind).nb_nodes * 2);
                 for j in 0..(*bind).nb_nodes {
                     let mut value: *mut XmlChar = null_mut();
 
@@ -29377,13 +29379,13 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
                     xml_schema_hash_key_sequence(vctxt, addr_of_mut!(value), keys, nb_fields);
                     let e: XmlIDCHashEntryPtr = xml_malloc(size_of::<XmlIDCHashEntry>()) as _;
                     (*e).index = j;
-                    let r: XmlIDCHashEntryPtr = xmlHashLookup(table, value) as _;
+                    let r: XmlIDCHashEntryPtr = xml_hash_lookup(table, value) as _;
                     if !r.is_null() {
                         (*e).next = (*r).next;
                         (*r).next = e;
                     } else {
                         (*e).next = null_mut();
-                        xmlHashAddEntry(table, value, e as _);
+                        xml_hash_add_entry(table, value, e as _);
                     }
                     FREE_AND_NULL!(value);
                 }
@@ -29396,7 +29398,7 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
                     let mut e: XmlIDCHashEntryPtr;
                     ref_keys = (*ref_node).keys;
                     xml_schema_hash_key_sequence(vctxt, addr_of_mut!(value), ref_keys, nb_fields);
-                    e = xmlHashLookup(table, value) as _;
+                    e = xml_hash_lookup(table, value) as _;
                     FREE_AND_NULL!(value);
                     res = 0;
                     while !e.is_null() {
@@ -29496,7 +29498,7 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
                 }
             }
             if !table.is_null() {
-                xmlHashFree(table, Some(xml_free_idc_hash_entry));
+                xml_hash_free(table, Some(xml_free_idc_hash_entry));
             }
         }
         matcher = (*matcher).next;
@@ -30653,7 +30655,7 @@ unsafe extern "C" fn xml_schema_idc_free_matcher_list(mut matcher: XmlSchemaIDCM
             xml_schema_item_list_free((*matcher).targets);
         }
         if !(*matcher).htab.is_null() {
-            xmlHashFree((*matcher).htab, Some(xml_free_idc_hash_entry));
+            xml_hash_free((*matcher).htab, Some(xml_free_idc_hash_entry));
         }
         xml_free(matcher as _);
         matcher = next;

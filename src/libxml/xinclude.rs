@@ -24,7 +24,7 @@ use crate::{
         },
         entities::{xml_add_doc_entity, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
-        hash::{xmlHashScan, XmlHashTablePtr},
+        hash::{xml_hash_scan, XmlHashTablePtr},
         parser::{
             xmlCtxtUseOptions, xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
             xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr, XmlParserInputPtr,
@@ -1003,7 +1003,7 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
         data.ctxt = ctxt;
         data.doc = doc;
 
-        xmlHashScan(
+        xml_hash_scan(
             (*source).entities as XmlHashTablePtr,
             xml_xinclude_merge_entity,
             addr_of_mut!(data) as _,
@@ -1022,7 +1022,7 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
         if xml_str_equal((*target).external_id, (*source).external_id) == 0
             && xml_str_equal((*target).system_id, (*source).system_id) == 0
         {
-            xmlHashScan(
+            xml_hash_scan(
                 (*source).entities as XmlHashTablePtr,
                 xml_xinclude_merge_entity,
                 addr_of_mut!(data) as _,

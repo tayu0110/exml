@@ -18,7 +18,7 @@ use crate::{
     __xml_raise_error,
     libxml::{
         globals::{xmlGenericErrorContext, xml_realloc},
-        hash::xmlHashAddEntry,
+        hash::xml_hash_add_entry,
         threads::xmlGetThreadId,
         uri::xml_build_uri,
         xml_io::XmlParserInputBufferPtr,
@@ -33,8 +33,8 @@ use super::{
     encoding::XmlCharEncoding,
     globals::{xml_free, xml_malloc, xml_malloc_atomic},
     hash::{
-        xmlHashCreate, xmlHashFree, xmlHashLookup, xmlHashRemoveEntry, xmlHashScan, xmlHashSize,
-        XmlHashTable, XmlHashTablePtr,
+        xml_hash_create, xml_hash_free, xml_hash_lookup, xml_hash_remove_entry, xml_hash_scan,
+        xml_hash_size, XmlHashTable, XmlHashTablePtr,
     },
     parser::{
         xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr,
@@ -226,7 +226,7 @@ unsafe extern "C" fn xml_create_new_catalog(
     (*ret).catal_max = XML_MAX_SGML_CATA_DEPTH as _;
     (*ret).prefer = prefer;
     if matches!((*ret).typ, XmlCatalogType::XmlSgmlCatalogType) {
-        (*ret).sgml = xmlHashCreate(10);
+        (*ret).sgml = xml_hash_create(10);
     }
     ret
 }
@@ -251,7 +251,7 @@ pub unsafe extern "C" fn xml_new_catalog(sgml: c_int) -> XmlCatalogPtr {
             XML_CATALOG_DEFAULT_PREFER,
         );
         if !catal.is_null() && (*catal).sgml.is_null() {
-            (*catal).sgml = xmlHashCreate(10);
+            (*catal).sgml = xml_hash_create(10);
         }
     } else {
         catal = xml_create_new_catalog(
@@ -891,7 +891,7 @@ unsafe extern "C" fn xmlParseSGMLCatalog(
                         XmlCatalogPrefer::None,
                         null_mut(),
                     );
-                    res = xmlHashAddEntry((*catal).sgml, name, entry as _);
+                    res = xml_hash_add_entry((*catal).sgml, name, entry as _);
                     if res < 0 {
                         xml_free_catalog_entry(entry as _, null_mut());
                     }
@@ -907,7 +907,7 @@ unsafe extern "C" fn xmlParseSGMLCatalog(
                         XmlCatalogPrefer::None,
                         null_mut(),
                     );
-                    res = xmlHashAddEntry((*catal).sgml, sysid, entry as _);
+                    res = xml_hash_add_entry((*catal).sgml, sysid, entry as _);
                     if res < 0 {
                         xml_free_catalog_entry(entry as _, null_mut());
                     }
@@ -1087,7 +1087,7 @@ unsafe extern "C" fn xml_catalog_convert_entry(
             (*entry).typ = XmlCatalogEntryType::XmlCataCatalog;
         }
         _ => {
-            xmlHashRemoveEntry((*catal).sgml, (*entry).name, Some(xml_free_catalog_entry));
+            xml_hash_remove_entry((*catal).sgml, (*entry).name, Some(xml_free_catalog_entry));
             return;
         }
     }
@@ -1095,7 +1095,7 @@ unsafe extern "C" fn xml_catalog_convert_entry(
      * Conversion successful, remove from the SGML catalog
      * and add it to the default XML one
      */
-    xmlHashRemoveEntry((*catal).sgml, (*entry).name, None);
+    xml_hash_remove_entry((*catal).sgml, (*entry).name, None);
     (*entry).parent = (*catal).xml;
     (*entry).next = null_mut();
     if (*(*catal).xml).children.is_null() {
@@ -1130,7 +1130,7 @@ pub unsafe extern "C" fn xml_convert_sgmlcatalog(mut catal: XmlCatalogPtr) -> c_
             c"Converting SGML catalog to XML\n".as_ptr() as _
         );
     }
-    xmlHashScan(
+    xml_hash_scan(
         (*catal).sgml,
         xml_catalog_convert_entry,
         addr_of_mut!(catal) as _,
@@ -1652,7 +1652,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
 
     let mut catalog_files = XML_CATALOG_XMLFILES.load(Ordering::Acquire);
     if !catalog_files.is_null() {
-        doc = xmlHashLookup(catalog_files, (*catal).url) as XmlCatalogEntryPtr;
+        doc = xml_hash_lookup(catalog_files, (*catal).url) as XmlCatalogEntryPtr;
         if !doc.is_null() {
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                 xml_generic_error!(
@@ -1701,7 +1701,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
     (*doc).dealloc = 1;
 
     if catalog_files.is_null() {
-        catalog_files = xmlHashCreate(10);
+        catalog_files = xml_hash_create(10);
     }
     if !catalog_files.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
@@ -1711,7 +1711,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
                 (*catal).url
             );
         }
-        xmlHashAddEntry(catalog_files, (*catal).url, doc as _);
+        xml_hash_add_entry(catalog_files, (*catal).url, doc as _);
     }
     xmlRMutexUnlock(mutex);
     XML_CATALOG_XMLFILES.store(catalog_files, Ordering::Release);
@@ -1846,7 +1846,7 @@ unsafe extern "C" fn xml_add_xmlcatalog(
     }
     if doregister != 0 {
         (*catal).typ = XmlCatalogEntryType::XmlCataCatalog;
-        cur = xmlHashLookup(XML_CATALOG_XMLFILES.load(Ordering::Relaxed), (*catal).url)
+        cur = xml_hash_lookup(XML_CATALOG_XMLFILES.load(Ordering::Relaxed), (*catal).url)
             as XmlCatalogEntryPtr;
         if !cur.is_null() {
             (*cur).children = (*catal).children;
@@ -1930,9 +1930,9 @@ pub unsafe extern "C" fn xml_a_catalog_add(
                 null_mut(),
             );
             if (*catal).sgml.is_null() {
-                (*catal).sgml = xmlHashCreate(10);
+                (*catal).sgml = xml_hash_create(10);
             }
-            res = xmlHashAddEntry((*catal).sgml, orig, entry as _);
+            res = xml_hash_add_entry((*catal).sgml, orig, entry as _);
             if res < 0 {
                 xml_free_catalog_entry(entry as _, null_mut());
             }
@@ -2025,7 +2025,7 @@ pub unsafe extern "C" fn xml_a_catalog_remove(
     if matches!((*catal).typ, XmlCatalogType::XmlXmlCatalogType) {
         res = xml_del_xml_catalog((*catal).xml, value);
     } else {
-        res = xmlHashRemoveEntry((*catal).sgml, value, Some(xml_free_catalog_entry));
+        res = xml_hash_remove_entry((*catal).sgml, value, Some(xml_free_catalog_entry));
         if res == 0 {
             res = 1;
         }
@@ -2536,7 +2536,7 @@ unsafe extern "C" fn xml_catalog_get_sgml_public(
         pub_id = if *normid != 0 { normid } else { null_mut() };
     }
 
-    let entry: XmlCatalogEntryPtr = xmlHashLookup(catal, pub_id) as XmlCatalogEntryPtr;
+    let entry: XmlCatalogEntryPtr = xml_hash_lookup(catal, pub_id) as XmlCatalogEntryPtr;
     if entry.is_null() {
         if !normid.is_null() {
             xml_free(normid as _);
@@ -2572,7 +2572,7 @@ unsafe extern "C" fn xml_catalog_get_sgml_system(
         return null_mut();
     }
 
-    let entry: XmlCatalogEntryPtr = xmlHashLookup(catal, sys_id) as XmlCatalogEntryPtr;
+    let entry: XmlCatalogEntryPtr = xml_hash_lookup(catal, sys_id) as XmlCatalogEntryPtr;
     if entry.is_null() {
         return null_mut();
     }
@@ -3336,7 +3336,7 @@ pub unsafe extern "C" fn xml_a_catalog_dump(catal: XmlCatalogPtr, out: *mut FILE
     if matches!((*catal).typ, XmlCatalogType::XmlXmlCatalogType) {
         xml_dump_xml_catalog(out, (*catal).xml);
     } else {
-        xmlHashScan((*catal).sgml, xml_catalog_dump_entry, out as _);
+        xml_hash_scan((*catal).sgml, xml_catalog_dump_entry, out as _);
     }
 }
 
@@ -3370,7 +3370,7 @@ pub unsafe extern "C" fn xml_free_catalog(catal: XmlCatalogPtr) {
         xml_free_catalog_entry_list((*catal).xml);
     }
     if !(*catal).sgml.is_null() {
-        xmlHashFree((*catal).sgml, Some(xml_free_catalog_entry));
+        xml_hash_free((*catal).sgml, Some(xml_free_catalog_entry));
     }
     xml_free(catal as _);
 }
@@ -3405,7 +3405,7 @@ pub unsafe extern "C" fn xml_catalog_is_empty(catal: XmlCatalogPtr) -> c_int {
         if (*catal).sgml.is_null() {
             return 1;
         }
-        let res: c_int = xmlHashSize((*catal).sgml);
+        let res: c_int = xml_hash_size((*catal).sgml);
         if res == 0 {
             return 1;
         }
@@ -3706,7 +3706,7 @@ pub unsafe extern "C" fn xml_catalog_cleanup() {
     }
     let files = XML_CATALOG_XMLFILES.load(Ordering::Acquire);
     if !files.is_null() {
-        xmlHashFree(files, Some(xml_free_catalog_hash_entry_list));
+        xml_hash_free(files, Some(xml_free_catalog_hash_entry_list));
     }
     XML_CATALOG_XMLFILES.store(null_mut(), Ordering::Release);
     let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);

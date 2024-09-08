@@ -36,8 +36,8 @@ use crate::{
             xml_malloc_atomic, xml_realloc,
         },
         hash::{
-            xmlHashDefaultDeallocator, xmlHashFree, xmlHashLookup2, xmlHashQLookup2,
-            xmlHashRemoveEntry2, xmlHashScanFull, xmlHashSize, XmlHashTablePtr,
+            xml_hash_default_deallocator, xml_hash_free, xml_hash_lookup2, xml_hash_qlookup2,
+            xml_hash_remove_entry2, xml_hash_scan_full, xml_hash_size, XmlHashTablePtr,
         },
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
@@ -2409,7 +2409,7 @@ unsafe extern "C" fn xml_clean_special_attr_callback(
     let ctxt: XmlParserCtxtPtr = data as XmlParserCtxtPtr;
 
     if payload as isize == XmlAttributeType::XmlAttributeCdata as isize {
-        xmlHashRemoveEntry2((*ctxt).atts_special, fullname, fullattr, None);
+        xml_hash_remove_entry2((*ctxt).atts_special, fullname, fullattr, None);
     }
 }
 
@@ -2426,14 +2426,14 @@ unsafe extern "C" fn xml_clean_special_attr(ctxt: XmlParserCtxtPtr) {
         return;
     }
 
-    xmlHashScanFull(
+    xml_hash_scan_full(
         (*ctxt).atts_special,
         Some(xml_clean_special_attr_callback),
         ctxt as _,
     );
 
-    if xmlHashSize((*ctxt).atts_special) == 0 {
-        xmlHashFree((*ctxt).atts_special, None);
+    if xml_hash_size((*ctxt).atts_special) == 0 {
+        xml_hash_free((*ctxt).atts_special, None);
         (*ctxt).atts_special = null_mut();
     }
 }
@@ -4797,10 +4797,10 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         xml_free((*ctxt).attallocs as _);
     }
     if !(*ctxt).atts_default.is_null() {
-        xmlHashFree((*ctxt).atts_default, Some(xmlHashDefaultDeallocator));
+        xml_hash_free((*ctxt).atts_default, Some(xml_hash_default_deallocator));
     }
     if !(*ctxt).atts_special.is_null() {
-        xmlHashFree((*ctxt).atts_special, None);
+        xml_hash_free((*ctxt).atts_special, None);
     }
     if !(*ctxt).free_elems.is_null() {
         let mut cur: XmlNodePtr;
@@ -7648,8 +7648,8 @@ unsafe extern "C" fn xml_parse_attribute2(
      * get the type if needed
      */
     if !(*ctxt).atts_special.is_null() {
-        let typ: c_int =
-            xmlHashQLookup2((*ctxt).atts_special, pref, elem, *prefix, name) as ptrdiff_t as c_int;
+        let typ: c_int = xml_hash_qlookup2((*ctxt).atts_special, pref, elem, *prefix, name)
+            as ptrdiff_t as c_int;
         if typ != 0 {
             normalize = 1;
         }
@@ -8310,7 +8310,7 @@ pub(crate) unsafe extern "C" fn xmlParseStartTag2(
          */
         if !(*ctxt).atts_default.is_null() {
             let defaults: XmlDefAttrsPtr =
-                xmlHashLookup2((*ctxt).atts_default, localname, prefix) as _;
+                xml_hash_lookup2((*ctxt).atts_default, localname, prefix) as _;
             if !defaults.is_null() {
                 'b: for i in 0..(*defaults).nb_attrs as usize {
                     attname = *(*defaults).values.as_ptr().add(5 * i);
@@ -11179,11 +11179,11 @@ pub unsafe extern "C" fn xmlCtxtReset(ctxt: XmlParserCtxtPtr) {
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
 
     if !(*ctxt).atts_default.is_null() {
-        xmlHashFree((*ctxt).atts_default, Some(xmlHashDefaultDeallocator));
+        xml_hash_free((*ctxt).atts_default, Some(xml_hash_default_deallocator));
         (*ctxt).atts_default = null_mut();
     }
     if !(*ctxt).atts_special.is_null() {
-        xmlHashFree((*ctxt).atts_special, None);
+        xml_hash_free((*ctxt).atts_special, None);
         (*ctxt).atts_special = null_mut();
     }
 

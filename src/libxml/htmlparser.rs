@@ -27,7 +27,7 @@ use crate::{
             xmlDefaultSAXLocator, xmlKeepBlanksDefaultValue, xmlLineNumbersDefaultValue, xml_free,
             xml_malloc, xml_malloc_atomic, xml_realloc,
         },
-        hash::{xmlHashDefaultDeallocator, xmlHashFree},
+        hash::{xml_hash_default_deallocator, xml_hash_free},
         parser::{
             xml_free_parser_ctxt, xml_init_node_info_seq, xml_init_parser,
             xml_load_external_entity, xml_new_io_input_stream, xml_parser_add_node_info,
@@ -12067,11 +12067,11 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
 
     if !(*ctxt).atts_default.is_null() {
-        xmlHashFree((*ctxt).atts_default, Some(xmlHashDefaultDeallocator));
+        xml_hash_free((*ctxt).atts_default, Some(xml_hash_default_deallocator));
         (*ctxt).atts_default = null_mut();
     }
     if !(*ctxt).atts_special.is_null() {
-        xmlHashFree((*ctxt).atts_special, None);
+        xml_hash_free((*ctxt).atts_special, None);
         (*ctxt).atts_special = null_mut();
     }
 

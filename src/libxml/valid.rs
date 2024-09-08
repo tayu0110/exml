@@ -35,9 +35,10 @@ use crate::{
         entities::{xml_get_doc_entity, XmlEntitiesTablePtr, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
-            xmlHashAddEntry, xmlHashAddEntry2, xmlHashAddEntry3, xmlHashCopy, xmlHashCreateDict,
-            xmlHashFree, xmlHashLookup, xmlHashLookup2, xmlHashLookup3, xmlHashRemoveEntry,
-            xmlHashRemoveEntry2, xmlHashScan, xmlHashUpdateEntry, XmlHashTable,
+            xml_hash_add_entry, xml_hash_add_entry2, xml_hash_add_entry3, xml_hash_copy,
+            xml_hash_create_dict, xml_hash_free, xml_hash_lookup, xml_hash_lookup2,
+            xml_hash_lookup3, xml_hash_remove_entry, xml_hash_remove_entry2, xml_hash_scan,
+            xml_hash_update_entry, XmlHashTable,
         },
         list::{
             xml_link_get_data, xml_list_append, xml_list_create, xml_list_delete, xml_list_empty,
@@ -395,7 +396,7 @@ pub unsafe extern "C" fn xml_add_notation_decl(
             dict = (*(*dtd).doc).dict;
         }
 
-        (*dtd).notations = xmlHashCreateDict(0, dict) as _;
+        (*dtd).notations = xml_hash_create_dict(0, dict) as _;
         table = (*dtd).notations as _;
     }
     if table.is_null() {
@@ -428,7 +429,7 @@ pub unsafe extern "C" fn xml_add_notation_decl(
      * Validity Check:
      * Check the DTD for previous declarations of the ATTLIST
      */
-    if xmlHashAddEntry(table, name, ret as _) != 0 {
+    if xml_hash_add_entry(table, name, ret as _) != 0 {
         #[cfg(feature = "valid")]
         {
             xml_err_valid(
@@ -491,7 +492,7 @@ unsafe extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlCh
 pub unsafe extern "C" fn xml_copy_notation_table(
     table: XmlNotationTablePtr,
 ) -> XmlNotationTablePtr {
-    xmlHashCopy(table, Some(xml_copy_notation)) as XmlNotationTablePtr
+    xml_hash_copy(table, Some(xml_copy_notation)) as XmlNotationTablePtr
 }
 
 unsafe extern "C" fn xml_free_notation_table_entry(nota: *mut c_void, _name: *const XmlChar) {
@@ -505,7 +506,7 @@ unsafe extern "C" fn xml_free_notation_table_entry(nota: *mut c_void, _name: *co
  * Deallocate the memory used by an entities hash table.
  */
 pub unsafe extern "C" fn xml_free_notation_table(table: XmlNotationTablePtr) {
-    xmlHashFree(table, Some(xml_free_notation_table_entry));
+    xml_hash_free(table, Some(xml_free_notation_table_entry));
 }
 
 /**
@@ -564,7 +565,7 @@ pub unsafe extern "C" fn xml_dump_notation_table(buf: XmlBufferPtr, table: XmlNo
     if buf.is_null() || table.is_null() {
         return;
     }
-    xmlHashScan(table, xml_dump_notation_decl_scan, buf as _);
+    xml_hash_scan(table, xml_dump_notation_decl_scan, buf as _);
 }
 
 /* Element Content */
@@ -1224,7 +1225,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
         if !(*dtd).doc.is_null() {
             dict = (*(*dtd).doc).dict;
         }
-        table = xmlHashCreateDict(0, dict);
+        table = xml_hash_create_dict(0, dict);
         (*dtd).elements = table as *mut c_void;
     }
     if table.is_null() {
@@ -1246,11 +1247,11 @@ pub unsafe extern "C" fn xml_add_element_decl(
      * internal subset.
      */
     if !(*dtd).doc.is_null() && !(*(*dtd).doc).int_subset.is_null() {
-        ret = xmlHashLookup2((*(*(*dtd).doc).int_subset).elements as _, name, ns) as _;
+        ret = xml_hash_lookup2((*(*(*dtd).doc).int_subset).elements as _, name, ns) as _;
         if !ret.is_null() && matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             old_attributes = (*ret).attributes;
             (*ret).attributes = null_mut();
-            xmlHashRemoveEntry2((*(*(*dtd).doc).int_subset).elements as _, name, ns, None);
+            xml_hash_remove_entry2((*(*(*dtd).doc).int_subset).elements as _, name, ns, None);
             xml_free_element(ret);
         }
     }
@@ -1259,7 +1260,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
      * The element may already be present if one of its attribute
      * was registered first
      */
-    ret = xmlHashLookup2(table, name, ns) as _;
+    ret = xml_hash_lookup2(table, name, ns) as _;
     if !ret.is_null() {
         if !matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             #[cfg(feature = "valid")]
@@ -1325,7 +1326,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
          * Validity Check:
          * Insertion must not fail
          */
-        if xmlHashAddEntry2(table, name, ns, ret as _) != 0 {
+        if xml_hash_add_entry2(table, name, ns, ret as _) != 0 {
             #[cfg(feature = "valid")]
             {
                 /*
@@ -1437,7 +1438,7 @@ unsafe extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlCha
  */
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_copy_element_table(table: XmlElementTablePtr) -> XmlElementTablePtr {
-    xmlHashCopy(table, Some(xml_copy_element)) as XmlElementTablePtr
+    xml_hash_copy(table, Some(xml_copy_element)) as XmlElementTablePtr
 }
 
 unsafe extern "C" fn xml_free_element_table_entry(elem: *mut c_void, _name: *const XmlChar) {
@@ -1451,7 +1452,7 @@ unsafe extern "C" fn xml_free_element_table_entry(elem: *mut c_void, _name: *con
  * Deallocate the memory used by an element hash table.
  */
 pub unsafe extern "C" fn xml_free_element_table(table: XmlElementTablePtr) {
-    xmlHashFree(table, Some(xml_free_element_table_entry));
+    xml_hash_free(table, Some(xml_free_element_table_entry));
 }
 
 /**
@@ -1483,7 +1484,7 @@ pub unsafe extern "C" fn xml_dump_element_table(buf: XmlBufferPtr, table: XmlEle
     if buf.is_null() || table.is_null() {
         return;
     }
-    xmlHashScan(table, xml_dump_element_decl_scan, buf as _);
+    xml_hash_scan(table, xml_dump_element_decl_scan, buf as _);
 }
 
 /**
@@ -2219,7 +2220,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
          */
         table = (*dtd).elements as XmlElementTablePtr;
         if table.is_null() {
-            table = xmlHashCreateDict(0, dict);
+            table = xml_hash_create_dict(0, dict);
             (*dtd).elements = table as *mut c_void;
         }
         if table.is_null() {
@@ -2233,7 +2234,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
     if !uqname.is_null() {
         name = uqname;
     }
-    cur = xmlHashLookup2(table, name, prefix) as _;
+    cur = xml_hash_lookup2(table, name, prefix) as _;
     if cur.is_null() && create != 0 {
         cur = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
         if cur.is_null() {
@@ -2257,7 +2258,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
         (*cur).prefix = xml_strdup(prefix);
         (*cur).etype = XmlElementTypeVal::XmlElementTypeUndefined;
 
-        if xmlHashAddEntry2(table, name, prefix, cur as _) < 0 {
+        if xml_hash_add_entry2(table, name, prefix, cur as _) < 0 {
             xml_verr_memory(ctxt, c"adding entry failed".as_ptr() as _);
             xml_free_element(cur);
             cur = null_mut();
@@ -2421,7 +2422,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
         && !(*(*dtd).doc).int_subset.is_null()
         && !(*(*(*dtd).doc).int_subset).attributes.is_null()
     {
-        ret = xmlHashLookup3((*(*(*dtd).doc).int_subset).attributes as _, name, ns, elem) as _;
+        ret = xml_hash_lookup3((*(*(*dtd).doc).int_subset).attributes as _, name, ns, elem) as _;
         if !ret.is_null() {
             xml_free_enumeration(tree);
             return null_mut();
@@ -2433,7 +2434,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
      */
     table = (*dtd).attributes as XmlAttributeTablePtr;
     if table.is_null() {
-        table = xmlHashCreateDict(0, dict);
+        table = xml_hash_create_dict(0, dict);
         (*dtd).attributes = table as *mut c_void;
     }
     if table.is_null() {
@@ -2487,7 +2488,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
      * Validity Check:
      * Search the DTD for previous declarations of the ATTLIST
      */
-    if xmlHashAddEntry3(table, (*ret).name, (*ret).prefix, (*ret).elem, ret as _) < 0 {
+    if xml_hash_add_entry3(table, (*ret).name, (*ret).prefix, (*ret).elem, ret as _) < 0 {
         #[cfg(feature = "valid")]
         {
             /*
@@ -2633,7 +2634,7 @@ unsafe extern "C" fn xml_copy_attribute(
 pub unsafe extern "C" fn xml_copy_attribute_table(
     table: XmlAttributeTablePtr,
 ) -> XmlAttributeTablePtr {
-    xmlHashCopy(table, Some(xml_copy_attribute)) as XmlAttributeTablePtr
+    xml_hash_copy(table, Some(xml_copy_attribute)) as XmlAttributeTablePtr
 }
 
 unsafe extern "C" fn xml_free_attribute_table_entry(attr: *mut c_void, _name: *const XmlChar) {
@@ -2647,7 +2648,7 @@ unsafe extern "C" fn xml_free_attribute_table_entry(attr: *mut c_void, _name: *c
  * Deallocate the memory used by an entities hash table.
  */
 pub unsafe extern "C" fn xml_free_attribute_table(table: XmlAttributeTablePtr) {
-    xmlHashFree(table, Some(xml_free_attribute_table_entry));
+    xml_hash_free(table, Some(xml_free_attribute_table_entry));
 }
 
 /**
@@ -2678,7 +2679,7 @@ pub unsafe extern "C" fn xml_dump_attribute_table(buf: XmlBufferPtr, table: XmlA
     if buf.is_null() || table.is_null() {
         return;
     }
-    xmlHashScan(table, xml_dump_attribute_decl_scan, buf as _);
+    xml_hash_scan(table, xml_dump_attribute_decl_scan, buf as _);
 }
 
 /**
@@ -2881,7 +2882,7 @@ pub unsafe extern "C" fn xml_add_id(
      */
     table = (*doc).ids as XmlIDTablePtr;
     if table.is_null() {
-        (*doc).ids = xmlHashCreateDict(0, (*doc).dict) as _;
+        (*doc).ids = xml_hash_create_dict(0, (*doc).dict) as _;
         table = (*doc).ids as _;
     }
     if table.is_null() {
@@ -2916,7 +2917,7 @@ pub unsafe extern "C" fn xml_add_id(
     }
     (*ret).lineno = xml_get_line_no((*attr).parent) as _;
 
-    if xmlHashAddEntry(table, value, ret as _) < 0 {
+    if xml_hash_add_entry(table, value, ret as _) < 0 {
         /*
          * The id is already defined in this DTD.
          */
@@ -2952,7 +2953,7 @@ unsafe extern "C" fn xml_free_id_table_entry(id: *mut c_void, _name: *const XmlC
  * Deallocate the memory used by an ID hash table.
  */
 pub unsafe extern "C" fn xml_free_id_table(table: XmlIDTablePtr) {
-    xmlHashFree(table, Some(xml_free_id_table_entry));
+    xml_hash_free(table, Some(xml_free_id_table_entry));
 }
 
 /**
@@ -2978,7 +2979,7 @@ pub unsafe extern "C" fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> XmlAt
         return null_mut();
     }
 
-    let id_ptr: XmlIDPtr = xmlHashLookup(table, id) as _;
+    let id_ptr: XmlIDPtr = xml_hash_lookup(table, id) as _;
     if id_ptr.is_null() {
         return null_mut();
     }
@@ -3153,13 +3154,13 @@ pub unsafe extern "C" fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> c_in
     }
     xml_valid_normalize_string(id);
 
-    let id_ptr: XmlIDPtr = xmlHashLookup(table, id) as _;
+    let id_ptr: XmlIDPtr = xml_hash_lookup(table, id) as _;
     if id_ptr.is_null() || (*id_ptr).attr != attr {
         xml_free(id as _);
         return -1;
     }
 
-    xmlHashRemoveEntry(table, id, Some(xml_free_id_table_entry));
+    xml_hash_remove_entry(table, id, Some(xml_free_id_table_entry));
     xml_free(id as _);
     (*attr).atype = None;
     0
@@ -3234,7 +3235,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
      */
     table = (*doc).refs as XmlRefTablePtr;
     if table.is_null() {
-        (*doc).refs = xmlHashCreateDict(0, (*doc).dict) as _;
+        (*doc).refs = xml_hash_create_dict(0, (*doc).dict) as _;
         table = (*doc).refs as _;
     }
     if table.is_null() {
@@ -3271,7 +3272,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
      * Return the ref
      */
 
-    ref_list = xmlHashLookup(table, value) as _;
+    ref_list = xml_hash_lookup(table, value) as _;
     'failed: {
         if ref_list.is_null() {
             ref_list = xml_list_create(Some(xml_free_ref), Some(xml_dummy_compare));
@@ -3284,7 +3285,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
                 );
                 break 'failed;
             }
-            if xmlHashAddEntry(table, value, ref_list as _) < 0 {
+            if xml_hash_add_entry(table, value, ref_list as _) < 0 {
                 xml_list_delete(ref_list);
                 xml_err_valid(
                     null_mut(),
@@ -3342,7 +3343,7 @@ unsafe extern "C" fn xml_free_ref_table_entry(payload: *mut c_void, _name: *cons
  * Deallocate the memory used by an Ref hash table.
  */
 pub(crate) unsafe extern "C" fn xml_free_ref_table(table: XmlRefTablePtr) {
-    xmlHashFree(table, Some(xml_free_ref_table_entry));
+    xml_hash_free(table, Some(xml_free_ref_table_entry));
 }
 
 /**
@@ -3460,7 +3461,7 @@ pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr)
         return -1;
     }
 
-    let ref_list: XmlListPtr = xmlHashLookup(table, id) as _;
+    let ref_list: XmlListPtr = xml_hash_lookup(table, id) as _;
     if ref_list.is_null() {
         xml_free(id as _);
         return -1;
@@ -3488,7 +3489,7 @@ pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr)
 
     /*If the list is empty then remove the list entry in the hash */
     if xml_list_empty(ref_list) != 0 {
-        xmlHashUpdateEntry(table, id, null_mut(), Some(xml_free_ref_table_entry));
+        xml_hash_update_entry(table, id, null_mut(), Some(xml_free_ref_table_entry));
     }
     xml_free(id as _);
     0
@@ -3519,7 +3520,7 @@ pub(crate) unsafe extern "C" fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar)
         return null_mut();
     }
 
-    xmlHashLookup(table, id) as _
+    xml_hash_lookup(table, id) as _
 }
 
 /**
@@ -4108,7 +4109,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
     doc: XmlDocPtr,
     attr: XmlAttributePtr,
 ) -> c_int {
-    use crate::libxml::hash::xmlHashScan3;
+    use crate::libxml::hash::xml_hash_scan3;
 
     let mut ret: c_int = 1;
     let val: c_int;
@@ -4172,7 +4173,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
             nb_id = 0;
             if !(*doc).int_subset.is_null() {
                 table = (*(*doc).int_subset).attributes as XmlAttributeTablePtr;
-                xmlHashScan3(
+                xml_hash_scan3(
                     table,
                     null_mut(),
                     null_mut(),
@@ -4682,20 +4683,20 @@ pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlD
     dtd = (*doc).int_subset;
     if !dtd.is_null() && !(*dtd).attributes.is_null() {
         table = (*dtd).attributes as XmlAttributeTablePtr;
-        xmlHashScan(table, xml_validate_attribute_callback, ctxt as _);
+        xml_hash_scan(table, xml_validate_attribute_callback, ctxt as _);
     }
     if !dtd.is_null() && !(*dtd).entities.is_null() {
         entities = (*dtd).entities as XmlEntitiesTablePtr;
-        xmlHashScan(entities, xml_validate_notation_callback, ctxt as _);
+        xml_hash_scan(entities, xml_validate_notation_callback, ctxt as _);
     }
     dtd = (*doc).ext_subset;
     if !dtd.is_null() && !(*dtd).attributes.is_null() {
         table = (*dtd).attributes as XmlAttributeTablePtr;
-        xmlHashScan(table, xml_validate_attribute_callback, ctxt as _);
+        xml_hash_scan(table, xml_validate_attribute_callback, ctxt as _);
     }
     if !dtd.is_null() && !(*dtd).entities.is_null() {
         entities = (*dtd).entities as XmlEntitiesTablePtr;
-        xmlHashScan(entities, xml_validate_notation_callback, ctxt as _);
+        xml_hash_scan(entities, xml_validate_notation_callback, ctxt as _);
     }
     (*ctxt).valid
 }
@@ -7482,7 +7483,7 @@ pub unsafe extern "C" fn xml_validate_document_final(
     let table: XmlRefTablePtr = (*doc).refs as XmlRefTablePtr;
     (*ctxt).doc = doc;
     (*ctxt).valid = 1;
-    xmlHashScan(table, xml_validate_check_ref_callback, ctxt as _);
+    xml_hash_scan(table, xml_validate_check_ref_callback, ctxt as _);
 
     (*ctxt).flags = save;
     (*ctxt).valid
@@ -7608,7 +7609,7 @@ pub unsafe extern "C" fn xml_get_dtd_attr_desc(
     let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix) as _) as _;
 
     if !uqname.is_null() {
-        cur = xmlHashLookup3(table, uqname, prefix, elem) as _;
+        cur = xml_hash_lookup3(table, uqname, prefix, elem) as _;
         if !prefix.is_null() {
             xml_free(prefix as _);
         }
@@ -7616,7 +7617,7 @@ pub unsafe extern "C" fn xml_get_dtd_attr_desc(
             xml_free(uqname as _);
         }
     } else {
-        cur = xmlHashLookup3(table, name, null_mut(), elem) as _;
+        cur = xml_hash_lookup3(table, name, null_mut(), elem) as _;
     }
     cur
 }
@@ -7647,7 +7648,7 @@ pub unsafe extern "C" fn xml_get_dtd_qattr_desc(
     }
     let table: XmlAttributeTablePtr = (*dtd).attributes as XmlAttributeTablePtr;
 
-    xmlHashLookup3(table, name, prefix, elem) as _
+    xml_hash_lookup3(table, name, prefix, elem) as _
 }
 
 /**
@@ -7671,7 +7672,7 @@ pub unsafe extern "C" fn xml_get_dtd_notation_desc(
     }
     let table: XmlNotationTablePtr = (*dtd).notations as XmlNotationTablePtr;
 
-    xmlHashLookup(table, name) as _
+    xml_hash_lookup(table, name) as _
 }
 
 /**
@@ -7697,7 +7698,7 @@ pub unsafe extern "C" fn xml_get_dtd_qelement_desc(
     }
     let table: XmlElementTablePtr = (*dtd).elements as XmlElementTablePtr;
 
-    xmlHashLookup2(table, name, prefix) as _
+    xml_hash_lookup2(table, name, prefix) as _
 }
 
 /**
@@ -7727,7 +7728,7 @@ pub unsafe extern "C" fn xml_get_dtd_element_desc(
     if !uqname.is_null() {
         name = uqname;
     }
-    let cur: XmlElementPtr = xmlHashLookup2(table, name, prefix) as _;
+    let cur: XmlElementPtr = xml_hash_lookup2(table, name, prefix) as _;
     if !prefix.is_null() {
         xml_free(prefix as _);
     }

@@ -30,9 +30,9 @@ use crate::{
             xml_realloc,
         },
         hash::{
-            xmlHashAddEntry, xmlHashAddEntry2, xmlHashCreate, xmlHashDefaultDeallocator,
-            xmlHashFree, xmlHashLookup, xmlHashLookup2, xmlHashRemoveEntry, xmlHashRemoveEntry2,
-            xmlHashUpdateEntry, xmlHashUpdateEntry2, XmlHashTablePtr,
+            xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_default_deallocator,
+            xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_remove_entry,
+            xml_hash_remove_entry2, xml_hash_update_entry, xml_hash_update_entry2, XmlHashTablePtr,
         },
         parser_internals::{xml_copy_char, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH},
         pattern::{
@@ -1912,21 +1912,21 @@ pub unsafe extern "C" fn xml_xpath_distinct_sorted(nodes: XmlNodeSetPtr) -> XmlN
         return ret;
     }
     let l: c_int = xmlXPathNodeSetGetLength!(nodes);
-    let hash: XmlHashTablePtr = xmlHashCreate(l);
+    let hash: XmlHashTablePtr = xml_hash_create(l);
     for i in 0..l {
         cur = xmlXPathNodeSetItem!(nodes, i);
         strval = xml_xpath_cast_node_to_string(cur);
-        if xmlHashLookup(hash, strval).is_null() {
-            if xmlHashAddEntry(hash, strval, strval as _) < 0 {
+        if xml_hash_lookup(hash, strval).is_null() {
+            if xml_hash_add_entry(hash, strval, strval as _) < 0 {
                 xml_free(strval as _);
                 // goto error;
-                xmlHashFree(hash, Some(xmlHashDefaultDeallocator));
+                xml_hash_free(hash, Some(xml_hash_default_deallocator));
                 xml_xpath_free_node_set(ret);
                 return null_mut();
             }
             if xml_xpath_node_set_add_unique(ret, cur) < 0 {
                 // goto error;
-                xmlHashFree(hash, Some(xmlHashDefaultDeallocator));
+                xml_hash_free(hash, Some(xml_hash_default_deallocator));
                 xml_xpath_free_node_set(ret);
                 return null_mut();
             }
@@ -1934,7 +1934,7 @@ pub unsafe extern "C" fn xml_xpath_distinct_sorted(nodes: XmlNodeSetPtr) -> XmlN
             xml_free(strval as _);
         }
     }
-    xmlHashFree(hash, Some(xmlHashDefaultDeallocator));
+    xml_hash_free(hash, Some(xml_hash_default_deallocator));
     ret
 
     // error:
@@ -2261,24 +2261,24 @@ pub unsafe extern "C" fn xml_xpath_register_ns(
     }
 
     if (*ctxt).ns_hash.is_null() {
-        (*ctxt).ns_hash = xmlHashCreate(10);
+        (*ctxt).ns_hash = xml_hash_create(10);
     }
     if (*ctxt).ns_hash.is_null() {
         return -1;
     }
     if ns_uri.is_null() {
-        return xmlHashRemoveEntry((*ctxt).ns_hash, prefix, Some(xmlHashDefaultDeallocator));
+        return xml_hash_remove_entry((*ctxt).ns_hash, prefix, Some(xml_hash_default_deallocator));
     }
 
     let copy: *mut XmlChar = xml_strdup(ns_uri);
     if copy.is_null() {
         return -1;
     }
-    if xmlHashUpdateEntry(
+    if xml_hash_update_entry(
         (*ctxt).ns_hash,
         prefix,
         copy as _,
-        Some(xmlHashDefaultDeallocator),
+        Some(xml_hash_default_deallocator),
     ) < 0
     {
         xml_free(copy as _);
@@ -2330,7 +2330,7 @@ pub unsafe extern "C" fn xml_xpath_ns_lookup(
         }
     }
 
-    xmlHashLookup((*ctxt).ns_hash, prefix) as _
+    xml_hash_lookup((*ctxt).ns_hash, prefix) as _
 }
 
 /**
@@ -2344,7 +2344,7 @@ pub unsafe extern "C" fn xml_xpath_registered_ns_cleanup(ctxt: XmlXPathContextPt
         return;
     }
 
-    xmlHashFree((*ctxt).ns_hash, Some(xmlHashDefaultDeallocator));
+    xml_hash_free((*ctxt).ns_hash, Some(xml_hash_default_deallocator));
     (*ctxt).ns_hash = null_mut();
 }
 
@@ -2391,20 +2391,20 @@ pub unsafe extern "C" fn xml_xpath_register_func_ns(
     }
 
     if (*ctxt).func_hash.is_null() {
-        (*ctxt).func_hash = xmlHashCreate(0);
+        (*ctxt).func_hash = xml_hash_create(0);
     }
     if (*ctxt).func_hash.is_null() {
         return -1;
     }
     if let Some(f) = f {
-        xmlHashAddEntry2(
+        xml_hash_add_entry2(
             (*ctxt).func_hash,
             name,
             ns_uri,
             *(addr_of!(f) as *const *mut c_void),
         )
     } else {
-        xmlHashRemoveEntry2((*ctxt).func_hash, name, ns_uri, None)
+        xml_hash_remove_entry2((*ctxt).func_hash, name, ns_uri, None)
     }
 }
 
@@ -2457,20 +2457,20 @@ pub unsafe extern "C" fn xml_xpath_register_variable_ns(
     }
 
     if (*ctxt).var_hash.is_null() {
-        (*ctxt).var_hash = xmlHashCreate(0);
+        (*ctxt).var_hash = xml_hash_create(0);
     }
     if (*ctxt).var_hash.is_null() {
         return -1;
     }
     if value.is_null() {
-        return xmlHashRemoveEntry2(
+        return xml_hash_remove_entry2(
             (*ctxt).var_hash,
             name,
             ns_uri,
             Some(xml_xpath_free_object_entry),
         );
     }
-    xmlHashUpdateEntry2(
+    xml_hash_update_entry2(
         (*ctxt).var_hash,
         name,
         ns_uri,
@@ -2538,7 +2538,7 @@ pub unsafe extern "C" fn xml_xpath_function_lookup_ns(
         return None;
     }
 
-    let ret = xmlHashLookup2((*ctxt).func_hash, name, ns_uri);
+    let ret = xml_hash_lookup2((*ctxt).func_hash, name, ns_uri);
     (!ret.is_null()).then(|| *(addr_of!(ret) as *const XmlXPathFunction))
 }
 
@@ -2553,7 +2553,7 @@ pub unsafe extern "C" fn xml_xpath_registered_funcs_cleanup(ctxt: XmlXPathContex
         return;
     }
 
-    xmlHashFree((*ctxt).func_hash, None);
+    xml_hash_free((*ctxt).func_hash, None);
     (*ctxt).func_hash = null_mut();
 }
 
@@ -2931,7 +2931,7 @@ pub unsafe extern "C" fn xml_xpath_variable_lookup_ns(
 
     xml_xpath_cache_object_copy(
         ctxt,
-        xmlHashLookup2((*ctxt).var_hash, name, ns_uri) as XmlXPathObjectPtr,
+        xml_hash_lookup2((*ctxt).var_hash, name, ns_uri) as XmlXPathObjectPtr,
     )
 }
 
@@ -2946,7 +2946,7 @@ pub unsafe extern "C" fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathCo
         return;
     }
 
-    xmlHashFree((*ctxt).var_hash, Some(xml_xpath_free_object_entry));
+    xml_hash_free((*ctxt).var_hash, Some(xml_xpath_free_object_entry));
     (*ctxt).var_hash = null_mut();
 }
 
