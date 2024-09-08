@@ -48,7 +48,7 @@ use exml::libxml::{
         xml_schema_set_parser_errors, xml_schema_set_valid_errors, xml_schema_validate_doc,
         XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaValidCtxtPtr,
     },
-    xmlschemastypes::xmlSchemaInitTypes,
+    xmlschemastypes::xml_schema_init_types,
     xmlstring::{xml_str_equal, xml_strdup, XmlChar},
     xpath::{
         xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_context_set_cache,
@@ -266,7 +266,7 @@ unsafe extern "C" fn initialize_libxml2() {
     xml_set_generic_error_func(null_mut(), Some(test_error_handler));
     #[cfg(feature = "schema")]
     {
-        xmlSchemaInitTypes();
+        xml_schema_init_types();
         xml_relaxng_init_types();
     }
 }

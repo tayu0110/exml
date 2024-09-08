@@ -112,18 +112,18 @@ use crate::{
             xml_reg_new_exec_ctxt, xml_regexp_exec, xml_regexp_is_determinist, XmlRegExecCtxtPtr,
         },
         xmlschemastypes::{
-            xmlSchemaInitTypes, xml_schema_check_facet, xml_schema_collapse_string,
-            xml_schema_compare_values, xml_schema_compare_values_whtsp, xml_schema_copy_value,
-            xml_schema_free_facet, xml_schema_free_value, xml_schema_get_built_in_type,
-            xml_schema_get_canon_value, xml_schema_get_facet_value_as_ulong,
-            xml_schema_get_predefined_type, xml_schema_get_val_type,
-            xml_schema_is_built_in_type_facet, xml_schema_new_facet, xml_schema_new_notation_value,
-            xml_schema_new_qname_value, xml_schema_val_predef_type_node,
-            xml_schema_val_predef_type_node_no_norm, xml_schema_validate_facet_whtsp,
-            xml_schema_validate_length_facet_whtsp, xml_schema_validate_list_simple_type_facet,
-            xml_schema_value_append, xml_schema_value_get_as_boolean,
-            xml_schema_value_get_as_string, xml_schema_value_get_next,
-            xml_schema_white_space_replace, XmlSchemaValPtr, XmlSchemaWhitespaceValueType,
+            xml_schema_check_facet, xml_schema_collapse_string, xml_schema_compare_values,
+            xml_schema_compare_values_whtsp, xml_schema_copy_value, xml_schema_free_facet,
+            xml_schema_free_value, xml_schema_get_built_in_type, xml_schema_get_canon_value,
+            xml_schema_get_facet_value_as_ulong, xml_schema_get_predefined_type,
+            xml_schema_get_val_type, xml_schema_init_types, xml_schema_is_built_in_type_facet,
+            xml_schema_new_facet, xml_schema_new_notation_value, xml_schema_new_qname_value,
+            xml_schema_val_predef_type_node, xml_schema_val_predef_type_node_no_norm,
+            xml_schema_validate_facet_whtsp, xml_schema_validate_length_facet_whtsp,
+            xml_schema_validate_list_simple_type_facet, xml_schema_value_append,
+            xml_schema_value_get_as_boolean, xml_schema_value_get_as_string,
+            xml_schema_value_get_next, xml_schema_white_space_replace, XmlSchemaValPtr,
+            XmlSchemaWhitespaceValueType,
         },
         xmlstring::{
             xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strcat, xml_strdup,
@@ -23756,7 +23756,7 @@ pub unsafe extern "C" fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSc
      * the API; i.e. not automatically by the validated instance document.
      */
 
-    if xmlSchemaInitTypes() < 0 {
+    if xml_schema_init_types() < 0 {
         return null_mut();
     }
 

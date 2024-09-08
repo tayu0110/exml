@@ -554,7 +554,7 @@ unsafe extern "C" fn xml_schema_add_particle() -> XmlSchemaParticlePtr {
  *
  * Returns 0 on success, -1 on error.
  */
-pub unsafe extern "C" fn xmlSchemaInitTypes() -> c_int {
+pub unsafe extern "C" fn xml_schema_init_types() -> c_int {
     if XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) {
         return 0;
     }
@@ -1276,7 +1276,7 @@ pub unsafe extern "C" fn xml_schema_get_predefined_type(
     name: *const XmlChar,
     ns: *const XmlChar,
 ) -> XmlSchemaTypePtr {
-    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) && xmlSchemaInitTypes() < 0 {
+    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) && xml_schema_init_types() < 0 {
         return null_mut();
     }
     if name.is_null() {
@@ -2392,7 +2392,7 @@ unsafe extern "C" fn _xml_schema_base64_decode(ch: XmlChar) -> c_int {
  * Returns 0 if this validates, a positive error code number otherwise
  *         and -1 in case of internal or API error.
  */
-unsafe extern "C" fn xmlSchemaValAtomicType(
+unsafe extern "C" fn xml_schema_val_atomic_type(
     typ: XmlSchemaTypePtr,
     mut value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
@@ -2407,7 +2407,7 @@ unsafe extern "C" fn xmlSchemaValAtomicType(
     let mut norm: *mut XmlChar = null_mut();
     let mut ret: c_int;
 
-    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) && xmlSchemaInitTypes() < 0 {
+    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) && xml_schema_init_types() < 0 {
         return -1;
     }
     if typ.is_null() {
@@ -4019,7 +4019,7 @@ pub unsafe extern "C" fn xml_schema_val_predef_type_node(
     val: *mut XmlSchemaValPtr,
     node: XmlNodePtr,
 ) -> c_int {
-    xmlSchemaValAtomicType(
+    xml_schema_val_atomic_type(
         typ,
         value,
         val,
@@ -6654,7 +6654,7 @@ pub unsafe extern "C" fn xml_schema_validate_list_simple_type_facet(
  * Returns the type if found, NULL otherwise.
  */
 pub unsafe extern "C" fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> XmlSchemaTypePtr {
-    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Relaxed) && xmlSchemaInitTypes() < 0 {
+    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Relaxed) && xml_schema_init_types() < 0 {
         return null_mut();
     }
     match typ {
@@ -7172,7 +7172,7 @@ pub unsafe extern "C" fn xml_schema_val_predef_type_node_no_norm(
     val: *mut XmlSchemaValPtr,
     node: XmlNodePtr,
 ) -> c_int {
-    xmlSchemaValAtomicType(
+    xml_schema_val_atomic_type(
         typ,
         value,
         val,
@@ -8483,7 +8483,7 @@ mod tests {
     fn test_xml_schema_init_types() {
         #[cfg(feature = "schema")]
         unsafe {
-            let ret_val = xmlSchemaInitTypes();
+            let ret_val = xml_schema_init_types();
             desret_int(ret_val);
             xml_reset_last_error();
         }

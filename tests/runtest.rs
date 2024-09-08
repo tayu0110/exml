@@ -74,7 +74,7 @@ use exml::{
         xmlreader::XmlTextReaderPtr,
         xmlregexp::XmlRegexpPtr,
         xmlschemas::{XmlSchemaPtr, XmlSchemaValidCtxtPtr},
-        xmlschemastypes::xmlSchemaInitTypes,
+        xmlschemastypes::xml_schema_init_types,
         xmlstring::{xml_get_utf8_char, xml_strlen, XmlChar},
         xpath::XmlXPathObjectPtr,
     },
@@ -512,7 +512,7 @@ unsafe extern "C" fn initialize_libxml2() {
     xml_set_structured_error_func(null_mut(), Some(test_structured_error_handler));
     #[cfg(feature = "schema")]
     {
-        xmlSchemaInitTypes();
+        xml_schema_init_types();
         xml_relaxng_init_types();
     }
 }
