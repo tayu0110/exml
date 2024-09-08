@@ -467,7 +467,7 @@ pub unsafe extern "C" fn xml_build_uri(uri: *const XmlChar, base: *const XmlChar
  * Returns a new URI string (to be freed by the caller) or NULL in case
  * error.
  */
-pub unsafe extern "C" fn xmlBuildRelativeURI(
+pub unsafe extern "C" fn xml_build_relative_uri(
     uri: *const XmlChar,
     base: *const XmlChar,
 ) -> *mut XmlChar {
@@ -3122,7 +3122,7 @@ mod tests {
                     let uri = gen_const_xml_char_ptr(n_uri, 0);
                     let base = gen_const_xml_char_ptr(n_base, 1);
 
-                    let ret_val = xmlBuildRelativeURI(uri as *const XmlChar, base);
+                    let ret_val = xml_build_relative_uri(uri as *const XmlChar, base);
                     desret_xml_char_ptr(ret_val);
                     des_const_xml_char_ptr(n_uri, uri, 0);
                     des_const_xml_char_ptr(n_base, base, 1);

@@ -41,7 +41,7 @@ use crate::{
             XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
         },
         uri::{
-            xmlBuildRelativeURI, xml_build_uri, xml_free_uri, xml_parse_uri, xml_save_uri,
+            xml_build_relative_uri, xml_build_uri, xml_free_uri, xml_parse_uri, xml_save_uri,
             xml_uri_escape, XmlURIPtr,
         },
         xml_io::{xmlParserGetDirectory, xmlParserInputBufferRead, XmlParserInputBufferPtr},
@@ -1976,7 +1976,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                  * No xml:base on the xinclude node, so we check whether the
                  * URI base is different than (relative to) the context base
                  */
-                cur_base = xmlBuildRelativeURI(url, (*ctxt).base);
+                cur_base = xml_build_relative_uri(url, (*ctxt).base);
                 if cur_base.is_null() {
                     /* Error return */
                     xml_xinclude_err(
