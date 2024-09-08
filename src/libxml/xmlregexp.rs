@@ -525,7 +525,7 @@ unsafe extern "C" fn xml_fa_is_char(ctxt: XmlRegParserCtxtPtr) -> c_int {
  *
  * Returns the new atom or NULL in case of error
  */
-pub(crate) unsafe extern "C" fn xml_reg_new_atom(
+pub(crate) unsafe fn xml_reg_new_atom(
     ctxt: XmlRegParserCtxtPtr,
     typ: Option<XmlRegAtomType>,
 ) -> XmlRegAtomPtr {
@@ -762,7 +762,7 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_epsilon_transition(
  *
  * Returns the new range or NULL in case of error
  */
-unsafe extern "C" fn xml_reg_new_range(
+unsafe fn xml_reg_new_range(
     ctxt: XmlRegParserCtxtPtr,
     neg: c_int,
     typ: Option<XmlRegAtomType>,
@@ -781,7 +781,7 @@ unsafe extern "C" fn xml_reg_new_range(
     ret
 }
 
-unsafe extern "C" fn xml_reg_atom_add_range(
+unsafe fn xml_reg_atom_add_range(
     ctxt: XmlRegParserCtxtPtr,
     atom: XmlRegAtomPtr,
     neg: c_int,

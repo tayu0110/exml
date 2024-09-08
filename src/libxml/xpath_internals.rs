@@ -4685,7 +4685,7 @@ macro_rules! PUSH_FULL_EXPR {
  *
  * Returns the axis or 0
  */
-unsafe extern "C" fn xml_xpath_is_axis_name(name: *const XmlChar) -> Option<XmlXPathAxisVal> {
+unsafe fn xml_xpath_is_axis_name(name: *const XmlChar) -> Option<XmlXPathAxisVal> {
     let mut ret: Option<XmlXPathAxisVal> = None;
     match *name.add(0) {
         b'a' => {

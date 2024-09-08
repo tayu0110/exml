@@ -2464,7 +2464,7 @@ macro_rules! AERROR_INT {
     };
 }
 
-unsafe extern "C" fn xml_schema_get_white_space_facet_value(
+unsafe fn xml_schema_get_white_space_facet_value(
     typ: XmlSchemaTypePtr,
 ) -> Option<XmlSchemaWhitespaceValueType> {
     /*

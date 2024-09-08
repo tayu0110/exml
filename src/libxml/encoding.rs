@@ -2813,7 +2813,7 @@ pub unsafe extern "C" fn iso_lat1_to_utf8(
  *     as the return value is positive, else unpredictable.
  * The value of @outlen after return is the number of octets consumed.
  */
-unsafe extern "C" fn utf8_to_iso8859x(
+unsafe fn utf8_to_iso8859x(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -2940,7 +2940,7 @@ unsafe extern "C" fn utf8_to_iso8859x(
  * The value of @inlen after return is the number of octets consumed
  * The value of @outlen after return is the number of octets produced.
  */
-unsafe extern "C" fn iso8859x_to_utf8(
+unsafe fn iso8859x_to_utf8(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
