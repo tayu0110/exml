@@ -26,7 +26,7 @@ use exml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
-        encoding::{xmlAddEncodingAlias, XmlCharEncoding},
+        encoding::{xml_add_encoding_alias, XmlCharEncoding},
         entities::{xml_encode_entities_reentrant, XmlEntityPtr},
         globals::{
             xml_deregister_node_default, xml_free, xml_generic_error, xml_generic_error_context,
@@ -51,8 +51,8 @@ use exml::{
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
-            xml_relaxng_new_parser_ctxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
-            xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
+            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
+            xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
             XmlRelaxNG, XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr,
         },
@@ -3930,7 +3930,7 @@ fn main() {
                 /*
                  * OK it's for testing purposes
                  */
-                xmlAddEncodingAlias(c"UTF-8".as_ptr(), c"DVEnc".as_ptr());
+                xml_add_encoding_alias(c"UTF-8".as_ptr(), c"DVEnc".as_ptr());
             } else if arg == "-noblanks" || arg == "--noblanks" {
                 NOBLANKS = 1;
             } else if arg == "-format" || arg == "--format" {

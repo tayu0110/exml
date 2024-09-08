@@ -17,7 +17,7 @@ use libc::{memset, size_t};
 use crate::{
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
-        encoding::{xmlFindCharEncodingHandler, XmlCharEncoding, XmlCharEncodingHandlerPtr},
+        encoding::{xml_find_char_encoding_handler, XmlCharEncoding, XmlCharEncodingHandlerPtr},
         globals::{
             xml_deregister_node_default_value, xml_free, xml_generic_error_context, xml_malloc,
         },
@@ -998,7 +998,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
 
     xml_ctxt_use_options((*reader).ctxt, options);
     if !encoding.is_null() {
-        let hdlr: XmlCharEncodingHandlerPtr = xmlFindCharEncodingHandler(encoding);
+        let hdlr: XmlCharEncodingHandlerPtr = xml_find_char_encoding_handler(encoding);
         if !hdlr.is_null() {
             xml_switch_to_encoding((*reader).ctxt, hdlr);
         }

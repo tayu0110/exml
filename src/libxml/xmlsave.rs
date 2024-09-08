@@ -16,8 +16,8 @@ use libc::{memcpy, memset};
 use crate::{
     libxml::{
         encoding::{
-            xmlCharEncCloseFunc, xmlFindCharEncodingHandler, xmlParseCharEncoding, XmlCharEncoding,
-            XmlCharEncodingHandlerPtr, XmlCharEncodingOutputFunc,
+            xml_char_enc_close_func, xml_find_char_encoding_handler, xml_parse_char_encoding,
+            XmlCharEncoding, XmlCharEncodingHandlerPtr, XmlCharEncodingOutputFunc,
         },
         entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{
@@ -466,7 +466,7 @@ unsafe extern "C" fn xmlSaveSwitchEncoding(ctxt: XmlSaveCtxtPtr, encoding: *cons
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
 
     if !encoding.is_null() && (*buf).encoder.is_null() && (*buf).conv.is_null() {
-        (*buf).encoder = xmlFindCharEncodingHandler(encoding);
+        (*buf).encoder = xml_find_char_encoding_handler(encoding);
         if (*buf).encoder.is_null() {
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding as i32,
@@ -477,7 +477,7 @@ unsafe extern "C" fn xmlSaveSwitchEncoding(ctxt: XmlSaveCtxtPtr, encoding: *cons
         }
         (*buf).conv = xml_buf_create();
         if (*buf).conv.is_null() {
-            xmlCharEncCloseFunc((*buf).encoder);
+            xml_char_enc_close_func((*buf).encoder);
             xml_save_err_memory(c"creating encoding buffer".as_ptr() as _);
             return -1;
         }
@@ -1688,7 +1688,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
 unsafe extern "C" fn xmlSaveClearEncoding(ctxt: XmlSaveCtxtPtr) -> c_int {
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     xmlOutputBufferFlush(buf);
-    xmlCharEncCloseFunc((*buf).encoder);
+    xml_char_enc_close_func((*buf).encoder);
     xml_buf_free((*buf).conv);
     (*buf).encoder = null_mut();
     (*buf).conv = null_mut();
@@ -1776,7 +1776,7 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
         || (*ctxt).options & XmlSaveOption::XmlSaveAsXml as i32 != 0
         || (*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32 != 0
     {
-        enc = xmlParseCharEncoding(encoding as _);
+        enc = xml_parse_char_encoding(encoding as _);
         if !encoding.is_null()
             && oldctxtenc.is_null()
             && (*buf).encoder.is_null()
@@ -1923,7 +1923,7 @@ unsafe extern "C" fn xmlNewSaveCtxt(encoding: *const c_char, mut options: c_int)
     memset(ret as _, 0, size_of::<XmlSaveCtxt>());
 
     if !encoding.is_null() {
-        (*ret).handler = xmlFindCharEncodingHandler(encoding);
+        (*ret).handler = xml_find_char_encoding_handler(encoding);
         if (*ret).handler.is_null() {
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding as i32,
@@ -1981,7 +1981,7 @@ pub unsafe extern "C" fn xmlSaveToFd(
     }
     (*ret).buf = xmlOutputBufferCreateFd(fd, (*ret).handler);
     if (*ret).buf.is_null() {
-        xmlCharEncCloseFunc((*ret).handler);
+        xml_char_enc_close_func((*ret).handler);
         xmlFreeSaveCtxt(ret);
         return null_mut();
     }
@@ -2013,7 +2013,7 @@ pub unsafe extern "C" fn xmlSaveToFilename(
     }
     (*ret).buf = xmlOutputBufferCreateFilename(filename, (*ret).handler, compression);
     if (*ret).buf.is_null() {
-        xmlCharEncCloseFunc((*ret).handler);
+        xml_char_enc_close_func((*ret).handler);
         xmlFreeSaveCtxt(ret);
         return null_mut();
     }
@@ -2042,7 +2042,7 @@ pub unsafe extern "C" fn xmlSaveToBuffer(
     }
     (*ret).buf = xmlOutputBufferCreateBuffer(buffer, (*ret).handler);
     if (*ret).buf.is_null() {
-        xmlCharEncCloseFunc((*ret).handler);
+        xml_char_enc_close_func((*ret).handler);
         xmlFreeSaveCtxt(ret);
         return null_mut();
     }
@@ -2075,7 +2075,7 @@ pub unsafe extern "C" fn xmlSaveToIO(
     }
     (*ret).buf = xmlOutputBufferCreateIO(iowrite, ioclose, ioctx, (*ret).handler);
     if (*ret).buf.is_null() {
-        xmlCharEncCloseFunc((*ret).handler);
+        xml_char_enc_close_func((*ret).handler);
         xmlFreeSaveCtxt(ret);
         return null_mut();
     }

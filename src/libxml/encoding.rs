@@ -154,7 +154,7 @@ pub struct XmlCharEncodingHandler {
  * DEPRECATED: Alias for xmlInitParser.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlInitCharEncodingHandlers() {
+pub unsafe extern "C" fn xml_init_char_encoding_handlers() {
     xml_init_parser();
 }
 
@@ -172,8 +172,8 @@ static NB_CHAR_ENCODING_HANDLER: AtomicUsize = AtomicUsize::new(0);
  * Cleanup the memory allocated for the c_char encoding support, it
  * unregisters all the encoding handlers and the aliases.
  */
-pub(crate) unsafe extern "C" fn xmlCleanupCharEncodingHandlers() {
-    xmlCleanupEncodingAliases();
+pub(crate) unsafe extern "C" fn xml_cleanup_char_encoding_handlers() {
+    xml_cleanup_encoding_aliases();
 
     let handlers = HANDLERS.load(Ordering::Acquire);
     if handlers.is_null() {
@@ -260,7 +260,7 @@ unsafe extern "C" fn xml_encoding_err_memory(extra: *const c_char) {
  *
  * Register the c_char encoding handler, surprising, isn't it ?
  */
-pub unsafe extern "C" fn xmlRegisterCharEncodingHandler(handler: XmlCharEncodingHandlerPtr) {
+pub unsafe extern "C" fn xml_register_char_encoding_handler(handler: XmlCharEncodingHandlerPtr) {
     if handler.is_null() {
         xml_encoding_err(
             XmlParserErrors::XmlI18nNoHandler,
@@ -340,7 +340,7 @@ macro_rules! MAKE_HANDLER {
  *     The value of *inlen after return is the number of octets consumed
  *     if the return value is positive, else unpredictable.
  */
-unsafe extern "C" fn UTF8ToUTF8(
+unsafe extern "C" fn utf8_to_utf8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     inb: *const c_uchar,
@@ -391,7 +391,7 @@ pub(crate) static XML_LITTLE_ENDIAN: AtomicI32 = AtomicI32::new(1);
  *     The value of *inlen after return is the number of octets consumed
  *     if the return value is positive, else unpredictable.
  */
-unsafe extern "C" fn UTF16LEToUTF8(
+unsafe extern "C" fn utf16le_to_utf8(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     inb: *const c_uchar,
@@ -504,7 +504,7 @@ unsafe extern "C" fn UTF16LEToUTF8(
  * Returns the number of bytes written, or -1 if lack of space, or -2
  *     if the transcoding failed.
  */
-unsafe extern "C" fn UTF8ToUTF16LE(
+unsafe extern "C" fn utf8_to_utf16le(
     outb: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -641,7 +641,7 @@ unsafe extern "C" fn UTF8ToUTF16LE(
  * The value of *inlen after return is the number of octets consumed
  *     if the return value is positive, else unpredictable.
  */
-unsafe extern "C" fn UTF16BEToUTF8(
+unsafe extern "C" fn utf16be_to_utf8(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     inb: *const c_uchar,
@@ -757,7 +757,7 @@ unsafe extern "C" fn UTF16BEToUTF8(
  * Returns the number of byte written, or -1 by lack of space, or -2
  *     if the transcoding failed.
  */
-unsafe extern "C" fn UTF8ToUTF16BE(
+unsafe extern "C" fn utf8_to_utf16be(
     outb: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -890,7 +890,7 @@ unsafe extern "C" fn UTF8ToUTF16BE(
  * Returns the number of bytes written, or -1 if lack of space, or -2
  *     if the transcoding failed.
  */
-unsafe extern "C" fn UTF8ToUTF16(
+unsafe extern "C" fn utf8_to_utf16(
     outb: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
@@ -915,7 +915,7 @@ unsafe extern "C" fn UTF8ToUTF16(
         *inlen = 0;
         return 0;
     }
-    UTF8ToUTF16LE(outb, outlen, input, inlen)
+    utf8_to_utf16le(outb, outlen, input, inlen)
 }
 
 /**
@@ -932,7 +932,7 @@ unsafe extern "C" fn UTF8ToUTF16(
  *     if the return value is positive, else unpredictable.
  * The value of @outlen after return is the number of octets produced.
  */
-unsafe extern "C" fn asciiToUTF8(
+unsafe extern "C" fn ascii_to_utf8(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -984,7 +984,7 @@ unsafe extern "C" fn asciiToUTF8(
  *     if the return value is positive, else unpredictable.
  * The value of @outlen after return is the number of octets produced.
  */
-unsafe extern "C" fn UTF8Toascii(
+unsafe extern "C" fn utf8_to_ascii(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -1077,130 +1077,138 @@ unsafe extern "C" fn UTF8Toascii(
 }
 
 static mut DEFAULT_HANDLERS: &mut [XmlCharEncodingHandler] = &mut [
-    MAKE_HANDLER!(c"UTF-8".as_ptr(), Some(UTF8ToUTF8), Some(UTF8ToUTF8)),
+    MAKE_HANDLER!(c"UTF-8".as_ptr(), Some(utf8_to_utf8), Some(utf8_to_utf8)),
     #[cfg(feature = "output")]
     MAKE_HANDLER!(
         c"UTF-16LE".as_ptr(),
-        Some(UTF16LEToUTF8),
-        Some(UTF8ToUTF16LE)
+        Some(utf16le_to_utf8),
+        Some(utf8_to_utf16le)
     ),
     #[cfg(feature = "output")]
     MAKE_HANDLER!(
         c"UTF-16BE".as_ptr(),
-        Some(UTF16BEToUTF8),
-        Some(UTF8ToUTF16BE)
+        Some(utf16be_to_utf8),
+        Some(utf8_to_utf16be)
     ),
     #[cfg(feature = "output")]
-    MAKE_HANDLER!(c"UTF-16".as_ptr(), Some(UTF16LEToUTF8), Some(UTF8ToUTF16)),
+    MAKE_HANDLER!(
+        c"UTF-16".as_ptr(),
+        Some(utf16le_to_utf8),
+        Some(utf8_to_utf16)
+    ),
     #[cfg(feature = "output")]
     MAKE_HANDLER!(
         c"ISO-8859-1".as_ptr(),
-        Some(isolat1ToUTF8),
-        Some(UTF8Toisolat1)
+        Some(iso_lat1_to_utf8),
+        Some(utf8_to_iso_lat1)
     ),
     #[cfg(feature = "output")]
-    MAKE_HANDLER!(c"ASCII".as_ptr(), Some(asciiToUTF8), Some(UTF8Toascii)),
+    MAKE_HANDLER!(c"ASCII".as_ptr(), Some(ascii_to_utf8), Some(utf8_to_ascii)),
     #[cfg(feature = "output")]
-    MAKE_HANDLER!(c"US-ASCII".as_ptr(), Some(asciiToUTF8), Some(UTF8Toascii)),
+    MAKE_HANDLER!(
+        c"US-ASCII".as_ptr(),
+        Some(ascii_to_utf8),
+        Some(utf8_to_ascii)
+    ),
     #[cfg(all(feature = "output", feature = "html"))]
     MAKE_HANDLER!(c"HTML".as_ptr(), None, Some(utf8_to_html)),
     #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"UTF-16LE".as_ptr(), Some(UTF16LEToUTF8), None),
+    MAKE_HANDLER!(c"UTF-16LE".as_ptr(), Some(utf16le_to_utf8), None),
     #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"UTF-16BE".as_ptr(), Some(UTF16BEToUTF8), None),
+    MAKE_HANDLER!(c"UTF-16BE".as_ptr(), Some(utf16be_to_utf8), None),
     #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"UTF-16".as_ptr(), Some(UTF16LEToUTF8), None),
+    MAKE_HANDLER!(c"UTF-16".as_ptr(), Some(utf16le_to_utf8), None),
     #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"ISO-8859-1".as_ptr(), Some(isolat1ToUTF8), None),
+    MAKE_HANDLER!(c"ISO-8859-1".as_ptr(), Some(iso_lat1_to_utf8), None),
     #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"ASCII".as_ptr(), Some(asciiToUTF8), None),
+    MAKE_HANDLER!(c"ASCII".as_ptr(), Some(ascii_to_utf8), None),
     #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"US-ASCII".as_ptr(), Some(asciiToUTF8), None),
+    MAKE_HANDLER!(c"US-ASCII".as_ptr(), Some(ascii_to_utf8), None),
     // #if !defined(LIBXML_ICONV_ENABLED) && !defined(LIBXML_ICU_ENABLED) && \
     //     defined(LIBXML_ISO8859X_ENABLED)
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-2".as_ptr(),
-        Some(ISO8859_2ToUTF8),
-        Some(UTF8ToISO8859_2)
+        Some(iso8859_2_to_utf8),
+        Some(utf8_to_iso8859_2)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-3".as_ptr(),
-        Some(ISO8859_3ToUTF8),
-        Some(UTF8ToISO8859_3)
+        Some(iso8859_3_to_utf8),
+        Some(utf8_to_iso8859_3)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-4".as_ptr(),
-        Some(ISO8859_4ToUTF8),
-        Some(UTF8ToISO8859_4)
+        Some(iso8859_4_to_utf8),
+        Some(utf8_to_iso8859_4)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-5".as_ptr(),
-        Some(ISO8859_5ToUTF8),
-        Some(UTF8ToISO8859_5)
+        Some(iso8859_5_to_utf8),
+        Some(utf8_to_iso8859_5)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-6".as_ptr(),
-        Some(ISO8859_6ToUTF8),
-        Some(UTF8ToISO8859_6)
+        Some(iso8859_6_to_utf8),
+        Some(utf8_to_iso8859_6)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-7".as_ptr(),
-        Some(ISO8859_7ToUTF8),
-        Some(UTF8ToISO8859_7)
+        Some(iso8859_7_to_utf8),
+        Some(utf8_to_iso8859_7)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-8".as_ptr(),
-        Some(ISO8859_8ToUTF8),
-        Some(UTF8ToISO8859_8)
+        Some(iso8859_8_to_utf8),
+        Some(utf8_to_iso8859_8)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-9".as_ptr(),
-        Some(ISO8859_9ToUTF8),
-        Some(UTF8ToISO8859_9)
+        Some(iso8859_9_to_utf8),
+        Some(utf8_to_iso8859_9)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-10".as_ptr(),
-        Some(ISO8859_10ToUTF8),
-        Some(UTF8ToISO8859_10)
+        Some(iso8859_10_to_utf8),
+        Some(utf8_to_iso8859_10)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-11".as_ptr(),
-        Some(ISO8859_11ToUTF8),
-        Some(UTF8ToISO8859_11)
+        Some(iso8859_11_to_utf8),
+        Some(utf8_to_iso8859_11)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-13".as_ptr(),
-        Some(ISO8859_13ToUTF8),
-        Some(UTF8ToISO8859_13)
+        Some(iso8859_13_to_utf8),
+        Some(utf8_to_iso8859_13)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-14".as_ptr(),
-        Some(ISO8859_14ToUTF8),
-        Some(UTF8ToISO8859_14)
+        Some(iso8859_14_to_utf8),
+        Some(utf8_to_iso8859_14)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-15".as_ptr(),
-        Some(ISO8859_15ToUTF8),
-        Some(UTF8ToISO8859_15)
+        Some(iso8859_15_to_utf8),
+        Some(utf8_to_iso8859_15)
     ),
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-16".as_ptr(),
-        Some(ISO8859_16ToUTF8),
-        Some(UTF8ToISO8859_16)
+        Some(iso8859_16_to_utf8),
+        Some(utf8_to_iso8859_16)
     ),
     // #endif
 ];
@@ -1216,7 +1224,7 @@ static XML_UTF16_BEHANDLER: &XmlCharEncodingHandler = unsafe { &DEFAULT_HANDLERS
  *
  * Returns the handler or NULL if not found
  */
-pub unsafe extern "C" fn xmlGetCharEncodingHandler(
+pub unsafe extern "C" fn xml_get_char_encoding_handler(
     enc: XmlCharEncoding,
 ) -> XmlCharEncodingHandlerPtr {
     let mut handler: XmlCharEncodingHandlerPtr;
@@ -1238,47 +1246,47 @@ pub unsafe extern "C" fn xmlGetCharEncodingHandler(
             return XML_UTF16_BEHANDLER as *const XmlCharEncodingHandler as _;
         }
         XmlCharEncoding::XmlCharEncodingEbcdic => {
-            handler = xmlFindCharEncodingHandler(c"EBCDIC".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"EBCDIC".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"ebcdic".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ebcdic".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"EBCDIC-US".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"EBCDIC-US".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"IBM-037".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"IBM-037".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncodingUcs4be => {
-            handler = xmlFindCharEncodingHandler(c"ISO-10646-UCS-4".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-10646-UCS-4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"UCS-4".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"UCS-4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"UCS4".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"UCS4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncodingUcs4le => {
-            handler = xmlFindCharEncodingHandler(c"ISO-10646-UCS-4".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-10646-UCS-4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"UCS-4".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"UCS-4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"UCS4".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"UCS4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
@@ -1286,15 +1294,15 @@ pub unsafe extern "C" fn xmlGetCharEncodingHandler(
         XmlCharEncoding::XmlCharEncodingUcs4_2143 => {}
         XmlCharEncoding::XmlCharEncodingUcs4_3412 => {}
         XmlCharEncoding::XmlCharEncodingUcs2 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-10646-UCS-2".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-10646-UCS-2".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"UCS-2".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"UCS-2".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"UCS2".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"UCS2".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
@@ -1307,82 +1315,82 @@ pub unsafe extern "C" fn xmlGetCharEncodingHandler(
          * back by registering no-ops encoders for those
          */
         XmlCharEncoding::XmlCharEncoding8859_1 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-1".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-1".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncoding8859_2 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-2".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-2".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncoding8859_3 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-3".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-3".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncoding8859_4 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-4".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncoding8859_5 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-5".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-5".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncoding8859_6 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-6".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-6".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncoding8859_7 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-7".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-7".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncoding8859_8 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-8".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-8".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncoding8859_9 => {
-            handler = xmlFindCharEncodingHandler(c"ISO-8859-9".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-8859-9".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
 
         XmlCharEncoding::XmlCharEncoding2022Jp => {
-            handler = xmlFindCharEncodingHandler(c"ISO-2022-JP".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ISO-2022-JP".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncodingShiftJis => {
-            handler = xmlFindCharEncodingHandler(c"SHIFT-JIS".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"SHIFT-JIS".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"SHIFT_JIS".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"SHIFT_JIS".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
-            handler = xmlFindCharEncodingHandler(c"Shift_JIS".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"Shift_JIS".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
         XmlCharEncoding::XmlCharEncodingEucJp => {
-            handler = xmlFindCharEncodingHandler(c"EUC-JP".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"EUC-JP".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
@@ -1408,7 +1416,7 @@ static NUM_DEFAULT_HANDLERS: usize = unsafe { DEFAULT_HANDLERS.len() };
  *
  * Returns the handler or NULL if not found
  */
-pub unsafe extern "C" fn xmlFindCharEncodingHandler(
+pub unsafe extern "C" fn xml_find_char_encoding_handler(
     mut name: *const c_char,
 ) -> XmlCharEncodingHandlerPtr {
     // #ifdef LIBXML_ICONV_ENABLED
@@ -1432,7 +1440,7 @@ pub unsafe extern "C" fn xmlFindCharEncodingHandler(
      * Do the alias resolution
      */
     let norig: *const c_char = name;
-    let nalias: *const c_char = xmlGetEncodingAlias(name);
+    let nalias: *const c_char = xml_get_encoding_alias(name);
     if !nalias.is_null() {
         name = nalias;
     }
@@ -1565,11 +1573,11 @@ pub unsafe extern "C" fn xmlFindCharEncodingHandler(
     /*
      * Fallback using the canonical names
      */
-    let alias: XmlCharEncoding = xmlParseCharEncoding(norig);
+    let alias: XmlCharEncoding = xml_parse_char_encoding(norig);
     if !matches!(alias, XmlCharEncoding::XmlCharEncodingError) {
-        let canon: *const c_char = xmlGetCharEncodingName(alias);
+        let canon: *const c_char = xml_get_char_encoding_name(alias);
         if !canon.is_null() && strcmp(name, canon) != 0 {
-            return xmlFindCharEncodingHandler(canon);
+            return xml_find_char_encoding_handler(canon);
         }
     }
 
@@ -1587,7 +1595,7 @@ pub unsafe extern "C" fn xmlFindCharEncodingHandler(
  *
  * Returns the xmlCharEncodingHandlerPtr created (or NULL in case of error).
  */
-pub unsafe extern "C" fn xmlNewCharEncodingHandler(
+pub unsafe extern "C" fn xml_new_char_encoding_handler(
     mut name: *const c_char,
     input: XmlCharEncodingInputFunc,
     output: XmlCharEncodingOutputFunc,
@@ -1597,7 +1605,7 @@ pub unsafe extern "C" fn xmlNewCharEncodingHandler(
     /*
      * Do the alias resolution
      */
-    let alias: *const c_char = xmlGetEncodingAlias(name);
+    let alias: *const c_char = xml_get_encoding_alias(name);
     if !alias.is_null() {
         name = alias;
     }
@@ -1654,7 +1662,7 @@ pub unsafe extern "C" fn xmlNewCharEncodingHandler(
     /*
      * registers and returns the handler.
      */
-    xmlRegisterCharEncodingHandler(handler);
+    xml_register_char_encoding_handler(handler);
     // #ifdef DEBUG_ENCODING
     //     xmlGenericError(xmlGenericErrorContext,
     // 	    "Registered encoding handler for %s\n", name);
@@ -1686,7 +1694,10 @@ static XML_CHAR_ENCODING_ALIASES_MAX: AtomicUsize = AtomicUsize::new(0);
  *
  * Returns 0 in case of success, -1 in case of error
  */
-pub unsafe extern "C" fn xmlAddEncodingAlias(name: *const c_char, alias: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_add_encoding_alias(
+    name: *const c_char,
+    alias: *const c_char,
+) -> c_int {
     let mut upper: [c_char; 100] = [0; 100];
 
     if name.is_null() || alias.is_null() {
@@ -1752,7 +1763,7 @@ pub unsafe extern "C" fn xmlAddEncodingAlias(name: *const c_char, alias: *const 
  *
  * Returns 0 in case of success, -1 in case of error
  */
-pub unsafe extern "C" fn xmlDelEncodingAlias(alias: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_del_encoding_alias(alias: *const c_char) -> c_int {
     if alias.is_null() {
         return -1;
     }
@@ -1790,7 +1801,7 @@ pub unsafe extern "C" fn xmlDelEncodingAlias(alias: *const c_char) -> c_int {
  *
  * Returns NULL if not found, otherwise the original name
  */
-pub unsafe extern "C" fn xmlGetEncodingAlias(alias: *const c_char) -> *const c_char {
+pub unsafe extern "C" fn xml_get_encoding_alias(alias: *const c_char) -> *const c_char {
     let mut upper: [c_char; 100] = [0; 100];
 
     if alias.is_null() {
@@ -1826,7 +1837,7 @@ pub unsafe extern "C" fn xmlGetEncodingAlias(alias: *const c_char) -> *const c_c
  *
  * Unregisters all aliases
  */
-pub unsafe extern "C" fn xmlCleanupEncodingAliases() {
+pub unsafe extern "C" fn xml_cleanup_encoding_aliases() {
     let aliases = XML_CHAR_ENCODING_ALIASES.load(Ordering::Acquire);
     if aliases.is_null() {
         return;
@@ -1858,7 +1869,7 @@ pub unsafe extern "C" fn xmlCleanupEncodingAliases() {
  * Returns one of the XML_CHAR_ENCODING_... values or XML_CHAR_ENCODING_NONE
  * if not recognized.
  */
-pub unsafe extern "C" fn xmlParseCharEncoding(mut name: *const c_char) -> XmlCharEncoding {
+pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> XmlCharEncoding {
     let mut upper: [c_char; 500] = [0; 500];
 
     if name.is_null() {
@@ -1868,7 +1879,7 @@ pub unsafe extern "C" fn xmlParseCharEncoding(mut name: *const c_char) -> XmlCha
     /*
      * Do the alias resolution
      */
-    let alias: *const c_char = xmlGetEncodingAlias(name);
+    let alias: *const c_char = xml_get_encoding_alias(name);
     if !alias.is_null() {
         name = alias;
     }
@@ -1994,7 +2005,7 @@ pub unsafe extern "C" fn xmlParseCharEncoding(mut name: *const c_char) -> XmlCha
  *
  * Returns the canonical name for the given encoding
  */
-pub unsafe extern "C" fn xmlGetCharEncodingName(enc: XmlCharEncoding) -> *const c_char {
+pub unsafe extern "C" fn xml_get_char_encoding_name(enc: XmlCharEncoding) -> *const c_char {
     match enc {
         XmlCharEncoding::XmlCharEncodingError => null(),
         XmlCharEncoding::XmlCharEncodingNone => null(),
@@ -2037,7 +2048,7 @@ pub unsafe extern "C" fn xmlGetCharEncodingName(enc: XmlCharEncoding) -> *const 
  *
  * Returns one of the XML_CHAR_ENCODING_... values.
  */
-pub unsafe extern "C" fn xmlDetectCharEncoding(
+pub unsafe extern "C" fn xml_detect_char_encoding(
     input: *const c_uchar,
     len: c_int,
 ) -> XmlCharEncoding {
@@ -2147,7 +2158,7 @@ pub unsafe extern "C" fn xmlDetectCharEncoding(
  *     as the return value is 0, else unpredictable.
  * The value of @outlen after return is the number of octets produced.
  */
-pub(crate) unsafe extern "C" fn xmlEncOutputChunk(
+pub(crate) unsafe extern "C" fn xml_enc_output_chunk(
     handler: *mut XmlCharEncodingHandler,
     out: *mut c_uchar,
     outlen: *mut c_int,
@@ -2199,7 +2210,7 @@ pub(crate) unsafe extern "C" fn xmlEncOutputChunk(
  *     -2 if the transcoding fails (for *in is not valid utf8 string or
  *        the result of transformation can't fit into the encoding we want), or
  */
-pub unsafe extern "C" fn xmlCharEncOutFunc(
+pub unsafe extern "C" fn xml_char_enc_out_func(
     handler: *mut XmlCharEncodingHandler,
     out: XmlBufferPtr,
     input: XmlBufferPtr,
@@ -2230,7 +2241,7 @@ pub unsafe extern "C" fn xmlCharEncOutFunc(
         if input.is_null() {
             toconv = 0;
             /* TODO: Check return value. */
-            xmlEncOutputChunk(
+            xml_enc_output_chunk(
                 handler,
                 (*out).content.add((*out).using as usize),
                 addr_of_mut!(written),
@@ -2257,7 +2268,7 @@ pub unsafe extern "C" fn xmlCharEncOutFunc(
             xml_buffer_grow(out, toconv as u32 * 4);
             written = (*out).size as i32 - (*out).using as i32 - 1;
         }
-        ret = xmlEncOutputChunk(
+        ret = xml_enc_output_chunk(
             handler,
             (*out).content.add((*out).using as usize),
             addr_of_mut!(written),
@@ -2345,7 +2356,7 @@ pub unsafe extern "C" fn xmlCharEncOutFunc(
                 xml_buffer_grow(out, charref_len as u32 * 4);
                 written = (*out).size as i32 - (*out).using as i32 - 1;
                 toconv = charref_len;
-                ret = xmlEncOutputChunk(
+                ret = xml_enc_output_chunk(
                     handler,
                     (*out).content.add((*out).using as usize),
                     addr_of_mut!(written),
@@ -2407,7 +2418,7 @@ pub unsafe extern "C" fn xmlCharEncOutFunc(
  *     -2 if the transcoding fails (for *in is not valid utf8 string or
  *        the result of transformation can't fit into the encoding we want), or
  */
-pub unsafe extern "C" fn xmlCharEncInFunc(
+pub unsafe extern "C" fn xml_char_enc_in_func(
     handler: *mut XmlCharEncodingHandler,
     out: XmlBufferPtr,
     input: XmlBufferPtr,
@@ -2515,12 +2526,12 @@ pub unsafe extern "C" fn xmlCharEncInFunc(
  * DEPERECATED: Don't use.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlCharEncFirstLine(
+pub unsafe extern "C" fn xml_char_enc_first_line(
     handler: *mut XmlCharEncodingHandler,
     out: XmlBufferPtr,
     input: XmlBufferPtr,
 ) -> c_int {
-    xmlCharEncInFunc(handler, out, input)
+    xml_char_enc_in_func(handler, out, input)
 }
 
 /**
@@ -2531,7 +2542,7 @@ pub unsafe extern "C" fn xmlCharEncFirstLine(
  *
  * Returns 0 if success, or -1 in case of error
  */
-pub unsafe extern "C" fn xmlCharEncCloseFunc(handler: *mut XmlCharEncodingHandler) -> c_int {
+pub unsafe extern "C" fn xml_char_enc_close_func(handler: *mut XmlCharEncodingHandler) -> c_int {
     let ret: c_int = 0;
     let tofree: c_int = 0;
 
@@ -2628,7 +2639,7 @@ pub unsafe extern "C" fn xmlCharEncCloseFunc(handler: *mut XmlCharEncodingHandle
  * The value of @outlen after return is the number of octets produced.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn UTF8Toisolat1(
+pub unsafe extern "C" fn utf8_to_iso_lat1(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -2740,7 +2751,7 @@ pub unsafe extern "C" fn UTF8Toisolat1(
  *     if the return value is positive, else unpredictable.
  * The value of @outlen after return is the number of octets produced.
  */
-pub unsafe extern "C" fn isolat1ToUTF8(
+pub unsafe extern "C" fn iso_lat1_to_utf8(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -2802,7 +2813,7 @@ pub unsafe extern "C" fn isolat1ToUTF8(
  *     as the return value is positive, else unpredictable.
  * The value of @outlen after return is the number of octets consumed.
  */
-unsafe extern "C" fn UTF8ToISO8859x(
+unsafe extern "C" fn utf8_to_iso8859x(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -2810,7 +2821,6 @@ unsafe extern "C" fn UTF8ToISO8859x(
     xlattable: &[c_uchar],
 ) -> c_int {
     let outstart: *const c_uchar = out;
-    let inend: *const c_uchar;
     let instart: *const c_uchar = input;
     let mut processed: *const c_uchar = input;
 
@@ -2825,7 +2835,7 @@ unsafe extern "C" fn UTF8ToISO8859x(
         *inlen = 0;
         return 0;
     }
-    inend = input.add(*inlen as usize);
+    let inend: *const c_uchar = input.add(*inlen as usize);
     while input < inend {
         let mut d: c_uchar = *input;
         input = input.add(1);
@@ -2853,8 +2863,8 @@ unsafe extern "C" fn UTF8ToISO8859x(
                 *inlen = processed.offset_from(instart) as _;
                 return -2;
             }
-            c = c & 0x3F;
-            d = d & 0x1F;
+            c &= 0x3F;
+            d &= 0x1F;
             d = xlattable[48 + c as usize + xlattable[d as usize] as usize * 64];
             if d == 0 {
                 /* not in character set */
@@ -2889,9 +2899,9 @@ unsafe extern "C" fn UTF8ToISO8859x(
                 *inlen = processed.offset_from(instart) as _;
                 return -2;
             }
-            c1 = c1 & 0x3F;
-            c2 = c2 & 0x3F;
-            d = d & 0x0F;
+            c1 &= 0x3F;
+            c2 &= 0x3F;
+            d &= 0x0F;
             d = xlattable[48
                 + c2 as usize
                 + xlattable[48 + c1 as usize + xlattable[32 + d as usize] as usize * 64] as usize
@@ -2930,7 +2940,7 @@ unsafe extern "C" fn UTF8ToISO8859x(
  * The value of @inlen after return is the number of octets consumed
  * The value of @outlen after return is the number of octets produced.
  */
-unsafe extern "C" fn ISO8859xToUTF8(
+unsafe extern "C" fn iso8859x_to_utf8(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const c_uchar,
@@ -2938,17 +2948,15 @@ unsafe extern "C" fn ISO8859xToUTF8(
     unicodetable: &[c_ushort],
 ) -> c_int {
     let outstart: *mut c_uchar = out;
-    let outend: *mut c_uchar;
     let instart: *const c_uchar = input;
-    let inend: *const c_uchar;
     let mut instop: *const c_uchar;
     let mut c: c_uint;
 
     if out.is_null() || outlen.is_null() || inlen.is_null() || input.is_null() {
         return -1;
     }
-    outend = out.add(*outlen as usize);
-    inend = input.add(*inlen as usize);
+    let outend: *mut c_uchar = out.add(*outlen as usize);
+    let inend: *const c_uchar = input.add(*inlen as usize);
     instop = inend;
 
     while input < inend && out < outend.sub(2) {
@@ -2999,245 +3007,245 @@ unsafe extern "C" fn ISO8859xToUTF8(
     *outlen
 }
 
-unsafe extern "C" fn ISO8859_2ToUTF8(
+unsafe extern "C" fn iso8859_2_to_utf8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_2)
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_2)
 }
-unsafe extern "C" fn UTF8ToISO8859_2(
+unsafe extern "C" fn utf8_to_iso8859_2(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_2)
-}
-
-unsafe extern "C" fn ISO8859_3ToUTF8(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_3)
-}
-unsafe extern "C" fn UTF8ToISO8859_3(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_3)
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_2)
 }
 
-unsafe extern "C" fn ISO8859_4ToUTF8(
+unsafe extern "C" fn iso8859_3_to_utf8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_4)
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_3)
 }
-unsafe extern "C" fn UTF8ToISO8859_4(
+unsafe extern "C" fn utf8_to_iso8859_3(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_4)
-}
-
-unsafe extern "C" fn ISO8859_5ToUTF8(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_5)
-}
-unsafe extern "C" fn UTF8ToISO8859_5(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_5)
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_3)
 }
 
-unsafe extern "C" fn ISO8859_6ToUTF8(
+unsafe extern "C" fn iso8859_4_to_utf8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_6)
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_4)
 }
-unsafe extern "C" fn UTF8ToISO8859_6(
+unsafe extern "C" fn utf8_to_iso8859_4(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_6)
-}
-
-unsafe extern "C" fn ISO8859_7ToUTF8(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_7)
-}
-unsafe extern "C" fn UTF8ToISO8859_7(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_7)
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_4)
 }
 
-unsafe extern "C" fn ISO8859_8ToUTF8(
+unsafe extern "C" fn iso8859_5_to_utf8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_8)
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_5)
 }
-unsafe extern "C" fn UTF8ToISO8859_8(
+unsafe extern "C" fn utf8_to_iso8859_5(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_8)
-}
-
-unsafe extern "C" fn ISO8859_9ToUTF8(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_9)
-}
-unsafe extern "C" fn UTF8ToISO8859_9(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_9)
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_5)
 }
 
-unsafe extern "C" fn ISO8859_10ToUTF8(
+unsafe extern "C" fn iso8859_6_to_utf8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_10)
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_6)
 }
-unsafe extern "C" fn UTF8ToISO8859_10(
+unsafe extern "C" fn utf8_to_iso8859_6(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_10)
-}
-
-unsafe extern "C" fn ISO8859_11ToUTF8(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_11)
-}
-unsafe extern "C" fn UTF8ToISO8859_11(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_11)
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_6)
 }
 
-unsafe extern "C" fn ISO8859_13ToUTF8(
+unsafe extern "C" fn iso8859_7_to_utf8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_13)
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_7)
 }
-unsafe extern "C" fn UTF8ToISO8859_13(
+unsafe extern "C" fn utf8_to_iso8859_7(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_13)
-}
-
-unsafe extern "C" fn ISO8859_14ToUTF8(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_14)
-}
-unsafe extern "C" fn UTF8ToISO8859_14(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_14)
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_7)
 }
 
-unsafe extern "C" fn ISO8859_15ToUTF8(
+unsafe extern "C" fn iso8859_8_to_utf8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_15)
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_8)
 }
-unsafe extern "C" fn UTF8ToISO8859_15(
+unsafe extern "C" fn utf8_to_iso8859_8(
     out: *mut c_uchar,
     outlen: *mut c_int,
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_15)
-}
-
-unsafe extern "C" fn ISO8859_16ToUTF8(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    ISO8859xToUTF8(out, outlen, input, inlen, &xmlunicodetable_ISO8859_16)
-}
-unsafe extern "C" fn UTF8ToISO8859_16(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    UTF8ToISO8859x(out, outlen, input, inlen, &xmltranscodetable_ISO8859_16)
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_8)
 }
 
-const xmlunicodetable_ISO8859_2: [c_ushort; 128] = [
+unsafe extern "C" fn iso8859_9_to_utf8(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_9)
+}
+unsafe extern "C" fn utf8_to_iso8859_9(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_9)
+}
+
+unsafe extern "C" fn iso8859_10_to_utf8(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_10)
+}
+unsafe extern "C" fn utf8_to_iso8859_10(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_10)
+}
+
+unsafe extern "C" fn iso8859_11_to_utf8(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_11)
+}
+unsafe extern "C" fn utf8_to_iso8859_11(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_11)
+}
+
+unsafe extern "C" fn iso8859_13_to_utf8(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_13)
+}
+unsafe extern "C" fn utf8_to_iso8859_13(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_13)
+}
+
+unsafe extern "C" fn iso8859_14_to_utf8(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_14)
+}
+unsafe extern "C" fn utf8_to_iso8859_14(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_14)
+}
+
+unsafe extern "C" fn iso8859_15_to_utf8(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_15)
+}
+unsafe extern "C" fn utf8_to_iso8859_15(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_15)
+}
+
+unsafe extern "C" fn iso8859_16_to_utf8(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    iso8859x_to_utf8(out, outlen, input, inlen, &XMLUNICODETABLE_ISO8859_16)
+}
+unsafe extern "C" fn utf8_to_iso8859_16(
+    out: *mut c_uchar,
+    outlen: *mut c_int,
+    input: *const c_uchar,
+    inlen: *mut c_int,
+) -> c_int {
+    utf8_to_iso8859x(out, outlen, input, inlen, &XMLTRANSCODETABLE_ISO8859_16)
+}
+
+const XMLUNICODETABLE_ISO8859_2: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0104, 0x02d8, 0x0141,
@@ -3251,7 +3259,7 @@ const xmlunicodetable_ISO8859_2: [c_ushort; 128] = [
     0x0159, 0x016f, 0x00fa, 0x0171, 0x00fc, 0x00fd, 0x0163, 0x02d9,
 ];
 
-const xmltranscodetable_ISO8859_2: [c_uchar; 48 + 6 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_2: [c_uchar; 48 + 6 * 64] = [
     0x00, 0x00, 0x01, 0x05, 0x02, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3281,7 +3289,7 @@ const xmltranscodetable_ISO8859_2: [c_uchar; 48 + 6 * 64] = [
     0x00, 0x00, 0x00, 0xf3, 0xf4, 0x00, 0xf6, 0xf7, 0x00, 0x00, 0xfa, 0x00, 0xfc, 0xfd, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_3: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_3: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0126, 0x02d8, 0x00a3,
@@ -3295,7 +3303,7 @@ const xmlunicodetable_ISO8859_3: [c_ushort; 128] = [
     0x011d, 0x00f9, 0x00fa, 0x00fb, 0x00fc, 0x016d, 0x015d, 0x02d9,
 ];
 
-const xmltranscodetable_ISO8859_3: [c_uchar; 48 + 7 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_3: [c_uchar; 48 + 7 * 64] = [
     0x04, 0x00, 0x01, 0x06, 0x02, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3329,7 +3337,7 @@ const xmltranscodetable_ISO8859_3: [c_uchar; 48 + 7 * 64] = [
     0x00, 0xf1, 0xf2, 0xf3, 0xf4, 0x00, 0xf6, 0xf7, 0x00, 0xf9, 0xfa, 0xfb, 0xfc, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_4: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_4: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0104, 0x0138, 0x0156,
@@ -3343,7 +3351,7 @@ const xmlunicodetable_ISO8859_4: [c_ushort; 128] = [
     0x00f8, 0x0173, 0x00fa, 0x00fb, 0x00fc, 0x0169, 0x016b, 0x02d9,
 ];
 
-const xmltranscodetable_ISO8859_4: [c_uchar; 48 + 6 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_4: [c_uchar; 48 + 6 * 64] = [
     0x00, 0x00, 0x01, 0x05, 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3373,7 +3381,7 @@ const xmltranscodetable_ISO8859_4: [c_uchar; 48 + 6 * 64] = [
     0x00, 0x00, 0x00, 0x00, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0x00, 0xfa, 0xfb, 0xfc, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_5: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_5: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0401, 0x0402, 0x0403,
@@ -3387,7 +3395,7 @@ const xmlunicodetable_ISO8859_5: [c_ushort; 128] = [
     0x0458, 0x0459, 0x045a, 0x045b, 0x045c, 0x00a7, 0x045e, 0x045f,
 ];
 
-const xmltranscodetable_ISO8859_5: [c_uchar; 48 + 6 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_5: [c_uchar; 48 + 6 * 64] = [
     0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3417,7 +3425,7 @@ const xmltranscodetable_ISO8859_5: [c_uchar; 48 + 6 * 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_6: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_6: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0000, 0x0000, 0x0000,
@@ -3431,7 +3439,7 @@ const xmlunicodetable_ISO8859_6: [c_ushort; 128] = [
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
 ];
 
-const xmltranscodetable_ISO8859_6: [c_uchar; 48 + 5 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_6: [c_uchar; 48 + 5 * 64] = [
     0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3457,7 +3465,7 @@ const xmltranscodetable_ISO8859_6: [c_uchar; 48 + 5 * 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_7: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_7: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x2018, 0x2019, 0x00a3,
@@ -3471,7 +3479,7 @@ const xmlunicodetable_ISO8859_7: [c_ushort; 128] = [
     0x03c8, 0x03c9, 0x03ca, 0x03cb, 0x03cc, 0x03cd, 0x03ce, 0x0000,
 ];
 
-const xmltranscodetable_ISO8859_7: [c_uchar; 48 + 7 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_7: [c_uchar; 48 + 7 * 64] = [
     0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x06,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3505,7 +3513,7 @@ const xmltranscodetable_ISO8859_7: [c_uchar; 48 + 7 * 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_8: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_8: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0000, 0x00a2, 0x00a3,
@@ -3519,7 +3527,7 @@ const xmlunicodetable_ISO8859_8: [c_ushort; 128] = [
     0x05e8, 0x05e9, 0x05ea, 0x0000, 0x0000, 0x200e, 0x200f, 0x0000,
 ];
 
-const xmltranscodetable_ISO8859_8: [c_uchar; 48 + 7 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_8: [c_uchar; 48 + 7 * 64] = [
     0x02, 0x00, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3553,7 +3561,7 @@ const xmltranscodetable_ISO8859_8: [c_uchar; 48 + 7 * 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_9: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_9: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x00a1, 0x00a2, 0x00a3,
@@ -3567,7 +3575,7 @@ const xmlunicodetable_ISO8859_9: [c_ushort; 128] = [
     0x00f8, 0x00f9, 0x00fa, 0x00fb, 0x00fc, 0x0131, 0x015f, 0x00ff,
 ];
 
-const xmltranscodetable_ISO8859_9: [c_uchar; 48 + 5 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_9: [c_uchar; 48 + 5 * 64] = [
     0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3593,7 +3601,7 @@ const xmltranscodetable_ISO8859_9: [c_uchar; 48 + 5 * 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_10: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_10: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0104, 0x0112, 0x0122,
@@ -3607,7 +3615,7 @@ const xmlunicodetable_ISO8859_10: [c_ushort; 128] = [
     0x00f8, 0x0173, 0x00fa, 0x00fb, 0x00fc, 0x00fd, 0x00fe, 0x0138,
 ];
 
-const xmltranscodetable_ISO8859_10: [c_uchar; 48 + 7 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_10: [c_uchar; 48 + 7 * 64] = [
     0x00, 0x00, 0x01, 0x06, 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3641,7 +3649,7 @@ const xmltranscodetable_ISO8859_10: [c_uchar; 48 + 7 * 64] = [
     0xf0, 0x00, 0x00, 0xf3, 0xf4, 0xf5, 0xf6, 0x00, 0xf8, 0x00, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_11: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_11: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0e01, 0x0e02, 0x0e03,
@@ -3655,7 +3663,7 @@ const xmlunicodetable_ISO8859_11: [c_ushort; 128] = [
     0x0e58, 0x0e59, 0x0e5a, 0x0e5b, 0x0000, 0x0000, 0x0000, 0x0000,
 ];
 
-const xmltranscodetable_ISO8859_11: [c_uchar; 48 + 6 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_11: [c_uchar; 48 + 6 * 64] = [
     0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3685,7 +3693,7 @@ const xmltranscodetable_ISO8859_11: [c_uchar; 48 + 6 * 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_13: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_13: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x201d, 0x00a2, 0x00a3,
@@ -3699,7 +3707,7 @@ const xmlunicodetable_ISO8859_13: [c_ushort; 128] = [
     0x0173, 0x0142, 0x015b, 0x016b, 0x00fc, 0x017c, 0x017e, 0x2019,
 ];
 
-const xmltranscodetable_ISO8859_13: [c_uchar; 48 + 7 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_13: [c_uchar; 48 + 7 * 64] = [
     0x00, 0x00, 0x01, 0x04, 0x06, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3733,7 +3741,7 @@ const xmltranscodetable_ISO8859_13: [c_uchar; 48 + 7 * 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xcd, 0xed, 0x00, 0x00, 0x00, 0xcf, 0xef, 0x00, 0x00, 0x00,
 ];
 
-const xmlunicodetable_ISO8859_14: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_14: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x1e02, 0x1e03, 0x00a3,
@@ -3747,7 +3755,7 @@ const xmlunicodetable_ISO8859_14: [c_ushort; 128] = [
     0x00f8, 0x00f9, 0x00fa, 0x00fb, 0x00fc, 0x00fd, 0x0177, 0x00ff,
 ];
 
-const xmltranscodetable_ISO8859_14: [c_uchar; 48 + 10 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_14: [c_uchar; 48 + 10 * 64] = [
     0x00, 0x00, 0x01, 0x09, 0x04, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3793,7 +3801,7 @@ const xmltranscodetable_ISO8859_14: [c_uchar; 48 + 10 * 64] = [
     0x00, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0x00, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0x00, 0xff,
 ];
 
-const xmlunicodetable_ISO8859_15: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_15: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x00a1, 0x00a2, 0x00a3,
@@ -3807,7 +3815,7 @@ const xmlunicodetable_ISO8859_15: [c_ushort; 128] = [
     0x00f8, 0x00f9, 0x00fa, 0x00fb, 0x00fc, 0x00fd, 0x00fe, 0x00ff,
 ];
 
-const xmltranscodetable_ISO8859_15: [c_uchar; 48 + 6 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_15: [c_uchar; 48 + 6 * 64] = [
     0x00, 0x00, 0x01, 0x05, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3837,7 +3845,7 @@ const xmltranscodetable_ISO8859_15: [c_uchar; 48 + 6 * 64] = [
     0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
 ];
 
-const xmlunicodetable_ISO8859_16: [c_ushort; 128] = [
+const XMLUNICODETABLE_ISO8859_16: [c_ushort; 128] = [
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087, 0x0088, 0x0089, 0x008a, 0x008b,
     0x008c, 0x008d, 0x008e, 0x008f, 0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
     0x0098, 0x0099, 0x009a, 0x009b, 0x009c, 0x009d, 0x009e, 0x009f, 0x00a0, 0x0104, 0x0105, 0x0141,
@@ -3851,7 +3859,7 @@ const xmlunicodetable_ISO8859_16: [c_ushort; 128] = [
     0x0171, 0x00f9, 0x00fa, 0x00fb, 0x00fc, 0x0119, 0x021b, 0x00ff,
 ];
 
-const xmltranscodetable_ISO8859_16: [c_uchar; 48 + 9 * 64] = [
+const XMLTRANSCODETABLE_ISO8859_16: [c_uchar; 48 + 9 * 64] = [
     0x00, 0x00, 0x01, 0x08, 0x02, 0x03, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -3958,7 +3966,7 @@ mod tests {
                                 let inlen = gen_int_ptr(n_inlen, 3);
 
                                 let ret_val =
-                                    UTF8Toisolat1(out, outlen, input as *const c_uchar, inlen);
+                                    utf8_to_iso_lat1(out, outlen, input as *const c_uchar, inlen);
                                 desret_int(ret_val);
                                 des_unsigned_char_ptr(n_out, out, 0);
                                 des_int_ptr(n_outlen, outlen, 1);
@@ -4001,7 +4009,7 @@ mod tests {
                             let inlen = gen_int_ptr(n_inlen, 3);
 
                             let ret_val =
-                                isolat1ToUTF8(out, outlen, input as *const c_uchar, inlen);
+                                iso_lat1_to_utf8(out, outlen, input as *const c_uchar, inlen);
                             desret_int(ret_val);
                             des_unsigned_char_ptr(n_out, out, 0);
                             des_int_ptr(n_outlen, outlen, 1);
@@ -4035,7 +4043,7 @@ mod tests {
                     let name = gen_const_char_ptr(n_name, 0);
                     let alias = gen_const_char_ptr(n_alias, 1);
 
-                    let ret_val = xmlAddEncodingAlias(name, alias);
+                    let ret_val = xml_add_encoding_alias(name, alias);
                     desret_int(ret_val);
                     des_const_char_ptr(n_name, name, 0);
                     des_const_char_ptr(n_alias, alias, 1);
@@ -4054,7 +4062,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
 
-                let ret_val = xmlCharEncCloseFunc(handler);
+                let ret_val = xml_char_enc_close_func(handler);
                 desret_int(ret_val);
                 des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
                 xmlResetLastError();
@@ -4087,7 +4095,7 @@ mod tests {
                         let out = gen_xml_buffer_ptr(n_out, 1);
                         let input = gen_xml_buffer_ptr(n_in, 2);
 
-                        let ret_val = xmlCharEncFirstLine(handler, out, input);
+                        let ret_val = xml_char_enc_first_line(handler, out, input);
                         desret_int(ret_val);
                         des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
                         des_xml_buffer_ptr(n_out, out, 1);
@@ -4127,7 +4135,7 @@ mod tests {
                         let out = gen_xml_buffer_ptr(n_out, 1);
                         let input = gen_xml_buffer_ptr(n_in, 2);
 
-                        let ret_val = xmlCharEncInFunc(handler, out, input);
+                        let ret_val = xml_char_enc_in_func(handler, out, input);
                         desret_int(ret_val);
                         des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
                         des_xml_buffer_ptr(n_out, out, 1);
@@ -4162,7 +4170,7 @@ mod tests {
                         let out = gen_xml_buffer_ptr(n_out, 1);
                         let input = gen_xml_buffer_ptr(n_in, 2);
 
-                        let ret_val = xmlCharEncOutFunc(handler, out, input);
+                        let ret_val = xml_char_enc_out_func(handler, out, input);
                         desret_int(ret_val);
                         des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
                         des_xml_buffer_ptr(n_out, out, 1);
@@ -4189,7 +4197,7 @@ mod tests {
     #[test]
     fn test_xml_cleanup_char_encoding_handlers() {
         unsafe {
-            xmlCleanupCharEncodingHandlers();
+            xml_cleanup_char_encoding_handlers();
             xmlResetLastError();
         }
     }
@@ -4200,7 +4208,7 @@ mod tests {
             let mut leaks = 0;
             let mem_base = xml_mem_blocks();
 
-            xmlCleanupEncodingAliases();
+            xml_cleanup_encoding_aliases();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -4225,7 +4233,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let alias = gen_const_char_ptr(n_alias, 0);
 
-                let ret_val = xmlDelEncodingAlias(alias);
+                let ret_val = xml_del_encoding_alias(alias);
                 desret_int(ret_val);
                 des_const_char_ptr(n_alias, alias, 0);
                 xmlResetLastError();
@@ -4256,7 +4264,7 @@ mod tests {
                     let input = gen_const_unsigned_char_ptr(n_in, 0);
                     let len = gen_int(n_len, 1);
 
-                    let ret_val = xmlDetectCharEncoding(input as *const c_uchar, len);
+                    let ret_val = xml_detect_char_encoding(input as *const c_uchar, len);
                     desret_xml_char_encoding(ret_val);
                     des_const_unsigned_char_ptr(n_in, input as *const c_uchar, 0);
                     des_int(n_len, len, 1);
@@ -4300,7 +4308,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let enc = gen_xml_char_encoding(n_enc, 0);
 
-                let ret_val = xmlGetCharEncodingName(enc);
+                let ret_val = xml_get_char_encoding_name(enc);
                 desret_const_char_ptr(ret_val);
                 des_xml_char_encoding(n_enc, enc, 0);
                 xmlResetLastError();
@@ -4329,7 +4337,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let alias = gen_const_char_ptr(n_alias, 0);
 
-                let ret_val = xmlGetEncodingAlias(alias);
+                let ret_val = xml_get_encoding_alias(alias);
                 desret_const_char_ptr(ret_val);
                 des_const_char_ptr(n_alias, alias, 0);
                 xmlResetLastError();
@@ -4352,7 +4360,7 @@ mod tests {
     #[test]
     fn test_xml_init_char_encoding_handlers() {
         unsafe {
-            xmlInitCharEncodingHandlers();
+            xml_init_char_encoding_handlers();
             xmlResetLastError();
         }
     }
@@ -4372,7 +4380,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let name = gen_const_char_ptr(n_name, 0);
 
-                let ret_val = xmlParseCharEncoding(name);
+                let ret_val = xml_parse_char_encoding(name);
                 desret_xml_char_encoding(ret_val);
                 des_const_char_ptr(n_name, name, 0);
                 xmlResetLastError();
@@ -4401,7 +4409,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
 
-                xmlRegisterCharEncodingHandler(handler);
+                xml_register_char_encoding_handler(handler);
                 des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {

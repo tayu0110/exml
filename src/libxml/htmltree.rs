@@ -520,7 +520,7 @@ pub unsafe extern "C" fn htmlDocDumpMemoryFormat(
     format: c_int,
 ) {
     use crate::libxml::{
-        encoding::{xmlFindCharEncodingHandler, xmlParseCharEncoding},
+        encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
         tree::{xml_buf_content, xml_buf_use},
         xml_io::{xmlAllocOutputBufferInternal, xmlOutputBufferClose, xmlOutputBufferFlush},
@@ -546,9 +546,9 @@ pub unsafe extern "C" fn htmlDocDumpMemoryFormat(
     let encoding: *const c_char = htmlGetMetaEncoding(cur) as _;
 
     if !encoding.is_null() {
-        let enc: XmlCharEncoding = xmlParseCharEncoding(encoding);
+        let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
-            handler = xmlFindCharEncodingHandler(encoding);
+            handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding as i32,
@@ -562,10 +562,10 @@ pub unsafe extern "C" fn htmlDocDumpMemoryFormat(
          * Fallback to HTML or ASCII when the encoding is unspecified
          */
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"HTML".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"HTML".as_ptr() as _);
         }
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"ascii".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ascii".as_ptr() as _);
         }
     }
 
@@ -601,7 +601,7 @@ pub unsafe extern "C" fn htmlDocDumpMemoryFormat(
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn htmlDocDump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
     use crate::libxml::{
-        encoding::{xmlFindCharEncodingHandler, xmlParseCharEncoding},
+        encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
         xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFile},
         xmlerror::XmlParserErrors,
@@ -620,9 +620,9 @@ pub unsafe extern "C" fn htmlDocDump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
     let encoding: *const c_char = htmlGetMetaEncoding(cur) as _;
 
     if !encoding.is_null() {
-        let enc: XmlCharEncoding = xmlParseCharEncoding(encoding);
+        let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
-            handler = xmlFindCharEncodingHandler(encoding);
+            handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding as i32,
@@ -636,10 +636,10 @@ pub unsafe extern "C" fn htmlDocDump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
          * Fallback to HTML or ASCII when the encoding is unspecified
          */
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"HTML".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"HTML".as_ptr() as _);
         }
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"ascii".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ascii".as_ptr() as _);
         }
     }
 
@@ -664,7 +664,7 @@ pub unsafe extern "C" fn htmlDocDump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn htmlSaveFile(filename: *const c_char, cur: XmlDocPtr) -> c_int {
     use crate::libxml::{
-        encoding::{xmlFindCharEncodingHandler, xmlParseCharEncoding},
+        encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
         xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFilename},
         xmlerror::XmlParserErrors,
@@ -683,9 +683,9 @@ pub unsafe extern "C" fn htmlSaveFile(filename: *const c_char, cur: XmlDocPtr) -
     let encoding: *const c_char = htmlGetMetaEncoding(cur) as _;
 
     if !encoding.is_null() {
-        let enc: XmlCharEncoding = xmlParseCharEncoding(encoding);
+        let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
-            handler = xmlFindCharEncodingHandler(encoding);
+            handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding as i32,
@@ -699,10 +699,10 @@ pub unsafe extern "C" fn htmlSaveFile(filename: *const c_char, cur: XmlDocPtr) -
          * Fallback to HTML or ASCII when the encoding is unspecified
          */
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"HTML".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"HTML".as_ptr() as _);
         }
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"ascii".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ascii".as_ptr() as _);
         }
     }
 
@@ -862,7 +862,7 @@ pub unsafe extern "C" fn htmlNodeDumpFileFormat(
     format: c_int,
 ) -> c_int {
     use crate::libxml::{
-        encoding::{xmlFindCharEncodingHandler, xmlParseCharEncoding},
+        encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
         xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFile},
         xmlerror::XmlParserErrors,
@@ -875,9 +875,9 @@ pub unsafe extern "C" fn htmlNodeDumpFileFormat(
     xml_init_parser();
 
     if !encoding.is_null() {
-        let enc: XmlCharEncoding = xmlParseCharEncoding(encoding);
+        let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
-            handler = xmlFindCharEncodingHandler(encoding);
+            handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding as i32,
@@ -891,10 +891,10 @@ pub unsafe extern "C" fn htmlNodeDumpFileFormat(
          * Fallback to HTML or ASCII when the encoding is unspecified
          */
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"HTML".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"HTML".as_ptr() as _);
         }
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"ascii".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ascii".as_ptr() as _);
         }
     }
 
@@ -950,7 +950,7 @@ pub unsafe extern "C" fn htmlSaveFileFormat(
     format: c_int,
 ) -> c_int {
     use crate::libxml::{
-        encoding::{xmlFindCharEncodingHandler, xmlParseCharEncoding},
+        encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
         xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFilename},
         xmlerror::XmlParserErrors,
@@ -967,9 +967,9 @@ pub unsafe extern "C" fn htmlSaveFileFormat(
     xml_init_parser();
 
     if !encoding.is_null() {
-        let enc: XmlCharEncoding = xmlParseCharEncoding(encoding);
+        let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
-            handler = xmlFindCharEncodingHandler(encoding);
+            handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding as i32,
@@ -986,10 +986,10 @@ pub unsafe extern "C" fn htmlSaveFileFormat(
          * Fallback to HTML or ASCII when the encoding is unspecified
          */
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"HTML".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"HTML".as_ptr() as _);
         }
         if handler.is_null() {
-            handler = xmlFindCharEncodingHandler(c"ascii".as_ptr() as _);
+            handler = xml_find_char_encoding_handler(c"ascii".as_ptr() as _);
         }
     }
 

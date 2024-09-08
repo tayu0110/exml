@@ -20,7 +20,7 @@ use crate::{
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         encoding::{
-            xmlDetectCharEncoding, xmlFindCharEncodingHandler, xmlParseCharEncoding,
+            xml_detect_char_encoding, xml_find_char_encoding_handler, xml_parse_char_encoding,
             XmlCharEncoding, XmlCharEncodingHandlerPtr,
         },
         globals::{
@@ -5961,7 +5961,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
                 xml_free((*(*ctxt).input).encoding as _);
             }
             (*(*ctxt).input).encoding = guess;
-            handler = xmlFindCharEncodingHandler(guess as _);
+            handler = xml_find_char_encoding_handler(guess as _);
             if !handler.is_null() {
                 /*
                  * Don't use UTF-8 encoder which isn't required and
@@ -7125,7 +7125,7 @@ unsafe extern "C" fn html_check_encoding_direct(
         }
         (*(*ctxt).input).encoding = xml_strdup(encoding);
 
-        let enc: XmlCharEncoding = xmlParseCharEncoding(encoding as _);
+        let enc: XmlCharEncoding = xml_parse_char_encoding(encoding as _);
         /*
          * registered set of known encodings
          */
@@ -7154,7 +7154,7 @@ unsafe extern "C" fn html_check_encoding_direct(
             /*
              * fallback for unknown encodings
              */
-            handler = xmlFindCharEncodingHandler(encoding as _);
+            handler = xml_find_char_encoding_handler(encoding as _);
             if !handler.is_null() {
                 xml_switch_to_encoding(ctxt, handler);
                 (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
@@ -9987,7 +9987,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
         start[1] = NXT!(ctxt, 1);
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
-        enc = xmlDetectCharEncoding(addr_of_mut!(start[0]), 4);
+        enc = xml_detect_char_encoding(addr_of_mut!(start[0]), 4);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
             xml_switch_encoding(ctxt, enc);
         }
@@ -10128,7 +10128,7 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
         }
         (*(*ctxt).input).encoding = xml_strdup(encoding as _);
 
-        let enc: XmlCharEncoding = xmlParseCharEncoding(encoding);
+        let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
         /*
          * registered set of known encodings
          */
@@ -10147,7 +10147,7 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
             /*
              * fallback for unknown encodings
              */
-            handler = xmlFindCharEncodingHandler(encoding);
+            handler = xml_find_char_encoding_handler(encoding);
             if !handler.is_null() {
                 xml_switch_to_encoding(ctxt, handler);
             } else {
@@ -12184,7 +12184,7 @@ unsafe extern "C" fn html_do_read(
     html_ctxt_use_options(ctxt, options);
     (*ctxt).html = 1;
     if !encoding.is_null() {
-        let hdlr: XmlCharEncodingHandlerPtr = xmlFindCharEncodingHandler(encoding);
+        let hdlr: XmlCharEncodingHandlerPtr = xml_find_char_encoding_handler(encoding);
         if !hdlr.is_null() {
             xml_switch_to_encoding(ctxt, hdlr);
             if !(*(*ctxt).input).encoding.is_null() {

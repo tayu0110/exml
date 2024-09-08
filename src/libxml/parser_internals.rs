@@ -16,7 +16,7 @@ use libc::{memcpy, memset, size_t, snprintf, strcmp, INT_MAX};
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::libxml::dict::xml_dict_owns;
-use crate::libxml::encoding::{xmlDetectCharEncoding, xmlFindCharEncodingHandler};
+use crate::libxml::encoding::{xml_detect_char_encoding, xml_find_char_encoding_handler};
 use crate::libxml::entities::{xml_get_predefined_entity, XmlEntityPtr};
 use crate::libxml::globals::xml_generic_error_context;
 use crate::libxml::parser::{
@@ -52,8 +52,8 @@ use crate::{__xml_raise_error, xml_generic_error};
 use super::catalog::xml_catalog_add_local;
 use super::dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, xml_dict_set_limit};
 use super::encoding::{
-    xmlCharEncCloseFunc, xmlGetCharEncodingHandler, xmlGetCharEncodingName, XmlCharEncoding,
-    XmlCharEncodingHandlerPtr,
+    xml_char_enc_close_func, xml_get_char_encoding_handler, xml_get_char_encoding_name,
+    XmlCharEncoding, XmlCharEncodingHandlerPtr,
 };
 use super::entities::XmlEntityType;
 use super::globals::{
@@ -939,7 +939,7 @@ unsafe extern "C" fn xml_detect_ebcdic(input: XmlParserInputPtr) -> XmlCharEncod
      * To detect the EBCDIC code page, we convert the first 200 bytes
      * to EBCDIC-US and try to find the encoding declaration.
      */
-    handler = xmlGetCharEncodingHandler(XmlCharEncoding::XmlCharEncodingEbcdic);
+    handler = xml_get_char_encoding_handler(XmlCharEncoding::XmlCharEncodingEbcdic);
     if handler.is_null() {
         return null_mut();
     }
@@ -1000,8 +1000,8 @@ unsafe extern "C" fn xml_detect_ebcdic(input: XmlParserInputPtr) -> XmlCharEncod
                 break;
             }
             out[i] = 0;
-            xmlCharEncCloseFunc(handler);
-            handler = xmlFindCharEncodingHandler((out.as_ptr() as *mut c_char).add(start));
+            xml_char_enc_close_func(handler);
+            handler = xml_find_char_encoding_handler((out.as_ptr() as *mut c_char).add(start));
             break;
         }
 
@@ -1082,7 +1082,7 @@ pub unsafe extern "C" fn xml_switch_encoding(
             return 0;
         }
         XmlCharEncoding::XmlCharEncodingEbcdic => xml_detect_ebcdic((*ctxt).input),
-        _ => xmlGetCharEncodingHandler(enc),
+        _ => xml_get_char_encoding_handler(enc),
     };
     if handler.is_null() {
         /*
@@ -1110,7 +1110,7 @@ pub unsafe extern "C" fn xml_switch_encoding(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
                     c"encoding not supported: %s\n".as_ptr() as _,
-                    xmlGetCharEncodingName(enc) as _,
+                    xml_get_char_encoding_name(enc) as _,
                     null(),
                 );
                 /*
@@ -1190,7 +1190,7 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
          * encoding handler. xmlCharEncCloseFunc frees unregistered
          * handlers and avoids a memory leak.
          */
-        xmlCharEncCloseFunc(handler);
+        xml_char_enc_close_func(handler);
         return -1;
     }
 
@@ -1208,7 +1208,7 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
          * convert the old content using the old encoder.
          */
 
-        xmlCharEncCloseFunc((*input_buf).encoder);
+        xml_char_enc_close_func((*input_buf).encoder);
         (*input_buf).encoder = handler;
         return 0;
     }
@@ -5542,7 +5542,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     start[1] = NXT!(ctxt, 1);
                     start[2] = NXT!(ctxt, 2);
                     start[3] = NXT!(ctxt, 3);
-                    enc = xmlDetectCharEncoding(start.as_ptr() as _, 4);
+                    enc = xml_detect_char_encoding(start.as_ptr() as _, 4);
                     if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
                         xml_switch_encoding(ctxt, enc);
                     }
@@ -6436,7 +6436,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
             (*(*ctxt).input).encoding = encoding;
 
             let handler: XmlCharEncodingHandlerPtr =
-                xmlFindCharEncodingHandler(encoding as *const c_char);
+                xml_find_char_encoding_handler(encoding as *const c_char);
             if !handler.is_null() {
                 if xml_switch_to_encoding(ctxt, handler) < 0 {
                     /* failed to convert */
@@ -6605,7 +6605,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
         start[1] = NXT!(ctxt, 1);
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
-        let enc: XmlCharEncoding = xmlDetectCharEncoding(start.as_ptr() as _, 4);
+        let enc: XmlCharEncoding = xml_detect_char_encoding(start.as_ptr() as _, 4);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
             xml_switch_encoding(ctxt, enc);
         }

@@ -20,7 +20,8 @@ use crate::{
     libxml::{
         dict::{xml_dict_free, xml_dict_reference},
         encoding::{
-            xmlCharEncCloseFunc, xmlGetCharEncodingHandler, xmlParseCharEncoding, XmlCharEncoding,
+            xml_char_enc_close_func, xml_get_char_encoding_handler, xml_parse_char_encoding,
+            XmlCharEncoding,
         },
         entities::{xml_add_doc_entity, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
@@ -2197,7 +2198,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
          *       xmlParserInputBufferCreateFilename should allow any
          *       encoding supported by iconv
          */
-        enc = xmlParseCharEncoding(encoding as _);
+        enc = xml_parse_char_encoding(encoding as _);
         if matches!(enc, XmlCharEncoding::XmlCharEncodingError) {
             xml_xinclude_err(
                 ctxt,
@@ -2245,9 +2246,9 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         return ret;
     }
     if !(*buf).encoder.is_null() {
-        xmlCharEncCloseFunc((*buf).encoder);
+        xml_char_enc_close_func((*buf).encoder);
     }
-    (*buf).encoder = xmlGetCharEncodingHandler(enc);
+    (*buf).encoder = xml_get_char_encoding_handler(enc);
     node = xml_new_doc_text((*ctxt).doc, null_mut());
     if node.is_null() {
         xml_xinclude_err_memory(ctxt, (*refe).elem, null());

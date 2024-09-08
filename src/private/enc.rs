@@ -12,7 +12,7 @@ use std::{
 use libc::{size_t, snprintf};
 
 use crate::libxml::{
-    encoding::{xmlEncOutputChunk, xml_encoding_err, XmlCharEncodingHandler, XML_LITTLE_ENDIAN},
+    encoding::{xml_enc_output_chunk, xml_encoding_err, XmlCharEncodingHandler, XML_LITTLE_ENDIAN},
     tree::{xml_buf_content, xml_buf_end, xml_buf_shrink, xml_buf_use, XmlBufPtr},
     xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr},
     xmlerror::XmlParserErrors,
@@ -270,7 +270,7 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
             c_in = 0;
             c_out = written as _;
             /* TODO: Check return value. */
-            xmlEncOutputChunk(
+            xml_enc_output_chunk(
                 (*output).encoder,
                 xml_buf_end(out),
                 addr_of_mut!(c_out),
@@ -305,7 +305,7 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
 
         c_in = toconv as _;
         c_out = written as _;
-        ret = xmlEncOutputChunk(
+        ret = xml_enc_output_chunk(
             (*output).encoder,
             xml_buf_end(out),
             addr_of_mut!(c_out) as _,
@@ -392,7 +392,7 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
                     xml_buf_grow(out, charref_len * 4);
                     c_out = xml_buf_avail(out) as _;
                     c_in = charref_len;
-                    ret = xmlEncOutputChunk(
+                    ret = xml_enc_output_chunk(
                         (*output).encoder,
                         xml_buf_end(out),
                         addr_of_mut!(c_out) as _,

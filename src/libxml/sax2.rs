@@ -33,7 +33,7 @@ use crate::{
 
 use super::{
     dict::{xml_dict_lookup, xml_dict_owns, xml_dict_qlookup, xml_dict_reference},
-    encoding::xmlDetectCharEncoding,
+    encoding::xml_detect_char_encoding,
     entities::{
         xml_add_doc_entity, xml_add_dtd_entity, xml_get_doc_entity, xml_get_parameter_entity,
         xml_get_predefined_entity, XmlEntityType,
@@ -389,7 +389,7 @@ pub unsafe extern "C" fn xmlSAX2ExternalSubset(
          * On the fly encoding conversion if needed
          */
         if (*(*ctxt).input).length >= 4 {
-            enc = xmlDetectCharEncoding((*(*ctxt).input).cur, 4);
+            enc = xml_detect_char_encoding((*(*ctxt).input).cur, 4);
             xml_switch_encoding(ctxt, enc);
         }
 

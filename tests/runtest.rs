@@ -30,7 +30,7 @@ use const_format::concatcp;
 use exml::{
     libxml::{
         encoding::{
-            xmlCharEncCloseFunc, xmlGetCharEncodingHandler, XmlCharEncoding,
+            xml_char_enc_close_func, xml_get_char_encoding_handler, XmlCharEncoding,
             XmlCharEncodingHandlerPtr,
         },
         entities::XmlEntityPtr,
@@ -4680,7 +4680,7 @@ unsafe extern "C" fn rng_test(
     use std::mem::zeroed;
 
     use exml::libxml::relaxng::{
-        xml_relaxng_new_parser_ctxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
+        xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_new_parser_ctxt,
         xml_relaxng_parse, xml_relaxng_set_parser_errors, XmlRelaxNGParserCtxtPtr,
     };
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
@@ -6987,9 +6987,9 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
     let mut mem: c_int;
 
     let ebcdic_handler: XmlCharEncodingHandlerPtr =
-        xmlGetCharEncodingHandler(XmlCharEncoding::XmlCharEncodingEbcdic);
+        xml_get_char_encoding_handler(XmlCharEncoding::XmlCharEncodingEbcdic);
     let euc_jp_handler: XmlCharEncodingHandlerPtr =
-        xmlGetCharEncodingHandler(XmlCharEncoding::XmlCharEncodingEucJp);
+        xml_get_char_encoding_handler(XmlCharEncoding::XmlCharEncodingEucJp);
 
     if let Some(input) = tst.input {
         let mut globbuf: glob_t = unsafe { zeroed() };
@@ -7083,8 +7083,8 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
         }
     }
 
-    xmlCharEncCloseFunc(ebcdic_handler);
-    xmlCharEncCloseFunc(euc_jp_handler);
+    xml_char_enc_close_func(ebcdic_handler);
+    xml_char_enc_close_func(euc_jp_handler);
 
     err
 }

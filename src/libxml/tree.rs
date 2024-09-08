@@ -9684,7 +9684,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     use std::mem::{size_of_val, zeroed};
 
     use crate::libxml::{
-        encoding::{xmlCharEncCloseFunc, xmlFindCharEncodingHandler},
+        encoding::{xml_char_enc_close_func, xml_find_char_encoding_handler},
         xml_io::{
             xmlAllocOutputBuffer, xmlOutputBufferClose, xmlOutputBufferFlush, XmlOutputBufferPtr,
         },
@@ -9727,7 +9727,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
         txt_encoding = (*out_doc).encoding as _;
     }
     if !txt_encoding.is_null() {
-        conv_hdlr = xmlFindCharEncodingHandler(txt_encoding);
+        conv_hdlr = xml_find_char_encoding_handler(txt_encoding);
         if conv_hdlr.is_null() {
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding as i32,
@@ -9741,7 +9741,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     let out_buff: XmlOutputBufferPtr = xmlAllocOutputBuffer(conv_hdlr);
     if out_buff.is_null() {
         xml_save_err_memory(c"creating buffer".as_ptr() as _);
-        xmlCharEncCloseFunc(conv_hdlr);
+        xml_char_enc_close_func(conv_hdlr);
         return;
     }
 
@@ -9786,7 +9786,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
     use std::mem::{size_of_val, zeroed};
 
     use crate::libxml::{
-        encoding::{xmlFindCharEncodingHandler, XmlCharEncodingHandlerPtr},
+        encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
         xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFile, XmlOutputBufferPtr},
         xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
     };
@@ -9808,7 +9808,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
     encoding = (*cur).encoding as _;
 
     if !encoding.is_null() {
-        handler = xmlFindCharEncodingHandler(encoding);
+        handler = xml_find_char_encoding_handler(encoding);
         if handler.is_null() {
             xml_free((*cur).encoding as _);
             (*cur).encoding = null_mut();
@@ -10248,7 +10248,7 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
     use std::mem::{size_of_val, zeroed};
 
     use crate::libxml::{
-        encoding::{xmlFindCharEncodingHandler, XmlCharEncodingHandlerPtr},
+        encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
         xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFilename},
         xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
     };
@@ -10268,7 +10268,7 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
     }
 
     if !encoding.is_null() {
-        handler = xmlFindCharEncodingHandler(encoding);
+        handler = xml_find_char_encoding_handler(encoding);
         if handler.is_null() {
             return -1;
         }

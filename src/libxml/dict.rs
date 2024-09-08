@@ -931,7 +931,7 @@ pub unsafe extern "C" fn xml_dict_exists(
  *
  * Returns the pointer of the local string, or NULL in case of error.
  */
-unsafe extern "C" fn xmlDictAddQString(
+unsafe extern "C" fn xml_dict_add_qstring(
     dict: XmlDictPtr,
     prefix: *const XmlChar,
     plen: c_uint,
@@ -1100,7 +1100,7 @@ pub unsafe extern "C" fn xml_dict_qlookup(
         key = okey % (*dict).size as u64;
     }
 
-    let ret: *const XmlChar = xmlDictAddQString(dict, prefix, plen, name, l);
+    let ret: *const XmlChar = xml_dict_add_qstring(dict, prefix, plen, name, l);
     if ret.is_null() {
         return null();
     }

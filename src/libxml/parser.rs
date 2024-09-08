@@ -24,8 +24,8 @@ use crate::{
             xml_dict_lookup, xml_dict_reference, xml_dict_set_limit, XmlDictPtr,
         },
         encoding::{
-            xmlCleanupCharEncodingHandlers, xmlDetectCharEncoding, xmlEncOutputChunk,
-            xmlFindCharEncodingHandler, XmlCharEncoding, XmlCharEncodingHandler,
+            xml_cleanup_char_encoding_handlers, xml_detect_char_encoding, xml_enc_output_chunk,
+            xml_find_char_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler,
             XmlCharEncodingHandlerPtr,
         },
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
@@ -1796,7 +1796,7 @@ pub unsafe extern "C" fn xml_cleanup_parser() {
         return;
     }
 
-    xmlCleanupCharEncodingHandlers();
+    xml_cleanup_char_encoding_handlers();
     #[cfg(feature = "catalog")]
     {
         xml_catalog_cleanup();
@@ -2498,7 +2498,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
         start[1] = NXT!(ctxt, 1);
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
-        let enc = xmlDetectCharEncoding(addr_of_mut!(start[0]), 4);
+        let enc = xml_detect_char_encoding(addr_of_mut!(start[0]), 4);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
             xml_switch_encoding(ctxt, enc);
         }
@@ -2709,7 +2709,7 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> c_i
         start[1] = NXT!(ctxt, 1);
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
-        enc = xmlDetectCharEncoding(start.as_ptr(), 4);
+        enc = xml_detect_char_encoding(start.as_ptr(), 4);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
             xml_switch_encoding(ctxt, enc);
         }
@@ -3294,7 +3294,7 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
         return null_mut();
     }
     if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
-        enc = xmlDetectCharEncoding((*(*ctxt).input).cur, 4);
+        enc = xml_detect_char_encoding((*(*ctxt).input).cur, 4);
         xml_switch_encoding(ctxt, enc);
     }
 
@@ -3464,7 +3464,7 @@ pub unsafe extern "C" fn xml_io_parse_dtd(
         start[1] = NXT!(ctxt, 1);
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
-        enc = xmlDetectCharEncoding(start.as_ptr(), 4);
+        enc = xml_detect_char_encoding(start.as_ptr(), 4);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
             xml_switch_encoding(ctxt, enc);
         }
@@ -3761,7 +3761,7 @@ pub unsafe extern "C" fn xml_parse_in_node_context(
         }
         (*ctxt).encoding = xml_strdup((*doc).encoding);
 
-        let hdlr: XmlCharEncodingHandlerPtr = xmlFindCharEncodingHandler((*doc).encoding as _);
+        let hdlr: XmlCharEncodingHandlerPtr = xml_find_char_encoding_handler((*doc).encoding as _);
         if !hdlr.is_null() {
             xml_switch_to_encoding(ctxt, hdlr);
         } else {
@@ -4188,7 +4188,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
         start[1] = NXT!(ctxt, 1);
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
-        enc = xmlDetectCharEncoding(start.as_ptr(), 4);
+        enc = xml_detect_char_encoding(start.as_ptr(), 4);
         if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
             xml_switch_encoding(ctxt, enc);
         }
@@ -9698,7 +9698,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         start[1] = NXT!(ctxt, 1);
                         start[2] = NXT!(ctxt, 2);
                         start[3] = NXT!(ctxt, 3);
-                        let enc: XmlCharEncoding = xmlDetectCharEncoding(start.as_ptr(), 4);
+                        let enc: XmlCharEncoding = xml_detect_char_encoding(start.as_ptr(), 4);
                         /*
                          * We need more bytes to detect EBCDIC code pages.
                          * See xmlDetectEBCDIC.
@@ -11013,7 +11013,7 @@ pub unsafe extern "C" fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> c_long {
             while {
                 toconv = (*input).end.offset_from(cur) as _;
                 written = 32000;
-                ret = xmlEncOutputChunk(
+                ret = xml_enc_output_chunk(
                     handler,
                     addr_of_mut!(convbuf[0]),
                     addr_of_mut!(written),
@@ -11227,7 +11227,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
     }
 
     if encoding.is_null() && !chunk.is_null() && size >= 4 {
-        enc = xmlDetectCharEncoding(chunk as _, size);
+        enc = xml_detect_char_encoding(chunk as _, size);
     }
 
     let buf: XmlParserInputBufferPtr = xmlAllocParserInputBuffer(enc);
@@ -11282,7 +11282,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
         }
         (*ctxt).encoding = xml_strdup(encoding as _);
 
-        let hdlr: XmlCharEncodingHandlerPtr = xmlFindCharEncodingHandler(encoding);
+        let hdlr: XmlCharEncodingHandlerPtr = xml_find_char_encoding_handler(encoding);
         if !hdlr.is_null() {
             xml_switch_to_encoding(ctxt, hdlr);
         } else {
@@ -11343,7 +11343,7 @@ unsafe extern "C" fn xml_do_read(
          * the encoding from the XML declaration which is likely to
          * break things. Also see xmlSwitchInputEncoding.
          */
-        let hdlr: XmlCharEncodingHandlerPtr = xmlFindCharEncodingHandler(encoding);
+        let hdlr: XmlCharEncodingHandlerPtr = xml_find_char_encoding_handler(encoding);
         if !hdlr.is_null() {
             xml_switch_to_encoding(ctxt, hdlr);
         }

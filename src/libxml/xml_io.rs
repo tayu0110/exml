@@ -28,7 +28,7 @@ use libc::{
 use crate::{
     __xml_raise_error,
     libxml::{
-        encoding::xmlFindCharEncodingHandler,
+        encoding::xml_find_char_encoding_handler,
         globals::xml_mem_strdup,
         parser::{XmlParserInputState, XML_SAX2_MAGIC},
         parser_internals::{xml_free_input_stream, xml_switch_input_encoding},
@@ -52,8 +52,8 @@ use super::{
         xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
     },
     encoding::{
-        xmlCharEncCloseFunc, xmlGetCharEncodingHandler, XmlCharEncoding, XmlCharEncodingHandlerPtr,
-        XmlCharEncodingOutputFunc,
+        xml_char_enc_close_func, xml_get_char_encoding_handler, XmlCharEncoding,
+        XmlCharEncodingHandlerPtr, XmlCharEncodingOutputFunc,
     },
     globals::{
         __xml_parser_input_buffer_create_filename_value, xml_default_buffer_size, xml_free,
@@ -369,7 +369,7 @@ pub unsafe extern "C" fn xmlAllocParserInputBuffer(
         (*ret).buffer,
         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
     );
-    (*ret).encoder = xmlGetCharEncodingHandler(enc);
+    (*ret).encoder = xml_get_char_encoding_handler(enc);
     if !(*ret).encoder.is_null() {
         (*ret).raw = xml_buf_create_size(2 * *xml_default_buffer_size() as usize);
     } else {
@@ -1031,7 +1031,7 @@ pub unsafe extern "C" fn xmlFreeParserInputBuffer(input: XmlParserInputBufferPtr
         (*input).raw = null_mut();
     }
     if !(*input).encoder.is_null() {
-        xmlCharEncCloseFunc((*input).encoder);
+        xml_char_enc_close_func((*input).encoder);
     }
     if let Some(callback) = (*input).closecallback {
         callback((*input).context);
@@ -2511,7 +2511,7 @@ pub unsafe extern "C" fn xmlOutputBufferClose(out: XmlOutputBufferPtr) -> c_int 
         (*out).conv = null_mut();
     }
     if !(*out).encoder.is_null() {
-        xmlCharEncCloseFunc((*out).encoder);
+        xml_char_enc_close_func((*out).encoder);
     }
     if !(*out).buffer.is_null() {
         xml_buf_free((*out).buffer);
@@ -2914,7 +2914,7 @@ pub unsafe extern "C" fn xmlCheckHTTPInput(
                     encoding = xmlNanoHTTPEncoding((*(*ret).buf).context);
                     if !encoding.is_null() {
                         let handler: XmlCharEncodingHandlerPtr =
-                            xmlFindCharEncodingHandler(encoding);
+                            xml_find_char_encoding_handler(encoding);
                         if !handler.is_null() {
                             xml_switch_input_encoding(ctxt, ret, handler);
                         } else {

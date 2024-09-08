@@ -22,7 +22,7 @@ use libc::memset;
 use crate::{
     __xml_raise_error,
     libxml::{
-        encoding::{xmlFindCharEncodingHandler, XmlCharEncodingHandlerPtr},
+        encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
         entities::xml_encode_special_chars,
         globals::{xml_free, xml_malloc},
         htmltree::htmlNewDocNoDtD,
@@ -937,7 +937,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDocument(
 
     encoder = null_mut();
     if !encoding.is_null() {
-        encoder = xmlFindCharEncodingHandler(encoding);
+        encoder = xml_find_char_encoding_handler(encoding);
         if encoder.is_null() {
             xml_writer_err_msg(
                 writer,
