@@ -28,15 +28,15 @@ use super::{
     encoding::{XmlCharEncoding, XmlCharEncodingHandlerPtr},
     parser::xml_init_parser,
     sax2::{
-        xmlSAX2AttributeDecl, xmlSAX2CDataBlock, xmlSAX2Characters, xmlSAX2Comment,
-        xmlSAX2ElementDecl, xmlSAX2EndDocument, xmlSAX2EndElement, xmlSAX2EntityDecl,
-        xmlSAX2ExternalSubset, xmlSAX2GetColumnNumber, xmlSAX2GetEntity, xmlSAX2GetLineNumber,
-        xmlSAX2GetParameterEntity, xmlSAX2GetPublicId, xmlSAX2GetSystemId,
-        xmlSAX2HasExternalSubset, xmlSAX2HasInternalSubset, xmlSAX2IgnorableWhitespace,
-        xmlSAX2InternalSubset, xmlSAX2IsStandalone, xmlSAX2NotationDecl,
-        xmlSAX2ProcessingInstruction, xmlSAX2Reference, xmlSAX2ResolveEntity,
-        xmlSAX2SetDocumentLocator, xmlSAX2StartDocument, xmlSAX2StartElement,
-        xmlSAX2UnparsedEntityDecl,
+        xml_sax2_attribute_decl, xml_sax2_cdata_block, xml_sax2_characters, xml_sax2_comment,
+        xml_sax2_element_decl, xml_sax2_end_document, xml_sax2_end_element, xml_sax2_entity_decl,
+        xml_sax2_external_subset, xml_sax2_get_column_number, xml_sax2_get_entity,
+        xml_sax2_get_line_number, xml_sax2_get_parameter_entity, xml_sax2_get_public_id,
+        xml_sax2_get_system_id, xml_sax2_has_external_subset, xml_sax2_has_internal_subset,
+        xml_sax2_ignorable_whitespace, xml_sax2_internal_subset, xml_sax2_is_standalone,
+        xml_sax2_notation_decl, xml_sax2_processing_instruction, xml_sax2_reference,
+        xml_sax2_resolve_entity, xml_sax2_set_document_locator, xml_sax2_start_document,
+        xml_sax2_start_element, xml_sax2_unparsed_entity_decl,
     },
     threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
@@ -462,10 +462,10 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     {
         initxmlDefaultSAXHandler(addr_of_mut!((*gs).xml_default_sax_handler), 1);
     }
-    (*gs).xml_default_sax_locator.get_public_id = xmlSAX2GetPublicId;
-    (*gs).xml_default_sax_locator.get_system_id = xmlSAX2GetSystemId;
-    (*gs).xml_default_sax_locator.get_line_number = xmlSAX2GetLineNumber;
-    (*gs).xml_default_sax_locator.get_column_number = xmlSAX2GetColumnNumber;
+    (*gs).xml_default_sax_locator.get_public_id = xml_sax2_get_public_id;
+    (*gs).xml_default_sax_locator.get_system_id = xml_sax2_get_system_id;
+    (*gs).xml_default_sax_locator.get_line_number = xml_sax2_get_line_number;
+    (*gs).xml_default_sax_locator.get_column_number = xml_sax2_get_column_number;
     (*gs).xml_do_validity_checking_default_value = XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
     // #if defined(DEBUG_MEMORY_LOCATION) | defined(DEBUG_MEMORY)
     //     {
@@ -869,32 +869,32 @@ pub use __globals_internal_for_thread_alloc::*;
  */
 #[cfg(all(feature = "html", feature = "sax1"))]
 static mut _HTML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
-    internal_subset: Some(xmlSAX2InternalSubset),
+    internal_subset: Some(xml_sax2_internal_subset),
     is_standalone: None,
     has_internal_subset: None,
     has_external_subset: None,
     resolve_entity: None,
-    get_entity: Some(xmlSAX2GetEntity),
+    get_entity: Some(xml_sax2_get_entity),
     entity_decl: None,
     notation_decl: None,
     attribute_decl: None,
     element_decl: None,
     unparsed_entity_decl: None,
-    set_document_locator: Some(xmlSAX2SetDocumentLocator),
-    start_document: Some(xmlSAX2StartDocument),
-    end_document: Some(xmlSAX2EndDocument),
-    start_element: Some(xmlSAX2StartElement),
-    end_element: Some(xmlSAX2EndElement),
+    set_document_locator: Some(xml_sax2_set_document_locator),
+    start_document: Some(xml_sax2_start_document),
+    end_document: Some(xml_sax2_end_document),
+    start_element: Some(xml_sax2_start_element),
+    end_element: Some(xml_sax2_end_element),
     reference: None,
-    characters: Some(xmlSAX2Characters),
-    ignorable_whitespace: Some(xmlSAX2IgnorableWhitespace),
-    processing_instruction: Some(xmlSAX2ProcessingInstruction),
-    comment: Some(xmlSAX2Comment),
+    characters: Some(xml_sax2_characters),
+    ignorable_whitespace: Some(xml_sax2_ignorable_whitespace),
+    processing_instruction: Some(xml_sax2_processing_instruction),
+    comment: Some(xml_sax2_comment),
     warning: Some(xmlParserWarning),
     error: Some(xmlParserError),
     fatal_error: Some(xmlParserError),
     get_parameter_entity: None,
-    cdata_block: Some(xmlSAX2CDataBlock),
+    cdata_block: Some(xml_sax2_cdata_block),
     external_subset: None,
     initialized: 1,
 };
@@ -1049,33 +1049,33 @@ pub unsafe extern "C" fn __xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
  */
 #[cfg(feature = "sax1")]
 static mut _XML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
-    internal_subset: Some(xmlSAX2InternalSubset),
-    is_standalone: Some(xmlSAX2IsStandalone),
-    has_internal_subset: Some(xmlSAX2HasInternalSubset),
-    has_external_subset: Some(xmlSAX2HasExternalSubset),
-    resolve_entity: Some(xmlSAX2ResolveEntity),
-    get_entity: Some(xmlSAX2GetEntity),
-    entity_decl: Some(xmlSAX2EntityDecl),
-    notation_decl: Some(xmlSAX2NotationDecl),
-    attribute_decl: Some(xmlSAX2AttributeDecl),
-    element_decl: Some(xmlSAX2ElementDecl),
-    unparsed_entity_decl: Some(xmlSAX2UnparsedEntityDecl),
-    set_document_locator: Some(xmlSAX2SetDocumentLocator),
-    start_document: Some(xmlSAX2StartDocument),
-    end_document: Some(xmlSAX2EndDocument),
-    start_element: Some(xmlSAX2StartElement),
-    end_element: Some(xmlSAX2EndElement),
-    reference: Some(xmlSAX2Reference),
-    characters: Some(xmlSAX2Characters),
-    ignorable_whitespace: Some(xmlSAX2Characters),
-    processing_instruction: Some(xmlSAX2ProcessingInstruction),
-    comment: Some(xmlSAX2Comment),
+    internal_subset: Some(xml_sax2_internal_subset),
+    is_standalone: Some(xml_sax2_is_standalone),
+    has_internal_subset: Some(xml_sax2_has_internal_subset),
+    has_external_subset: Some(xml_sax2_has_external_subset),
+    resolve_entity: Some(xml_sax2_resolve_entity),
+    get_entity: Some(xml_sax2_get_entity),
+    entity_decl: Some(xml_sax2_entity_decl),
+    notation_decl: Some(xml_sax2_notation_decl),
+    attribute_decl: Some(xml_sax2_attribute_decl),
+    element_decl: Some(xml_sax2_element_decl),
+    unparsed_entity_decl: Some(xml_sax2_unparsed_entity_decl),
+    set_document_locator: Some(xml_sax2_set_document_locator),
+    start_document: Some(xml_sax2_start_document),
+    end_document: Some(xml_sax2_end_document),
+    start_element: Some(xml_sax2_start_element),
+    end_element: Some(xml_sax2_end_element),
+    reference: Some(xml_sax2_reference),
+    characters: Some(xml_sax2_characters),
+    ignorable_whitespace: Some(xml_sax2_characters),
+    processing_instruction: Some(xml_sax2_processing_instruction),
+    comment: Some(xml_sax2_comment),
     warning: Some(xmlParserWarning),
     error: Some(xmlParserError),
     fatal_error: Some(xmlParserError),
-    get_parameter_entity: Some(xmlSAX2GetParameterEntity),
-    cdata_block: Some(xmlSAX2CDataBlock),
-    external_subset: Some(xmlSAX2ExternalSubset),
+    get_parameter_entity: Some(xml_sax2_get_parameter_entity),
+    cdata_block: Some(xml_sax2_cdata_block),
+    external_subset: Some(xml_sax2_external_subset),
     initialized: 1,
 };
 
@@ -1107,10 +1107,10 @@ pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSaxlocator {
  * { getPublicId, getSystemId, getLineNumber, getColumnNumber}
  */
 static mut _XML_DEFAULT_SAXLOCATOR: XmlSaxlocator = XmlSaxlocator {
-    get_public_id: xmlSAX2GetPublicId,
-    get_system_id: xmlSAX2GetSystemId,
-    get_line_number: xmlSAX2GetLineNumber,
-    get_column_number: xmlSAX2GetColumnNumber,
+    get_public_id: xml_sax2_get_public_id,
+    get_system_id: xml_sax2_get_system_id,
+    get_line_number: xml_sax2_get_line_number,
+    get_column_number: xml_sax2_get_column_number,
 };
 
 #[cfg(feature = "thread")]

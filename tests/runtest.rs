@@ -2406,36 +2406,36 @@ unsafe extern "C" fn internal_subset_bnd(
     external_id: *const XmlChar,
     system_id: *const XmlChar,
 ) {
-    use exml::libxml::sax2::xmlSAX2InternalSubset;
+    use exml::libxml::sax2::xml_sax2_internal_subset;
 
     PUSH_BOUNDARY_COUNT += 1;
-    xmlSAX2InternalSubset(ctx, name, external_id, system_id);
+    xml_sax2_internal_subset(ctx, name, external_id, system_id);
 }
 
 #[cfg(feature = "push")]
 unsafe extern "C" fn reference_bnd(ctx: *mut c_void, name: *const XmlChar) {
-    use exml::libxml::sax2::xmlSAX2Reference;
+    use exml::libxml::sax2::xml_sax2_reference;
 
     PUSH_BOUNDARY_REF_COUNT += 1;
-    xmlSAX2Reference(ctx, name);
+    xml_sax2_reference(ctx, name);
 }
 
 #[cfg(feature = "push")]
 unsafe extern "C" fn characters_bnd(ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
-    use exml::libxml::sax2::xmlSAX2Characters;
+    use exml::libxml::sax2::xml_sax2_characters;
 
     PUSH_BOUNDARY_COUNT += 1;
     PUSH_BOUNDARY_CHARS_COUNT += 1;
-    xmlSAX2Characters(ctx, ch, len);
+    xml_sax2_characters(ctx, ch, len);
 }
 
 #[cfg(feature = "push")]
 unsafe extern "C" fn cdata_block_bnd(ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
-    use exml::libxml::sax2::xmlSAX2CDataBlock;
+    use exml::libxml::sax2::xml_sax2_cdata_block;
 
     PUSH_BOUNDARY_COUNT += 1;
     PUSH_BOUNDARY_CDATA_COUNT += 1;
-    xmlSAX2CDataBlock(ctx, ch, len);
+    xml_sax2_cdata_block(ctx, ch, len);
 }
 
 #[cfg(feature = "push")]
@@ -2444,21 +2444,21 @@ unsafe extern "C" fn processing_instruction_bnd(
     target: *const XmlChar,
     data: *const XmlChar,
 ) {
-    use exml::libxml::sax2::xmlSAX2ProcessingInstruction;
+    use exml::libxml::sax2::xml_sax2_processing_instruction;
 
     PUSH_BOUNDARY_COUNT += 1;
-    xmlSAX2ProcessingInstruction(ctx, target, data);
+    xml_sax2_processing_instruction(ctx, target, data);
 }
 
 #[cfg(feature = "push")]
 unsafe extern "C" fn comment_bnd(ctx: *mut c_void, value: *const XmlChar) {
-    use exml::libxml::sax2::xmlSAX2Comment;
+    use exml::libxml::sax2::xml_sax2_comment;
 
     let ctxt: XmlParserCtxtPtr = ctx as _;
     if (*ctxt).in_subset == 0 {
         PUSH_BOUNDARY_COUNT += 1;
     }
-    xmlSAX2Comment(ctx, value);
+    xml_sax2_comment(ctx, value);
 }
 
 #[cfg(feature = "push")]
@@ -2467,7 +2467,7 @@ unsafe extern "C" fn start_element_bnd(
     xname: *const XmlChar,
     atts: *mut *const XmlChar,
 ) {
-    use exml::libxml::sax2::xmlSAX2StartElement;
+    use exml::libxml::sax2::xml_sax2_start_element;
 
     let name: *const c_char = xname as *const c_char;
 
@@ -2479,15 +2479,15 @@ unsafe extern "C" fn start_element_bnd(
     {
         PUSH_BOUNDARY_COUNT += 1;
     }
-    xmlSAX2StartElement(ctx, xname, atts);
+    xml_sax2_start_element(ctx, xname, atts);
 }
 
 #[cfg(feature = "push")]
 unsafe extern "C" fn end_element_bnd(ctx: *mut c_void, name: *const XmlChar) {
     /*pushBoundaryCount++;*/
 
-    use exml::libxml::sax2::xmlSAX2EndElement;
-    xmlSAX2EndElement(ctx, name);
+    use exml::libxml::sax2::xml_sax2_end_element;
+    xml_sax2_end_element(ctx, name);
 }
 
 #[cfg(feature = "push")]
@@ -2502,10 +2502,10 @@ unsafe extern "C" fn start_element_ns_bnd(
     nb_defaulted: c_int,
     attributes: *mut *const XmlChar,
 ) {
-    use exml::libxml::sax2::xmlSAX2StartElementNs;
+    use exml::libxml::sax2::xml_sax2_start_element_ns;
 
     PUSH_BOUNDARY_COUNT += 1;
-    xmlSAX2StartElementNs(
+    xml_sax2_start_element_ns(
         ctx,
         localname,
         prefix,
@@ -2527,8 +2527,8 @@ unsafe extern "C" fn end_element_ns_bnd(
 ) {
     /*pushBoundaryCount++;*/
 
-    use exml::libxml::sax2::xmlSAX2EndElementNs;
-    xmlSAX2EndElementNs(ctx, localname, prefix, uri);
+    use exml::libxml::sax2::xml_sax2_end_element_ns;
+    xml_sax2_end_element_ns(ctx, localname, prefix, uri);
 }
 
 /**
@@ -2556,7 +2556,7 @@ unsafe extern "C" fn push_boundary_test(
         parser::{
             xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
         },
-        sax2::{xmlSAX2InitHtmlDefaultSAXHandler, xmlSAXVersion},
+        sax2::{xml_sax2_init_html_default_sax_handler, xml_sax_version},
         tree::xml_doc_dump_memory,
     };
     use libc::memset;
@@ -2583,17 +2583,17 @@ unsafe extern "C" fn push_boundary_test(
     memset(addr_of_mut!(bnd_sax) as _, 0, size_of::<XmlSAXHandler>());
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
-        xmlSAX2InitHtmlDefaultSAXHandler(addr_of_mut!(bnd_sax) as _);
+        xml_sax2_init_html_default_sax_handler(addr_of_mut!(bnd_sax) as _);
         bnd_sax.start_element = Some(start_element_bnd);
         bnd_sax.end_element = Some(end_element_bnd);
     } else {
-        xmlSAXVersion(addr_of_mut!(bnd_sax) as _, 2);
+        xml_sax_version(addr_of_mut!(bnd_sax) as _, 2);
         bnd_sax.start_element_ns = Some(start_element_ns_bnd);
         bnd_sax.end_element_ns = Some(end_element_ns_bnd);
     }
     #[cfg(not(feature = "html"))]
     {
-        xmlSAXVersion(addr_of_mut!(bndSAX) as _, 2);
+        xml_sax_version(addr_of_mut!(bndSAX) as _, 2);
         bndSAX.startElementNs = Some(start_element_ns_bnd);
         bndSAX.endElementNs = Some(end_element_ns_bnd);
     }

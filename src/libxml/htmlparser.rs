@@ -40,7 +40,7 @@ use crate::{
             xml_switch_encoding, xml_switch_to_encoding, INPUT_CHUNK, XML_MAX_HUGE_LENGTH,
             XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
         },
-        sax2::{xmlSAX2IgnorableWhitespace, xmlSAX2InitHtmlDefaultSAXHandler},
+        sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         tree::{
             xml_buf_shrink, xml_create_int_subset, xml_free_doc, xml_get_int_subset,
             xml_get_last_child, xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
@@ -9393,7 +9393,7 @@ unsafe extern "C" fn html_init_parser_ctxt(
     }
     if sax.is_null() {
         memset((*ctxt).sax as _, 0, size_of::<HtmlSaxhandler>());
-        xmlSAX2InitHtmlDefaultSAXHandler((*ctxt).sax);
+        xml_sax2_init_html_default_sax_handler((*ctxt).sax);
         (*ctxt).user_data = ctxt as _;
     } else {
         memcpy((*ctxt).sax as _, sax as _, size_of::<HtmlSaxhandler>());
@@ -12125,7 +12125,7 @@ pub unsafe extern "C" fn html_ctxt_use_options(
     }
     if options & XmlParserOption::XmlParseNoblanks as i32 != 0 {
         (*ctxt).keep_blanks = 0;
-        (*(*ctxt).sax).ignorable_whitespace = Some(xmlSAX2IgnorableWhitespace);
+        (*(*ctxt).sax).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
         options -= XmlParserOption::XmlParseNoblanks as i32;
         (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
     } else {

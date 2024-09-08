@@ -35,7 +35,7 @@ use crate::{
             xml_create_push_parser_ctxt, xml_free_parser_ctxt, xml_parse_chunk, XmlParserCtxtPtr,
             XmlParserInputState, XmlSAXHandler, XML_DEFAULT_VERSION,
         },
-        sax2::{xmlSAX2EndElement, xmlSAX2InitDefaultSAXHandler, xmlSAX2StartElement},
+        sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
         tree::{
             xml_free_doc, xml_new_doc, xml_set_doc_compress_mode, XmlBufferPtr, XmlDocPtr,
             XmlNodePtr,
@@ -710,10 +710,10 @@ pub unsafe extern "C" fn xmlNewTextWriterDoc(
         b'\0' as _,
         size_of_val(&sax_handler),
     );
-    xmlSAX2InitDefaultSAXHandler(addr_of_mut!(sax_handler), 1);
+    xml_sax2_init_default_sax_handler(addr_of_mut!(sax_handler), 1);
     sax_handler.start_document = Some(xmlTextWriterStartDocumentCallback);
-    sax_handler.start_element = Some(xmlSAX2StartElement);
-    sax_handler.end_element = Some(xmlSAX2EndElement);
+    sax_handler.start_element = Some(xml_sax2_start_element);
+    sax_handler.end_element = Some(xml_sax2_end_element);
 
     let ctxt: XmlParserCtxtPtr = xml_create_push_parser_ctxt(
         addr_of_mut!(sax_handler),
@@ -801,10 +801,10 @@ pub unsafe extern "C" fn xmlNewTextWriterTree(
         b'\0' as _,
         size_of_val(&sax_handler),
     );
-    xmlSAX2InitDefaultSAXHandler(addr_of_mut!(sax_handler), 1);
+    xml_sax2_init_default_sax_handler(addr_of_mut!(sax_handler), 1);
     sax_handler.start_document = Some(xmlTextWriterStartDocumentCallback);
-    sax_handler.start_element = Some(xmlSAX2StartElement);
-    sax_handler.end_element = Some(xmlSAX2EndElement);
+    sax_handler.start_element = Some(xml_sax2_start_element);
+    sax_handler.end_element = Some(xml_sax2_end_element);
 
     let ctxt: XmlParserCtxtPtr = xml_create_push_parser_ctxt(
         addr_of_mut!(sax_handler),

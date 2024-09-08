@@ -40,7 +40,7 @@ use crate::{
             xml_relaxng_validate_push_element, XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr,
             XmlRelaxNGValidCtxtPtr,
         },
-        sax2::xmlSAXVersion,
+        sax2::xml_sax_version,
         tree::{
             xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_buffer_cat,
             xml_buffer_create, xml_buffer_free, xml_buffer_set_allocation_scheme, xml_copy_dtd,
@@ -575,7 +575,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
         );
         return null_mut();
     }
-    xmlSAXVersion((*ret).sax, 2);
+    xml_sax_version((*ret).sax, 2);
     (*ret).start_element = (*(*ret).sax).start_element;
     (*(*ret).sax).start_element = Some(xml_text_reader_start_element);
     (*ret).end_element = (*(*ret).sax).end_element;
@@ -850,7 +850,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         );
         return -1;
     }
-    xmlSAXVersion((*reader).sax, 2);
+    xml_sax_version((*reader).sax, 2);
     (*reader).start_element = (*(*reader).sax).start_element;
     (*(*reader).sax).start_element = Some(xml_text_reader_start_element);
     (*reader).end_element = (*(*reader).sax).end_element;

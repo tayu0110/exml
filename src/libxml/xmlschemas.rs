@@ -38,7 +38,7 @@ use crate::{
             xml_patterncompile, xml_stream_pop, xml_stream_push, xml_stream_push_attr,
             XmlPatternFlags, XmlPatternPtr, XmlStreamCtxtPtr,
         },
-        sax2::xmlSAX2GetLineNumber,
+        sax2::xml_sax2_get_line_number,
         schemas_internals::{
             xml_schema_free_annot, xml_schema_free_type, xml_schema_free_wildcard,
             xml_schema_free_wildcard_ns_set, xml_schema_item_list_free, XmlSchemaAnnot,
@@ -31178,7 +31178,7 @@ unsafe extern "C" fn xml_schema_sax_handle_start_element_ns(
     /*
      * TODO: Is this OK?
      */
-    (*ielem).node_line = xmlSAX2GetLineNumber((*vctxt).parser_ctxt as _);
+    (*ielem).node_line = xml_sax2_get_line_number((*vctxt).parser_ctxt as _);
     (*ielem).local_name = localname;
     (*ielem).ns_name = uri;
     (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;

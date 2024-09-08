@@ -26,7 +26,7 @@ use crate::libxml::parser::{
     xml_parse_version_num, xml_parser_add_node_info, xml_string_decode_entities_int,
     xml_validity_error, XmlParserInputState, XmlSAXHandlerPtr,
 };
-use crate::libxml::sax2::{xmlSAX2EndElement, xmlSAX2GetEntity, xmlSAX2StartElement};
+use crate::libxml::sax2::{xml_sax2_end_element, xml_sax2_get_entity, xml_sax2_start_element};
 use crate::libxml::tree::{
     xml_create_int_subset, xml_new_doc, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
     XmlElementContentOccur, XmlElementContentType, XmlElementTypeVal,
@@ -74,7 +74,7 @@ use super::parser::{
     XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
     XML_SKIP_IDS,
 };
-use super::sax2::xmlSAX2IgnorableWhitespace;
+use super::sax2::xml_sax2_ignorable_whitespace;
 use super::tree::{
     xml_add_child, xml_add_child_list, xml_buf_content, xml_buf_end, xml_buf_shrink, xml_buf_use,
     xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc_node,
@@ -646,7 +646,7 @@ pub(crate) unsafe extern "C" fn xml_ctxt_use_options_internal(
     }
     if options & XmlParserOption::XmlParseNoblanks as i32 != 0 {
         (*ctxt).keep_blanks = 0;
-        (*(*ctxt).sax).ignorable_whitespace = Some(xmlSAX2IgnorableWhitespace);
+        (*(*ctxt).sax).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
         options -= XmlParserOption::XmlParseNoblanks as i32;
         (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
     } else {
@@ -676,8 +676,8 @@ pub(crate) unsafe extern "C" fn xml_ctxt_use_options_internal(
     }
     #[cfg(feature = "sax1")]
     if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
-        (*(*ctxt).sax).start_element = Some(xmlSAX2StartElement);
-        (*(*ctxt).sax).end_element = Some(xmlSAX2EndElement);
+        (*(*ctxt).sax).start_element = Some(xml_sax2_start_element);
+        (*(*ctxt).sax).end_element = Some(xml_sax2_end_element);
         (*(*ctxt).sax).start_element_ns = None;
         (*(*ctxt).sax).end_element_ns = None;
         (*(*ctxt).sax).initialized = 1;
@@ -4417,7 +4417,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
             ent = xml_get_predefined_entity(name);
         }
         if (*ctxt).well_formed == 1 && ent.is_null() && (*ctxt).user_data == ctxt as _ {
-            ent = xmlSAX2GetEntity(ctxt as _, name);
+            ent = xml_sax2_get_entity(ctxt as _, name);
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {

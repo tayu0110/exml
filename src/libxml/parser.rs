@@ -62,7 +62,10 @@ use crate::{
             XML_SUBSTITUTE_REF,
         },
         relaxng::xml_relaxng_cleanup_types,
-        sax2::{xmlSAX2EntityDecl, xmlSAX2GetEntity, xmlSAX2IgnorableWhitespace, xmlSAXVersion},
+        sax2::{
+            xml_sax2_entity_decl, xml_sax2_get_entity, xml_sax2_ignorable_whitespace,
+            xml_sax_version,
+        },
         tree::{
             xml_add_child, xml_buf_content, xml_buf_end, xml_buf_use, xml_buffer_add,
             xml_buffer_create, xml_buffer_free, xml_buffer_set_allocation_scheme, xml_build_qname,
@@ -4481,7 +4484,7 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
     }
     if sax.is_null() {
         memset((*ctxt).sax as _, 0, size_of::<XmlSAXHandler>());
-        xmlSAXVersion((*ctxt).sax, 2);
+        xml_sax_version((*ctxt).sax, 2);
         (*ctxt).user_data = ctxt as _;
     } else {
         if (*sax).initialized == XML_SAX2_MAGIC as u32 {
@@ -4624,7 +4627,7 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
     (*ctxt).linenumbers = *xml_line_numbers_default_value();
     (*ctxt).keep_blanks = *xml_keep_blanks_default_value();
     if (*ctxt).keep_blanks == 0 {
-        (*(*ctxt).sax).ignorable_whitespace = Some(xmlSAX2IgnorableWhitespace);
+        (*(*ctxt).sax).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
         (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
     }
 
@@ -6125,7 +6128,7 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
             ent = xml_get_predefined_entity(name);
         }
         if ent.is_null() && (*ctxt).user_data == ctxt as _ {
-            ent = xmlSAX2GetEntity(ctxt as _, name);
+            ent = xml_sax2_get_entity(ctxt as _, name);
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -12374,7 +12377,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         xml_new_dtd((*ctxt).my_doc, c"fake".as_ptr() as _, null(), null());
                 }
 
-                xmlSAX2EntityDecl(
+                xml_sax2_entity_decl(
                     ctxt as _,
                     name,
                     XmlEntityType::XmlInternalGeneralEntity as i32,
@@ -12483,7 +12486,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         (*(*ctxt).my_doc).int_subset =
                             xml_new_dtd((*ctxt).my_doc, c"fake".as_ptr() as _, null(), null());
                     }
-                    xmlSAX2EntityDecl(
+                    xml_sax2_entity_decl(
                         ctxt as _,
                         name,
                         XmlEntityType::XmlExternalGeneralParsedEntity as i32,
@@ -12548,7 +12551,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     }
                 }
                 if cur.is_null() && (*ctxt).user_data == ctxt as _ {
-                    cur = xmlSAX2GetEntity(ctxt as _, name);
+                    cur = xml_sax2_get_entity(ctxt as _, name);
                 }
             }
             if !cur.is_null() && (*cur).orig.load(Ordering::Relaxed).is_null() {

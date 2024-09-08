@@ -82,7 +82,7 @@ use super::{
  *
  * Returns a xmlChar *
  */
-pub unsafe extern "C" fn xmlSAX2GetPublicId(_ctx: *mut c_void) -> *const XmlChar {
+pub unsafe extern "C" fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const XmlChar {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
     null()
 }
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn xmlSAX2GetPublicId(_ctx: *mut c_void) -> *const XmlChar
  *
  * Returns a xmlChar *
  */
-pub unsafe extern "C" fn xmlSAX2GetSystemId(ctx: *mut c_void) -> *const XmlChar {
+pub unsafe extern "C" fn xml_sax2_get_system_id(ctx: *mut c_void) -> *const XmlChar {
     let ctxt: XmlParserCtxtPtr = ctx as _;
     if ctx.is_null() || (*ctxt).input.is_null() {
         return null();
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn xmlSAX2GetSystemId(ctx: *mut c_void) -> *const XmlChar 
  * Receive the document locator at startup, actually xmlDefaultSAXLocator
  * Everything is available on the context, so this is useless in our case.
  */
-pub unsafe extern "C" fn xmlSAX2SetDocumentLocator(_ctx: *mut c_void, _loc: XmlSaxlocatorPtr) {
+pub unsafe extern "C" fn xml_sax2_set_document_locator(_ctx: *mut c_void, _loc: XmlSaxlocatorPtr) {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
     // #ifdef DEBUG_SAX
     //     xmlGenericError(xmlGenericErrorContext,
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn xmlSAX2SetDocumentLocator(_ctx: *mut c_void, _loc: XmlS
  *
  * Returns an c_int
  */
-pub unsafe extern "C" fn xmlSAX2GetLineNumber(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_sax2_get_line_number(ctx: *mut c_void) -> c_int {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).input.is_null() {
         return 0;
@@ -144,7 +144,7 @@ pub unsafe extern "C" fn xmlSAX2GetLineNumber(ctx: *mut c_void) -> c_int {
  *
  * Returns an c_int
  */
-pub unsafe extern "C" fn xmlSAX2GetColumnNumber(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_sax2_get_column_number(ctx: *mut c_void) -> c_int {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).input.is_null() {
         return 0;
@@ -160,7 +160,7 @@ pub unsafe extern "C" fn xmlSAX2GetColumnNumber(ctx: *mut c_void) -> c_int {
  *
  * Returns 1 if true
  */
-pub unsafe extern "C" fn xmlSAX2IsStandalone(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_sax2_is_standalone(ctx: *mut c_void) -> c_int {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).my_doc.is_null() {
         return 0;
@@ -176,7 +176,7 @@ pub unsafe extern "C" fn xmlSAX2IsStandalone(ctx: *mut c_void) -> c_int {
  *
  * Returns 1 if true
  */
-pub unsafe extern "C" fn xmlSAX2HasInternalSubset(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_sax2_has_internal_subset(ctx: *mut c_void) -> c_int {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctxt.is_null() || (*ctxt).my_doc.is_null() {
         return 0;
@@ -192,7 +192,7 @@ pub unsafe extern "C" fn xmlSAX2HasInternalSubset(ctx: *mut c_void) -> c_int {
  *
  * Returns 1 if true
  */
-pub unsafe extern "C" fn xmlSAX2HasExternalSubset(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_sax2_has_external_subset(ctx: *mut c_void) -> c_int {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctxt.is_null() || (*ctxt).my_doc.is_null() {
         return 0;
@@ -270,7 +270,7 @@ unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_c
  *
  * Callback on internal subset declaration.
  */
-pub unsafe extern "C" fn xmlSAX2InternalSubset(
+pub unsafe extern "C" fn xml_sax2_internal_subset(
     ctx: *mut c_void,
     name: *const XmlChar,
     external_id: *const XmlChar,
@@ -315,7 +315,7 @@ pub unsafe extern "C" fn xmlSAX2InternalSubset(
  *
  * Callback on external subset declaration.
  */
-pub unsafe extern "C" fn xmlSAX2ExternalSubset(
+pub unsafe extern "C" fn xml_sax2_external_subset(
     ctx: *mut c_void,
     name: *const XmlChar,
     external_id: *const XmlChar,
@@ -514,7 +514,10 @@ unsafe extern "C" fn xml_fatal_err_msg(
  *
  * Returns the xmlEntityPtr if found.
  */
-pub unsafe extern "C" fn xmlSAX2GetEntity(ctx: *mut c_void, name: *const XmlChar) -> XmlEntityPtr {
+pub unsafe extern "C" fn xml_sax2_get_entity(
+    ctx: *mut c_void,
+    name: *const XmlChar,
+) -> XmlEntityPtr {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut ret: XmlEntityPtr;
 
@@ -570,7 +573,7 @@ pub unsafe extern "C" fn xmlSAX2GetEntity(ctx: *mut c_void, name: *const XmlChar
  *
  * Returns the xmlEntityPtr if found.
  */
-pub unsafe extern "C" fn xmlSAX2GetParameterEntity(
+pub unsafe extern "C" fn xml_sax2_get_parameter_entity(
     ctx: *mut c_void,
     name: *const XmlChar,
 ) -> XmlEntityPtr {
@@ -601,7 +604,7 @@ pub unsafe extern "C" fn xmlSAX2GetParameterEntity(
  *
  * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
  */
-pub unsafe extern "C" fn xmlSAX2ResolveEntity(
+pub unsafe extern "C" fn xml_sax2_resolve_entity(
     ctx: *mut c_void,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
@@ -691,7 +694,7 @@ unsafe extern "C" fn xml_warn_msg(
  *
  * An entity definition has been parsed
  */
-pub unsafe extern "C" fn xmlSAX2EntityDecl(
+pub unsafe extern "C" fn xml_sax2_entity_decl(
     ctx: *mut c_void,
     name: *const XmlChar,
     typ: c_int,
@@ -858,7 +861,7 @@ unsafe extern "C" fn xml_err_valid(
  *
  * An attribute definition has been parsed
  */
-pub unsafe extern "C" fn xmlSAX2AttributeDecl(
+pub unsafe extern "C" fn xml_sax2_attribute_decl(
     ctx: *mut c_void,
     elem: *const XmlChar,
     fullname: *const XmlChar,
@@ -967,7 +970,7 @@ pub unsafe extern "C" fn xmlSAX2AttributeDecl(
  *
  * An element definition has been parsed
  */
-pub unsafe extern "C" fn xmlSAX2ElementDecl(
+pub unsafe extern "C" fn xml_sax2_element_decl(
     ctx: *mut c_void,
     name: *const XmlChar,
     typ: c_int,
@@ -1036,7 +1039,7 @@ pub unsafe extern "C" fn xmlSAX2ElementDecl(
  *
  * What to do when a notation declaration has been parsed.
  */
-pub unsafe extern "C" fn xmlSAX2NotationDecl(
+pub unsafe extern "C" fn xml_sax2_notation_decl(
     ctx: *mut c_void,
     name: *const XmlChar,
     public_id: *const XmlChar,
@@ -1114,7 +1117,7 @@ pub unsafe extern "C" fn xmlSAX2NotationDecl(
  *
  * What to do when an unparsed entity declaration is parsed
  */
-pub unsafe extern "C" fn xmlSAX2UnparsedEntityDecl(
+pub unsafe extern "C" fn xml_sax2_unparsed_entity_decl(
     ctx: *mut c_void,
     name: *const XmlChar,
     public_id: *const XmlChar,
@@ -1216,7 +1219,7 @@ pub unsafe extern "C" fn xmlSAX2UnparsedEntityDecl(
  *
  * called when the document start being processed.
  */
-pub unsafe extern "C" fn xmlSAX2StartDocument(ctx: *mut c_void) {
+pub unsafe extern "C" fn xml_sax2_start_document(ctx: *mut c_void) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let doc: XmlDocPtr;
 
@@ -1294,7 +1297,7 @@ pub unsafe extern "C" fn xmlSAX2StartDocument(ctx: *mut c_void) {
  *
  * called when the document end has been detected.
  */
-pub unsafe extern "C" fn xmlSAX2EndDocument(ctx: *mut c_void) {
+pub unsafe extern "C" fn xml_sax2_end_document(ctx: *mut c_void) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     // #ifdef DEBUG_SAX
     //     xmlGenericError(xmlGenericErrorContext,
@@ -1461,7 +1464,7 @@ unsafe extern "C" fn xml_ns_err_msg(
     feature = "writer",
     feature = "legacy"
 ))]
-unsafe extern "C" fn xmlSAX2AttributeInternal(
+unsafe extern "C" fn xml_sax2_attribute_internal(
     ctx: *mut c_void,
     fullname: *const XmlChar,
     mut value: *const XmlChar,
@@ -1967,7 +1970,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
     feature = "writer",
     feature = "legacy"
 ))]
-unsafe extern "C" fn xmlCheckDefaultedAttributes(
+unsafe extern "C" fn xml_check_defaulted_attributes(
     ctxt: XmlParserCtxtPtr,
     name: *const XmlChar,
     prefix: *const XmlChar,
@@ -2120,7 +2123,7 @@ unsafe extern "C" fn xmlCheckDefaultedAttributes(
                                 }
                             }
                             if att.is_null() {
-                                xmlSAX2AttributeInternal(
+                                xml_sax2_attribute_internal(
                                     ctxt as _,
                                     fulln,
                                     (*attr).default_value,
@@ -2161,7 +2164,7 @@ unsafe extern "C" fn xmlCheckDefaultedAttributes(
     feature = "writer",
     feature = "legacy"
 ))]
-pub unsafe extern "C" fn xmlSAX2StartElement(
+pub unsafe extern "C" fn xml_sax2_start_element(
     ctx: *mut c_void,
     fullname: *const XmlChar,
     atts: *mut *const XmlChar,
@@ -2286,7 +2289,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
          * namespaces
          */
         if !(*(*ctxt).my_doc).int_subset.is_null() || !(*(*ctxt).my_doc).ext_subset.is_null() {
-            xmlCheckDefaultedAttributes(ctxt, name, prefix, atts);
+            xml_check_defaulted_attributes(ctxt, name, prefix, atts);
         }
 
         /*
@@ -2305,7 +2308,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
                     && (*att.add(3) == b'n')
                     && (*att.add(4) == b's')
                 {
-                    xmlSAX2AttributeInternal(ctxt as _, att, value, prefix);
+                    xml_sax2_attribute_internal(ctxt as _, att, value, prefix);
                 }
 
                 att = *atts.add(i as usize);
@@ -2358,7 +2361,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
         i += 1;
         if (*ctxt).html != 0 {
             while !att.is_null() {
-                xmlSAX2AttributeInternal(ctxt as _, att, value, null_mut());
+                xml_sax2_attribute_internal(ctxt as _, att, value, null_mut());
                 att = *atts.add(i as usize);
                 i += 1;
                 value = *atts.add(i as usize);
@@ -2372,7 +2375,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
                     || (*att.add(3) != b'n')
                     || (*att.add(4) != b's')
                 {
-                    xmlSAX2AttributeInternal(ctxt as _, att, value, null_mut());
+                    xml_sax2_attribute_internal(ctxt as _, att, value, null_mut());
                 }
 
                 /*
@@ -2424,7 +2427,7 @@ pub unsafe extern "C" fn xmlSAX2StartElement(
     feature = "writer",
     feature = "legacy"
 ))]
-pub unsafe extern "C" fn xmlSAX2EndElement(ctx: *mut c_void, _name: *const XmlChar) {
+pub unsafe extern "C" fn xml_sax2_end_element(ctx: *mut c_void, _name: *const XmlChar) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
 
     if ctx.is_null() {
@@ -2478,7 +2481,7 @@ pub unsafe extern "C" fn xmlSAX2EndElement(ctx: *mut c_void, _name: *const XmlCh
  * It provides the namespace information for the element, as well as
  * the new namespace declarations on the element.
  */
-pub unsafe extern "C" fn xmlSAX2StartElementNs(
+pub unsafe extern "C" fn xml_sax2_start_element_ns(
     ctx: *mut c_void,
     mut localname: *const XmlChar,
     prefix: *const XmlChar,
@@ -2716,7 +2719,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
                     let fullname: *const XmlChar =
                         xml_dict_qlookup((*ctxt).dict, *attributes.add(j + 1), *attributes.add(j));
                     if !fullname.is_null() {
-                        xmlSAX2AttributeNs(
+                        xml_sax2_attribute_ns(
                             ctxt,
                             fullname,
                             null_mut(),
@@ -2729,7 +2732,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
                     lname =
                         xml_build_qname(*attributes.add(j), *attributes.add(j + 1), null_mut(), 0);
                     if !lname.is_null() {
-                        xmlSAX2AttributeNs(
+                        xml_sax2_attribute_ns(
                             ctxt,
                             lname,
                             null_mut(),
@@ -2741,7 +2744,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
                     }
                 }
             }
-            xmlSAX2AttributeNs(
+            xml_sax2_attribute_ns(
                 ctxt,
                 *attributes.add(j),
                 *attributes.add(j + 1),
@@ -2782,7 +2785,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
  *
  * Returns the newly allocated string or NULL if not needed or error
  */
-unsafe extern "C" fn xmlSAX2TextNode(
+unsafe extern "C" fn xml_sax2_text_node(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
     len: c_int,
@@ -2887,7 +2890,7 @@ unsafe extern "C" fn xmlSAX2TextNode(
  * Returns the newly allocated string or NULL if not needed or error
  */
 #[cfg(feature = "valid")]
-unsafe extern "C" fn xmlSAX2DecodeAttrEntities(
+unsafe extern "C" fn xml_sax2_decode_attr_entities(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
     end: *const XmlChar,
@@ -2934,7 +2937,7 @@ unsafe extern "C" fn xmlSAX2DecodeAttrEntities(
  * DOM subtree and past it in a new xmlAttr element added to
  * the element.
  */
-unsafe extern "C" fn xmlSAX2AttributeNs(
+unsafe extern "C" fn xml_sax2_attribute_ns(
     ctxt: XmlParserCtxtPtr,
     localname: *const XmlChar,
     prefix: *const XmlChar,
@@ -3011,7 +3014,7 @@ unsafe extern "C" fn xmlSAX2AttributeNs(
          * otherwise with ' or "
          */
         if *valueend != 0 {
-            tmp = xmlSAX2TextNode(ctxt, value, valueend.offset_from(value) as _);
+            tmp = xml_sax2_text_node(ctxt, value, valueend.offset_from(value) as _);
             (*ret).children = tmp;
             (*ret).last = tmp;
             if !tmp.is_null() {
@@ -3035,7 +3038,7 @@ unsafe extern "C" fn xmlSAX2AttributeNs(
             }
         }
     } else if !value.is_null() {
-        let tmp: XmlNodePtr = xmlSAX2TextNode(ctxt, value, valueend.offset_from(value) as _);
+        let tmp: XmlNodePtr = xml_sax2_text_node(ctxt, value, valueend.offset_from(value) as _);
         (*ret).children = tmp;
         (*ret).last = tmp;
         if !tmp.is_null() {
@@ -3060,7 +3063,7 @@ unsafe extern "C" fn xmlSAX2AttributeNs(
              * done on a value with replaced entities anyway.
              */
             if (*ctxt).replace_entities == 0 {
-                dup = xmlSAX2DecodeAttrEntities(ctxt, value, valueend);
+                dup = xml_sax2_decode_attr_entities(ctxt, value, valueend);
                 if dup.is_null() {
                     if *valueend == 0 {
                         (*ctxt).valid &= xml_validate_one_attribute(
@@ -3225,7 +3228,7 @@ unsafe extern "C" fn xmlSAX2AttributeNs(
  * SAX2 callback when an element end has been detected by the parser.
  * It provides the namespace information for the element.
  */
-pub unsafe extern "C" fn xmlSAX2EndElementNs(
+pub unsafe extern "C" fn xml_sax2_end_element_ns(
     ctx: *mut c_void,
     _localname: *const XmlChar,
     _prefix: *const XmlChar,
@@ -3266,7 +3269,7 @@ pub unsafe extern "C" fn xmlSAX2EndElementNs(
  *
  * called when an entity xmlSAX2Reference is detected.
  */
-pub unsafe extern "C" fn xmlSAX2Reference(ctx: *mut c_void, name: *const XmlChar) {
+pub unsafe extern "C" fn xml_sax2_reference(ctx: *mut c_void, name: *const XmlChar) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
 
     if ctx.is_null() {
@@ -3302,7 +3305,7 @@ pub unsafe extern "C" fn xmlSAX2Reference(ctx: *mut c_void, name: *const XmlChar
 // static void
 // xmlSAX2Text(xmlParserCtxtPtr ctxt, const xmlChar *ch, c_int len,
 //             xmlElementType type)
-unsafe extern "C" fn xmlSAX2Text(
+unsafe extern "C" fn xml_sax2_text(
     ctxt: XmlParserCtxtPtr,
     ch: *const XmlChar,
     len: c_int,
@@ -3342,7 +3345,7 @@ unsafe extern "C" fn xmlSAX2Text(
      */
     if last_child.is_null() {
         if matches!(typ, XmlElementType::XmlTextNode) {
-            last_child = xmlSAX2TextNode(ctxt, ch, len);
+            last_child = xml_sax2_text_node(ctxt, ch, len);
         } else {
             last_child = xml_new_cdata_block((*ctxt).my_doc, ch, len);
         }
@@ -3434,7 +3437,7 @@ unsafe extern "C" fn xmlSAX2Text(
         } else {
             /* Mixed content, first time */
             if matches!(typ, XmlElementType::XmlTextNode) {
-                last_child = xmlSAX2TextNode(ctxt, ch, len);
+                last_child = xml_sax2_text_node(ctxt, ch, len);
                 if !last_child.is_null() {
                     (*last_child).doc = (*ctxt).my_doc;
                 }
@@ -3460,8 +3463,8 @@ unsafe extern "C" fn xmlSAX2Text(
  *
  * receiving some chars from the parser.
  */
-pub unsafe extern "C" fn xmlSAX2Characters(ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
-    xmlSAX2Text(
+pub unsafe extern "C" fn xml_sax2_characters(ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+    xml_sax2_text(
         ctx as XmlParserCtxtPtr,
         ch,
         len,
@@ -3478,7 +3481,7 @@ pub unsafe extern "C" fn xmlSAX2Characters(ctx: *mut c_void, ch: *const XmlChar,
  * receiving some ignorable whitespaces from the parser.
  * UNUSED: by default the DOM building will use xmlSAX2Characters
  */
-pub unsafe extern "C" fn xmlSAX2IgnorableWhitespace(
+pub unsafe extern "C" fn xml_sax2_ignorable_whitespace(
     _ctx: *mut c_void,
     _ch: *const XmlChar,
     _len: c_int,
@@ -3498,7 +3501,7 @@ pub unsafe extern "C" fn xmlSAX2IgnorableWhitespace(
  *
  * A processing instruction has been parsed.
  */
-pub unsafe extern "C" fn xmlSAX2ProcessingInstruction(
+pub unsafe extern "C" fn xml_sax2_processing_instruction(
     ctx: *mut c_void,
     target: *const XmlChar,
     data: *const XmlChar,
@@ -3564,7 +3567,7 @@ pub unsafe extern "C" fn xmlSAX2ProcessingInstruction(
  *
  * A xmlSAX2Comment has been parsed.
  */
-pub unsafe extern "C" fn xmlSAX2Comment(ctx: *mut c_void, value: *const XmlChar) {
+pub unsafe extern "C" fn xml_sax2_comment(ctx: *mut c_void, value: *const XmlChar) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
 
     if ctx.is_null() {
@@ -3625,8 +3628,8 @@ pub unsafe extern "C" fn xmlSAX2Comment(ctx: *mut c_void, value: *const XmlChar)
  *
  * called when a pcdata block has been parsed
  */
-pub unsafe extern "C" fn xmlSAX2CDataBlock(ctx: *mut c_void, value: *const XmlChar, len: c_int) {
-    xmlSAX2Text(
+pub unsafe extern "C" fn xml_sax2_cdata_block(ctx: *mut c_void, value: *const XmlChar, len: c_int) {
+    xml_sax2_text(
         ctx as XmlParserCtxtPtr,
         value,
         len,
@@ -3652,7 +3655,7 @@ static mut XML_SAX2_DEFAULT_VERSION_VALUE: c_int = 2;
  */
 #[deprecated]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn xmlSAXDefaultVersion(version: c_int) -> c_int {
+pub unsafe extern "C" fn xml_sax_default_version(version: c_int) -> c_int {
     let ret: c_int = XML_SAX2_DEFAULT_VERSION_VALUE;
 
     if version != 1 && version != 2 {
@@ -3671,49 +3674,49 @@ pub unsafe extern "C" fn xmlSAXDefaultVersion(version: c_int) -> c_int {
  *
  * Returns 0 in case of success and -1 in case of error.
  */
-pub unsafe extern "C" fn xmlSAXVersion(hdlr: *mut XmlSAXHandler, version: c_int) -> c_int {
+pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: c_int) -> c_int {
     if hdlr.is_null() {
         return -1;
     }
     if version == 2 {
         (*hdlr).start_element = None;
         (*hdlr).end_element = None;
-        (*hdlr).start_element_ns = Some(xmlSAX2StartElementNs);
-        (*hdlr).end_element_ns = Some(xmlSAX2EndElementNs);
+        (*hdlr).start_element_ns = Some(xml_sax2_start_element_ns);
+        (*hdlr).end_element_ns = Some(xml_sax2_end_element_ns);
         (*hdlr).serror = None;
         (*hdlr).initialized = XML_SAX2_MAGIC as _;
     } else if cfg!(feature = "sax1") && version == 1 {
         #[cfg(feature = "sax1")]
         {
-            (*hdlr).start_element = Some(xmlSAX2StartElement);
-            (*hdlr).end_element = Some(xmlSAX2EndElement);
+            (*hdlr).start_element = Some(xml_sax2_start_element);
+            (*hdlr).end_element = Some(xml_sax2_end_element);
             (*hdlr).initialized = 1;
         }
     } else {
         return -1;
     }
-    (*hdlr).internal_subset = Some(xmlSAX2InternalSubset);
-    (*hdlr).external_subset = Some(xmlSAX2ExternalSubset);
-    (*hdlr).is_standalone = Some(xmlSAX2IsStandalone);
-    (*hdlr).has_internal_subset = Some(xmlSAX2HasInternalSubset);
-    (*hdlr).has_external_subset = Some(xmlSAX2HasExternalSubset);
-    (*hdlr).resolve_entity = Some(xmlSAX2ResolveEntity);
-    (*hdlr).get_entity = Some(xmlSAX2GetEntity);
-    (*hdlr).get_parameter_entity = Some(xmlSAX2GetParameterEntity);
-    (*hdlr).entity_decl = Some(xmlSAX2EntityDecl);
-    (*hdlr).attribute_decl = Some(xmlSAX2AttributeDecl);
-    (*hdlr).element_decl = Some(xmlSAX2ElementDecl);
-    (*hdlr).notation_decl = Some(xmlSAX2NotationDecl);
-    (*hdlr).unparsed_entity_decl = Some(xmlSAX2UnparsedEntityDecl);
-    (*hdlr).set_document_locator = Some(xmlSAX2SetDocumentLocator);
-    (*hdlr).start_document = Some(xmlSAX2StartDocument);
-    (*hdlr).end_document = Some(xmlSAX2EndDocument);
-    (*hdlr).reference = Some(xmlSAX2Reference);
-    (*hdlr).characters = Some(xmlSAX2Characters);
-    (*hdlr).cdata_block = Some(xmlSAX2CDataBlock);
-    (*hdlr).ignorable_whitespace = Some(xmlSAX2Characters);
-    (*hdlr).processing_instruction = Some(xmlSAX2ProcessingInstruction);
-    (*hdlr).comment = Some(xmlSAX2Comment);
+    (*hdlr).internal_subset = Some(xml_sax2_internal_subset);
+    (*hdlr).external_subset = Some(xml_sax2_external_subset);
+    (*hdlr).is_standalone = Some(xml_sax2_is_standalone);
+    (*hdlr).has_internal_subset = Some(xml_sax2_has_internal_subset);
+    (*hdlr).has_external_subset = Some(xml_sax2_has_external_subset);
+    (*hdlr).resolve_entity = Some(xml_sax2_resolve_entity);
+    (*hdlr).get_entity = Some(xml_sax2_get_entity);
+    (*hdlr).get_parameter_entity = Some(xml_sax2_get_parameter_entity);
+    (*hdlr).entity_decl = Some(xml_sax2_entity_decl);
+    (*hdlr).attribute_decl = Some(xml_sax2_attribute_decl);
+    (*hdlr).element_decl = Some(xml_sax2_element_decl);
+    (*hdlr).notation_decl = Some(xml_sax2_notation_decl);
+    (*hdlr).unparsed_entity_decl = Some(xml_sax2_unparsed_entity_decl);
+    (*hdlr).set_document_locator = Some(xml_sax2_set_document_locator);
+    (*hdlr).start_document = Some(xml_sax2_start_document);
+    (*hdlr).end_document = Some(xml_sax2_end_document);
+    (*hdlr).reference = Some(xml_sax2_reference);
+    (*hdlr).characters = Some(xml_sax2_characters);
+    (*hdlr).cdata_block = Some(xml_sax2_cdata_block);
+    (*hdlr).ignorable_whitespace = Some(xml_sax2_characters);
+    (*hdlr).processing_instruction = Some(xml_sax2_processing_instruction);
+    (*hdlr).comment = Some(xml_sax2_comment);
     (*hdlr).warning = Some(xmlParserWarning);
     (*hdlr).error = Some(xmlParserError);
     (*hdlr).fatal_error = Some(xmlParserError);
@@ -3728,12 +3731,15 @@ pub unsafe extern "C" fn xmlSAXVersion(hdlr: *mut XmlSAXHandler, version: c_int)
  *
  * Initialize the default XML SAX2 handler
  */
-pub unsafe extern "C" fn xmlSAX2InitDefaultSAXHandler(hdlr: *mut XmlSAXHandler, warning: c_int) {
+pub unsafe extern "C" fn xml_sax2_init_default_sax_handler(
+    hdlr: *mut XmlSAXHandler,
+    warning: c_int,
+) {
     if hdlr.is_null() || (*hdlr).initialized != 0 {
         return;
     }
 
-    xmlSAXVersion(hdlr, XML_SAX2_DEFAULT_VERSION_VALUE);
+    xml_sax_version(hdlr, XML_SAX2_DEFAULT_VERSION_VALUE);
     if warning == 0 {
         (*hdlr).warning = None;
     } else {
@@ -3748,35 +3754,35 @@ pub unsafe extern "C" fn xmlSAX2InitDefaultSAXHandler(hdlr: *mut XmlSAXHandler, 
  * Initialize the default HTML SAX2 handler
  */
 #[cfg(feature = "html")]
-pub unsafe extern "C" fn xmlSAX2InitHtmlDefaultSAXHandler(hdlr: *mut XmlSAXHandler) {
+pub unsafe extern "C" fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSAXHandler) {
     if hdlr.is_null() || (*hdlr).initialized != 0 {
         return;
     }
 
-    (*hdlr).internal_subset = Some(xmlSAX2InternalSubset);
+    (*hdlr).internal_subset = Some(xml_sax2_internal_subset);
     (*hdlr).external_subset = None;
     (*hdlr).is_standalone = None;
     (*hdlr).has_internal_subset = None;
     (*hdlr).has_external_subset = None;
     (*hdlr).resolve_entity = None;
-    (*hdlr).get_entity = Some(xmlSAX2GetEntity);
+    (*hdlr).get_entity = Some(xml_sax2_get_entity);
     (*hdlr).get_parameter_entity = None;
     (*hdlr).entity_decl = None;
     (*hdlr).attribute_decl = None;
     (*hdlr).element_decl = None;
     (*hdlr).notation_decl = None;
     (*hdlr).unparsed_entity_decl = None;
-    (*hdlr).set_document_locator = Some(xmlSAX2SetDocumentLocator);
-    (*hdlr).start_document = Some(xmlSAX2StartDocument);
-    (*hdlr).end_document = Some(xmlSAX2EndDocument);
-    (*hdlr).start_element = Some(xmlSAX2StartElement);
-    (*hdlr).end_element = Some(xmlSAX2EndElement);
+    (*hdlr).set_document_locator = Some(xml_sax2_set_document_locator);
+    (*hdlr).start_document = Some(xml_sax2_start_document);
+    (*hdlr).end_document = Some(xml_sax2_end_document);
+    (*hdlr).start_element = Some(xml_sax2_start_element);
+    (*hdlr).end_element = Some(xml_sax2_end_element);
     (*hdlr).reference = None;
-    (*hdlr).characters = Some(xmlSAX2Characters);
-    (*hdlr).cdata_block = Some(xmlSAX2CDataBlock);
-    (*hdlr).ignorable_whitespace = Some(xmlSAX2IgnorableWhitespace);
-    (*hdlr).processing_instruction = Some(xmlSAX2ProcessingInstruction);
-    (*hdlr).comment = Some(xmlSAX2Comment);
+    (*hdlr).characters = Some(xml_sax2_characters);
+    (*hdlr).cdata_block = Some(xml_sax2_cdata_block);
+    (*hdlr).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
+    (*hdlr).processing_instruction = Some(xml_sax2_processing_instruction);
+    (*hdlr).comment = Some(xml_sax2_comment);
     (*hdlr).warning = Some(xmlParserWarning);
     (*hdlr).error = Some(xmlParserError);
     (*hdlr).fatal_error = Some(xmlParserError);
@@ -3792,7 +3798,7 @@ pub unsafe extern "C" fn xmlSAX2InitHtmlDefaultSAXHandler(hdlr: *mut XmlSAXHandl
  */
 #[deprecated]
 #[cfg(feature = "html")]
-pub unsafe extern "C" fn htmlDefaultSAXHandlerInit() {}
+pub unsafe extern "C" fn html_default_sax_handler_init() {}
 
 /**
  * xmlDefaultSAXHandlerInit:
@@ -3803,7 +3809,7 @@ pub unsafe extern "C" fn htmlDefaultSAXHandlerInit() {}
  * Initialize the default SAX2 handler
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlDefaultSAXHandlerInit() {}
+pub unsafe extern "C" fn xml_default_sax_handler_init() {}
 
 #[cfg(test)]
 mod tests {
@@ -3823,7 +3829,7 @@ mod tests {
             {
                 let mem_base = xml_mem_blocks();
 
-                htmlDefaultSAXHandlerInit();
+                html_default_sax_handler_init();
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
@@ -3846,7 +3852,7 @@ mod tests {
             let mut leaks = 0;
             let mem_base = xml_mem_blocks();
 
-            xmlDefaultSAXHandlerInit();
+            xml_default_sax_handler_init();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -3884,7 +3890,7 @@ mod tests {
                                             gen_const_xml_char_ptr(n_default_value, 5);
                                         let tree = gen_xml_enumeration_ptr(n_tree, 6);
 
-                                        xmlSAX2AttributeDecl(
+                                        xml_sax2_attribute_decl(
                                             ctx,
                                             elem,
                                             fullname,
@@ -3945,7 +3951,7 @@ mod tests {
                             len = 0;
                         }
 
-                        xmlSAX2CDataBlock(ctx, value, len);
+                        xml_sax2_cdata_block(ctx, value, len);
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_value, value, 1);
                         des_int(n_len, len, 2);
@@ -3983,7 +3989,7 @@ mod tests {
                             len = 0;
                         }
 
-                        xmlSAX2Characters(ctx, ch, len);
+                        xml_sax2_characters(ctx, ch, len);
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_ch, ch, 1);
                         des_int(n_len, len, 2);
@@ -4016,7 +4022,7 @@ mod tests {
                     let ctx = gen_void_ptr(n_ctx, 0);
                     let value = gen_const_xml_char_ptr(n_value, 1);
 
-                    xmlSAX2Comment(ctx, value);
+                    xml_sax2_comment(ctx, value);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_const_xml_char_ptr(n_value, value, 1);
                     xmlResetLastError();
@@ -4050,7 +4056,7 @@ mod tests {
                             let typ = gen_int(n_type, 2);
                             let content = gen_xml_element_content_ptr(n_content, 3);
 
-                            xmlSAX2ElementDecl(ctx, name, typ, content);
+                            xml_sax2_element_decl(ctx, name, typ, content);
                             des_void_ptr(n_ctx, ctx, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_int(n_type, typ, 2);
@@ -4086,7 +4092,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                xmlSAX2EndDocument(ctx);
+                xml_sax2_end_document(ctx);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {
@@ -4123,7 +4129,7 @@ mod tests {
                         let ctx = gen_void_ptr(n_ctx, 0);
                         let name = gen_const_xml_char_ptr(n_name, 1);
 
-                        xmlSAX2EndElement(ctx, name);
+                        xml_sax2_end_element(ctx, name);
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         xmlResetLastError();
@@ -4158,7 +4164,7 @@ mod tests {
                             let prefix = gen_const_xml_char_ptr(n_prefix, 2);
                             let uri = gen_const_xml_char_ptr(n_uri, 3);
 
-                            xmlSAX2EndElementNs(ctx, localname, prefix, uri);
+                            xml_sax2_end_element_ns(ctx, localname, prefix, uri);
                             des_void_ptr(n_ctx, ctx, 0);
                             des_const_xml_char_ptr(n_localname, localname, 1);
                             des_const_xml_char_ptr(n_prefix, prefix, 2);
@@ -4205,7 +4211,7 @@ mod tests {
                                     let system_id = gen_const_xml_char_ptr(n_system_id, 4);
                                     let content = gen_xml_char_ptr(n_content, 5);
 
-                                    xmlSAX2EntityDecl(
+                                    xml_sax2_entity_decl(
                                         ctx, name, typ, public_id, system_id, content,
                                     );
                                     des_void_ptr(n_ctx, ctx, 0);
@@ -4253,7 +4259,7 @@ mod tests {
                             let external_id = gen_const_xml_char_ptr(n_external_id, 2);
                             let system_id = gen_const_xml_char_ptr(n_system_id, 3);
 
-                            xmlSAX2ExternalSubset(ctx, name, external_id, system_id);
+                            xml_sax2_external_subset(ctx, name, external_id, system_id);
                             des_void_ptr(n_ctx, ctx, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_external_id, external_id, 2);
@@ -4290,7 +4296,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                let ret_val = xmlSAX2GetColumnNumber(ctx);
+                let ret_val = xml_sax2_get_column_number(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -4321,7 +4327,7 @@ mod tests {
                     let ctx = gen_void_ptr(n_ctx, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    let ret_val = xmlSAX2GetEntity(ctx, name);
+                    let ret_val = xml_sax2_get_entity(ctx, name);
                     desret_xml_entity_ptr(ret_val);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
@@ -4350,7 +4356,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                let ret_val = xmlSAX2GetLineNumber(ctx);
+                let ret_val = xml_sax2_get_line_number(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -4381,7 +4387,7 @@ mod tests {
                     let ctx = gen_void_ptr(n_ctx, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    let ret_val = xmlSAX2GetParameterEntity(ctx, name);
+                    let ret_val = xml_sax2_get_parameter_entity(ctx, name);
                     desret_xml_entity_ptr(ret_val);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
@@ -4413,7 +4419,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                let ret_val = xmlSAX2GetPublicId(ctx);
+                let ret_val = xml_sax2_get_public_id(ctx);
                 desret_const_xml_char_ptr(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -4442,7 +4448,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                let ret_val = xmlSAX2GetSystemId(ctx);
+                let ret_val = xml_sax2_get_system_id(ctx);
                 desret_const_xml_char_ptr(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -4471,7 +4477,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                let ret_val = xmlSAX2HasExternalSubset(ctx);
+                let ret_val = xml_sax2_has_external_subset(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -4500,7 +4506,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                let ret_val = xmlSAX2HasInternalSubset(ctx);
+                let ret_val = xml_sax2_has_internal_subset(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -4536,7 +4542,7 @@ mod tests {
                             len = 0;
                         }
 
-                        xmlSAX2IgnorableWhitespace(ctx, ch, len);
+                        xml_sax2_ignorable_whitespace(ctx, ch, len);
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_ch, ch, 1);
                         des_int(n_len, len, 2);
@@ -4572,7 +4578,7 @@ mod tests {
                     let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
                     let warning = gen_int(n_warning, 1);
 
-                    xmlSAX2InitDefaultSAXHandler(hdlr, warning);
+                    xml_sax2_init_default_sax_handler(hdlr, warning);
                     des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
                     des_int(n_warning, warning, 1);
                     xmlResetLastError();
@@ -4604,7 +4610,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
 
-                xmlSAX2InitHtmlDefaultSAXHandler(hdlr);
+                xml_sax2_init_html_default_sax_handler(hdlr);
                 des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {
@@ -4638,7 +4644,7 @@ mod tests {
                             let external_id = gen_const_xml_char_ptr(n_external_id, 2);
                             let system_id = gen_const_xml_char_ptr(n_system_id, 3);
 
-                            xmlSAX2InternalSubset(ctx, name, external_id, system_id);
+                            xml_sax2_internal_subset(ctx, name, external_id, system_id);
                             des_void_ptr(n_ctx, ctx, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_external_id, external_id, 2);
@@ -4675,7 +4681,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                let ret_val = xmlSAX2IsStandalone(ctx);
+                let ret_val = xml_sax2_is_standalone(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
@@ -4710,7 +4716,7 @@ mod tests {
                             let public_id = gen_const_xml_char_ptr(n_public_id, 2);
                             let system_id = gen_const_xml_char_ptr(n_system_id, 3);
 
-                            xmlSAX2NotationDecl(ctx, name, public_id, system_id);
+                            xml_sax2_notation_decl(ctx, name, public_id, system_id);
                             des_void_ptr(n_ctx, ctx, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_public_id, public_id, 2);
@@ -4751,7 +4757,7 @@ mod tests {
                         let target = gen_const_xml_char_ptr(n_target, 1);
                         let data = gen_const_xml_char_ptr(n_data, 2);
 
-                        xmlSAX2ProcessingInstruction(ctx, target, data);
+                        xml_sax2_processing_instruction(ctx, target, data);
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_target, target, 1);
                         des_const_xml_char_ptr(n_data, data, 2);
@@ -4787,7 +4793,7 @@ mod tests {
                     let ctx = gen_void_ptr(n_ctx, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    xmlSAX2Reference(ctx, name);
+                    xml_sax2_reference(ctx, name);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
                     xmlResetLastError();
@@ -4819,7 +4825,7 @@ mod tests {
                         let public_id = gen_const_xml_char_ptr(n_public_id, 1);
                         let system_id = gen_const_xml_char_ptr(n_system_id, 2);
 
-                        let ret_val = xmlSAX2ResolveEntity(ctx, public_id, system_id);
+                        let ret_val = xml_sax2_resolve_entity(ctx, public_id, system_id);
                         desret_xml_parser_input_ptr(ret_val);
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_public_id, public_id, 1);
@@ -4856,7 +4862,7 @@ mod tests {
                     let ctx = gen_void_ptr(n_ctx, 0);
                     let loc = gen_xml_saxlocator_ptr(n_loc, 1);
 
-                    xmlSAX2SetDocumentLocator(ctx, loc);
+                    xml_sax2_set_document_locator(ctx, loc);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_xml_saxlocator_ptr(n_loc, loc, 1);
                     xmlResetLastError();
@@ -4887,7 +4893,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                xmlSAX2StartDocument(ctx);
+                xml_sax2_start_document(ctx);
                 des_void_ptr(n_ctx, ctx, 0);
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {
@@ -4926,7 +4932,7 @@ mod tests {
                             let fullname = gen_const_xml_char_ptr(n_fullname, 1);
                             let atts = gen_const_xml_char_ptr_ptr(n_atts, 2);
 
-                            xmlSAX2StartElement(ctx, fullname, atts as *mut *const XmlChar);
+                            xml_sax2_start_element(ctx, fullname, atts as *mut *const XmlChar);
                             des_void_ptr(n_ctx, ctx, 0);
                             des_const_xml_char_ptr(n_fullname, fullname, 1);
                             des_const_xml_char_ptr_ptr(n_atts, atts as *mut *const XmlChar, 2);
@@ -4980,7 +4986,7 @@ mod tests {
                                                 let attributes =
                                                     gen_const_xml_char_ptr_ptr(n_attributes, 8);
 
-                                                xmlSAX2StartElementNs(
+                                                xml_sax2_start_element_ns(
                                                     ctx,
                                                     localname,
                                                     prefix,
@@ -5055,7 +5061,7 @@ mod tests {
                                 let system_id = gen_const_xml_char_ptr(n_system_id, 3);
                                 let notation_name = gen_const_xml_char_ptr(n_notation_name, 4);
 
-                                xmlSAX2UnparsedEntityDecl(
+                                xml_sax2_unparsed_entity_decl(
                                     ctx,
                                     name,
                                     public_id,
@@ -5103,7 +5109,7 @@ mod tests {
                     let mem_base = xml_mem_blocks();
                     let version = gen_int(n_version, 0);
 
-                    let ret_val = xmlSAXDefaultVersion(version);
+                    let ret_val = xml_sax_default_version(version);
                     desret_int(ret_val);
                     des_int(n_version, version, 0);
                     xmlResetLastError();
@@ -5135,7 +5141,7 @@ mod tests {
                     let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
                     let version = gen_int(n_version, 1);
 
-                    let ret_val = xmlSAXVersion(hdlr, version);
+                    let ret_val = xml_sax_version(hdlr, version);
                     desret_int(ret_val);
                     des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
                     des_int(n_version, version, 1);
