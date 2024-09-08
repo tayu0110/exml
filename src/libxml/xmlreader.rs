@@ -4699,7 +4699,7 @@ pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
  * Returns the xmlDocPtr or NULL in case of error.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xmlTextReaderCurrentDoc(reader: XmlTextReaderPtr) -> XmlDocPtr {
+pub unsafe extern "C" fn xml_text_reader_current_doc(reader: XmlTextReaderPtr) -> XmlDocPtr {
     if reader.is_null() {
         return null_mut();
     }
@@ -7389,7 +7389,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let reader = gen_xml_text_reader_ptr(n_reader, 0);
 
-                let ret_val = xmlTextReaderCurrentDoc(reader);
+                let ret_val = xml_text_reader_current_doc(reader);
                 desret_xml_doc_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
                 xmlResetLastError();
