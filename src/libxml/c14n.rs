@@ -986,13 +986,13 @@ unsafe extern "C" fn xml_c14n_print_namespaces_walker(
  *    - The nearest ancestor element of E in the node-set has a default
  *        namespace node in the node-set (default namespace nodes always
  *      have non-empty values in XPath)
- * The latter condition eliminates unnecessary occurrences of xmlns="" in
- * the canonical form since an element only receives an xmlns="" if its
- * default namespace is empty and if it has an immediate parent in the
- * canonical form that has a non-empty default namespace. To finish
- * processing  L, simply process every namespace node in L, except omit
- * namespace node with local name xml, which defines the xml prefix,
- * if its string value is http://www.w3.org/XML/1998/namespace.
+ *      The latter condition eliminates unnecessary occurrences of xmlns="" in
+ *      the canonical form since an element only receives an xmlns="" if its
+ *      default namespace is empty and if it has an immediate parent in the
+ *      canonical form that has a non-empty default namespace. To finish
+ *      processing  L, simply process every namespace node in L, except omit
+ *      namespace node with local name xml, which defines the xml prefix,
+ *      if its string value is http://www.w3.org/XML/1998/namespace.
  *
  * Exclusive XML Canonicalization v 1.0 (http://www.w3.org/TR/xml-exc-c14n)
  * Canonical XML applied to a document subset requires the search of the
@@ -1165,8 +1165,8 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
  *      prefixes and their values which have already been rendered by
  *      an output ancestor of the namespace node's parent element.
  * 2. Append the rendered namespace node to the list ns_rendered of namespace
- * nodes rendered by output ancestors. Push ns_rendered on state stack and
- * recurse.
+ *    nodes rendered by output ancestors. Push ns_rendered on state stack and
+ *    recurse.
  * 3. After the recursion returns, pop thestate stack.
  *
  *

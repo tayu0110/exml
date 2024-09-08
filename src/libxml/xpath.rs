@@ -34,16 +34,16 @@ use crate::{
         xmlerror::{xml_reset_error, XmlError, XmlStructuredErrorFunc},
         xmlstring::{xml_strdup, xml_strlen, XmlChar},
         xpath_internals::{
-            value_pop, xmlXPathReleaseObject, xml_xpath_compile_expr, xml_xpath_err_memory,
-            xml_xpath_eval_expr, xml_xpath_free_parser_context, xml_xpath_new_boolean,
-            xml_xpath_new_cstring, xml_xpath_new_float, xml_xpath_new_parser_context,
-            xml_xpath_node_set_dup_ns, xml_xpath_node_set_free_ns, xml_xpath_node_set_merge,
-            xml_xpath_node_set_sort, xml_xpath_optimize_expression,
-            xml_xpath_register_all_functions, xml_xpath_registered_funcs_cleanup,
-            xml_xpath_registered_ns_cleanup, xml_xpath_registered_variables_cleanup,
-            xml_xpath_run_eval, xml_xpath_string_eval_number, xml_xpath_try_stream_compile,
-            xml_xpath_wrap_string, xml_xpatherror, XmlPointerListPtr, XmlXpathContextCache,
-            XmlXpathContextCachePtr, XML_NODESET_DEFAULT,
+            value_pop, xml_xpath_compile_expr, xml_xpath_err_memory, xml_xpath_eval_expr,
+            xml_xpath_free_parser_context, xml_xpath_new_boolean, xml_xpath_new_cstring,
+            xml_xpath_new_float, xml_xpath_new_parser_context, xml_xpath_node_set_dup_ns,
+            xml_xpath_node_set_free_ns, xml_xpath_node_set_merge, xml_xpath_node_set_sort,
+            xml_xpath_optimize_expression, xml_xpath_register_all_functions,
+            xml_xpath_registered_funcs_cleanup, xml_xpath_registered_ns_cleanup,
+            xml_xpath_registered_variables_cleanup, xml_xpath_release_object, xml_xpath_run_eval,
+            xml_xpath_string_eval_number, xml_xpath_try_stream_compile, xml_xpath_wrap_string,
+            xml_xpatherror, XmlPointerListPtr, XmlXpathContextCache, XmlXpathContextCachePtr,
+            XML_NODESET_DEFAULT,
         },
     },
     xml_generic_error,
@@ -2390,7 +2390,7 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
     if !res_obj_ptr.is_null() {
         *res_obj_ptr = res_obj;
     } else {
-        xmlXPathReleaseObject(ctxt, res_obj);
+        xml_xpath_release_object(ctxt, res_obj);
     }
 
     (*pctxt).comp = null_mut();
