@@ -9857,7 +9857,7 @@ pub unsafe extern "C" fn xml_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNodePtr) {
     use crate::libxml::{
-        htmltree::htmlNodeDumpOutput,
+        htmltree::html_node_dump_output,
         parser::xml_init_parser,
         xml_io::{xmlOutputBufferClose, xmlOutputBufferCreateFile, XmlOutputBufferPtr},
     };
@@ -9885,7 +9885,7 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
     if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
         #[cfg(feature = "html")]
         {
-            htmlNodeDumpOutput(outbuf, doc, cur, null_mut());
+            html_node_dump_output(outbuf, doc, cur, null_mut());
         }
         #[cfg(not(feature = "html"))]
         {

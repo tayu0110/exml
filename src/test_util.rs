@@ -1830,10 +1830,10 @@ pub(crate) unsafe extern "C" fn desret_html_parser_ctxt_ptr(val: HtmlParserCtxtP
 
 #[cfg(feature = "html")]
 pub(crate) unsafe extern "C" fn gen_html_doc_ptr(no: c_int, _nr: c_int) -> HtmlDocPtr {
-    use crate::libxml::{htmlparser::html_read_memory, htmltree::htmlNewDoc};
+    use crate::libxml::{htmlparser::html_read_memory, htmltree::html_new_doc};
 
     if no == 0 {
-        return htmlNewDoc(null_mut(), null_mut());
+        return html_new_doc(null_mut(), null_mut());
     }
     if no == 1 {
         return html_read_memory(

@@ -38,7 +38,7 @@ use exml::{
             html_parse_chunk, html_read_file, html_read_memory, HtmlParserCtxtPtr,
             HtmlParserOption,
         },
-        htmltree::{htmlDocDump, htmlSaveFile, htmlSaveFileFormat},
+        htmltree::{html_doc_dump, html_save_file, html_save_file_format},
         parser::{
             xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_read_file, xml_ctxt_read_io,
             xml_ctxt_read_memory, xml_ctxt_use_options, xml_free_parser_ctxt,
@@ -2774,7 +2774,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             .unwrap()
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        htmlSaveFile(o, doc);
+                        html_save_file(o, doc);
                     } else if let Some(encoding) = ENCODING.lock().unwrap().as_ref() {
                         let o = OUTPUT
                             .lock()
@@ -2782,9 +2782,9 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
                         if FORMAT == 1 {
-                            htmlSaveFileFormat(o, doc, encoding.as_ptr(), 1);
+                            html_save_file_format(o, doc, encoding.as_ptr(), 1);
                         } else {
-                            htmlSaveFileFormat(o, doc, encoding.as_ptr(), 0);
+                            html_save_file_format(o, doc, encoding.as_ptr(), 0);
                         }
                     } else if FORMAT == 1 {
                         let o = OUTPUT
@@ -2792,7 +2792,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             .unwrap()
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        htmlSaveFileFormat(o, doc, null_mut(), 1);
+                        html_save_file_format(o, doc, null_mut(), 1);
                     } else {
                         let out: *mut FILE = OUTPUT
                             .lock()
@@ -2800,7 +2800,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             .as_ref()
                             .map_or(stdout, |o| fopen(o.as_ptr(), c"wb".as_ptr()));
                         if !out.is_null() {
-                            if htmlDocDump(out, doc) < 0 {
+                            if html_doc_dump(out, doc) < 0 {
                                 PROGRESULT = XmllintReturnCode::ErrOut;
                             }
 

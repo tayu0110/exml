@@ -25,7 +25,7 @@ use crate::{
         encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
         entities::xml_encode_special_chars,
         globals::{xml_free, xml_malloc},
-        htmltree::htmlNewDocNoDtD,
+        htmltree::html_new_doc_no_dtd,
         list::{
             xml_link_get_data, xml_list_create, xml_list_delete, xml_list_empty, xml_list_front,
             xml_list_pop_front, xml_list_push_front, xml_list_search, xml_list_size, XmlLinkPtr,
@@ -623,7 +623,7 @@ unsafe extern "C" fn xmlTextWriterStartDocumentCallback(ctx: *mut c_void) {
         #[cfg(feature = "html")]
         {
             if (*ctxt).my_doc.is_null() {
-                (*ctxt).my_doc = htmlNewDocNoDtD(null_mut(), null_mut());
+                (*ctxt).my_doc = html_new_doc_no_dtd(null_mut(), null_mut());
             }
             if (*ctxt).my_doc.is_null() {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {

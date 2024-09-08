@@ -24,7 +24,9 @@ use crate::{
             xml_free, xml_generic_error_context, xml_indent_tree_output, xml_malloc,
             xml_save_no_empty_tags, xml_tree_indent_string,
         },
-        htmltree::{htmlDocContentDumpFormatOutput, htmlGetMetaEncoding, htmlSetMetaEncoding},
+        htmltree::{
+            html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
+        },
         parser::xml_init_parser,
         parser_internals::XML_STRING_TEXT_NOENC,
         tree::{
@@ -1121,7 +1123,7 @@ unsafe extern "C" fn xmlNsDumpOutputCtxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr) {
 unsafe extern "C" fn xhtmlAttrListDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr) {
     use crate::libxml::tree::{xml_free_node, xml_new_doc_text};
 
-    use super::htmltree::htmlIsBooleanAttr;
+    use super::htmltree::html_is_boolean_attr;
 
     let mut xml_lang: XmlAttrPtr = null_mut();
     let mut lang: XmlAttrPtr = null_mut();
@@ -1152,7 +1154,7 @@ unsafe extern "C" fn xhtmlAttrListDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlA
             && ((*cur).children.is_null()
                 || (*(*cur).children).content.is_null()
                 || *(*(*cur).children).content.add(0) == 0)
-            && htmlIsBooleanAttr((*cur).name) != 0
+            && html_is_boolean_attr((*cur).name) != 0
         {
             if !(*cur).children.is_null() {
                 xml_free_node((*cur).children);
@@ -1741,10 +1743,10 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
         #[cfg(feature = "html")]
         {
             if !encoding.is_null() {
-                htmlSetMetaEncoding(cur, encoding);
+                html_set_meta_encoding(cur, encoding);
             }
             if encoding.is_null() {
-                encoding = htmlGetMetaEncoding(cur);
+                encoding = html_get_meta_encoding(cur);
             }
             if encoding.is_null() {
                 encoding = c"HTML".as_ptr() as _;
@@ -1759,9 +1761,9 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
                 return -1;
             }
             if (*ctxt).options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-                htmlDocContentDumpFormatOutput(buf, cur, encoding as _, 1);
+                html_doc_content_dump_format_output(buf, cur, encoding as _, 1);
             } else {
-                htmlDocContentDumpFormatOutput(buf, cur, encoding as _, 0);
+                html_doc_content_dump_format_output(buf, cur, encoding as _, 0);
             }
             if !(*ctxt).encoding.is_null() {
                 (*cur).encoding = oldenc;
@@ -2113,7 +2115,7 @@ pub unsafe extern "C" fn xmlSaveDoc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> c_l
  */
 #[cfg(feature = "html")]
 unsafe extern "C" fn htmlNodeDumpOutputInternal(ctxt: XmlSaveCtxtPtr, cur: XmlNodePtr) -> c_int {
-    use super::htmltree::htmlNodeDumpFormatOutput;
+    use super::htmltree::html_node_dump_format_output;
 
     let mut oldenc: *const XmlChar = null();
     let oldctxtenc: *const XmlChar = (*ctxt).encoding;
@@ -2134,10 +2136,10 @@ unsafe extern "C" fn htmlNodeDumpOutputInternal(ctxt: XmlSaveCtxtPtr, cur: XmlNo
     }
 
     if !encoding.is_null() && !doc.is_null() {
-        htmlSetMetaEncoding(doc, encoding);
+        html_set_meta_encoding(doc, encoding);
     }
     if encoding.is_null() && !doc.is_null() {
-        encoding = htmlGetMetaEncoding(doc);
+        encoding = html_get_meta_encoding(doc);
     }
     if encoding.is_null() {
         encoding = c"HTML".as_ptr() as _;
@@ -2154,9 +2156,9 @@ unsafe extern "C" fn htmlNodeDumpOutputInternal(ctxt: XmlSaveCtxtPtr, cur: XmlNo
         switched_encoding = 1;
     }
     if (*ctxt).options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-        htmlNodeDumpFormatOutput(buf, doc, cur, encoding as _, 1);
+        html_node_dump_format_output(buf, doc, cur, encoding as _, 1);
     } else {
-        htmlNodeDumpFormatOutput(buf, doc, cur, encoding as _, 0);
+        html_node_dump_format_output(buf, doc, cur, encoding as _, 0);
     }
     /*
      * Restore the state of the saving context at the end of the document

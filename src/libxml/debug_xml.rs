@@ -2669,7 +2669,7 @@ pub unsafe extern "C" fn xml_shell_cat(
     _node2: XmlNodePtr,
 ) -> c_int {
     use crate::libxml::{
-        htmltree::{htmlDocDump, htmlNodeDumpFile},
+        htmltree::{html_doc_dump, html_node_dump_file},
         tree::{xml_doc_dump, xml_elem_dump},
     };
 
@@ -2685,9 +2685,9 @@ pub unsafe extern "C" fn xml_shell_cat(
     if (*(*ctxt).doc).typ == XmlElementType::XmlHtmlDocumentNode {
         #[cfg(feature = "html")]
         if (*node).typ == XmlElementType::XmlHtmlDocumentNode {
-            htmlDocDump((*ctxt).output, node as HtmlDocPtr);
+            html_doc_dump((*ctxt).output, node as HtmlDocPtr);
         } else {
-            htmlNodeDumpFile((*ctxt).output, (*ctxt).doc, node);
+            html_node_dump_file((*ctxt).output, (*ctxt).doc, node);
         }
         #[cfg(not(feature = "html"))]
         if (*node).typ == XmlElementType::XmlDocumentNode {
@@ -2726,7 +2726,7 @@ pub unsafe extern "C" fn xml_shell_write(
 ) -> c_int {
     use libc::{fclose, fopen};
 
-    use crate::libxml::{htmltree::htmlSaveFile, tree::xml_elem_dump};
+    use crate::libxml::{htmltree::html_save_file, tree::xml_elem_dump};
 
     use super::tree::xml_save_file;
 
@@ -2755,7 +2755,7 @@ pub unsafe extern "C" fn xml_shell_write(
         }
         XmlElementType::XmlHtmlDocumentNode => {
             #[cfg(feature = "html")]
-            if htmlSaveFile(filename as *mut c_char, (*ctxt).doc) < 0 {
+            if html_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
                 xml_generic_error!(
                     xml_generic_error_context(),
                     c"Failed to write to %s\n".as_ptr(),
@@ -2809,7 +2809,7 @@ pub unsafe extern "C" fn xml_shell_save(
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> c_int {
-    use crate::libxml::htmltree::htmlSaveFile;
+    use crate::libxml::htmltree::html_save_file;
 
     use super::tree::xml_save_file;
 
@@ -2840,7 +2840,7 @@ pub unsafe extern "C" fn xml_shell_save(
         }
         XmlElementType::XmlHtmlDocumentNode => {
             #[cfg(feature = "html")]
-            if htmlSaveFile(filename as *mut c_char, (*ctxt).doc) < 0 {
+            if html_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
                 xml_generic_error!(
                     xml_generic_error_context(),
                     c"Failed to save to %s\n".as_ptr(),
@@ -3090,8 +3090,8 @@ unsafe extern "C" fn xml_shell_rng_validate(
     use crate::libxml::{
         globals::xml_generic_error,
         relaxng::{
-            xml_relaxng_new_parser_ctxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
-            xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
+            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
+            xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
             XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr,
         },

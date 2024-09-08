@@ -71,18 +71,18 @@ const HTML_PI_NODE: XmlElementType = XmlElementType::XmlPiNode;
  *
  * Returns a new document
  */
-pub unsafe extern "C" fn htmlNewDoc(
+pub unsafe extern "C" fn html_new_doc(
     uri: *const XmlChar,
     external_id: *const XmlChar,
 ) -> HtmlDocPtr {
     if uri.is_null() && external_id.is_null() {
-        return htmlNewDocNoDtD(
+        return html_new_doc_no_dtd(
             c"http://www.w3.org/TR/REC-html40/loose.dtd".as_ptr() as _,
             c"-//W3C//DTD HTML 4.0 Transitional//EN".as_ptr() as _,
         );
     }
 
-    htmlNewDocNoDtD(uri, external_id)
+    html_new_doc_no_dtd(uri, external_id)
 }
 
 /**
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn htmlNewDoc(
  *
  * Returns a new document, do not initialize the DTD if not provided
  */
-pub unsafe extern "C" fn htmlNewDocNoDtD(
+pub unsafe extern "C" fn html_new_doc_no_dtd(
     uri: *const XmlChar,
     external_id: *const XmlChar,
 ) -> HtmlDocPtr {
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn htmlNewDocNoDtD(
  *
  * Returns the current encoding as flagged in the HTML source
  */
-pub unsafe extern "C" fn htmlGetMetaEncoding(doc: HtmlDocPtr) -> *const XmlChar {
+pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlChar {
     let mut cur: HtmlNodePtr;
     let mut content: *const XmlChar;
     let mut encoding: *const XmlChar;
@@ -280,7 +280,10 @@ pub unsafe extern "C" fn htmlGetMetaEncoding(doc: HtmlDocPtr) -> *const XmlChar 
  *
  * Returns 0 in case of success and -1 in case of error
  */
-pub unsafe extern "C" fn htmlSetMetaEncoding(doc: HtmlDocPtr, encoding: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn html_set_meta_encoding(
+    doc: HtmlDocPtr,
+    encoding: *const XmlChar,
+) -> c_int {
     let mut cur: HtmlNodePtr;
     let mut meta: HtmlNodePtr = null_mut();
     let mut head: HtmlNodePtr = null_mut();
@@ -470,12 +473,12 @@ pub unsafe extern "C" fn htmlSetMetaEncoding(doc: HtmlDocPtr, encoding: *const X
  * It's up to the caller to free the memory.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlDocDumpMemory(
+pub unsafe extern "C" fn html_doc_dump_memory(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
     size: *mut c_int,
 ) {
-    htmlDocDumpMemoryFormat(cur, mem, size, 1);
+    html_doc_dump_memory_format(cur, mem, size, 1);
 }
 
 /**
@@ -513,7 +516,7 @@ unsafe extern "C" fn html_save_err(code: c_int, node: XmlNodePtr, extra: *const 
  * It's up to the caller to free the memory.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlDocDumpMemoryFormat(
+pub unsafe extern "C" fn html_doc_dump_memory_format(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
     size: *mut c_int,
@@ -543,7 +546,7 @@ pub unsafe extern "C" fn htmlDocDumpMemoryFormat(
         return;
     }
 
-    let encoding: *const c_char = htmlGetMetaEncoding(cur) as _;
+    let encoding: *const c_char = html_get_meta_encoding(cur) as _;
 
     if !encoding.is_null() {
         let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
@@ -576,7 +579,7 @@ pub unsafe extern "C" fn htmlDocDumpMemoryFormat(
         return;
     }
 
-    htmlDocContentDumpFormatOutput(buf, cur, null_mut(), format);
+    html_doc_content_dump_format_output(buf, cur, null_mut(), format);
 
     xmlOutputBufferFlush(buf);
     if !(*buf).conv.is_null() {
@@ -599,7 +602,7 @@ pub unsafe extern "C" fn htmlDocDumpMemoryFormat(
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlDocDump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
@@ -617,7 +620,7 @@ pub unsafe extern "C" fn htmlDocDump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
         return -1;
     }
 
-    let encoding: *const c_char = htmlGetMetaEncoding(cur) as _;
+    let encoding: *const c_char = html_get_meta_encoding(cur) as _;
 
     if !encoding.is_null() {
         let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
@@ -647,7 +650,7 @@ pub unsafe extern "C" fn htmlDocDump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
     if buf.is_null() {
         return -1;
     }
-    htmlDocContentDumpOutput(buf, cur, null_mut());
+    html_doc_content_dump_output(buf, cur, null_mut());
 
     xmlOutputBufferClose(buf)
 }
@@ -662,7 +665,7 @@ pub unsafe extern "C" fn htmlDocDump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlSaveFile(filename: *const c_char, cur: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> c_int {
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
@@ -680,7 +683,7 @@ pub unsafe extern "C" fn htmlSaveFile(filename: *const c_char, cur: XmlDocPtr) -
 
     xml_init_parser();
 
-    let encoding: *const c_char = htmlGetMetaEncoding(cur) as _;
+    let encoding: *const c_char = html_get_meta_encoding(cur) as _;
 
     if !encoding.is_null() {
         let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
@@ -715,7 +718,7 @@ pub unsafe extern "C" fn htmlSaveFile(filename: *const c_char, cur: XmlDocPtr) -
         return 0;
     }
 
-    htmlDocContentDumpOutput(buf, cur, null_mut());
+    html_doc_content_dump_output(buf, cur, null_mut());
 
     xmlOutputBufferClose(buf)
 }
@@ -754,7 +757,7 @@ unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
  * Returns the number of byte written or -1 in case of error
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn htmlBufNodeDumpFormat(
+unsafe extern "C" fn html_buf_node_dump_format(
     buf: XmlBufPtr,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
@@ -782,7 +785,7 @@ unsafe extern "C" fn htmlBufNodeDumpFormat(
     (*outbuf).written = 0;
 
     let using: size_t = xml_buf_use(buf);
-    htmlNodeDumpFormatOutput(outbuf, doc, cur, null_mut(), format);
+    html_node_dump_format_output(outbuf, doc, cur, null_mut(), format);
     xml_free(outbuf as _);
     (xml_buf_use(buf) as i32 - using as i32) as _
 }
@@ -799,7 +802,11 @@ unsafe extern "C" fn htmlBufNodeDumpFormat(
  * Returns the number of byte written or -1 in case of error
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlNodeDump(buf: XmlBufferPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
+pub unsafe extern "C" fn html_node_dump(
+    buf: XmlBufferPtr,
+    doc: XmlDocPtr,
+    cur: XmlNodePtr,
+) -> c_int {
     use crate::{
         libxml::parser::xml_init_parser,
         private::buf::{xml_buf_back_to_buffer, xml_buf_from_buffer},
@@ -815,7 +822,7 @@ pub unsafe extern "C" fn htmlNodeDump(buf: XmlBufferPtr, doc: XmlDocPtr, cur: Xm
         return -1;
     }
 
-    let ret: size_t = htmlBufNodeDumpFormat(buffer, doc, cur, 1);
+    let ret: size_t = html_buf_node_dump_format(buffer, doc, cur, 1);
 
     xml_buf_back_to_buffer(buffer);
 
@@ -835,8 +842,8 @@ pub unsafe extern "C" fn htmlNodeDump(buf: XmlBufferPtr, doc: XmlDocPtr, cur: Xm
  * and formatting returns are added.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlNodeDumpFile(out: *mut FILE, doc: XmlDocPtr, cur: XmlNodePtr) {
-    htmlNodeDumpFileFormat(out, doc, cur, null_mut(), 1);
+pub unsafe extern "C" fn html_node_dump_file(out: *mut FILE, doc: XmlDocPtr, cur: XmlNodePtr) {
+    html_node_dump_file_format(out, doc, cur, null_mut(), 1);
 }
 
 /**
@@ -854,7 +861,7 @@ pub unsafe extern "C" fn htmlNodeDumpFile(out: *mut FILE, doc: XmlDocPtr, cur: X
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlNodeDumpFileFormat(
+pub unsafe extern "C" fn html_node_dump_file_format(
     out: *mut FILE,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
@@ -906,7 +913,7 @@ pub unsafe extern "C" fn htmlNodeDumpFileFormat(
         return 0;
     }
 
-    htmlNodeDumpFormatOutput(buf, doc, cur, null_mut(), format);
+    html_node_dump_format_output(buf, doc, cur, null_mut(), format);
 
     xmlOutputBufferClose(buf)
 }
@@ -923,12 +930,12 @@ pub unsafe extern "C" fn htmlNodeDumpFileFormat(
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlSaveFileEnc(
+pub unsafe extern "C" fn html_save_file_enc(
     filename: *const c_char,
     cur: XmlDocPtr,
     encoding: *const c_char,
 ) -> c_int {
-    htmlSaveFileFormat(filename, cur, encoding, 1)
+    html_save_file_format(filename, cur, encoding, 1)
 }
 
 /**
@@ -943,7 +950,7 @@ pub unsafe extern "C" fn htmlSaveFileEnc(
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlSaveFileFormat(
+pub unsafe extern "C" fn html_save_file_format(
     filename: *const c_char,
     cur: XmlDocPtr,
     encoding: *const c_char,
@@ -978,9 +985,9 @@ pub unsafe extern "C" fn htmlSaveFileFormat(
                 );
             }
         }
-        htmlSetMetaEncoding(cur, encoding as _);
+        html_set_meta_encoding(cur, encoding as _);
     } else {
-        htmlSetMetaEncoding(cur, c"UTF-8".as_ptr() as _);
+        html_set_meta_encoding(cur, c"UTF-8".as_ptr() as _);
 
         /*
          * Fallback to HTML or ASCII when the encoding is unspecified
@@ -1001,7 +1008,7 @@ pub unsafe extern "C" fn htmlSaveFileFormat(
         return 0;
     }
 
-    htmlDocContentDumpFormatOutput(buf, cur, encoding, format);
+    html_doc_content_dump_format_output(buf, cur, encoding, format);
 
     xmlOutputBufferClose(buf)
 }
@@ -1017,7 +1024,7 @@ pub unsafe extern "C" fn htmlSaveFileFormat(
  * Dump the HTML document DTD, if any.
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn htmlDtdDumpOutput(
+unsafe extern "C" fn html_dtd_dump_output(
     buf: XmlOutputBufferPtr,
     doc: XmlDocPtr,
     _encoding: *const c_char,
@@ -1068,7 +1075,11 @@ unsafe extern "C" fn htmlDtdDumpOutput(
  * Dump an HTML attribute
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn htmlAttrDumpOutput(buf: XmlOutputBufferPtr, doc: XmlDocPtr, cur: XmlAttrPtr) {
+unsafe extern "C" fn html_attr_dump_output(
+    buf: XmlOutputBufferPtr,
+    doc: XmlDocPtr,
+    cur: XmlAttrPtr,
+) {
     use crate::{
         libxml::{
             globals::xml_free, tree::xml_node_list_get_string, uri::xml_uri_escape_str,
@@ -1096,7 +1107,7 @@ unsafe extern "C" fn htmlAttrDumpOutput(buf: XmlOutputBufferPtr, doc: XmlDocPtr,
         xmlOutputBufferWriteString(buf, c":".as_ptr() as _);
     }
     xmlOutputBufferWriteString(buf, (*cur).name as _);
-    if !(*cur).children.is_null() && htmlIsBooleanAttr((*cur).name as _) == 0 {
+    if !(*cur).children.is_null() && html_is_boolean_attr((*cur).name as _) == 0 {
         value = xml_node_list_get_string(doc, (*cur).children, 0);
         if !value.is_null() {
             xmlOutputBufferWriteString(buf, c"=".as_ptr() as _);
@@ -1152,7 +1163,7 @@ unsafe extern "C" fn htmlAttrDumpOutput(buf: XmlOutputBufferPtr, doc: XmlDocPtr,
  * Dump an HTML node, recursive behaviour,children are printed too.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlNodeDumpFormatOutput(
+pub unsafe extern "C" fn html_node_dump_format_output(
     buf: XmlOutputBufferPtr,
     doc: XmlDocPtr,
     mut cur: XmlNodePtr,
@@ -1190,7 +1201,7 @@ pub unsafe extern "C" fn htmlNodeDumpFormatOutput(
         match (*cur).typ {
             XmlElementType::XmlHtmlDocumentNode | XmlElementType::XmlDocumentNode => {
                 if !(*(cur as XmlDocPtr)).int_subset.is_null() {
-                    htmlDtdDumpOutput(buf, cur as _, null_mut());
+                    html_dtd_dump_output(buf, cur as _, null_mut());
                 }
                 if !(*cur).children.is_null() {
                     /* Always validate (*cur).parent when descending. */
@@ -1211,7 +1222,7 @@ pub unsafe extern "C" fn htmlNodeDumpFormatOutput(
                  * case.
                  */
                 if (*cur).parent != parent && !(*cur).children.is_null() {
-                    htmlNodeDumpFormatOutput(buf, doc, cur, encoding, format);
+                    html_node_dump_format_output(buf, doc, cur, encoding, format);
                     break 'to_break;
                 }
 
@@ -1238,7 +1249,7 @@ pub unsafe extern "C" fn htmlNodeDumpFormatOutput(
                 }
                 attr = (*cur).properties;
                 while !attr.is_null() {
-                    htmlAttrDumpOutput(buf, doc, attr);
+                    html_attr_dump_output(buf, doc, attr);
                     attr = (*attr).next;
                 }
 
@@ -1299,7 +1310,7 @@ pub unsafe extern "C" fn htmlNodeDumpFormatOutput(
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                htmlAttrDumpOutput(buf, doc, cur as XmlAttrPtr);
+                html_attr_dump_output(buf, doc, cur as XmlAttrPtr);
             }
 
             HTML_TEXT_NODE => 'to_break: {
@@ -1427,12 +1438,12 @@ pub unsafe extern "C" fn htmlNodeDumpFormatOutput(
  * Dump an HTML document. Formatting return/spaces are added.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlDocContentDumpOutput(
+pub unsafe extern "C" fn html_doc_content_dump_output(
     buf: XmlOutputBufferPtr,
     cur: XmlDocPtr,
     _encoding: *const c_char,
 ) {
-    htmlNodeDumpFormatOutput(buf, cur, cur as _, null_mut(), 1);
+    html_node_dump_format_output(buf, cur, cur as _, null_mut(), 1);
 }
 
 /**
@@ -1445,7 +1456,7 @@ pub unsafe extern "C" fn htmlDocContentDumpOutput(
  * Dump an HTML document.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlDocContentDumpFormatOutput(
+pub unsafe extern "C" fn html_doc_content_dump_format_output(
     buf: XmlOutputBufferPtr,
     cur: XmlDocPtr,
     _encoding: *const c_char,
@@ -1456,7 +1467,7 @@ pub unsafe extern "C" fn htmlDocContentDumpFormatOutput(
         typ = (*cur).typ as i32;
         (*cur).typ = XmlElementType::XmlHtmlDocumentNode;
     }
-    htmlNodeDumpFormatOutput(buf, cur, cur as _, null_mut(), format);
+    html_node_dump_format_output(buf, cur, cur as _, null_mut(), format);
     if !cur.is_null() {
         (*cur).typ = typ.try_into().unwrap();
     }
@@ -1473,13 +1484,13 @@ pub unsafe extern "C" fn htmlDocContentDumpFormatOutput(
  * and formatting returns/spaces are added.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn htmlNodeDumpOutput(
+pub unsafe extern "C" fn html_node_dump_output(
     buf: XmlOutputBufferPtr,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
     _encoding: *const c_char,
 ) {
-    htmlNodeDumpFormatOutput(buf, doc, cur, null_mut(), 1);
+    html_node_dump_format_output(buf, doc, cur, null_mut(), 1);
 }
 
 /**
@@ -1515,7 +1526,7 @@ const HTML_BOOLEAN_ATTRS: &[*const c_char] = &[
  *
  * returns: false if the attribute is not boolean, true otherwise.
  */
-pub unsafe extern "C" fn htmlIsBooleanAttr(name: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn html_is_boolean_attr(name: *const XmlChar) -> c_int {
     let mut i: usize = 0;
 
     while !HTML_BOOLEAN_ATTRS[i].is_null() {
@@ -1552,7 +1563,7 @@ mod tests {
                             let encoding = gen_const_char_ptr(n_encoding, 2);
                             let format = gen_int(n_format, 3);
 
-                            htmlDocContentDumpFormatOutput(buf, cur, encoding, format);
+                            html_doc_content_dump_format_output(buf, cur, encoding, format);
                             des_xml_output_buffer_ptr(n_buf, buf, 0);
                             des_xml_doc_ptr(n_cur, cur, 1);
                             des_const_char_ptr(n_encoding, encoding, 2);
@@ -1583,7 +1594,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let doc = gen_html_doc_ptr(n_doc, 0);
 
-                let ret_val = htmlGetMetaEncoding(doc);
+                let ret_val = html_get_meta_encoding(doc);
                 desret_const_xml_char_ptr(ret_val);
                 des_html_doc_ptr(n_doc, doc, 0);
                 xmlResetLastError();
@@ -1617,7 +1628,7 @@ mod tests {
                         let cur = gen_xml_doc_ptr(n_cur, 1);
                         let encoding = gen_const_char_ptr(n_encoding, 2);
 
-                        htmlDocContentDumpOutput(buf, cur, encoding);
+                        html_doc_content_dump_output(buf, cur, encoding);
                         des_xml_output_buffer_ptr(n_buf, buf, 0);
                         des_xml_doc_ptr(n_cur, cur, 1);
                         des_const_char_ptr(n_encoding, encoding, 2);
@@ -1654,7 +1665,7 @@ mod tests {
                     let f = gen_file_ptr(n_f, 0);
                     let cur = gen_xml_doc_ptr(n_cur, 1);
 
-                    let ret_val = htmlDocDump(f, cur);
+                    let ret_val = html_doc_dump(f, cur);
                     desret_int(ret_val);
                     des_file_ptr(n_f, f, 0);
                     des_xml_doc_ptr(n_cur, cur, 1);
@@ -1688,7 +1699,7 @@ mod tests {
                         let mem = gen_xml_char_ptr_ptr(n_mem, 1);
                         let size = gen_int_ptr(n_size, 2);
 
-                        htmlDocDumpMemory(cur, mem, size);
+                        html_doc_dump_memory(cur, mem, size);
                         des_xml_doc_ptr(n_cur, cur, 0);
                         des_xml_char_ptr_ptr(n_mem, mem, 1);
                         des_int_ptr(n_size, size, 2);
@@ -1726,7 +1737,7 @@ mod tests {
                             let size = gen_int_ptr(n_size, 2);
                             let format = gen_int(n_format, 3);
 
-                            htmlDocDumpMemoryFormat(cur, mem, size, format);
+                            html_doc_dump_memory_format(cur, mem, size, format);
                             des_xml_doc_ptr(n_cur, cur, 0);
                             des_xml_char_ptr_ptr(n_mem, mem, 1);
                             des_int_ptr(n_size, size, 2);
@@ -1764,7 +1775,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let name = gen_const_xml_char_ptr(n_name, 0);
 
-                let ret_val = htmlIsBooleanAttr(name as *const XmlChar);
+                let ret_val = html_is_boolean_attr(name as *const XmlChar);
                 desret_int(ret_val);
                 des_const_xml_char_ptr(n_name, name, 0);
                 xmlResetLastError();
@@ -1793,7 +1804,7 @@ mod tests {
                     let uri = gen_const_xml_char_ptr(n_uri, 0);
                     let external_id = gen_const_xml_char_ptr(n_external_id, 1);
 
-                    let ret_val = htmlNewDoc(uri as *const XmlChar, external_id);
+                    let ret_val = html_new_doc(uri as *const XmlChar, external_id);
                     desret_html_doc_ptr(ret_val);
                     des_const_xml_char_ptr(n_uri, uri, 0);
                     des_const_xml_char_ptr(n_external_id, external_id, 1);
@@ -1825,7 +1836,7 @@ mod tests {
                     let uri = gen_const_xml_char_ptr(n_uri, 0);
                     let external_id = gen_const_xml_char_ptr(n_external_id, 1);
 
-                    let ret_val = htmlNewDocNoDtD(uri as *const XmlChar, external_id);
+                    let ret_val = html_new_doc_no_dtd(uri as *const XmlChar, external_id);
                     desret_html_doc_ptr(ret_val);
                     des_const_xml_char_ptr(n_uri, uri, 0);
                     des_const_xml_char_ptr(n_external_id, external_id, 1);
@@ -1859,7 +1870,7 @@ mod tests {
                         let doc = gen_xml_doc_ptr(n_doc, 1);
                         let cur = gen_xml_node_ptr(n_cur, 2);
 
-                        let ret_val = htmlNodeDump(buf, doc, cur);
+                        let ret_val = html_node_dump(buf, doc, cur);
                         desret_int(ret_val);
                         des_xml_buffer_ptr(n_buf, buf, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
@@ -1896,7 +1907,7 @@ mod tests {
                         let doc = gen_xml_doc_ptr(n_doc, 1);
                         let cur = gen_xml_node_ptr(n_cur, 2);
 
-                        htmlNodeDumpFile(out, doc, cur);
+                        html_node_dump_file(out, doc, cur);
                         des_file_ptr(n_out, out, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_cur, cur, 2);
@@ -1937,7 +1948,7 @@ mod tests {
                                 let format = gen_int(n_format, 4);
 
                                 let ret_val =
-                                    htmlNodeDumpFileFormat(out, doc, cur, encoding, format);
+                                    html_node_dump_file_format(out, doc, cur, encoding, format);
                                 desret_int(ret_val);
                                 des_file_ptr(n_out, out, 0);
                                 des_xml_doc_ptr(n_doc, doc, 1);
@@ -1987,7 +1998,7 @@ mod tests {
                                 let encoding = gen_const_char_ptr(n_encoding, 3);
                                 let format = gen_int(n_format, 4);
 
-                                htmlNodeDumpFormatOutput(buf, doc, cur, encoding, format);
+                                html_node_dump_format_output(buf, doc, cur, encoding, format);
                                 des_xml_output_buffer_ptr(n_buf, buf, 0);
                                 des_xml_doc_ptr(n_doc, doc, 1);
                                 des_xml_node_ptr(n_cur, cur, 2);
@@ -2034,7 +2045,7 @@ mod tests {
                             let cur = gen_xml_node_ptr(n_cur, 2);
                             let encoding = gen_const_char_ptr(n_encoding, 3);
 
-                            htmlNodeDumpOutput(buf, doc, cur, encoding);
+                            html_node_dump_output(buf, doc, cur, encoding);
                             des_xml_output_buffer_ptr(n_buf, buf, 0);
                             des_xml_doc_ptr(n_doc, doc, 1);
                             des_xml_node_ptr(n_cur, cur, 2);
@@ -2074,7 +2085,7 @@ mod tests {
                     let filename = gen_fileoutput(n_filename, 0);
                     let cur = gen_xml_doc_ptr(n_cur, 1);
 
-                    let ret_val = htmlSaveFile(filename, cur);
+                    let ret_val = html_save_file(filename, cur);
                     desret_int(ret_val);
                     des_fileoutput(n_filename, filename, 0);
                     des_xml_doc_ptr(n_cur, cur, 1);
@@ -2108,7 +2119,7 @@ mod tests {
                         let cur = gen_xml_doc_ptr(n_cur, 1);
                         let encoding = gen_const_char_ptr(n_encoding, 2);
 
-                        let ret_val = htmlSaveFileEnc(filename, cur, encoding);
+                        let ret_val = html_save_file_enc(filename, cur, encoding);
                         desret_int(ret_val);
                         des_fileoutput(n_filename, filename, 0);
                         des_xml_doc_ptr(n_cur, cur, 1);
@@ -2147,7 +2158,7 @@ mod tests {
                             let encoding = gen_const_char_ptr(n_encoding, 2);
                             let format = gen_int(n_format, 3);
 
-                            let ret_val = htmlSaveFileFormat(filename, cur, encoding, format);
+                            let ret_val = html_save_file_format(filename, cur, encoding, format);
                             desret_int(ret_val);
                             des_fileoutput(n_filename, filename, 0);
                             des_xml_doc_ptr(n_cur, cur, 1);

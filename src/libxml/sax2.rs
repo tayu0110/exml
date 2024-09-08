@@ -17,7 +17,7 @@ use crate::{
     libxml::{
         encoding::XmlCharEncoding,
         entities::XmlEntityPtr,
-        htmltree::htmlNewDocNoDtD,
+        htmltree::html_new_doc_no_dtd,
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlSaxlocatorPtr},
         tree::{
             xml_validate_ncname, XmlAttributePtr, XmlDocProperties, XmlElementPtr, XmlNode,
@@ -1232,7 +1232,7 @@ pub unsafe extern "C" fn xmlSAX2StartDocument(ctx: *mut c_void) {
         #[cfg(feature = "html")]
         {
             if (*ctxt).my_doc.is_null() {
-                (*ctxt).my_doc = htmlNewDocNoDtD(null(), null());
+                (*ctxt).my_doc = html_new_doc_no_dtd(null(), null());
             }
             if (*ctxt).my_doc.is_null() {
                 xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
@@ -1467,7 +1467,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
     mut value: *const XmlChar,
     prefix: *const XmlChar,
 ) {
-    use super::htmltree::htmlIsBooleanAttr;
+    use super::htmltree::html_is_boolean_attr;
 
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut name: *mut XmlChar;
@@ -1521,7 +1521,7 @@ unsafe extern "C" fn xmlSAX2AttributeInternal(
     #[cfg(not(feature = "html"))]
     let f = false;
     #[cfg(feature = "html")]
-    let f = (*ctxt).html != 0 && value.is_null() && htmlIsBooleanAttr(fullname) != 0;
+    let f = (*ctxt).html != 0 && value.is_null() && html_is_boolean_attr(fullname) != 0;
     if f {
         nval = xml_strdup(fullname);
         value = nval;

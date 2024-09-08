@@ -39,7 +39,7 @@ use exml::{
             html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_fd,
             html_read_file, HtmlParserCtxtPtr,
         },
-        htmltree::htmlDocDumpMemory,
+        htmltree::html_doc_dump_memory,
         parser::{
             xml_cleanup_parser, xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser,
             xml_parse_document, xml_parse_file, xml_pedantic_parser_default, xml_read_fd,
@@ -2343,7 +2343,7 @@ unsafe extern "C" fn push_parse_test(
     }
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
-        htmlDocDumpMemory(
+        html_doc_dump_memory(
             doc,
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
@@ -2552,7 +2552,7 @@ unsafe extern "C" fn push_boundary_test(
     use exml::libxml::{
         encoding::XmlCharEncoding,
         htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
-        htmltree::htmlDocDumpMemory,
+        htmltree::html_doc_dump_memory,
         parser::{
             xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
         },
@@ -2789,7 +2789,7 @@ unsafe extern "C" fn push_boundary_test(
     }
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
-        htmlDocDumpMemory(
+        html_doc_dump_memory(
             doc,
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
@@ -3010,7 +3010,7 @@ unsafe extern "C" fn err_parse_test(
         } else {
             #[cfg(feature = "html")]
             if options & XML_PARSE_HTML != 0 {
-                htmlDocDumpMemory(
+                html_doc_dump_memory(
                     doc,
                     addr_of_mut!(base) as *mut *mut XmlChar,
                     addr_of_mut!(size),
@@ -3105,7 +3105,7 @@ unsafe extern "C" fn fd_parse_test(
         } else {
             #[cfg(feature = "html")]
             if options & XML_PARSE_HTML != 0 {
-                htmlDocDumpMemory(
+                html_doc_dump_memory(
                     doc,
                     addr_of_mut!(base) as *mut *mut XmlChar,
                     addr_of_mut!(size),
