@@ -19,7 +19,7 @@ use crate::{
     libxml::{
         globals::{xml_generic_error_context, xml_realloc},
         hash::xml_hash_add_entry,
-        threads::xmlGetThreadId,
+        threads::xml_get_thread_id,
         uri::xml_build_uri,
         xml_io::XmlParserInputBufferPtr,
         xmlerror::XmlParserErrors,
@@ -41,7 +41,7 @@ use super::{
         XmlParserInputPtr,
     },
     parser_internals::{input_push, xml_new_input_stream, XML_MAX_NAMELEN},
-    threads::{xmlFreeRMutex, xmlNewRMutex, xmlRMutexLock, xmlRMutexUnlock, XmlRMutex},
+    threads::{xml_free_rmutex, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock, XmlRMutex},
     tree::{
         xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_ns, xml_get_ns_prop,
         xml_get_prop, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns, xml_node_get_base,
@@ -1555,7 +1555,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
         xml_generic_error!(
             xml_generic_error_context(),
             c"%d Parsing catalog %s\n".as_ptr() as _,
-            xmlGetThreadId(),
+            xml_get_thread_id(),
             filename
         );
     }
@@ -1643,10 +1643,10 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
      * lock the whole catalog for modification
      */
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xmlRMutexLock(mutex);
+    xml_rmutex_lock(mutex);
     if !(*catal).children.is_null() {
         /* Okay someone else did it in the meantime */
-        xmlRMutexUnlock(mutex);
+        xml_rmutex_unlock(mutex);
         return 0;
     }
 
@@ -1668,7 +1668,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
                 (*catal).children = doc;
             }
             (*catal).dealloc = 0;
-            xmlRMutexUnlock(mutex);
+            xml_rmutex_unlock(mutex);
             return 0;
         }
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
@@ -1688,7 +1688,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
     doc = xml_parse_xml_catalog_file((*catal).prefer, (*catal).url);
     if doc.is_null() {
         (*catal).typ = XmlCatalogEntryType::XmlCataBrokenCatalog;
-        xmlRMutexUnlock(mutex);
+        xml_rmutex_unlock(mutex);
         return -1;
     }
 
@@ -1713,7 +1713,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
         }
         xml_hash_add_entry(catalog_files, (*catal).url, doc as _);
     }
-    xmlRMutexUnlock(mutex);
+    xml_rmutex_unlock(mutex);
     XML_CATALOG_XMLFILES.store(catalog_files, Ordering::Release);
     0
 }
@@ -3450,7 +3450,7 @@ unsafe extern "C" fn xml_initialize_catalog_data() {
     if !getenv(c"XML_DEBUG_CATALOG".as_ptr() as _).is_null() {
         XML_DEBUG_CATALOGS.store(1, Ordering::Release);
     }
-    XML_CATALOG_MUTEX.store(xmlNewRMutex(), Ordering::Release);
+    XML_CATALOG_MUTEX.store(xml_new_rmutex(), Ordering::Release);
 
     XML_CATALOG_INITIALIZED.store(true, Ordering::Release);
 }
@@ -3470,7 +3470,7 @@ pub unsafe extern "C" fn xml_initialize_catalog() {
 
     xml_initialize_catalog_data();
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xmlRMutexLock(mutex);
+    xml_rmutex_lock(mutex);
 
     if !getenv(c"XML_DEBUG_CATALOG".as_ptr() as _).is_null() {
         XML_DEBUG_CATALOGS.store(1, Ordering::Release);
@@ -3558,7 +3558,7 @@ pub unsafe extern "C" fn xml_initialize_catalog() {
         }
     }
 
-    xmlRMutexUnlock(mutex);
+    xml_rmutex_unlock(mutex);
 }
 
 /**
@@ -3580,23 +3580,23 @@ pub unsafe extern "C" fn xml_load_catalog(filename: *const c_char) -> c_int {
     }
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xmlRMutexLock(mutex);
+    xml_rmutex_lock(mutex);
 
     let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
     if default_catalog.is_null() {
         catal = xml_load_a_catalog(filename);
         if catal.is_null() {
-            xmlRMutexUnlock(mutex);
+            xml_rmutex_unlock(mutex);
             return -1;
         }
 
         XML_DEFAULT_CATALOG.store(catal, Ordering::Release);
-        xmlRMutexUnlock(mutex);
+        xml_rmutex_unlock(mutex);
         return 0;
     }
 
     let ret: c_int = xml_expand_catalog(default_catalog, filename);
-    xmlRMutexUnlock(mutex);
+    xml_rmutex_unlock(mutex);
     ret
 }
 
@@ -3697,7 +3697,7 @@ pub unsafe extern "C" fn xml_catalog_cleanup() {
     }
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xmlRMutexLock(mutex);
+    xml_rmutex_lock(mutex);
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
             xml_generic_error_context(),
@@ -3716,8 +3716,8 @@ pub unsafe extern "C" fn xml_catalog_cleanup() {
     XML_DEFAULT_CATALOG.store(null_mut(), Ordering::Release);
     XML_DEBUG_CATALOGS.store(0, Ordering::Release);
     XML_CATALOG_INITIALIZED.store(false, Ordering::Release);
-    xmlRMutexUnlock(mutex);
-    xmlFreeRMutex(mutex);
+    xml_rmutex_unlock(mutex);
+    xml_free_rmutex(mutex);
 }
 
 /**
@@ -3842,7 +3842,7 @@ pub unsafe extern "C" fn xml_catalog_add(
     }
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xmlRMutexLock(mutex);
+    xml_rmutex_lock(mutex);
     /*
      * Specific case where one want to override the default catalog
      * put in place by xmlInitializeCatalog();
@@ -3865,13 +3865,13 @@ pub unsafe extern "C" fn xml_catalog_add(
             );
         }
         XML_DEFAULT_CATALOG.store(default_catalog, Ordering::Release);
-        xmlRMutexUnlock(mutex);
+        xml_rmutex_unlock(mutex);
         return 0;
     }
 
     let res: c_int = xml_a_catalog_add(default_catalog, typ, orig, replace);
     XML_DEFAULT_CATALOG.store(default_catalog, Ordering::Release);
-    xmlRMutexUnlock(mutex);
+    xml_rmutex_unlock(mutex);
     res
 }
 
@@ -3889,9 +3889,9 @@ pub unsafe extern "C" fn xml_catalog_remove(value: *const XmlChar) -> c_int {
     }
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xmlRMutexLock(mutex);
+    xml_rmutex_lock(mutex);
     let res: c_int = xml_a_catalog_remove(XML_DEFAULT_CATALOG.load(Ordering::Relaxed), value);
-    xmlRMutexUnlock(mutex);
+    xml_rmutex_unlock(mutex);
     res
 }
 
@@ -3972,9 +3972,9 @@ pub unsafe extern "C" fn xml_catalog_convert() -> c_int {
     }
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xmlRMutexLock(mutex);
+    xml_rmutex_lock(mutex);
     let res: c_int = xml_convert_sgmlcatalog(XML_DEFAULT_CATALOG.load(Ordering::Relaxed));
-    xmlRMutexUnlock(mutex);
+    xml_rmutex_unlock(mutex);
     res
 }
 

@@ -16,7 +16,7 @@ use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
 use super::{
     globals::{xml_free, xml_malloc},
     parser::xml_init_parser,
-    threads::{xmlMutexLock, xmlMutexUnlock, XmlMutex},
+    threads::{xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     xmlstring::{xml_str_qequal, xml_strncmp, XmlChar},
 };
 
@@ -273,9 +273,9 @@ pub unsafe extern "C" fn xml_initialize_dict() -> c_int {
 }
 
 pub(crate) unsafe extern "C" fn __xml_random() -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_DICT_MUTEX) as _);
+    xml_mutex_lock(addr_of_mut!(XML_DICT_MUTEX) as _);
     let ret = rand();
-    xmlMutexUnlock(addr_of_mut!(XML_DICT_MUTEX) as _);
+    xml_mutex_unlock(addr_of_mut!(XML_DICT_MUTEX) as _);
     ret
 }
 
@@ -400,9 +400,9 @@ pub unsafe extern "C" fn xml_dict_reference(dict: XmlDictPtr) -> c_int {
     if dict.is_null() {
         return -1;
     }
-    xmlMutexLock(addr_of_mut!(XML_DICT_MUTEX) as _);
+    xml_mutex_lock(addr_of_mut!(XML_DICT_MUTEX) as _);
     (*dict).ref_counter += 1;
-    xmlMutexUnlock(addr_of_mut!(XML_DICT_MUTEX) as _);
+    xml_mutex_unlock(addr_of_mut!(XML_DICT_MUTEX) as _);
     0
 }
 
@@ -425,14 +425,14 @@ pub unsafe extern "C" fn xml_dict_free(dict: XmlDictPtr) {
     }
 
     /* decrement the counter, it may be shared by a parser and docs */
-    xmlMutexLock(addr_of_mut!(XML_DICT_MUTEX) as _);
+    xml_mutex_lock(addr_of_mut!(XML_DICT_MUTEX) as _);
     (*dict).ref_counter -= 1;
     if (*dict).ref_counter > 0 {
-        xmlMutexUnlock(addr_of_mut!(XML_DICT_MUTEX) as _);
+        xml_mutex_unlock(addr_of_mut!(XML_DICT_MUTEX) as _);
         return;
     }
 
-    xmlMutexUnlock(addr_of_mut!(XML_DICT_MUTEX) as _);
+    xml_mutex_unlock(addr_of_mut!(XML_DICT_MUTEX) as _);
 
     if !(*dict).subdict.is_null() {
         xml_dict_free((*dict).subdict);

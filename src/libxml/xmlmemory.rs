@@ -20,7 +20,7 @@ use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
 use crate::xml_generic_error;
 
 use super::globals::{_XML_FREE, _XML_MALLOC, _XML_MALLOC_ATOMIC, _XML_MEM_STRDUP, _XML_REALLOC};
-use super::threads::{xmlMutexLock, xmlMutexUnlock, XmlMutex};
+use super::threads::{xml_mutex_lock, xml_mutex_unlock, XmlMutex};
 use super::xmlstring::XmlChar;
 
 static mut DEBUG_MEM_SIZE: c_ulong = 0;
@@ -445,9 +445,9 @@ pub unsafe extern "C" fn xml_mem_used() -> c_int {
  * Returns an int representing the number of blocks
  */
 pub unsafe extern "C" fn xml_mem_blocks() -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     let res: c_int = DEBUG_MEM_BLOCKS as _;
-    xmlMutexUnlock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
     res
 }
 
@@ -822,7 +822,7 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
         }
         (*p).mh_tag = !MEMTAG as _;
         memset(target as _, -1, (*p).mh_size);
-        xmlMutexLock(addr_of_mut!(XML_MEM_MUTEX));
+        xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
         DEBUG_MEM_SIZE -= (*p).mh_size as u64;
         DEBUG_MEM_BLOCKS -= 1;
         // if cfg!(feature = "debug_memory") {
@@ -831,7 +831,7 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
         // if cfg!(feature = "debug_memory_location") {
         //     debugmem_list_delete(p);
         // }
-        xmlMutexUnlock(addr_of_mut!(XML_MEM_MUTEX));
+        xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
         free(p as _);
 
@@ -914,7 +914,7 @@ pub unsafe extern "C" fn xml_malloc_loc(
     (*p).mh_type = MALLOC_TYPE as _;
     (*p).mh_file = file;
     (*p).mh_line = line as _;
-    xmlMutexLock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     BLOCK += 1;
     (*p).mh_number = BLOCK as _;
     DEBUG_MEM_SIZE += size as u64;
@@ -925,7 +925,7 @@ pub unsafe extern "C" fn xml_malloc_loc(
     // if cfg!(feature = "debug_memory_location") {
     //     debugmem_list_add(p);
     // }
-    xmlMutexUnlock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     // if cfg!(feature = "debug_memory") {
     //     xml_generic_error!(
@@ -996,7 +996,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
         return null_mut();
     }
     (*p).mh_tag = !MEMTAG as _;
-    xmlMutexLock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     DEBUG_MEM_SIZE -= (*p).mh_size as u64;
     DEBUG_MEM_BLOCKS -= 1;
     // if cfg!(feature = "debug_memory") {
@@ -1006,7 +1006,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
     // if cfg!(feature = "debug_memory_location") {
     //     debugmem_list_delete(p);
     // }
-    xmlMutexUnlock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
         xml_generic_error!(
@@ -1040,7 +1040,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
     (*p).mh_size = size;
     (*p).mh_file = file;
     (*p).mh_line = line as _;
-    xmlMutexLock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     DEBUG_MEM_SIZE += size as u64;
     DEBUG_MEM_BLOCKS += 1;
     if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
@@ -1049,7 +1049,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
     // if cfg!(feature = "debug_memory_location") {
     //     debugmem_list_add(p);
     // }
-    xmlMutexUnlock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     //  TEST_POINT
 
@@ -1113,7 +1113,7 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     (*p).mh_type = MALLOC_ATOMIC_TYPE as _;
     (*p).mh_file = file;
     (*p).mh_line = line as _;
-    xmlMutexLock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     BLOCK += 1;
     (*p).mh_number = BLOCK as _;
     DEBUG_MEM_SIZE += size as u64;
@@ -1124,7 +1124,7 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     // if cfg!(feature = "debug_memory_location") {
     //     debugmem_list_add(p);
     // }
-    xmlMutexUnlock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     // if cfg!(feature = "debug_memory") {
     //     xml_generic_error!(
@@ -1193,7 +1193,7 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
     (*p).mh_type = STRDUP_TYPE as _;
     (*p).mh_file = file;
     (*p).mh_line = line as _;
-    xmlMutexLock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     BLOCK += 1;
     (*p).mh_number = BLOCK as _;
     DEBUG_MEM_SIZE += size as u64;
@@ -1204,7 +1204,7 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
     // if cfg!(feature = "debug_memory_location") {
     //     debugmem_list_add(p);
     // }
-    xmlMutexUnlock(addr_of_mut!(XML_MEM_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     let s: *mut char = HDR_2_CLIENT!(p) as _;
 

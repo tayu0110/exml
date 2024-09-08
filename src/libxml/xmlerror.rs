@@ -17,7 +17,7 @@ use super::globals::{
     xml_free, xml_generic_error, xml_generic_error_context, xml_last_error,
     _XML_GENERIC_ERROR_CONTEXT, _XML_STRUCTURED_ERROR, _XML_STRUCTURED_ERROR_CONTEXT,
 };
-use super::threads::{xmlGetGlobalState, xmlIsMainThread};
+use super::threads::{xml_get_global_state, xml_is_main_thread};
 use super::tree::{XmlElementType, XmlNodePtr};
 use super::xmlstring::{xml_get_utf8_char, xml_strdup, xml_strlen, XmlChar};
 
@@ -1007,14 +1007,14 @@ pub unsafe extern "C" fn xmlSetGenericErrorFunc(
     ctx: *mut c_void,
     handler: Option<XmlGenericErrorFunc>,
 ) {
-    if xmlIsMainThread() != 0 {
+    if xml_is_main_thread() != 0 {
         _XML_GENERIC_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
         _XML_GENERIC_ERROR = handler.or(Some(xmlGenericErrorDefaultFunc));
     } else {
-        (*xmlGetGlobalState())
+        (*xml_get_global_state())
             .xml_generic_error_context
             .store(ctx, Ordering::Relaxed);
-        (*xmlGetGlobalState()).xml_generic_error = handler.or(Some(xmlGenericErrorDefaultFunc));
+        (*xml_get_global_state()).xml_generic_error = handler.or(Some(xmlGenericErrorDefaultFunc));
     }
 }
 
@@ -1048,14 +1048,14 @@ pub unsafe extern "C" fn xmlSetStructuredErrorFunc(
     ctx: *mut c_void,
     handler: Option<XmlStructuredErrorFunc>,
 ) {
-    if xmlIsMainThread() != 0 {
+    if xml_is_main_thread() != 0 {
         _XML_STRUCTURED_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
         _XML_STRUCTURED_ERROR = handler;
     } else {
-        (*xmlGetGlobalState())
+        (*xml_get_global_state())
             .xml_structured_error_context
             .store(ctx, Ordering::Relaxed);
-        (*xmlGetGlobalState()).xml_structured_error = handler;
+        (*xml_get_global_state()).xml_structured_error = handler;
     }
 }
 

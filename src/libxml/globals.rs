@@ -38,7 +38,7 @@ use super::{
         xmlSAX2SetDocumentLocator, xmlSAX2StartDocument, xmlSAX2StartElement,
         xmlSAX2UnparsedEntityDecl,
     },
-    threads::{xmlGetGlobalState, xmlMutexLock, xmlMutexUnlock, XmlMutex},
+    threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
     xml_io::__xmlParserInputBufferCreateFilename,
     xmlerror::{
@@ -448,7 +448,7 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     // 	    (void *) gs, xmlGetThreadId());
     // #endif
 
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
     #[cfg(all(feature = "html", feature = "legacy", feature = "sax1"))]
     {
@@ -516,31 +516,31 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
         size_of::<XmlError>(),
     );
 
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
 pub unsafe extern "C" fn xml_thr_def_set_generic_error_func(
     ctx: *mut c_void,
     handler: Option<XmlGenericErrorFunc>,
 ) {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     XML_GENERIC_ERROR_CONTEXT_THR_DEF.store(ctx, Ordering::Relaxed);
     if let Some(handler) = handler {
         XML_GENERIC_ERROR_THR_DEF = Some(handler);
     } else {
         XML_GENERIC_ERROR_THR_DEF = Some(xmlGenericErrorDefaultFunc);
     }
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
 pub unsafe extern "C" fn xml_thr_def_set_structured_error_func(
     ctx: *mut c_void,
     handler: XmlStructuredErrorFunc,
 ) {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.store(ctx, Ordering::Relaxed);
     XML_STRUCTURED_ERROR_THR_DEF = Some(handler);
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
 /**
@@ -564,12 +564,12 @@ pub unsafe extern "C" fn xml_register_node_default(
 pub unsafe extern "C" fn xml_thr_def_register_node_default(
     func: XmlRegisterNodeFunc,
 ) -> Option<XmlRegisterNodeFunc> {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let old = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
     __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
     XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF = Some(func);
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
     old
 }
@@ -595,12 +595,12 @@ pub unsafe extern "C" fn xml_deregister_node_default(
 pub unsafe extern "C" fn xml_thr_def_deregister_node_default(
     func: XmlDeregisterNodeFunc,
 ) -> Option<XmlDeregisterNodeFunc> {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let old = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
     __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
     XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF = Some(func);
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
     old
 }
@@ -608,7 +608,7 @@ pub unsafe extern "C" fn xml_thr_def_deregister_node_default(
 pub unsafe extern "C" fn xml_thr_def_output_buffer_create_filename_default(
     func: XmlOutputBufferCreateFilenameFunc,
 ) -> Option<XmlOutputBufferCreateFilenameFunc> {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let mut old = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
     #[cfg(feature = "output")]
     {
@@ -617,7 +617,7 @@ pub unsafe extern "C" fn xml_thr_def_output_buffer_create_filename_default(
         }
     }
     XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = Some(func);
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
     old
 }
@@ -625,12 +625,12 @@ pub unsafe extern "C" fn xml_thr_def_output_buffer_create_filename_default(
 pub unsafe extern "C" fn xml_thr_def_parser_input_buffer_create_filename_default(
     func: Option<XmlParserInputBufferCreateFilenameFunc>,
 ) -> XmlParserInputBufferCreateFilenameFunc {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let old = XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF
         .unwrap_or(__xmlParserInputBufferCreateFilename);
 
     XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = func;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
     old
 }
@@ -642,7 +642,7 @@ pub unsafe extern "C" fn xml_thr_def_parser_input_buffer_create_filename_default
 #[cfg(feature = "thread")]
 macro_rules! IS_MAIN_THREAD {
     () => {
-        $crate::libxml::threads::xmlIsMainThread()
+        $crate::libxml::threads::xml_is_main_thread()
     };
 }
 #[macro_export]
@@ -683,7 +683,7 @@ pub unsafe extern "C" fn xml_malloc(size: usize) -> *mut c_void {
 pub fn set_xml_malloc(malloc: Option<XmlMallocFunc>) {
     unsafe {
         _XML_MALLOC = malloc;
-        (*xmlGetGlobalState()).xml_malloc = malloc;
+        (*xml_get_global_state()).xml_malloc = malloc;
     }
 }
 /**
@@ -726,7 +726,7 @@ pub unsafe extern "C" fn xml_realloc(mem: *mut c_void, size: usize) -> *mut c_vo
 pub fn set_xml_realloc(realloc: Option<XmlReallocFunc>) {
     unsafe {
         _XML_REALLOC = realloc;
-        (*xmlGetGlobalState()).xml_realloc = realloc;
+        (*xml_get_global_state()).xml_realloc = realloc;
     }
 }
 /**
@@ -747,7 +747,7 @@ pub unsafe extern "C" fn xml_free(mem: *mut c_void) {
 pub fn set_xml_free(free: Option<XmlFreeFunc>) {
     unsafe {
         _XML_FREE = free;
-        (*xmlGetGlobalState()).xml_free = free;
+        (*xml_get_global_state()).xml_free = free;
     }
 }
 
@@ -782,21 +782,21 @@ pub unsafe extern "C" fn xml_mem_strdup(str: *const XmlChar) -> *mut XmlChar {
 pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
     unsafe {
         _XML_MEM_STRDUP = mem_strdup;
-        (*xmlGetGlobalState()).xml_mem_strdup = mem_strdup;
+        (*xml_get_global_state()).xml_mem_strdup = mem_strdup;
     }
 }
 
 #[cfg(feature = "thread_alloc")]
 mod __globals_internal_for_thread_alloc {
     use super::*;
-    use crate::libxml::threads::xmlGetGlobalState;
+    use crate::libxml::threads::xml_get_global_state;
 
     #[cfg(feature = "thread")]
     pub unsafe extern "C" fn __xml_malloc() -> Option<XmlMallocFunc> {
         if IS_MAIN_THREAD!() != 0 {
             _XML_MALLOC
         } else {
-            (*xmlGetGlobalState()).xml_malloc
+            (*xml_get_global_state()).xml_malloc
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -809,7 +809,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_MALLOC_ATOMIC
         } else {
-            (*xmlGetGlobalState()).xml_malloc_atomic.unwrap()
+            (*xml_get_global_state()).xml_malloc_atomic.unwrap()
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -822,7 +822,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_REALLOC
         } else {
-            (*xmlGetGlobalState()).xml_realloc
+            (*xml_get_global_state()).xml_realloc
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -835,7 +835,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_FREE
         } else {
-            (*xmlGetGlobalState()).xml_free
+            (*xml_get_global_state()).xml_free
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -848,7 +848,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_MEM_STRDUP
         } else {
-            (*xmlGetGlobalState()).xml_mem_strdup
+            (*xml_get_global_state()).xml_mem_strdup
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -908,7 +908,7 @@ mod __globals_internal_for_html {
         if IS_MAIN_THREAD!() != 0 {
             addr_of_mut!(_HTML_DEFAULT_SAXHANDLER)
         } else {
-            addr_of_mut!((*xmlGetGlobalState()).html_default_sax_handler)
+            addr_of_mut!((*xml_get_global_state()).html_default_sax_handler)
         }
     }
     #[cfg(feature = "thread")]
@@ -928,7 +928,7 @@ pub unsafe extern "C" fn __xml_last_error() -> *mut XmlError {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_LAST_ERROR)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_last_error)
+        addr_of_mut!((*xml_get_global_state()).xml_last_error)
     }
 }
 
@@ -954,7 +954,7 @@ pub unsafe extern "C" fn __old_xml_wd_compatibility() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_OLD_XMLWDCOMPATIBILITY)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).old_xml_wd_compatibility)
+        addr_of_mut!((*xml_get_global_state()).old_xml_wd_compatibility)
     }
 }
 
@@ -979,7 +979,7 @@ pub unsafe extern "C" fn __xml_buffer_alloc_scheme() -> *mut XmlBufferAllocation
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_BUFFER_ALLOC_SCHEME)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_buffer_alloc_scheme)
+        addr_of_mut!((*xml_get_global_state()).xml_buffer_alloc_scheme)
     }
 }
 #[cfg(feature = "thread")]
@@ -995,10 +995,10 @@ pub unsafe extern "C" fn xml_buffer_alloc_scheme() -> *mut XmlBufferAllocationSc
 pub unsafe extern "C" fn xml_thr_def_buffer_alloc_scheme(
     v: XmlBufferAllocationScheme,
 ) -> XmlBufferAllocationScheme {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: XmlBufferAllocationScheme = XML_BUFFER_ALLOC_SCHEME_THR_DEF;
     XML_BUFFER_ALLOC_SCHEME_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1007,7 +1007,7 @@ pub unsafe extern "C" fn __xml_default_buffer_size() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_DEFAULT_BUFFER_SIZE)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_default_buffer_size)
+        addr_of_mut!((*xml_get_global_state()).xml_default_buffer_size)
     }
 }
 
@@ -1023,10 +1023,10 @@ pub unsafe extern "C" fn xml_default_buffer_size() -> *mut c_int {
 
 #[deprecated]
 pub unsafe extern "C" fn xml_thr_def_default_buffer_size(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_DEFAULT_BUFFER_SIZE_THR_DEF;
     XML_DEFAULT_BUFFER_SIZE_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1035,7 +1035,7 @@ pub unsafe extern "C" fn __xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_DEFAULT_SAXHANDLER)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_default_sax_handler)
+        addr_of_mut!((*xml_get_global_state()).xml_default_sax_handler)
     }
 }
 
@@ -1094,7 +1094,7 @@ pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSaxlocator {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_default_sax_locator)
+        addr_of_mut!((*xml_get_global_state()).xml_default_sax_locator)
     }
 }
 
@@ -1127,7 +1127,7 @@ pub unsafe extern "C" fn __xml_do_validity_checking_default_value() -> *mut c_in
     if IS_MAIN_THREAD!() != 0 {
         _XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_do_validity_checking_default_value)
+        addr_of_mut!((*xml_get_global_state()).xml_do_validity_checking_default_value)
     }
 }
 #[cfg(feature = "thread")]
@@ -1140,10 +1140,10 @@ pub unsafe extern "C" fn xml_do_validity_checking_default_value() -> *mut c_int 
 }
 
 pub unsafe extern "C" fn xml_thr_def_do_validity_checking_default_value(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
     XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1151,7 +1151,7 @@ pub unsafe extern "C" fn __xml_generic_error() -> XmlGenericErrorFunc {
     if IS_MAIN_THREAD!() != 0 {
         _XML_GENERIC_ERROR.unwrap()
     } else {
-        (*xmlGetGlobalState()).xml_generic_error.unwrap()
+        (*xml_get_global_state()).xml_generic_error.unwrap()
     }
 }
 
@@ -1168,7 +1168,7 @@ pub unsafe extern "C" fn __xml_structured_error() -> Option<XmlStructuredErrorFu
     if IS_MAIN_THREAD!() != 0 {
         _XML_STRUCTURED_ERROR
     } else {
-        (*xmlGetGlobalState()).xml_structured_error
+        (*xml_get_global_state()).xml_structured_error
     }
 }
 
@@ -1187,7 +1187,7 @@ pub unsafe extern "C" fn __xml_generic_error_context() -> *mut *mut c_void {
     if IS_MAIN_THREAD!() != 0 {
         _XML_GENERIC_ERROR_CONTEXT.as_ptr()
     } else {
-        (*xmlGetGlobalState()).xml_generic_error_context.as_ptr()
+        (*xml_get_global_state()).xml_generic_error_context.as_ptr()
     }
 }
 
@@ -1204,7 +1204,9 @@ pub unsafe extern "C" fn __xml_structured_error_context() -> *mut *mut c_void {
     if IS_MAIN_THREAD!() != 0 {
         _XML_STRUCTURED_ERROR_CONTEXT.as_ptr()
     } else {
-        (*xmlGetGlobalState()).xml_structured_error_context.as_ptr()
+        (*xml_get_global_state())
+            .xml_structured_error_context
+            .as_ptr()
     }
 }
 
@@ -1221,7 +1223,7 @@ pub unsafe extern "C" fn __xml_get_warnings_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_GET_WARNINGS_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_get_warnings_default_value)
+        addr_of_mut!((*xml_get_global_state()).xml_get_warnings_default_value)
     }
 }
 #[cfg(feature = "thread")]
@@ -1234,10 +1236,10 @@ pub unsafe extern "C" fn xml_get_warnings_default_value() -> *mut c_int {
 }
 
 pub unsafe extern "C" fn xml_thr_def_get_warnings_default_value(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
     XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1245,7 +1247,7 @@ pub unsafe extern "C" fn __xml_indent_tree_output() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_INDENT_TREE_OUTPUT.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_indent_tree_output)
+        addr_of_mut!((*xml_get_global_state()).xml_indent_tree_output)
     }
 }
 #[cfg(feature = "thread")]
@@ -1258,10 +1260,10 @@ pub unsafe extern "C" fn xml_indent_tree_output() -> *mut c_int {
 }
 
 pub unsafe extern "C" fn xml_thr_def_indent_tree_output(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_INDENT_TREE_OUTPUT_THR_DEF;
     XML_INDENT_TREE_OUTPUT_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1269,7 +1271,7 @@ pub unsafe extern "C" fn __xml_tree_indent_string() -> *mut *const c_char {
     if IS_MAIN_THREAD!() != 0 {
         _XML_TREE_INDENT_STRING.as_ptr() as _
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_tree_indent_string)
+        addr_of_mut!((*xml_get_global_state()).xml_tree_indent_string)
     }
 }
 #[cfg(feature = "thread")]
@@ -1282,10 +1284,10 @@ pub unsafe extern "C" fn xml_tree_indent_string() -> *mut *const c_char {
 }
 
 pub unsafe extern "C" fn xml_thr_def_tree_indent_string(v: *const c_char) -> *const c_char {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: *const c_char = XML_TREE_INDENT_STRING_THR_DEF.load(Ordering::Relaxed);
     XML_TREE_INDENT_STRING_THR_DEF.store(v as _, Ordering::Relaxed);
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1293,7 +1295,7 @@ pub unsafe extern "C" fn __xml_keep_blanks_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_KEEP_BLANKS_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_keep_blanks_default_value)
+        addr_of_mut!((*xml_get_global_state()).xml_keep_blanks_default_value)
     }
 }
 #[cfg(feature = "thread")]
@@ -1306,10 +1308,10 @@ pub unsafe extern "C" fn xml_keep_blanks_default_value() -> *mut c_int {
 }
 
 pub unsafe extern "C" fn xml_thr_def_keep_blanks_default_value(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
     XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1318,7 +1320,7 @@ pub unsafe extern "C" fn __xml_line_numbers_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_LINE_NUMBERS_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_line_numbers_default_value)
+        addr_of_mut!((*xml_get_global_state()).xml_line_numbers_default_value)
     }
 }
 #[cfg(feature = "thread")]
@@ -1333,10 +1335,10 @@ pub unsafe extern "C" fn xml_line_numbers_default_value() -> *mut c_int {
 
 #[deprecated]
 pub unsafe extern "C" fn xml_thr_def_line_numbers_default_value(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
     XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1344,7 +1346,7 @@ pub unsafe extern "C" fn __xml_load_ext_dtd_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_LOAD_EXT_DTD_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_load_ext_dtd_default_value)
+        addr_of_mut!((*xml_get_global_state()).xml_load_ext_dtd_default_value)
     }
 }
 #[cfg(feature = "thread")]
@@ -1357,10 +1359,10 @@ pub unsafe extern "C" fn xml_load_ext_dtd_default_value() -> *mut c_int {
 }
 
 pub unsafe extern "C" fn xml_thr_def_load_ext_dtd_default_value(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
     XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1368,7 +1370,7 @@ pub unsafe extern "C" fn __xml_parser_debug_entities() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_PARSER_DEBUG_ENTITIES.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_parser_debug_entities)
+        addr_of_mut!((*xml_get_global_state()).xml_parser_debug_entities)
     }
 }
 #[cfg(feature = "thread")]
@@ -1381,10 +1383,10 @@ pub unsafe extern "C" fn xml_parser_debug_entities() -> *mut c_int {
 }
 
 pub unsafe extern "C" fn xml_thr_def_parser_debug_entities(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
     XML_PARSER_DEBUG_ENTITIES_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1414,7 +1416,7 @@ pub unsafe extern "C" fn __xml_pedantic_parser_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_PEDANTIC_PARSER_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_pedantic_parser_default_value)
+        addr_of_mut!((*xml_get_global_state()).xml_pedantic_parser_default_value)
     }
 }
 #[cfg(feature = "thread")]
@@ -1429,10 +1431,10 @@ pub unsafe extern "C" fn xml_pedantic_parser_default_value() -> *mut c_int {
 
 #[deprecated]
 pub unsafe extern "C" fn xml_thr_def_pedantic_parser_default_value(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
     XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1440,7 +1442,7 @@ pub unsafe extern "C" fn __xml_save_no_empty_tags() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_SAVE_NO_EMPTY_TAGS.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_save_no_empty_tags)
+        addr_of_mut!((*xml_get_global_state()).xml_save_no_empty_tags)
     }
 }
 #[cfg(feature = "thread")]
@@ -1453,10 +1455,10 @@ pub unsafe extern "C" fn xml_save_no_empty_tags() -> *mut c_int {
 }
 
 pub unsafe extern "C" fn xml_thr_def_save_no_empty_tags(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
     XML_SAVE_NO_EMPTY_TAGS_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1464,7 +1466,7 @@ pub unsafe extern "C" fn __xml_substitute_entities_default_value() -> *mut c_int
     if IS_MAIN_THREAD!() != 0 {
         _XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xml_substitute_entities_default_value)
+        addr_of_mut!((*xml_get_global_state()).xml_substitute_entities_default_value)
     }
 }
 
@@ -1478,10 +1480,10 @@ pub unsafe extern "C" fn xml_substitute_entities_default_value() -> *mut c_int {
 }
 
 pub unsafe extern "C" fn xml_thr_def_substitute_entities_default_value(v: c_int) -> c_int {
-    xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
     XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF = v;
-    xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }
 
@@ -1490,7 +1492,7 @@ pub unsafe extern "C" fn __xml_register_node_default_value() -> XmlRegisterNodeF
     if IS_MAIN_THREAD!() != 0 {
         _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()
     } else {
-        (*xmlGetGlobalState())
+        (*xml_get_global_state())
             .xml_register_node_default_value
             .unwrap()
     }
@@ -1511,7 +1513,7 @@ pub unsafe extern "C" fn __xml_deregister_node_default_value() -> XmlDeregisterN
     if IS_MAIN_THREAD!() != 0 {
         _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()
     } else {
-        (*xmlGetGlobalState())
+        (*xml_get_global_state())
             .xml_deregister_node_default_value
             .unwrap()
     }
@@ -1532,7 +1534,7 @@ pub(crate) unsafe extern "C" fn __xml_parser_input_buffer_create_filename_value(
     if IS_MAIN_THREAD!() != 0 {
         _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
     } else {
-        (*xmlGetGlobalState()).xml_parser_input_buffer_create_filename_value
+        (*xml_get_global_state()).xml_parser_input_buffer_create_filename_value
     }
 }
 
@@ -1562,7 +1564,7 @@ pub unsafe extern "C" fn __xml_output_buffer_create_filename_value(
     if IS_MAIN_THREAD!() != 0 {
         _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE
     } else {
-        (*xmlGetGlobalState()).xml_output_buffer_create_filename_value
+        (*xml_get_global_state()).xml_output_buffer_create_filename_value
     }
 }
 
