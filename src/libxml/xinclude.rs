@@ -1597,7 +1597,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
  *
  * Returns 0 in case of success, -1 in case of failure
  */
-unsafe extern "C" fn xmlXIncludeLoadDoc(
+unsafe extern "C" fn xml_xinclude_load_doc(
     ctxt: XmlXincludeCtxtPtr,
     url: *const XmlChar,
     refe: XmlXincludeRefPtr,
@@ -2068,7 +2068,7 @@ unsafe extern "C" fn xmlXIncludeLoadDoc(
  *
  * Returns 0 in case of success, -1 in case of failure
  */
-unsafe extern "C" fn xmlXIncludeLoadTxt(
+unsafe extern "C" fn xml_xinclude_load_txt(
     ctxt: XmlXincludeCtxtPtr,
     mut url: *const XmlChar,
     refe: XmlXincludeRefPtr,
@@ -2503,10 +2503,10 @@ unsafe extern "C" fn xml_xinclude_load_node(
     (*ctxt).base = base;
 
     if xml != 0 {
-        ret = xmlXIncludeLoadDoc(ctxt, uri, refe);
+        ret = xml_xinclude_load_doc(ctxt, uri, refe);
     /* xmlXIncludeGetFragment(ctxt, cur, URI); */
     } else {
-        ret = xmlXIncludeLoadTxt(ctxt, uri, refe);
+        ret = xml_xinclude_load_txt(ctxt, uri, refe);
     }
 
     /*
