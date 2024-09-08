@@ -14,7 +14,7 @@ use crate::{
         tree::{XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlNsPtr},
         xml_io::XmlOutputBufferPtr,
         xmlerror::XmlParserErrors,
-        xmlsave::{xmlNsDumpOutput, xmlSerializeHexCharRef, xml_save_err},
+        xmlsave::{xml_ns_dump_output, xml_save_err, xml_serialize_hex_char_ref},
         xmlstring::XmlChar,
     },
     IS_CHAR,
@@ -108,7 +108,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
             }
             if *cur < 0xC0 {
                 xml_save_err(XmlParserErrors::XmlSaveNotUtf8 as _, attr as _, null_mut());
-                xmlSerializeHexCharRef(tmp.as_mut_ptr() as _, *cur as _);
+                xml_serialize_hex_char_ref(tmp.as_mut_ptr() as _, *cur as _);
                 xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);
                 base = cur;
@@ -141,7 +141,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
                     attr as _,
                     null_mut(),
                 );
-                xmlSerializeHexCharRef(tmp.as_mut_ptr() as _, *cur as _);
+                xml_serialize_hex_char_ref(tmp.as_mut_ptr() as _, *cur as _);
                 xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);
                 base = cur;
@@ -151,7 +151,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
              * We could do multiple things here. Just save
              * as a c_char ref
              */
-            xmlSerializeHexCharRef(tmp.as_mut_ptr() as _, val);
+            xml_serialize_hex_char_ref(tmp.as_mut_ptr() as _, val);
             xml_buf_add(buf, tmp.as_ptr() as _, -1);
             cur = cur.add(l as usize);
             base = cur;
@@ -177,7 +177,7 @@ pub(crate) unsafe extern "C" fn xml_ns_list_dump_output(
     mut cur: XmlNsPtr,
 ) {
     while !cur.is_null() {
-        xmlNsDumpOutput(buf, cur, null_mut());
+        xml_ns_dump_output(buf, cur, null_mut());
         cur = (*cur).next.load(Ordering::Relaxed);
     }
 }

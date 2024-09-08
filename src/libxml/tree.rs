@@ -9690,7 +9690,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
             XmlOutputBufferPtr,
         },
         xmlsave::{
-            xmlDocContentDumpOutput, xmlSaveCtxtInit, xml_save_err, xml_save_err_memory,
+            xml_doc_content_dump_output, xml_save_ctxt_init, xml_save_err, xml_save_err_memory,
             XmlSaveCtxt, XmlSaveOption,
         },
     };
@@ -9751,9 +9751,9 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     ctxt.level = 0;
     ctxt.format = (format != 0) as i32;
     ctxt.encoding = txt_encoding as _;
-    xmlSaveCtxtInit(addr_of_mut!(ctxt));
+    xml_save_ctxt_init(addr_of_mut!(ctxt));
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-    xmlDocContentDumpOutput(addr_of_mut!(ctxt), out_doc);
+    xml_doc_content_dump_output(addr_of_mut!(ctxt), out_doc);
     xml_output_buffer_flush(out_buff);
     if !(*out_buff).conv.is_null() {
         *doc_txt_len = xml_buf_use((*out_buff).conv) as _;
@@ -9789,7 +9789,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
         xml_io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
-        xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
+        xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
     use super::xmlsave::XmlSaveCtxt;
@@ -9825,9 +9825,9 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding as _;
-    xmlSaveCtxtInit(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-    xmlDocContentDumpOutput(addr_of_mut!(ctxt) as _, cur);
+    xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
 
     let ret: c_int = xml_output_buffer_close(buf);
     ret
@@ -10070,7 +10070,7 @@ pub unsafe extern "C" fn xml_save_file_to(
 
     use crate::libxml::{
         xml_io::xml_output_buffer_close,
-        xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
+        xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
     use super::xmlsave::XmlSaveCtxt;
@@ -10089,9 +10089,9 @@ pub unsafe extern "C" fn xml_save_file_to(
     ctxt.level = 0;
     ctxt.format = 0;
     ctxt.encoding = encoding as _;
-    xmlSaveCtxtInit(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-    xmlDocContentDumpOutput(addr_of_mut!(ctxt) as _, cur);
+    xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
     let ret: c_int = xml_output_buffer_close(buf);
     ret
 }
@@ -10120,7 +10120,7 @@ pub unsafe extern "C" fn xml_save_format_file_to(
 
     use crate::libxml::{
         xml_io::xml_output_buffer_close,
-        xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
+        xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
     use super::xmlsave::XmlSaveCtxt;
@@ -10142,9 +10142,9 @@ pub unsafe extern "C" fn xml_save_format_file_to(
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding as _;
-    xmlSaveCtxtInit(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-    xmlDocContentDumpOutput(addr_of_mut!(ctxt) as _, cur);
+    xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
     let ret: c_int = xml_output_buffer_close(buf);
     ret
 }
@@ -10175,7 +10175,10 @@ pub unsafe extern "C" fn xml_node_dump_output(
 
     use crate::libxml::{
         parser::xml_init_parser,
-        xmlsave::{xhtmlNodeDumpOutput, xmlNodeDumpOutputInternal, xmlSaveCtxtInit, XmlSaveOption},
+        xmlsave::{
+            xhtml_node_dump_output, xml_node_dump_output_internal, xml_save_ctxt_init,
+            XmlSaveOption,
+        },
     };
 
     use super::xmlsave::XmlSaveCtxt;
@@ -10201,7 +10204,7 @@ pub unsafe extern "C" fn xml_node_dump_output(
     ctxt.level = level;
     ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding as _;
-    xmlSaveCtxtInit(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
 
     #[cfg(feature = "html")]
@@ -10215,14 +10218,14 @@ pub unsafe extern "C" fn xml_node_dump_output(
         }
 
         if is_xhtml != 0 {
-            xhtmlNodeDumpOutput(addr_of_mut!(ctxt) as _, cur);
+            xhtml_node_dump_output(addr_of_mut!(ctxt) as _, cur);
         } else {
-            xmlNodeDumpOutputInternal(addr_of_mut!(ctxt) as _, cur);
+            xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
         }
     }
     #[cfg(not(feature = "html"))]
     {
-        xmlNodeDumpOutputInternal(addr_of_mut!(ctxt) as _, cur);
+        xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
     }
 }
 
@@ -10251,7 +10254,7 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
         xml_io::{xml_output_buffer_close, xml_output_buffer_create_filename},
-        xmlsave::{xmlDocContentDumpOutput, xmlSaveCtxtInit, XmlSaveOption},
+        xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
     use super::xmlsave::XmlSaveCtxt;
@@ -10291,10 +10294,10 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding as _;
-    xmlSaveCtxtInit(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
 
-    xmlDocContentDumpOutput(addr_of_mut!(ctxt) as _, cur);
+    xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
 
     let ret: c_int = xml_output_buffer_close(buf);
     ret

@@ -136,7 +136,7 @@ pub(crate) unsafe extern "C" fn xml_save_err_memory(extra: *const c_char) {
     );
 }
 
-pub(crate) unsafe extern "C" fn xmlSerializeHexCharRef(
+pub(crate) unsafe extern "C" fn xml_serialize_hex_char_ref(
     mut out: *mut c_uchar,
     mut val: c_int,
 ) -> *mut c_uchar {
@@ -256,7 +256,7 @@ pub(crate) unsafe extern "C" fn xmlSerializeHexCharRef(
  *     if the return value is positive, else unpredictable.
  * The value of @outlen after return is the number of octets consumed.
  */
-unsafe extern "C" fn xmlEscapeEntities(
+unsafe extern "C" fn xml_escape_entities(
     mut out: *mut c_uchar,
     outlen: *mut c_int,
     mut input: *const XmlChar,
@@ -400,12 +400,12 @@ unsafe extern "C" fn xmlEscapeEntities(
             /*
              * We could do multiple things here. Just save as a c_char ref
              */
-            out = xmlSerializeHexCharRef(out, val);
+            out = xml_serialize_hex_char_ref(out, val);
         } else if IS_BYTE_CHAR!(*input) {
             if outend.offset_from(out) < 6 {
                 break;
             }
-            out = xmlSerializeHexCharRef(out, *input as _);
+            out = xml_serialize_hex_char_ref(out, *input as _);
             input = input.add(1);
         } else {
             xml_generic_error!(
@@ -434,12 +434,12 @@ unsafe extern "C" fn xmlEscapeEntities(
  *
  * Initialize a saving context
  */
-pub(crate) unsafe extern "C" fn xmlSaveCtxtInit(ctxt: XmlSaveCtxtPtr) {
+pub(crate) unsafe extern "C" fn xml_save_ctxt_init(ctxt: XmlSaveCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
     if (*ctxt).encoding.is_null() && (*ctxt).escape.is_none() {
-        (*ctxt).escape = Some(xmlEscapeEntities);
+        (*ctxt).escape = Some(xml_escape_entities);
     }
     let len: c_int = xml_strlen(*xml_tree_indent_string() as _) as _;
     if xml_tree_indent_string().is_null() || len == 0 {
@@ -465,7 +465,10 @@ pub(crate) unsafe extern "C" fn xmlSaveCtxtInit(ctxt: XmlSaveCtxtPtr) {
     }
 }
 
-unsafe extern "C" fn xmlSaveSwitchEncoding(ctxt: XmlSaveCtxtPtr, encoding: *const c_char) -> c_int {
+unsafe extern "C" fn xml_save_switch_encoding(
+    ctxt: XmlSaveCtxtPtr,
+    encoding: *const c_char,
+) -> c_int {
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
 
     if !encoding.is_null() && (*buf).encoder.is_null() && (*buf).conv.is_null() {
@@ -499,7 +502,7 @@ unsafe extern "C" fn xmlSaveSwitchEncoding(ctxt: XmlSaveCtxtPtr, encoding: *cons
  *
  * Write out formatting for non-significant whitespace output.
  */
-unsafe extern "C" fn xmlOutputBufferWriteWSNonSig(ctxt: XmlSaveCtxtPtr, extra: c_int) {
+unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: XmlSaveCtxtPtr, extra: c_int) {
     if ctxt.is_null() || (*ctxt).buf.is_null() {
         return;
     }
@@ -528,7 +531,7 @@ unsafe extern "C" fn xmlOutputBufferWriteWSNonSig(ctxt: XmlSaveCtxtPtr, extra: c
  * Should be called in the context of attributes dumps.
  * If @ctxt is supplied, @buf should be its buffer.
  */
-pub(crate) unsafe extern "C" fn xmlNsDumpOutput(
+pub(crate) unsafe extern "C" fn xml_ns_dump_output(
     buf: XmlOutputBufferPtr,
     cur: XmlNsPtr,
     ctxt: XmlSaveCtxtPtr,
@@ -544,7 +547,7 @@ pub(crate) unsafe extern "C" fn xmlNsDumpOutput(
         }
 
         if !ctxt.is_null() && (*ctxt).format == 2 {
-            xmlOutputBufferWriteWSNonSig(ctxt, 2);
+            xml_output_buffer_write_ws_non_sig(ctxt, 2);
         } else {
             xml_output_buffer_write(buf, 1, c" ".as_ptr() as _);
         }
@@ -568,7 +571,7 @@ pub(crate) unsafe extern "C" fn xmlNsDumpOutput(
  *
  * This will dump the content of the notation table as an XML DTD definition
  */
-unsafe extern "C" fn xmlBufDumpNotationTable(buf: XmlBufPtr, table: XmlNotationTablePtr) {
+unsafe extern "C" fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
     let buffer: XmlBufferPtr = xml_buffer_create();
     if buffer.is_null() {
         /*
@@ -589,7 +592,7 @@ unsafe extern "C" fn xmlBufDumpNotationTable(buf: XmlBufPtr, table: XmlNotationT
  * This will dump the content of the element declaration as an XML
  * DTD definition
  */
-unsafe extern "C" fn xmlBufDumpElementDecl(buf: XmlBufPtr, elem: XmlElementPtr) {
+unsafe extern "C" fn xml_buf_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
     let buffer: XmlBufferPtr = xml_buffer_create();
     if buffer.is_null() {
         /*
@@ -610,7 +613,7 @@ unsafe extern "C" fn xmlBufDumpElementDecl(buf: XmlBufPtr, elem: XmlElementPtr) 
  * This will dump the content of the attribute declaration as an XML
  * DTD definition
  */
-unsafe extern "C" fn xmlBufDumpAttributeDecl(buf: XmlBufPtr, attr: XmlAttributePtr) {
+unsafe extern "C" fn xml_buf_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
     let buffer: XmlBufferPtr = xml_buffer_create();
     if buffer.is_null() {
         /*
@@ -630,7 +633,7 @@ unsafe extern "C" fn xmlBufDumpAttributeDecl(buf: XmlBufPtr, attr: XmlAttributeP
  *
  * This will dump the content of the entity table as an XML DTD definition
  */
-unsafe extern "C" fn xmlBufDumpEntityDecl(buf: XmlBufPtr, ent: XmlEntityPtr) {
+unsafe extern "C" fn xml_buf_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
     let buffer: XmlBufferPtr = xml_buffer_create();
     if buffer.is_null() {
         /*
@@ -651,9 +654,9 @@ unsafe extern "C" fn xmlBufDumpEntityDecl(buf: XmlBufPtr, ent: XmlEntityPtr) {
  * Dump a list of local namespace definitions to a save context.
  * Should be called in the context of attribute dumps.
  */
-unsafe extern "C" fn xmlNsListDumpOutputCtxt(ctxt: XmlSaveCtxtPtr, mut cur: XmlNsPtr) {
+unsafe extern "C" fn xml_ns_list_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, mut cur: XmlNsPtr) {
     while !cur.is_null() {
-        xmlNsDumpOutput((*ctxt).buf, cur, ctxt);
+        xml_ns_dump_output((*ctxt).buf, cur, ctxt);
         cur = (*cur).next.load(Ordering::Relaxed);
     }
 }
@@ -666,7 +669,7 @@ unsafe extern "C" fn xmlNsListDumpOutputCtxt(ctxt: XmlSaveCtxtPtr, mut cur: XmlN
  *
  * Serialize the attribute in the buffer
  */
-unsafe extern "C" fn xmlAttrSerializeContent(buf: XmlOutputBufferPtr, attr: XmlAttrPtr) {
+unsafe extern "C" fn xml_attr_serialize_content(buf: XmlOutputBufferPtr, attr: XmlAttrPtr) {
     let mut children: XmlNodePtr;
 
     children = (*attr).children;
@@ -702,7 +705,7 @@ unsafe extern "C" fn xmlAttrSerializeContent(buf: XmlOutputBufferPtr, attr: XmlA
  *
  * Dump an XML attribute
  */
-unsafe extern "C" fn xmlAttrDumpOutput(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
+unsafe extern "C" fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
     if cur.is_null() {
         return;
     }
@@ -711,7 +714,7 @@ unsafe extern "C" fn xmlAttrDumpOutput(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
         return;
     }
     if (*ctxt).format == 2 {
-        xmlOutputBufferWriteWSNonSig(ctxt, 2);
+        xml_output_buffer_write_ws_non_sig(ctxt, 2);
     } else {
         xml_output_buffer_write(buf, 1, c" ".as_ptr() as _);
     }
@@ -721,7 +724,7 @@ unsafe extern "C" fn xmlAttrDumpOutput(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
     }
     xml_output_buffer_write_string(buf, (*cur).name as _);
     xml_output_buffer_write(buf, 2, c"=\"".as_ptr() as _);
-    xmlAttrSerializeContent(buf, cur);
+    xml_attr_serialize_content(buf, cur);
     xml_output_buffer_write(buf, 1, c"\"".as_ptr() as _);
 }
 
@@ -731,7 +734,7 @@ unsafe extern "C" fn xmlAttrDumpOutput(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
  *
  * Dump an XML node, recursive behaviour, children are printed too.
  */
-pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
+pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
     ctxt: XmlSaveCtxtPtr,
     mut cur: XmlNodePtr,
 ) {
@@ -754,10 +757,10 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
     loop {
         match (*cur).typ {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
-                xmlDocContentDumpOutput(ctxt, cur as _);
+                xml_doc_content_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlDtdNode => {
-                xmlDtdDumpOutput(ctxt, cur as _);
+                xml_dtd_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlDocumentFragNode => {
                 /* Always validate (*cur).parent when descending. */
@@ -768,13 +771,13 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xmlBufDumpElementDecl((*buf).buffer, cur as _);
+                xml_buf_dump_element_decl((*buf).buffer, cur as _);
             }
             XmlElementType::XmlAttributeDecl => {
-                xmlBufDumpAttributeDecl((*buf).buffer, cur as _);
+                xml_buf_dump_attribute_decl((*buf).buffer, cur as _);
             }
             XmlElementType::XmlEntityDecl => {
-                xmlBufDumpEntityDecl((*buf).buffer, cur as _);
+                xml_buf_dump_entity_decl((*buf).buffer, cur as _);
             }
             XmlElementType::XmlElementNode => {
                 if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
@@ -796,7 +799,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                  * case.
                  */
                 if (*cur).parent != parent && !(*cur).children.is_null() {
-                    xmlNodeDumpOutputInternal(ctxt, cur);
+                    xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     xml_output_buffer_write(buf, 1, c"<".as_ptr() as _);
                     if !(*cur).ns.is_null()
@@ -810,23 +813,23 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                     }
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if !(*cur).ns_def.is_null() {
-                        xmlNsListDumpOutputCtxt(ctxt, (*cur).ns_def);
+                        xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
                     }
                     attr = (*cur).properties;
                     while !attr.is_null() {
-                        xmlAttrDumpOutput(ctxt, attr);
+                        xml_attr_dump_output(ctxt, attr);
                         attr = (*attr).next;
                     }
 
                     if (*cur).children.is_null() {
                         if (*ctxt).options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0 {
                             if (*ctxt).format == 2 {
-                                xmlOutputBufferWriteWSNonSig(ctxt, 0);
+                                xml_output_buffer_write_ws_non_sig(ctxt, 0);
                             }
                             xml_output_buffer_write(buf, 2, c"/>".as_ptr() as _);
                         } else {
                             if (*ctxt).format == 2 {
-                                xmlOutputBufferWriteWSNonSig(ctxt, 1);
+                                xml_output_buffer_write_ws_non_sig(ctxt, 1);
                             }
                             xml_output_buffer_write(buf, 3, c"></".as_ptr() as _);
                             if !(*cur).ns.is_null()
@@ -840,7 +843,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                             }
                             xml_output_buffer_write_string(buf, (*cur).name as _);
                             if (*ctxt).format == 2 {
-                                xmlOutputBufferWriteWSNonSig(ctxt, 0);
+                                xml_output_buffer_write_ws_non_sig(ctxt, 0);
                             }
                             xml_output_buffer_write(buf, 1, c">".as_ptr() as _);
                         }
@@ -862,7 +865,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                             }
                         }
                         if (*ctxt).format == 2 {
-                            xmlOutputBufferWriteWSNonSig(ctxt, 1);
+                            xml_output_buffer_write_ws_non_sig(ctxt, 1);
                         }
                         xml_output_buffer_write(buf, 1, c">".as_ptr() as _);
                         if (*ctxt).format == 1 {
@@ -908,7 +911,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if !(*cur).content.is_null() {
                         if (*ctxt).format == 2 {
-                            xmlOutputBufferWriteWSNonSig(ctxt, 0);
+                            xml_output_buffer_write_ws_non_sig(ctxt, 0);
                         } else {
                             xml_output_buffer_write(buf, 1, c" ".as_ptr() as _);
                         }
@@ -919,7 +922,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                     xml_output_buffer_write(buf, 2, c"<?".as_ptr() as _);
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if (*ctxt).format == 2 {
-                        xmlOutputBufferWriteWSNonSig(ctxt, 0);
+                        xml_output_buffer_write_ws_non_sig(ctxt, 0);
                     }
                     xml_output_buffer_write(buf, 2, c"?>".as_ptr() as _);
                 }
@@ -973,10 +976,10 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                xmlAttrDumpOutput(ctxt, cur as _);
+                xml_attr_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlNamespaceDecl => {
-                xmlNsDumpOutputCtxt(ctxt, cur as _);
+                xml_ns_dump_output_ctxt(ctxt, cur as _);
             }
             _ => {}
         }
@@ -1030,7 +1033,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
 
                 xml_output_buffer_write_string(buf, (*cur).name as _);
                 if (*ctxt).format == 2 {
-                    xmlOutputBufferWriteWSNonSig(ctxt, 0);
+                    xml_output_buffer_write_ws_non_sig(ctxt, 0);
                 }
                 xml_output_buffer_write(buf, 1, c">".as_ptr() as _);
 
@@ -1050,7 +1053,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
  *
  * Dump the XML document DTD, if any.
  */
-unsafe extern "C" fn xmlDtdDumpOutput(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
+unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     let mut cur: XmlNodePtr;
 
     if dtd.is_null() {
@@ -1086,7 +1089,7 @@ unsafe extern "C" fn xmlDtdDumpOutput(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
      * Do this only on a standalone DTD or on the internal subset though.
      */
     if !(*dtd).notations.is_null() && ((*dtd).doc.is_null() || (*(*dtd).doc).int_subset == dtd) {
-        xmlBufDumpNotationTable((*buf).buffer, (*dtd).notations as _);
+        xml_buf_dump_notation_table((*buf).buffer, (*dtd).notations as _);
     }
     let format: c_int = (*ctxt).format;
     let level: c_int = (*ctxt).level;
@@ -1094,7 +1097,7 @@ unsafe extern "C" fn xmlDtdDumpOutput(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     (*ctxt).level = -1;
     cur = (*dtd).children;
     while !cur.is_null() {
-        xmlNodeDumpOutputInternal(ctxt, cur);
+        xml_node_dump_output_internal(ctxt, cur);
         cur = (*cur).next;
     }
     (*ctxt).format = format;
@@ -1110,8 +1113,8 @@ unsafe extern "C" fn xmlDtdDumpOutput(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
  * Dump a local Namespace definition to a save context.
  * Should be called in the context of attribute dumps.
  */
-unsafe extern "C" fn xmlNsDumpOutputCtxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr) {
-    xmlNsDumpOutput((*ctxt).buf, cur, ctxt);
+unsafe extern "C" fn xml_ns_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr) {
+    xml_ns_dump_output((*ctxt).buf, cur, ctxt);
 }
 
 /**
@@ -1121,7 +1124,7 @@ unsafe extern "C" fn xmlNsDumpOutputCtxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr) {
  * Dump a list of XML attributes
  */
 #[cfg(feature = "html")]
-unsafe extern "C" fn xhtmlAttrListDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr) {
+unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr) {
     use crate::libxml::tree::{xml_free_node, xml_new_doc_text};
 
     use super::htmltree::html_is_boolean_attr;
@@ -1165,7 +1168,7 @@ unsafe extern "C" fn xhtmlAttrListDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlA
                 (*(*cur).children).parent = cur as _;
             }
         }
-        xmlAttrDumpOutput(ctxt, cur);
+        xml_attr_dump_output(ctxt, cur);
         cur = (*cur).next;
     }
     /*
@@ -1185,7 +1188,7 @@ unsafe extern "C" fn xhtmlAttrListDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlA
                 || xml_str_equal((*parent).name, c"iframe".as_ptr() as _) != 0))
     {
         xml_output_buffer_write(buf, 5, c" id=\"".as_ptr() as _);
-        xmlAttrSerializeContent(buf, name);
+        xml_attr_serialize_content(buf, name);
         xml_output_buffer_write(buf, 1, c"\"".as_ptr() as _);
     }
     /*
@@ -1193,11 +1196,11 @@ unsafe extern "C" fn xhtmlAttrListDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlA
      */
     if !lang.is_null() && xml_lang.is_null() {
         xml_output_buffer_write(buf, 11, c" xml:lang=\"".as_ptr() as _);
-        xmlAttrSerializeContent(buf, lang);
+        xml_attr_serialize_content(buf, lang);
         xml_output_buffer_write(buf, 1, c"\"".as_ptr() as _);
     } else if !xml_lang.is_null() && lang.is_null() {
         xml_output_buffer_write(buf, 7, c" lang=\"".as_ptr() as _);
-        xmlAttrSerializeContent(buf, xml_lang);
+        xml_attr_serialize_content(buf, xml_lang);
         xml_output_buffer_write(buf, 1, c"\"".as_ptr() as _);
     }
 }
@@ -1213,7 +1216,7 @@ const XHTML_NS_NAME: &str = "http://www.w3.org/1999/xhtml";
  * Returns 1 if the node is an empty node, 0 if not and -1 in case of error
  */
 #[cfg(feature = "html")]
-unsafe extern "C" fn xhtmlIsEmpty(node: XmlNodePtr) -> c_int {
+unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> c_int {
     if node.is_null() {
         return -1;
     }
@@ -1318,7 +1321,7 @@ unsafe extern "C" fn xhtmlIsEmpty(node: XmlNodePtr) -> c_int {
  * Dump an XHTML node, recursive behaviour, children are printed too.
  */
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cur: XmlNodePtr) {
+pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlNodePtr) {
     use crate::libxml::{
         parser_internals::XML_STRING_TEXT, tree::xml_get_prop, xmlstring::xml_strcasecmp,
     };
@@ -1342,13 +1345,13 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
     loop {
         match (*cur).typ {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
-                xmlDocContentDumpOutput(ctxt, cur as _);
+                xml_doc_content_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlNamespaceDecl => {
-                xmlNsDumpOutputCtxt(ctxt, cur as _);
+                xml_ns_dump_output_ctxt(ctxt, cur as _);
             }
             XmlElementType::XmlDtdNode => {
-                xmlDtdDumpOutput(ctxt, cur as _);
+                xml_dtd_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlDocumentFragNode => {
                 /* Always validate (*cur).parent when descending. */
@@ -1359,13 +1362,13 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xmlBufDumpElementDecl((*buf).buffer, cur as _);
+                xml_buf_dump_element_decl((*buf).buffer, cur as _);
             }
             XmlElementType::XmlAttributeDecl => {
-                xmlBufDumpAttributeDecl((*buf).buffer, cur as _);
+                xml_buf_dump_attribute_decl((*buf).buffer, cur as _);
             }
             XmlElementType::XmlEntityDecl => {
-                xmlBufDumpEntityDecl((*buf).buffer, cur as _);
+                xml_buf_dump_entity_decl((*buf).buffer, cur as _);
             }
             XmlElementType::XmlElementNode => {
                 addmeta = 0;
@@ -1389,7 +1392,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
                  * case.
                  */
                 if (*cur).parent != parent && !(*cur).children.is_null() {
-                    xhtmlNodeDumpOutput(ctxt, cur);
+                    xhtml_node_dump_output(ctxt, cur);
                     break;
                 }
 
@@ -1404,7 +1407,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
 
                 xml_output_buffer_write_string(buf, (*cur).name as _);
                 if !(*cur).ns_def.is_null() {
-                    xmlNsListDumpOutputCtxt(ctxt, (*cur).ns_def);
+                    xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
                 }
                 if xml_str_equal((*cur).name, c"html".as_ptr() as _) != 0
                     && (*cur).ns.is_null()
@@ -1419,7 +1422,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
                     );
                 }
                 if !(*cur).properties.is_null() {
-                    xhtmlAttrListDumpOutput(ctxt, (*cur).properties);
+                    xhtml_attr_list_dump_output(ctxt, (*cur).properties);
                 }
 
                 if !parent.is_null()
@@ -1450,7 +1453,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
                 if (*cur).children.is_null() {
                     if ((*cur).ns.is_null()
                         || (*(*cur).ns).prefix.load(Ordering::Relaxed).is_null())
-                        && (xhtmlIsEmpty(cur) == 1 && addmeta == 0)
+                        && (xhtml_is_empty(cur) == 1 && addmeta == 0)
                     {
                         /*
                          * C.2. Empty Elements
@@ -1629,7 +1632,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                xmlAttrDumpOutput(ctxt, cur as _);
+                xml_attr_dump_output(ctxt, cur as _);
             }
             _ => {}
         }
@@ -1688,7 +1691,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
     }
 }
 
-unsafe extern "C" fn xmlSaveClearEncoding(ctxt: XmlSaveCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> c_int {
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     xml_output_buffer_flush(buf);
     xml_char_enc_close_func((*buf).encoder);
@@ -1704,7 +1707,7 @@ unsafe extern "C" fn xmlSaveClearEncoding(ctxt: XmlSaveCtxtPtr) -> c_int {
  *
  * Dump an XML document.
  */
-pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
+pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     ctxt: XmlSaveCtxtPtr,
     cur: XmlDocPtr,
 ) -> c_int {
@@ -1756,7 +1759,7 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
                 && oldctxtenc.is_null()
                 && (*buf).encoder.is_null()
                 && (*buf).conv.is_null())
-                && xmlSaveSwitchEncoding(ctxt, encoding as _) < 0
+                && xml_save_switch_encoding(ctxt, encoding as _) < 0
             {
                 (*cur).encoding = oldenc;
                 return -1;
@@ -1797,16 +1800,16 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
                  * document since we output the XMLDecl the conversion
                  * must be done to not generate not well formed documents.
                  */
-                if xmlSaveSwitchEncoding(ctxt, encoding as _) < 0 {
+                if xml_save_switch_encoding(ctxt, encoding as _) < 0 {
                     (*cur).encoding = oldenc;
                     return -1;
                 }
                 switched_encoding = 1;
             }
-            if (*ctxt).escape == Some(xmlEscapeEntities) {
+            if (*ctxt).escape == Some(xml_escape_entities) {
                 (*ctxt).escape = None;
             }
-            if (*ctxt).escape_attr == Some(xmlEscapeEntities) {
+            if (*ctxt).escape_attr == Some(xml_escape_entities) {
                 (*ctxt).escape_attr = None;
             }
         }
@@ -1860,14 +1863,14 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
                 #[cfg(feature = "html")]
                 {
                     if is_xhtml != 0 {
-                        xhtmlNodeDumpOutput(ctxt, child);
+                        xhtml_node_dump_output(ctxt, child);
                     } else {
-                        xmlNodeDumpOutputInternal(ctxt, child);
+                        xml_node_dump_output_internal(ctxt, child);
                     }
                 }
                 #[cfg(not(feature = "html"))]
                 {
-                    xmlNodeDumpOutputInternal(ctxt, child);
+                    xml_node_dump_output_internal(ctxt, child);
                 }
                 if !matches!(
                     (*child).typ,
@@ -1884,7 +1887,7 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
      * Restore the state of the saving context at the end of the document
      */
     if switched_encoding != 0 && oldctxtenc.is_null() {
-        xmlSaveClearEncoding(ctxt);
+        xml_save_clear_encoding(ctxt);
         (*ctxt).escape = oldescape;
         (*ctxt).escape_attr = oldescape_attr;
     }
@@ -1897,7 +1900,7 @@ pub(crate) unsafe extern "C" fn xmlDocContentDumpOutput(
  *
  * Free a saving context, destroying the output in any remaining buffer
  */
-unsafe extern "C" fn xmlFreeSaveCtxt(ctxt: XmlSaveCtxtPtr) {
+unsafe extern "C" fn xml_free_save_ctxt(ctxt: XmlSaveCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -1917,7 +1920,10 @@ unsafe extern "C" fn xmlFreeSaveCtxt(ctxt: XmlSaveCtxtPtr) {
  *
  * Returns the new structure or NULL in case of error
  */
-unsafe extern "C" fn xmlNewSaveCtxt(encoding: *const c_char, mut options: c_int) -> XmlSaveCtxtPtr {
+unsafe extern "C" fn xml_new_save_ctxt(
+    encoding: *const c_char,
+    mut options: c_int,
+) -> XmlSaveCtxtPtr {
     let ret: XmlSaveCtxtPtr = xml_malloc(size_of::<XmlSaveCtxt>()) as _;
     if ret.is_null() {
         xml_save_err_memory(c"creating saving context".as_ptr() as _);
@@ -1933,13 +1939,13 @@ unsafe extern "C" fn xmlNewSaveCtxt(encoding: *const c_char, mut options: c_int)
                 null_mut(),
                 encoding,
             );
-            xmlFreeSaveCtxt(ret);
+            xml_free_save_ctxt(ret);
             return null_mut();
         }
         (*ret).encoding = xml_strdup(encoding as _) as _;
         (*ret).escape = None;
     }
-    xmlSaveCtxtInit(ret);
+    xml_save_ctxt_init(ret);
 
     /*
      * Use the options
@@ -1973,19 +1979,19 @@ unsafe extern "C" fn xmlNewSaveCtxt(encoding: *const c_char, mut options: c_int)
  *
  * Returns a new serialization context or NULL in case of error.
  */
-pub unsafe extern "C" fn xmlSaveToFd(
+pub unsafe extern "C" fn xml_save_to_fd(
     fd: c_int,
     encoding: *const c_char,
     options: c_int,
 ) -> XmlSaveCtxtPtr {
-    let ret: XmlSaveCtxtPtr = xmlNewSaveCtxt(encoding, options);
+    let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
     if ret.is_null() {
         return null_mut();
     }
     (*ret).buf = xml_output_buffer_create_fd(fd, (*ret).handler);
     if (*ret).buf.is_null() {
         xml_char_enc_close_func((*ret).handler);
-        xmlFreeSaveCtxt(ret);
+        xml_free_save_ctxt(ret);
         return null_mut();
     }
     ret
@@ -2003,21 +2009,21 @@ pub unsafe extern "C" fn xmlSaveToFd(
  *
  * Returns a new serialization context or NULL in case of error.
  */
-pub unsafe extern "C" fn xmlSaveToFilename(
+pub unsafe extern "C" fn xml_save_to_filename(
     filename: *const c_char,
     encoding: *const c_char,
     options: c_int,
 ) -> XmlSaveCtxtPtr {
     let compression: c_int = 0; /* TODO handle compression option */
 
-    let ret: XmlSaveCtxtPtr = xmlNewSaveCtxt(encoding, options);
+    let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
     if ret.is_null() {
         return null_mut();
     }
     (*ret).buf = xml_output_buffer_create_filename(filename, (*ret).handler, compression);
     if (*ret).buf.is_null() {
         xml_char_enc_close_func((*ret).handler);
-        xmlFreeSaveCtxt(ret);
+        xml_free_save_ctxt(ret);
         return null_mut();
     }
     ret
@@ -2034,19 +2040,19 @@ pub unsafe extern "C" fn xmlSaveToFilename(
  *
  * Returns a new serialization context or NULL in case of error.
  */
-pub unsafe extern "C" fn xmlSaveToBuffer(
+pub unsafe extern "C" fn xml_save_to_buffer(
     buffer: XmlBufferPtr,
     encoding: *const c_char,
     options: c_int,
 ) -> XmlSaveCtxtPtr {
-    let ret: XmlSaveCtxtPtr = xmlNewSaveCtxt(encoding, options);
+    let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
     if ret.is_null() {
         return null_mut();
     }
     (*ret).buf = xml_output_buffer_create_buffer(buffer, (*ret).handler);
     if (*ret).buf.is_null() {
         xml_char_enc_close_func((*ret).handler);
-        xmlFreeSaveCtxt(ret);
+        xml_free_save_ctxt(ret);
         return null_mut();
     }
     ret
@@ -2065,21 +2071,21 @@ pub unsafe extern "C" fn xmlSaveToBuffer(
  *
  * Returns a new serialization context or NULL in case of error.
  */
-pub unsafe extern "C" fn xmlSaveToIO(
+pub unsafe extern "C" fn xml_save_to_io(
     iowrite: Option<XmlOutputWriteCallback>,
     ioclose: Option<XmlOutputCloseCallback>,
     ioctx: *mut c_void,
     encoding: *const c_char,
     options: c_int,
 ) -> XmlSaveCtxtPtr {
-    let ret: XmlSaveCtxtPtr = xmlNewSaveCtxt(encoding, options);
+    let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
     if ret.is_null() {
         return null_mut();
     }
     (*ret).buf = xml_output_buffer_create_io(iowrite, ioclose, ioctx, (*ret).handler);
     if (*ret).buf.is_null() {
         xml_char_enc_close_func((*ret).handler);
-        xmlFreeSaveCtxt(ret);
+        xml_free_save_ctxt(ret);
         return null_mut();
     }
     ret
@@ -2096,13 +2102,13 @@ pub unsafe extern "C" fn xmlSaveToIO(
  *
  * Returns the number of byte written or -1 in case of error
  */
-pub unsafe extern "C" fn xmlSaveDoc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> c_long {
+pub unsafe extern "C" fn xml_save_doc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> c_long {
     let ret: c_long = 0;
 
     if ctxt.is_null() || doc.is_null() {
         return -1;
     }
-    if xmlDocContentDumpOutput(ctxt, doc) < 0 {
+    if xml_doc_content_dump_output(ctxt, doc) < 0 {
         return -1;
     }
     ret
@@ -2115,7 +2121,10 @@ pub unsafe extern "C" fn xmlSaveDoc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> c_l
  * Dump an HTML node, recursive behaviour, children are printed too.
  */
 #[cfg(feature = "html")]
-unsafe extern "C" fn htmlNodeDumpOutputInternal(ctxt: XmlSaveCtxtPtr, cur: XmlNodePtr) -> c_int {
+unsafe extern "C" fn html_node_dump_output_internal(
+    ctxt: XmlSaveCtxtPtr,
+    cur: XmlNodePtr,
+) -> c_int {
     use super::htmltree::html_node_dump_format_output;
 
     let mut oldenc: *const XmlChar = null();
@@ -2150,7 +2159,7 @@ unsafe extern "C" fn htmlNodeDumpOutputInternal(ctxt: XmlSaveCtxtPtr, cur: XmlNo
         && (*buf).encoder.is_null()
         && (*buf).conv.is_null()
     {
-        if xmlSaveSwitchEncoding(ctxt, encoding as _) < 0 {
+        if xml_save_switch_encoding(ctxt, encoding as _) < 0 {
             (*doc).encoding = oldenc;
             return -1;
         }
@@ -2165,7 +2174,7 @@ unsafe extern "C" fn htmlNodeDumpOutputInternal(ctxt: XmlSaveCtxtPtr, cur: XmlNo
      * Restore the state of the saving context at the end of the document
      */
     if switched_encoding != 0 && oldctxtenc.is_null() {
-        xmlSaveClearEncoding(ctxt);
+        xml_save_clear_encoding(ctxt);
     }
     if !doc.is_null() {
         (*doc).encoding = oldenc;
@@ -2184,7 +2193,7 @@ unsafe extern "C" fn htmlNodeDumpOutputInternal(ctxt: XmlSaveCtxtPtr, cur: XmlNo
  *
  * Returns the number of byte written or -1 in case of error
  */
-pub unsafe extern "C" fn xmlSaveTree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -> c_long {
+pub unsafe extern "C" fn xml_save_tree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -> c_long {
     let ret: c_long = 0;
 
     if ctxt.is_null() || node.is_null() {
@@ -2193,7 +2202,7 @@ pub unsafe extern "C" fn xmlSaveTree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -> 
     #[cfg(feature = "html")]
     {
         if (*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32 != 0 {
-            xhtmlNodeDumpOutput(ctxt, node);
+            xhtml_node_dump_output(ctxt, node);
             return ret;
         }
         if (!matches!((*node).typ, XmlElementType::XmlNamespaceDecl)
@@ -2202,11 +2211,11 @@ pub unsafe extern "C" fn xmlSaveTree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -> 
             && (*ctxt).options & XmlSaveOption::XmlSaveAsXml as i32 == 0)
             || (*ctxt).options & XmlSaveOption::XmlSaveAsHtml as i32 != 0
         {
-            htmlNodeDumpOutputInternal(ctxt, node);
+            html_node_dump_output_internal(ctxt, node);
             return ret;
         }
     }
-    xmlNodeDumpOutputInternal(ctxt, node);
+    xml_node_dump_output_internal(ctxt, node);
     ret
 }
 
@@ -2219,7 +2228,7 @@ pub unsafe extern "C" fn xmlSaveTree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -> 
  *
  * Returns the number of byte written or -1 in case of error.
  */
-pub unsafe extern "C" fn xmlSaveFlush(ctxt: XmlSaveCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_save_flush(ctxt: XmlSaveCtxtPtr) -> c_int {
     if ctxt.is_null() {
         return -1;
     }
@@ -2238,12 +2247,12 @@ pub unsafe extern "C" fn xmlSaveFlush(ctxt: XmlSaveCtxtPtr) -> c_int {
  *
  * Returns the number of byte written or -1 in case of error.
  */
-pub unsafe extern "C" fn xmlSaveClose(ctxt: XmlSaveCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_save_close(ctxt: XmlSaveCtxtPtr) -> c_int {
     if ctxt.is_null() {
         return -1;
     }
-    let ret: c_int = xmlSaveFlush(ctxt);
-    xmlFreeSaveCtxt(ctxt);
+    let ret: c_int = xml_save_flush(ctxt);
+    xml_free_save_ctxt(ctxt);
     ret
 }
 
@@ -2256,7 +2265,7 @@ pub unsafe extern "C" fn xmlSaveClose(ctxt: XmlSaveCtxtPtr) -> c_int {
  *
  * Returns 0 if successful or -1 in case of error.
  */
-pub unsafe extern "C" fn xmlSaveSetEscape(
+pub unsafe extern "C" fn xml_save_set_escape(
     ctxt: XmlSaveCtxtPtr,
     escape: Option<XmlCharEncodingOutputFunc>,
 ) -> c_int {
@@ -2276,7 +2285,7 @@ pub unsafe extern "C" fn xmlSaveSetEscape(
  *
  * Returns 0 if successful or -1 in case of error.
  */
-pub unsafe extern "C" fn xmlSaveSetAttrEscape(
+pub unsafe extern "C" fn xml_save_set_attr_escape(
     ctxt: XmlSaveCtxtPtr,
     escape: Option<XmlCharEncodingOutputFunc>,
 ) -> c_int {
@@ -2306,7 +2315,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctxt = gen_xml_save_ctxt_ptr(n_ctxt, 0);
 
-                let ret_val = xmlSaveClose(ctxt);
+                let ret_val = xml_save_close(ctxt);
                 desret_int(ret_val);
                 des_xml_save_ctxt_ptr(n_ctxt, ctxt, 0);
                 xml_reset_last_error();
@@ -2335,7 +2344,7 @@ mod tests {
                     let ctxt = gen_xml_save_ctxt_ptr(n_ctxt, 0);
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
-                    let ret_val = xmlSaveDoc(ctxt, doc);
+                    let ret_val = xml_save_doc(ctxt, doc);
                     desret_long(ret_val);
                     des_xml_save_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
@@ -2365,7 +2374,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctxt = gen_xml_save_ctxt_ptr(n_ctxt, 0);
 
-                let ret_val = xmlSaveFlush(ctxt);
+                let ret_val = xml_save_flush(ctxt);
                 desret_int(ret_val);
                 des_xml_save_ctxt_ptr(n_ctxt, ctxt, 0);
                 xml_reset_last_error();
@@ -2424,7 +2433,7 @@ mod tests {
                     let ctxt = gen_xml_save_ctxt_ptr(n_ctxt, 0);
                     let cur = gen_xml_node_ptr(n_cur, 1);
 
-                    let ret_val = xmlSaveTree(ctxt, cur);
+                    let ret_val = xml_save_tree(ctxt, cur);
                     desret_long(ret_val);
                     des_xml_save_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);

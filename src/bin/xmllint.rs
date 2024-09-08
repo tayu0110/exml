@@ -85,7 +85,8 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlsave::{
-            xmlSaveClose, xmlSaveDoc, xmlSaveToFd, xmlSaveToFilename, XmlSaveCtxtPtr, XmlSaveOption,
+            xml_save_close, xml_save_doc, xml_save_to_fd, xml_save_to_filename, XmlSaveCtxtPtr,
+            XmlSaveOption,
         },
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
@@ -3006,7 +3007,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 }
 
                 if let Some(o) = OUTPUT.lock().unwrap().as_ref() {
-                    ctxt = xmlSaveToFilename(
+                    ctxt = xml_save_to_filename(
                         o.as_ptr(),
                         ENCODING
                             .lock()
@@ -3016,7 +3017,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         save_opts,
                     );
                 } else {
-                    ctxt = xmlSaveToFd(
+                    ctxt = xml_save_to_fd(
                         1,
                         ENCODING
                             .lock()
@@ -3028,13 +3029,13 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 }
 
                 if !ctxt.is_null() {
-                    if xmlSaveDoc(ctxt, doc) < 0 {
+                    if xml_save_doc(ctxt, doc) < 0 {
                         let lock = OUTPUT.lock().unwrap();
                         let o = lock.as_ref().map_or(c"-", |o| o.as_c_str());
                         eprintln!("failed save to {}", o.to_string_lossy());
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
-                    xmlSaveClose(ctxt);
+                    xml_save_close(ctxt);
                 } else {
                     PROGRESULT = XmllintReturnCode::ErrOut;
                 }
