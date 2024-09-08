@@ -543,7 +543,7 @@ pub unsafe extern "C" fn xml_build_relative_uri(
             val = xml_strdup(uri);
             break 'done;
         }
-        if xml_str_equal((*bas).path as *mut XmlChar, (*refe).path as *mut XmlChar) != 0 {
+        if xml_str_equal((*bas).path as *mut XmlChar, (*refe).path as *mut XmlChar) {
             val = xml_strdup(c"".as_ptr() as _);
             break 'done;
         }
@@ -2117,7 +2117,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     && ((*p.add(1) >= b'a' as i8 && *p.add(1) <= b'z' as i8)
                         || (*p.add(1) >= b'A' as i8 && *p.add(1) <= b'Z' as i8))
                     && *p.add(2) == b':' as i8
-                    && xml_str_equal((*uri).scheme as _, c"file".as_ptr() as _) != 0
+                    && xml_str_equal((*uri).scheme as _, c"file".as_ptr() as _)
                 {
                     if len + 3 >= max {
                         temp = xml_save_uri_realloc(ret, addr_of_mut!(max));

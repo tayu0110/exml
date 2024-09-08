@@ -2645,7 +2645,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
      * Remove locally kept entity definitions if the tree was not built
      */
     if !(*ctxt).my_doc.is_null()
-        && xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _) != 0
+        && xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _)
     {
         xml_free_doc((*ctxt).my_doc);
         (*ctxt).my_doc = null_mut();
@@ -4207,8 +4207,8 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
         /*
          * An XML-1.0 document can't reference an entity not XML-1.0
          */
-        if xml_str_equal((*oldctxt).version, c"1.0".as_ptr() as _) != 0
-            && xml_str_equal((*(*ctxt).input).version, c"1.0".as_ptr() as _) == 0
+        if xml_str_equal((*oldctxt).version, c"1.0".as_ptr() as _)
+            && !xml_str_equal((*(*ctxt).input).version, c"1.0".as_ptr() as _)
         {
             xml_fatal_err_msg(
                 ctxt,
@@ -7707,7 +7707,7 @@ unsafe extern "C" fn xml_parse_attribute2(
          * No more registered as an error, just generate a warning now
          * since this was deprecated in XML second edition
          */
-        if (*ctxt).pedantic != 0 && xml_str_equal(name, c"lang".as_ptr() as _) != 0 {
+        if (*ctxt).pedantic != 0 && xml_str_equal(name, c"lang".as_ptr() as _) {
             internal_val = xml_strndup(val, *len);
             if xml_check_language_id(internal_val) == 0 {
                 xml_warning_msg(
@@ -7723,11 +7723,11 @@ unsafe extern "C" fn xml_parse_attribute2(
         /*
          * Check that xml:space conforms to the specification
          */
-        if xml_str_equal(name, c"space".as_ptr() as _) != 0 {
+        if xml_str_equal(name, c"space".as_ptr() as _) {
             internal_val = xml_strndup(val, *len);
-            if xml_str_equal(internal_val, c"default".as_ptr() as _) != 0 {
+            if xml_str_equal(internal_val, c"default".as_ptr() as _) {
                 *(*ctxt).space = 0;
-            } else if xml_str_equal(internal_val, c"preserve".as_ptr() as _) != 0 {
+            } else if xml_str_equal(internal_val, c"preserve".as_ptr() as _) {
                 *(*ctxt).space = 1;
             } else {
                 xml_warning_msg(
@@ -8078,7 +8078,6 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         }
                         if len == 29
                             && xml_str_equal(url, c"http://www.w3.org/2000/xmlns/".as_ptr() as _)
-                                != 0
                         {
                             xml_ns_err(
                                 ctxt,
@@ -8152,7 +8151,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         break 'next_attr;
                     }
                     if len == 29
-                        && xml_str_equal(url, c"http://www.w3.org/2000/xmlns/".as_ptr() as _) != 0
+                        && xml_str_equal(url, c"http://www.w3.org/2000/xmlns/".as_ptr() as _)
                     {
                         xml_ns_err(
                             ctxt,
@@ -12360,7 +12359,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
              * For expat compatibility in SAX mode.
              */
             if (*ctxt).my_doc.is_null()
-                || xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _) != 0
+                || xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _)
             {
                 if (*ctxt).my_doc.is_null() {
                     (*ctxt).my_doc = xml_new_doc(SAX_COMPAT_MODE.as_ptr() as _);
@@ -12468,8 +12467,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                  */
                 if (*ctxt).replace_entities != 0
                     && ((*ctxt).my_doc.is_null()
-                        || xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _)
-                            != 0)
+                        || xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _))
                 {
                     if (*ctxt).my_doc.is_null() {
                         (*ctxt).my_doc = xml_new_doc(SAX_COMPAT_MODE.as_ptr() as _);
@@ -13844,7 +13842,7 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
     if version.is_null() {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrVersionMissing, null());
     } else {
-        if xml_str_equal(version, XML_DEFAULT_VERSION.as_ptr() as *const XmlChar) == 0 {
+        if !xml_str_equal(version, XML_DEFAULT_VERSION.as_ptr() as *const XmlChar) {
             /*
              * Changed here for XML-1.0 5th edition
              */

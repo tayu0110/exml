@@ -302,17 +302,14 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
     if xml_str_equal(
         (*(*node).ns).href.load(Ordering::Relaxed),
         XINCLUDE_NS.as_ptr() as _,
-    ) != 0
-        || xml_str_equal(
-            (*(*node).ns).href.load(Ordering::Relaxed),
-            XINCLUDE_OLD_NS.as_ptr() as _,
-        ) != 0
-    {
+    ) || xml_str_equal(
+        (*(*node).ns).href.load(Ordering::Relaxed),
+        XINCLUDE_OLD_NS.as_ptr() as _,
+    ) {
         if xml_str_equal(
             (*(*node).ns).href.load(Ordering::Relaxed),
             XINCLUDE_OLD_NS.as_ptr() as _,
-        ) != 0
-            && (*ctxt).legacy == 0
+        ) && (*ctxt).legacy == 0
         {
             // #if 0 /* wait for the XML Core Working Group to get something stable ! */
             //         xmlXIncludeWarn(ctxt, node, XML_XINCLUDE_DEPRECATED_NS,
@@ -321,7 +318,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
             // #endif
             (*ctxt).legacy = 1;
         }
-        if xml_str_equal((*node).name, XINCLUDE_NODE.as_ptr() as _) != 0 {
+        if xml_str_equal((*node).name, XINCLUDE_NODE.as_ptr() as _) {
             let mut child: XmlNodePtr = (*node).children;
             let mut nb_fallback: c_int = 0;
 
@@ -331,13 +328,12 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
                     && (xml_str_equal(
                         (*(*child).ns).href.load(Ordering::Relaxed),
                         XINCLUDE_NS.as_ptr() as _,
-                    ) != 0
-                        || xml_str_equal(
-                            (*(*child).ns).href.load(Ordering::Relaxed),
-                            XINCLUDE_OLD_NS.as_ptr() as _,
-                        ) != 0)
+                    ) || xml_str_equal(
+                        (*(*child).ns).href.load(Ordering::Relaxed),
+                        XINCLUDE_OLD_NS.as_ptr() as _,
+                    ))
                 {
-                    if xml_str_equal((*child).name, XINCLUDE_NODE.as_ptr() as _) != 0 {
+                    if xml_str_equal((*child).name, XINCLUDE_NODE.as_ptr() as _) {
                         xml_xinclude_err(
                             ctxt,
                             node,
@@ -347,7 +343,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
                         );
                         return 0;
                     }
-                    if xml_str_equal((*child).name, XINCLUDE_FALLBACK.as_ptr() as _) != 0 {
+                    if xml_str_equal((*child).name, XINCLUDE_FALLBACK.as_ptr() as _) {
                         nb_fallback += 1;
                     }
                 }
@@ -365,19 +361,18 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
             }
             return 1;
         }
-        if xml_str_equal((*node).name, XINCLUDE_FALLBACK.as_ptr() as _) != 0
+        if xml_str_equal((*node).name, XINCLUDE_FALLBACK.as_ptr() as _)
             && ((*node).parent.is_null()
                 || (*(*node).parent).typ != XmlElementType::XmlElementNode
                 || (*(*node).parent).ns.is_null()
-                || (xml_str_equal(
+                || (!xml_str_equal(
                     (*(*(*node).parent).ns).href.load(Ordering::Relaxed),
                     XINCLUDE_NS.as_ptr() as _,
-                ) == 0
-                    && xml_str_equal(
-                        (*(*(*node).parent).ns).href.load(Ordering::Relaxed),
-                        XINCLUDE_OLD_NS.as_ptr() as _,
-                    ) == 0)
-                || xml_str_equal((*(*node).parent).name, XINCLUDE_NODE.as_ptr() as _) == 0)
+                ) && !xml_str_equal(
+                    (*(*(*node).parent).ns).href.load(Ordering::Relaxed),
+                    XINCLUDE_OLD_NS.as_ptr() as _,
+                ))
+                || !xml_str_equal((*(*node).parent).name, XINCLUDE_NODE.as_ptr() as _))
         {
             xml_xinclude_err(
                 ctxt,
@@ -584,9 +579,9 @@ unsafe extern "C" fn xml_xinclude_add_node(
     }
     let parse: *mut XmlChar = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.as_ptr() as _);
     if !parse.is_null() {
-        if xml_str_equal(parse, XINCLUDE_PARSE_XML.as_ptr() as _) != 0 {
+        if xml_str_equal(parse, XINCLUDE_PARSE_XML.as_ptr() as _) {
             xml = 1;
-        } else if xml_str_equal(parse, XINCLUDE_PARSE_TEXT.as_ptr() as _) != 0 {
+        } else if xml_str_equal(parse, XINCLUDE_PARSE_TEXT.as_ptr() as _) {
             xml = 0;
         } else {
             xml_xinclude_err(
@@ -711,7 +706,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
     }
     xml_free(uri as _);
 
-    if xml_str_equal(url, (*(*ctxt).doc).url) != 0 {
+    if xml_str_equal(url, (*(*ctxt).doc).url) {
         local = 1;
     }
 
@@ -909,33 +904,30 @@ unsafe extern "C" fn xml_xinclude_merge_entity(
             if !(*ent).system_id.load(Ordering::Relaxed).is_null()
                 && !(*prev).system_id.load(Ordering::Relaxed).is_null()
             {
-                if xml_str_equal(
+                if !xml_str_equal(
                     (*ent).system_id.load(Ordering::Relaxed),
                     (*prev).system_id.load(Ordering::Relaxed),
-                ) == 0
-                {
+                ) {
                     // goto error;
                     error()
                 }
             } else if !(*ent).external_id.load(Ordering::Relaxed).is_null()
                 && !(*prev).external_id.load(Ordering::Relaxed).is_null()
             {
-                if xml_str_equal(
+                if !xml_str_equal(
                     (*ent).external_id.load(Ordering::Relaxed),
                     (*prev).external_id.load(Ordering::Relaxed),
-                ) == 0
-                {
+                ) {
                     // goto error;
                     return error();
                 }
             } else if !(*ent).content.load(Ordering::Relaxed).is_null()
                 && !(*prev).content.load(Ordering::Relaxed).is_null()
             {
-                if xml_str_equal(
+                if !xml_str_equal(
                     (*ent).content.load(Ordering::Relaxed),
                     (*prev).content.load(Ordering::Relaxed),
-                ) == 0
-                {
+                ) {
                     // goto error;
                     return error();
                 }
@@ -1020,8 +1012,8 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
         /*
          * don't duplicate existing stuff when external subsets are the same
          */
-        if xml_str_equal((*target).external_id, (*source).external_id) == 0
-            && xml_str_equal((*target).system_id, (*source).system_id) == 0
+        if !xml_str_equal((*target).external_id, (*source).external_id)
+            && !xml_str_equal((*target).system_id, (*source).system_id)
         {
             xml_hash_scan(
                 (*source).entities as XmlHashTablePtr,
@@ -1112,15 +1104,14 @@ unsafe extern "C" fn xml_xinclude_copy_node(
         ) {
         } else if (*cur).typ == XmlElementType::XmlElementNode
             && !(*cur).ns.is_null()
-            && xml_str_equal((*cur).name, XINCLUDE_NODE.as_ptr() as _) != 0
+            && xml_str_equal((*cur).name, XINCLUDE_NODE.as_ptr() as _)
             && (xml_str_equal(
                 (*(*cur).ns).href.load(Ordering::Relaxed),
                 XINCLUDE_NS.as_ptr() as _,
-            ) != 0
-                || xml_str_equal(
-                    (*(*cur).ns).href.load(Ordering::Relaxed),
-                    XINCLUDE_OLD_NS.as_ptr() as _,
-                ) != 0)
+            ) || xml_str_equal(
+                (*(*cur).ns).href.load(Ordering::Relaxed),
+                XINCLUDE_OLD_NS.as_ptr() as _,
+            ))
         {
             let refe: XmlXincludeRefPtr = xml_xinclude_expand_node(ctxt, cur);
 
@@ -1665,7 +1656,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
         'load: {
             if *url.add(0) == 0
                 || *url.add(0) == b'#'
-                || (!(*ctxt).doc.is_null() && xml_str_equal(url, (*(*ctxt).doc).url) != 0)
+                || (!(*ctxt).doc.is_null() && xml_str_equal(url, (*(*ctxt).doc).url))
             {
                 doc = (*ctxt).doc;
                 break 'load;
@@ -1674,7 +1665,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
              * Prevent reloading the document twice.
              */
             for i in 0..(*ctxt).url_nr {
-                if xml_str_equal(url, (*(*ctxt).url_tab.add(i as usize)).url) != 0 {
+                if xml_str_equal(url, (*(*ctxt).url_tab.add(i as usize)).url) {
                     // #ifdef DEBUG_XINCLUDE
                     //         printf("Already loaded %s\n".as_ptr() as _, URL);
                     // #endif
@@ -1760,7 +1751,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
              * To check for this, we compare the URL with that of the doc
              * and change it if they disagree (bug 146988).
              */
-            if xml_str_equal(url, (*doc).url) == 0 {
+            if !xml_str_equal(url, (*doc).url) {
                 xml_free(url as _);
                 url = xml_strdup((*doc).url);
             }
@@ -2010,7 +2001,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                              * URL of the document, then reset it to be
                              * the specified xml:base or the relative URI
                              */
-                            if xml_str_equal(cur_base, (*(*node).doc).url) != 0 {
+                            if xml_str_equal(cur_base, (*(*node).doc).url) {
                                 xml_node_set_base(node, base);
                             } else {
                                 /*
@@ -2169,7 +2160,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
      * Prevent reloading the document twice.
      */
     for i in 0..(*ctxt).txt_nr {
-        if xml_str_equal(url, (*(*ctxt).txt_tab.add(i as usize)).url) != 0 {
+        if xml_str_equal(url, (*(*ctxt).txt_tab.add(i as usize)).url) {
             node = xml_new_doc_text((*ctxt).doc, (*(*ctxt).txt_tab.add(i as usize)).text);
             // goto loaded;
             (*refe).inc = node;
@@ -2426,9 +2417,9 @@ unsafe extern "C" fn xml_xinclude_load_node(
     }
     let parse: *mut XmlChar = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.as_ptr() as _);
     if !parse.is_null() {
-        if xml_str_equal(parse, XINCLUDE_PARSE_XML.as_ptr() as _) != 0 {
+        if xml_str_equal(parse, XINCLUDE_PARSE_XML.as_ptr() as _) {
             xml = 1;
-        } else if xml_str_equal(parse, XINCLUDE_PARSE_TEXT.as_ptr() as _) != 0 {
+        } else if xml_str_equal(parse, XINCLUDE_PARSE_TEXT.as_ptr() as _) {
             xml = 0;
         } else {
             xml_xinclude_err(
@@ -2527,15 +2518,14 @@ unsafe extern "C" fn xml_xinclude_load_node(
         while !children.is_null() {
             if (*children).typ == XmlElementType::XmlElementNode
                 && !(*children).ns.is_null()
-                && xml_str_equal((*children).name, XINCLUDE_FALLBACK.as_ptr() as _) != 0
+                && xml_str_equal((*children).name, XINCLUDE_FALLBACK.as_ptr() as _)
                 && (xml_str_equal(
                     (*(*children).ns).href.load(Ordering::Relaxed),
                     XINCLUDE_NS.as_ptr() as _,
-                ) != 0
-                    || xml_str_equal(
-                        (*(*children).ns).href.load(Ordering::Relaxed),
-                        XINCLUDE_OLD_NS.as_ptr() as _,
-                    ) != 0)
+                ) || xml_str_equal(
+                    (*(*children).ns).href.load(Ordering::Relaxed),
+                    XINCLUDE_OLD_NS.as_ptr() as _,
+                ))
             {
                 ret = xml_xinclude_load_fallback(ctxt, children, refe);
                 break;

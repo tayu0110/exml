@@ -2755,7 +2755,7 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
                 value = (*(*(*ret).atoms.add(i as usize))).valuep as _;
                 let mut k = nbatoms;
                 for j in 0..nbatoms {
-                    if xml_str_equal(*string_map.add(j as usize), value) != 0 {
+                    if xml_str_equal(*string_map.add(j as usize), value) {
                         *string_remap.add(i as usize) = j;
                         k = j;
                         break;
@@ -4243,7 +4243,7 @@ unsafe extern "C" fn xml_fa_equal_atoms(
                 ret = xml_str_equal(
                     (*atom1).valuep as *mut XmlChar,
                     (*atom2).valuep as *mut XmlChar,
-                );
+                ) as i32;
             }
         }
         XmlRegAtomType::XmlRegexpCharval => {
@@ -4638,7 +4638,7 @@ unsafe extern "C" fn xml_fa_compare_ranges(
         || (*range2).typ == XmlRegAtomType::XmlRegexpBlockName
     {
         if (*range1).typ == (*range2).typ {
-            ret = xml_str_equal((*range1).block_name, (*range2).block_name);
+            ret = xml_str_equal((*range1).block_name, (*range2).block_name) as i32;
         } else {
             /*
              * comparing a block range with anything else is way
@@ -5574,7 +5574,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                                 count = *(*exec).counts.add((*t).counter as usize);
                                 if count < (*counter).max
                                     && !(*t).atom.is_null()
-                                    && xml_str_equal(value, (*(*t).atom).valuep as _) != 0
+                                    && xml_str_equal(value, (*(*t).atom).valuep as _)
                                 {
                                     ret = 0;
                                     break;
@@ -5582,7 +5582,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                                 if count >= (*counter).min
                                     && count < (*counter).max
                                     && !(*t).atom.is_null()
-                                    && xml_str_equal(value, (*(*t).atom).valuep as _) != 0
+                                    && xml_str_equal(value, (*(*t).atom).valuep as _)
                                 {
                                     ret = 1;
                                     break;
@@ -5700,7 +5700,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                                     (*exec).transno = transno;
                                     (*exec).state = state;
                                 }
-                                ret = xml_str_equal(value, (*atom).valuep as _);
+                                ret = xml_str_equal(value, (*atom).valuep as _) as i32;
                                 (*exec).transcount += 1;
                                 ret == 1
                             } {}

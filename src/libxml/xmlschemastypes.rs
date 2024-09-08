@@ -5526,7 +5526,7 @@ unsafe extern "C" fn xml_schema_compare_values_internal(
                 if xws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
                     if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
                         /* TODO: What about x < y or x > y. */
-                        if xml_str_equal(xv, yv) != 0 {
+                        if xml_str_equal(xv, yv) {
                             return 0;
                         } else {
                             return 2;
@@ -5570,8 +5570,8 @@ unsafe extern "C" fn xml_schema_compare_values_internal(
                 ytype,
                 XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
             ) {
-                if xml_str_equal((*x).value.qname.name, (*y).value.qname.name) != 0
-                    && xml_str_equal((*x).value.qname.uri, (*y).value.qname.uri) != 0
+                if xml_str_equal((*x).value.qname.name, (*y).value.qname.name)
+                    && xml_str_equal((*x).value.qname.uri, (*y).value.qname.uri)
                 {
                     return 0;
                 }
@@ -5869,7 +5869,7 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
                  * xmlSchemaValidateFacet().
                  * TODO: Get rid of this case.
                  */
-                if !(*facet).value.is_null() && xml_str_equal((*facet).value, value) != 0 {
+                if !(*facet).value.is_null() && xml_str_equal((*facet).value, value) {
                     return 0;
                 }
             } else {
@@ -6465,11 +6465,11 @@ pub unsafe extern "C" fn xml_schema_check_facet(
             }
         }
         XmlSchemaTypeType::XmlSchemaFacetWhitespace => {
-            if xml_str_equal((*facet).value, c"preserve".as_ptr() as _) != 0 {
+            if xml_str_equal((*facet).value, c"preserve".as_ptr() as _) {
                 (*facet).whitespace = XML_SCHEMAS_FACET_PRESERVE;
-            } else if xml_str_equal((*facet).value, c"replace".as_ptr() as _) != 0 {
+            } else if xml_str_equal((*facet).value, c"replace".as_ptr() as _) {
                 (*facet).whitespace = XML_SCHEMAS_FACET_REPLACE;
-            } else if xml_str_equal((*facet).value, c"collapse".as_ptr() as _) != 0 {
+            } else if xml_str_equal((*facet).value, c"collapse".as_ptr() as _) {
                 (*facet).whitespace = XML_SCHEMAS_FACET_COLLAPSE;
             } else {
                 ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;

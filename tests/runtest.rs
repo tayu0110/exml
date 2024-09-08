@@ -5311,7 +5311,7 @@ unsafe extern "C" fn load_xpath_expr(
     }
 
     node = (*doc).children;
-    while !node.is_null() && xml_str_equal((*node).name, c"XPath".as_ptr() as *const XmlChar) == 0 {
+    while !node.is_null() && !xml_str_equal((*node).name, c"XPath".as_ptr() as *const XmlChar) {
         node = (*node).next;
     }
 

@@ -390,7 +390,7 @@ unsafe extern "C" fn xml_add_entity(
                             }
                         } else {
                             let refe = [b'0' + (c / 10 % 10) as u8, b'0' + (c % 10) as u8, b';', 0];
-                            if xml_str_equal(content.add(2) as _, refe.as_ptr()) != 0 {
+                            if xml_str_equal(content.add(2) as _, refe.as_ptr()) {
                                 valid = 1;
                             }
                         }
@@ -685,25 +685,25 @@ pub unsafe extern "C" fn xml_get_predefined_entity(name: *const XmlChar) -> XmlE
     }
     match *name.add(0) {
         b'l' => {
-            if xml_str_equal(name, c"lt".as_ptr() as _) != 0 {
+            if xml_str_equal(name, c"lt".as_ptr() as _) {
                 return addr_of_mut!(XML_ENTITY_LT);
             }
         }
         b'g' => {
-            if xml_str_equal(name, c"gt".as_ptr() as _) != 0 {
+            if xml_str_equal(name, c"gt".as_ptr() as _) {
                 return addr_of_mut!(XML_ENTITY_GT);
             }
         }
         b'a' => {
-            if xml_str_equal(name, c"amp".as_ptr() as _) != 0 {
+            if xml_str_equal(name, c"amp".as_ptr() as _) {
                 return addr_of_mut!(XML_ENTITY_AMP);
             }
-            if xml_str_equal(name, c"apos".as_ptr() as _) != 0 {
+            if xml_str_equal(name, c"apos".as_ptr() as _) {
                 return addr_of_mut!(XML_ENTITY_APOS);
             }
         }
         b'q' => {
-            if xml_str_equal(name, c"quot".as_ptr() as _) != 0 {
+            if xml_str_equal(name, c"quot".as_ptr() as _) {
                 return addr_of_mut!(XML_ENTITY_QUOT);
             }
         }

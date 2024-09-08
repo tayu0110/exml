@@ -4392,7 +4392,7 @@ pub unsafe extern "C" fn html_tag_lookup(tag: *const XmlChar) -> *const HtmlElem
  */
 pub unsafe extern "C" fn html_entity_lookup(name: *const XmlChar) -> *const HtmlEntityDesc {
     for entry in HTML40_ENTITIES_TABLE {
-        if xml_str_equal(name, entry.name as _) != 0 {
+        if xml_str_equal(name, entry.name as _) {
             return entry as *const HtmlEntityDesc;
         }
     }
@@ -5520,7 +5520,7 @@ pub unsafe extern "C" fn html_auto_close_tag(
     if elem.is_null() {
         return 1;
     }
-    if xml_str_equal(name, (*elem).name) != 0 {
+    if xml_str_equal(name, (*elem).name) {
         return 0;
     }
     if html_check_auto_close((*elem).name, name) != 0 {
@@ -5969,11 +5969,10 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
                  * Don't use UTF-8 encoder which isn't required and
                  * can produce invalid UTF-8.
                  */
-                if xml_str_equal(
+                if !xml_str_equal(
                     (*handler).name.load(Ordering::Relaxed) as _,
                     c"UTF-8".as_ptr() as _,
-                ) == 0
-                {
+                ) {
                     xml_switch_to_encoding(ctxt, handler);
                 }
             } else {
@@ -6624,9 +6623,9 @@ unsafe extern "C" fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const Xml
     }
     while newtag.is_null()
         && !(*ctxt).name.is_null()
-        && (xml_str_equal((*ctxt).name, c"head".as_ptr() as _) != 0
-            || xml_str_equal((*ctxt).name, c"body".as_ptr() as _) != 0
-            || xml_str_equal((*ctxt).name, c"html".as_ptr() as _) != 0)
+        && (xml_str_equal((*ctxt).name, c"head".as_ptr() as _)
+            || xml_str_equal((*ctxt).name, c"body".as_ptr() as _)
+            || xml_str_equal((*ctxt).name, c"html".as_ptr() as _))
     {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
             ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data, (*ctxt).name);
@@ -6647,10 +6646,10 @@ static HTML_OMITTED_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
  * Returns -1 in case of error, the index in the stack otherwise
  */
 unsafe extern "C" fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlChar) -> c_int {
-    if (*ctxt).html < 3 && xml_str_equal(value, c"head".as_ptr() as _) != 0 {
+    if (*ctxt).html < 3 && xml_str_equal(value, c"head".as_ptr() as _) {
         (*ctxt).html = 3;
     }
-    if (*ctxt).html < 10 && xml_str_equal(value, c"body".as_ptr() as _) != 0 {
+    if (*ctxt).html < 10 && xml_str_equal(value, c"body".as_ptr() as _) {
         (*ctxt).html = 10;
     }
     if (*ctxt).name_nr >= (*ctxt).name_max {
@@ -6690,7 +6689,7 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
     if HTML_OMITTED_DEFAULT_VALUE.load(Ordering::Relaxed) == 0 {
         return;
     }
-    if xml_str_equal(newtag, c"html".as_ptr() as _) != 0 {
+    if xml_str_equal(newtag, c"html".as_ptr() as _) {
         return;
     }
     if (*ctxt).name_nr <= 0 {
@@ -6703,18 +6702,17 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
             );
         }
     }
-    if xml_str_equal(newtag, c"body".as_ptr() as _) != 0
-        || xml_str_equal(newtag, c"head".as_ptr() as _) != 0
+    if xml_str_equal(newtag, c"body".as_ptr() as _) || xml_str_equal(newtag, c"head".as_ptr() as _)
     {
         return;
     }
     if (*ctxt).name_nr <= 1
-        && (xml_str_equal(newtag, c"script".as_ptr() as _) != 0
-            || xml_str_equal(newtag, c"style".as_ptr() as _) != 0
-            || xml_str_equal(newtag, c"meta".as_ptr() as _) != 0
-            || xml_str_equal(newtag, c"link".as_ptr() as _) != 0
-            || xml_str_equal(newtag, c"title".as_ptr() as _) != 0
-            || xml_str_equal(newtag, c"base".as_ptr() as _) != 0)
+        && (xml_str_equal(newtag, c"script".as_ptr() as _)
+            || xml_str_equal(newtag, c"style".as_ptr() as _)
+            || xml_str_equal(newtag, c"meta".as_ptr() as _)
+            || xml_str_equal(newtag, c"link".as_ptr() as _)
+            || xml_str_equal(newtag, c"title".as_ptr() as _)
+            || xml_str_equal(newtag, c"base".as_ptr() as _))
     {
         if (*ctxt).html >= 3 {
             /* we already saw or generated an <head> before */
@@ -6732,19 +6730,19 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
                 null_mut(),
             );
         }
-    } else if xml_str_equal(newtag, c"noframes".as_ptr() as _) == 0
-        && xml_str_equal(newtag, c"frame".as_ptr() as _) == 0
-        && xml_str_equal(newtag, c"frameset".as_ptr() as _) == 0
+    } else if !xml_str_equal(newtag, c"noframes".as_ptr() as _)
+        && !xml_str_equal(newtag, c"frame".as_ptr() as _)
+        && !xml_str_equal(newtag, c"frameset".as_ptr() as _)
     {
         if (*ctxt).html >= 10 {
             /* we already saw or generated a <body> before */
             return;
         }
         for i in 0..(*ctxt).name_nr {
-            if xml_str_equal(*(*ctxt).name_tab.add(i as usize), c"body".as_ptr() as _) != 0 {
+            if xml_str_equal(*(*ctxt).name_tab.add(i as usize), c"body".as_ptr() as _) {
                 return;
             }
-            if xml_str_equal(*(*ctxt).name_tab.add(i as usize), c"head".as_ptr() as _) != 0 {
+            if xml_str_equal(*(*ctxt).name_tab.add(i as usize), c"head".as_ptr() as _) {
                 return;
             }
         }
@@ -7340,7 +7338,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
         }
         return -1;
     }
-    if xml_str_equal(name, c"meta".as_ptr() as _) != 0 {
+    if xml_str_equal(name, c"meta".as_ptr() as _) {
         meta = 1;
     }
 
@@ -7358,7 +7356,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
      * Avoid html at any level > 0, head at any level != 1
      * or any attempt to recurse body
      */
-    if (*ctxt).name_nr > 0 && xml_str_equal(name, c"html".as_ptr() as _) != 0 {
+    if (*ctxt).name_nr > 0 && xml_str_equal(name, c"html".as_ptr() as _) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHtmlStrucureError,
@@ -7369,7 +7367,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
         discardtag = 1;
         (*ctxt).depth += 1;
     }
-    if (*ctxt).name_nr != 1 && xml_str_equal(name, c"head".as_ptr() as _) != 0 {
+    if (*ctxt).name_nr != 1 && xml_str_equal(name, c"head".as_ptr() as _) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHtmlStrucureError,
@@ -7380,9 +7378,9 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
         discardtag = 1;
         (*ctxt).depth += 1;
     }
-    if xml_str_equal(name, c"body".as_ptr() as _) != 0 {
+    if xml_str_equal(name, c"body".as_ptr() as _) {
         for indx in 0..(*ctxt).name_nr {
-            if xml_str_equal(*(*ctxt).name_tab.add(indx as usize), c"body".as_ptr() as _) != 0 {
+            if xml_str_equal(*(*ctxt).name_tab.add(indx as usize), c"body".as_ptr() as _) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlHtmlStrucureError,
@@ -7414,7 +7412,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
              * Well formedness requires at most one declaration of an attribute
              */
             for i in (0..nbatts).step_by(2) {
-                if xml_str_equal(*atts.add(i as usize), attname) != 0 {
+                if xml_str_equal(*atts.add(i as usize), attname) {
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrAttributeRedefined,
@@ -7596,7 +7594,7 @@ unsafe extern "C" fn html_get_end_priority(name: *const XmlChar) -> c_int {
     let mut i: usize = 0;
 
     while !HTML_END_PRIORITY[i].name.is_null()
-        && xml_str_equal(HTML_END_PRIORITY[i].name as _, name) == 0
+        && !xml_str_equal(HTML_END_PRIORITY[i].name as _, name)
     {
         i += 1;
     }
@@ -7618,8 +7616,8 @@ unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *
     let priority: c_int = html_get_end_priority(newtag);
 
     for i in (0..(*ctxt).name_nr).rev() {
-        if xml_str_equal(newtag, *(*ctxt).name_tab.add(i as usize)) != 0 {
-            while xml_str_equal(newtag, (*ctxt).name) == 0 {
+        if xml_str_equal(newtag, *(*ctxt).name_tab.add(i as usize)) {
+            while !xml_str_equal(newtag, (*ctxt).name) {
                 info = html_tag_lookup((*ctxt).name);
                 if !info.is_null() && (*info).end_tag == 3 {
                     html_parse_err(
@@ -7736,9 +7734,9 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
      * out now.
      */
     if (*ctxt).depth > 0
-        && (xml_str_equal(name as _, c"html".as_ptr() as _) != 0
-            || xml_str_equal(name as _, c"body".as_ptr() as _) != 0
-            || xml_str_equal(name as _, c"head".as_ptr() as _) != 0)
+        && (xml_str_equal(name as _, c"html".as_ptr() as _)
+            || xml_str_equal(name as _, c"body".as_ptr() as _)
+            || xml_str_equal(name as _, c"head".as_ptr() as _))
     {
         (*ctxt).depth -= 1;
         return 0;
@@ -7749,7 +7747,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
      * then return, it's just an error.
      */
     for i in (0..(*ctxt).name_nr).rev() {
-        if xml_str_equal(name, *(*ctxt).name_tab.add(i as usize)) != 0 {
+        if xml_str_equal(name, *(*ctxt).name_tab.add(i as usize)) {
             /*
              * Check for auto-closure of HTML elements.
              */
@@ -7761,7 +7759,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
              * With the exception that the autoclose may have popped stuff out
              * of the stack.
              */
-            if !(*ctxt).name.is_null() && xml_str_equal((*ctxt).name, name) == 0 {
+            if !(*ctxt).name.is_null() && !xml_str_equal((*ctxt).name, name) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrTagNameMismatch,
@@ -7775,7 +7773,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
              * SAX: End of Tag
              */
             oldname = (*ctxt).name;
-            if !oldname.is_null() && xml_str_equal(oldname, name) != 0 {
+            if !oldname.is_null() && xml_str_equal(oldname, name) {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
                     ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data, name);
                 }
@@ -8652,7 +8650,7 @@ unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> c_int {
         return 0;
     }
     for &elem in HTML_NO_CONTENT_ELEMENTS {
-        if xml_str_equal(tag, elem as _) != 0 {
+        if xml_str_equal(tag, elem as _) {
             html_auto_close(ctxt, c"p".as_ptr() as _);
             html_check_implied(ctxt, c"p".as_ptr() as _);
             html_name_push(ctxt, c"p".as_ptr() as _);
@@ -8868,15 +8866,15 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
     if (*ctxt).name.is_null() {
         return 1;
     }
-    if xml_str_equal((*ctxt).name, c"html".as_ptr() as _) != 0 {
+    if xml_str_equal((*ctxt).name, c"html".as_ptr() as _) {
         return 1;
     }
-    if xml_str_equal((*ctxt).name, c"head".as_ptr() as _) != 0 {
+    if xml_str_equal((*ctxt).name, c"head".as_ptr() as _) {
         return 1;
     }
 
     /* Only strip CDATA children of the body tag for strict HTML DTDs */
-    if xml_str_equal((*ctxt).name, c"body".as_ptr() as _) != 0 && !(*ctxt).my_doc.is_null() {
+    if xml_str_equal((*ctxt).name, c"body".as_ptr() as _) && !(*ctxt).my_doc.is_null() {
         dtd = xml_get_int_subset((*ctxt).my_doc);
         if !dtd.is_null()
             && !(*dtd).external_id.is_null()
@@ -8906,7 +8904,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
         /* keep ws in constructs like ...<b> </b>...
         for all tags "b" allowing PCDATA */
         for &pcdata in ALLOW_PCDATA {
-            if xml_str_equal((*ctxt).name, pcdata as _) != 0 {
+            if xml_str_equal((*ctxt).name, pcdata as _) {
                 return 0;
             }
         }
@@ -8916,7 +8914,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
         /* keep ws in constructs like <p><b>xy</b> <i>z</i><p>
         for all tags "p" allowing PCDATA */
         for &pcdata in ALLOW_PCDATA {
-            if xml_str_equal((*last_child).name, pcdata as _) != 0 {
+            if xml_str_equal((*last_child).name, pcdata as _) {
                 return 0;
             }
         }
@@ -9095,7 +9093,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
          */
         if (*ctxt).name_nr > 0
             && depth >= (*ctxt).name_nr
-            && xml_str_equal(current_node, (*ctxt).name) == 0
+            && !xml_str_equal(current_node, (*ctxt).name)
         {
             if !current_node.is_null() {
                 xml_free(current_node as _);
@@ -9104,8 +9102,8 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
         }
 
         if CUR!(ctxt) != 0
-            && (xml_str_equal(current_node as _, c"script".as_ptr() as _) != 0
-                || xml_str_equal(current_node as _, c"style".as_ptr() as _) != 0)
+            && (xml_str_equal(current_node as _, c"script".as_ptr() as _)
+                || xml_str_equal(current_node as _, c"style".as_ptr() as _))
         {
             /*
              * Handle SCRIPT/STYLE separately
@@ -9278,7 +9276,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         /*
          * end of parsing of this node.
          */
-        if xml_str_equal(name, (*ctxt).name) != 0 {
+        if xml_str_equal(name, (*ctxt).name) {
             node_pop(ctxt);
             html_name_pop(ctxt);
         }
@@ -9704,7 +9702,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
         /*
          * end of parsing of this node.
          */
-        if xml_str_equal(name, (*ctxt).name) != 0 {
+        if xml_str_equal(name, (*ctxt).name) {
             node_pop(ctxt);
             html_name_pop(ctxt);
         }
@@ -9826,7 +9824,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
          */
         if (*ctxt).name_nr > 0
             && depth >= (*ctxt).name_nr
-            && xml_str_equal(current_node, (*ctxt).name) == 0
+            && !xml_str_equal(current_node, (*ctxt).name)
         {
             html_parser_finish_element_parsing(ctxt);
             if !current_node.is_null() {
@@ -9843,8 +9841,8 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
         }
 
         if CUR!(ctxt) != 0
-            && (xml_str_equal(current_node as _, c"script".as_ptr() as _) != 0
-                || xml_str_equal(current_node as _, c"style".as_ptr() as _) != 0)
+            && (xml_str_equal(current_node as _, c"script".as_ptr() as _)
+                || xml_str_equal(current_node as _, c"style".as_ptr() as _))
         {
             /*
              * Handle SCRIPT/STYLE separately
@@ -10654,7 +10652,7 @@ pub unsafe extern "C" fn html_is_script_attribute(name: *const XmlChar) -> c_int
     }
 
     for &attr in HTML_SCRIPT_ATTRIBUTES {
-        if xml_str_equal(name, attr as _) != 0 {
+        if xml_str_equal(name, attr as _) {
             return 1;
         }
     }
@@ -11395,7 +11393,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     /*
                      * end of parsing of this node.
                      */
-                    if xml_str_equal(name, (*ctxt).name) != 0 {
+                    if xml_str_equal(name, (*ctxt).name) {
                         node_pop(ctxt);
                         html_name_pop(ctxt);
                     }
@@ -11481,8 +11479,8 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 }
                 cur = *(*input).cur.add(0);
                 next = *(*input).cur.add(1);
-                if xml_str_equal((*ctxt).name, c"script".as_ptr() as _) != 0
-                    || xml_str_equal((*ctxt).name, c"style".as_ptr() as _) != 0
+                if xml_str_equal((*ctxt).name, c"script".as_ptr() as _)
+                    || xml_str_equal((*ctxt).name, c"style".as_ptr() as _)
                 {
                     /*
                      * Handle SCRIPT/STYLE separately

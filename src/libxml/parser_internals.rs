@@ -3228,7 +3228,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *
             if pis.is_null() {
                 break;
             }
-            if xml_str_equal(name, pis as *const XmlChar) != 0 {
+            if xml_str_equal(name, pis as *const XmlChar) {
                 return name;
             }
         }
@@ -3471,7 +3471,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 if matches!(
                     state,
                     XmlParserInputState::XmlParserMisc | XmlParserInputState::XmlParserStart
-                ) && xml_str_equal(target, XML_CATALOG_PI.as_ptr() as _) != 0
+                ) && xml_str_equal(target, XML_CATALOG_PI.as_ptr() as _)
                 {
                     let allow: XmlCatalogAllow = xml_catalog_get_defaults();
                     if matches!(allow, XmlCatalogAllow::Document | XmlCatalogAllow::All) {
@@ -3636,7 +3636,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
         }
         tmp = ret;
         while !tmp.is_null() {
-            if xml_str_equal(name, (*tmp).name) != 0 {
+            if xml_str_equal(name, (*tmp).name) {
                 xml_validity_error(
                     ctxt,
                     XmlParserErrors::XmlDtdDupToken,
@@ -3717,7 +3717,7 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
         }
         tmp = ret;
         while !tmp.is_null() {
-            if xml_str_equal(name, (*tmp).name) != 0 {
+            if xml_str_equal(name, (*tmp).name) {
                 xml_validity_error(
                     ctxt,
                     XmlParserErrors::XmlDtdDupToken,
@@ -5720,7 +5720,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
      * since this was deprecated in XML second edition
      */
     if (*ctxt).pedantic != 0
-        && xml_str_equal(name, c"xml:lang".as_ptr() as _) != 0
+        && xml_str_equal(name, c"xml:lang".as_ptr() as _)
         && xml_check_language_id(val) == 0
     {
         xml_warning_msg(
@@ -5735,10 +5735,10 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
     /*
      * Check that xml:space conforms to the specification
      */
-    if xml_str_equal(name, c"xml:space".as_ptr() as _) != 0 {
-        if xml_str_equal(val, c"default".as_ptr() as _) != 0 {
+    if xml_str_equal(name, c"xml:space".as_ptr() as _) {
+        if xml_str_equal(val, c"default".as_ptr() as _) {
             *(*ctxt).space = 0;
-        } else if xml_str_equal(val, c"preserve".as_ptr() as _) != 0 {
+        } else if xml_str_equal(val, c"preserve".as_ptr() as _) {
             *(*ctxt).space = 1;
         } else {
             xml_warning_msg(
@@ -5850,7 +5850,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
                  * start-tag or empty-element tag.
                  */
                 for i in (0..nbatts).step_by(2) {
-                    if xml_str_equal(*atts.add(i as usize) as _, attname as _) != 0 {
+                    if xml_str_equal(*atts.add(i as usize) as _, attname as _) {
                         xml_err_attribute_dup(ctxt, null_mut(), attname);
                         xml_free(attvalue as _);
                         break 'failed;

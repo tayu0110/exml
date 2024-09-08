@@ -542,7 +542,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
     if matches!((*cur).typ, Some(XML_LOCAL_NAMESPACE))
         && !(*cur).href.load(Ordering::Relaxed).is_null()
     {
-        if xml_str_equal((*cur).prefix.load(Ordering::Relaxed), c"xml".as_ptr() as _) != 0 {
+        if xml_str_equal((*cur).prefix.load(Ordering::Relaxed), c"xml".as_ptr() as _) {
             return;
         }
 
@@ -1140,18 +1140,18 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     let parent: XmlNodePtr = (*cur).parent;
     while !cur.is_null() {
-        if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"id".as_ptr() as _) != 0 {
+        if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"id".as_ptr() as _) {
             id = cur;
-        } else if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"name".as_ptr() as _) != 0 {
+        } else if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"name".as_ptr() as _) {
             name = cur;
-        } else if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"lang".as_ptr() as _) != 0 {
+        } else if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"lang".as_ptr() as _) {
             lang = cur;
         } else if !(*cur).ns.is_null()
-            && xml_str_equal((*cur).name, c"lang".as_ptr() as _) != 0
+            && xml_str_equal((*cur).name, c"lang".as_ptr() as _)
             && xml_str_equal(
                 (*(*cur).ns).prefix.load(Ordering::Relaxed),
                 c"xml".as_ptr() as _,
-            ) != 0
+            )
         {
             xml_lang = cur;
         } else if (*cur).ns.is_null()
@@ -1177,15 +1177,15 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
     if (!name.is_null() && id.is_null())
         && (!parent.is_null()
             && !(*parent).name.is_null()
-            && (xml_str_equal((*parent).name, c"a".as_ptr() as _) != 0
-                || xml_str_equal((*parent).name, c"p".as_ptr() as _) != 0
-                || xml_str_equal((*parent).name, c"div".as_ptr() as _) != 0
-                || xml_str_equal((*parent).name, c"img".as_ptr() as _) != 0
-                || xml_str_equal((*parent).name, c"map".as_ptr() as _) != 0
-                || xml_str_equal((*parent).name, c"applet".as_ptr() as _) != 0
-                || xml_str_equal((*parent).name, c"form".as_ptr() as _) != 0
-                || xml_str_equal((*parent).name, c"frame".as_ptr() as _) != 0
-                || xml_str_equal((*parent).name, c"iframe".as_ptr() as _) != 0))
+            && (xml_str_equal((*parent).name, c"a".as_ptr() as _)
+                || xml_str_equal((*parent).name, c"p".as_ptr() as _)
+                || xml_str_equal((*parent).name, c"div".as_ptr() as _)
+                || xml_str_equal((*parent).name, c"img".as_ptr() as _)
+                || xml_str_equal((*parent).name, c"map".as_ptr() as _)
+                || xml_str_equal((*parent).name, c"applet".as_ptr() as _)
+                || xml_str_equal((*parent).name, c"form".as_ptr() as _)
+                || xml_str_equal((*parent).name, c"frame".as_ptr() as _)
+                || xml_str_equal((*parent).name, c"iframe".as_ptr() as _)))
     {
         xml_output_buffer_write(buf, 5, c" id=\"".as_ptr() as _);
         xml_attr_serialize_content(buf, name);
@@ -1226,10 +1226,10 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> c_int {
     {
         let str2 = CString::new(XHTML_NS_NAME).unwrap();
         if !(*node).ns.is_null()
-            && xml_str_equal(
+            && !xml_str_equal(
                 (*(*node).ns).href.load(Ordering::Relaxed),
                 str2.as_ptr() as _,
-            ) == 0
+            )
         {
             return 0;
         }
@@ -1239,67 +1239,67 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> c_int {
     }
     match *(*node).name.add(0) {
         b'a' => {
-            if xml_str_equal((*node).name, c"area".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"area".as_ptr() as _) {
                 return 1;
             }
             return 0;
         }
         b'b' => {
-            if xml_str_equal((*node).name, c"br".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"br".as_ptr() as _) {
                 return 1;
             }
-            if xml_str_equal((*node).name, c"base".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"base".as_ptr() as _) {
                 return 1;
             }
-            if xml_str_equal((*node).name, c"basefont".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"basefont".as_ptr() as _) {
                 return 1;
             }
             return 0;
         }
         b'c' => {
-            if xml_str_equal((*node).name, c"col".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"col".as_ptr() as _) {
                 return 1;
             }
             return 0;
         }
         b'f' => {
-            if xml_str_equal((*node).name, c"frame".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"frame".as_ptr() as _) {
                 return 1;
             }
             return 0;
         }
         b'h' => {
-            if xml_str_equal((*node).name, c"hr".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"hr".as_ptr() as _) {
                 return 1;
             }
             return 0;
         }
         b'i' => {
-            if xml_str_equal((*node).name, c"img".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"img".as_ptr() as _) {
                 return 1;
             }
-            if xml_str_equal((*node).name, c"input".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"input".as_ptr() as _) {
                 return 1;
             }
-            if xml_str_equal((*node).name, c"isindex".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"isindex".as_ptr() as _) {
                 return 1;
             }
             return 0;
         }
         b'l' => {
-            if xml_str_equal((*node).name, c"link".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"link".as_ptr() as _) {
                 return 1;
             }
             return 0;
         }
         b'm' => {
-            if xml_str_equal((*node).name, c"meta".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"meta".as_ptr() as _) {
                 return 1;
             }
             return 0;
         }
         b'p' => {
-            if xml_str_equal((*node).name, c"param".as_ptr() as _) != 0 {
+            if xml_str_equal((*node).name, c"param".as_ptr() as _) {
                 return 1;
             }
             return 0;
@@ -1409,7 +1409,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 if !(*cur).ns_def.is_null() {
                     xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
                 }
-                if xml_str_equal((*cur).name, c"html".as_ptr() as _) != 0
+                if xml_str_equal((*cur).name, c"html".as_ptr() as _)
                     && (*cur).ns.is_null()
                     && (*cur).ns_def.is_null()
                 {
@@ -1427,12 +1427,12 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
 
                 if !parent.is_null()
                     && ((*parent).parent == (*cur).doc as _)
-                    && xml_str_equal((*cur).name, c"head".as_ptr() as _) != 0
-                    && xml_str_equal((*parent).name, c"html".as_ptr() as _) != 0
+                    && xml_str_equal((*cur).name, c"head".as_ptr() as _)
+                    && xml_str_equal((*parent).name, c"html".as_ptr() as _)
                 {
                     tmp = (*cur).children;
                     while !tmp.is_null() {
-                        if xml_str_equal((*tmp).name, c"meta".as_ptr() as _) != 0 {
+                        if xml_str_equal((*tmp).name, c"meta".as_ptr() as _) {
                             let httpequiv: *mut XmlChar =
                                 xml_get_prop(tmp, c"http-equiv".as_ptr() as _);
                             if !httpequiv.is_null() {

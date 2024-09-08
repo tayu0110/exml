@@ -2624,8 +2624,8 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
         XP_ERROR!(ctxt, XmlXPathError::XptrSyntaxError as i32);
     }
 
-    if xml_str_equal(name, c"xpointer".as_ptr() as _) != 0
-        || xml_str_equal(name, c"xpath1".as_ptr() as _) != 0
+    if xml_str_equal(name, c"xpointer".as_ptr() as _)
+        || xml_str_equal(name, c"xpath1".as_ptr() as _)
     {
         let old_base: *const XmlChar = (*ctxt).base;
         let old_cur: *const XmlChar = (*ctxt).cur;
@@ -2648,7 +2648,7 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
         xml_xpath_eval_expr(ctxt);
         (*ctxt).base = old_base;
         (*ctxt).cur = old_cur;
-    } else if xml_str_equal(name, c"element".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"element".as_ptr() as _) {
         let old_base: *const XmlChar = (*ctxt).base;
         let old_cur: *const XmlChar = (*ctxt).cur;
         let name2: *mut XmlChar;
@@ -2671,7 +2671,7 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
         }
         (*ctxt).base = old_base;
         (*ctxt).cur = old_cur;
-    } else if xml_str_equal(name, c"xmlns".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"xmlns".as_ptr() as _) {
         let old_base: *const XmlChar = (*ctxt).base;
         let old_cur: *const XmlChar = (*ctxt).cur;
 

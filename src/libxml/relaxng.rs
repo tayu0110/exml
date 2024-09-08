@@ -1048,8 +1048,8 @@ unsafe extern "C" fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) 
                 dup = (*ctxt).err_tab.add(j as usize);
                 if (*err).err == (*dup).err
                     && (*err).node == (*dup).node
-                    && xml_str_equal((*err).arg1, (*dup).arg1) != 0
-                    && xml_str_equal((*err).arg2, (*dup).arg2) != 0
+                    && xml_str_equal((*err).arg1, (*dup).arg1)
+                    && xml_str_equal((*err).arg2, (*dup).arg2)
                 {
                     if (*err).flags & ERROR_IS_DUP != 0 {
                         if !(*err).arg1.is_null() {
@@ -1512,29 +1512,29 @@ unsafe extern "C" fn xml_relaxng_schema_facet_check(
         return -1;
     }
 
-    if xml_str_equal(facetname, c"minInclusive".as_ptr() as _) != 0 {
+    if xml_str_equal(facetname, c"minInclusive".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMininclusive;
-    } else if xml_str_equal(facetname, c"minExclusive".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"minExclusive".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinexclusive;
-    } else if xml_str_equal(facetname, c"maxInclusive".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"maxInclusive".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxinclusive;
-    } else if xml_str_equal(facetname, c"maxExclusive".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"maxExclusive".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxexclusive;
-    } else if xml_str_equal(facetname, c"totalDigits".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"totalDigits".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetTotaldigits;
-    } else if xml_str_equal(facetname, c"fractionDigits".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"fractionDigits".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetFractiondigits;
-    } else if xml_str_equal(facetname, c"pattern".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"pattern".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetPattern;
-    } else if xml_str_equal(facetname, c"enumeration".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"enumeration".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetEnumeration;
-    } else if xml_str_equal(facetname, c"whiteSpace".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"whiteSpace".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetWhitespace;
-    } else if xml_str_equal(facetname, c"length".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"length".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetLength;
-    } else if xml_str_equal(facetname, c"maxLength".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"maxLength".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxlength;
-    } else if xml_str_equal(facetname, c"minLength".as_ptr() as _) != 0 {
+    } else if xml_str_equal(facetname, c"minLength".as_ptr() as _) {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
     } else {
         xml_schema_free_facet(facet);
@@ -1577,11 +1577,11 @@ macro_rules! IS_RELAXNG {
         !$node.is_null()
             && !(*$node).ns.is_null()
             && (*$node).typ == XmlElementType::XmlElementNode
-            && xml_str_equal((*$node).name, $typ) != 0
+            && xml_str_equal((*$node).name, $typ)
             && xml_str_equal(
                 (*(*$node).ns).href.load(Ordering::Relaxed),
                 XML_RELAXNG_NS.as_ptr() as _,
-            ) != 0
+            )
     };
 }
 
@@ -1602,10 +1602,10 @@ unsafe extern "C" fn xml_relaxng_default_type_have(
     if typ.is_null() {
         return -1;
     }
-    if xml_str_equal(typ, c"string".as_ptr() as _) != 0 {
+    if xml_str_equal(typ, c"string".as_ptr() as _) {
         return 1;
     }
-    if xml_str_equal(typ, c"token".as_ptr() as _) != 0 {
+    if xml_str_equal(typ, c"token".as_ptr() as _) {
         return 1;
     }
     0
@@ -1633,10 +1633,10 @@ unsafe extern "C" fn xml_relaxng_default_type_check(
     if value.is_null() {
         return -1;
     }
-    if xml_str_equal(typ, c"string".as_ptr() as _) != 0 {
+    if xml_str_equal(typ, c"string".as_ptr() as _) {
         return 1;
     }
-    if xml_str_equal(typ, c"token".as_ptr() as _) != 0 {
+    if xml_str_equal(typ, c"token".as_ptr() as _) {
         return 1;
     }
 
@@ -1721,10 +1721,10 @@ unsafe extern "C" fn xml_relaxng_default_type_compare(
 ) -> c_int {
     let mut ret: c_int = -1;
 
-    if xml_str_equal(typ, c"string".as_ptr() as _) != 0 {
-        ret = xml_str_equal(value1, value2);
-    } else if xml_str_equal(typ, c"token".as_ptr() as _) != 0 {
-        if xml_str_equal(value1, value2) == 0 {
+    if xml_str_equal(typ, c"string".as_ptr() as _) {
+        ret = xml_str_equal(value1, value2) as i32;
+    } else if xml_str_equal(typ, c"token".as_ptr() as _) {
+        if !xml_str_equal(value1, value2) {
             /*
              * TODO: trivial optimizations are possible by
              * computing at compile-time
@@ -1734,7 +1734,7 @@ unsafe extern "C" fn xml_relaxng_default_type_compare(
 
             if nval.is_null() || nvalue.is_null() {
                 ret = -1;
-            } else if xml_str_equal(nval, nvalue) != 0 {
+            } else if xml_str_equal(nval, nvalue) {
                 ret = 1;
             } else {
                 ret = 0;
@@ -2502,7 +2502,7 @@ unsafe extern "C" fn xml_relaxng_element_match(
     let mut ret: c_int = 0;
     let mut oldflags: c_int = 0;
 
-    if !(*define).name.is_null() && xml_str_equal((*elem).name, (*define).name) == 0 {
+    if !(*define).name.is_null() && !xml_str_equal((*elem).name, (*define).name) {
         VALID_ERR3!(
             ctxt,
             XmlRelaxNGValidErr::XmlRelaxngErrElemname,
@@ -2519,7 +2519,7 @@ unsafe extern "C" fn xml_relaxng_element_match(
                 (*elem).name
             );
             return 0;
-        } else if xml_str_equal((*(*elem).ns).href.load(Ordering::Relaxed), (*define).ns) == 0 {
+        } else if !xml_str_equal((*(*elem).ns).href.load(Ordering::Relaxed), (*define).ns) {
             VALID_ERR3!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrElemwrongns,
@@ -3101,15 +3101,15 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
             || xml_str_equal(
                 (*(*cur).ns).href.load(Ordering::Relaxed),
                 XML_RELAXNG_NS.as_ptr() as _,
-            ) != 0
+            )
         {
-            if xml_str_equal((*cur).name, c"name".as_ptr() as _) != 0 {
-                if xml_str_equal((*node).name, c"element".as_ptr() as _) == 0
-                    && xml_str_equal((*node).name, c"attribute".as_ptr() as _) == 0
-                    && xml_str_equal((*node).name, c"ref".as_ptr() as _) == 0
-                    && xml_str_equal((*node).name, c"parentRef".as_ptr() as _) == 0
-                    && xml_str_equal((*node).name, c"param".as_ptr() as _) == 0
-                    && xml_str_equal((*node).name, c"define".as_ptr() as _) == 0
+            if xml_str_equal((*cur).name, c"name".as_ptr() as _) {
+                if !xml_str_equal((*node).name, c"element".as_ptr() as _)
+                    && !xml_str_equal((*node).name, c"attribute".as_ptr() as _)
+                    && !xml_str_equal((*node).name, c"ref".as_ptr() as _)
+                    && !xml_str_equal((*node).name, c"parentRef".as_ptr() as _)
+                    && !xml_str_equal((*node).name, c"param".as_ptr() as _)
+                    && !xml_str_equal((*node).name, c"define".as_ptr() as _)
                 {
                     xml_rng_perr(
                         ctxt,
@@ -3120,9 +3120,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                         (*node).name,
                     );
                 }
-            } else if xml_str_equal((*cur).name, c"type".as_ptr() as _) != 0 {
-                if xml_str_equal((*node).name, c"value".as_ptr() as _) == 0
-                    && xml_str_equal((*node).name, c"data".as_ptr() as _) == 0
+            } else if xml_str_equal((*cur).name, c"type".as_ptr() as _) {
+                if !xml_str_equal((*node).name, c"value".as_ptr() as _)
+                    && !xml_str_equal((*node).name, c"data".as_ptr() as _)
                 {
                     xml_rng_perr(
                         ctxt,
@@ -3133,9 +3133,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                         (*node).name,
                     );
                 }
-            } else if xml_str_equal((*cur).name, c"href".as_ptr() as _) != 0 {
-                if xml_str_equal((*node).name, c"externalRef".as_ptr() as _) == 0
-                    && xml_str_equal((*node).name, c"include".as_ptr() as _) == 0
+            } else if xml_str_equal((*cur).name, c"href".as_ptr() as _) {
+                if !xml_str_equal((*node).name, c"externalRef".as_ptr() as _)
+                    && !xml_str_equal((*node).name, c"include".as_ptr() as _)
                 {
                     xml_rng_perr(
                         ctxt,
@@ -3146,9 +3146,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                         (*node).name,
                     );
                 }
-            } else if xml_str_equal((*cur).name, c"combine".as_ptr() as _) != 0 {
-                if xml_str_equal((*node).name, c"start".as_ptr() as _) == 0
-                    && xml_str_equal((*node).name, c"define".as_ptr() as _) == 0
+            } else if xml_str_equal((*cur).name, c"combine".as_ptr() as _) {
+                if !xml_str_equal((*node).name, c"start".as_ptr() as _)
+                    && !xml_str_equal((*node).name, c"define".as_ptr() as _)
                 {
                     xml_rng_perr(
                         ctxt,
@@ -3159,7 +3159,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                         (*node).name,
                     );
                 }
-            } else if xml_str_equal((*cur).name, c"datatypeLibrary".as_ptr() as _) != 0 {
+            } else if xml_str_equal((*cur).name, c"datatypeLibrary".as_ptr() as _) {
                 let uri: XmlURIPtr;
 
                 let val: *mut XmlChar = xml_node_list_get_string((*node).doc, (*cur).children, 1);
@@ -3201,7 +3201,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                     }
                     xml_free(val as _);
                 }
-            } else if xml_str_equal((*cur).name, c"ns".as_ptr() as _) == 0 {
+            } else if !xml_str_equal((*cur).name, c"ns".as_ptr() as _) {
                 xml_rng_perr(
                     ctxt,
                     node,
@@ -3305,7 +3305,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
      * check against recursion in the stack
      */
     for i in 0..(*ctxt).doc_nr {
-        if xml_str_equal((*(*(*ctxt).doc_tab.add(i as usize))).href, url) != 0 {
+        if xml_str_equal((*(*(*ctxt).doc_tab.add(i as usize))).href, url) {
             xml_rng_perr(
                 ctxt,
                 null_mut(),
@@ -3554,7 +3554,7 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
             name2 = xml_get_prop(tmp, c"name".as_ptr() as _);
             xml_relaxng_norm_ext_space(name2);
             if !name2.is_null() {
-                if xml_str_equal(name, name2) != 0 {
+                if xml_str_equal(name, name2) {
                     found = 1;
                     xml_unlink_node(tmp);
                     xml_free_node(tmp);
@@ -3566,7 +3566,7 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
             let inc: XmlRelaxNGDocumentPtr = (*tmp).psvi as _;
 
             if (!inc.is_null() && !(*inc).doc.is_null() && !(*(*inc).doc).children.is_null())
-                && xml_str_equal((*(*(*inc).doc).children).name, c"grammar".as_ptr() as _) != 0
+                && xml_str_equal((*(*(*inc).doc).children).name, c"grammar".as_ptr() as _)
             {
                 // #ifdef DEBUG_INCLUDE
                 //                     href = xmlGetProp(tmp, c"href".as_ptr() as _);
@@ -3626,7 +3626,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
      * check against recursion in the stack
      */
     for i in 0..(*ctxt).inc_nr {
-        if xml_str_equal((*(*(*ctxt).inc_tab.add(i as usize))).href, url) != 0 {
+        if xml_str_equal((*(*(*ctxt).inc_tab.add(i as usize))).href, url) {
             xml_rng_perr(
                 ctxt,
                 null_mut(),
@@ -3829,16 +3829,16 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                  * Simplification 4.1. Annotations
                  */
                 if (*cur).ns.is_null()
-                    || xml_str_equal(
+                    || !xml_str_equal(
                         (*(*cur).ns).href.load(Ordering::Relaxed),
                         XML_RELAXNG_NS.as_ptr() as _,
-                    ) == 0
+                    )
                 {
                     if !(*cur).parent.is_null()
                         && (*(*cur).parent).typ == XmlElementType::XmlElementNode
-                        && (xml_str_equal((*(*cur).parent).name, c"name".as_ptr() as _) != 0
-                            || xml_str_equal((*(*cur).parent).name, c"value".as_ptr() as _) != 0
-                            || xml_str_equal((*(*cur).parent).name, c"param".as_ptr() as _) != 0)
+                        && (xml_str_equal((*(*cur).parent).name, c"name".as_ptr() as _)
+                            || xml_str_equal((*(*cur).parent).name, c"value".as_ptr() as _)
+                            || xml_str_equal((*(*cur).parent).name, c"param".as_ptr() as _))
                     {
                         xml_rng_perr(
                             ctxt,
@@ -3853,7 +3853,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                     break 'skip_children;
                 } else {
                     xml_relaxng_cleanup_attributes(ctxt, cur);
-                    if xml_str_equal((*cur).name, c"externalRef".as_ptr() as _) != 0 {
+                    if xml_str_equal((*cur).name, c"externalRef".as_ptr() as _) {
                         let mut ns: *mut XmlChar;
                         let mut tmp: XmlNodePtr;
 
@@ -3976,7 +3976,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         }
                         xml_free(url as _);
                         (*cur).psvi = docu as _;
-                    } else if xml_str_equal((*cur).name, c"include".as_ptr() as _) != 0 {
+                    } else if xml_str_equal((*cur).name, c"include".as_ptr() as _) {
                         let mut ns: *mut XmlChar;
                         let mut tmp: XmlNodePtr;
 
@@ -4050,8 +4050,8 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         }
                         xml_free(url as _);
                         (*cur).psvi = incl as _;
-                    } else if xml_str_equal((*cur).name, c"element".as_ptr() as _) != 0
-                        || xml_str_equal((*cur).name, c"attribute".as_ptr() as _) != 0
+                    } else if xml_str_equal((*cur).name, c"element".as_ptr() as _)
+                        || xml_str_equal((*cur).name, c"attribute".as_ptr() as _)
                     {
                         let ns: *mut XmlChar;
                         let mut text: XmlNodePtr = null_mut();
@@ -4097,13 +4097,13 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                     /* xmlUnsetProp(cur, c"ns".as_ptr() as _); */
                                 }
                                 xml_free(ns as _);
-                            } else if xml_str_equal((*cur).name, c"attribute".as_ptr() as _) != 0 {
+                            } else if xml_str_equal((*cur).name, c"attribute".as_ptr() as _) {
                                 xml_set_prop(text, c"ns".as_ptr() as _, c"".as_ptr() as _);
                             }
                         }
-                    } else if xml_str_equal((*cur).name, c"name".as_ptr() as _) != 0
-                        || xml_str_equal((*cur).name, c"nsName".as_ptr() as _) != 0
-                        || xml_str_equal((*cur).name, c"value".as_ptr() as _) != 0
+                    } else if xml_str_equal((*cur).name, c"name".as_ptr() as _)
+                        || xml_str_equal((*cur).name, c"nsName".as_ptr() as _)
+                        || xml_str_equal((*cur).name, c"value".as_ptr() as _)
                     {
                         /*
                          * Simplification 4.8. name attribute of element
@@ -4128,7 +4128,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 xml_free(ns as _);
                             }
                         }
-                        if xml_str_equal((*cur).name, c"name".as_ptr() as _) != 0 {
+                        if xml_str_equal((*cur).name, c"name".as_ptr() as _) {
                             let local: *mut XmlChar;
                             let mut prefix: *mut XmlChar = null_mut();
 
@@ -4168,7 +4168,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         /*
                          * 4.16
                          */
-                        if xml_str_equal((*cur).name, c"nsName".as_ptr() as _) != 0
+                        if xml_str_equal((*cur).name, c"nsName".as_ptr() as _)
                             && (*ctxt).flags & XML_RELAXNG_IN_NSEXCEPT != 0
                         {
                             xml_rng_perr(
@@ -4180,30 +4180,28 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 null_mut(),
                             );
                         }
-                    } else if xml_str_equal((*cur).name, c"except".as_ptr() as _) != 0
-                        && cur != root
-                    {
+                    } else if xml_str_equal((*cur).name, c"except".as_ptr() as _) && cur != root {
                         let oldflags: c_int = (*ctxt).flags;
 
                         /*
                          * 4.16
                          */
                         if !(*cur).parent.is_null()
-                            && xml_str_equal((*(*cur).parent).name, c"anyName".as_ptr() as _) != 0
+                            && xml_str_equal((*(*cur).parent).name, c"anyName".as_ptr() as _)
                         {
                             (*ctxt).flags |= XML_RELAXNG_IN_ANYEXCEPT;
                             xml_relaxng_cleanup_tree(ctxt, cur);
                             (*ctxt).flags = oldflags;
                             break 'skip_children;
                         } else if !(*cur).parent.is_null()
-                            && xml_str_equal((*(*cur).parent).name, c"nsName".as_ptr() as _) != 0
+                            && xml_str_equal((*(*cur).parent).name, c"nsName".as_ptr() as _)
                         {
                             (*ctxt).flags |= XML_RELAXNG_IN_NSEXCEPT;
                             xml_relaxng_cleanup_tree(ctxt, cur);
                             (*ctxt).flags = oldflags;
                             break 'skip_children;
                         }
-                    } else if xml_str_equal((*cur).name, c"anyName".as_ptr() as _) != 0 {
+                    } else if xml_str_equal((*cur).name, c"anyName".as_ptr() as _) {
                         /*
                          * 4.16
                          */
@@ -4232,7 +4230,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                      * This is not an else since "include" is transformed
                      * into a div
                      */
-                    if xml_str_equal((*cur).name, c"div".as_ptr() as _) != 0 {
+                    if xml_str_equal((*cur).name, c"div".as_ptr() as _) {
                         let mut child: XmlNodePtr;
                         let mut ins: XmlNodePtr;
                         let mut tmp: XmlNodePtr;
@@ -4289,8 +4287,8 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                     if !(*cur).parent.is_null()
                         && (*(*cur).parent).typ == XmlElementType::XmlElementNode
                     {
-                        if xml_str_equal((*(*cur).parent).name, c"value".as_ptr() as _) == 0
-                            && xml_str_equal((*(*cur).parent).name, c"param".as_ptr() as _) == 0
+                        if !xml_str_equal((*(*cur).parent).name, c"value".as_ptr() as _)
+                            && !xml_str_equal((*(*cur).parent).name, c"param".as_ptr() as _)
                         {
                             delete = cur;
                         }
@@ -4481,7 +4479,7 @@ unsafe extern "C" fn xml_relaxng_check_combine(
     while !cur.is_null() {
         combine = xml_get_prop((*cur).node, c"combine".as_ptr() as _);
         if !combine.is_null() {
-            if xml_str_equal(combine, c"choice".as_ptr() as _) != 0 {
+            if xml_str_equal(combine, c"choice".as_ptr() as _) {
                 if choice_or_interleave == -1 {
                     choice_or_interleave = 1;
                 } else if choice_or_interleave == 0 {
@@ -4494,7 +4492,7 @@ unsafe extern "C" fn xml_relaxng_check_combine(
                         null_mut(),
                     );
                 }
-            } else if xml_str_equal(combine, c"interleave".as_ptr() as _) != 0 {
+            } else if xml_str_equal(combine, c"interleave".as_ptr() as _) {
                 if choice_or_interleave == -1 {
                     choice_or_interleave = 0;
                 } else if choice_or_interleave == 1 {
@@ -4866,7 +4864,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
         (*ret).ns = val;
         if (*ctxt).flags & XML_RELAXNG_IN_ATTRIBUTE != 0
             && !val.is_null()
-            && xml_str_equal(val, c"http://www.w3.org/2000/xmlns".as_ptr() as _) != 0
+            && xml_str_equal(val, c"http://www.w3.org/2000/xmlns".as_ptr() as _)
         {
             xml_rng_perr(
                 ctxt,
@@ -4880,7 +4878,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
         if (*ctxt).flags & XML_RELAXNG_IN_ATTRIBUTE != 0
             && !val.is_null()
             && *val.add(0) == 0
-            && xml_str_equal((*ret).name, c"xmlns".as_ptr() as _) != 0
+            && xml_str_equal((*ret).name, c"xmlns".as_ptr() as _)
         {
             xml_rng_perr(
                 ctxt,
@@ -4916,7 +4914,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
         }
         if (*ctxt).flags & XML_RELAXNG_IN_ATTRIBUTE != 0
             && !(*ret).ns.is_null()
-            && xml_str_equal((*ret).ns, c"http://www.w3.org/2000/xmlns".as_ptr() as _) != 0
+            && xml_str_equal((*ret).ns, c"http://www.w3.org/2000/xmlns".as_ptr() as _)
         {
             xml_rng_perr(
                 ctxt,
@@ -5145,9 +5143,8 @@ unsafe extern "C" fn xml_relaxng_parse_data(
             } else if xml_str_equal(
                 library,
                 c"http://www.w3.org/2001/XMLSchema-datatypes".as_ptr() as _,
-            ) != 0
-                && (xml_str_equal((*def).name, c"IDREF".as_ptr() as _) != 0
-                    || xml_str_equal((*def).name, c"IDREFS".as_ptr() as _) != 0)
+            ) && (xml_str_equal((*def).name, c"IDREF".as_ptr() as _)
+                || xml_str_equal((*def).name, c"IDREFS".as_ptr() as _))
             {
                 (*ctxt).idref = 1;
             }
@@ -5168,14 +5165,13 @@ unsafe extern "C" fn xml_relaxng_parse_data(
      * Handle optional params
      */
     while !content.is_null() {
-        if xml_str_equal((*content).name, c"param".as_ptr() as _) == 0 {
+        if !xml_str_equal((*content).name, c"param".as_ptr() as _) {
             break;
         }
         if xml_str_equal(
             library,
             c"http://relaxng.org/ns/structure/1.0".as_ptr() as _,
-        ) != 0
-        {
+        ) {
             xml_rng_perr(
                 ctxt,
                 node,
@@ -5185,8 +5181,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                 null_mut(),
             );
             content = (*content).next;
-            while !content.is_null() && xml_str_equal((*content).name, c"param".as_ptr() as _) != 0
-            {
+            while !content.is_null() && xml_str_equal((*content).name, c"param".as_ptr() as _) {
                 content = (*content).next;
             }
         } else {
@@ -5220,7 +5215,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
     /*
      * Handle optional except
      */
-    if !content.is_null() && xml_str_equal((*content).name, c"except".as_ptr() as _) != 0 {
+    if !content.is_null() && xml_str_equal((*content).name, c"except".as_ptr() as _) {
         let mut child: XmlNodePtr;
         let mut tmp2: XmlRelaxNGDefinePtr;
         let mut last: XmlRelaxNGDefinePtr = null_mut();
@@ -6639,7 +6634,7 @@ unsafe extern "C" fn xml_relaxng_parse_include(
         );
         return -1;
     }
-    if xml_str_equal((*root).name, c"grammar".as_ptr() as _) == 0 {
+    if !xml_str_equal((*root).name, c"grammar".as_ptr() as _) {
         xml_rng_perr(
             ctxt,
             node,
@@ -6764,7 +6759,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
     while !cur.is_null() {
         if (*cur).node.is_null()
             || (*(*cur).node).parent.is_null()
-            || xml_str_equal((*(*(*cur).node).parent).name, c"start".as_ptr() as _) == 0
+            || !xml_str_equal((*(*(*cur).node).parent).name, c"start".as_ptr() as _)
         {
             combine = null_mut();
             xml_rng_perr(
@@ -6780,7 +6775,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
         }
 
         if !combine.is_null() {
-            if xml_str_equal(combine, c"choice".as_ptr() as _) != 0 {
+            if xml_str_equal(combine, c"choice".as_ptr() as _) {
                 if choice_or_interleave == -1 {
                     choice_or_interleave = 1;
                 } else if choice_or_interleave == 0 {
@@ -6793,7 +6788,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                         null_mut(),
                     );
                 }
-            } else if xml_str_equal(combine, c"interleave".as_ptr() as _) != 0 {
+            } else if xml_str_equal(combine, c"interleave".as_ptr() as _) {
                 if choice_or_interleave == -1 {
                     choice_or_interleave = 0;
                 } else if choice_or_interleave == 1 {
@@ -9933,7 +9928,7 @@ unsafe extern "C" fn xml_relaxng_validate_value(
         }
         XmlRelaxNGType::Text => {}
         XmlRelaxNGType::Value => {
-            if xml_str_equal(value, (*define).value) == 0 {
+            if !xml_str_equal(value, (*define).value) {
                 if !(*define).name.is_null() {
                     let lib: XmlRelaxNGTypeLibraryPtr = (*define).data as _;
                     if !lib.is_null() && (*lib).comp.is_some() {
@@ -9969,7 +9964,7 @@ unsafe extern "C" fn xml_relaxng_validate_value(
                     let nval: *mut XmlChar = xml_relaxng_normalize(ctxt, (*define).value);
                     let nvalue: *mut XmlChar = xml_relaxng_normalize(ctxt, value);
 
-                    if nval.is_null() || nvalue.is_null() || xml_str_equal(nval, nvalue) == 0 {
+                    if nval.is_null() || nvalue.is_null() || !xml_str_equal(nval, nvalue) {
                         ret = -1;
                     }
                     if !nval.is_null() {
@@ -10242,7 +10237,7 @@ unsafe extern "C" fn xml_relaxng_attribute_match(
 ) -> c_int {
     let mut ret: c_int;
 
-    if !(*define).name.is_null() && xml_str_equal((*define).name, (*prop).name) == 0 {
+    if !(*define).name.is_null() && !xml_str_equal((*define).name, (*prop).name) {
         return 0;
     }
     if !(*define).ns.is_null() {
@@ -10251,7 +10246,7 @@ unsafe extern "C" fn xml_relaxng_attribute_match(
                 return 0;
             }
         } else if (*prop).ns.is_null()
-            || xml_str_equal((*define).ns, (*(*prop).ns).href.load(Ordering::Relaxed)) == 0
+            || !xml_str_equal((*define).ns, (*(*prop).ns).href.load(Ordering::Relaxed))
         {
             return 0;
         }
@@ -10323,11 +10318,10 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
         for i in 0..(*(*ctxt).state).nb_attrs {
             tmp = *(*(*ctxt).state).attrs.add(i as usize);
             if !tmp.is_null()
-                && xml_str_equal((*define).name, (*tmp).name) != 0
+                && xml_str_equal((*define).name, (*tmp).name)
                 && ((((*define).ns.is_null() || *(*define).ns.add(0) == 0) && (*tmp).ns.is_null())
                     || (!(*tmp).ns.is_null()
-                        && xml_str_equal((*define).ns, (*(*tmp).ns).href.load(Ordering::Relaxed))
-                            != 0))
+                        && xml_str_equal((*define).ns, (*(*tmp).ns).href.load(Ordering::Relaxed))))
             {
                 prop = tmp;
                 j = i;
@@ -10900,7 +10894,7 @@ unsafe extern "C" fn xml_relaxng_equal_valid_state(
     if (*state1).endvalue != (*state2).endvalue {
         return 0;
     }
-    if (*state1).value != (*state2).value && xml_str_equal((*state1).value, (*state2).value) == 0 {
+    if (*state1).value != (*state2).value && !xml_str_equal((*state1).value, (*state2).value) {
         return 0;
     }
     for i in 0..(*state1).nb_attrs {
@@ -11200,8 +11194,8 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                            hence fail the validation, hence this perhaps
                            dirty attempt to rectify such a situation */
                         && ((*(*define).parent).typ != XmlRelaxNGType::Def
-                            || xml_str_equal((*(*define).parent).name,
-                                            c"open-name-class".as_ptr() as _) == 0)
+                            || !xml_str_equal((*(*define).parent).name,
+                                            c"open-name-class".as_ptr() as _))
                 {
                     VALID_ERR2!(
                         ctxt,
@@ -11442,9 +11436,9 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 if (*ctxt).err_nr != 0 {
                     while !(*ctxt).err.is_null()
                         && (((*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
-                            && xml_str_equal((*(*ctxt).err).arg2, (*node).name) != 0)
+                            && xml_str_equal((*(*ctxt).err).arg2, (*node).name))
                             || ((*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
-                                && xml_str_equal((*(*ctxt).err).arg1, (*node).name) != 0)
+                                && xml_str_equal((*(*ctxt).err).arg1, (*node).name))
                             || (*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
                             || (*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem)
                     {
@@ -11468,9 +11462,9 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 }
                 while !(*ctxt).err.is_null()
                     && (((*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
-                        && xml_str_equal((*(*ctxt).err).arg2, (*node).name) != 0)
+                        && xml_str_equal((*(*ctxt).err).arg2, (*node).name))
                         || ((*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
-                            && xml_str_equal((*(*ctxt).err).arg1, (*node).name) != 0)
+                            && xml_str_equal((*(*ctxt).err).arg1, (*node).name))
                         || (*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
                         || (*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem)
                 {

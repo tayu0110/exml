@@ -593,18 +593,18 @@ pub unsafe extern "C" fn xml_hash_add_entry3(
     } else {
         insert = (*table).table.add(key as usize);
         while !(*insert).next.is_null() {
-            if xml_str_equal((*insert).name, name) != 0
-                && xml_str_equal((*insert).name2, name2) != 0
-                && xml_str_equal((*insert).name3, name3) != 0
+            if xml_str_equal((*insert).name, name)
+                && xml_str_equal((*insert).name2, name2)
+                && xml_str_equal((*insert).name3, name3)
             {
                 return -1;
             }
             len += 1;
             insert = (*insert).next;
         }
-        if xml_str_equal((*insert).name, name) != 0
-            && xml_str_equal((*insert).name2, name2) != 0
-            && xml_str_equal((*insert).name3, name3) != 0
+        if xml_str_equal((*insert).name, name)
+            && xml_str_equal((*insert).name2, name2)
+            && xml_str_equal((*insert).name3, name3)
         {
             return -1;
         }
@@ -761,9 +761,9 @@ pub unsafe extern "C" fn xml_hash_update_entry3(
     } else {
         insert = (*table).table.add(key as usize);
         while !(*insert).next.is_null() {
-            if xml_str_equal((*insert).name, name) != 0
-                && xml_str_equal((*insert).name2, name2) != 0
-                && xml_str_equal((*insert).name3, name3) != 0
+            if xml_str_equal((*insert).name, name)
+                && xml_str_equal((*insert).name2, name2)
+                && xml_str_equal((*insert).name3, name3)
             {
                 if let Some(f) = f.as_ref() {
                     f((*insert).payload, (*insert).name);
@@ -773,9 +773,9 @@ pub unsafe extern "C" fn xml_hash_update_entry3(
             }
             insert = (*insert).next;
         }
-        if xml_str_equal((*insert).name, name) != 0
-            && xml_str_equal((*insert).name2, name2) != 0
-            && xml_str_equal((*insert).name3, name3) != 0
+        if xml_str_equal((*insert).name, name)
+            && xml_str_equal((*insert).name2, name2)
+            && xml_str_equal((*insert).name3, name3)
         {
             if let Some(f) = f.as_ref() {
                 f((*insert).payload, (*insert).name);
@@ -921,9 +921,9 @@ pub unsafe extern "C" fn xml_hash_remove_entry3(
     } else {
         entry = (*table).table.add(key as usize);
         while !entry.is_null() {
-            if xml_str_equal((*entry).name, name) != 0
-                && xml_str_equal((*entry).name2, name2) != 0
-                && xml_str_equal((*entry).name3, name3) != 0
+            if xml_str_equal((*entry).name, name)
+                && xml_str_equal((*entry).name2, name2)
+                && xml_str_equal((*entry).name3, name3)
             {
                 if let Some(f) = f.as_ref() {
                     if !(*entry).payload.is_null() {
@@ -1046,9 +1046,9 @@ pub unsafe extern "C" fn xml_hash_lookup3(
     }
     entry = (*table).table.add(key as usize);
     while !entry.is_null() {
-        if xml_str_equal((*entry).name, name) != 0
-            && xml_str_equal((*entry).name2, name2) != 0
-            && xml_str_equal((*entry).name3, name3) != 0
+        if xml_str_equal((*entry).name, name)
+            && xml_str_equal((*entry).name2, name2)
+            && xml_str_equal((*entry).name3, name3)
         {
             return (*entry).payload;
         }
@@ -1501,9 +1501,9 @@ pub unsafe extern "C" fn xml_hash_scan_full3(
             iter = (*table).table.add(i as usize);
             while !iter.is_null() {
                 next = (*iter).next;
-                if (name.is_null() || xml_str_equal(name, (*iter).name) != 0)
-                    && (name2.is_null() || xml_str_equal(name2, (*iter).name2) != 0)
-                    && (name3.is_null() || xml_str_equal(name3, (*iter).name3) != 0)
+                if (name.is_null() || xml_str_equal(name, (*iter).name))
+                    && (name2.is_null() || xml_str_equal(name2, (*iter).name2))
+                    && (name3.is_null() || xml_str_equal(name3, (*iter).name3))
                     && !(*iter).payload.is_null()
                 {
                     f(

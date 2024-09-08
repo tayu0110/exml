@@ -2692,9 +2692,9 @@ pub unsafe extern "C" fn xml_new_ns(
         return null_mut();
     }
 
-    if !prefix.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) != 0 {
+    if !prefix.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) {
         /* xml namespace is predefined, no need to add it */
-        if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) != 0 {
+        if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
             return null_mut();
         }
 
@@ -2740,7 +2740,7 @@ pub unsafe extern "C" fn xml_new_ns(
                 || xml_str_equal(
                     (*prev).prefix.load(Ordering::Relaxed),
                     (*cur).prefix.load(Ordering::Relaxed),
-                ) != 0
+                )
             {
                 xml_free_ns(cur);
                 return null_mut();
@@ -2752,7 +2752,7 @@ pub unsafe extern "C" fn xml_new_ns(
                     || xml_str_equal(
                         (*prev).prefix.load(Ordering::Relaxed),
                         (*cur).prefix.load(Ordering::Relaxed),
-                    ) != 0
+                    )
                 {
                     xml_free_ns(cur);
                     return null_mut();
@@ -3720,8 +3720,7 @@ unsafe extern "C" fn xml_copy_prop_internal(
             if xml_str_equal(
                 (*ns).href.load(Ordering::Relaxed),
                 (*(*cur).ns).href.load(Ordering::Relaxed),
-            ) != 0
-            {
+            ) {
                 /* this is the nice case */
                 (*ret).ns = ns;
             } else {
@@ -5069,14 +5068,14 @@ pub unsafe extern "C" fn xml_get_node_path(node: *const XmlNode) -> *mut XmlChar
             while !tmp.is_null() {
                 if matches!((*tmp).typ, XmlElementType::XmlElementNode)
                     && (generic != 0
-                        || (xml_str_equal((*cur).name, (*tmp).name) != 0
+                        || (xml_str_equal((*cur).name, (*tmp).name)
                             && ((*tmp).ns == (*cur).ns
                                 || (!(*tmp).ns.is_null()
                                     && !(*cur).ns.is_null()
                                     && xml_str_equal(
                                         (*(*cur).ns).prefix.load(Ordering::Relaxed),
                                         (*(*tmp).ns).prefix.load(Ordering::Relaxed),
-                                    ) != 0))))
+                                    )))))
                 {
                     occur += 1;
                 }
@@ -5087,14 +5086,14 @@ pub unsafe extern "C" fn xml_get_node_path(node: *const XmlNode) -> *mut XmlChar
                 while !tmp.is_null() && occur == 0 {
                     if matches!((*tmp).typ, XmlElementType::XmlElementNode)
                         && (generic != 0
-                            || (xml_str_equal((*cur).name, (*tmp).name) != 0
+                            || (xml_str_equal((*cur).name, (*tmp).name)
                                 && (((*tmp).ns == (*cur).ns)
                                     || (!(*tmp).ns.is_null()
                                         && !(*cur).ns.is_null()
                                         && (xml_str_equal(
                                             (*(*cur).ns).prefix.load(Ordering::Relaxed),
                                             (*(*tmp).ns).prefix.load(Ordering::Relaxed),
-                                        ) != 0)))))
+                                        ))))))
                     {
                         occur += 1;
                     }
@@ -5191,7 +5190,7 @@ pub unsafe extern "C" fn xml_get_node_path(node: *const XmlNode) -> *mut XmlChar
             tmp = (*cur).prev;
             while !tmp.is_null() {
                 if matches!((*tmp).typ, XmlElementType::XmlPiNode)
-                    && xml_str_equal((*cur).name, (*tmp).name) != 0
+                    && xml_str_equal((*cur).name, (*tmp).name)
                 {
                     occur += 1;
                 }
@@ -5201,7 +5200,7 @@ pub unsafe extern "C" fn xml_get_node_path(node: *const XmlNode) -> *mut XmlChar
                 tmp = (*cur).next;
                 while !tmp.is_null() && occur == 0 {
                     if matches!((*tmp).typ, XmlElementType::XmlPiNode)
-                        && xml_str_equal((*cur).name, (*tmp).name) != 0
+                        && xml_str_equal((*cur).name, (*tmp).name)
                     {
                         occur += 1;
                     }
@@ -6653,7 +6652,7 @@ pub unsafe extern "C" fn xml_search_ns(
     if node.is_null() || matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
-    if !name_space.is_null() && xml_str_equal(name_space, c"xml".as_ptr() as _) != 0 {
+    if !name_space.is_null() && xml_str_equal(name_space, c"xml".as_ptr() as _) {
         if doc.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
             /*
              * The XML-1.0 namespace is normally held on the root
@@ -6712,7 +6711,7 @@ pub unsafe extern "C" fn xml_search_ns(
                 if !(*cur).prefix.load(Ordering::Relaxed).is_null()
                     && !name_space.is_null()
                     && !(*cur).href.load(Ordering::Relaxed).is_null()
-                    && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), name_space) != 0
+                    && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), name_space)
                 {
                     return cur;
                 }
@@ -6730,7 +6729,7 @@ pub unsafe extern "C" fn xml_search_ns(
                     if !(*cur).prefix.load(Ordering::Relaxed).is_null()
                         && !name_space.is_null()
                         && !(*cur).href.load(Ordering::Relaxed).is_null()
-                        && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), name_space) != 0
+                        && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), name_space)
                     {
                         return cur;
                     }
@@ -6777,7 +6776,7 @@ unsafe extern "C" fn xml_ns_in_scope(
                 }
                 if !(*tst).prefix.load(Ordering::Relaxed).is_null()
                     && !prefix.is_null()
-                    && xml_str_equal((*tst).prefix.load(Ordering::Relaxed), prefix) != 0
+                    && xml_str_equal((*tst).prefix.load(Ordering::Relaxed), prefix)
                 {
                     return 0;
                 }
@@ -6813,7 +6812,7 @@ pub unsafe extern "C" fn xml_search_ns_by_href(
     if node.is_null() || matches!((*node).typ, XmlElementType::XmlNamespaceDecl) || href.is_null() {
         return null_mut();
     }
-    if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) != 0 {
+    if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
         /*
          * Only the document can hold the XML spec namespace.
          */
@@ -6869,7 +6868,7 @@ pub unsafe extern "C" fn xml_search_ns_by_href(
             while !cur.is_null() {
                 if !(*cur).href.load(Ordering::Relaxed).is_null()
                     && !href.is_null()
-                    && xml_str_equal((*cur).href.load(Ordering::Relaxed), href) != 0
+                    && xml_str_equal((*cur).href.load(Ordering::Relaxed), href)
                     && (is_attr == 0 || !(*cur).prefix.load(Ordering::Relaxed).is_null())
                     && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed)) == 1
                 {
@@ -6882,7 +6881,7 @@ pub unsafe extern "C" fn xml_search_ns_by_href(
                 if !cur.is_null()
                     && !(*cur).href.load(Ordering::Relaxed).is_null()
                     && !href.is_null()
-                    && xml_str_equal((*cur).href.load(Ordering::Relaxed), href) != 0
+                    && xml_str_equal((*cur).href.load(Ordering::Relaxed), href)
                     && (is_attr == 0 || !(*cur).prefix.load(Ordering::Relaxed).is_null())
                     && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed)) == 1
                 {
@@ -6929,7 +6928,7 @@ pub unsafe extern "C" fn xml_get_ns_list(
                         || xml_str_equal(
                             (*cur).prefix.load(Ordering::Relaxed),
                             (*(*ret.add(i as usize))).prefix.load(Ordering::Relaxed),
-                        ) != 0
+                        )
                     {
                         cur = (*cur).next.load(Ordering::Relaxed);
                         continue 'b;
@@ -7108,7 +7107,7 @@ unsafe extern "C" fn xml_get_prop_node_internal(
              * We want the attr to be in no namespace.
              */
             while {
-                if (*prop).ns.is_null() && xml_str_equal((*prop).name, name) != 0 {
+                if (*prop).ns.is_null() && xml_str_equal((*prop).name, name) {
                     return prop;
                 }
                 prop = (*prop).next;
@@ -7120,9 +7119,9 @@ unsafe extern "C" fn xml_get_prop_node_internal(
              */
             while {
                 if !(*prop).ns.is_null()
-                    && xml_str_equal((*prop).name, name) != 0
+                    && xml_str_equal((*prop).name, name)
                     && ((*(*prop).ns).href.load(Ordering::Relaxed) == ns_name as _
-                        || xml_str_equal((*(*prop).ns).href.load(Ordering::Relaxed), ns_name) != 0)
+                        || xml_str_equal((*(*prop).ns).href.load(Ordering::Relaxed), ns_name))
                 {
                     return prop;
                 }
@@ -7170,7 +7169,7 @@ unsafe extern "C" fn xml_get_prop_node_internal(
                     attr_decl =
                         xml_get_dtd_qattr_desc((*doc).ext_subset, elem_qname, name, null_mut());
                 }
-            } else if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) != 0 {
+            } else if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
                 /*
                  * The XML namespace must be bound to prefix 'xml'.
                  */
@@ -7204,7 +7203,7 @@ unsafe extern "C" fn xml_get_prop_node_internal(
                 }
                 cur = ns_list;
                 while !(*cur).is_null() {
-                    if xml_str_equal((*(*cur)).href.load(Ordering::Relaxed), ns_name) != 0 {
+                    if xml_str_equal((*(*cur)).href.load(Ordering::Relaxed), ns_name) {
                         attr_decl = xml_get_dtd_qattr_desc(
                             (*doc).int_subset,
                             elem_qname,
@@ -7434,7 +7433,7 @@ pub unsafe extern "C" fn xml_has_prop(node: *const XmlNode, name: *const XmlChar
      */
     prop = (*node).properties;
     while !prop.is_null() {
-        if xml_str_equal((*prop).name, name) != 0 {
+        if xml_str_equal((*prop).name, name) {
             return prop;
         }
         prop = (*prop).next;
@@ -8877,11 +8876,11 @@ pub unsafe extern "C" fn xml_node_get_space_preserve(mut cur: *const XmlNode) ->
     while !cur.is_null() {
         space = xml_get_ns_prop(cur, c"space".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
         if !space.is_null() {
-            if xml_str_equal(space, c"preserve".as_ptr() as _) != 0 {
+            if xml_str_equal(space, c"preserve".as_ptr() as _) {
                 xml_free(space as _);
                 return 1;
             }
-            if xml_str_equal(space, c"default".as_ptr() as _) != 0 {
+            if xml_str_equal(space, c"default".as_ptr() as _) {
                 xml_free(space as _);
                 return 0;
             }
@@ -10349,24 +10348,24 @@ pub unsafe extern "C" fn xml_is_xhtml(
         return -1;
     }
     if !public_id.is_null() {
-        if xml_str_equal(public_id, XHTML_STRICT_PUBLIC_ID.as_ptr() as _) != 0 {
+        if xml_str_equal(public_id, XHTML_STRICT_PUBLIC_ID.as_ptr() as _) {
             return 1;
         }
-        if xml_str_equal(public_id, XHTML_FRAME_PUBLIC_ID.as_ptr() as _) != 0 {
+        if xml_str_equal(public_id, XHTML_FRAME_PUBLIC_ID.as_ptr() as _) {
             return 1;
         }
-        if xml_str_equal(public_id, XHTML_TRANS_PUBLIC_ID.as_ptr() as _) != 0 {
+        if xml_str_equal(public_id, XHTML_TRANS_PUBLIC_ID.as_ptr() as _) {
             return 1;
         }
     }
     if !system_id.is_null() {
-        if xml_str_equal(system_id, XHTML_STRICT_SYSTEM_ID.as_ptr() as _) != 0 {
+        if xml_str_equal(system_id, XHTML_STRICT_SYSTEM_ID.as_ptr() as _) {
             return 1;
         }
-        if xml_str_equal(system_id, XHTML_FRAME_SYSTEM_ID.as_ptr() as _) != 0 {
+        if xml_str_equal(system_id, XHTML_FRAME_SYSTEM_ID.as_ptr() as _) {
             return 1;
         }
-        if xml_str_equal(system_id, XHTML_TRANS_SYSTEM_ID.as_ptr() as _) != 0 {
+        if xml_str_equal(system_id, XHTML_TRANS_SYSTEM_ID.as_ptr() as _) {
             return 1;
         }
     }
@@ -10733,7 +10732,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
                             || xml_str_equal(
                                 (*ns).prefix.load(Ordering::Relaxed),
                                 (*(*mi).new_ns).prefix.load(Ordering::Relaxed),
-                            ) != 0
+                            )
                         {
                             shadowed = 1;
                             break;
@@ -10839,8 +10838,8 @@ unsafe extern "C" fn xml_dom_wrap_store_ns(
         ns = (*ns).next.load(Ordering::Relaxed);
         while !ns.is_null() {
             if (((*ns).prefix.load(Ordering::Relaxed) == prefix as _)
-                || xml_str_equal((*ns).prefix.load(Ordering::Relaxed), prefix) != 0)
-                && xml_str_equal((*ns).href.load(Ordering::Relaxed), ns_name) != 0
+                || xml_str_equal((*ns).prefix.load(Ordering::Relaxed), prefix))
+                && xml_str_equal((*ns).href.load(Ordering::Relaxed), ns_name)
             {
                 return ns;
             }
@@ -10882,7 +10881,7 @@ unsafe extern "C" fn xml_tree_nslist_lookup_by_prefix(
         ns = ns_list;
         loop {
             if prefix == (*ns).prefix.load(Ordering::Relaxed)
-                || xml_str_equal(prefix, (*ns).prefix.load(Ordering::Relaxed)) != 0
+                || xml_str_equal(prefix, (*ns).prefix.load(Ordering::Relaxed))
             {
                 return ns;
             }
@@ -10941,7 +10940,7 @@ unsafe extern "C" fn xml_search_ns_by_prefix_strict(
                 ns = (*cur).ns_def;
                 loop {
                     if prefix == (*ns).prefix.load(Ordering::Relaxed)
-                        || xml_str_equal(prefix, (*ns).prefix.load(Ordering::Relaxed)) != 0
+                        || xml_str_equal(prefix, (*ns).prefix.load(Ordering::Relaxed))
                     {
                         /*
                         	* Disabled namespaces, e.g. xmlns:abc="".
@@ -11144,7 +11143,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
 		        (prefixed == 0 || !(*(*mi).new_ns).prefix.load(Ordering::Relaxed).is_null()) &&
 		        /* Equal ns name */
 		        ((*(*mi).new_ns).href.load(Ordering::Relaxed) == (*ns).href.load(Ordering::Relaxed) ||
-                xml_str_equal((*(*mi).new_ns).href.load(Ordering::Relaxed), (*ns).href.load(Ordering::Relaxed)) != 0)
+                xml_str_equal((*(*mi).new_ns).href.load(Ordering::Relaxed), (*ns).href.load(Ordering::Relaxed)) )
             {
                 /* Set the mapping. */
                 (*mi).old_ns = ns;
@@ -11200,7 +11199,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
                         || xml_str_equal(
                             (*ns).prefix.load(Ordering::Relaxed),
                             (*(*mi).new_ns).prefix.load(Ordering::Relaxed),
-                        ) != 0)
+                        ))
                 {
                     /*
                      * Shadows.
@@ -11321,7 +11320,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                                         (*(*mi).new_ns)
                                                             .prefix
                                                             .load(Ordering::Relaxed),
-                                                    ) != 0)
+                                                    ))
                                                 && ((*ns).href.load(Ordering::Relaxed)
                                                     == (*(*mi).new_ns).href.load(Ordering::Relaxed)
                                                     || xml_str_equal(
@@ -11329,7 +11328,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                                         (*(*mi).new_ns)
                                                             .href
                                                             .load(Ordering::Relaxed),
-                                                    ) != 0)
+                                                    ))
                                             {
                                                 /*
                                                  * A redundant ns-decl was found.
@@ -11387,7 +11386,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                                         (*(*mi).new_ns)
                                                             .prefix
                                                             .load(Ordering::Relaxed),
-                                                    ) != 0)
+                                                    ))
                                             {
                                                 (*mi).shadow_depth = depth;
                                             }
@@ -11824,7 +11823,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                                             (*(*mi).new_ns)
                                                                 .prefix
                                                                 .load(Ordering::Relaxed),
-                                                        ) != 0)
+                                                        ))
                                                 {
                                                     (*mi).shadow_depth = depth;
                                                 }
@@ -12150,7 +12149,7 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
     }
 
     *ret_ns = null_mut();
-    if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) != 0 {
+    if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
         *ret_ns = xml_tree_ensure_xmldecl(doc);
         if (*ret_ns).is_null() {
             return -1;
@@ -12181,7 +12180,7 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
                                     && xml_str_equal(
                                         (*prevns).prefix.load(Ordering::Relaxed),
                                         (*ns).prefix.load(Ordering::Relaxed),
-                                    ) != 0)
+                                    ))
                             {
                                 /*
                                  * Shadowed.
@@ -12203,7 +12202,7 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
                      * Ns-name comparison.
                      */
                     if ns_name == (*ns).href.load(Ordering::Relaxed)
-                        || xml_str_equal(ns_name, (*ns).href.load(Ordering::Relaxed)) != 0
+                        || xml_str_equal(ns_name, (*ns).href.load(Ordering::Relaxed))
                     {
                         /*
                          * At this point the prefix can only be shadowed,
@@ -13112,7 +13111,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                                         (*(*mi).new_ns)
                                                             .prefix
                                                             .load(Ordering::Relaxed),
-                                                    ) != 0)
+                                                    ))
                                             {
                                                 /*
                                                  * Mark as shadowed at the current

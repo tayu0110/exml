@@ -162,13 +162,13 @@ pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlCh
         'goto_found_head: {
             while !cur.is_null() {
                 if matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null() {
-                    if xml_str_equal((*cur).name, c"html".as_ptr() as _) != 0 {
+                    if xml_str_equal((*cur).name, c"html".as_ptr() as _) {
                         break;
                     }
-                    if xml_str_equal((*cur).name, c"head".as_ptr() as _) != 0 {
+                    if xml_str_equal((*cur).name, c"head".as_ptr() as _) {
                         break 'goto_found_head;
                     }
-                    if xml_str_equal((*cur).name, c"meta".as_ptr() as _) != 0 {
+                    if xml_str_equal((*cur).name, c"meta".as_ptr() as _) {
                         break 'goto_found_meta;
                     }
                 }
@@ -183,10 +183,10 @@ pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlCh
              */
             while !cur.is_null() {
                 if matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null() {
-                    if xml_str_equal((*cur).name, c"head".as_ptr() as _) != 0 {
+                    if xml_str_equal((*cur).name, c"head".as_ptr() as _) {
                         break;
                     }
-                    if xml_str_equal((*cur).name, c"meta".as_ptr() as _) != 0 {
+                    if xml_str_equal((*cur).name, c"meta".as_ptr() as _) {
                         break 'goto_found_meta;
                     }
                 }
@@ -207,7 +207,7 @@ pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlCh
 
     while !cur.is_null() {
         if (matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null())
-            && xml_str_equal((*cur).name, c"meta".as_ptr() as _) != 0
+            && xml_str_equal((*cur).name, c"meta".as_ptr() as _)
         {
             let mut attr: XmlAttrPtr = (*cur).properties;
             let mut http: c_int;

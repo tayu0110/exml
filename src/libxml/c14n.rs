@@ -766,11 +766,11 @@ unsafe extern "C" fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> c_int {
         && xml_str_equal(
             (*ns).prefix.load(Ordering::Relaxed) as _,
             c"xml".as_ptr() as _,
-        ) != 0
+        )
         && xml_str_equal(
             (*ns).href.load(Ordering::Relaxed) as _,
             XML_XML_NAMESPACE.as_ptr() as _,
-        ) != 0) as i32
+        )) as i32
 }
 
 unsafe extern "C" fn xml_c14n_str_equal(
@@ -1216,8 +1216,8 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
             /*
              * Special values for namespace with empty prefix
              */
-            if xml_str_equal(prefix, c"#default".as_ptr() as _) != 0
-                || xml_str_equal(prefix, c"".as_ptr() as _) != 0
+            if xml_str_equal(prefix, c"#default".as_ptr() as _)
+                || xml_str_equal(prefix, c"".as_ptr() as _)
             {
                 prefix = null_mut();
                 has_empty_ns_in_inclusive_list = 1;
@@ -1523,7 +1523,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     }
 
     /* check if result uri is empty or not */
-    if res.is_null() || xml_str_equal(res, c"".as_ptr() as _) != 0 {
+    if res.is_null() || xml_str_equal(res, c"".as_ptr() as _) {
         xml_free(res as _);
         return null_mut();
     }
@@ -1940,14 +1940,14 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
                     /* check for simple inheritance attributes */
                     if matched == 0
                         && xml_lang_attr.is_null()
-                        && xml_str_equal((*attr).name, c"lang".as_ptr() as _) != 0
+                        && xml_str_equal((*attr).name, c"lang".as_ptr() as _)
                     {
                         xml_lang_attr = attr;
                         matched = 1;
                     }
                     if matched == 0
                         && xml_space_attr.is_null()
-                        && xml_str_equal((*attr).name, c"space".as_ptr() as _) != 0
+                        && xml_str_equal((*attr).name, c"space".as_ptr() as _)
                     {
                         xml_space_attr = attr;
                         matched = 1;
@@ -1956,7 +1956,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
                     /* check for base attr */
                     if matched == 0
                         && xml_base_attr.is_null()
-                        && xml_str_equal((*attr).name, c"base".as_ptr() as _) != 0
+                        && xml_str_equal((*attr).name, c"base".as_ptr() as _)
                     {
                         xml_base_attr = attr;
                         matched = 1;

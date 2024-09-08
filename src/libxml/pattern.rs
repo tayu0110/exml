@@ -563,7 +563,7 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
             } else {
                 i = 0;
                 while i < (*ctxt).nb_namespaces {
-                    if xml_str_equal(*(*ctxt).namespaces.add(2 * i as usize + 1), prefix) != 0 {
+                    if xml_str_equal(*(*ctxt).namespaces.add(2 * i as usize + 1), prefix) {
                         XML_PAT_COPY_NSNAME!(ctxt, url, *(*ctxt).namespaces.add(2 * i as usize));
                         break;
                     }
@@ -691,7 +691,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                 } else {
                     i = 0;
                     while i < (*ctxt).nb_namespaces {
-                        if xml_str_equal(*(*ctxt).namespaces.add(2 * i as usize + 1), prefix) != 0 {
+                        if xml_str_equal(*(*ctxt).namespaces.add(2 * i as usize + 1), prefix) {
                             XML_PAT_COPY_NSNAME!(
                                 ctxt,
                                 url,
@@ -726,7 +726,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                 }
             } else {
                 NEXT!(ctxt);
-                if xml_str_equal(name, c"child".as_ptr() as _) != 0 {
+                if xml_str_equal(name, c"child".as_ptr() as _) {
                     XML_PAT_FREE_STRING!(ctxt, name);
                     name = xml_pat_scan_name(ctxt);
                     if name.is_null() {
@@ -767,8 +767,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                                 if xml_str_equal(
                                     *(*ctxt).namespaces.add(2 * i as usize + 1),
                                     prefix,
-                                ) != 0
-                                {
+                                ) {
                                     XML_PAT_COPY_NSNAME!(
                                         ctxt,
                                         url,
@@ -804,7 +803,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                     } else {
                         PUSH!(ctxt, XmlPatOp::XmlOpChild, name, null_mut(), 'error);
                     }
-                } else if xml_str_equal(name, c"attribute".as_ptr() as _) != 0 {
+                } else if xml_str_equal(name, c"attribute".as_ptr() as _) {
                     XML_PAT_FREE_STRING!(ctxt, name);
                     name = null_mut();
                     if XML_STREAM_XS_IDC_SEL!((*ctxt).comp) {
@@ -1665,7 +1664,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 if *(*step).value.add(0) != *(*node).name.add(0) {
                                     break 'rollback;
                                 }
-                                if xml_str_equal((*step).value, (*node).name) == 0 {
+                                if !xml_str_equal((*step).value, (*node).name) {
                                     break 'rollback;
                                 }
 
@@ -1678,11 +1677,10 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     if (*step).value2.is_null() {
                                         break 'rollback;
                                     }
-                                    if xml_str_equal(
+                                    if !xml_str_equal(
                                         (*step).value2,
                                         (*(*node).ns).href.load(Ordering::Relaxed),
-                                    ) == 0
-                                    {
+                                    ) {
                                         break 'rollback;
                                     }
                                 }
@@ -1706,7 +1704,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     while !lst.is_null() {
                                         if matches!((*lst).typ, XmlElementType::XmlElementNode)
                                             && *(*step).value.add(0) == *(*lst).name.add(0)
-                                            && xml_str_equal((*step).value, (*lst).name) != 0
+                                            && xml_str_equal((*step).value, (*lst).name)
                                         {
                                             break;
                                         }
@@ -1726,7 +1724,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     if *(*step).value.add(0) != *(*node).name.add(0) {
                                         break 'rollback;
                                     }
-                                    if xml_str_equal((*step).value, (*node).name) == 0 {
+                                    if !xml_str_equal((*step).value, (*node).name) {
                                         break 'rollback;
                                     }
                                 }
@@ -1736,10 +1734,10 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                         break 'rollback;
                                     }
                                 } else if !(*step).value2.is_null()
-                                    && xml_str_equal(
+                                    && !xml_str_equal(
                                         (*step).value2,
                                         (*(*node).ns).href.load(Ordering::Relaxed),
-                                    ) == 0
+                                    )
                                 {
                                     break 'rollback;
                                 }
@@ -1764,7 +1762,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 if *(*step).value.add(0) != *(*node).name.add(0) {
                                     break 'rollback;
                                 }
-                                if xml_str_equal((*step).value, (*node).name) == 0 {
+                                if !xml_str_equal((*step).value, (*node).name) {
                                     break 'rollback;
                                 }
                                 /* Namespace test */
@@ -1776,11 +1774,10 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     if (*step).value2.is_null() {
                                         break 'rollback;
                                     }
-                                    if xml_str_equal(
+                                    if !xml_str_equal(
                                         (*step).value2,
                                         (*(*node).ns).href.load(Ordering::Relaxed),
-                                    ) == 0
-                                    {
+                                    ) {
                                         break 'rollback;
                                     }
                                 }
@@ -1816,7 +1813,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 while !node.is_null() {
                                     if matches!((*node).typ, XmlElementType::XmlElementNode)
                                         && *(*step).value.add(0) == *(*node).name.add(0)
-                                        && xml_str_equal((*step).value, (*node).name) != 0
+                                        && xml_str_equal((*step).value, (*node).name)
                                     {
                                         /* Namespace test */
                                         if (*node).ns.is_null() {
@@ -1831,7 +1828,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                                 && xml_str_equal(
                                                     (*step).value2,
                                                     (*(*node).ns).href.load(Ordering::Relaxed),
-                                                ) != 0)
+                                                ))
                                         {
                                             break;
                                         }
@@ -1864,11 +1861,10 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     if (*step).value.is_null() {
                                         break 'rollback;
                                     }
-                                    if xml_str_equal(
+                                    if !xml_str_equal(
                                         (*step).value,
                                         (*(*node).ns).href.load(Ordering::Relaxed),
-                                    ) == 0
-                                    {
+                                    ) {
                                         break 'rollback;
                                     }
                                 }
@@ -2395,13 +2391,13 @@ unsafe extern "C" fn xml_stream_push_internal(
                              */
                             is_match = 1;
                         } else if !ns.is_null() {
-                            is_match = xml_str_equal(step.ns, ns);
+                            is_match = xml_str_equal(step.ns, ns) as i32;
                         }
                     } else if step.ns.is_null() == ns.is_null()
                         && !name.is_null()
                         && *step.name.add(0) == *name.add(0)
-                        && xml_str_equal(step.name, name) != 0
-                        && (step.ns == ns || xml_str_equal(step.ns, ns) != 0)
+                        && xml_str_equal(step.name, name)
+                        && (step.ns == ns || xml_str_equal(step.ns, ns))
                     {
                         is_match = 1;
                     }
@@ -2522,13 +2518,13 @@ unsafe extern "C" fn xml_stream_push_internal(
                      */
                     is_match = 1;
                 } else if !ns.is_null() {
-                    is_match = xml_str_equal(step.ns, ns);
+                    is_match = xml_str_equal(step.ns, ns) as i32;
                 }
             } else if step.ns.is_null() == ns.is_null()
                 && !name.is_null()
                 && *step.name.add(0) == *name.add(0)
-                && xml_str_equal(step.name, name) != 0
-                && (step.ns == ns || xml_str_equal(step.ns, ns) != 0)
+                && xml_str_equal(step.name, name)
+                && (step.ns == ns || xml_str_equal(step.ns, ns))
             {
                 is_match = 1;
             }

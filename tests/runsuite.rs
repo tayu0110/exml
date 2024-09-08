@@ -788,7 +788,7 @@ unsafe extern "C" fn xsd_test(logfile: &mut Option<File>) -> c_int {
     test_log!(logfile, "filename: {}", filename.to_string_lossy());
 
     cur = xml_doc_get_root_element(doc);
-    if cur.is_null() || xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) == 0 {
+    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
         if !doc.is_null() {
@@ -798,7 +798,7 @@ unsafe extern "C" fn xsd_test(logfile: &mut Option<File>) -> c_int {
     }
 
     cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
-    if cur.is_null() || xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) == 0 {
+    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
         if !doc.is_null() {
@@ -859,7 +859,7 @@ unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
     test_log!(logfile, "filename: {}", filename.to_string_lossy());
 
     cur = xml_doc_get_root_element(doc);
-    if cur.is_null() || xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) == 0 {
+    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
         if !doc.is_null() {
@@ -869,7 +869,7 @@ unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
     }
 
     cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
-    if cur.is_null() || xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) == 0 {
+    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
         if !doc.is_null() {
@@ -906,7 +906,7 @@ unsafe extern "C" fn rng_test2(logfile: &mut Option<File>) -> c_int {
     test_log!(logfile, "filename: {}", filename.to_string_lossy());
 
     cur = xml_doc_get_root_element(doc);
-    if cur.is_null() || xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) == 0 {
+    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
         if !doc.is_null() {
@@ -916,7 +916,7 @@ unsafe extern "C" fn rng_test2(logfile: &mut Option<File>) -> c_int {
     }
 
     cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
-    if cur.is_null() || xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) == 0 {
+    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
         if !doc.is_null() {
@@ -1023,7 +1023,7 @@ unsafe extern "C" fn xstc_test_instance(
                     );
                     ret = xml_schema_validate_doc(ctxt, doc);
 
-                    if xml_str_equal(validity, c"valid".as_ptr() as _) != 0 {
+                    if xml_str_equal(validity, c"valid".as_ptr() as _) {
                         match ret.cmp(&0) {
                             std::cmp::Ordering::Greater => {
                                 test_log!(
@@ -1046,7 +1046,7 @@ unsafe extern "C" fn xstc_test_instance(
                             }
                             _ => {}
                         }
-                    } else if xml_str_equal(validity, c"invalid".as_ptr() as _) != 0 {
+                    } else if xml_str_equal(validity, c"invalid".as_ptr() as _) {
                         if ret == 0 {
                             test_log!(
                                 logfile,
@@ -1163,7 +1163,7 @@ unsafe extern "C" fn xstc_test_group(
                 // goto done;
             } else {
                 NB_TESTS += 1;
-                if xml_str_equal(validity, c"valid".as_ptr() as _) != 0 {
+                if xml_str_equal(validity, c"valid".as_ptr() as _) {
                     NB_SCHEMATAS += 1;
                     ctxt = xml_schema_new_parser_ctxt(path as *const c_char);
                     xml_schema_set_parser_errors(
@@ -1211,7 +1211,7 @@ unsafe extern "C" fn xstc_test_group(
                             c"following-sibling::ts:instanceTest[1]".as_ptr() as _,
                         );
                     }
-                } else if xml_str_equal(validity, c"invalid".as_ptr() as _) != 0 {
+                } else if xml_str_equal(validity, c"invalid".as_ptr() as _) {
                     NB_SCHEMATAS += 1;
                     ctxt = xml_schema_new_parser_ctxt(path as *const c_char);
                     xml_schema_set_parser_errors(
@@ -1304,7 +1304,7 @@ unsafe extern "C" fn xstc_metadata(
     }
 
     cur = xml_doc_get_root_element(doc);
-    if cur.is_null() || xml_str_equal((*cur).name, c"testSet".as_ptr() as _) == 0 {
+    if cur.is_null() || !xml_str_equal((*cur).name, c"testSet".as_ptr() as _) {
         eprintln!(
             "Unexpected format {}",
             CStr::from_ptr(metadata as _).to_string_lossy()
@@ -1328,7 +1328,7 @@ unsafe extern "C" fn xstc_metadata(
     xml_free(name as _);
 
     cur = get_next(cur, c"./ts:testGroup[1]".as_ptr() as _);
-    if cur.is_null() || xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) == 0 {
+    if cur.is_null() || !xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) {
         eprintln!(
             "Unexpected format {}",
             CStr::from_ptr(metadata as _).to_string_lossy()

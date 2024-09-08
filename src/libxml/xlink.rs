@@ -254,7 +254,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
         && xml_str_equal(
             (*(*node).ns).href.load(Ordering::Relaxed),
             XHTML_NAMESPACE.as_ptr() as _,
-        ) != 0
+        )
     {
         /*
          * !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@
@@ -273,15 +273,15 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
     let typ: *mut XmlChar =
         xml_get_ns_prop(node, c"type".as_ptr() as _, XLINK_NAMESPACE.as_ptr() as _);
     if !typ.is_null() {
-        if xml_str_equal(typ, c"simple".as_ptr() as _) != 0 {
+        if xml_str_equal(typ, c"simple".as_ptr() as _) {
             ret = XlinkType::XlinkTypeSimple;
-        } else if xml_str_equal(typ, c"extended".as_ptr() as _) != 0 {
+        } else if xml_str_equal(typ, c"extended".as_ptr() as _) {
             role = xml_get_ns_prop(node, c"role".as_ptr() as _, XLINK_NAMESPACE.as_ptr() as _);
             if !role.is_null() {
                 let xlink: XmlNsPtr = xml_search_ns(doc, node, XLINK_NAMESPACE.as_ptr() as _);
                 if xlink.is_null() {
                     /* Humm, fallback method */
-                    if xml_str_equal(role, c"xlink:external-linkset".as_ptr() as _) != 0 {
+                    if xml_str_equal(role, c"xlink:external-linkset".as_ptr() as _) {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 } else {
@@ -293,7 +293,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
                         (*xlink).prefix.load(Ordering::Relaxed) as *const c_char,
                     );
                     buf[buf.len() - 1] = 0;
-                    if xml_str_equal(role, buf.as_ptr() as _) != 0 {
+                    if xml_str_equal(role, buf.as_ptr() as _) {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 }

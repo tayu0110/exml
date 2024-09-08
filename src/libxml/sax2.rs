@@ -886,7 +886,7 @@ pub unsafe extern "C" fn xml_sax2_attribute_decl(
     // 	    "SAX.xmlSAX2AttributeDecl(%s, %s, %d, %d, %s, ...)\n".as_ptr() as _,
     //             elem, fullname, type, def, defaultValue);
     // #endif
-    if xml_str_equal(fullname, c"xml:id".as_ptr() as _) != 0
+    if xml_str_equal(fullname, c"xml:id".as_ptr() as _)
         && typ != XmlAttributeType::XmlAttributeId as i32
     {
         /*
@@ -1490,7 +1490,7 @@ unsafe extern "C" fn xml_sax2_attribute_internal(
          */
         name = xml_split_qname(ctxt, fullname, addr_of_mut!(ns));
         if !name.is_null() && *name.add(0) == 0 {
-            if xml_str_equal(ns, c"xmlns".as_ptr() as _) != 0 {
+            if xml_str_equal(ns, c"xmlns".as_ptr() as _) {
                 xml_ns_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrNsDeclError,
@@ -1770,12 +1770,12 @@ unsafe extern "C" fn xml_sax2_attribute_internal(
             prop = (*(*ctxt).node).properties;
             while !prop.is_null() {
                 if !(*prop).ns.is_null()
-                    && (xml_str_equal(name, (*prop).name) != 0
+                    && (xml_str_equal(name, (*prop).name)
                         && (namespace == (*prop).ns
                             || xml_str_equal(
                                 (*namespace).href.load(Ordering::Relaxed) as _,
                                 (*(*prop).ns).href.load(Ordering::Relaxed) as _,
-                            ) != 0))
+                            )))
                 {
                     xml_ns_err_msg(
                         ctxt,
@@ -1914,7 +1914,7 @@ unsafe extern "C" fn xml_sax2_attribute_internal(
          * when validating, the ID registration is done at the attribute
          * validation level. Otherwise we have to do specific handling here.
          */
-        if xml_str_equal(fullname, c"xml:id".as_ptr() as _) != 0 {
+        if xml_str_equal(fullname, c"xml:id".as_ptr() as _) {
             /*
              * Add the xml:id value
              *
@@ -2040,7 +2040,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                             i = 0;
                             att = *atts.add(i as usize);
                             while !att.is_null() {
-                                if xml_str_equal(att, fulln) != 0 {
+                                if xml_str_equal(att, fulln) {
                                     break;
                                 }
                                 i += 2;
@@ -2083,9 +2083,9 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                      *    in the internal subset overriding it.
                      */
                     if (!(*attr).prefix.is_null()
-                        && xml_str_equal((*attr).prefix, c"xmlns".as_ptr() as _) != 0)
+                        && xml_str_equal((*attr).prefix, c"xmlns".as_ptr() as _))
                         || ((*attr).prefix.is_null()
-                            && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) != 0)
+                            && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _))
                         || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                     {
                         let tst: XmlAttributePtr = xml_get_dtd_qattr_desc(
@@ -2117,7 +2117,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                                 i = 0;
                                 att = *atts.add(i as usize);
                                 while !att.is_null() {
-                                    if xml_str_equal(att, fulln) != 0 {
+                                    if xml_str_equal(att, fulln) {
                                         break;
                                     }
                                     i += 2;
@@ -2679,7 +2679,7 @@ pub unsafe extern "C" fn xml_sax2_start_element_ns(
      */
     if !orig_uri.is_null() && (*ret).ns.is_null() {
         (*ret).ns = xml_search_ns((*ctxt).my_doc, parent, prefix);
-        if (*ret).ns.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) != 0 {
+        if (*ret).ns.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) {
             (*ret).ns = xml_search_ns((*ctxt).my_doc, ret, prefix);
         }
         if (*ret).ns.is_null() {

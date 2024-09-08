@@ -760,29 +760,29 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                 break;
             }
             SKIP_BLANKS!(cur);
-            if xml_str_equal(name, c"SYSTEM".as_ptr() as _) != 0 {
+            if xml_str_equal(name, c"SYSTEM".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataSystem;
-            } else if xml_str_equal(name, c"PUBLIC".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"PUBLIC".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataPublic;
-            } else if xml_str_equal(name, c"DELEGATE".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"DELEGATE".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataDelegate;
-            } else if xml_str_equal(name, c"ENTITY".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"ENTITY".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataEntity;
-            } else if xml_str_equal(name, c"DOCTYPE".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"DOCTYPE".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataDoctype;
-            } else if xml_str_equal(name, c"LINKTYPE".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"LINKTYPE".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataLinktype;
-            } else if xml_str_equal(name, c"NOTATION".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"NOTATION".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataNotation;
-            } else if xml_str_equal(name, c"SGMLDECL".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"SGMLDECL".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataSgmldecl;
-            } else if xml_str_equal(name, c"DOCUMENT".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"DOCUMENT".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataDocument;
-            } else if xml_str_equal(name, c"CATALOG".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"CATALOG".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataCatalog;
-            } else if xml_str_equal(name, c"BASE".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"BASE".as_ptr() as _) {
                 typ = XmlCatalogEntryType::SgmlCataBase;
-            } else if xml_str_equal(name, c"OVERRIDE".as_ptr() as _) != 0 {
+            } else if xml_str_equal(name, c"OVERRIDE".as_ptr() as _) {
                 xml_free(name as _);
                 cur = xml_parse_sgml_catalog_name(cur, addr_of_mut!(name));
                 if name.is_null() {
@@ -1332,15 +1332,15 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
     if cur.is_null() {
         return;
     }
-    if xml_str_equal((*cur).name, c"group".as_ptr() as _) != 0 {
+    if xml_str_equal((*cur).name, c"group".as_ptr() as _) {
         let mut prop: *mut XmlChar;
         let mut pref: XmlCatalogPrefer = XmlCatalogPrefer::None;
 
         prop = xml_get_prop(cur, c"prefer".as_ptr() as _);
         if !prop.is_null() {
-            if xml_str_equal(prop, c"system".as_ptr() as _) != 0 {
+            if xml_str_equal(prop, c"system".as_ptr() as _) {
                 prefer = XmlCatalogPrefer::System;
-            } else if xml_str_equal(prop, c"public".as_ptr() as _) != 0 {
+            } else if xml_str_equal(prop, c"public".as_ptr() as _) {
                 prefer = XmlCatalogPrefer::Public;
             } else {
                 xml_catalog_err(
@@ -1367,7 +1367,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             cgroup,
         );
         xml_free(prop as _);
-    } else if xml_str_equal((*cur).name, c"public".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"public".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataPublic,
@@ -1377,7 +1377,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"system".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"system".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataSystem,
@@ -1387,7 +1387,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"rewriteSystem".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"rewriteSystem".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataRewriteSystem,
@@ -1397,7 +1397,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"delegatePublic".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"delegatePublic".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegatePublic,
@@ -1407,7 +1407,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"delegateSystem".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"delegateSystem".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegateSystem,
@@ -1417,7 +1417,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"uri".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"uri".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataUri,
@@ -1427,7 +1427,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"rewriteURI".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"rewriteURI".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataRewriteUri,
@@ -1437,7 +1437,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"delegateURI".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"delegateURI".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegateUri,
@@ -1447,7 +1447,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"nextCatalog".as_ptr() as _) != 0 {
+    } else if xml_str_equal((*cur).name, c"nextCatalog".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataNextCatalog,
@@ -1509,7 +1509,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node_list(
             && xml_str_equal(
                 (*(*cur).ns).href.load(Ordering::Relaxed) as _,
                 XML_CATALOGS_NAMESPACE.as_ptr() as _,
-            ) != 0
+            )
         {
             xml_parse_xml_catalog_node(cur, prefer, parent, cgroup);
         }
@@ -1563,13 +1563,13 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
 
     cur = xml_doc_get_root_element(doc);
     if !cur.is_null()
-        && xml_str_equal((*cur).name, c"catalog".as_ptr() as _) != 0
+        && xml_str_equal((*cur).name, c"catalog".as_ptr() as _)
         && !(*cur).ns.is_null()
         && !(*(*cur).ns).href.load(Ordering::Relaxed).is_null()
         && xml_str_equal(
             (*(*cur).ns).href.load(Ordering::Relaxed),
             XML_CATALOGS_NAMESPACE.as_ptr() as _,
-        ) != 0
+        )
     {
         parent = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
@@ -1586,9 +1586,9 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
 
         prop = xml_get_prop(cur, c"prefer".as_ptr() as _);
         if !prop.is_null() {
-            if xml_str_equal(prop, c"system".as_ptr() as _) != 0 {
+            if xml_str_equal(prop, c"system".as_ptr() as _) {
                 prefer = XmlCatalogPrefer::System;
-            } else if xml_str_equal(prop, c"public".as_ptr() as _) != 0 {
+            } else if xml_str_equal(prop, c"public".as_ptr() as _) {
                 prefer = XmlCatalogPrefer::Public;
             } else {
                 xml_catalog_err(
@@ -1729,25 +1729,25 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
  */
 unsafe extern "C" fn xml_get_xml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEntryType {
     let mut typ: XmlCatalogEntryType = XmlCatalogEntryType::XmlCataNone;
-    if xml_str_equal(name, c"system".as_ptr() as _) != 0 {
+    if xml_str_equal(name, c"system".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataSystem;
-    } else if xml_str_equal(name, c"public".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"public".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataPublic;
-    } else if xml_str_equal(name, c"rewriteSystem".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"rewriteSystem".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataRewriteSystem;
-    } else if xml_str_equal(name, c"delegatePublic".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"delegatePublic".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataDelegatePublic;
-    } else if xml_str_equal(name, c"delegateSystem".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"delegateSystem".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataDelegateSystem;
-    } else if xml_str_equal(name, c"uri".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"uri".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataUri;
-    } else if xml_str_equal(name, c"rewriteURI".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"rewriteURI".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataRewriteUri;
-    } else if xml_str_equal(name, c"delegateURI".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"delegateURI".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataDelegateUri;
-    } else if xml_str_equal(name, c"nextCatalog".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"nextCatalog".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataNextCatalog;
-    } else if xml_str_equal(name, c"catalog".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"catalog".as_ptr() as _) {
         typ = XmlCatalogEntryType::XmlCataCatalog;
     }
     typ
@@ -1807,7 +1807,7 @@ unsafe extern "C" fn xml_add_xml_catalog(
      */
     if !cur.is_null() {
         while !cur.is_null() {
-            if !orig.is_null() && ((*cur).typ == typ) && xml_str_equal(orig, (*cur).name) != 0 {
+            if !orig.is_null() && ((*cur).typ == typ) && xml_str_equal(orig, (*cur).name) {
                 if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                     xml_generic_error!(
                         xml_generic_error_context(),
@@ -1867,27 +1867,27 @@ unsafe extern "C" fn xml_add_xml_catalog(
  */
 unsafe extern "C" fn xml_get_sgml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEntryType {
     let mut typ: XmlCatalogEntryType = XmlCatalogEntryType::XmlCataNone;
-    if xml_str_equal(name, c"SYSTEM".as_ptr() as _) != 0 {
+    if xml_str_equal(name, c"SYSTEM".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataSystem;
-    } else if xml_str_equal(name, c"PUBLIC".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"PUBLIC".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataPublic;
-    } else if xml_str_equal(name, c"DELEGATE".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"DELEGATE".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataDelegate;
-    } else if xml_str_equal(name, c"ENTITY".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"ENTITY".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataEntity;
-    } else if xml_str_equal(name, c"DOCTYPE".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"DOCTYPE".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataDoctype;
-    } else if xml_str_equal(name, c"LINKTYPE".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"LINKTYPE".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataLinktype;
-    } else if xml_str_equal(name, c"NOTATION".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"NOTATION".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataNotation;
-    } else if xml_str_equal(name, c"SGMLDECL".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"SGMLDECL".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataSgmldecl;
-    } else if xml_str_equal(name, c"DOCUMENT".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"DOCUMENT".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataDocument;
-    } else if xml_str_equal(name, c"CATALOG".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"CATALOG".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataCatalog;
-    } else if xml_str_equal(name, c"BASE".as_ptr() as _) != 0 {
+    } else if xml_str_equal(name, c"BASE".as_ptr() as _) {
         typ = XmlCatalogEntryType::SgmlCataBase;
     }
     typ
@@ -1979,8 +1979,8 @@ unsafe extern "C" fn xml_del_xml_catalog(
      */
     cur = (*catal).children;
     while !cur.is_null() {
-        if (!(*cur).name.is_null() && xml_str_equal(value, (*cur).name) != 0)
-            || xml_str_equal(value, (*cur).value) != 0
+        if (!(*cur).name.is_null() && xml_str_equal(value, (*cur).name))
+            || xml_str_equal(value, (*cur).value)
         {
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                 if !(*cur).name.is_null() {
@@ -2178,7 +2178,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
         while !cur.is_null() {
             match (*cur).typ {
                 XmlCatalogEntryType::XmlCataSystem => {
-                    if xml_str_equal(sys_id, (*cur).name) != 0 {
+                    if xml_str_equal(sys_id, (*cur).name) {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             xml_generic_error!(
                                 xml_generic_error_context(),
@@ -2239,7 +2239,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
                     && xml_strncmp(sys_id, (*cur).name, xml_strlen((*cur).name)) == 0
                 {
                     for i in 0..nb_list {
-                        if xml_str_equal((*cur).url, delegates[i]) != 0 {
+                        if xml_str_equal((*cur).url, delegates[i]) {
                             cur = (*cur).next;
                             continue 'b;
                         }
@@ -2285,7 +2285,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
         while !cur.is_null() {
             match (*cur).typ {
                 XmlCatalogEntryType::XmlCataPublic => {
-                    if xml_str_equal(pub_id, (*cur).name) != 0 {
+                    if xml_str_equal(pub_id, (*cur).name) {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             xml_generic_error!(
                                 xml_generic_error_context(),
@@ -2328,7 +2328,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
                     && xml_strncmp(pub_id, (*cur).name, xml_strlen((*cur).name)) == 0
                 {
                     for i in 0..nb_list {
-                        if xml_str_equal((*cur).url, delegates[i]) != 0 {
+                        if xml_str_equal((*cur).url, delegates[i]) {
                             cur = (*cur).next;
                             continue 'b;
                         }
@@ -2479,7 +2479,7 @@ unsafe extern "C" fn xml_catalog_list_xml_resolve(
         }
         if pub_id.is_null() {
             ret = xml_catalog_list_xml_resolve(catal, urn_id, null_mut());
-        } else if xml_str_equal(pub_id, urn_id) != 0 {
+        } else if xml_str_equal(pub_id, urn_id) {
             ret = xml_catalog_list_xml_resolve(catal, pub_id, null_mut());
         } else {
             ret = xml_catalog_list_xml_resolve(catal, pub_id, urn_id);
@@ -2817,7 +2817,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
     while !cur.is_null() {
         match (*cur).typ {
             XmlCatalogEntryType::XmlCataUri => {
-                if xml_str_equal(uri, (*cur).name) != 0 {
+                if xml_str_equal(uri, (*cur).name) {
                     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                         xml_generic_error!(
                             xml_generic_error_context(),
@@ -2878,7 +2878,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
             ) && xml_strncmp(uri, (*cur).name, xml_strlen((*cur).name)) == 0
             {
                 for i in 0..nb_list {
-                    if xml_str_equal((*cur).url, delegates[i]) != 0 {
+                    if xml_str_equal((*cur).url, delegates[i]) {
                         cur = (*cur).next;
                         continue 'b;
                     }
@@ -3849,7 +3849,7 @@ pub unsafe extern "C" fn xml_catalog_add(
      * put in place by xmlInitializeCatalog();
      */
     let mut default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
-    if default_catalog.is_null() && xml_str_equal(typ, c"catalog".as_ptr() as _) != 0 {
+    if default_catalog.is_null() && xml_str_equal(typ, c"catalog".as_ptr() as _) {
         default_catalog = xml_create_new_catalog(
             XmlCatalogType::XmlXmlCatalogType,
             XML_CATALOG_DEFAULT_PREFER,

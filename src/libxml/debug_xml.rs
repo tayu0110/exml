@@ -286,8 +286,7 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> c
                 if xml_str_equal(
                     (*cur).prefix.load(Ordering::Relaxed),
                     (*ns).prefix.load(Ordering::Relaxed),
-                ) != 0
-                {
+                ) {
                     return -2;
                 }
                 cur = (*cur).next.load(Ordering::Relaxed);
@@ -463,7 +462,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     }
     if !(*node).parent.is_null()
         && (*node).doc != (*(*node).parent).doc
-        && xml_str_equal((*node).name, c"pseudoroot".as_ptr() as _) == 0
+        && !xml_str_equal((*node).name, c"pseudoroot".as_ptr() as _)
     {
         xml_debug_err(
             ctxt,

@@ -461,18 +461,18 @@ unsafe extern "C" fn xmlconf_test_item(
                     version = xml_get_prop(cur, c"VERSION".as_ptr() as _);
 
                     entities = xml_get_prop(cur, c"ENTITIES".as_ptr() as _);
-                    if xml_str_equal(entities, "none".as_ptr()) == 0 {
+                    if !xml_str_equal(entities, "none".as_ptr()) {
                         options |= XmlParserOption::XmlParseDtdload as i32;
                         options |= XmlParserOption::XmlParseNoent as i32;
                     }
                     rec = xml_get_prop(cur, c"RECOMMENDATION".as_ptr() as _);
                     if rec.is_null()
-                        || xml_str_equal(rec, c"XML1.0".as_ptr() as _) != 0
-                        || xml_str_equal(rec, c"XML1.0-errata2e".as_ptr() as _) != 0
-                        || xml_str_equal(rec, c"XML1.0-errata3e".as_ptr() as _) != 0
-                        || xml_str_equal(rec, c"XML1.0-errata4e".as_ptr() as _) != 0
+                        || xml_str_equal(rec, c"XML1.0".as_ptr() as _)
+                        || xml_str_equal(rec, c"XML1.0-errata2e".as_ptr() as _)
+                        || xml_str_equal(rec, c"XML1.0-errata3e".as_ptr() as _)
+                        || xml_str_equal(rec, c"XML1.0-errata4e".as_ptr() as _)
                     {
-                        if !version.is_null() && xml_str_equal(version, c"1.0".as_ptr() as _) == 0 {
+                        if !version.is_null() && !xml_str_equal(version, c"1.0".as_ptr() as _) {
                             test_log!(
                                 logfile,
                                 "Skipping test {} for {}\n",
@@ -512,8 +512,8 @@ unsafe extern "C" fn xmlconf_test_item(
                             return ret;
                         }
                         ret = 1;
-                    } else if xml_str_equal(rec, c"NS1.0".as_ptr() as _) != 0
-                        || xml_str_equal(rec, c"NS1.0-errata1e".as_ptr() as _) != 0
+                    } else if xml_str_equal(rec, c"NS1.0".as_ptr() as _)
+                        || xml_str_equal(rec, c"NS1.0-errata1e".as_ptr() as _)
                     {
                         ret = 1;
                         nstest = 1;
@@ -570,7 +570,7 @@ unsafe extern "C" fn xmlconf_test_item(
                     TEST_ERRORS[0] = 0;
                     mem = xml_mem_used();
 
-                    if xml_str_equal(typ, c"not-wf".as_ptr() as _) != 0 {
+                    if xml_str_equal(typ, c"not-wf".as_ptr() as _) {
                         if nstest == 0 {
                             xmlconf_test_not_wf(
                                 logfile,
@@ -586,7 +586,7 @@ unsafe extern "C" fn xmlconf_test_item(
                                 options,
                             );
                         }
-                    } else if xml_str_equal(typ, c"valid".as_ptr() as _) != 0 {
+                    } else if xml_str_equal(typ, c"valid".as_ptr() as _) {
                         options |= XmlParserOption::XmlParseDtdvalid as i32;
                         xmlconf_test_valid(
                             logfile,
@@ -594,7 +594,7 @@ unsafe extern "C" fn xmlconf_test_item(
                             filename as *mut c_char,
                             options,
                         );
-                    } else if xml_str_equal(typ, c"invalid".as_ptr() as _) != 0 {
+                    } else if xml_str_equal(typ, c"invalid".as_ptr() as _) {
                         options |= XmlParserOption::XmlParseDtdvalid as i32;
                         xmlconf_test_invalid(
                             logfile,
@@ -602,7 +602,7 @@ unsafe extern "C" fn xmlconf_test_item(
                             filename as *mut c_char,
                             options,
                         );
-                    } else if xml_str_equal(typ, c"error".as_ptr() as _) != 0 {
+                    } else if xml_str_equal(typ, c"error".as_ptr() as _) {
                         test_log!(
                             logfile,
                             "Skipping error test {} \n",
@@ -761,9 +761,9 @@ unsafe extern "C" fn xmlconf_test_cases(
     while !cur.is_null() {
         /* look only at elements we ignore everything else */
         if (*cur).typ == XmlElementType::XmlElementNode {
-            if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) != 0 {
+            if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) {
                 ret += xmlconf_test_cases(logfile, doc, cur, level);
-            } else if xml_str_equal((*cur).name, c"TEST".as_ptr() as _) != 0 {
+            } else if xml_str_equal((*cur).name, c"TEST".as_ptr() as _) {
                 if xmlconf_test_item(logfile, doc, cur) >= 0 {
                     ret += 1;
                 }
@@ -804,7 +804,7 @@ unsafe extern "C" fn xmlconf_test_suite(
     while !cur.is_null() {
         /* look only at elements we ignore everything else */
         if (*cur).typ == XmlElementType::XmlElementNode {
-            if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) != 0 {
+            if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) {
                 ret += xmlconf_test_cases(logfile, doc, cur, 1);
             } else {
                 eprintln!(
@@ -845,7 +845,7 @@ unsafe extern "C" fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
     }
 
     let cur: XmlNodePtr = xml_doc_get_root_element(doc);
-    let ret = if cur.is_null() || xml_str_equal((*cur).name, c"TESTSUITE".as_ptr() as _) == 0 {
+    let ret = if cur.is_null() || !xml_str_equal((*cur).name, c"TESTSUITE".as_ptr() as _) {
         eprintln!("Unexpected format {}", confxml.to_string_lossy());
         xmlconf_info();
         -1

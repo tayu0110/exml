@@ -461,15 +461,14 @@ macro_rules! IS_SCHEMATRON {
         !$node.is_null()
             && ((*$node).typ == XmlElementType::XmlElementNode)
             && !(*$node).ns.is_null()
-            && xml_str_equal((*$node).name, $elem) != 0
+            && xml_str_equal((*$node).name, $elem)
             && (xml_str_equal(
                 (*(*$node).ns).href.load(Ordering::Relaxed),
                 XML_SCHEMATRON_NS.as_ptr() as _,
-            ) != 0
-                || xml_str_equal(
-                    (*(*$node).ns).href.load(Ordering::Relaxed),
-                    XML_OLD_SCHEMATRON_NS.as_ptr() as _,
-                ) != 0)
+            ) || xml_str_equal(
+                (*(*$node).ns).href.load(Ordering::Relaxed),
+                XML_OLD_SCHEMATRON_NS.as_ptr() as _,
+            ))
     };
 }
 
@@ -481,11 +480,10 @@ macro_rules! NEXT_SCHEMATRON {
                 && (xml_str_equal(
                     (*(*$node).ns).href.load(Ordering::Relaxed),
                     XML_SCHEMATRON_NS.as_ptr() as _,
-                ) != 0
-                    || xml_str_equal(
-                        (*(*$node).ns).href.load(Ordering::Relaxed),
-                        XML_OLD_SCHEMATRON_NS.as_ptr() as _,
-                    ) != 0)
+                ) || xml_str_equal(
+                    (*(*$node).ns).href.load(Ordering::Relaxed),
+                    XML_OLD_SCHEMATRON_NS.as_ptr() as _,
+                ))
             {
                 break;
             }

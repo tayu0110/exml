@@ -2215,11 +2215,10 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: XmlTextReaderPtr) -> c_int
                 && (xml_str_equal(
                     (*(*(*reader).node).ns).href.load(Ordering::Relaxed),
                     XINCLUDE_NS.as_ptr() as _,
-                ) != 0
-                    || xml_str_equal(
-                        (*(*(*reader).node).ns).href.load(Ordering::Relaxed),
-                        XINCLUDE_OLD_NS.as_ptr() as _,
-                    ) != 0)
+                ) || xml_str_equal(
+                    (*(*(*reader).node).ns).href.load(Ordering::Relaxed),
+                    XINCLUDE_OLD_NS.as_ptr() as _,
+                ))
             {
                 if (*reader).xincctxt.is_null() {
                     (*reader).xincctxt = xml_xinclude_new_context((*(*reader).ctxt).my_doc);
@@ -3804,7 +3803,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
         /*
          * Namespace default decl
          */
-        if xml_str_equal(name, c"xmlns".as_ptr() as _) != 0 {
+        if xml_str_equal(name, c"xmlns".as_ptr() as _) {
             ns = (*(*reader).node).ns_def;
             while !ns.is_null() {
                 if (*ns).prefix.load(Ordering::Relaxed).is_null() {
@@ -3820,11 +3819,11 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
     /*
      * Namespace default decl
      */
-    if xml_str_equal(prefix, c"xmlns".as_ptr() as _) != 0 {
+    if xml_str_equal(prefix, c"xmlns".as_ptr() as _) {
         ns = (*(*reader).node).ns_def;
         while !ns.is_null() {
             if !(*ns).prefix.load(Ordering::Relaxed).is_null()
-                && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), localname) != 0
+                && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), localname)
             {
                 ret = xml_strdup((*ns).href.load(Ordering::Relaxed));
                 break;
@@ -3887,16 +3886,15 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
     if xml_str_equal(
         namespace_uri,
         c"http://www.w3.org/2000/xmlns/".as_ptr() as _,
-    ) != 0
-    {
-        if xml_str_equal(local_name, c"xmlns".as_ptr() as _) == 0 {
+    ) {
+        if !xml_str_equal(local_name, c"xmlns".as_ptr() as _) {
             prefix = local_name as _;
         }
         ns = (*(*reader).node).ns_def;
         while !ns.is_null() {
             if (prefix.is_null() && (*ns).prefix.load(Ordering::Relaxed).is_null())
                 || (!(*ns).prefix.load(Ordering::Relaxed).is_null()
-                    && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), local_name) != 0)
+                    && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), local_name))
             {
                 return xml_strdup((*ns).href.load(Ordering::Relaxed));
             }
@@ -4092,7 +4090,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
         /*
          * Namespace default decl
          */
-        if xml_str_equal(name, c"xmlns".as_ptr() as _) != 0 {
+        if xml_str_equal(name, c"xmlns".as_ptr() as _) {
             ns = (*(*reader).node).ns_def;
             while !ns.is_null() {
                 if (*ns).prefix.load(Ordering::Relaxed).is_null() {
@@ -4111,7 +4109,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
              *   - same attribute names
              *   - and the attribute carrying that namespace
              */
-            if xml_str_equal((*prop).name, name) != 0
+            if xml_str_equal((*prop).name, name)
                 && ((*prop).ns.is_null() || (*(*prop).ns).prefix.load(Ordering::Relaxed).is_null())
             {
                 (*reader).curnode = prop as XmlNodePtr;
@@ -4125,11 +4123,11 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
     /*
      * Namespace default decl
      */
-    if xml_str_equal(prefix, c"xmlns".as_ptr() as _) != 0 {
+    if xml_str_equal(prefix, c"xmlns".as_ptr() as _) {
         ns = (*(*reader).node).ns_def;
         while !ns.is_null() {
             if !(*ns).prefix.load(Ordering::Relaxed).is_null()
-                && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), localname) != 0
+                && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), localname)
             {
                 (*reader).curnode = ns as XmlNodePtr;
                 // goto found;
@@ -4152,9 +4150,9 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
              *   - same attribute names
              *   - and the attribute carrying that namespace
              */
-            if xml_str_equal((*prop).name, localname) != 0
+            if xml_str_equal((*prop).name, localname)
                 && !(*prop).ns.is_null()
-                && xml_str_equal((*(*prop).ns).prefix.load(Ordering::Relaxed), prefix) != 0
+                && xml_str_equal((*(*prop).ns).prefix.load(Ordering::Relaxed), prefix)
             {
                 (*reader).curnode = prop as XmlNodePtr;
                 // goto found;
@@ -4214,16 +4212,15 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
     if xml_str_equal(
         namespace_uri,
         c"http://www.w3.org/2000/xmlns/".as_ptr() as _,
-    ) != 0
-    {
-        if xml_str_equal(local_name, c"xmlns".as_ptr() as _) == 0 {
+    ) {
+        if !xml_str_equal(local_name, c"xmlns".as_ptr() as _) {
             prefix = local_name as _;
         }
         ns = (*(*reader).node).ns_def;
         while !ns.is_null() {
             if (prefix.is_null() && (*ns).prefix.load(Ordering::Relaxed).is_null())
                 || (!(*ns).prefix.load(Ordering::Relaxed).is_null()
-                    && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), local_name) != 0)
+                    && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), local_name))
             {
                 (*reader).curnode = ns as XmlNodePtr;
                 return 1;
@@ -4240,9 +4237,9 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
          *   - same attribute names
          *   - and the attribute carrying that namespace
          */
-        if xml_str_equal((*prop).name, local_name) != 0
+        if xml_str_equal((*prop).name, local_name)
             && (!(*prop).ns.is_null()
-                && xml_str_equal((*(*prop).ns).href.load(Ordering::Relaxed), namespace_uri) != 0)
+                && xml_str_equal((*(*prop).ns).href.load(Ordering::Relaxed), namespace_uri))
         {
             (*reader).curnode = prop as XmlNodePtr;
             return 1;

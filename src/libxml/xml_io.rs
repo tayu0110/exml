@@ -1212,7 +1212,7 @@ pub(crate) unsafe extern "C" fn __xml_parser_input_buffer_create_filename(
 #[cfg(feature = "output")]
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub(crate) struct xmlOutputCallback {
+pub(crate) struct XmlOutputCallback {
     matchcallback: Option<XmlOutputMatchCallback>,
     opencallback: Option<XmlOutputOpenCallback>,
     writecallback: Option<XmlOutputWriteCallback>,
@@ -1223,8 +1223,8 @@ pub(crate) struct xmlOutputCallback {
 const MAX_OUTPUT_CALLBACK: usize = 15;
 
 #[cfg(feature = "output")]
-static mut XML_OUTPUT_CALLBACK_TABLE: [xmlOutputCallback; MAX_OUTPUT_CALLBACK] =
-    [xmlOutputCallback {
+static mut XML_OUTPUT_CALLBACK_TABLE: [XmlOutputCallback; MAX_OUTPUT_CALLBACK] =
+    [XmlOutputCallback {
         matchcallback: None,
         opencallback: None,
         writecallback: None,
@@ -2654,9 +2654,7 @@ pub(crate) unsafe extern "C" fn __xml_output_buffer_create_filename(
         /*
          * try to limit the damages of the URI unescaping code.
          */
-        if (*puri).scheme.is_null()
-            || xml_str_equal((*puri).scheme as _, c"file".as_ptr() as _) != 0
-        {
+        if (*puri).scheme.is_null() || xml_str_equal((*puri).scheme as _, c"file".as_ptr() as _) {
             unescaped = xml_uri_unescape_string(uri, 0, null_mut());
         }
         xml_free_uri(puri);

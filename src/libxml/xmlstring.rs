@@ -153,44 +153,28 @@ pub unsafe extern "C" fn xml_strcmp(mut str1: *const XmlChar, mut str2: *const X
     // }
 }
 
-/**
- * xmlStrEqual:
- * @str1:  the first XmlChar *
- * @str2:  the second XmlChar *
- *
- * Check if both strings are equal of have same content.
- * Should be a bit more readable and faster than xmlStrcmp()
- *
- * Returns 1 if they are equal, 0 if they are different
- */
-pub unsafe extern "C" fn xml_str_equal(
-    mut str1: *const XmlChar,
-    mut str2: *const XmlChar,
-) -> c_int {
+/// Check string `str1` is equal to `str2`.  
+/// Return `true` if they are equal, otherwise return `false`.
+///
+/// Please refer to the document of `xmlStrEqual` for original libxml2.
+pub unsafe fn xml_str_equal(mut str1: *const XmlChar, mut str2: *const XmlChar) -> bool {
     if str1 == str2 {
-        return 1;
+        return true;
     };
-    if str1.is_null() {
-        return 0;
+    if str1.is_null() || str2.is_null() {
+        return false;
     };
-    if str2.is_null() {
-        return 0;
-    };
-    // if cfg!(fuzzing) {
-    //     (strcmp(str1 as *const c_char, str2 as *const c_char) == 0) as c_int
-    // } else {
     while {
         let s = *str1;
         str1 = str1.add(1);
         if s != *str2 {
-            return 0;
+            return false;
         };
         let f = *str2 != 0;
         str2 = str2.add(1);
         f
     } {}
-    1
-    // }
+    true
 }
 
 /**
@@ -209,7 +193,7 @@ pub unsafe extern "C" fn xml_str_qequal(
     mut str: *const XmlChar,
 ) -> c_int {
     if pref.is_null() {
-        return xml_str_equal(name, str);
+        return xml_str_equal(name, str) as i32;
     }
     if name.is_null() {
         return 0;
@@ -1431,7 +1415,7 @@ mod tests {
                     let str1 = gen_const_xml_char_ptr(n_str1, 0);
                     let str2 = gen_const_xml_char_ptr(n_str2, 1);
 
-                    let ret_val = xml_str_equal(str1 as *const XmlChar, str2);
+                    let ret_val = xml_str_equal(str1 as *const XmlChar, str2) as i32;
                     desret_int(ret_val);
                     des_const_xml_char_ptr(n_str1, str1, 0);
                     des_const_xml_char_ptr(n_str2, str2, 1);
