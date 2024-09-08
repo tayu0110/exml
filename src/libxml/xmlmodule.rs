@@ -84,7 +84,7 @@ unsafe extern "C" fn xml_module_err_memory(module: XmlModulePtr, extra: *const c
  * returns a handle on success, and zero on error.
  */
 #[cfg(not(target_os = "windows"))]
-unsafe extern "C" fn xmlModulePlatformOpen(name: *const c_char) -> *mut c_void {
+unsafe extern "C" fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
     dlopen(name, RTLD_GLOBAL | RTLD_NOW)
 }
 
@@ -112,7 +112,7 @@ unsafe extern "C" fn xmlModulePlatformOpen(name: *const c_char) -> *mut c_void {
  *
  * Returns a handle for the module or NULL in case of error
  */
-pub unsafe extern "C" fn xmlModuleOpen(name: *const c_char, _options: c_int) -> XmlModulePtr {
+pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: c_int) -> XmlModulePtr {
     let module: XmlModulePtr = xml_malloc(size_of::<XmlModule>()) as XmlModulePtr;
     if module.is_null() {
         xml_module_err_memory(null_mut(), c"creating module".as_ptr() as _);
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn xmlModuleOpen(name: *const c_char, _options: c_int) -> 
 
     memset(module as _, 0, size_of::<XmlModule>());
 
-    (*module).handle = xmlModulePlatformOpen(name);
+    (*module).handle = xml_module_platform_open(name);
 
     if (*module).handle.is_null() {
         xml_free(module as _);
@@ -157,7 +157,7 @@ pub unsafe extern "C" fn xmlModuleOpen(name: *const c_char, _options: c_int) -> 
  * returns 0 on success and the loaded symbol in result, and -1 on error.
  */
 #[cfg(not(target_os = "windows"))]
-unsafe extern "C" fn xmlModulePlatformSymbol(
+unsafe extern "C" fn xml_module_platform_symbol(
     handle: *mut c_void,
     name: *const c_char,
     symbol: *mut *mut c_void,
@@ -199,7 +199,7 @@ unsafe extern "C" fn xmlModulePlatformSymbol(
  *
  * Returns 0 if the symbol was found, or -1 in case of error
  */
-pub unsafe extern "C" fn xmlModuleSymbol(
+pub unsafe extern "C" fn xml_module_symbol(
     module: XmlModulePtr,
     name: *const c_char,
     symbol: *mut *mut c_void,
@@ -228,7 +228,7 @@ pub unsafe extern "C" fn xmlModuleSymbol(
         return rc;
     }
 
-    rc = xmlModulePlatformSymbol((*module).handle, name, symbol);
+    rc = xml_module_platform_symbol((*module).handle, name, symbol);
 
     if rc == -1 {
         __xml_raise_error!(
@@ -267,7 +267,7 @@ pub unsafe extern "C" fn xmlModuleSymbol(
  * returns 0 on success, and non-zero on error.
  */
 #[cfg(not(target_os = "windows"))]
-unsafe extern "C" fn xmlModulePlatformClose(handle: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_module_platform_close(handle: *mut c_void) -> c_int {
     dlclose(handle)
 }
 
@@ -294,7 +294,7 @@ unsafe extern "C" fn xmlModulePlatformClose(handle: *mut c_void) -> c_int {
  * Returns 0 in case of success, -1 in case of argument error and -2
  *         if the module could not be closed/unloaded.
  */
-pub unsafe extern "C" fn xmlModuleClose(module: XmlModulePtr) -> c_int {
+pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> c_int {
     if module.is_null() {
         __xml_raise_error!(
             None,
@@ -317,7 +317,7 @@ pub unsafe extern "C" fn xmlModuleClose(module: XmlModulePtr) -> c_int {
         return -1;
     }
 
-    let rc: c_int = xmlModulePlatformClose((*module).handle);
+    let rc: c_int = xml_module_platform_close((*module).handle);
 
     if rc != 0 {
         __xml_raise_error!(
@@ -342,7 +342,7 @@ pub unsafe extern "C" fn xmlModuleClose(module: XmlModulePtr) -> c_int {
         return -2;
     }
 
-    xmlModuleFree(module)
+    xml_module_free(module)
 }
 
 /**
@@ -355,7 +355,7 @@ pub unsafe extern "C" fn xmlModuleClose(module: XmlModulePtr) -> c_int {
  *
  * Returns 0 in case of success, -1 in case of argument error
  */
-pub unsafe extern "C" fn xmlModuleFree(module: XmlModulePtr) -> c_int {
+pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> c_int {
     if module.is_null() {
         __xml_raise_error!(
             None,
@@ -403,7 +403,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let module = gen_xml_module_ptr(n_module, 0);
 
-                let ret_val = xmlModuleClose(module);
+                let ret_val = xml_module_close(module);
                 desret_int(ret_val);
                 des_xml_module_ptr(n_module, module, 0);
                 xml_reset_last_error();
@@ -440,7 +440,7 @@ mod tests {
                         let name = gen_const_char_ptr(n_name, 1);
                         let symbol = gen_void_ptr_ptr(n_symbol, 2);
 
-                        let ret_val = xmlModuleSymbol(module, name, symbol);
+                        let ret_val = xml_module_symbol(module, name, symbol);
                         desret_int(ret_val);
                         des_xml_module_ptr(n_module, module, 0);
                         des_const_char_ptr(n_name, name, 1);
