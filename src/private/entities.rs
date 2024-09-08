@@ -3,7 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use crate::libxml::{entities::xmlEncodeEntitiesInternal, tree::XmlDocPtr, xmlstring::XmlChar};
+use crate::libxml::{entities::xml_encode_entities_internal, tree::XmlDocPtr, xmlstring::XmlChar};
 
 /*
  * Entity flags
@@ -33,5 +33,5 @@ pub(crate) unsafe extern "C" fn xml_encode_attribute_entities(
     doc: XmlDocPtr,
     input: *const XmlChar,
 ) -> *mut XmlChar {
-    xmlEncodeEntitiesInternal(doc, input, 1)
+    xml_encode_entities_internal(doc, input, 1)
 }

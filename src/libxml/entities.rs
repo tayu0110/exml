@@ -896,7 +896,7 @@ macro_rules! grow_buffer_reentrant {
  *
  * Returns A newly allocated string with the substitution done.
  */
-pub(crate) unsafe extern "C" fn xmlEncodeEntitiesInternal(
+pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
     doc: XmlDocPtr,
     input: *const XmlChar,
     attr: c_int,
@@ -1206,7 +1206,7 @@ pub unsafe extern "C" fn xml_encode_entities_reentrant(
     doc: XmlDocPtr,
     input: *const XmlChar,
 ) -> *mut XmlChar {
-    xmlEncodeEntitiesInternal(doc, input, 0)
+    xml_encode_entities_internal(doc, input, 0)
 }
 
 /**
