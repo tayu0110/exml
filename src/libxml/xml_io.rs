@@ -59,7 +59,7 @@ use super::{
         __xml_parser_input_buffer_create_filename_value, xml_default_buffer_size, xml_free,
         xml_malloc, xml_output_buffer_create_filename_value,
     },
-    nanoftp::{xmlNanoFTPClose, xmlNanoFTPOpen, xmlNanoFTPRead},
+    nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
     nanohttp::{
         xmlNanoHTTPClose, xmlNanoHTTPEncoding, xmlNanoHTTPMethod, xmlNanoHTTPMimeType,
         xmlNanoHTTPOpen, xmlNanoHTTPRead, xmlNanoHTTPRedir, xmlNanoHTTPReturnCode,
@@ -3627,7 +3627,7 @@ pub unsafe extern "C" fn xmlIOFTPMatch(filename: *const c_char) -> c_int {
  */
 #[cfg(feature = "ftp")]
 pub unsafe extern "C" fn xmlIOFTPOpen(filename: *const c_char) -> *mut c_void {
-    xmlNanoFTPOpen(filename)
+    xml_nanoftp_open(filename)
 }
 
 /**
@@ -3649,7 +3649,7 @@ pub unsafe extern "C" fn xmlIOFTPRead(
     if buffer.is_null() || len < 0 {
         return -1;
     }
-    xmlNanoFTPRead(context, buffer.add(0) as _, len)
+    xml_nanoftp_read(context, buffer.add(0) as _, len)
 }
 
 /**
@@ -3662,7 +3662,7 @@ pub unsafe extern "C" fn xmlIOFTPRead(
  */
 #[cfg(feature = "ftp")]
 pub unsafe extern "C" fn xmlIOFTPClose(context: *mut c_void) -> c_int {
-    xmlNanoFTPClose(context)
+    xml_nanoftp_close(context)
 }
 
 #[cfg(test)]

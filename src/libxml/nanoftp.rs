@@ -135,7 +135,7 @@ static PROXY_TYPE: AtomicI32 = AtomicI32::new(0); /* uses TYPE or a@b ? */
  * and get the hostname
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPInit() {
+pub unsafe extern "C" fn xml_nanoftp_init() {
     let mut env: *const c_char;
     // #ifdef _WINSOCKAPI_
     //     WSADATA wsaData;
@@ -157,11 +157,11 @@ pub unsafe extern "C" fn xmlNanoFTPInit() {
     }
     env = getenv(c"ftp_proxy".as_ptr() as _);
     if !env.is_null() {
-        xmlNanoFTPScanProxy(env);
+        xml_nanoftp_scan_proxy(env);
     } else {
         env = getenv(c"FTP_PROXY".as_ptr() as _);
         if !env.is_null() {
-            xmlNanoFTPScanProxy(env);
+            xml_nanoftp_scan_proxy(env);
         }
     }
     env = getenv(c"ftp_proxy_user".as_ptr() as _);
@@ -181,7 +181,7 @@ pub unsafe extern "C" fn xmlNanoFTPInit() {
  * Cleanup the FTP protocol layer. This cleanup proxy information.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPCleanup() {
+pub unsafe extern "C" fn xml_nanoftp_cleanup() {
     let p = PROXY.load(Ordering::Acquire);
     if !p.is_null() {
         xml_free(p as _);
@@ -229,7 +229,7 @@ unsafe extern "C" fn xml_ftp_err_memory(extra: *const c_char) {
  * the protocol host port and path it indicates.
  */
 
-unsafe extern "C" fn xmlNanoFTPScanURL(ctx: *mut c_void, url: *const c_char) {
+unsafe extern "C" fn xml_nanoftp_scan_url(ctx: *mut c_void, url: *const c_char) {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
 
     /*
@@ -301,7 +301,7 @@ unsafe extern "C" fn xmlNanoFTPScanURL(ctx: *mut c_void, url: *const c_char) {
  * Returns an FTP context or NULL in case of error.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPNewCtxt(url: *const c_char) -> *mut c_void {
+pub unsafe extern "C" fn xml_nanoftp_new_ctxt(url: *const c_char) -> *mut c_void {
     let ret: XmlNanoFtpctxtPtr = xml_malloc(size_of::<XmlNanoFtpctxt>()) as _;
     if ret.is_null() {
         xml_ftp_err_memory(c"allocating FTP context".as_ptr() as _);
@@ -318,10 +318,10 @@ pub unsafe extern "C" fn xmlNanoFTPNewCtxt(url: *const c_char) -> *mut c_void {
 
     let unescaped: *mut c_char = xml_uri_unescape_string(url, 0, null_mut());
     if !unescaped.is_null() {
-        xmlNanoFTPScanURL(ret as _, unescaped);
+        xml_nanoftp_scan_url(ret as _, unescaped);
         xml_free(unescaped as _);
     } else if !url.is_null() {
-        xmlNanoFTPScanURL(ret as _, url);
+        xml_nanoftp_scan_url(ret as _, url);
     }
 
     ret as _
@@ -338,7 +338,7 @@ unsafe extern "C" fn closesocket(s: i32) -> i32 {
  * Frees the context after closing the connection.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPFreeCtxt(ctx: *mut c_void) {
+pub unsafe extern "C" fn xml_nanoftp_free_ctxt(ctx: *mut c_void) {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     if ctxt.is_null() {
         return;
@@ -378,27 +378,27 @@ pub unsafe extern "C" fn xmlNanoFTPFreeCtxt(ctx: *mut c_void) {
  * Returns an fTP context or NULL if it failed
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPConnectTo(server: *const c_char, port: c_int) -> *mut c_void {
-    xmlNanoFTPInit();
+pub unsafe extern "C" fn xml_nanoftp_connect_to(server: *const c_char, port: c_int) -> *mut c_void {
+    xml_nanoftp_init();
     if server.is_null() {
         return null_mut();
     }
     if port <= 0 {
         return null_mut();
     }
-    let ctxt: XmlNanoFtpctxtPtr = xmlNanoFTPNewCtxt(null_mut()) as _;
+    let ctxt: XmlNanoFtpctxtPtr = xml_nanoftp_new_ctxt(null_mut()) as _;
     if ctxt.is_null() {
         return null_mut();
     }
     (*ctxt).hostname = xml_mem_strdup(server as _) as _;
     if (*ctxt).hostname.is_null() {
-        xmlNanoFTPFreeCtxt(ctxt as _);
+        xml_nanoftp_free_ctxt(ctxt as _);
         return null_mut();
     }
     (*ctxt).port = port;
-    let res: c_int = xmlNanoFTPConnect(ctxt as _);
+    let res: c_int = xml_nanoftp_connect(ctxt as _);
     if res < 0 {
-        xmlNanoFTPFreeCtxt(ctxt as _);
+        xml_nanoftp_free_ctxt(ctxt as _);
         return null_mut();
     }
     ctxt as _
@@ -416,8 +416,8 @@ pub unsafe extern "C" fn xmlNanoFTPConnectTo(server: *const c_char, port: c_int)
  * Returns an FTP context, or NULL
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPOpen(url: *const c_char) -> *mut c_void {
-    xmlNanoFTPInit();
+pub unsafe extern "C" fn xml_nanoftp_open(url: *const c_char) -> *mut c_void {
+    xml_nanoftp_init();
     if url.is_null() {
         return null_mut();
     }
@@ -425,17 +425,17 @@ pub unsafe extern "C" fn xmlNanoFTPOpen(url: *const c_char) -> *mut c_void {
         return null_mut();
     }
 
-    let ctxt: XmlNanoFtpctxtPtr = xmlNanoFTPNewCtxt(url) as _;
+    let ctxt: XmlNanoFtpctxtPtr = xml_nanoftp_new_ctxt(url) as _;
     if ctxt.is_null() {
         return null_mut();
     }
-    if xmlNanoFTPConnect(ctxt as _) < 0 {
-        xmlNanoFTPFreeCtxt(ctxt as _);
+    if xml_nanoftp_connect(ctxt as _) < 0 {
+        xml_nanoftp_free_ctxt(ctxt as _);
         return null_mut();
     }
-    let sock: Socket = xmlNanoFTPGetSocket(ctxt as _, (*ctxt).path);
+    let sock: Socket = xml_nanoftp_get_socket(ctxt as _, (*ctxt).path);
     if sock == INVALID_SOCKET {
-        xmlNanoFTPFreeCtxt(ctxt as _);
+        xml_nanoftp_free_ctxt(ctxt as _);
         return null_mut();
     }
     ctxt as _
@@ -454,7 +454,7 @@ unsafe extern "C" fn have_ipv6() -> bool {
  * Send the user authentication
  */
 
-unsafe extern "C" fn xmlNanoFTPSendUser(ctx: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_nanoftp_send_user(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut buf: [c_char; 200] = [0; 200];
 
@@ -492,7 +492,7 @@ unsafe extern "C" fn xmlNanoFTPSendUser(ctx: *mut c_void) -> c_int {
 /**
  * Send the password authentication
  */
-unsafe extern "C" fn xmlNanoFTPSendPasswd(ctx: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_nanoftp_send_passwd(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut buf: [c_char; 200] = [0; 200];
 
@@ -536,7 +536,7 @@ unsafe extern "C" fn xmlNanoFTPSendPasswd(ctx: *mut c_void) -> c_int {
  * Returns -1 in case of error, 0 otherwise
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let hp: *mut hostent;
     let mut port: c_int;
@@ -734,7 +734,7 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
     /*
      * Wait for the HELLO from the server.
      */
-    res = xmlNanoFTPGetResponse(ctxt as _);
+    res = xml_nanoftp_get_response(ctxt as _);
     if res != 2 {
         closesocket((*ctxt).control_fd);
         (*ctxt).control_fd = INVALID_SOCKET;
@@ -807,7 +807,7 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
                 (*ctxt).control_fd = INVALID_SOCKET;
                 return res;
             }
-            res = xmlNanoFTPGetResponse(ctxt as _);
+            res = xml_nanoftp_get_response(ctxt as _);
             match res {
                 /* Falls through. */
                 r @ 2 | r @ 3 => {
@@ -844,7 +844,7 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
                             (*ctxt).control_fd = INVALID_SOCKET;
                             return res;
                         }
-                        res = xmlNanoFTPGetResponse(ctxt as _);
+                        res = xml_nanoftp_get_response(ctxt as _);
                         if res > 3 {
                             closesocket((*ctxt).control_fd);
                             (*ctxt).control_fd = INVALID_SOCKET;
@@ -893,7 +893,7 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
                         (*ctxt).control_fd = INVALID_SOCKET;
                         return res;
                     }
-                    res = xmlNanoFTPGetResponse(ctxt as _);
+                    res = xml_nanoftp_get_response(ctxt as _);
                     if res == 2 {
                         /* we assume it worked :-\ 1 is error for SITE command */
                         PROXY_TYPE.store(1, Ordering::Relaxed);
@@ -941,7 +941,7 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
                             (*ctxt).control_fd = INVALID_SOCKET;
                             return res;
                         }
-                        res = xmlNanoFTPGetResponse(ctxt as _);
+                        res = xml_nanoftp_get_response(ctxt as _);
                         if res == 1 || res == 2 {
                             /* we assume it worked :-\ */
                             PROXY_TYPE.store(2, Ordering::Relaxed);
@@ -978,7 +978,7 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
                             (*ctxt).control_fd = INVALID_SOCKET;
                             return res;
                         }
-                        res = xmlNanoFTPGetResponse(ctxt as _);
+                        res = xml_nanoftp_get_response(ctxt as _);
                         if res == 1 || res == 2 {
                             /* we assume it worked :-\ */
                             PROXY_TYPE.store(2, Ordering::Relaxed);
@@ -1006,14 +1006,14 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
     /*
      * Non-proxy handling.
      */
-    res = xmlNanoFTPSendUser(ctxt as _);
+    res = xml_nanoftp_send_user(ctxt as _);
     if res < 0 {
         closesocket((*ctxt).control_fd);
         (*ctxt).control_fd = INVALID_SOCKET;
         (*ctxt).control_fd = INVALID_SOCKET;
         return -1;
     }
-    res = xmlNanoFTPGetResponse(ctxt as _);
+    res = xml_nanoftp_get_response(ctxt as _);
     match res {
         2 => {
             return 0;
@@ -1026,14 +1026,14 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
             return -1;
         }
     }
-    res = xmlNanoFTPSendPasswd(ctxt as _);
+    res = xml_nanoftp_send_passwd(ctxt as _);
     if res < 0 {
         closesocket((*ctxt).control_fd);
         (*ctxt).control_fd = INVALID_SOCKET;
         (*ctxt).control_fd = INVALID_SOCKET;
         return -1;
     }
-    res = xmlNanoFTPGetResponse(ctxt as _);
+    res = xml_nanoftp_get_response(ctxt as _);
     match res {
         2 => {}
         r @ 3 | r @ 1 | r @ 4 | r @ 5 | r @ -1 | r => {
@@ -1064,7 +1064,7 @@ pub unsafe extern "C" fn xmlNanoFTPConnect(ctx: *mut c_void) -> c_int {
  * Returns -1 in case of error, 0 otherwise
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPClose(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_nanoftp_close(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
 
     if ctxt.is_null() {
@@ -1076,11 +1076,11 @@ pub unsafe extern "C" fn xmlNanoFTPClose(ctx: *mut c_void) -> c_int {
         (*ctxt).data_fd = INVALID_SOCKET;
     }
     if (*ctxt).control_fd != INVALID_SOCKET {
-        xmlNanoFTPQuit(ctxt as _);
+        xml_nanoftp_quit(ctxt as _);
         closesocket((*ctxt).control_fd);
         (*ctxt).control_fd = INVALID_SOCKET;
     }
-    xmlNanoFTPFreeCtxt(ctxt as _);
+    xml_nanoftp_free_ctxt(ctxt as _);
     0
 }
 
@@ -1093,7 +1093,7 @@ pub unsafe extern "C" fn xmlNanoFTPClose(ctx: *mut c_void) -> c_int {
  * Returns -1 in case of error, 0 otherwise
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPQuit(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_nanoftp_quit(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut buf: [c_char; 200] = [0; 200];
 
@@ -1128,7 +1128,7 @@ pub unsafe extern "C" fn xmlNanoFTPQuit(ctx: *mut c_void) -> c_int {
  * A NULL URL cleans up proxy information.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPScanProxy(URL: *const c_char) {
+pub unsafe extern "C" fn xml_nanoftp_scan_proxy(url: *const c_char) {
     let p = PROXY.load(Ordering::Acquire);
     if !p.is_null() {
         xml_free(p as _);
@@ -1144,11 +1144,11 @@ pub unsafe extern "C" fn xmlNanoFTPScanProxy(URL: *const c_char) {
     // 	xmlGenericError(xmlGenericErrorContext,
     // 		c"Using FTP proxy %s\n".as_ptr() as _, URL);
     // #endif
-    if URL.is_null() {
+    if url.is_null() {
         return;
     }
 
-    let uri: XmlURIPtr = xml_parse_uri_raw(URL, 1);
+    let uri: XmlURIPtr = xml_parse_uri_raw(url, 1);
     if uri.is_null()
         || (*uri).scheme.is_null()
         || strcmp((*uri).scheme, c"ftp".as_ptr() as _) != 0
@@ -1186,7 +1186,7 @@ pub unsafe extern "C" fn xmlNanoFTPScanProxy(URL: *const c_char) {
  * ftp_proxy_password environment variables.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPProxy(
+pub unsafe extern "C" fn xml_nanoftp_proxy(
     host: *const c_char,
     port: c_int,
     user: *const c_char,
@@ -1235,7 +1235,7 @@ pub unsafe extern "C" fn xmlNanoFTPProxy(
  * Returns 0 if Ok, -1 in case of error (other host).
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPUpdateURL(ctx: *mut c_void, url: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_nanoftp_update_url(ctx: *mut c_void, url: *const c_char) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
 
     if url.is_null() {
@@ -1295,7 +1295,7 @@ pub unsafe extern "C" fn xmlNanoFTPUpdateURL(ctx: *mut c_void, url: *const c_cha
  * Read more information from the FTP control connection
  * Returns the number of bytes read, < 0 indicates an error
  */
-unsafe extern "C" fn xmlNanoFTPGetMore(ctx: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_nanoftp_get_more(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let len: c_int;
 
@@ -1401,7 +1401,7 @@ unsafe extern "C" fn xmlNanoFTPGetMore(ctx: *mut c_void) -> c_int {
  *     +XXX for last line of response
  *     -XXX for response to be continued
  */
-unsafe extern "C" fn xmlNanoFTPParseResponse(mut buf: *mut c_char, len: c_int) -> c_int {
+unsafe extern "C" fn xml_nanoftp_parse_response(mut buf: *mut c_char, len: c_int) -> c_int {
     let mut val: c_int = 0;
 
     if len < 3 {
@@ -1438,7 +1438,7 @@ unsafe extern "C" fn xmlNanoFTPParseResponse(mut buf: *mut c_char, len: c_int) -
  * Read the response from the FTP server after a command.
  * Returns the code number
  */
-unsafe extern "C" fn xmlNanoFTPReadResponse(ctx: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_nanoftp_read_response(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut ptr: *mut c_char;
     let mut end: *mut c_char;
@@ -1456,7 +1456,7 @@ unsafe extern "C" fn xmlNanoFTPReadResponse(ctx: *mut c_void) -> c_int {
          * Assumes everything up to controlBuf[controlBufIndex] has been read
          * and analyzed.
          */
-        len = xmlNanoFTPGetMore(ctx);
+        len = xml_nanoftp_get_more(ctx);
         if len < 0 {
             return -1;
         }
@@ -1477,7 +1477,7 @@ unsafe extern "C" fn xmlNanoFTPReadResponse(ctx: *mut c_void) -> c_int {
         // 	    c"\n<<<\n%s\n--\n".as_ptr() as _, ptr);
         // #endif
         while ptr < end {
-            cur = xmlNanoFTPParseResponse(ptr, end.offset_from(ptr) as _);
+            cur = xml_nanoftp_parse_response(ptr, end.offset_from(ptr) as _);
             if cur > 0 {
                 /*
                  * Successfully scanned the control code, scratch
@@ -1542,8 +1542,8 @@ unsafe extern "C" fn xmlNanoFTPReadResponse(ctx: *mut c_void) -> c_int {
  * Returns the code number
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPGetResponse(ctx: *mut c_void) -> c_int {
-    let res: c_int = xmlNanoFTPReadResponse(ctx as _);
+pub unsafe extern "C" fn xml_nanoftp_get_response(ctx: *mut c_void) -> c_int {
+    let res: c_int = xml_nanoftp_read_response(ctx as _);
 
     res
 }
@@ -1556,7 +1556,7 @@ pub unsafe extern "C" fn xmlNanoFTPGetResponse(ctx: *mut c_void) -> c_int {
  * Returns the code number, or 0
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPCheckResponse(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_nanoftp_check_response(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut rfd: fd_set = unsafe { zeroed() };
     let mut tv: timeval = unsafe { zeroed() };
@@ -1589,7 +1589,7 @@ pub unsafe extern "C" fn xmlNanoFTPCheckResponse(ctx: *mut c_void) -> c_int {
         _ => {}
     }
 
-    xmlNanoFTPReadResponse(ctx)
+    xml_nanoftp_read_response(ctx)
 }
 
 /*
@@ -1605,7 +1605,7 @@ pub unsafe extern "C" fn xmlNanoFTPCheckResponse(ctx: *mut c_void) -> c_int {
  * Returns -1 in case of error, 1 if CWD worked, 0 if it failed
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPCwd(ctx: *mut c_void, directory: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_nanoftp_cwd(ctx: *mut c_void, directory: *const c_char) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut buf: [c_char; 400] = [0; 400];
 
@@ -1645,7 +1645,7 @@ pub unsafe extern "C" fn xmlNanoFTPCwd(ctx: *mut c_void, directory: *const c_cha
         );
         return res;
     }
-    res = xmlNanoFTPGetResponse(ctxt as _);
+    res = xml_nanoftp_get_response(ctxt as _);
     if res == 4 {
         return -1;
     }
@@ -1668,7 +1668,7 @@ pub unsafe extern "C" fn xmlNanoFTPCwd(ctx: *mut c_void, directory: *const c_cha
  * Returns -1 in case of error, 1 if DELE worked, 0 if it failed
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPDele(ctx: *mut c_void, file: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_nanoftp_dele(ctx: *mut c_void, file: *const c_char) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut buf: [c_char; 400] = [0; 400];
 
@@ -1707,7 +1707,7 @@ pub unsafe extern "C" fn xmlNanoFTPDele(ctx: *mut c_void, file: *const c_char) -
         );
         return res;
     }
-    res = xmlNanoFTPGetResponse(ctxt as _);
+    res = xml_nanoftp_get_response(ctxt as _);
     if res == 4 {
         return -1;
     }
@@ -1730,7 +1730,7 @@ pub unsafe extern "C" fn xmlNanoFTPDele(ctx: *mut c_void, file: *const c_char) -
  * Returns -1 in case of error, 0 otherwise
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPGetConnection(ctx: *mut c_void) -> Socket {
+pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut buf: [c_char; 200] = [0; 200];
     let mut cur: *mut c_char;
@@ -1788,7 +1788,7 @@ pub unsafe extern "C" fn xmlNanoFTPGetConnection(ctx: *mut c_void) -> Socket {
             (*ctxt).data_fd = INVALID_SOCKET;
             return INVALID_SOCKET;
         }
-        res = xmlNanoFTPReadResponse(ctx);
+        res = xml_nanoftp_read_response(ctx);
         if res != 2 {
             if res == 5 {
                 closesocket((*ctxt).data_fd);
@@ -1979,7 +1979,7 @@ pub unsafe extern "C" fn xmlNanoFTPGetConnection(ctx: *mut c_void) -> Socket {
             (*ctxt).data_fd = INVALID_SOCKET;
             return INVALID_SOCKET;
         }
-        res = xmlNanoFTPGetResponse(ctxt as _);
+        res = xml_nanoftp_get_response(ctxt as _);
         if res != 2 {
             closesocket((*ctxt).data_fd);
             (*ctxt).data_fd = INVALID_SOCKET;
@@ -1998,7 +1998,7 @@ pub unsafe extern "C" fn xmlNanoFTPGetConnection(ctx: *mut c_void) -> Socket {
  * Returns -1 in case of error, 0 otherwise
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPCloseConnection(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_nanoftp_close_connection(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut res: c_int;
     let mut rfd: fd_set = unsafe { zeroed() };
@@ -2040,7 +2040,7 @@ pub unsafe extern "C" fn xmlNanoFTPCloseConnection(ctx: *mut c_void) -> c_int {
         closesocket((*ctxt).control_fd);
         (*ctxt).control_fd = INVALID_SOCKET;
     } else {
-        res = xmlNanoFTPGetResponse(ctxt as _);
+        res = xml_nanoftp_get_response(ctxt as _);
         if res != 2 {
             closesocket((*ctxt).control_fd);
             (*ctxt).control_fd = INVALID_SOCKET;
@@ -2060,7 +2060,7 @@ pub unsafe extern "C" fn xmlNanoFTPCloseConnection(ctx: *mut c_void) -> c_int {
  *
  * Returns -1 in case of error, the length of data parsed otherwise
  */
-unsafe extern "C" fn xmlNanoFTPParseList(
+unsafe extern "C" fn xml_nanoftp_parse_list(
     list: *const c_char,
     callback: Option<FtpListCallback>,
     user_data: *mut c_void,
@@ -2281,7 +2281,7 @@ unsafe extern "C" fn xmlNanoFTPParseList(
  * Returns -1 in case of error, 0 otherwise
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPList(
+pub unsafe extern "C" fn xml_nanoftp_list(
     ctx: *mut c_void,
     callback: FtpListCallback,
     user_data: *mut c_void,
@@ -2301,10 +2301,10 @@ pub unsafe extern "C" fn xmlNanoFTPList(
         return -1;
     }
     if filename.is_null() {
-        if xmlNanoFTPCwd(ctxt as _, (*ctxt).path) < 1 {
+        if xml_nanoftp_cwd(ctxt as _, (*ctxt).path) < 1 {
             return -1;
         }
-        (*ctxt).data_fd = xmlNanoFTPGetConnection(ctxt as _);
+        (*ctxt).data_fd = xml_nanoftp_get_connection(ctxt as _);
         if (*ctxt).data_fd == INVALID_SOCKET {
             return -1;
         }
@@ -2314,10 +2314,10 @@ pub unsafe extern "C" fn xmlNanoFTPList(
             c"LIST -L\r\n".as_ptr() as _,
         );
     } else {
-        if *filename.add(0) != b'/' as i8 && xmlNanoFTPCwd(ctxt as _, (*ctxt).path) < 1 {
+        if *filename.add(0) != b'/' as i8 && xml_nanoftp_cwd(ctxt as _, (*ctxt).path) < 1 {
             return -1;
         }
-        (*ctxt).data_fd = xmlNanoFTPGetConnection(ctxt as _);
+        (*ctxt).data_fd = xml_nanoftp_get_connection(ctxt as _);
         if (*ctxt).data_fd == INVALID_SOCKET {
             return -1;
         }
@@ -2344,7 +2344,7 @@ pub unsafe extern "C" fn xmlNanoFTPList(
         (*ctxt).data_fd = INVALID_SOCKET;
         return res;
     }
-    res = xmlNanoFTPReadResponse(ctxt as _);
+    res = xml_nanoftp_read_response(ctxt as _);
     if res != 1 {
         closesocket((*ctxt).data_fd);
         (*ctxt).data_fd = INVALID_SOCKET;
@@ -2374,7 +2374,7 @@ pub unsafe extern "C" fn xmlNanoFTPList(
             return -1;
         }
         if res == 0 {
-            res = xmlNanoFTPCheckResponse(ctxt as _);
+            res = xml_nanoftp_check_response(ctxt as _);
             if res < 0 {
                 closesocket((*ctxt).data_fd);
                 (*ctxt).data_fd = INVALID_SOCKET;
@@ -2416,7 +2416,8 @@ pub unsafe extern "C" fn xmlNanoFTPList(
         buf[indx as usize] = 0;
         base = 0;
         while {
-            res = xmlNanoFTPParseList(addr_of_mut!(buf[base as usize]), Some(callback), user_data);
+            res =
+                xml_nanoftp_parse_list(addr_of_mut!(buf[base as usize]), Some(callback), user_data);
             base += res;
             res > 0
         } {}
@@ -2432,7 +2433,7 @@ pub unsafe extern "C" fn xmlNanoFTPList(
             break;
         }
     }
-    xmlNanoFTPCloseConnection(ctxt as _);
+    xml_nanoftp_close_connection(ctxt as _);
     0
 }
 
@@ -2446,7 +2447,10 @@ pub unsafe extern "C" fn xmlNanoFTPList(
  * Returns the socket for the data connection, or <0 in case of error
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPGetSocket(ctx: *mut c_void, filename: *const c_char) -> Socket {
+pub unsafe extern "C" fn xml_nanoftp_get_socket(
+    ctx: *mut c_void,
+    filename: *const c_char,
+) -> Socket {
     let ctxt: XmlNanoFtpctxtPtr = ctx as XmlNanoFtpctxtPtr;
     let mut buf: [c_char; 300] = [0; 300];
     let mut res: c_int;
@@ -2457,7 +2461,7 @@ pub unsafe extern "C" fn xmlNanoFTPGetSocket(ctx: *mut c_void, filename: *const 
     if filename.is_null() && (*ctxt).path.is_null() {
         return INVALID_SOCKET;
     }
-    (*ctxt).data_fd = xmlNanoFTPGetConnection(ctxt as _);
+    (*ctxt).data_fd = xml_nanoftp_get_connection(ctxt as _);
     if (*ctxt).data_fd == INVALID_SOCKET {
         return INVALID_SOCKET;
     }
@@ -2482,7 +2486,7 @@ pub unsafe extern "C" fn xmlNanoFTPGetSocket(ctx: *mut c_void, filename: *const 
         (*ctxt).data_fd = INVALID_SOCKET;
         return INVALID_SOCKET;
     }
-    res = xmlNanoFTPReadResponse(ctxt as _);
+    res = xml_nanoftp_read_response(ctxt as _);
     if res != 2 {
         closesocket((*ctxt).data_fd);
         (*ctxt).data_fd = INVALID_SOCKET;
@@ -2519,7 +2523,7 @@ pub unsafe extern "C" fn xmlNanoFTPGetSocket(ctx: *mut c_void, filename: *const 
         (*ctxt).data_fd = INVALID_SOCKET;
         return INVALID_SOCKET;
     }
-    res = xmlNanoFTPReadResponse(ctxt as _);
+    res = xml_nanoftp_read_response(ctxt as _);
     if res != 1 {
         closesocket((*ctxt).data_fd);
         (*ctxt).data_fd = INVALID_SOCKET;
@@ -2541,7 +2545,7 @@ pub unsafe extern "C" fn xmlNanoFTPGetSocket(ctx: *mut c_void, filename: *const 
  * Returns -1 in case of error, 0 otherwise
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPGet(
+pub unsafe extern "C" fn xml_nanoftp_get(
     ctx: *mut c_void,
     callback: Option<FtpDataCallback>,
     user_data: *mut c_void,
@@ -2564,7 +2568,7 @@ pub unsafe extern "C" fn xmlNanoFTPGet(
         return -1;
     }
     let callback = callback.unwrap();
-    if xmlNanoFTPGetSocket(ctxt as _, filename) == INVALID_SOCKET {
+    if xml_nanoftp_get_socket(ctxt as _, filename) == INVALID_SOCKET {
         return -1;
     }
 
@@ -2589,7 +2593,7 @@ pub unsafe extern "C" fn xmlNanoFTPGet(
             return -1;
         }
         if res == 0 {
-            res = xmlNanoFTPCheckResponse(ctxt as _);
+            res = xml_nanoftp_check_response(ctxt as _);
             if res < 0 {
                 closesocket((*ctxt).data_fd);
                 (*ctxt).data_fd = INVALID_SOCKET;
@@ -2629,7 +2633,7 @@ pub unsafe extern "C" fn xmlNanoFTPGet(
         }
     }
 
-    xmlNanoFTPCloseConnection(ctxt as _)
+    xml_nanoftp_close_connection(ctxt as _)
 }
 
 /**
@@ -2645,7 +2649,7 @@ pub unsafe extern "C" fn xmlNanoFTPGet(
  *         -1 indicates a parameter error.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlNanoFTPRead(
+pub unsafe extern "C" fn xml_nanoftp_read(
     ctx: *mut c_void,
     dest: *mut c_void,
     mut len: c_int,
@@ -2674,7 +2678,7 @@ pub unsafe extern "C" fn xmlNanoFTPRead(
                 c"recv failed".as_ptr() as _,
             );
         }
-        xmlNanoFTPCloseConnection(ctxt as _);
+        xml_nanoftp_close_connection(ctxt as _);
     }
     // #ifdef DEBUG_FTP
     //     xmlGenericError(xmlGenericErrorContext, c"Recvd %d bytes\n".as_ptr() as _, len);
