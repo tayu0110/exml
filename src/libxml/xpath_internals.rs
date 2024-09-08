@@ -1686,11 +1686,10 @@ unsafe extern "C" fn xml_xpath_debug_dump_step_op(
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathOp::XpathOpRangeto => {
             fprintf(output, c"RANGETO".as_ptr());
-        }
-        _ => {
-            fprintf(output, c"UNKNOWN %d\n".as_ptr(), (*op).op);
-            return;
-        }
+        } // _ => {
+          //     fprintf(output, c"UNKNOWN %d\n".as_ptr(), (*op).op);
+          //     return;
+          // }
     }
     fprintf(output, c"\n".as_ptr());
     // finish:
@@ -5835,12 +5834,12 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
                     //  #endif
                     lc = 1;
                     break;
-                } else if NXT!(ctxt, len as usize) == b'<'
-                    || NXT!(ctxt, len as usize) == b'>'
-                    || NXT!(ctxt, len as usize) == b'='
-                {
-                    lc = 1;
-                    break;
+                // } else if NXT!(ctxt, len as usize) == b'<'
+                //     || NXT!(ctxt, len as usize) == b'>'
+                //     || NXT!(ctxt, len as usize) == b'='
+                // {
+                //     lc = 1;
+                //     break;
                 } else {
                     lc = 1;
                     break;
@@ -9182,15 +9181,14 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
             (*(*ctxt).context).node = oldnode;
             (*(*ctxt).context).context_size = oldcs;
             (*(*ctxt).context).proximity_position = oldpp;
-        }
-        _ => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"XPath: unknown precompiled operation %d\n".as_ptr(),
-                (*op).op
-            );
-            (*ctxt).error = XmlXPathError::XpathInvalidOperand as i32;
-        }
+        } // _ => {
+          //     xml_generic_error!(
+          //         xml_generic_error_context(),
+          //         c"XPath: unknown precompiled operation %d\n".as_ptr(),
+          //         (*op).op
+          //     );
+          //     (*ctxt).error = XmlXPathError::XpathInvalidOperand as i32;
+          // }
     }
 
     (*(*ctxt).context).depth -= 1;
@@ -11236,7 +11234,7 @@ pub unsafe extern "C" fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) 
             XmlXPathObjectType::XpathPoint
             | XmlXPathObjectType::XpathRange
             | XmlXPathObjectType::XpathLocationset => todo!(),
-            _ => {}
+            // _ => {}
         }
         xml_xpath_release_object((*ctxt).context, arg1);
         xml_xpath_release_object((*ctxt).context, arg2);
@@ -11336,8 +11334,7 @@ pub unsafe extern "C" fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextP
             | XmlXPathObjectType::XpathRange
             | XmlXPathObjectType::XpathLocationset => {
                 todo!()
-            }
-            _ => {}
+            } // _ => {}
         }
         xml_xpath_release_object((*ctxt).context, arg1);
         xml_xpath_release_object((*ctxt).context, arg2);

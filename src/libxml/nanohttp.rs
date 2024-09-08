@@ -287,12 +287,12 @@ unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHttpctxtPtr) -> c_int {
         }
         if (*ctxt).last == -1 {
             match *__errno_location() {
-                EINPROGRESS | EWOULDBLOCK | EAGAIN => {}
-
+                EINPROGRESS | EWOULDBLOCK => {
+                    // This pattern covers `EAGAIN`.
+                }
                 ECONNRESET | ESHUTDOWN => {
                     return 0;
                 }
-
                 _ => {
                     __xml_ioerr(
                         XmlErrorDomain::XmlFromHttp as i32,
@@ -370,9 +370,7 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
     *ptr = (*ctxt).content;
     *len = rcvd_lgth;
 
-    if (*ctxt).content_length > 0 && rcvd_lgth < (*ctxt).content_length {
-        rc = -1;
-    } else if rcvd_lgth == 0 {
+    if ((*ctxt).content_length > 0 && rcvd_lgth < (*ctxt).content_length) || rcvd_lgth == 0 {
         rc = -1;
     }
 

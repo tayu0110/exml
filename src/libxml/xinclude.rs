@@ -1878,8 +1878,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         }
                     }
                     #[cfg(feature = "libxml_xptr_locs")]
-                    XmlXPathObjectType::XpathRange | XmlXPathObjectType::XpathLocationset => {}
-                    _ => {}
+                    XmlXPathObjectType::XpathRange | XmlXPathObjectType::XpathLocationset => {} // _ => {}
                 }
                 let set: XmlNodeSetPtr = (*xptr).nodesetval;
                 if !set.is_null() {

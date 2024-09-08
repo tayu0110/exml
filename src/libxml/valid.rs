@@ -657,16 +657,15 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
                     null_mut(),
                 );
             }
-        }
-        _ => {
-            xml_err_valid(
-                null_mut(),
-                XmlParserErrors::XmlErrInternalError,
-                c"Internal: ELEMENT content corrupted invalid type\n".as_ptr() as _,
-                null_mut(),
-            );
-            return null_mut();
-        }
+        } // _ => {
+          //     xml_err_valid(
+          //         null_mut(),
+          //         XmlParserErrors::XmlErrInternalError,
+          //         c"Internal: ELEMENT content corrupted invalid type\n".as_ptr() as _,
+          //         null_mut(),
+          //     );
+          //     return null_mut();
+          // }
     }
     let ret: XmlElementContentPtr =
         xml_malloc(size_of::<XmlElementContent>()) as XmlElementContentPtr;
@@ -830,16 +829,15 @@ pub unsafe extern "C" fn xml_free_doc_element_content(
             XmlElementContentType::XmlElementContentPcdata
             | XmlElementContentType::XmlElementContentElement
             | XmlElementContentType::XmlElementContentSeq
-            | XmlElementContentType::XmlElementContentOr => {}
-            _ => {
-                xml_err_valid(
-                    null_mut(),
-                    XmlParserErrors::XmlErrInternalError,
-                    c"Internal: ELEMENT content corrupted invalid type\n".as_ptr() as _,
-                    null_mut(),
-                );
-                return;
-            }
+            | XmlElementContentType::XmlElementContentOr => {} // _ => {
+                                                               //     xml_err_valid(
+                                                               //         null_mut(),
+                                                               //         XmlParserErrors::XmlErrInternalError,
+                                                               //         c"Internal: ELEMENT content corrupted invalid type\n".as_ptr() as _,
+                                                               //         null_mut(),
+                                                               //     );
+                                                               //     return;
+                                                               // }
         }
         if !dict.is_null() {
             if !(*cur).name.is_null() && xml_dict_owns(dict, (*cur).name) == 0 {
@@ -1559,15 +1557,14 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufferPtr, content: XmlEle
                     }
                     cur = (*cur).c1;
                     break 'to_continue;
-                }
-                _ => {
-                    xml_err_valid(
-                        null_mut(),
-                        XmlParserErrors::XmlErrInternalError,
-                        c"Internal: ELEMENT cur corrupted invalid type\n".as_ptr() as _,
-                        null_mut(),
-                    );
-                }
+                } // _ => {
+                  //     xml_err_valid(
+                  //         null_mut(),
+                  //         XmlParserErrors::XmlErrInternalError,
+                  //         c"Internal: ELEMENT cur corrupted invalid type\n".as_ptr() as _,
+                  //         null_mut(),
+                  //     );
+                  // }
             }
 
             while cur != content {
@@ -2069,8 +2066,7 @@ unsafe extern "C" fn xml_validate_attribute_value_internal(
         XmlAttributeType::XmlAttributeNmtoken => {
             return xml_validate_nmtoken_value_internal(doc, value);
         }
-        XmlAttributeType::XmlAttributeCdata => {}
-        _ => {}
+        XmlAttributeType::XmlAttributeCdata => {} // _ => {}
     }
     1
 }
@@ -2382,17 +2378,16 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
             XmlAttributeType::XmlAttributeNmtoken => {}
             XmlAttributeType::XmlAttributeNmtokens => {}
             XmlAttributeType::XmlAttributeEnumeration => {}
-            XmlAttributeType::XmlAttributeNotation => {}
-            _ => {
-                xml_err_valid(
-                    ctxt,
-                    XmlParserErrors::XmlErrInternalError,
-                    c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
-                    null_mut(),
-                );
-                xml_free_enumeration(tree);
-                return null_mut();
-            }
+            XmlAttributeType::XmlAttributeNotation => {} // _ => {
+                                                         //     xml_err_valid(
+                                                         //         ctxt,
+                                                         //         XmlParserErrors::XmlErrInternalError,
+                                                         //         c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
+                                                         //         null_mut(),
+                                                         //     );
+                                                         //     xml_free_enumeration(tree);
+                                                         //     return null_mut();
+                                                         // }
         }
         if !default_value.is_null()
             && xml_validate_attribute_value_internal((*dtd).doc, typ, default_value) == 0
@@ -2757,15 +2752,14 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufferPtr, attr: XmlAtt
         XmlAttributeType::XmlAttributeNotation => {
             xml_buffer_write_char(buf, c" NOTATION (".as_ptr() as _);
             xml_dump_enumeration(buf, (*attr).tree);
-        }
-        _ => {
-            xml_err_valid(
-                null_mut(),
-                XmlParserErrors::XmlErrInternalError,
-                c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
-                null_mut(),
-            );
-        }
+        } // _ => {
+          //     xml_err_valid(
+          //         null_mut(),
+          //         XmlParserErrors::XmlErrInternalError,
+          //         c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
+          //         null_mut(),
+          //     );
+          // }
     }
     match (*attr).def {
         XmlAttributeDefault::XmlAttributeNone => {}
@@ -2777,15 +2771,14 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufferPtr, attr: XmlAtt
         }
         XmlAttributeDefault::XmlAttributeFixed => {
             xml_buffer_write_char(buf, c" #FIXED".as_ptr() as _);
-        }
-        _ => {
-            xml_err_valid(
-                null_mut(),
-                XmlParserErrors::XmlErrInternalError,
-                c"Internal: ATTRIBUTE struct corrupted invalid def\n".as_ptr() as _,
-                null_mut(),
-            );
-        }
+        } // _ => {
+          //     xml_err_valid(
+          //         null_mut(),
+          //         XmlParserErrors::XmlErrInternalError,
+          //         c"Internal: ATTRIBUTE struct corrupted invalid def\n".as_ptr() as _,
+          //         null_mut(),
+          //     );
+          // }
     }
     if !(*attr).default_value.is_null() {
         xml_buffer_write_char(buf, c" ".as_ptr() as _);
@@ -3536,9 +3529,7 @@ pub(crate) unsafe extern "C" fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar)
  */
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
-    let ret: XmlValidCtxtPtr;
-
-    ret = xml_malloc(size_of::<XmlValidCtxt>()) as _;
+    let ret: XmlValidCtxtPtr = xml_malloc(size_of::<XmlValidCtxt>()) as _;
     if ret.is_null() {
         xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
         return null_mut();
@@ -3578,7 +3569,7 @@ pub unsafe extern "C" fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
  * basically it does the following check as described by the
  * XML-1.0 recommendation:
  *  - [ VC: Root Element Type ]
- * it doesn't try to recurse or apply other check to the element
+ *    it doesn't try to recurse or apply other check to the element
  *
  * returns 1 if valid or 0 otherwise
  */
@@ -4287,7 +4278,7 @@ pub unsafe extern "C" fn xml_validate_attribute_value(
  * basically it does the following checks as described by the
  * XML-1.0 recommendation:
  *  - it seems that no validity constraint exists on notation declarations
- * But this function get called anyway ...
+ *    But this function get called anyway ...
  *
  * returns 1 if valid or 0 otherwise
  */
@@ -6103,7 +6094,7 @@ unsafe extern "C" fn xml_validate_element_content(
  * XML-1.0 recommendation:
  *  - [ VC: Element Valid ]
  *  - [ VC: Required Attribute ]
- * Then call xmlValidateOneAttribute() for each attribute present.
+ *    Then call xmlValidateOneAttribute() for each attribute present.
  *
  * The ID/IDREF checkings are done separately
  *
@@ -6323,7 +6314,6 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     while !child.is_null() {
                         'child_ok: {
                             if matches!((*child).typ, XmlElementType::XmlElementNode) {
-                                let mut child_ok = false;
                                 name = (*child).name;
                                 if !(*child).ns.is_null()
                                     && !(*(*child).ns).prefix.load(Ordering::Relaxed).is_null()
@@ -8213,16 +8203,15 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
                     xml_automata_new_epsilon((*ctxt).am, oldend, oldstate);
                 }
             }
-        }
-        _ => {
-            xml_err_valid(
-                ctxt,
-                XmlParserErrors::XmlErrInternalError,
-                c"ContentModel broken for element %s\n".as_ptr() as _,
-                name as *const c_char,
-            );
-            return 0;
-        }
+        } // _ => {
+          //     xml_err_valid(
+          //         ctxt,
+          //         XmlParserErrors::XmlErrInternalError,
+          //         c"ContentModel broken for element %s\n".as_ptr() as _,
+          //         name as *const c_char,
+          //     );
+          //     return 0;
+          // }
     }
     1
 }

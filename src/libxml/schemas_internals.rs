@@ -861,7 +861,7 @@ pub(crate) const XML_SCHEMAS_ELEM_INTERNAL_CHECKED: i32 = 1 << 18;
 
 pub type XmlSchemaElementPtr = *mut XmlSchemaElement;
 #[repr(C)]
-pub(crate) struct XmlSchemaElement {
+pub struct XmlSchemaElement {
     pub(crate) typ: XmlSchemaTypeType,   /* The kind of type */
     pub(crate) next: *mut XmlSchemaType, /* Not used? */
     pub(crate) name: *const XmlChar,

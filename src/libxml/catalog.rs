@@ -75,7 +75,7 @@ pub(crate) const XML_CATALOG_PI: &CStr = c"oasis-xml-catalog";
  */
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum XmlCatalogPrefer {
+pub enum XmlCatalogPrefer {
     None = 0,
     Public = 1,
     System,
@@ -83,7 +83,7 @@ pub(crate) enum XmlCatalogPrefer {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum XmlCatalogAllow {
+pub enum XmlCatalogAllow {
     None = 0,
     Global = 1,
     Document = 2,

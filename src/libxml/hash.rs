@@ -28,7 +28,7 @@ const MAX_HASH_LEN: usize = 8;
 
 pub type XmlHashEntryPtr = *mut XmlHashEntry;
 #[repr(C)]
-struct XmlHashEntry {
+pub struct XmlHashEntry {
     next: *mut XmlHashEntry,
     name: *mut XmlChar,
     name2: *mut XmlChar,

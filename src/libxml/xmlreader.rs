@@ -5280,7 +5280,7 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_validate_ctxt(
 * Use RelaxNG to validate the document as it is processed.
 * Activation is only possible before the first Read().
 * if @schema is NULL, then RelaxNG validation is deactivated.
-@ The @schema should not be freed until the reader is deallocated
+* The @schema should not be freed until the reader is deallocated
 * or its use has been deactivated.
 *
 * Returns 0 in case the RelaxNG validation could be (de)activated and -1 in case of error.

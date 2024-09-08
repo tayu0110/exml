@@ -7255,12 +7255,12 @@ unsafe extern "C" fn xml_parse_att_value_complex(
  *   #x20 is appended for a "#xD#xA" sequence that is part of an external
  *   parsed entity or the literal entity value of an internal parsed entity
  * - other characters are processed by appending them to the normalized value
- * If the declared value is not CDATA, then the XML processor must further
- * process the normalized attribute value by discarding any leading and
- * trailing space (#x20) characters, and by replacing sequences of space
- * (#x20) characters by a single space (#x20) character.
- * All attributes for which no declaration has been read should be treated
- * by a non-validating parser as if declared CDATA.
+ *   If the declared value is not CDATA, then the XML processor must further
+ *   process the normalized attribute value by discarding any leading and
+ *   trailing space (#x20) characters, and by replacing sequences of space
+ *   (#x20) characters by a single space (#x20) character.
+ *   All attributes for which no declaration has been read should be treated
+ *   by a non-validating parser as if declared CDATA.
  *
  * Returns the AttValue parsed or NULL. The value has to be freed by the
  *     caller if it was copied, this can be detected by val[*len] == 0.
@@ -13696,7 +13696,7 @@ pub(crate) unsafe extern "C" fn xml_parse_version_num(ctxt: XmlParserCtxtPtr) ->
         return null_mut();
     }
     cur = CUR!(ctxt);
-    if !(b'0'..=b'9').contains(&cur) {
+    if !cur.is_ascii_digit() {
         xml_free(buf as _);
         return null_mut();
     }
@@ -13712,7 +13712,7 @@ pub(crate) unsafe extern "C" fn xml_parse_version_num(ctxt: XmlParserCtxtPtr) ->
     len += 1;
     NEXT!(ctxt);
     cur = CUR!(ctxt);
-    while (b'0'..=b'9').contains(&cur) {
+    while cur.is_ascii_digit() {
         if len + 1 >= size {
             size *= 2;
             let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as *mut XmlChar;
@@ -14144,9 +14144,7 @@ pub(crate) unsafe extern "C" fn xml_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> 
              * by the attachment of one leading and one following space (#x20)
              * character."
              */
-            if res < i32::MAX {
-                res += 1;
-            }
+            res = res.saturating_add(1);
         }
     }
     res
@@ -15482,7 +15480,7 @@ mod tests {
 
                     xml_parser_add_node_info(ctxt, info as XmlParserNodeInfoPtr);
                     des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_const_xml_parser_node_info_ptr(n_info, info as *const XmlParserNodeInfo, 1);
+                    des_const_xml_parser_node_info_ptr(n_info, info, 1);
                     xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
@@ -15516,7 +15514,7 @@ mod tests {
                     let ret_val =
                         xml_parser_find_node_info(ctx as XmlParserCtxtPtr, node as XmlNodePtr);
                     desret_const_xml_parser_node_info_ptr(ret_val);
-                    des_const_xml_parser_ctxt_ptr(n_ctx, ctx as *const XmlParserCtxt, 0);
+                    des_const_xml_parser_ctxt_ptr(n_ctx, ctx, 0);
                     des_const_xml_node_ptr(n_node, node as XmlNodePtr, 1);
                     xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -15553,11 +15551,7 @@ mod tests {
                         node as XmlNodePtr,
                     );
                     desret_unsigned_long(ret_val);
-                    des_const_xml_parser_node_info_seq_ptr(
-                        n_seq,
-                        seq as *const XmlParserNodeInfoSeq,
-                        0,
-                    );
+                    des_const_xml_parser_node_info_seq_ptr(n_seq, seq, 0);
                     des_const_xml_node_ptr(n_node, node as XmlNodePtr, 1);
                     xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {

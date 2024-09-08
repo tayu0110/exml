@@ -2207,7 +2207,7 @@ pub type XmlShellReadlineFunc = unsafe extern "C" fn(prompt: *mut c_char) -> *mu
 pub type XmlShellCtxtPtr = *mut XmlShellCtxt;
 #[cfg(feature = "xpath")]
 #[repr(C)]
-pub(crate) struct XmlShellCtxt {
+pub struct XmlShellCtxt {
     filename: *mut c_char,
     doc: XmlDocPtr,
     node: XmlNodePtr,

@@ -853,7 +853,7 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
                     }
                 }
                 1 => {}
-                4 | 5 | -1 | _ => {
+                _ => {
                     closesocket((*ctxt).control_fd);
                     (*ctxt).control_fd = INVALID_SOCKET;
                     return -1;
@@ -1019,7 +1019,7 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
             return 0;
         }
         3 => {}
-        1 | 4 | 5 | -1 | _ => {
+        _ => {
             closesocket((*ctxt).control_fd);
             (*ctxt).control_fd = INVALID_SOCKET;
             (*ctxt).control_fd = INVALID_SOCKET;

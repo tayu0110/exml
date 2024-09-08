@@ -732,7 +732,7 @@ const SUBSET_UNION: i32 = 1 << 4;
 
 pub type XmlSchemaItemListPtr = *mut XmlSchemaItemList;
 #[repr(C)]
-pub(crate) struct XmlSchemaItemList {
+pub struct XmlSchemaItemList {
     pub(crate) items: *mut *mut c_void, /* used for dynamic addition of schemata */
     pub(crate) nb_items: c_int,         /* used for dynamic addition of schemata */
     pub(crate) size_items: c_int,       /* used for dynamic addition of schemata */
@@ -743,7 +743,7 @@ const XML_SCHEMA_CTXT_VALIDATOR: i32 = 2;
 
 pub type XmlSchemaAbstractCtxtPtr = *mut XmlSchemaAbstractCtxt;
 #[repr(C)]
-pub(crate) struct XmlSchemaAbstractCtxt {
+pub struct XmlSchemaAbstractCtxt {
     pub(crate) typ: c_int,         /* E.g. XML_SCHEMA_CTXT_VALIDATOR */
     pub(crate) dummy: *mut c_void, /* Fix alignment issues */
 }
@@ -760,7 +760,7 @@ const XML_SCHEMA_SCHEMA_REDEFINE: i32 = 3;
  */
 pub type XmlSchemaSchemaRelationPtr = *mut XmlSchemaSchemaRelation;
 #[repr(C)]
-pub(crate) struct XmlSchemaSchemaRelation {
+pub struct XmlSchemaSchemaRelation {
     next: XmlSchemaSchemaRelationPtr,
     typ: c_int, /* E.g. XML_SCHEMA_SCHEMA_IMPORT */
     import_namespace: *const XmlChar,
@@ -772,7 +772,7 @@ const XML_SCHEMA_BUCKET_COMPS_ADDED: i32 = 1 << 1;
 
 pub type XmlSchemaBucketPtr = *mut XmlSchemaBucket;
 #[repr(C)]
-pub(crate) struct XmlSchemaBucket {
+pub struct XmlSchemaBucket {
     typ: c_int,
     flags: c_int,
     schema_location: *const XmlChar,
@@ -827,7 +827,7 @@ pub struct XmlSchemaImport {
 */
 pub type XmlSchemaIncludePtr = *mut XmlSchemaInclude;
 #[repr(C)]
-pub(crate) struct XmlSchemaInclude {
+pub struct XmlSchemaInclude {
     typ: c_int,
     flags: c_int,
     schema_location: *const XmlChar,
@@ -853,7 +853,7 @@ pub(crate) struct XmlSchemaInclude {
  */
 pub type XmlSchemaBasicItemPtr = *mut XmlSchemaBasicItem;
 #[repr(C)]
-pub(crate) struct XmlSchemaBasicItem {
+pub struct XmlSchemaBasicItem {
     pub(crate) typ: XmlSchemaTypeType,
     pub(crate) dummy: *mut c_void, /* Fix alignment issues */
 }
@@ -866,7 +866,7 @@ pub(crate) struct XmlSchemaBasicItem {
  */
 pub type XmlSchemaAnnotItemPtr = *mut XmlSchemaAnnotItem;
 #[repr(C)]
-pub(crate) struct XmlSchemaAnnotItem {
+pub struct XmlSchemaAnnotItem {
     typ: XmlSchemaTypeType,
     annot: XmlSchemaAnnotPtr,
 }
@@ -879,7 +879,7 @@ pub(crate) struct XmlSchemaAnnotItem {
  */
 pub type XmlSchemaTreeItemPtr = *mut XmlSchemaTreeItem;
 #[repr(C)]
-pub(crate) struct XmlSchemaTreeItem {
+pub struct XmlSchemaTreeItem {
     pub(crate) typ: XmlSchemaTypeType,
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) next: XmlSchemaTreeItemPtr,
@@ -895,7 +895,7 @@ const XML_SCHEMA_ATTR_USE_FIXED: i32 = 1 << 0;
  */
 pub type XmlSchemaAttributeUsePtr = *mut XmlSchemaAttributeUse;
 #[repr(C)]
-pub(crate) struct XmlSchemaAttributeUse {
+pub struct XmlSchemaAttributeUse {
     typ: XmlSchemaTypeType,
     annot: XmlSchemaAnnotPtr,
     next: XmlSchemaAttributeUsePtr, /* The next attr. use. */
@@ -920,7 +920,7 @@ pub(crate) struct XmlSchemaAttributeUse {
  */
 pub type XmlSchemaAttributeUseProhibPtr = *mut XmlSchemaAttributeUseProhib;
 #[repr(C)]
-pub(crate) struct XmlSchemaAttributeUseProhib {
+pub struct XmlSchemaAttributeUseProhib {
     typ: XmlSchemaTypeType, /* == XML_SCHEMA_EXTRA_ATTR_USE_PROHIB */
     node: XmlNodePtr,
     name: *const XmlChar,
@@ -933,7 +933,7 @@ pub(crate) struct XmlSchemaAttributeUseProhib {
  */
 pub type XmlSchemaRedefPtr = *mut XmlSchemaRedef;
 #[repr(C)]
-pub(crate) struct XmlSchemaRedef {
+pub struct XmlSchemaRedef {
     next: XmlSchemaRedefPtr,
     item: XmlSchemaBasicItemPtr,      /* The redefining component. */
     reference: XmlSchemaBasicItemPtr, /* The referencing component. */
@@ -949,7 +949,7 @@ pub(crate) struct XmlSchemaRedef {
  */
 pub type XmlSchemaConstructionCtxtPtr = *mut XmlSchemaConstructionCtxt;
 #[repr(C)]
-pub(crate) struct XmlSchemaConstructionCtxt {
+pub struct XmlSchemaConstructionCtxt {
     main_schema: XmlSchemaPtr,       /* The main schema. */
     main_bucket: XmlSchemaBucketPtr, /* The main schema bucket */
     dict: XmlDictPtr,
@@ -1027,7 +1027,7 @@ pub struct XmlSchemaParserCtxt {
  */
 pub type XmlSchemaQnameRefPtr = *mut XmlSchemaQnameRef;
 #[repr(C)]
-pub(crate) struct XmlSchemaQnameRef {
+pub struct XmlSchemaQnameRef {
     typ: XmlSchemaTypeType,
     item: XmlSchemaBasicItemPtr, /* The resolved referenced item. */
     item_type: XmlSchemaTypeType,
@@ -1044,7 +1044,7 @@ pub(crate) struct XmlSchemaQnameRef {
  */
 pub type XmlSchemaParticlePtr = *mut XmlSchemaParticle;
 #[repr(C)]
-pub(crate) struct XmlSchemaParticle {
+pub struct XmlSchemaParticle {
     pub(crate) typ: XmlSchemaTypeType,
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) next: XmlSchemaTreeItemPtr, /* next particle */
@@ -1064,7 +1064,7 @@ pub(crate) struct XmlSchemaParticle {
  */
 pub type XmlSchemaModelGroupPtr = *mut XmlSchemaModelGroup;
 #[repr(C)]
-pub(crate) struct XmlSchemaModelGroup {
+pub struct XmlSchemaModelGroup {
     pub(crate) typ: XmlSchemaTypeType, /* XmlSchemaTypeSequence, XmlSchemaTypeChoice, XmlSchemaTypeAll */
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) next: XmlSchemaTreeItemPtr,     /* not used */
@@ -1082,7 +1082,7 @@ const XML_SCHEMA_MODEL_GROUP_DEF_REDEFINED: i32 = 1 << 1;
  */
 pub type XmlSchemaModelGroupDefPtr = *mut XmlSchemaModelGroupDef;
 #[repr(C)]
-pub(crate) struct XmlSchemaModelGroupDef {
+pub struct XmlSchemaModelGroupDef {
     typ: XmlSchemaTypeType, /* XML_SCHEMA_TYPE_GROUP */
     annot: XmlSchemaAnnotPtr,
     next: XmlSchemaTreeItemPtr,     /* not used */
@@ -1101,7 +1101,7 @@ pub(crate) struct XmlSchemaModelGroupDef {
  */
 pub type XmlSchemaIdcselectPtr = *mut XmlSchemaIdcselect;
 #[repr(C)]
-pub(crate) struct XmlSchemaIdcselect {
+pub struct XmlSchemaIdcselect {
     next: XmlSchemaIdcselectPtr,
     idc: XmlSchemaIDCPtr,
     index: c_int,            /* an index position if significant for IDC key-sequences */
@@ -1117,7 +1117,7 @@ pub(crate) struct XmlSchemaIdcselect {
  */
 pub type XmlSchemaIDCPtr = *mut XmlSchemaIDC;
 #[repr(C)]
-pub(crate) struct XmlSchemaIDC {
+pub struct XmlSchemaIDC {
     typ: XmlSchemaTypeType,
     annot: XmlSchemaAnnotPtr,
     next: XmlSchemaIDCPtr,
@@ -1137,7 +1137,7 @@ pub(crate) struct XmlSchemaIDC {
  */
 pub type XmlSchemaIDCAugPtr = *mut XmlSchemaIDCAug;
 #[repr(C)]
-pub(crate) struct XmlSchemaIDCAug {
+pub struct XmlSchemaIDCAug {
     next: XmlSchemaIDCAugPtr, /* next in a list */
     def: XmlSchemaIDCPtr,     /* the IDC definition */
     keyref_depth: c_int,      /* the lowest tree level to which IDC
@@ -1151,7 +1151,7 @@ pub(crate) struct XmlSchemaIDCAug {
  */
 pub type XmlSchemaPSVIIDCKeyPtr = *mut XmlSchemaPSVIIDCKey;
 #[repr(C)]
-pub(crate) struct XmlSchemaPSVIIDCKey {
+pub struct XmlSchemaPSVIIDCKey {
     typ: XmlSchemaTypePtr,
     val: XmlSchemaValPtr,
 }
@@ -1163,7 +1163,7 @@ pub(crate) struct XmlSchemaPSVIIDCKey {
  */
 pub type XmlSchemaPSVIIDCNodePtr = *mut XmlSchemaPSVIIDCNode;
 #[repr(C)]
-pub(crate) struct XmlSchemaPSVIIDCNode {
+pub struct XmlSchemaPSVIIDCNode {
     node: XmlNodePtr,
     keys: *mut XmlSchemaPSVIIDCKeyPtr,
     node_line: c_int,
@@ -1177,7 +1177,7 @@ pub(crate) struct XmlSchemaPSVIIDCNode {
  */
 pub type XmlSchemaPSVIIDCBindingPtr = *mut XmlSchemaPSVIIDCBinding;
 #[repr(C)]
-pub(crate) struct XmlSchemaPSVIIDCBinding {
+pub struct XmlSchemaPSVIIDCBinding {
     next: XmlSchemaPSVIIDCBindingPtr, /* next binding of a specific node */
     definition: XmlSchemaIDCPtr,      /* the IDC definition */
     node_table: *mut XmlSchemaPSVIIDCNodePtr, /* array of key-sequences */
@@ -1199,7 +1199,7 @@ const XPATH_STATE_OBJ_BLOCKED: i32 = -3;
  */
 pub type XmlSchemaIDCStateObjPtr = *mut XmlSchemaIDCStateObj;
 #[repr(C)]
-pub(crate) struct XmlSchemaIDCStateObj {
+pub struct XmlSchemaIDCStateObj {
     typ: c_int,
     next: XmlSchemaIDCStateObjPtr, /* next if in a list */
     depth: c_int,                  /* depth of creation */
@@ -1221,7 +1221,7 @@ const IDC_MATCHER: i32 = 0;
  */
 pub type XmlSchemaIDCMatcherPtr = *mut XmlSchemaIDCMatcher;
 #[repr(C)]
-pub(crate) struct XmlSchemaIDCMatcher {
+pub struct XmlSchemaIDCMatcher {
     typ: c_int,
     depth: c_int,                        /* the tree depth at creation time */
     next: XmlSchemaIDCMatcherPtr,        /* next in the list */
@@ -1260,7 +1260,7 @@ const XML_SCHEMA_NODE_INFO_ERR_BAD_TYPE: i32 = 1 << 10;
  */
 pub type XmlSchemaNodeInfoPtr = *mut XmlSchemaNodeInfo;
 #[repr(C)]
-pub(crate) struct XmlSchemaNodeInfo {
+pub struct XmlSchemaNodeInfo {
     node_type: c_int,
     node: XmlNodePtr,
     node_line: c_int,
@@ -1319,7 +1319,7 @@ const XML_SCHEMA_ATTR_INFO_META_XMLNS: i32 = 5;
 
 pub type XmlSchemaAttrInfoPtr = *mut XmlSchemaAttrInfo;
 #[repr(C)]
-pub(crate) struct XmlSchemaAttrInfo {
+pub struct XmlSchemaAttrInfo {
     node_type: c_int,
     node: XmlNodePtr,
     node_line: c_int,
@@ -1425,7 +1425,7 @@ pub struct XmlSchemaValidCtxt {
  */
 pub type XmlSchemaSubstGroupPtr = *mut XmlSchemaSubstGroup;
 #[repr(C)]
-pub(crate) struct XmlSchemaSubstGroup {
+pub struct XmlSchemaSubstGroup {
     head: XmlSchemaElementPtr,
     members: XmlSchemaItemListPtr,
 }
@@ -1437,7 +1437,7 @@ pub(crate) struct XmlSchemaSubstGroup {
  */
 pub type XmlIDCHashEntryPtr = *mut XmlIDCHashEntry;
 #[repr(C)]
-pub(crate) struct XmlIDCHashEntry {
+pub struct XmlIDCHashEntry {
     next: XmlIDCHashEntryPtr, /* next item with same hash */
     index: c_int,             /* index into associated item list */
 }
@@ -31068,7 +31068,7 @@ pub unsafe extern "C" fn xml_schema_validate_stream(
 pub unsafe extern "C" fn xml_schema_validate_file(
     ctxt: XmlSchemaValidCtxtPtr,
     filename: *const c_char,
-    options: c_int,
+    _options: c_int,
 ) -> c_int {
     if ctxt.is_null() || filename.is_null() {
         return -1;

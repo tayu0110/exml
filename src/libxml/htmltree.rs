@@ -1170,7 +1170,7 @@ pub unsafe extern "C" fn html_node_dump_format_output(
     buf: XmlOutputBufferPtr,
     doc: XmlDocPtr,
     mut cur: XmlNodePtr,
-    encoding: *const c_char,
+    _encoding: *const c_char,
     format: c_int,
 ) {
     use crate::{
@@ -1225,7 +1225,7 @@ pub unsafe extern "C" fn html_node_dump_format_output(
                  * case.
                  */
                 if (*cur).parent != parent && !(*cur).children.is_null() {
-                    html_node_dump_format_output(buf, doc, cur, encoding, format);
+                    html_node_dump_format_output(buf, doc, cur, _encoding, format);
                     break 'to_break;
                 }
 

@@ -2274,9 +2274,9 @@ unsafe extern "C" fn xml_fa_parse_reg_exp(ctxt: XmlRegParserCtxtPtr, top: c_int)
  * reduced to state elimination:
  *    - if there exists an epsilon from X to Y
  *    - if there is no other transition from X
- * then X and Y are semantically equivalent and X can be eliminated
- * If X is the start state then make Y the start state, else replace the
- * target of all transitions to X by transitions to Y.
+ *      then X and Y are semantically equivalent and X can be eliminated
+ *      If X is the start state then make Y the start state, else replace the
+ *      target of all transitions to X by transitions to Y.
  *
  * If X is a final state, skip it.
  * Otherwise it would be necessary to manipulate counters for this case when
@@ -6694,7 +6694,7 @@ unsafe extern "C" fn xml_exp_parse_expr(ctxt: XmlExpCtxtPtr) -> XmlExpNodePtr {
  *  - usual cardinality operators + * and ?
  *  - finite sequences  { min, max }
  *  - infinite sequences { min, * }
- * There is minimal checkings made especially no checking on strings values
+ *    There is minimal checkings made especially no checking on strings values
  *
  * Returns a new expression or NULL in case of failure
  */

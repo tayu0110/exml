@@ -125,6 +125,7 @@ pub type HtmlEntityDescPtr = *mut HtmlEntityDesc;
 pub struct HtmlEntityDesc {
     value: c_uint,       /* the UNICODE value for the character */
     name: *const c_char, /* The entity name */
+    #[allow(unused)]
     desc: *const c_char, /* the description */
 }
 
@@ -5510,7 +5511,7 @@ unsafe extern "C" fn html_check_auto_close(
  * Returns 1 if autoclose, 0 otherwise
  */
 pub unsafe extern "C" fn html_auto_close_tag(
-    doc: HtmlDocPtr,
+    _doc: HtmlDocPtr,
     name: *const XmlChar,
     elem: HtmlNodePtr,
 ) -> c_int {
@@ -5527,7 +5528,7 @@ pub unsafe extern "C" fn html_auto_close_tag(
     }
     child = (*elem).children;
     while !child.is_null() {
-        if html_auto_close_tag(doc, name, child) != 0 {
+        if html_auto_close_tag(_doc, name, child) != 0 {
             return 1;
         }
         child = (*child).next;
@@ -12732,15 +12733,15 @@ pub unsafe extern "C" fn html_element_status_here(
  * htmlNodeStatus:
  * @node: an htmlNodePtr in a tree
  * @legacy: whether to allow deprecated elements (YES is faster here
- *	for Element nodes)
+ *    for Element nodes)
  *
  * Checks whether the tree node is valid.  Experimental (the author
  *     only uses the HTML enhancements in a SAX parser)
  *
  * Return: for Element nodes, a return from htmlElementAllowedHere (if
- *	legacy allowed) or htmlElementStatusHere (otherwise).
- *	for Attribute nodes, a return from htmlAttrAllowed
- *	for other nodes, htmlStatus::HTML_NA (no checks performed)
+ *    legacy allowed) or htmlElementStatusHere (otherwise).
+ *    for Attribute nodes, a return from htmlAttrAllowed
+ *    for other nodes, htmlStatus::HTML_NA (no checks performed)
  */
 pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: c_int) -> HtmlStatus {
     if node.is_null() {

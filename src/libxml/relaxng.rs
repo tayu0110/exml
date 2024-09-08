@@ -143,6 +143,7 @@ pub enum XmlRelaxNGValidErr {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum XmlRelaxNGParserFlag {
+    #[allow(unused)]
     None = 0,
     FreeDoc = 1,
     Crng = 2,
@@ -151,9 +152,12 @@ enum XmlRelaxNGParserFlag {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum XmlRelaxNGCombine {
+    #[allow(unused)]
     Undefined = 0, /* undefined */
-    Choice,        /* choice */
-    Interleave,    /* interleave */
+    #[allow(unused)]
+    Choice, /* choice */
+    #[allow(unused)]
+    Interleave, /* interleave */
 }
 
 #[repr(C)]
@@ -9170,10 +9174,9 @@ unsafe extern "C" fn xml_relaxng_dump_grammar(
         }
         XmlRelaxNGCombine::Interleave => {
             fprintf(output, c" combine=\"interleave\"".as_ptr() as _);
-        }
-        _ => {
-            fprintf(output, c" <!-- invalid combine value -->".as_ptr() as _);
-        }
+        } // _ => {
+          //     fprintf(output, c" <!-- invalid combine value -->".as_ptr() as _);
+          // }
     }
     fprintf(output, c">\n".as_ptr() as _);
     if (*grammar).start.is_null() {
@@ -10472,7 +10475,7 @@ unsafe extern "C" fn xml_relaxng_validate_attribute_list(
 * @exec:  the regular expression instance
 * @token:  the token which matched
 * @transdata:  callback data, the define for the subelement if available
-@ @inputdata:  callback data, the Relax NG validation context
+* @inputdata:  callback data, the Relax NG validation context
 *
 * Handle the callback and if needed validate the element children.
 */
@@ -11932,7 +11935,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 }
                 ret = xml_relaxng_validate_definition(ctxt, list);
                 // Is This correct ??????
-                if ret == 0 {}
+                // if ret == 0 {}
                 break 'to_break;
             }
             list = (*define).content;
@@ -12507,7 +12510,7 @@ pub unsafe extern "C" fn xml_relaxng_validate_doc(
 * @exec:  the regular expression instance
 * @token:  the token which matched
 * @transdata:  callback data, the define for the subelement if available
-@ @inputdata:  callback data, the Relax NG validation context
+* @inputdata:  callback data, the Relax NG validation context
 *
 * Handle the callback and if needed validate the element children.
 * some of the in/out information are passed via the context in @inputdata.

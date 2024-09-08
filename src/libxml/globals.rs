@@ -158,12 +158,13 @@ pub type XmlRegisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
  */
 pub type XmlDeregisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
 
-pub(crate) type XmlGlobalStatePtr = *mut XmlGlobalState;
-pub(crate) struct XmlGlobalState {
+pub type XmlGlobalStatePtr = *mut XmlGlobalState;
+pub struct XmlGlobalState {
     pub(crate) xml_parser_version: *const c_char,
 
     pub(crate) xml_default_sax_locator: XmlSaxlocator,
     pub(crate) xml_default_sax_handler: XmlSAXHandlerV1,
+    #[allow(unused)]
     pub(crate) docb_default_sax_handler: XmlSAXHandlerV1, /* unused */
     pub(crate) html_default_sax_handler: XmlSAXHandlerV1,
 

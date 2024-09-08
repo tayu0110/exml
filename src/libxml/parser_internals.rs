@@ -2617,12 +2617,12 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
  *   #x20 is appended for a "#xD#xA" sequence that is part of an external
  *   parsed entity or the literal entity value of an internal parsed entity
  * - other characters are processed by appending them to the normalized value
- * If the declared value is not CDATA, then the XML processor must further
- * process the normalized attribute value by discarding any leading and
- * trailing space (#x20) characters, and by replacing sequences of space
- * (#x20) characters by a single space (#x20) character.
- * All attributes for which no declaration has been read should be treated
- * by a non-validating parser as if declared CDATA.
+ *   If the declared value is not CDATA, then the XML processor must further
+ *   process the normalized attribute value by discarding any leading and
+ *   trailing space (#x20) characters, and by replacing sequences of space
+ *   (#x20) characters by a single space (#x20) character.
+ *   All attributes for which no declaration has been read should be treated
+ *   by a non-validating parser as if declared CDATA.
  *
  * Returns the AttValue parsed or NULL. The value has to be freed by the caller.
  */

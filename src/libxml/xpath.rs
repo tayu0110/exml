@@ -397,11 +397,11 @@ pub(crate) const XML_XPATH_NOVAR: usize = 1 << 1;
  *    - a set of variable bindings
  *    - a function library
  *    - the set of namespace declarations in scope for the expression
- * Following the switch to hash tables, this need to be trimmed up at
- * the next binary incompatible release.
- * The node may be modified when the context is passed to libxml2
- * for an XPath evaluation so you may need to initialize it again
- * before the next call.
+ *      Following the switch to hash tables, this need to be trimmed up at
+ *      the next binary incompatible release.
+ *      The node may be modified when the context is passed to libxml2
+ *      for an XPath evaluation so you may need to initialize it again
+ *      before the next call.
  */
 
 #[cfg(feature = "xpath")]
@@ -878,8 +878,7 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
                 c"xmlXPathObjectCopy: unsupported type %d\n".as_ptr(),
                 (*val).typ
             );
-        }
-        _ => {}
+        } // _ => {}
     }
     ret
 }
@@ -1125,8 +1124,6 @@ pub unsafe extern "C" fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -
  */
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> c_int {
-    let mut ret: c_int = 0;
-
     if val.is_null() {
         return 0;
     }
@@ -1135,33 +1132,26 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> c_
             // #ifdef DEBUG_EXPR
             // 	xmlGenericError(xmlGenericErrorContext, "BOOLEAN: undefined\n");
             // #endif
-            ret = 0;
+            0
         }
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
-            ret = xml_xpath_cast_node_set_to_boolean((*val).nodesetval);
+            xml_xpath_cast_node_set_to_boolean((*val).nodesetval)
         }
-        XmlXPathObjectType::XpathString => {
-            ret = xml_xpath_cast_string_to_boolean((*val).stringval);
-        }
-        XmlXPathObjectType::XpathNumber => {
-            ret = xml_xpath_cast_number_to_boolean((*val).floatval);
-        }
-        XmlXPathObjectType::XpathBoolean => {
-            ret = (*val).boolval;
-        }
+        XmlXPathObjectType::XpathString => xml_xpath_cast_string_to_boolean((*val).stringval),
+        XmlXPathObjectType::XpathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
+        XmlXPathObjectType::XpathBoolean => (*val).boolval,
         XmlXPathObjectType::XpathUsers => {
             // todo!();
-            ret = 0;
+            0
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XpathPoint
         | XmlXPathObjectType::XpathRange
         | XmlXPathObjectType::XpathLocationset => {
             // todo!();
-            ret = 0;
+            0
         }
     }
-    ret
 }
 
 /**

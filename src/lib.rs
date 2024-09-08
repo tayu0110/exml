@@ -1,4 +1,9 @@
 #![allow(clippy::missing_safety_doc)]
+#![allow(clippy::blocks_in_conditions)]
+#![allow(clippy::needless_range_loop)]
+#![allow(unused_assignments)]
+#![allow(deprecated)]
+#![allow(unused)]
 
 pub mod libxml;
 pub mod private;

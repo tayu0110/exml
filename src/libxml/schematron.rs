@@ -93,7 +93,7 @@ enum XmlSchematronTestType {
  */
 pub type XmlSchematronLetPtr = *mut XmlSchematronLet;
 #[repr(C)]
-struct XmlSchematronLet {
+pub struct XmlSchematronLet {
     next: XmlSchematronLetPtr, /* the next let variable in the list */
     name: *mut XmlChar,        /* the name of the variable */
     comp: XmlXPathCompExprPtr, /* the compiled expression */
@@ -106,7 +106,7 @@ struct XmlSchematronLet {
  */
 pub type XmlSchematronTestPtr = *mut XmlSchematronTest;
 #[repr(C)]
-struct XmlSchematronTest {
+pub struct XmlSchematronTest {
     next: XmlSchematronTestPtr, /* the next test in the list */
     typ: XmlSchematronTestType, /* the test type */
     node: XmlNodePtr,           /* the node in the tree */
@@ -122,7 +122,7 @@ struct XmlSchematronTest {
  */
 pub type XmlSchematronRulePtr = *mut XmlSchematronRule;
 #[repr(C)]
-struct XmlSchematronRule {
+pub struct XmlSchematronRule {
     next: XmlSchematronRulePtr,    /* the next rule in the list */
     patnext: XmlSchematronRulePtr, /* the next rule in the pattern list */
     node: XmlNodePtr,              /* the node in the tree */
@@ -140,7 +140,7 @@ struct XmlSchematronRule {
  */
 pub type XmlSchematronPatternPtr = *mut XmlSchematronPattern;
 #[repr(C)]
-struct XmlSchematronPattern {
+pub struct XmlSchematronPattern {
     next: XmlSchematronPatternPtr, /* the next pattern in the list */
     rules: XmlSchematronRulePtr,   /* the list of rules */
     name: *mut XmlChar,            /* the name of the pattern */
@@ -2055,9 +2055,9 @@ unsafe extern "C" fn xml_schematron_run_test(
         }
         xml_xpath_free_object(ret);
     }
-    if failed != 0 && (*test).typ == XmlSchematronTestType::XmlSchematronAssert {
-        (*ctxt).nberrors += 1;
-    } else if failed == 0 && (*test).typ == XmlSchematronTestType::XmlSchematronReport {
+    if (failed != 0 && (*test).typ == XmlSchematronTestType::XmlSchematronAssert)
+        || (failed == 0 && (*test).typ == XmlSchematronTestType::XmlSchematronReport)
+    {
         (*ctxt).nberrors += 1;
     }
 

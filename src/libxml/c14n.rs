@@ -1064,7 +1064,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
     if visible != 0 && has_empty_ns == 0 {
         static mut NS_DEFAULT: XmlNs = unsafe { zeroed() };
 
-        memset(addr_of_mut!(NS_DEFAULT) as _, 0, size_of_val(&NS_DEFAULT));
+        memset(addr_of_mut!(NS_DEFAULT) as _, 0, size_of::<XmlNs>());
         if xml_c14n_visible_ns_stack_find((*ctx).ns_rendered, addr_of_mut!(NS_DEFAULT)) == 0 {
             xml_c14n_print_namespaces(addr_of_mut!(NS_DEFAULT), ctx);
         }
@@ -1301,8 +1301,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
     {
         static mut NS_DEFAULT: XmlNs = unsafe { zeroed() };
 
-        memset(addr_of_mut!(NS_DEFAULT) as _, 0, size_of_val(&NS_DEFAULT));
-
+        memset(addr_of_mut!(NS_DEFAULT) as _, 0, size_of::<XmlNs>());
         already_rendered =
             xml_exc_c14n_visible_ns_stack_find((*ctx).ns_rendered, addr_of_mut!(NS_DEFAULT), ctx);
         if already_rendered == 0 {
@@ -1311,7 +1310,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
     } else if visible != 0 && has_empty_ns == 0 && has_empty_ns_in_inclusive_list != 0 {
         static mut NS_DEFAULT: XmlNs = unsafe { zeroed() };
 
-        memset(addr_of_mut!(NS_DEFAULT) as _, 0, size_of_val(&NS_DEFAULT));
+        memset(addr_of_mut!(NS_DEFAULT) as _, 0, size_of::<XmlNs>());
         if xml_c14n_visible_ns_stack_find((*ctx).ns_rendered, addr_of_mut!(NS_DEFAULT)) == 0 {
             xml_c14n_print_namespaces(addr_of_mut!(NS_DEFAULT), ctx);
         }

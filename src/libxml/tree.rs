@@ -7609,7 +7609,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
                 while tmp != b';' {
                     /* Non input consuming loop */
                     /* Don't check for integer overflow, see above. */
-                    if (b'0'..=b'9').contains(&tmp) {
+                    if tmp.is_ascii_digit() {
                         charval = charval * 16 + (tmp - b'0') as i32;
                     } else if (b'a'..=b'f').contains(&tmp) {
                         charval = charval * 16 + (tmp - b'a') as i32 + 10;
@@ -7637,7 +7637,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
                 while tmp != b';' {
                     /* Non input consuming loops */
                     /* Don't check for integer overflow, see above. */
-                    if (b'0'..=b'9').contains(&tmp) {
+                    if tmp.is_ascii_digit() {
                         charval = charval * 10 + (tmp - b'0') as i32;
                     } else {
                         xml_tree_err(
@@ -7918,7 +7918,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
                      * So it's better *not* to check for overflow to
                      * potentially discover new bugs.
                      */
-                    if (b'0'..=b'9').contains(&tmp) {
+                    if tmp.is_ascii_digit() {
                         charval = charval * 16 + (tmp - b'0') as i32;
                     } else if (b'a'..=b'f').contains(&tmp) {
                         charval = charval * 16 + (tmp - b'a') as i32 + 10;
@@ -11464,7 +11464,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                          */
                         if !list_redund.is_null() {
                             for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
-                                if (*cur).ns == *list_redund.add(j as usize) {
+                                if (*cur).ns == *list_redund.add(j) {
                                     (*cur).ns = *list_redund.add(j + 1);
                                     break;
                                 }

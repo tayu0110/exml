@@ -2042,7 +2042,7 @@ unsafe extern "C" fn xml_schema_validate_duration(
             let mut num: c_long = 0;
             let mut has_digits: size_t = 0;
             let mut has_frac: c_int = 0;
-            let desig: &[XmlChar] = &[b'Y', b'M', b'D', b'H', b'M', b'S'];
+            let desig: &[XmlChar] = b"YMDHMS";
 
             /* input string should be empty or invalid date/time item */
             if seq >= desig.len() {

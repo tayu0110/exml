@@ -25,7 +25,7 @@ pub(crate) struct XmlChLRange {
 }
 
 pub(crate) type XmlChRangeGroupPtr = *mut XmlChRangeGroup;
-pub(crate) struct XmlChRangeGroup {
+pub struct XmlChRangeGroup {
     pub(crate) nb_short_range: c_int,
     pub(crate) nb_long_range: c_int,
     pub(crate) short_range: *const XmlChSRange, /* points to an array of ranges */
