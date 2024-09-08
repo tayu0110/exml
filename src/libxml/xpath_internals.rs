@@ -1169,7 +1169,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
 
 #[cfg(feature = "libxml_debug")]
 unsafe extern "C" fn xml_xpath_debug_dump_node(output: *mut FILE, cur: XmlNodePtr, depth: c_int) {
-    use crate::libxml::debug_xml::{xmlDebugDumpAttr, xmlDebugDumpOneNode};
+    use crate::libxml::debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node};
 
     let mut shift: [c_char; 100] = [0; 100];
 
@@ -1192,9 +1192,9 @@ unsafe extern "C" fn xml_xpath_debug_dump_node(output: *mut FILE, cur: XmlNodePt
         fprintf(output, c"%s".as_ptr(), shift.as_ptr());
         fprintf(output, c" /\n".as_ptr());
     } else if (*cur).typ == XmlElementType::XmlAttributeNode {
-        xmlDebugDumpAttr(output, cur as XmlAttrPtr, depth);
+        xml_debug_dump_attr(output, cur as XmlAttrPtr, depth);
     } else {
-        xmlDebugDumpOneNode(output, cur, depth);
+        xml_debug_dump_one_node(output, cur, depth);
     }
 }
 
@@ -1204,7 +1204,7 @@ unsafe extern "C" fn xml_xpath_debug_dump_node_list(
     mut cur: XmlNodePtr,
     depth: c_int,
 ) {
-    use super::debug_xml::xmlDebugDumpOneNode;
+    use super::debug_xml::xml_debug_dump_one_node;
 
     let mut tmp: XmlNodePtr;
     let mut shift: [c_char; 100] = [0; 100];
@@ -1225,7 +1225,7 @@ unsafe extern "C" fn xml_xpath_debug_dump_node_list(
     while !cur.is_null() {
         tmp = cur;
         cur = (*cur).next;
-        xmlDebugDumpOneNode(output, tmp, depth);
+        xml_debug_dump_one_node(output, tmp, depth);
     }
 }
 
@@ -1332,7 +1332,7 @@ pub unsafe extern "C" fn xml_xpath_debug_dump_object(
     cur: XmlXPathObjectPtr,
     depth: c_int,
 ) {
-    use super::debug_xml::xmlDebugDumpString;
+    use super::debug_xml::xml_debug_dump_string;
 
     let mut shift: [c_char; 100] = [0; 100];
 
@@ -1399,7 +1399,7 @@ pub unsafe extern "C" fn xml_xpath_debug_dump_object(
         }
         XmlXPathObjectType::XpathString => {
             fprintf(output, c"Object is a string : ".as_ptr());
-            xmlDebugDumpString(output, (*cur).stringval);
+            xml_debug_dump_string(output, (*cur).stringval);
             fprintf(output, c"\n".as_ptr());
         }
         #[cfg(feature = "libxml_xptr_locs")]

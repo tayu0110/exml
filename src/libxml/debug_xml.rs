@@ -63,7 +63,7 @@ pub struct XmlDebugCtxt {
  *
  * Dumps information about the string, shorten it if necessary
  */
-pub unsafe extern "C" fn xmlDebugDumpString(mut output: *mut FILE, str: *const XmlChar) {
+pub unsafe extern "C" fn xml_debug_dump_string(mut output: *mut FILE, str: *const XmlChar) {
     extern "C" {
         static stdout: *mut FILE;
     }
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn xmlDebugDumpString(mut output: *mut FILE, str: *const X
     fprintf(output, c"...".as_ptr());
 }
 
-unsafe extern "C" fn xmlCtxtDumpInitCtxt(ctxt: XmlDebugCtxtPtr) {
+unsafe extern "C" fn xml_ctxt_dump_init_ctxt(ctxt: XmlDebugCtxtPtr) {
     extern "C" {
         static stdout: *mut FILE;
     }
@@ -108,7 +108,7 @@ unsafe extern "C" fn xmlCtxtDumpInitCtxt(ctxt: XmlDebugCtxtPtr) {
     (*ctxt).shift[100] = 0;
 }
 
-unsafe extern "C" fn xmlCtxtDumpSpaces(ctxt: XmlDebugCtxtPtr) {
+unsafe extern "C" fn xml_ctxt_dump_spaces(ctxt: XmlDebugCtxtPtr) {
     if (*ctxt).check != 0 {
         return;
     }
@@ -125,7 +125,7 @@ unsafe extern "C" fn xmlCtxtDumpSpaces(ctxt: XmlDebugCtxtPtr) {
     }
 }
 
-unsafe extern "C" fn xmlCtxtDumpString(ctxt: XmlDebugCtxtPtr, str: *const XmlChar) {
+unsafe extern "C" fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, str: *const XmlChar) {
     if (*ctxt).check != 0 {
         return;
     }
@@ -246,32 +246,38 @@ unsafe extern "C" fn xml_debug_err3(
  *         -2 if the namespace is not in scope, and -3 if not on
  *         an ancestor node.
  */
-unsafe extern "C" fn xmlNsCheckScope(mut node: XmlNodePtr, ns: XmlNsPtr) -> c_int {
+unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> c_int {
     let mut cur: XmlNsPtr;
 
     if node.is_null() || ns.is_null() {
         return -1;
     }
 
-    if (*node).typ != XmlElementType::XmlElementNode
-        && (*node).typ != XmlElementType::XmlAttributeNode
-        && (*node).typ != XmlElementType::XmlDocumentNode
-        && ((*node).typ != XmlElementType::XmlTextNode)
-        && (*node).typ != XmlElementType::XmlHtmlDocumentNode
-        && ((*node).typ != XmlElementType::XmlXincludeStart)
-    {
+    if !matches!(
+        (*node).typ,
+        XmlElementType::XmlElementNode
+            | XmlElementType::XmlAttributeNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlTextNode
+            | XmlElementType::XmlHtmlDocumentNode
+            | XmlElementType::XmlXincludeStart
+    ) {
         return -2;
     }
 
     while !node.is_null()
-        && (((*node).typ == XmlElementType::XmlElementNode)
-            || (*node).typ == XmlElementType::XmlAttributeNode
-            || (*node).typ == XmlElementType::XmlTextNode
-            || ((*node).typ == XmlElementType::XmlXincludeStart))
+        && matches!(
+            (*node).typ,
+            XmlElementType::XmlElementNode
+                | XmlElementType::XmlAttributeNode
+                | XmlElementType::XmlTextNode
+                | XmlElementType::XmlXincludeStart
+        )
     {
-        if ((*node).typ == XmlElementType::XmlElementNode)
-            || ((*node).typ == XmlElementType::XmlXincludeStart)
-        {
+        if matches!(
+            (*node).typ,
+            XmlElementType::XmlElementNode | XmlElementType::XmlXincludeStart
+        ) {
             cur = (*node).ns_def;
             while !cur.is_null() {
                 if cur == ns {
@@ -291,8 +297,10 @@ unsafe extern "C" fn xmlNsCheckScope(mut node: XmlNodePtr, ns: XmlNsPtr) -> c_in
     }
     /* the xml namespace may be declared on the document node */
     if !node.is_null()
-        && ((*node).typ == XmlElementType::XmlDocumentNode
-            || (*node).typ == XmlElementType::XmlHtmlDocumentNode)
+        && matches!(
+            (*node).typ,
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+        )
     {
         let old_ns: XmlNsPtr = (*(node as XmlDocPtr)).old_ns;
         if old_ns == ns {
@@ -310,8 +318,12 @@ unsafe extern "C" fn xmlNsCheckScope(mut node: XmlNodePtr, ns: XmlNsPtr) -> c_in
  *
  * Report if a given namespace is is not in scope.
  */
-unsafe extern "C" fn xmlCtxtNsCheckScope(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr, ns: XmlNsPtr) {
-    let ret: c_int = xmlNsCheckScope(node, ns);
+unsafe extern "C" fn xml_ctxt_ns_check_scope(
+    ctxt: XmlDebugCtxtPtr,
+    node: XmlNodePtr,
+    ns: XmlNsPtr,
+) {
+    let ret: c_int = xml_ns_check_scope(node, ns);
     if ret == -2 {
         if (*ns).prefix.load(Ordering::Relaxed).is_null() {
             xml_debug_err(
@@ -353,7 +365,7 @@ unsafe extern "C" fn xmlCtxtNsCheckScope(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr
  *
  * Do debugging on the string, currently it just checks the UTF-8 content
  */
-unsafe extern "C" fn xmlCtxtCheckString(ctxt: XmlDebugCtxtPtr, str: *const XmlChar) {
+unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const XmlChar) {
     if str.is_null() {
         return;
     }
@@ -375,7 +387,7 @@ unsafe extern "C" fn xmlCtxtCheckString(ctxt: XmlDebugCtxtPtr, str: *const XmlCh
  * Do debugging on the name, for example the dictionary status and
  * conformance to the Name production.
  */
-unsafe extern "C" fn xmlCtxtCheckName(ctxt: XmlDebugCtxtPtr, name: *const XmlChar) {
+unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const XmlChar) {
     if (*ctxt).check != 0 {
         if name.is_null() {
             xml_debug_err(
@@ -412,9 +424,8 @@ unsafe extern "C" fn xmlCtxtCheckName(ctxt: XmlDebugCtxtPtr, name: *const XmlCha
     }
 }
 
-unsafe extern "C" fn xmlCtxtGenericNodeCheck(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
+unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     let dict: XmlDictPtr;
-
     let doc: XmlDocPtr = (*node).doc;
 
     if (*node).parent.is_null() {
@@ -430,7 +441,7 @@ unsafe extern "C" fn xmlCtxtGenericNodeCheck(ctxt: XmlDebugCtxtPtr, node: XmlNod
             XmlParserErrors::XmlCheckNoDoc as i32,
             c"Node has no doc\n".as_ptr(),
         );
-        // dict = null_mut();
+        dict = null_mut();
     } else {
         dict = (*doc).dict;
         if dict.is_null() && (*ctxt).nodict == 0 {
@@ -451,8 +462,8 @@ unsafe extern "C" fn xmlCtxtGenericNodeCheck(ctxt: XmlDebugCtxtPtr, node: XmlNod
         }
     }
     if !(*node).parent.is_null()
-        && ((*node).doc != (*(*node).parent).doc)
-        && xml_str_equal((*node).name, "pseudoroot".as_ptr()) == 0
+        && (*node).doc != (*(*node).parent).doc
+        && xml_str_equal((*node).name, c"pseudoroot".as_ptr() as _) == 0
     {
         xml_debug_err(
             ctxt,
@@ -516,30 +527,32 @@ unsafe extern "C" fn xmlCtxtGenericNodeCheck(ctxt: XmlDebugCtxtPtr, node: XmlNod
 
         ns = (*node).ns_def;
         while !ns.is_null() {
-            xmlCtxtNsCheckScope(ctxt, node, ns);
+            xml_ctxt_ns_check_scope(ctxt, node, ns);
             ns = (*ns).next.load(Ordering::Relaxed);
         }
         if !(*node).ns.is_null() {
-            xmlCtxtNsCheckScope(ctxt, node, (*node).ns);
+            xml_ctxt_ns_check_scope(ctxt, node, (*node).ns);
         }
     } else if (*node).typ == XmlElementType::XmlAttributeNode && !(*node).ns.is_null() {
-        xmlCtxtNsCheckScope(ctxt, node, (*node).ns);
+        xml_ctxt_ns_check_scope(ctxt, node, (*node).ns);
     }
 
-    if ((*node).typ != XmlElementType::XmlElementNode
-        && (*node).typ != XmlElementType::XmlAttributeNode
-        && (*node).typ != XmlElementType::XmlElementDecl
-        && (*node).typ != XmlElementType::XmlAttributeDecl
-        && (*node).typ != XmlElementType::XmlDtdNode
-        && (*node).typ != XmlElementType::XmlHtmlDocumentNode
-        && (*node).typ != XmlElementType::XmlDocumentNode)
-        && !(*node).content.is_null()
+    if !matches!(
+        (*node).typ,
+        XmlElementType::XmlElementNode
+            | XmlElementType::XmlAttributeNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlHtmlDocumentNode
+            | XmlElementType::XmlDocumentNode
+    ) && !(*node).content.is_null()
     {
-        xmlCtxtCheckString(ctxt, (*node).content as *const XmlChar);
+        xml_ctxt_check_string(ctxt, (*node).content as *const XmlChar);
     }
     match (*node).typ {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            xmlCtxtCheckName(ctxt, (*node).name);
+            xml_ctxt_check_name(ctxt, (*node).name);
         }
         XmlElementType::XmlTextNode => {
             if (*node).name == XML_STRING_TEXT.as_ptr() as _
@@ -575,7 +588,7 @@ unsafe extern "C" fn xmlCtxtGenericNodeCheck(ctxt: XmlDebugCtxtPtr, node: XmlNod
             }
         }
         XmlElementType::XmlPiNode => {
-            xmlCtxtCheckName(ctxt, (*node).name);
+            xml_ctxt_check_name(ctxt, (*node).name);
         }
         XmlElementType::XmlCdataSectionNode => {
             if (*node).name.is_null() {
@@ -607,8 +620,8 @@ unsafe extern "C" fn xmlCtxtGenericNodeCheck(ctxt: XmlDebugCtxtPtr, node: XmlNod
     }
 }
 
-unsafe extern "C" fn xmlCtxtDumpDtdNode(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
-    xmlCtxtDumpSpaces(ctxt);
+unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
+    xml_ctxt_dump_spaces(ctxt);
 
     if dtd.is_null() {
         if (*ctxt).check == 0 {
@@ -654,7 +667,7 @@ unsafe extern "C" fn xmlCtxtDumpDtdNode(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
     /*
      * Do a bit of checking
      */
-    xmlCtxtGenericNodeCheck(ctxt, dtd as XmlNodePtr);
+    xml_ctxt_generic_node_check(ctxt, dtd as XmlNodePtr);
 }
 
 /**
@@ -664,25 +677,25 @@ unsafe extern "C" fn xmlCtxtDumpDtdNode(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
  *
  * Dumps debug information for the DTD
  */
-unsafe extern "C" fn xmlCtxtDumpDTD(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
+unsafe extern "C" fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
     if dtd.is_null() {
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"DTD is NULL\n".as_ptr());
         }
         return;
     }
-    xmlCtxtDumpDtdNode(ctxt, dtd);
+    xml_ctxt_dump_dtd_node(ctxt, dtd);
     if (*dtd).children.is_null() {
         fprintf((*ctxt).output, c"    DTD is empty\n".as_ptr());
     } else {
         (*ctxt).depth += 1;
-        xmlCtxtDumpNodeList(ctxt, (*dtd).children);
+        xml_ctxt_dump_node_list(ctxt, (*dtd).children);
         (*ctxt).depth -= 1;
     }
 }
 
-unsafe extern "C" fn xmlCtxtDumpElemDecl(ctxt: XmlDebugCtxtPtr, elem: XmlElementPtr) {
-    xmlCtxtDumpSpaces(ctxt);
+unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlElementPtr) {
+    xml_ctxt_dump_spaces(ctxt);
 
     if elem.is_null() {
         if (*ctxt).check == 0 {
@@ -701,7 +714,7 @@ unsafe extern "C" fn xmlCtxtDumpElemDecl(ctxt: XmlDebugCtxtPtr, elem: XmlElement
     if !(*elem).name.is_null() {
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"ELEMDECL(".as_ptr());
-            xmlCtxtDumpString(ctxt, (*elem).name);
+            xml_ctxt_dump_string(ctxt, (*elem).name);
             fprintf((*ctxt).output, c")".as_ptr());
         }
     } else {
@@ -743,11 +756,11 @@ unsafe extern "C" fn xmlCtxtDumpElemDecl(ctxt: XmlDebugCtxtPtr, elem: XmlElement
     /*
      * Do a bit of checking
      */
-    xmlCtxtGenericNodeCheck(ctxt, elem as XmlNodePtr);
+    xml_ctxt_generic_node_check(ctxt, elem as XmlNodePtr);
 }
 
-unsafe extern "C" fn xmlCtxtDumpAttrDecl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) {
-    xmlCtxtDumpSpaces(ctxt);
+unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) {
+    xml_ctxt_dump_spaces(ctxt);
 
     if attr.is_null() {
         if (*ctxt).check == 0 {
@@ -860,7 +873,7 @@ unsafe extern "C" fn xmlCtxtDumpAttrDecl(ctxt: XmlDebugCtxtPtr, attr: XmlAttribu
         }
         if !(*attr).default_value.is_null() {
             fprintf((*ctxt).output, c"\"".as_ptr());
-            xmlCtxtDumpString(ctxt, (*attr).default_value);
+            xml_ctxt_dump_string(ctxt, (*attr).default_value);
             fprintf((*ctxt).output, c"\"".as_ptr());
         }
         fprintf((*ctxt).output, c"\n".as_ptr());
@@ -869,11 +882,11 @@ unsafe extern "C" fn xmlCtxtDumpAttrDecl(ctxt: XmlDebugCtxtPtr, attr: XmlAttribu
     /*
      * Do a bit of checking
      */
-    xmlCtxtGenericNodeCheck(ctxt, attr as XmlNodePtr);
+    xml_ctxt_generic_node_check(ctxt, attr as XmlNodePtr);
 }
 
-unsafe extern "C" fn xmlCtxtDumpEntityDecl(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
-    xmlCtxtDumpSpaces(ctxt);
+unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
+    xml_ctxt_dump_spaces(ctxt);
 
     if ent.is_null() {
         if (*ctxt).check == 0 {
@@ -892,7 +905,7 @@ unsafe extern "C" fn xmlCtxtDumpEntityDecl(ctxt: XmlDebugCtxtPtr, ent: XmlEntity
     if !(*ent).name.load(Ordering::Relaxed).is_null() {
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"ENTITYDECL(".as_ptr());
-            xmlCtxtDumpString(ctxt, (*ent).name.load(Ordering::Relaxed));
+            xml_ctxt_dump_string(ctxt, (*ent).name.load(Ordering::Relaxed));
             fprintf((*ctxt).output, c")".as_ptr());
         }
     } else {
@@ -925,7 +938,7 @@ unsafe extern "C" fn xmlCtxtDumpEntityDecl(ctxt: XmlDebugCtxtPtr, ent: XmlEntity
             _ => unreachable!(),
         }
         if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf(
                 (*ctxt).output,
                 c" ExternalID=%s\n".as_ptr(),
@@ -933,7 +946,7 @@ unsafe extern "C" fn xmlCtxtDumpEntityDecl(ctxt: XmlDebugCtxtPtr, ent: XmlEntity
             );
         }
         if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf(
                 (*ctxt).output,
                 c" SystemID=%s\n".as_ptr(),
@@ -941,7 +954,7 @@ unsafe extern "C" fn xmlCtxtDumpEntityDecl(ctxt: XmlDebugCtxtPtr, ent: XmlEntity
             );
         }
         if !(*ent).uri.load(Ordering::Relaxed).is_null() {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf(
                 (*ctxt).output,
                 c" URI=%s\n".as_ptr(),
@@ -949,9 +962,9 @@ unsafe extern "C" fn xmlCtxtDumpEntityDecl(ctxt: XmlDebugCtxtPtr, ent: XmlEntity
             );
         }
         if !(*ent).content.load(Ordering::Relaxed).is_null() {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf((*ctxt).output, c" content=".as_ptr());
-            xmlCtxtDumpString(ctxt, (*ent).content.load(Ordering::Relaxed));
+            xml_ctxt_dump_string(ctxt, (*ent).content.load(Ordering::Relaxed));
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
     }
@@ -959,11 +972,11 @@ unsafe extern "C" fn xmlCtxtDumpEntityDecl(ctxt: XmlDebugCtxtPtr, ent: XmlEntity
     /*
      * Do a bit of checking
      */
-    xmlCtxtGenericNodeCheck(ctxt, ent as XmlNodePtr);
+    xml_ctxt_generic_node_check(ctxt, ent as XmlNodePtr);
 }
 
-unsafe extern "C" fn xmlCtxtDumpNamespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr) {
-    xmlCtxtDumpSpaces(ctxt);
+unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr) {
+    xml_ctxt_dump_spaces(ctxt);
 
     if ns.is_null() {
         if (*ctxt).check == 0 {
@@ -1005,20 +1018,20 @@ unsafe extern "C" fn xmlCtxtDumpNamespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr) {
             fprintf((*ctxt).output, c"default namespace href=".as_ptr());
         }
 
-        xmlCtxtDumpString(ctxt, (*ns).href.load(Ordering::Relaxed));
+        xml_ctxt_dump_string(ctxt, (*ns).href.load(Ordering::Relaxed));
         fprintf((*ctxt).output, c"\n".as_ptr());
     }
 }
 
-unsafe extern "C" fn xmlCtxtDumpNamespaceList(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) {
+unsafe extern "C" fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) {
     while !ns.is_null() {
-        xmlCtxtDumpNamespace(ctxt, ns);
+        xml_ctxt_dump_namespace(ctxt, ns);
         ns = (*ns).next.load(Ordering::Relaxed);
     }
 }
 
-unsafe extern "C" fn xmlCtxtDumpEntity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
-    xmlCtxtDumpSpaces(ctxt);
+unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
+    xml_ctxt_dump_spaces(ctxt);
 
     if ent.is_null() {
         if (*ctxt).check == 0 {
@@ -1057,7 +1070,7 @@ unsafe extern "C" fn xmlCtxtDumpEntity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr)
             (*ent).name.load(Ordering::Relaxed),
         );
         if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf(
                 (*ctxt).output,
                 c"ExternalID=%s\n".as_ptr(),
@@ -1065,7 +1078,7 @@ unsafe extern "C" fn xmlCtxtDumpEntity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr)
             );
         }
         if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf(
                 (*ctxt).output,
                 c"SystemID=%s\n".as_ptr(),
@@ -1073,7 +1086,7 @@ unsafe extern "C" fn xmlCtxtDumpEntity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr)
             );
         }
         if !(*ent).uri.load(Ordering::Relaxed).is_null() {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf(
                 (*ctxt).output,
                 c"URI=%s\n".as_ptr(),
@@ -1081,9 +1094,9 @@ unsafe extern "C" fn xmlCtxtDumpEntity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr)
             );
         }
         if !(*ent).content.load(Ordering::Relaxed).is_null() {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf((*ctxt).output, c"content=".as_ptr());
-            xmlCtxtDumpString(ctxt, (*ent).content.load(Ordering::Relaxed));
+            xml_ctxt_dump_string(ctxt, (*ent).content.load(Ordering::Relaxed));
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
     }
@@ -1097,9 +1110,9 @@ unsafe extern "C" fn xmlCtxtDumpEntity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr)
  *
  * Dumps debug information for the attribute list
  */
-unsafe extern "C" fn xmlCtxtDumpAttrList(ctxt: XmlDebugCtxtPtr, mut attr: XmlAttrPtr) {
+unsafe extern "C" fn xml_ctxt_dump_attr_list(ctxt: XmlDebugCtxtPtr, mut attr: XmlAttrPtr) {
     while !attr.is_null() {
-        xmlCtxtDumpAttr(ctxt, attr);
+        xml_ctxt_dump_attr(ctxt, attr);
         attr = (*attr).next;
     }
 }
@@ -1112,10 +1125,10 @@ unsafe extern "C" fn xmlCtxtDumpAttrList(ctxt: XmlDebugCtxtPtr, mut attr: XmlAtt
  *
  * Dumps debug information for the element node, it is not recursive
  */
-unsafe extern "C" fn xmlCtxtDumpOneNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
+unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         if (*ctxt).check == 0 {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf((*ctxt).output, c"node is NULL\n".as_ptr());
         }
         return;
@@ -1125,28 +1138,28 @@ unsafe extern "C" fn xmlCtxtDumpOneNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
     match (*node).typ {
         XmlElementType::XmlElementNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"ELEMENT ".as_ptr());
                 if !(*node).ns.is_null() && !(*(*node).ns).prefix.load(Ordering::Relaxed).is_null()
                 {
-                    xmlCtxtDumpString(ctxt, (*(*node).ns).prefix.load(Ordering::Relaxed));
+                    xml_ctxt_dump_string(ctxt, (*(*node).ns).prefix.load(Ordering::Relaxed));
                     fprintf((*ctxt).output, c":".as_ptr());
                 }
-                xmlCtxtDumpString(ctxt, (*node).name);
+                xml_ctxt_dump_string(ctxt, (*node).name);
                 fprintf((*ctxt).output, c"\n".as_ptr());
             }
         }
         XmlElementType::XmlAttributeNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
             }
             fprintf((*ctxt).output, c"Error, ATTRIBUTE found here\n".as_ptr());
-            xmlCtxtGenericNodeCheck(ctxt, node);
+            xml_ctxt_generic_node_check(ctxt, node);
             return;
         }
         XmlElementType::XmlTextNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 if (*node).name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
                     fprintf((*ctxt).output, c"TEXT no enc".as_ptr());
                 } else {
@@ -1167,13 +1180,13 @@ unsafe extern "C" fn xmlCtxtDumpOneNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
         }
         XmlElementType::XmlCdataSectionNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"CDATA_SECTION\n".as_ptr());
             }
         }
         XmlElementType::XmlEntityRefNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf(
                     (*ctxt).output,
                     c"ENTITY_REF(%s)\n".as_ptr(),
@@ -1183,13 +1196,13 @@ unsafe extern "C" fn xmlCtxtDumpOneNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
         }
         XmlElementType::XmlEntityNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"ENTITY\n".as_ptr());
             }
         }
         XmlElementType::XmlPiNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf(
                     (*ctxt).output,
                     c"PI %s\n".as_ptr(),
@@ -1199,73 +1212,73 @@ unsafe extern "C" fn xmlCtxtDumpOneNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
         }
         XmlElementType::XmlCommentNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"COMMENT\n".as_ptr());
             }
         }
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
             }
             fprintf((*ctxt).output, c"Error, DOCUMENT found here\n".as_ptr());
-            xmlCtxtGenericNodeCheck(ctxt, node);
+            xml_ctxt_generic_node_check(ctxt, node);
             return;
         }
         XmlElementType::XmlDocumentTypeNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"DOCUMENT_TYPE\n".as_ptr());
             }
         }
         XmlElementType::XmlDocumentFragNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"DOCUMENT_FRAG\n".as_ptr());
             }
         }
         XmlElementType::XmlNotationNode => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"NOTATION\n".as_ptr());
             }
         }
         XmlElementType::XmlDtdNode => {
-            xmlCtxtDumpDtdNode(ctxt, node as XmlDtdPtr);
+            xml_ctxt_dump_dtd_node(ctxt, node as XmlDtdPtr);
             return;
         }
         XmlElementType::XmlElementDecl => {
-            xmlCtxtDumpElemDecl(ctxt, node as XmlElementPtr);
+            xml_ctxt_dump_elem_decl(ctxt, node as XmlElementPtr);
             return;
         }
         XmlElementType::XmlAttributeDecl => {
-            xmlCtxtDumpAttrDecl(ctxt, node as XmlAttributePtr);
+            xml_ctxt_dump_attr_decl(ctxt, node as XmlAttributePtr);
             return;
         }
         XmlElementType::XmlEntityDecl => {
-            xmlCtxtDumpEntityDecl(ctxt, node as XmlEntityPtr);
+            xml_ctxt_dump_entity_decl(ctxt, node as XmlEntityPtr);
             return;
         }
         XmlElementType::XmlNamespaceDecl => {
-            xmlCtxtDumpNamespace(ctxt, node as XmlNsPtr);
+            xml_ctxt_dump_namespace(ctxt, node as XmlNsPtr);
             return;
         }
         XmlElementType::XmlXincludeStart => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"INCLUDE START\n".as_ptr());
             }
             return;
         }
         XmlElementType::XmlXincludeEnd => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"INCLUDE END\n".as_ptr());
             }
             return;
         }
         _ => {
             if (*ctxt).check == 0 {
-                xmlCtxtDumpSpaces(ctxt);
+                xml_ctxt_dump_spaces(ctxt);
             }
             xml_debug_err2(
                 ctxt,
@@ -1278,30 +1291,30 @@ unsafe extern "C" fn xmlCtxtDumpOneNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
     }
     if (*node).doc.is_null() {
         if (*ctxt).check == 0 {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
         }
         fprintf((*ctxt).output, c"PBM: doc.is_null() !!!\n".as_ptr());
     }
     (*ctxt).depth += 1;
-    if ((*node).typ == XmlElementType::XmlElementNode) && !(*node).ns_def.is_null() {
-        xmlCtxtDumpNamespaceList(ctxt, (*node).ns_def);
+    if (*node).typ == XmlElementType::XmlElementNode && !(*node).ns_def.is_null() {
+        xml_ctxt_dump_namespace_list(ctxt, (*node).ns_def);
     }
-    if ((*node).typ == XmlElementType::XmlElementNode) && !(*node).properties.is_null() {
-        xmlCtxtDumpAttrList(ctxt, (*node).properties);
+    if (*node).typ == XmlElementType::XmlElementNode && !(*node).properties.is_null() {
+        xml_ctxt_dump_attr_list(ctxt, (*node).properties);
     }
     if (*node).typ != XmlElementType::XmlEntityRefNode {
         if ((*node).typ != XmlElementType::XmlElementNode && !(*node).content.is_null())
             && (*ctxt).check == 0
         {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf((*ctxt).output, c"content=".as_ptr());
-            xmlCtxtDumpString(ctxt, (*node).content);
+            xml_ctxt_dump_string(ctxt, (*node).content);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
     } else {
         let ent: XmlEntityPtr = xml_get_doc_entity((*node).doc, (*node).name);
         if !ent.is_null() {
-            xmlCtxtDumpEntity(ctxt, ent);
+            xml_ctxt_dump_entity(ctxt, ent);
         }
     }
     (*ctxt).depth -= 1;
@@ -1309,7 +1322,7 @@ unsafe extern "C" fn xmlCtxtDumpOneNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
     /*
      * Do a bit of checking
      */
-    xmlCtxtGenericNodeCheck(ctxt, node);
+    xml_ctxt_generic_node_check(ctxt, node);
 }
 
 /**
@@ -1320,21 +1333,21 @@ unsafe extern "C" fn xmlCtxtDumpOneNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
  *
  * Dumps debug information for the element node, it is recursive
  */
-unsafe extern "C" fn xmlCtxtDumpNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
+unsafe extern "C" fn xml_ctxt_dump_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         if (*ctxt).check == 0 {
-            xmlCtxtDumpSpaces(ctxt);
+            xml_ctxt_dump_spaces(ctxt);
             fprintf((*ctxt).output, c"node is NULL\n".as_ptr());
         }
         return;
     }
-    xmlCtxtDumpOneNode(ctxt, node);
+    xml_ctxt_dump_one_node(ctxt, node);
     if (*node).typ != XmlElementType::XmlNamespaceDecl
         && !(*node).children.is_null()
         && (*node).typ != XmlElementType::XmlEntityRefNode
     {
         (*ctxt).depth += 1;
-        xmlCtxtDumpNodeList(ctxt, (*node).children);
+        xml_ctxt_dump_node_list(ctxt, (*node).children);
         (*ctxt).depth -= 1;
     }
 }
@@ -1347,9 +1360,9 @@ unsafe extern "C" fn xmlCtxtDumpNode(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
  *
  * Dumps debug information for the list of element node, it is recursive
  */
-unsafe extern "C" fn xmlCtxtDumpNodeList(ctxt: XmlDebugCtxtPtr, mut node: XmlNodePtr) {
+unsafe extern "C" fn xml_ctxt_dump_node_list(ctxt: XmlDebugCtxtPtr, mut node: XmlNodePtr) {
     while !node.is_null() {
-        xmlCtxtDumpNode(ctxt, node);
+        xml_ctxt_dump_node(ctxt, node);
         node = (*node).next;
     }
 }
@@ -1362,8 +1375,8 @@ unsafe extern "C" fn xmlCtxtDumpNodeList(ctxt: XmlDebugCtxtPtr, mut node: XmlNod
  *
  * Dumps debug information for the attribute
  */
-unsafe extern "C" fn xmlCtxtDumpAttr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
-    xmlCtxtDumpSpaces(ctxt);
+unsafe extern "C" fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
+    xml_ctxt_dump_spaces(ctxt);
 
     if attr.is_null() {
         if (*ctxt).check == 0 {
@@ -1373,11 +1386,11 @@ unsafe extern "C" fn xmlCtxtDumpAttr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
     }
     if (*ctxt).check == 0 {
         fprintf((*ctxt).output, c"ATTRIBUTE ".as_ptr());
-        xmlCtxtDumpString(ctxt, (*attr).name);
+        xml_ctxt_dump_string(ctxt, (*attr).name);
         fprintf((*ctxt).output, c"\n".as_ptr());
         if !(*attr).children.is_null() {
             (*ctxt).depth += 1;
-            xmlCtxtDumpNodeList(ctxt, (*attr).children);
+            xml_ctxt_dump_node_list(ctxt, (*attr).children);
             (*ctxt).depth -= 1;
         }
     }
@@ -1392,11 +1405,11 @@ unsafe extern "C" fn xmlCtxtDumpAttr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
     /*
      * Do a bit of checking
      */
-    xmlCtxtGenericNodeCheck(ctxt, attr as XmlNodePtr);
+    xml_ctxt_generic_node_check(ctxt, attr as XmlNodePtr);
 }
 
-unsafe extern "C" fn xmlCtxtDumpCleanCtxt(_ctxt: XmlDebugCtxtPtr) {
-    /* remove the  when this is added */
+unsafe extern "C" fn xml_ctxt_dump_clean_ctxt(_ctxt: XmlDebugCtxtPtr) {
+    /* remove the ATTRIBUTE_UNUSED when this is added */
 }
 
 /**
@@ -1407,17 +1420,17 @@ unsafe extern "C" fn xmlCtxtDumpCleanCtxt(_ctxt: XmlDebugCtxtPtr) {
  *
  * Dumps debug information for the attribute
  */
-pub unsafe extern "C" fn xmlDebugDumpAttr(output: *mut FILE, attr: XmlAttrPtr, depth: c_int) {
+pub unsafe extern "C" fn xml_debug_dump_attr(output: *mut FILE, attr: XmlAttrPtr, depth: c_int) {
     let mut ctxt: XmlDebugCtxt = zeroed();
 
     if output.is_null() {
         return;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.output = output;
     ctxt.depth = depth;
-    xmlCtxtDumpAttr(addr_of_mut!(ctxt), attr);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_attr(addr_of_mut!(ctxt), attr);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /**
@@ -1428,17 +1441,21 @@ pub unsafe extern "C" fn xmlDebugDumpAttr(output: *mut FILE, attr: XmlAttrPtr, d
  *
  * Dumps debug information for the attribute list
  */
-pub unsafe extern "C" fn xmlDebugDumpAttrList(output: *mut FILE, attr: XmlAttrPtr, depth: c_int) {
+pub unsafe extern "C" fn xml_debug_dump_attr_list(
+    output: *mut FILE,
+    attr: XmlAttrPtr,
+    depth: c_int,
+) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     if output.is_null() {
         return;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.output = output;
     ctxt.depth = depth;
-    xmlCtxtDumpAttrList(addr_of_mut!(ctxt), attr);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_attr_list(addr_of_mut!(ctxt), attr);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /**
@@ -1449,17 +1466,21 @@ pub unsafe extern "C" fn xmlDebugDumpAttrList(output: *mut FILE, attr: XmlAttrPt
  *
  * Dumps debug information for the element node, it is not recursive
  */
-pub unsafe extern "C" fn xmlDebugDumpOneNode(output: *mut FILE, node: XmlNodePtr, depth: c_int) {
+pub unsafe extern "C" fn xml_debug_dump_one_node(
+    output: *mut FILE,
+    node: XmlNodePtr,
+    depth: c_int,
+) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     if output.is_null() {
         return;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.output = output;
     ctxt.depth = depth;
-    xmlCtxtDumpOneNode(addr_of_mut!(ctxt), node);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_one_node(addr_of_mut!(ctxt), node);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /**
@@ -1470,7 +1491,11 @@ pub unsafe extern "C" fn xmlDebugDumpOneNode(output: *mut FILE, node: XmlNodePtr
  *
  * Dumps debug information for the element node, it is recursive
  */
-pub unsafe extern "C" fn xmlDebugDumpNode(mut output: *mut FILE, node: XmlNodePtr, depth: c_int) {
+pub unsafe extern "C" fn xml_debug_dump_node(
+    mut output: *mut FILE,
+    node: XmlNodePtr,
+    depth: c_int,
+) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     extern "C" {
@@ -1479,11 +1504,11 @@ pub unsafe extern "C" fn xmlDebugDumpNode(mut output: *mut FILE, node: XmlNodePt
     if output.is_null() {
         output = stdout;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.output = output;
     ctxt.depth = depth;
-    xmlCtxtDumpNode(addr_of_mut!(ctxt), node);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_node(addr_of_mut!(ctxt), node);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /**
@@ -1494,7 +1519,7 @@ pub unsafe extern "C" fn xmlDebugDumpNode(mut output: *mut FILE, node: XmlNodePt
  *
  * Dumps debug information for the list of element node, it is recursive
  */
-pub unsafe extern "C" fn xmlDebugDumpNodeList(
+pub unsafe extern "C" fn xml_debug_dump_node_list(
     mut output: *mut FILE,
     node: XmlNodePtr,
     depth: c_int,
@@ -1508,14 +1533,14 @@ pub unsafe extern "C" fn xmlDebugDumpNodeList(
     if output.is_null() {
         output = stdout;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.output = output;
     ctxt.depth = depth;
-    xmlCtxtDumpNodeList(addr_of_mut!(ctxt), node);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_node_list(addr_of_mut!(ctxt), node);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-unsafe extern "C" fn xmlCtxtDumpDocHead(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
+unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"DOCUMENT.is_null() !\n".as_ptr());
@@ -1630,30 +1655,30 @@ unsafe extern "C" fn xmlCtxtDumpDocHead(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
  *
  * Dumps debug information concerning the document, not recursive
  */
-unsafe extern "C" fn xmlCtxtDumpDocumentHead(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
+unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         return;
     }
-    xmlCtxtDumpDocHead(ctxt, doc);
+    xml_ctxt_dump_doc_head(ctxt, doc);
     if (*ctxt).check == 0 {
         if !(*doc).name.is_null() {
             fprintf((*ctxt).output, c"name=".as_ptr());
-            xmlCtxtDumpString(ctxt, (*doc).name as _);
+            xml_ctxt_dump_string(ctxt, (*doc).name as _);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
         if !(*doc).version.is_null() {
             fprintf((*ctxt).output, c"version=".as_ptr());
-            xmlCtxtDumpString(ctxt, (*doc).version);
+            xml_ctxt_dump_string(ctxt, (*doc).version);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
         if !(*doc).encoding.is_null() {
             fprintf((*ctxt).output, c"encoding=".as_ptr());
-            xmlCtxtDumpString(ctxt, (*doc).encoding);
+            xml_ctxt_dump_string(ctxt, (*doc).encoding);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
         if !(*doc).url.is_null() {
             fprintf((*ctxt).output, c"URL=".as_ptr());
-            xmlCtxtDumpString(ctxt, (*doc).url);
+            xml_ctxt_dump_string(ctxt, (*doc).url);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
         if (*doc).standalone != 0 {
@@ -1661,7 +1686,7 @@ unsafe extern "C" fn xmlCtxtDumpDocumentHead(ctxt: XmlDebugCtxtPtr, doc: XmlDocP
         }
     }
     if !(*doc).old_ns.is_null() {
-        xmlCtxtDumpNamespaceList(ctxt, (*doc).old_ns);
+        xml_ctxt_dump_namespace_list(ctxt, (*doc).old_ns);
     }
 }
 
@@ -1672,7 +1697,7 @@ unsafe extern "C" fn xmlCtxtDumpDocumentHead(ctxt: XmlDebugCtxtPtr, doc: XmlDocP
  *
  * Dumps debug information concerning the document, not recursive
  */
-pub unsafe extern "C" fn xmlDebugDumpDocumentHead(mut output: *mut FILE, doc: XmlDocPtr) {
+pub unsafe extern "C" fn xml_debug_dump_document_head(mut output: *mut FILE, doc: XmlDocPtr) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     extern "C" {
@@ -1682,11 +1707,11 @@ pub unsafe extern "C" fn xmlDebugDumpDocumentHead(mut output: *mut FILE, doc: Xm
     if output.is_null() {
         output = stdout;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output;
-    xmlCtxtDumpDocumentHead(addr_of_mut!(ctxt), doc);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_document_head(addr_of_mut!(ctxt), doc);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /**
@@ -1696,20 +1721,21 @@ pub unsafe extern "C" fn xmlDebugDumpDocumentHead(mut output: *mut FILE, doc: Xm
  *
  * Dumps debug information for the document, it's recursive
  */
-unsafe extern "C" fn xmlCtxtDumpDocument(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
+unsafe extern "C" fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"DOCUMENT.is_null() !\n".as_ptr());
         }
         return;
     }
-    xmlCtxtDumpDocumentHead(ctxt, doc);
-    if ((*doc).typ == XmlElementType::XmlDocumentNode
-        || (*doc).typ == XmlElementType::XmlHtmlDocumentNode)
-        && !(*doc).children.is_null()
+    xml_ctxt_dump_document_head(ctxt, doc);
+    if matches!(
+        (*doc).typ,
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+    ) && !(*doc).children.is_null()
     {
         (*ctxt).depth += 1;
-        xmlCtxtDumpNodeList(ctxt, (*doc).children);
+        xml_ctxt_dump_node_list(ctxt, (*doc).children);
         (*ctxt).depth -= 1;
     }
 }
@@ -1721,7 +1747,7 @@ unsafe extern "C" fn xmlCtxtDumpDocument(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) 
  *
  * Dumps debug information for the document, it's recursive
  */
-pub unsafe extern "C" fn xmlDebugDumpDocument(mut output: *mut FILE, doc: XmlDocPtr) {
+pub unsafe extern "C" fn xml_debug_dump_document(mut output: *mut FILE, doc: XmlDocPtr) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     extern "C" {
@@ -1731,11 +1757,11 @@ pub unsafe extern "C" fn xmlDebugDumpDocument(mut output: *mut FILE, doc: XmlDoc
     if output.is_null() {
         output = stdout;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output;
-    xmlCtxtDumpDocument(addr_of_mut!(ctxt), doc);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /**
@@ -1745,7 +1771,7 @@ pub unsafe extern "C" fn xmlDebugDumpDocument(mut output: *mut FILE, doc: XmlDoc
  *
  * Dumps debug information for the DTD
  */
-pub unsafe extern "C" fn xmlDebugDumpDTD(mut output: *mut FILE, dtd: XmlDtdPtr) {
+pub unsafe extern "C" fn xml_debug_dump_dtd(mut output: *mut FILE, dtd: XmlDtdPtr) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     extern "C" {
@@ -1755,14 +1781,14 @@ pub unsafe extern "C" fn xmlDebugDumpDTD(mut output: *mut FILE, dtd: XmlDtdPtr) 
     if output.is_null() {
         output = stdout;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output;
-    xmlCtxtDumpDTD(addr_of_mut!(ctxt), dtd);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_dtd(addr_of_mut!(ctxt), dtd);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-unsafe extern "C" fn xmlCtxtDumpEntityCallback(
+unsafe extern "C" fn xml_ctxt_dump_entity_callback(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
@@ -1828,7 +1854,7 @@ unsafe extern "C" fn xmlCtxtDumpEntityCallback(
                 (*cur).orig.load(Ordering::Relaxed) as *mut c_char,
             );
         }
-        if ((*cur).typ != XmlElementType::XmlElementNode)
+        if (*cur).typ != XmlElementType::XmlElementNode
             && !(*cur).content.load(Ordering::Relaxed).is_null()
         {
             fprintf(
@@ -1848,18 +1874,18 @@ unsafe extern "C" fn xmlCtxtDumpEntityCallback(
  *
  * Dumps debug information for all the entities in use by the document
  */
-unsafe extern "C" fn xmlCtxtDumpEntities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
+unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         return;
     }
-    xmlCtxtDumpDocHead(ctxt, doc);
+    xml_ctxt_dump_doc_head(ctxt, doc);
     if !(*doc).int_subset.is_null() && !(*(*doc).int_subset).entities.is_null() {
         let table: XmlEntitiesTablePtr = (*(*doc).int_subset).entities as XmlEntitiesTablePtr;
 
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"Entities in internal subset\n".as_ptr());
         }
-        xmlHashScan(table, xmlCtxtDumpEntityCallback, ctxt as _);
+        xmlHashScan(table, xml_ctxt_dump_entity_callback, ctxt as _);
     } else {
         fprintf((*ctxt).output, c"No entities in internal subset\n".as_ptr());
     }
@@ -1869,7 +1895,7 @@ unsafe extern "C" fn xmlCtxtDumpEntities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) 
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"Entities in external subset\n".as_ptr());
         }
-        xmlHashScan(table, xmlCtxtDumpEntityCallback, ctxt as _);
+        xmlHashScan(table, xml_ctxt_dump_entity_callback, ctxt as _);
     } else if (*ctxt).check == 0 {
         fprintf((*ctxt).output, c"No entities in external subset\n".as_ptr());
     }
@@ -1882,16 +1908,16 @@ unsafe extern "C" fn xmlCtxtDumpEntities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) 
  *
  * Dumps debug information for all the entities in use by the document
  */
-pub unsafe extern "C" fn xmlDebugDumpEntities(output: *mut FILE, doc: XmlDocPtr) {
+pub unsafe extern "C" fn xml_debug_dump_entities(output: *mut FILE, doc: XmlDocPtr) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     if output.is_null() {
         return;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.output = output;
-    xmlCtxtDumpEntities(addr_of_mut!(ctxt), doc);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_entities(addr_of_mut!(ctxt), doc);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /****************************************************************
@@ -1909,7 +1935,7 @@ pub unsafe extern "C" fn xmlDebugDumpEntities(output: *mut FILE, doc: XmlDocPtr)
  *
  * Returns the number of errors found
  */
-pub unsafe extern "C" fn xmlDebugCheckDocument(mut output: *mut FILE, doc: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn xml_debug_check_document(mut output: *mut FILE, doc: XmlDocPtr) -> c_int {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     extern "C" {
@@ -1919,11 +1945,11 @@ pub unsafe extern "C" fn xmlDebugCheckDocument(mut output: *mut FILE, doc: XmlDo
     if output.is_null() {
         output = stdout;
     }
-    xmlCtxtDumpInitCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.output = output;
     ctxt.check = 1;
-    xmlCtxtDumpDocument(addr_of_mut!(ctxt), doc);
-    xmlCtxtDumpCleanCtxt(addr_of_mut!(ctxt));
+    xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
+    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
     ctxt.errors
 }
 
@@ -1939,7 +1965,7 @@ pub unsafe extern "C" fn xmlDebugCheckDocument(mut output: *mut FILE, doc: XmlDo
  *
  * Dump to @output the type and name of @node.
  */
-pub unsafe extern "C" fn xmlLsOneNode(output: *mut FILE, node: XmlNodePtr) {
+pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
     if output.is_null() {
         return;
     }
@@ -2007,7 +2033,7 @@ pub unsafe extern "C" fn xmlLsOneNode(output: *mut FILE, node: XmlNodePtr) {
         }
     }
 
-    fprintf(output, c" %8d ".as_ptr(), xmlLsCountNode(node));
+    fprintf(output, c" %8d ".as_ptr(), xml_ls_count_node(node));
 
     match (*node).typ {
         XmlElementType::XmlElementNode => {
@@ -2030,7 +2056,7 @@ pub unsafe extern "C" fn xmlLsOneNode(output: *mut FILE, node: XmlNodePtr) {
         }
         XmlElementType::XmlTextNode => {
             if !(*node).content.is_null() {
-                xmlDebugDumpString(output, (*node).content);
+                xml_debug_dump_string(output, (*node).content);
             }
         }
         XmlElementType::XmlCdataSectionNode => {}
@@ -2090,7 +2116,7 @@ pub unsafe extern "C" fn xmlLsOneNode(output: *mut FILE, node: XmlNodePtr) {
  *
  * Returns the number of children of @node.
  */
-pub unsafe extern "C" fn xmlLsCountNode(node: XmlNodePtr) -> c_int {
+pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> c_int {
     let mut ret: c_int = 0;
     let mut list: XmlNodePtr = null_mut();
 
@@ -2147,7 +2173,7 @@ pub unsafe extern "C" fn xmlLsCountNode(node: XmlNodePtr) -> c_int {
  *
  * Returns a pointer to either "True" or "False"
  */
-pub unsafe extern "C" fn xmlBoolToText(boolval: c_int) -> *const c_char {
+pub unsafe extern "C" fn xml_bool_to_text(boolval: c_int) -> *const c_char {
     if boolval != 0 {
         c"True".as_ptr()
     } else {
@@ -2218,7 +2244,7 @@ pub type XmlShellCmd = unsafe extern "C" fn(
  * Print the xpath error to libxml default error channel
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShellPrintXPathError(error_type: c_int, mut arg: *const c_char) {
+pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: c_int, mut arg: *const c_char) {
     let default_arg: *const c_char = c"Result".as_ptr();
 
     if arg.is_null() {
@@ -2285,7 +2311,7 @@ pub unsafe extern "C" fn xmlShellPrintXPathError(error_type: c_int, mut arg: *co
  * Print node to the output FILE
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xmlShellPrintNodeCtxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
+unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
     use crate::libxml::tree::{xml_doc_dump, xml_elem_dump};
 
     if !node.is_null() {
@@ -2305,7 +2331,7 @@ unsafe extern "C" fn xmlShellPrintNodeCtxt(ctxt: XmlShellCtxtPtr, node: XmlNodeP
     if (*node).typ == XmlElementType::XmlDocumentNode {
         xml_doc_dump(fp, node as XmlDocPtr);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
-        xmlDebugDumpAttrList(fp, node as XmlAttrPtr, 0);
+        xml_debug_dump_attr_list(fp, node as XmlAttrPtr, 0);
     } else {
         xml_elem_dump(fp, (*node).doc, node);
     }
@@ -2320,7 +2346,10 @@ unsafe extern "C" fn xmlShellPrintNodeCtxt(ctxt: XmlShellCtxtPtr, node: XmlNodeP
  *
  * Prints result to the output FILE
  */
-unsafe extern "C" fn xmlShellPrintXPathResultCtxt(ctxt: XmlShellCtxtPtr, list: XmlXPathObjectPtr) {
+unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
+    ctxt: XmlShellCtxtPtr,
+    list: XmlXPathObjectPtr,
+) {
     if !ctxt.is_null() {
         return;
     }
@@ -2329,17 +2358,15 @@ unsafe extern "C" fn xmlShellPrintXPathResultCtxt(ctxt: XmlShellCtxtPtr, list: X
         match (*list).typ {
             XmlXPathObjectType::XpathNodeset => {
                 #[cfg(feature = "output")]
-                {
-                    if !(*list).nodesetval.is_null() {
-                        for indx in 0..(*(*list).nodesetval).node_nr {
-                            xmlShellPrintNodeCtxt(
-                                ctxt,
-                                *(*(*list).nodesetval).node_tab.add(indx as usize),
-                            );
-                        }
-                    } else {
-                        xml_generic_error!(xmlGenericErrorContext(), c"Empty node set\n".as_ptr());
+                if !(*list).nodesetval.is_null() {
+                    for indx in 0..(*(*list).nodesetval).node_nr {
+                        xml_shell_print_node_ctxt(
+                            ctxt,
+                            *(*(*list).nodesetval).node_tab.add(indx as usize),
+                        );
                     }
+                } else {
+                    xml_generic_error!(xmlGenericErrorContext(), c"Empty node set\n".as_ptr());
                 }
                 #[cfg(not(feature = "output"))]
                 {
@@ -2350,7 +2377,7 @@ unsafe extern "C" fn xmlShellPrintXPathResultCtxt(ctxt: XmlShellCtxtPtr, list: X
                 xml_generic_error!(
                     xmlGenericErrorContext(),
                     c"Is a Boolean:%s\n".as_ptr(),
-                    xmlBoolToText((*list).boolval)
+                    xml_bool_to_text((*list).boolval)
                 );
             }
             XmlXPathObjectType::XpathNumber => {
@@ -2368,7 +2395,7 @@ unsafe extern "C" fn xmlShellPrintXPathResultCtxt(ctxt: XmlShellCtxtPtr, list: X
                 );
             }
             _ => {
-                xmlShellPrintXPathError((*list).typ as i32, null_mut());
+                xml_shell_print_xpath_error((*list).typ as i32, null_mut());
             }
         }
     }
@@ -2381,8 +2408,8 @@ unsafe extern "C" fn xmlShellPrintXPathResultCtxt(ctxt: XmlShellCtxtPtr, list: X
  * Prints result to the output FILE
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShellPrintXPathResult(list: XmlXPathObjectPtr) {
-    xmlShellPrintXPathResultCtxt(null_mut(), list);
+pub unsafe extern "C" fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
+    xml_shell_print_xpath_result_ctxt(null_mut(), list);
 }
 
 /**
@@ -2398,7 +2425,7 @@ pub unsafe extern "C" fn xmlShellPrintXPathResult(list: XmlXPathObjectPtr) {
  * Returns 0
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShellList(
+pub unsafe extern "C" fn xml_shell_list(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     node: XmlNodePtr,
@@ -2417,16 +2444,16 @@ pub unsafe extern "C" fn xmlShellList(
     {
         cur = (*(node as XmlDocPtr)).children;
     } else if (*node).typ == XmlElementType::XmlNamespaceDecl {
-        xmlLsOneNode((*ctxt).output, node);
+        xml_ls_one_node((*ctxt).output, node);
         return 0;
     } else if !(*node).children.is_null() {
         cur = (*node).children;
     } else {
-        xmlLsOneNode((*ctxt).output, node);
+        xml_ls_one_node((*ctxt).output, node);
         return 0;
     }
     while !cur.is_null() {
-        xmlLsOneNode((*ctxt).output, cur);
+        xml_ls_one_node((*ctxt).output, cur);
         cur = (*cur).next;
     }
     0
@@ -2445,7 +2472,7 @@ pub unsafe extern "C" fn xmlShellList(
  * Returns 0
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShellBase(
+pub unsafe extern "C" fn xml_shell_base(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     node: XmlNodePtr,
@@ -2487,7 +2514,7 @@ pub unsafe extern "C" fn xmlShellBase(
  * Returns 0
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShellDir(
+pub unsafe extern "C" fn xml_shell_dir(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     node: XmlNodePtr,
@@ -2503,11 +2530,11 @@ pub unsafe extern "C" fn xmlShellDir(
     if (*node).typ == XmlElementType::XmlDocumentNode
         || (*node).typ == XmlElementType::XmlHtmlDocumentNode
     {
-        xmlDebugDumpDocumentHead((*ctxt).output, node as XmlDocPtr);
+        xml_debug_dump_document_head((*ctxt).output, node as XmlDocPtr);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
-        xmlDebugDumpAttr((*ctxt).output, node as XmlAttrPtr, 0);
+        xml_debug_dump_attr((*ctxt).output, node as XmlAttrPtr, 0);
     } else {
-        xmlDebugDumpOneNode((*ctxt).output, node, 0);
+        xml_debug_dump_one_node((*ctxt).output, node, 0);
     }
     0
 }
@@ -2525,7 +2552,7 @@ pub unsafe extern "C" fn xmlShellDir(
  * Returns 0 or -1 if loading failed
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShellLoad(
+pub unsafe extern "C" fn xml_shell_load(
     ctxt: XmlShellCtxtPtr,
     filename: *mut c_char,
     _node: XmlNodePtr,
@@ -2594,8 +2621,8 @@ pub unsafe extern "C" fn xmlShellLoad(
  * Print node to the output FILE
  */
 #[cfg(all(feature = "xpath", feature = "output"))]
-pub unsafe extern "C" fn xmlShellPrintNode(node: XmlNodePtr) {
-    xmlShellPrintNodeCtxt(null_mut(), node);
+pub unsafe extern "C" fn xml_shell_print_node(node: XmlNodePtr) {
+    xml_shell_print_node_ctxt(null_mut(), node);
 }
 
 /**
@@ -2611,7 +2638,7 @@ pub unsafe extern "C" fn xmlShellPrintNode(node: XmlNodePtr) {
  * Returns 0
  */
 #[cfg(all(feature = "xpath", feature = "output"))]
-pub unsafe extern "C" fn xmlShellCat(
+pub unsafe extern "C" fn xml_shell_cat(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     node: XmlNodePtr,
@@ -2667,7 +2694,7 @@ pub unsafe extern "C" fn xmlShellCat(
  * Returns 0 or -1 in case of error
  */
 #[cfg(all(feature = "xpath", feature = "output"))]
-pub unsafe extern "C" fn xmlShellWrite(
+pub unsafe extern "C" fn xml_shell_write(
     ctxt: XmlShellCtxtPtr,
     filename: *mut c_char,
     node: XmlNodePtr,
@@ -2752,7 +2779,7 @@ pub unsafe extern "C" fn xmlShellWrite(
  * Returns 0 or -1 in case of error
  */
 #[cfg(all(feature = "xpath", feature = "output"))]
-pub unsafe extern "C" fn xmlShellSave(
+pub unsafe extern "C" fn xml_shell_save(
     ctxt: XmlShellCtxtPtr,
     mut filename: *mut c_char,
     _node: XmlNodePtr,
@@ -2830,7 +2857,7 @@ pub unsafe extern "C" fn xmlShellSave(
  * Returns 0 or -1 in case of error
  */
 #[cfg(all(feature = "xpath", feature = "valid"))]
-pub unsafe extern "C" fn xmlShellValidate(
+pub unsafe extern "C" fn xml_shell_validate(
     ctxt: XmlShellCtxtPtr,
     dtd: *mut c_char,
     _node: XmlNodePtr,
@@ -2886,7 +2913,7 @@ pub unsafe extern "C" fn xmlShellValidate(
  * Returns 0 or -1 in case of error
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShellDu(
+pub unsafe extern "C" fn xml_shell_du(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     tree: XmlNodePtr,
@@ -2983,7 +3010,7 @@ pub unsafe extern "C" fn xmlShellDu(
  * Returns 0 or -1 in case of error
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShellPwd(
+pub unsafe extern "C" fn xml_shell_pwd(
     _ctxt: XmlShellCtxtPtr,
     buffer: *mut c_char,
     node: XmlNodePtr,
@@ -3030,7 +3057,7 @@ pub unsafe extern "C" fn xmlShellPwd(
  * Returns 0
  */
 #[cfg(feature = "schema")]
-unsafe extern "C" fn xmlShellRNGValidate(
+unsafe extern "C" fn xml_shell_rng_validate(
     sctxt: XmlShellCtxtPtr,
     schemas: *mut c_char,
     _node: XmlNodePtr,
@@ -3078,20 +3105,24 @@ unsafe extern "C" fn xmlShellRNGValidate(
         static stderr: *mut FILE;
     }
 
-    if ret == 0 {
-        fprintf(stderr, c"%s validates\n".as_ptr(), (*sctxt).filename);
-    } else if ret > 0 {
-        fprintf(
-            stderr,
-            c"%s fails to validate\n".as_ptr(),
-            (*sctxt).filename,
-        );
-    } else {
-        fprintf(
-            stderr,
-            c"%s validation generated an internal error\n".as_ptr(),
-            (*sctxt).filename,
-        );
+    match ret.cmp(&0) {
+        std::cmp::Ordering::Equal => {
+            fprintf(stderr, c"%s validates\n".as_ptr(), (*sctxt).filename);
+        }
+        std::cmp::Ordering::Greater => {
+            fprintf(
+                stderr,
+                c"%s fails to validate\n".as_ptr(),
+                (*sctxt).filename,
+            );
+        }
+        std::cmp::Ordering::Less => {
+            fprintf(
+                stderr,
+                c"%s validation generated an internal error\n".as_ptr(),
+                (*sctxt).filename,
+            );
+        }
     }
     xml_relaxng_free_valid_ctxt(vctxt);
     if !relaxngschemas.is_null() {
@@ -3112,13 +3143,13 @@ unsafe extern "C" fn xmlShellRNGValidate(
  *
  * Returns 0
  */
-unsafe extern "C" fn xmlShellGrep(
+unsafe extern "C" fn xml_shell_grep(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
     mut node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> c_int {
-    if !ctxt.is_null() {
+    if ctxt.is_null() {
         return 0;
     }
     if node.is_null() {
@@ -3127,6 +3158,7 @@ unsafe extern "C" fn xmlShellGrep(
     if arg.is_null() {
         return 0;
     }
+    // what does the following do... ?
     // #[cfg(feature = "regexp")]
     // if !xmlStrchr(arg as *mut xmlChar, b'?').is_null()
     //     || !xmlStrchr(arg as *mut xmlChar, b'*').is_null()
@@ -3137,7 +3169,7 @@ unsafe extern "C" fn xmlShellGrep(
         if (*node).typ == XmlElementType::XmlCommentNode {
             if !xml_strstr((*node).content, arg as *mut XmlChar).is_null() {
                 fprintf((*ctxt).output, c"%s : ".as_ptr(), xml_get_node_path(node));
-                xmlShellList(ctxt, null_mut(), node, null_mut());
+                xml_shell_list(ctxt, null_mut(), node, null_mut());
             }
         } else if (*node).typ == XmlElementType::XmlTextNode
             && !xml_strstr((*node).content, arg as *mut XmlChar).is_null()
@@ -3147,7 +3179,7 @@ unsafe extern "C" fn xmlShellGrep(
                 c"%s : ".as_ptr(),
                 xml_get_node_path((*node).parent),
             );
-            xmlShellList(ctxt, null_mut(), (*node).parent, null_mut());
+            xml_shell_list(ctxt, null_mut(), (*node).parent, null_mut());
         }
 
         /*
@@ -3196,7 +3228,7 @@ unsafe extern "C" fn xmlShellGrep(
  *
  * Returns 0
  */
-unsafe extern "C" fn xmlShellSetContent(
+unsafe extern "C" fn xml_shell_set_content(
     ctxt: XmlShellCtxtPtr,
     value: *mut c_char,
     node: XmlNodePtr,
@@ -3204,7 +3236,7 @@ unsafe extern "C" fn xmlShellSetContent(
 ) -> c_int {
     let mut results: XmlNodePtr = null_mut();
 
-    if !ctxt.is_null() {
+    if ctxt.is_null() {
         return 0;
     }
     if node.is_null() {
@@ -3250,7 +3282,7 @@ unsafe extern "C" fn xmlShellSetContent(
  * Returns 0 on success and a negative value otherwise.
  */
 #[cfg(feature = "xpath")]
-unsafe extern "C" fn xmlShellRegisterNamespace(
+unsafe extern "C" fn xml_shell_register_namespace(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
     _node: XmlNodePtr,
@@ -3322,7 +3354,7 @@ unsafe extern "C" fn xmlShellRegisterNamespace(
  * Returns 0 on success and a negative value otherwise.
  */
 #[cfg(feature = "xpath")]
-unsafe extern "C" fn xmlShellRegisterRootNamespaces(
+unsafe extern "C" fn xml_shell_register_root_namespaces(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     root: XmlNodePtr,
@@ -3333,7 +3365,7 @@ unsafe extern "C" fn xmlShellRegisterRootNamespaces(
     let mut ns: XmlNsPtr;
 
     if root.is_null()
-        || ((*root).typ != XmlElementType::XmlElementNode)
+        || (*root).typ != XmlElementType::XmlElementNode
         || (*root).ns_def.is_null()
         || ctxt.is_null()
         || (*ctxt).pctxt.is_null()
@@ -3373,7 +3405,7 @@ unsafe extern "C" fn xmlShellRegisterRootNamespaces(
  * Returns 0
  */
 #[cfg(feature = "tree")]
-unsafe extern "C" fn xmlShellSetBase(
+unsafe extern "C" fn xml_shell_set_base(
     _ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
     node: XmlNodePtr,
@@ -3400,7 +3432,7 @@ unsafe extern "C" fn xmlShellSetBase(
  * using a environment similar to a UNIX commandline.
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xmlShell(
+pub unsafe extern "C" fn xml_shell(
     doc: XmlDocPtr,
     filename: *mut c_char,
     input: Option<XmlShellReadlineFunc>,
@@ -3428,7 +3460,6 @@ pub unsafe extern "C" fn xmlShell(
     let mut command: [c_char; 100] = [0; 100];
     let mut arg: [c_char; 400] = [0; 400];
     let mut i: c_int;
-
     let mut list: XmlXPathObjectPtr;
 
     if doc.is_null() {
@@ -3668,10 +3699,10 @@ pub unsafe extern "C" fn xmlShell(
         } {
             #[cfg(feature = "valid")]
             {
-                xmlShellValidate(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
+                xml_shell_validate(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
         } else if strcmp(command.as_ptr(), c"load".as_ptr()) == 0 {
-            xmlShellLoad(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
+            xml_shell_load(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
         } else if {
             #[cfg(feature = "schema")]
             {
@@ -3684,7 +3715,7 @@ pub unsafe extern "C" fn xmlShell(
         } {
             #[cfg(feature = "schema")]
             {
-                xmlShellRNGValidate(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
+                xml_shell_rng_validate(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
         } else if {
             #[cfg(feature = "output")]
@@ -3698,7 +3729,7 @@ pub unsafe extern "C" fn xmlShell(
         } {
             #[cfg(feature = "output")]
             {
-                xmlShellSave(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
+                xml_shell_save(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
         } else if {
             #[cfg(feature = "output")]
@@ -3717,10 +3748,10 @@ pub unsafe extern "C" fn xmlShell(
                     c"Write command requires a filename argument\n".as_ptr()
                 );
             } else {
-                xmlShellWrite(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
+                xml_shell_write(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
             }
         } else if strcmp(command.as_ptr(), c"grep".as_ptr()) == 0 {
-            xmlShellGrep(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
+            xml_shell_grep(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
         } else if strcmp(command.as_ptr(), c"free".as_ptr()) == 0 {
             if arg[0] == 0 {
                 xml_mem_show((*ctxt).output, 0);
@@ -3733,12 +3764,12 @@ pub unsafe extern "C" fn xmlShell(
         } else if strcmp(command.as_ptr(), c"pwd".as_ptr()) == 0 {
             let mut dir: [c_char; 500] = [0; 500];
 
-            if xmlShellPwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, null_mut()) == 0 {
+            if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, null_mut()) == 0 {
                 fprintf((*ctxt).output, c"%s\n".as_ptr(), dir);
             }
         } else if strcmp(command.as_ptr(), c"du".as_ptr()) == 0 {
             if arg[0] == 0 {
-                xmlShellDu(ctxt, null_mut(), (*ctxt).node, null_mut());
+                xml_shell_du(ctxt, null_mut(), (*ctxt).node, null_mut());
             } else {
                 (*(*ctxt).pctxt).node = (*ctxt).node;
                 #[cfg(feature = "xpath")]
@@ -3764,7 +3795,7 @@ pub unsafe extern "C" fn xmlShell(
                                 // break;
                             } else {
                                 for indx in 0..(*(*list).nodesetval).node_nr {
-                                    xmlShellDu(
+                                    xml_shell_du(
                                         ctxt,
                                         null_mut(),
                                         *(*(*list).nodesetval).node_tab.add(indx as usize),
@@ -3847,9 +3878,9 @@ pub unsafe extern "C" fn xmlShell(
                 (*(*ctxt).pctxt).node = null_mut();
             }
         } else if strcmp(command.as_ptr(), c"base".as_ptr()) == 0 {
-            xmlShellBase(ctxt, null_mut(), (*ctxt).node, null_mut());
+            xml_shell_base(ctxt, null_mut(), (*ctxt).node, null_mut());
         } else if strcmp(command.as_ptr(), c"set".as_ptr()) == 0 {
-            xmlShellSetContent(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
+            xml_shell_set_content(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
         } else if {
             #[cfg(feature = "xpath")]
             {
@@ -3867,7 +3898,7 @@ pub unsafe extern "C" fn xmlShell(
                     c"setns: prefix=[nsuri] required\n".as_ptr()
                 );
             } else {
-                xmlShellRegisterNamespace(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
+                xml_shell_register_namespace(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
         } else if {
             #[cfg(feature = "xpath")]
@@ -3882,7 +3913,7 @@ pub unsafe extern "C" fn xmlShell(
             #[cfg(feature = "xpath")]
             {
                 let root: XmlNodePtr = xml_doc_get_root_element((*ctxt).doc);
-                xmlShellRegisterRootNamespaces(ctxt, null_mut(), root, null_mut());
+                xml_shell_register_root_namespaces(ctxt, null_mut(), root, null_mut());
             }
         } else if {
             #[cfg(feature = "xpath")]
@@ -3918,7 +3949,7 @@ pub unsafe extern "C" fn xmlShell(
         } {
             #[cfg(feature = "tree")]
             {
-                xmlShellSetBase(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
+                xml_shell_set_base(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
             }
         } else if strcmp(command.as_ptr(), c"ls".as_ptr()) == 0
             || strcmp(command.as_ptr(), c"dir".as_ptr()) == 0
@@ -3927,9 +3958,9 @@ pub unsafe extern "C" fn xmlShell(
 
             if arg[0] == 0 {
                 if dir != 0 {
-                    xmlShellDir(ctxt, null_mut(), (*ctxt).node, null_mut());
+                    xml_shell_dir(ctxt, null_mut(), (*ctxt).node, null_mut());
                 } else {
-                    xmlShellList(ctxt, null_mut(), (*ctxt).node, null_mut());
+                    xml_shell_list(ctxt, null_mut(), (*ctxt).node, null_mut());
                 }
             } else {
                 (*(*ctxt).pctxt).node = (*ctxt).node;
@@ -3958,14 +3989,14 @@ pub unsafe extern "C" fn xmlShell(
 
                             for indx in 0..(*(*list).nodesetval).node_nr {
                                 if dir != 0 {
-                                    xmlShellDir(
+                                    xml_shell_dir(
                                         ctxt,
                                         null_mut(),
                                         *(*(*list).nodesetval).node_tab.add(indx as usize),
                                         null_mut(),
                                     );
                                 } else {
-                                    xmlShellList(
+                                    xml_shell_list(
                                         ctxt,
                                         null_mut(),
                                         *(*(*list).nodesetval).node_tab.add(indx as usize),
@@ -4051,7 +4082,7 @@ pub unsafe extern "C" fn xmlShell(
             let mut dir: [c_char; 500] = [0; 500];
 
             if arg[0] == 0 {
-                if xmlShellPwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, null_mut()) == 0 {
+                if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, null_mut()) == 0 {
                     fprintf((*ctxt).output, c"%s\n".as_ptr(), dir);
                 }
             } else {
@@ -4075,10 +4106,10 @@ pub unsafe extern "C" fn xmlShell(
                         }
                         XmlXPathObjectType::XpathNodeset => {
                             if (*list).nodesetval.is_null() {
-                                break;
+                                // break;
                             } else {
                                 for indx in 0..(*(*list).nodesetval).node_nr {
-                                    if xmlShellPwd(
+                                    if xml_shell_pwd(
                                         ctxt,
                                         dir.as_mut_ptr(),
                                         *(*(*list).nodesetval).node_tab.add(indx as usize),
@@ -4304,7 +4335,7 @@ pub unsafe extern "C" fn xmlShell(
         } {
             #[cfg(feature = "output")]
             if arg[0] == 0 {
-                xmlShellCat(ctxt, null_mut(), (*ctxt).node, null_mut());
+                xml_shell_cat(ctxt, null_mut(), (*ctxt).node, null_mut());
             } else {
                 (*(*ctxt).pctxt).node = (*ctxt).node;
                 #[cfg(feature = "xpath")]
@@ -4333,7 +4364,7 @@ pub unsafe extern "C" fn xmlShell(
                                     if i > 0 {
                                         fprintf((*ctxt).output, c" -------\n".as_ptr());
                                     }
-                                    xmlShellCat(
+                                    xml_shell_cat(
                                         ctxt,
                                         null_mut(),
                                         *(*(*list).nodesetval).node_tab.add(indx as usize),
@@ -4423,7 +4454,7 @@ pub unsafe extern "C" fn xmlShell(
             );
         }
         free(cmdline as _); /* not xmlFree here !  as _*/
-        // cmdline = null_mut();
+        cmdline = null_mut();
     }
     #[cfg(feature = "xpath")]
     {
@@ -4460,7 +4491,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let boolval = gen_int(n_boolval, 0);
 
-                let ret_val = xmlBoolToText(boolval);
+                let ret_val = xml_bool_to_text(boolval);
                 desret_const_char_ptr(ret_val);
                 des_int(n_boolval, boolval, 0);
                 xmlResetLastError();
@@ -4489,7 +4520,7 @@ mod tests {
                     let output = gen_debug_file_ptr(n_output, 0);
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
-                    let ret_val = xmlDebugCheckDocument(output, doc);
+                    let ret_val = xml_debug_check_document(output, doc);
                     desret_int(ret_val);
                     des_debug_file_ptr(n_output, output, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
@@ -4526,7 +4557,7 @@ mod tests {
                         let attr = gen_xml_attr_ptr(n_attr, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xmlDebugDumpAttr(output, attr, depth);
+                        xml_debug_dump_attr(output, attr, depth);
                         des_debug_file_ptr(n_output, output, 0);
                         des_xml_attr_ptr(n_attr, attr, 1);
                         des_int(n_depth, depth, 2);
@@ -4562,7 +4593,7 @@ mod tests {
                         let attr = gen_xml_attr_ptr(n_attr, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xmlDebugDumpAttrList(output, attr, depth);
+                        xml_debug_dump_attr_list(output, attr, depth);
                         des_debug_file_ptr(n_output, output, 0);
                         des_xml_attr_ptr(n_attr, attr, 1);
                         des_int(n_depth, depth, 2);
@@ -4599,7 +4630,7 @@ mod tests {
                     let output = gen_debug_file_ptr(n_output, 0);
                     let dtd = gen_xml_dtd_ptr(n_dtd, 1);
 
-                    xmlDebugDumpDTD(output, dtd);
+                    xml_debug_dump_dtd(output, dtd);
                     des_debug_file_ptr(n_output, output, 0);
                     des_xml_dtd_ptr(n_dtd, dtd, 1);
                     xmlResetLastError();
@@ -4630,7 +4661,7 @@ mod tests {
                     let output = gen_debug_file_ptr(n_output, 0);
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
-                    xmlDebugDumpDocument(output, doc);
+                    xml_debug_dump_document(output, doc);
                     des_debug_file_ptr(n_output, output, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
                     xmlResetLastError();
@@ -4664,7 +4695,7 @@ mod tests {
                     let output = gen_debug_file_ptr(n_output, 0);
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
-                    xmlDebugDumpDocumentHead(output, doc);
+                    xml_debug_dump_document_head(output, doc);
                     des_debug_file_ptr(n_output, output, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
                     xmlResetLastError();
@@ -4698,7 +4729,7 @@ mod tests {
                     let output = gen_debug_file_ptr(n_output, 0);
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
-                    xmlDebugDumpEntities(output, doc);
+                    xml_debug_dump_entities(output, doc);
                     des_debug_file_ptr(n_output, output, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
                     xmlResetLastError();
@@ -4734,7 +4765,7 @@ mod tests {
                         let node = gen_xml_node_ptr(n_node, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xmlDebugDumpNode(output, node, depth);
+                        xml_debug_dump_node(output, node, depth);
                         des_debug_file_ptr(n_output, output, 0);
                         des_xml_node_ptr(n_node, node, 1);
                         des_int(n_depth, depth, 2);
@@ -4770,7 +4801,7 @@ mod tests {
                         let node = gen_xml_node_ptr(n_node, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xmlDebugDumpNodeList(output, node, depth);
+                        xml_debug_dump_node_list(output, node, depth);
                         des_debug_file_ptr(n_output, output, 0);
                         des_xml_node_ptr(n_node, node, 1);
                         des_int(n_depth, depth, 2);
@@ -4809,7 +4840,7 @@ mod tests {
                         let node = gen_xml_node_ptr(n_node, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xmlDebugDumpOneNode(output, node, depth);
+                        xml_debug_dump_one_node(output, node, depth);
                         des_debug_file_ptr(n_output, output, 0);
                         des_xml_node_ptr(n_node, node, 1);
                         des_int(n_depth, depth, 2);
@@ -4846,7 +4877,7 @@ mod tests {
                     let output = gen_debug_file_ptr(n_output, 0);
                     let str = gen_const_xml_char_ptr(n_str, 1);
 
-                    xmlDebugDumpString(output, str);
+                    xml_debug_dump_string(output, str);
                     des_debug_file_ptr(n_output, output, 0);
                     des_const_xml_char_ptr(n_str, str, 1);
                     xmlResetLastError();
@@ -4878,7 +4909,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let node = gen_xml_node_ptr(n_node, 0);
 
-                let ret_val = xmlLsCountNode(node);
+                let ret_val = xml_ls_count_node(node);
                 desret_int(ret_val);
                 des_xml_node_ptr(n_node, node, 0);
                 xmlResetLastError();
@@ -4907,7 +4938,7 @@ mod tests {
                     let output = gen_debug_file_ptr(n_output, 0);
                     let node = gen_xml_node_ptr(n_node, 1);
 
-                    xmlLsOneNode(output, node);
+                    xml_ls_one_node(output, node);
                     des_debug_file_ptr(n_output, output, 0);
                     des_xml_node_ptr(n_node, node, 1);
                     xmlResetLastError();
@@ -4948,7 +4979,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellBase(ctxt, arg, node, node2);
+                            let ret_val = xml_shell_base(ctxt, arg, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_arg, arg, 1);
@@ -4990,7 +5021,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellCat(ctxt, arg, node, node2);
+                            let ret_val = xml_shell_cat(ctxt, arg, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_arg, arg, 1);
@@ -5032,7 +5063,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellDir(ctxt, arg, node, node2);
+                            let ret_val = xml_shell_dir(ctxt, arg, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_arg, arg, 1);
@@ -5074,7 +5105,7 @@ mod tests {
                             let tree = gen_xml_node_ptr(n_tree, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellDu(ctxt, arg, tree, node2);
+                            let ret_val = xml_shell_du(ctxt, arg, tree, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_arg, arg, 1);
@@ -5116,7 +5147,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellList(ctxt, arg, node, node2);
+                            let ret_val = xml_shell_list(ctxt, arg, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_arg, arg, 1);
@@ -5158,7 +5189,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellLoad(ctxt, filename, node, node2);
+                            let ret_val = xml_shell_load(ctxt, filename, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_filename, filename, 1);
@@ -5194,7 +5225,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let list = gen_xml_xpath_object_ptr(n_list, 0);
 
-                xmlShellPrintXPathResult(list);
+                xml_shell_print_xpath_result(list);
                 des_xml_xpath_object_ptr(n_list, list, 0);
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {
@@ -5229,7 +5260,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellPwd(ctxt, buffer, node, node2);
+                            let ret_val = xml_shell_pwd(ctxt, buffer, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_buffer, buffer, 1);
@@ -5271,7 +5302,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellSave(ctxt, filename, node, node2);
+                            let ret_val = xml_shell_save(ctxt, filename, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_filename, filename, 1);
@@ -5313,7 +5344,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellValidate(ctxt, dtd, node, node2);
+                            let ret_val = xml_shell_validate(ctxt, dtd, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_dtd, dtd, 1);
@@ -5358,7 +5389,7 @@ mod tests {
                             let node = gen_xml_node_ptr(n_node, 2);
                             let node2 = gen_xml_node_ptr(n_node2, 3);
 
-                            let ret_val = xmlShellWrite(ctxt, filename, node, node2);
+                            let ret_val = xml_shell_write(ctxt, filename, node, node2);
                             desret_int(ret_val);
                             des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_char_ptr(n_filename, filename, 1);

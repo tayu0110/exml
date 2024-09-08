@@ -25,7 +25,7 @@ use exml::{
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
-        debug_xml::{xmlDebugDumpDocument, xmlDebugDumpEntities, xmlShell},
+        debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
         encoding::{xmlAddEncodingAlias, XmlCharEncoding},
         entities::{xml_encode_entities_reentrant, XmlEntityPtr},
         globals::{
@@ -234,8 +234,8 @@ static mut LOAD_TRACE: c_int = 0;
 
 fn parse_path(mut path: &str) {
     let mut paths = PATHS.lock().unwrap();
-    path = path.trim_start_matches(|c| c == ' ' || c == PATH_SEPARATOR);
-    while let Some((p, rem)) = path.split_once(|c| c == ' ' || c == PATH_SEPARATOR) {
+    path = path.trim_start_matches([' ', PATH_SEPARATOR]);
+    while let Some((p, rem)) = path.split_once([' ', PATH_SEPARATOR]) {
         if paths.len() >= MAX_PATHS {
             eprintln!("MAX_PATHS reached: too many paths");
             return;
@@ -245,7 +245,7 @@ fn parse_path(mut path: &str) {
             paths.push(p.to_owned());
         }
 
-        path = rem.trim_start_matches(|c| c == ' ' || c == PATH_SEPARATOR);
+        path = rem.trim_start_matches([' ', PATH_SEPARATOR]);
     }
 }
 
@@ -2688,7 +2688,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
     #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
     if SHELL != 0 {
         xml_xpath_order_doc_elems(doc);
-        xmlShell(doc, filename, Some(xml_shell_readline), stdout);
+        xml_shell(doc, filename, Some(xml_shell_readline), stdout);
     }
 
     /*
@@ -3048,7 +3048,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                     .as_ref()
                     .map_or(stdout, |o| fopen(o.as_ptr(), c"wb".as_ptr()));
                 if !out.is_null() {
-                    xmlDebugDumpDocument(out, doc);
+                    xml_debug_dump_document(out, doc);
 
                     if OUTPUT.lock().unwrap().is_some() {
                         fclose(out);
@@ -3317,7 +3317,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
 
     #[cfg(all(feature = "libxml_debug", any(feature = "html", feature = "valid")))]
     if DEBUGENT != 0 && HTML == 0 {
-        xmlDebugDumpEntities(stderr, doc);
+        xml_debug_dump_entities(stderr, doc);
     }
 
     /*
