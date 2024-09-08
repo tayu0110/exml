@@ -156,7 +156,7 @@ pub unsafe extern "C" fn xml_strcmp(mut str1: *const XmlChar, mut str2: *const X
 /// Check string `str1` is equal to `str2`.  
 /// Return `true` if they are equal, otherwise return `false`.
 ///
-/// Please refer to the document of `xmlStrEqual` for original libxml2.
+/// Please refer to the document of `xmlStrEqual` for original libxml2 also.
 pub unsafe fn xml_str_equal(mut str1: *const XmlChar, mut str2: *const XmlChar) -> bool {
     if str1 == str2 {
         return true;
@@ -177,36 +177,30 @@ pub unsafe fn xml_str_equal(mut str1: *const XmlChar, mut str2: *const XmlChar) 
     true
 }
 
-/**
- * xmlStrQEqual:
- * @pref:  the prefix of the QName
- * @name:  the localname of the QName
- * @str:  the second XmlChar *
- *
- * Check if a QName is Equal to a given string
- *
- * Returns 1 if they are equal, 0 if they are different
- */
-pub unsafe extern "C" fn xml_str_qequal(
+/// Check given QName that its prefix is `pref` and localname is `name` is equal to a string `str`.  
+/// Return `true` if they are equal, otherwise return `false`.
+///
+/// Please refer to the document of `xmlStrQEqual` for original libxml2 also.
+pub unsafe fn xml_str_qequal(
     mut pref: *const XmlChar,
     mut name: *const XmlChar,
     mut str: *const XmlChar,
-) -> c_int {
+) -> bool {
     if pref.is_null() {
-        return xml_str_equal(name, str) as i32;
+        return xml_str_equal(name, str);
     }
     if name.is_null() {
-        return 0;
+        return false;
     }
     if str.is_null() {
-        return 0;
+        return false;
     }
 
     while {
         let p = *pref;
         pref = pref.add(1);
         if p != *str {
-            return 0;
+            return false;
         };
         let s = *str;
         str = str.add(1);
@@ -215,19 +209,19 @@ pub unsafe extern "C" fn xml_str_qequal(
     let s = *str;
     str = str.add(1);
     if s != b':' {
-        return 0;
+        return false;
     };
     while {
         let n = *name;
         name = name.add(1);
         if n != *str {
-            return 0;
+            return false;
         };
         let s = *str;
         str = str.add(1);
         s != 0
     } {}
-    1
+    true
 }
 
 /**
@@ -1454,7 +1448,7 @@ mod tests {
                         let name = gen_const_xml_char_ptr(n_name, 1);
                         let str = gen_const_xml_char_ptr(n_str, 2);
 
-                        let ret_val = xml_str_qequal(pref as *const XmlChar, name, str);
+                        let ret_val = xml_str_qequal(pref as *const XmlChar, name, str) as i32;
                         desret_int(ret_val);
                         des_const_xml_char_ptr(n_pref, pref, 0);
                         des_const_xml_char_ptr(n_name, name, 1);

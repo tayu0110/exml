@@ -1052,7 +1052,7 @@ pub unsafe extern "C" fn xml_dict_qlookup(
         while !(*insert).next.is_null() {
             if (*insert).okey == okey
                 && (*insert).len == len
-                && xml_str_qequal(prefix, name, (*insert).name) != 0
+                && xml_str_qequal(prefix, name, (*insert).name)
             {
                 return (*insert).name;
             }
@@ -1061,7 +1061,7 @@ pub unsafe extern "C" fn xml_dict_qlookup(
         }
         if (*insert).okey == okey
             && (*insert).len == len
-            && xml_str_qequal(prefix, name, (*insert).name) != 0
+            && xml_str_qequal(prefix, name, (*insert).name)
         {
             return (*insert).name;
         }
@@ -1083,16 +1083,14 @@ pub unsafe extern "C" fn xml_dict_qlookup(
             while !(*tmp).next.is_null() {
                 if (*tmp).okey == skey
                     && (*tmp).len == len
-                    && xml_str_qequal(prefix, name, (*tmp).name) != 0
+                    && xml_str_qequal(prefix, name, (*tmp).name)
                 {
                     return (*tmp).name;
                 }
                 nbi += 1;
                 tmp = (*tmp).next;
             }
-            if (*tmp).okey == skey
-                && (*tmp).len == len
-                && xml_str_qequal(prefix, name, (*tmp).name) != 0
+            if (*tmp).okey == skey && (*tmp).len == len && xml_str_qequal(prefix, name, (*tmp).name)
             {
                 return (*tmp).name;
             }

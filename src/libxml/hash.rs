@@ -1242,9 +1242,9 @@ pub unsafe extern "C" fn xml_hash_qlookup3(
     }
     entry = (*table).table.add(key as usize);
     while !entry.is_null() {
-        if xml_str_qequal(prefix, name, (*entry).name) != 0
-            && xml_str_qequal(prefix2, name2, (*entry).name2) != 0
-            && xml_str_qequal(prefix3, name3, (*entry).name3) != 0
+        if xml_str_qequal(prefix, name, (*entry).name)
+            && xml_str_qequal(prefix2, name2, (*entry).name2)
+            && xml_str_qequal(prefix3, name3, (*entry).name3)
         {
             return (*entry).payload;
         }
