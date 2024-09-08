@@ -24,8 +24,8 @@ use exml::libxml::{
     },
     parser_internals::xml_new_string_input_stream,
     relaxng::{
-        xmlRelaxNGNewMemParserCtxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
-        xml_relaxng_free_valid_ctxt, xml_relaxng_init_types, xml_relaxng_new_valid_ctxt,
+        xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
+        xml_relaxng_init_types, xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt,
         xml_relaxng_parse, xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
         xml_relaxng_validate_doc, XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr,
     },
@@ -372,7 +372,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
     xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_node_dump(buf, (*test).doc, test, 0, 0);
     let pctxt: XmlRelaxNGParserCtxtPtr =
-        xmlRelaxNGNewMemParserCtxt((*buf).content as *const c_char, (*buf).using as _);
+        xml_relaxng_new_mem_parser_ctxt((*buf).content as *const c_char, (*buf).using as _);
     xml_relaxng_set_parser_errors(
         pctxt,
         Some(test_error_handler),
@@ -526,7 +526,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
     xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_node_dump(buf, (*test).doc, test, 0, 0);
     let pctxt: XmlRelaxNGParserCtxtPtr =
-        xmlRelaxNGNewMemParserCtxt((*buf).content as *const c_char, (*buf).using as _);
+        xml_relaxng_new_mem_parser_ctxt((*buf).content as *const c_char, (*buf).using as _);
     xml_relaxng_set_parser_errors(
         pctxt,
         Some(test_error_handler),

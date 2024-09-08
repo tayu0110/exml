@@ -4680,8 +4680,8 @@ unsafe extern "C" fn rng_test(
     use std::mem::zeroed;
 
     use exml::libxml::relaxng::{
-        xmlRelaxNGNewParserCtxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
-        xml_relaxng_set_parser_errors, XmlRelaxNGParserCtxtPtr,
+        xml_relaxng_new_parser_ctxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
+        xml_relaxng_parse, xml_relaxng_set_parser_errors, XmlRelaxNGParserCtxtPtr,
     };
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
@@ -4699,7 +4699,7 @@ unsafe extern "C" fn rng_test(
     let mut count: c_char;
 
     /* first compile the schemas if possible */
-    let ctxt: XmlRelaxNGParserCtxtPtr = xmlRelaxNGNewParserCtxt(filename);
+    let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(filename);
     xml_relaxng_set_parser_errors(
         ctxt,
         Some(test_error_handler),

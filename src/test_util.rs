@@ -158,15 +158,15 @@ pub(crate) const GEN_NB_XML_STREAM_CTXT_PTR: i32 = 1;
 #[cfg(feature = "libxml_pattern")]
 pub(crate) const GEN_NB_XML_PATTERN_PTR: i32 = 1;
 #[cfg(feature = "schema")]
-pub(crate) const GEN_NB_XML_RELAX_NGPTR: i32 = 1;
+pub(crate) const GEN_NB_XML_RELAXNG_PTR: i32 = 1;
 #[cfg(feature = "schema")]
-pub(crate) const GEN_NB_XML_RELAX_NGPARSER_CTXT_PTR: i32 = 1;
+pub(crate) const GEN_NB_XML_RELAXNG_PARSER_CTXT_PTR: i32 = 1;
 #[cfg(feature = "schema")]
-pub(crate) const GEN_NB_XML_RELAX_NGVALIDITY_ERROR_FUNC_PTR: i32 = 1;
+pub(crate) const GEN_NB_XML_RELAXNG_VALIDITY_ERROR_FUNC_PTR: i32 = 1;
 #[cfg(feature = "schema")]
-pub(crate) const GEN_NB_XML_RELAX_NGVALIDITY_WARNING_FUNC_PTR: i32 = 1;
+pub(crate) const GEN_NB_XML_RELAXNG_VALIDITY_WARNING_FUNC_PTR: i32 = 1;
 #[cfg(feature = "schema")]
-pub(crate) const GEN_NB_XML_RELAX_NGVALID_CTXT_PTR: i32 = 1;
+pub(crate) const GEN_NB_XML_RELAXNG_VALID_CTXT_PTR: i32 = 1;
 #[cfg(any(
     feature = "libxml_modules",
     feature = "libxml_reader",
@@ -1109,7 +1109,7 @@ pub(crate) unsafe extern "C" fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchema
 pub(crate) fn desret_xml_schema_type_ptr(_val: XmlSchemaTypePtr) {}
 
 #[cfg(feature = "schema")]
-pub(crate) unsafe extern "C" fn desret_xml_relax_ngparser_ctxt_ptr(val: XmlRelaxNGParserCtxtPtr) {
+pub(crate) unsafe extern "C" fn desret_xml_relaxng_parser_ctxt_ptr(val: XmlRelaxNGParserCtxtPtr) {
     use crate::libxml::relaxng::xml_relaxng_free_parser_ctxt;
 
     xml_relaxng_free_parser_ctxt(val);
@@ -1132,23 +1132,23 @@ pub(crate) fn gen_void_ptr_ptr(_no: c_int, _nr: c_int) -> *mut *mut c_void {
 pub(crate) fn des_void_ptr_ptr(_no: c_int, _val: *mut *mut c_void, _nr: c_int) {}
 
 #[cfg(feature = "schema")]
-pub(crate) fn gen_xml_relax_ngvalid_ctxt_ptr(_no: i32, _nr: i32) -> XmlRelaxNGValidCtxtPtr {
+pub(crate) fn gen_xml_relaxng_valid_ctxt_ptr(_no: i32, _nr: i32) -> XmlRelaxNGValidCtxtPtr {
     null_mut()
 }
 
 #[cfg(feature = "schema")]
-pub(crate) fn des_xml_relax_ngvalid_ctxt_ptr(_no: i32, _val: XmlRelaxNGValidCtxtPtr, _nr: i32) {}
+pub(crate) fn des_xml_relaxng_valid_ctxt_ptr(_no: i32, _val: XmlRelaxNGValidCtxtPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
-pub(crate) fn gen_xml_relax_ngparser_ctxt_ptr(_no: i32, _nr: i32) -> XmlRelaxNGParserCtxtPtr {
+pub(crate) fn gen_xml_relaxng_parser_ctxt_ptr(_no: i32, _nr: i32) -> XmlRelaxNGParserCtxtPtr {
     null_mut()
 }
 
 #[cfg(feature = "schema")]
-pub(crate) fn des_xml_relax_ngparser_ctxt_ptr(_no: i32, _val: XmlRelaxNGParserCtxtPtr, _nr: i32) {}
+pub(crate) fn des_xml_relaxng_parser_ctxt_ptr(_no: i32, _val: XmlRelaxNGParserCtxtPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
-pub(crate) fn gen_xml_relax_ngvalidity_error_func_ptr(
+pub(crate) fn gen_xml_relaxng_validity_error_func_ptr(
     _no: i32,
     _nr: i32,
 ) -> *mut Option<XmlRelaxNGValidityErrorFunc> {
@@ -1156,7 +1156,7 @@ pub(crate) fn gen_xml_relax_ngvalidity_error_func_ptr(
 }
 
 #[cfg(feature = "schema")]
-pub(crate) fn des_xml_relax_ngvalidity_error_func_ptr(
+pub(crate) fn des_xml_relaxng_validity_error_func_ptr(
     _no: i32,
     _val: *mut Option<XmlRelaxNGValidityErrorFunc>,
     _nr: i32,
@@ -1164,7 +1164,7 @@ pub(crate) fn des_xml_relax_ngvalidity_error_func_ptr(
 }
 
 #[cfg(feature = "schema")]
-pub(crate) fn gen_xml_relax_ngvalidity_warning_func_ptr(
+pub(crate) fn gen_xml_relaxng_validity_warning_func_ptr(
     _no: i32,
     _nr: i32,
 ) -> *mut Option<XmlRelaxNGValidityWarningFunc> {
@@ -1172,7 +1172,7 @@ pub(crate) fn gen_xml_relax_ngvalidity_warning_func_ptr(
 }
 
 #[cfg(feature = "schema")]
-pub(crate) fn des_xml_relax_ngvalidity_warning_func_ptr(
+pub(crate) fn des_xml_relaxng_validity_warning_func_ptr(
     _no: i32,
     _val: *mut Option<XmlRelaxNGValidityWarningFunc>,
     _nr: i32,
@@ -1180,12 +1180,12 @@ pub(crate) fn des_xml_relax_ngvalidity_warning_func_ptr(
 }
 
 #[cfg(feature = "schema")]
-pub(crate) fn gen_xml_relax_ngptr(_no: i32, _nr: i32) -> XmlRelaxNGPtr {
+pub(crate) fn gen_xml_relaxng_ptr(_no: i32, _nr: i32) -> XmlRelaxNGPtr {
     null_mut()
 }
 
 #[cfg(feature = "schema")]
-pub(crate) fn des_xml_relax_ngptr(_no: i32, _val: XmlRelaxNGPtr, _nr: i32) {}
+pub(crate) fn des_xml_relaxng_ptr(_no: i32, _val: XmlRelaxNGPtr, _nr: i32) {}
 
 #[cfg(feature = "libxml_pattern")]
 pub(crate) fn gen_xml_pattern_ptr(_no: c_int, _nr: c_int) -> XmlPatternPtr {

@@ -51,7 +51,7 @@ use exml::{
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
-            xmlRelaxNGNewParserCtxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
+            xml_relaxng_new_parser_ctxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
             xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
             XmlRelaxNG, XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr,
@@ -4117,7 +4117,7 @@ fn main() {
                 if TIMING != 0 {
                     start_timer();
                 }
-                let ctxt: XmlRelaxNGParserCtxtPtr = xmlRelaxNGNewParserCtxt(r.as_ptr());
+                let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(r.as_ptr());
                 if ctxt.is_null() {
                     PROGRESULT = XmllintReturnCode::ErrMem;
                     // goto error;

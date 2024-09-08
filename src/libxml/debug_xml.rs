@@ -3090,7 +3090,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
     use crate::libxml::{
         globals::xml_generic_error,
         relaxng::{
-            xmlRelaxNGNewParserCtxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
+            xml_relaxng_new_parser_ctxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
             xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
             XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr,
@@ -3099,7 +3099,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
 
     use super::relaxng::XmlRelaxNGPtr;
 
-    let ctxt: XmlRelaxNGParserCtxtPtr = xmlRelaxNGNewParserCtxt(schemas);
+    let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(schemas);
     xml_relaxng_set_parser_errors(
         ctxt,
         Some(xml_generic_error),

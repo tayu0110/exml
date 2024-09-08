@@ -32,8 +32,8 @@ use crate::{
         parser_internals::{input_push, xml_new_input_stream, xml_switch_to_encoding},
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
         relaxng::{
-            xmlRelaxNGNewParserCtxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
-            xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
+            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
+            xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
             xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
             xml_relaxng_validate_pop_element, xml_relaxng_validate_push_cdata,
@@ -5170,7 +5170,7 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
     if !rng.is_null() {
         /* Parse the schema and create validation environment. */
 
-        let pctxt: XmlRelaxNGParserCtxtPtr = xmlRelaxNGNewParserCtxt(rng);
+        let pctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(rng);
         if (*reader).error_func.is_some() {
             xml_relaxng_set_parser_errors(
                 pctxt,
@@ -8686,15 +8686,15 @@ mod tests {
             let mut leaks = 0;
 
             for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                for n_schema in 0..GEN_NB_XML_RELAX_NGPTR {
+                for n_schema in 0..GEN_NB_XML_RELAXNG_PTR {
                     let mem_base = xml_mem_blocks();
                     let reader = gen_xml_text_reader_ptr(n_reader, 0);
-                    let schema = gen_xml_relax_ngptr(n_schema, 1);
+                    let schema = gen_xml_relaxng_ptr(n_schema, 1);
 
                     let ret_val = xml_text_reader_relaxng_set_schema(reader, schema);
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
-                    des_xml_relax_ngptr(n_schema, schema, 1);
+                    des_xml_relaxng_ptr(n_schema, schema, 1);
                     xmlResetLastError();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
@@ -8756,17 +8756,17 @@ mod tests {
             let mut leaks = 0;
 
             for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                for n_ctxt in 0..GEN_NB_XML_RELAX_NGVALID_CTXT_PTR {
+                for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
                     for n_options in 0..GEN_NB_PARSEROPTIONS {
                         let mem_base = xml_mem_blocks();
                         let reader = gen_xml_text_reader_ptr(n_reader, 0);
-                        let ctxt = gen_xml_relax_ngvalid_ctxt_ptr(n_ctxt, 1);
+                        let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 1);
                         let options = gen_parseroptions(n_options, 2);
 
                         let ret_val = xml_text_reader_relaxng_validate_ctxt(reader, ctxt, options);
                         desret_int(ret_val);
                         des_xml_text_reader_ptr(n_reader, reader, 0);
-                        des_xml_relax_ngvalid_ctxt_ptr(n_ctxt, ctxt, 1);
+                        des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 1);
                         des_parseroptions(n_options, options, 2);
                         xmlResetLastError();
                         if mem_base != xml_mem_blocks() {

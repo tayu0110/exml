@@ -616,8 +616,8 @@ pub struct XmlRelaxNGTypeLibrary {
     freef: Option<XmlRelaxNGTypeFree>,   /* the freeing function */
 }
 
-static XML_RELAX_NGTYPE_INITIALIZED: AtomicBool = AtomicBool::new(false);
-static XML_RELAX_NGREGISTERED_TYPES: AtomicPtr<XmlHashTable> = AtomicPtr::new(null_mut());
+static XML_RELAXNG_TYPE_INITIALIZED: AtomicBool = AtomicBool::new(false);
+static XML_RELAXNG_REGISTERED_TYPES: AtomicPtr<XmlHashTable> = AtomicPtr::new(null_mut());
 
 macro_rules! VALID_ERR {
     ($ctxt:expr, $a:expr) => {
@@ -1296,7 +1296,7 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     facet: Option<XmlRelaxNGFacetCheck>,
     freef: Option<XmlRelaxNGTypeFree>,
 ) -> c_int {
-    let registered_types = XML_RELAX_NGREGISTERED_TYPES.load(Ordering::Acquire);
+    let registered_types = XML_RELAXNG_REGISTERED_TYPES.load(Ordering::Acquire);
     if registered_types.is_null() || namespace.is_null() || check.is_none() || comp.is_none() {
         return -1;
     }
@@ -1566,7 +1566,7 @@ unsafe extern "C" fn xml_relaxng_schema_free_value(_data: *mut c_void, value: *m
 /*
  * The Relax-NG namespace
  */
-const XML_RELAX_NGNS: &CStr = c"http://relaxng.org/ns/structure/1.0";
+const XML_RELAXNG_NS: &CStr = c"http://relaxng.org/ns/structure/1.0";
 
 macro_rules! IS_RELAXNG {
     ($node:expr, $typ:expr) => {
@@ -1576,7 +1576,7 @@ macro_rules! IS_RELAXNG {
             && xml_str_equal((*$node).name, $typ) != 0
             && xml_str_equal(
                 (*(*$node).ns).href.load(Ordering::Relaxed),
-                XML_RELAX_NGNS.as_ptr() as _,
+                XML_RELAXNG_NS.as_ptr() as _,
             ) != 0
     };
 }
@@ -1756,7 +1756,7 @@ unsafe extern "C" fn xml_relaxng_default_type_compare(
  * Returns 0 in case of success and -1 in case of error.
  */
 pub unsafe extern "C" fn xml_relaxng_init_types() -> c_int {
-    if XML_RELAX_NGTYPE_INITIALIZED.load(Ordering::Acquire) {
+    if XML_RELAXNG_TYPE_INITIALIZED.load(Ordering::Acquire) {
         return 0;
     }
 
@@ -1769,7 +1769,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> c_int {
         return -1;
     }
 
-    XML_RELAX_NGREGISTERED_TYPES.store(registered_types, Ordering::Release);
+    XML_RELAXNG_REGISTERED_TYPES.store(registered_types, Ordering::Release);
     xml_relaxng_register_type_library(
         c"http://www.w3.org/2001/XMLSchema-datatypes".as_ptr() as _,
         null_mut(),
@@ -1780,7 +1780,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> c_int {
         Some(xml_relaxng_schema_free_value),
     );
     xml_relaxng_register_type_library(
-        XML_RELAX_NGNS.as_ptr() as _,
+        XML_RELAXNG_NS.as_ptr() as _,
         null_mut(),
         Some(xml_relaxng_default_type_have),
         Some(xml_relaxng_default_type_check),
@@ -1788,7 +1788,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> c_int {
         None,
         None,
     );
-    XML_RELAX_NGTYPE_INITIALIZED.store(true, Ordering::Release);
+    XML_RELAXNG_TYPE_INITIALIZED.store(true, Ordering::Release);
     0
 }
 
@@ -1825,14 +1825,14 @@ unsafe extern "C" fn xml_relaxng_free_type_library(
  */
 pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
     xml_schema_cleanup_types();
-    if !XML_RELAX_NGTYPE_INITIALIZED.load(Ordering::Acquire) {
+    if !XML_RELAXNG_TYPE_INITIALIZED.load(Ordering::Acquire) {
         return;
     }
     xml_hash_free(
-        XML_RELAX_NGREGISTERED_TYPES.load(Ordering::Relaxed),
+        XML_RELAXNG_REGISTERED_TYPES.load(Ordering::Relaxed),
         Some(xml_relaxng_free_type_library),
     );
-    XML_RELAX_NGTYPE_INITIALIZED.store(false, Ordering::Release);
+    XML_RELAXNG_TYPE_INITIALIZED.store(false, Ordering::Release);
 }
 
 /**
@@ -1910,7 +1910,9 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
  *
  * Returns the parser context or NULL in case of error
  */
-pub unsafe extern "C" fn xmlRelaxNGNewParserCtxt(url: *const c_char) -> XmlRelaxNGParserCtxtPtr {
+pub unsafe extern "C" fn xml_relaxng_new_parser_ctxt(
+    url: *const c_char,
+) -> XmlRelaxNGParserCtxtPtr {
     if url.is_null() {
         return null_mut();
     }
@@ -1937,7 +1939,7 @@ pub unsafe extern "C" fn xmlRelaxNGNewParserCtxt(url: *const c_char) -> XmlRelax
  *
  * Returns the parser context or NULL in case of error
  */
-pub unsafe extern "C" fn xmlRelaxNGNewMemParserCtxt(
+pub unsafe extern "C" fn xml_relaxng_new_mem_parser_ctxt(
     buffer: *const c_char,
     size: c_int,
 ) -> XmlRelaxNGParserCtxtPtr {
@@ -3094,7 +3096,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
         if (*cur).ns.is_null()
             || xml_str_equal(
                 (*(*cur).ns).href.load(Ordering::Relaxed),
-                XML_RELAX_NGNS.as_ptr() as _,
+                XML_RELAXNG_NS.as_ptr() as _,
             ) != 0
         {
             if xml_str_equal((*cur).name, c"name".as_ptr() as _) != 0 {
@@ -3804,7 +3806,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
  * Cleanup the subtree from unwanted nodes for parsing, resolve
  * Include and externalRef lookups.
  */
-unsafe extern "C" fn xmlRelaxNGCleanupTree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodePtr) {
+unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodePtr) {
     let mut cur: XmlNodePtr;
     let mut delete: XmlNodePtr;
 
@@ -3825,7 +3827,7 @@ unsafe extern "C" fn xmlRelaxNGCleanupTree(ctxt: XmlRelaxNGParserCtxtPtr, root: 
                 if (*cur).ns.is_null()
                     || xml_str_equal(
                         (*(*cur).ns).href.load(Ordering::Relaxed),
-                        XML_RELAX_NGNS.as_ptr() as _,
+                        XML_RELAXNG_NS.as_ptr() as _,
                     ) == 0
                 {
                     if !(*cur).parent.is_null()
@@ -4186,14 +4188,14 @@ unsafe extern "C" fn xmlRelaxNGCleanupTree(ctxt: XmlRelaxNGParserCtxtPtr, root: 
                             && xml_str_equal((*(*cur).parent).name, c"anyName".as_ptr() as _) != 0
                         {
                             (*ctxt).flags |= XML_RELAXNG_IN_ANYEXCEPT;
-                            xmlRelaxNGCleanupTree(ctxt, cur);
+                            xml_relaxng_cleanup_tree(ctxt, cur);
                             (*ctxt).flags = oldflags;
                             break 'skip_children;
                         } else if !(*cur).parent.is_null()
                             && xml_str_equal((*(*cur).parent).name, c"nsName".as_ptr() as _) != 0
                         {
                             (*ctxt).flags |= XML_RELAXNG_IN_NSEXCEPT;
-                            xmlRelaxNGCleanupTree(ctxt, cur);
+                            xml_relaxng_cleanup_tree(ctxt, cur);
                             (*ctxt).flags = oldflags;
                             break 'skip_children;
                         }
@@ -4374,7 +4376,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_doc(
         );
         return null_mut();
     }
-    xmlRelaxNGCleanupTree(ctxt, root);
+    xml_relaxng_cleanup_tree(ctxt, root);
     doc
 }
 
@@ -4386,7 +4388,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_doc(
  *
  * Returns the newly allocated structure or NULL in case or error
  */
-unsafe extern "C" fn xml_relaxng_new_relax_ng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
+unsafe extern "C" fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
     let ret: XmlRelaxNGPtr = xml_malloc(size_of::<XmlRelaxNG>()) as _;
     if ret.is_null() {
         xml_rng_perr_memory(ctxt, null_mut());
@@ -5110,7 +5112,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
     (*def).ns = library;
 
     let lib: XmlRelaxNGTypeLibraryPtr = xml_hash_lookup(
-        XML_RELAX_NGREGISTERED_TYPES.load(Ordering::Relaxed),
+        XML_RELAXNG_REGISTERED_TYPES.load(Ordering::Relaxed),
         library,
     ) as _;
     if lib.is_null() {
@@ -5417,7 +5419,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
         (*def).ns = library;
 
         lib = xml_hash_lookup(
-            XML_RELAX_NGREGISTERED_TYPES.load(Ordering::Relaxed),
+            XML_RELAXNG_REGISTERED_TYPES.load(Ordering::Relaxed),
             library,
         ) as _;
         if lib.is_null() {
@@ -7055,7 +7057,7 @@ unsafe extern "C" fn xml_relaxng_try_unlink(
  *
  * Returns 1 if yes, 0 if no and -1 in case of error.
  */
-unsafe extern "C" fn xmlRelaxNGGenerateAttributes(
+unsafe extern "C" fn xml_relaxng_generate_attributes(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
 ) -> c_int {
@@ -7144,7 +7146,7 @@ unsafe extern "C" fn xmlRelaxNGGenerateAttributes(
  *
  * Check for simplification of empty and notAllowed
  */
-unsafe extern "C" fn xmlRelaxNGSimplify(
+unsafe extern "C" fn xml_relaxng_simplify(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut cur: XmlRelaxNGDefinePtr,
     parent: XmlRelaxNGDefinePtr,
@@ -7155,7 +7157,7 @@ unsafe extern "C" fn xmlRelaxNGSimplify(
         if matches!((*cur).typ, XmlRelaxNGType::Ref | XmlRelaxNGType::Parentref) {
             if (*cur).depth != -3 {
                 (*cur).depth = -3;
-                xmlRelaxNGSimplify(ctxt, (*cur).content, cur);
+                xml_relaxng_simplify(ctxt, (*cur).content, cur);
             }
         } else if (*cur).typ == XmlRelaxNGType::NotAllowed {
             (*cur).parent = parent;
@@ -7202,13 +7204,13 @@ unsafe extern "C" fn xmlRelaxNGSimplify(
         } else {
             (*cur).parent = parent;
             if !(*cur).content.is_null() {
-                xmlRelaxNGSimplify(ctxt, (*cur).content, cur);
+                xml_relaxng_simplify(ctxt, (*cur).content, cur);
             }
             if (*cur).typ != XmlRelaxNGType::Value && !(*cur).attrs.is_null() {
-                xmlRelaxNGSimplify(ctxt, (*cur).attrs, cur);
+                xml_relaxng_simplify(ctxt, (*cur).attrs, cur);
             }
             if !(*cur).name_class.is_null() {
-                xmlRelaxNGSimplify(ctxt, (*cur).name_class, cur);
+                xml_relaxng_simplify(ctxt, (*cur).name_class, cur);
             }
             /*
              * On Elements, try to move attribute only generating rules on
@@ -7220,7 +7222,7 @@ unsafe extern "C" fn xmlRelaxNGSimplify(
                 let mut pre: XmlRelaxNGDefinePtr;
 
                 while !(*cur).content.is_null() {
-                    attronly = xmlRelaxNGGenerateAttributes(ctxt, (*cur).content);
+                    attronly = xml_relaxng_generate_attributes(ctxt, (*cur).content);
                     if attronly == 1 {
                         /*
                          * migrate (*cur).content to attrs
@@ -7239,7 +7241,7 @@ unsafe extern "C" fn xmlRelaxNGSimplify(
                 pre = (*cur).content;
                 while !pre.is_null() && !(*pre).next.is_null() {
                     tmp = (*pre).next;
-                    attronly = xmlRelaxNGGenerateAttributes(ctxt, tmp);
+                    attronly = xml_relaxng_generate_attributes(ctxt, tmp);
                     if attronly == 1 {
                         /*
                          * migrate tmp to attrs
@@ -8220,7 +8222,7 @@ unsafe extern "C" fn xml_relaxng_parse_document(
         return null_mut();
     }
 
-    let schema: XmlRelaxNGPtr = xml_relaxng_new_relax_ng(ctxt);
+    let schema: XmlRelaxNGPtr = xml_relaxng_new_relaxng(ctxt);
     if schema.is_null() {
         return null_mut();
     }
@@ -8268,7 +8270,7 @@ unsafe extern "C" fn xml_relaxng_parse_document(
     if !(*(*schema).topgrammar).start.is_null() {
         xml_relaxng_check_cycles(ctxt, (*(*schema).topgrammar).start, 0);
         if (*ctxt).flags & XML_RELAXNG_IN_EXTERNALREF == 0 {
-            xmlRelaxNGSimplify(ctxt, (*(*schema).topgrammar).start, null_mut());
+            xml_relaxng_simplify(ctxt, (*(*schema).topgrammar).start, null_mut());
             while !(*(*schema).topgrammar).start.is_null()
                 && (*(*(*schema).topgrammar).start).typ == XmlRelaxNGType::Noop
                 && !(*(*(*schema).topgrammar).start).next.is_null()
@@ -11344,7 +11346,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
  *
  * Returns 0 if the validation succeeded or an error code.
  */
-unsafe extern "C" fn xmlRelaxNGValidateState(
+unsafe extern "C" fn xml_relaxng_validate_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
 ) -> c_int {
@@ -12209,7 +12211,7 @@ unsafe extern "C" fn xml_relaxng_validate_definition(
             xml_relaxng_free_states(ctxt, (*ctxt).states);
             (*ctxt).states = null_mut();
         }
-        ret = xmlRelaxNGValidateState(ctxt, define);
+        ret = xml_relaxng_validate_state(ctxt, define);
         if !(*ctxt).state.is_null() && !(*ctxt).states.is_null() {
             // TODO
             xml_relaxng_free_valid_state(ctxt, (*ctxt).state);
@@ -12232,7 +12234,7 @@ unsafe extern "C" fn xml_relaxng_validate_definition(
     for i in 0..(*states).nb_state {
         (*ctxt).state = *(*states).tab_state.add(i as usize);
         (*ctxt).states = null_mut();
-        ret = xmlRelaxNGValidateState(ctxt, define);
+        ret = xml_relaxng_validate_state(ctxt, define);
         /*
          * We should NOT have both (*ctxt).state and (*ctxt).states
          */
@@ -12966,20 +12968,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_xml_relax_ngdump() {
+    fn test_xml_relaxng_dump() {
         #[cfg(all(feature = "schema", feature = "output"))]
         unsafe {
             let mut leaks = 0;
 
             for n_output in 0..GEN_NB_FILE_PTR {
-                for n_schema in 0..GEN_NB_XML_RELAX_NGPTR {
+                for n_schema in 0..GEN_NB_XML_RELAXNG_PTR {
                     let mem_base = xml_mem_blocks();
                     let output = gen_file_ptr(n_output, 0);
-                    let schema = gen_xml_relax_ngptr(n_schema, 1);
+                    let schema = gen_xml_relaxng_ptr(n_schema, 1);
 
                     xml_relaxng_dump(output, schema);
                     des_file_ptr(n_output, output, 0);
-                    des_xml_relax_ngptr(n_schema, schema, 1);
+                    des_xml_relaxng_ptr(n_schema, schema, 1);
                     xmlResetLastError();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
@@ -12997,20 +12999,20 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngdump_tree() {
+    fn test_xml_relaxng_dump_tree() {
         #[cfg(all(feature = "schema", feature = "output"))]
         unsafe {
             let mut leaks = 0;
 
             for n_output in 0..GEN_NB_FILE_PTR {
-                for n_schema in 0..GEN_NB_XML_RELAX_NGPTR {
+                for n_schema in 0..GEN_NB_XML_RELAXNG_PTR {
                     let mem_base = xml_mem_blocks();
                     let output = gen_file_ptr(n_output, 0);
-                    let schema = gen_xml_relax_ngptr(n_schema, 1);
+                    let schema = gen_xml_relaxng_ptr(n_schema, 1);
 
                     xml_relaxng_dump_tree(output, schema);
                     des_file_ptr(n_output, output, 0);
-                    des_xml_relax_ngptr(n_schema, schema, 1);
+                    des_xml_relaxng_ptr(n_schema, schema, 1);
                     xmlResetLastError();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
@@ -13031,26 +13033,26 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngget_parser_errors() {
+    fn test_xml_relaxng_get_parser_errors() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
 
-            for n_ctxt in 0..GEN_NB_XML_RELAX_NGPARSER_CTXT_PTR {
-                for n_err in 0..GEN_NB_XML_RELAX_NGVALIDITY_ERROR_FUNC_PTR {
-                    for n_warn in 0..GEN_NB_XML_RELAX_NGVALIDITY_WARNING_FUNC_PTR {
+            for n_ctxt in 0..GEN_NB_XML_RELAXNG_PARSER_CTXT_PTR {
+                for n_err in 0..GEN_NB_XML_RELAXNG_VALIDITY_ERROR_FUNC_PTR {
+                    for n_warn in 0..GEN_NB_XML_RELAXNG_VALIDITY_WARNING_FUNC_PTR {
                         for n_ctx in 0..GEN_NB_VOID_PTR_PTR {
                             let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_relax_ngparser_ctxt_ptr(n_ctxt, 0);
-                            let err = gen_xml_relax_ngvalidity_error_func_ptr(n_err, 1);
-                            let warn = gen_xml_relax_ngvalidity_warning_func_ptr(n_warn, 2);
+                            let ctxt = gen_xml_relaxng_parser_ctxt_ptr(n_ctxt, 0);
+                            let err = gen_xml_relaxng_validity_error_func_ptr(n_err, 1);
+                            let warn = gen_xml_relaxng_validity_warning_func_ptr(n_warn, 2);
                             let ctx = gen_void_ptr_ptr(n_ctx, 3);
 
                             let ret_val = xml_relaxng_get_parser_errors(ctxt, err, warn, ctx);
                             desret_int(ret_val);
-                            des_xml_relax_ngparser_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_xml_relax_ngvalidity_error_func_ptr(n_err, err, 1);
-                            des_xml_relax_ngvalidity_warning_func_ptr(n_warn, warn, 2);
+                            des_xml_relaxng_parser_ctxt_ptr(n_ctxt, ctxt, 0);
+                            des_xml_relaxng_validity_error_func_ptr(n_err, err, 1);
+                            des_xml_relaxng_validity_warning_func_ptr(n_warn, warn, 2);
                             des_void_ptr_ptr(n_ctx, ctx, 3);
                             xmlResetLastError();
                             if mem_base != xml_mem_blocks() {
@@ -13076,26 +13078,26 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngget_valid_errors() {
+    fn test_xml_relaxng_get_valid_errors() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
 
-            for n_ctxt in 0..GEN_NB_XML_RELAX_NGVALID_CTXT_PTR {
-                for n_err in 0..GEN_NB_XML_RELAX_NGVALIDITY_ERROR_FUNC_PTR {
-                    for n_warn in 0..GEN_NB_XML_RELAX_NGVALIDITY_WARNING_FUNC_PTR {
+            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
+                for n_err in 0..GEN_NB_XML_RELAXNG_VALIDITY_ERROR_FUNC_PTR {
+                    for n_warn in 0..GEN_NB_XML_RELAXNG_VALIDITY_WARNING_FUNC_PTR {
                         for n_ctx in 0..GEN_NB_VOID_PTR_PTR {
                             let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_relax_ngvalid_ctxt_ptr(n_ctxt, 0);
-                            let err = gen_xml_relax_ngvalidity_error_func_ptr(n_err, 1);
-                            let warn = gen_xml_relax_ngvalidity_warning_func_ptr(n_warn, 2);
+                            let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
+                            let err = gen_xml_relaxng_validity_error_func_ptr(n_err, 1);
+                            let warn = gen_xml_relaxng_validity_warning_func_ptr(n_warn, 2);
                             let ctx = gen_void_ptr_ptr(n_ctx, 3);
 
                             let ret_val = xml_relaxng_get_valid_errors(ctxt, err, warn, ctx);
                             desret_int(ret_val);
-                            des_xml_relax_ngvalid_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_xml_relax_ngvalidity_error_func_ptr(n_err, err, 1);
-                            des_xml_relax_ngvalidity_warning_func_ptr(n_warn, warn, 2);
+                            des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
+                            des_xml_relaxng_validity_error_func_ptr(n_err, err, 1);
+                            des_xml_relaxng_validity_warning_func_ptr(n_warn, warn, 2);
                             des_void_ptr_ptr(n_ctx, ctx, 3);
                             xmlResetLastError();
                             if mem_base != xml_mem_blocks() {
@@ -13121,7 +13123,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_nginit_types() {
+    fn test_xml_relaxng_init_types() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
@@ -13146,7 +13148,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngnew_doc_parser_ctxt() {
+    fn test_xml_relaxng_new_doc_parser_ctxt() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
@@ -13156,7 +13158,7 @@ mod tests {
                 let doc = gen_xml_doc_ptr(n_doc, 0);
 
                 let ret_val = xml_relaxng_new_doc_parser_ctxt(doc);
-                desret_xml_relax_ngparser_ctxt_ptr(ret_val);
+                desret_xml_relaxng_parser_ctxt_ptr(ret_val);
                 des_xml_doc_ptr(n_doc, doc, 0);
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {
@@ -13176,7 +13178,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngnew_mem_parser_ctxt() {
+    fn test_xml_relaxng_new_mem_parser_ctxt() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
@@ -13190,8 +13192,8 @@ mod tests {
                         size = 0;
                     }
 
-                    let ret_val = xmlRelaxNGNewMemParserCtxt(buffer, size);
-                    desret_xml_relax_ngparser_ctxt_ptr(ret_val);
+                    let ret_val = xml_relaxng_new_mem_parser_ctxt(buffer, size);
+                    desret_xml_relaxng_parser_ctxt_ptr(ret_val);
                     des_const_char_ptr(n_buffer, buffer, 0);
                     des_int(n_size, size, 1);
                     xmlResetLastError();
@@ -13214,7 +13216,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngnew_parser_ctxt() {
+    fn test_xml_relaxng_new_parser_ctxt() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
@@ -13223,8 +13225,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let url = gen_const_char_ptr(n_url, 0);
 
-                let ret_val = xmlRelaxNGNewParserCtxt(url);
-                desret_xml_relax_ngparser_ctxt_ptr(ret_val);
+                let ret_val = xml_relaxng_new_parser_ctxt(url);
+                desret_xml_relaxng_parser_ctxt_ptr(ret_val);
                 des_const_char_ptr(n_url, url, 0);
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {
@@ -13244,56 +13246,56 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngnew_valid_ctxt() {
+    fn test_xml_relaxng_new_valid_ctxt() {
 
         /* missing type support */
     }
 
     #[test]
-    fn test_xml_relax_ngparse() {
+    fn test_xml_relaxng_parse() {
 
         /* missing type support */
     }
 
     #[test]
-    fn test_xml_relax_ngset_parser_errors() {
+    fn test_xml_relaxng_set_parser_errors() {
 
         /* missing type support */
     }
 
     #[test]
-    fn test_xml_relax_ngset_parser_structured_errors() {
+    fn test_xml_relaxng_set_parser_structured_errors() {
 
         /* missing type support */
     }
 
     #[test]
-    fn test_xml_relax_ngset_valid_errors() {
+    fn test_xml_relaxng_set_valid_errors() {
 
         /* missing type support */
     }
 
     #[test]
-    fn test_xml_relax_ngset_valid_structured_errors() {
+    fn test_xml_relaxng_set_valid_structured_errors() {
 
         /* missing type support */
     }
 
     #[test]
-    fn test_xml_relax_ngvalidate_doc() {
+    fn test_xml_relaxng_validate_doc() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
 
-            for n_ctxt in 0..GEN_NB_XML_RELAX_NGVALID_CTXT_PTR {
+            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
                 for n_doc in 0..GEN_NB_XML_DOC_PTR {
                     let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_relax_ngvalid_ctxt_ptr(n_ctxt, 0);
+                    let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
                     let ret_val = xml_relaxng_validate_doc(ctxt, doc);
                     desret_int(ret_val);
-                    des_xml_relax_ngvalid_ctxt_ptr(n_ctxt, ctxt, 0);
+                    des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
                     xmlResetLastError();
                     if mem_base != xml_mem_blocks() {
@@ -13315,22 +13317,22 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngvalidate_full_element() {
+    fn test_xml_relaxng_validate_full_element() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
 
-            for n_ctxt in 0..GEN_NB_XML_RELAX_NGVALID_CTXT_PTR {
+            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
                 for n_doc in 0..GEN_NB_XML_DOC_PTR {
                     for n_elem in 0..GEN_NB_XML_NODE_PTR {
                         let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_relax_ngvalid_ctxt_ptr(n_ctxt, 0);
+                        let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
                         let doc = gen_xml_doc_ptr(n_doc, 1);
                         let elem = gen_xml_node_ptr(n_elem, 2);
 
                         let ret_val = xml_relaxng_validate_full_element(ctxt, doc, elem);
                         desret_int(ret_val);
-                        des_xml_relax_ngvalid_ctxt_ptr(n_ctxt, ctxt, 0);
+                        des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_elem, elem, 2);
                         xmlResetLastError();
@@ -13355,22 +13357,22 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngvalidate_pop_element() {
+    fn test_xml_relaxng_validate_pop_element() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
 
-            for n_ctxt in 0..GEN_NB_XML_RELAX_NGVALID_CTXT_PTR {
+            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
                 for n_doc in 0..GEN_NB_XML_DOC_PTR {
                     for n_elem in 0..GEN_NB_XML_NODE_PTR {
                         let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_relax_ngvalid_ctxt_ptr(n_ctxt, 0);
+                        let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
                         let doc = gen_xml_doc_ptr(n_doc, 1);
                         let elem = gen_xml_node_ptr(n_elem, 2);
 
                         let ret_val = xml_relaxng_validate_pop_element(ctxt, doc, elem);
                         desret_int(ret_val);
-                        des_xml_relax_ngvalid_ctxt_ptr(n_ctxt, ctxt, 0);
+                        des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_elem, elem, 2);
                         xmlResetLastError();
@@ -13395,16 +13397,16 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngvalidate_push_cdata() {
+    fn test_xml_relaxng_validate_push_cdata() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
 
-            for n_ctxt in 0..GEN_NB_XML_RELAX_NGVALID_CTXT_PTR {
+            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
                 for n_data in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_len in 0..GEN_NB_INT {
                         let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_relax_ngvalid_ctxt_ptr(n_ctxt, 0);
+                        let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
                         let data = gen_const_xml_char_ptr(n_data, 1);
                         let mut len = gen_int(n_len, 2);
                         if !data.is_null() && len > xml_strlen(data) {
@@ -13413,7 +13415,7 @@ mod tests {
 
                         let ret_val = xml_relaxng_validate_push_cdata(ctxt, data, len);
                         desret_int(ret_val);
-                        des_xml_relax_ngvalid_ctxt_ptr(n_ctxt, ctxt, 0);
+                        des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_const_xml_char_ptr(n_data, data, 1);
                         des_int(n_len, len, 2);
                         xmlResetLastError();
@@ -13438,22 +13440,22 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relax_ngvalidate_push_element() {
+    fn test_xml_relaxng_validate_push_element() {
         #[cfg(feature = "schema")]
         unsafe {
             let mut leaks = 0;
 
-            for n_ctxt in 0..GEN_NB_XML_RELAX_NGVALID_CTXT_PTR {
+            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
                 for n_doc in 0..GEN_NB_XML_DOC_PTR {
                     for n_elem in 0..GEN_NB_XML_NODE_PTR {
                         let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_relax_ngvalid_ctxt_ptr(n_ctxt, 0);
+                        let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
                         let doc = gen_xml_doc_ptr(n_doc, 1);
                         let elem = gen_xml_node_ptr(n_elem, 2);
 
                         let ret_val = xml_relaxng_validate_push_element(ctxt, doc, elem);
                         desret_int(ret_val);
-                        des_xml_relax_ngvalid_ctxt_ptr(n_ctxt, ctxt, 0);
+                        des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_elem, elem, 2);
                         xmlResetLastError();
@@ -13483,15 +13485,15 @@ mod tests {
         unsafe {
             let mut leaks = 0;
 
-            for n_ctxt in 0..GEN_NB_XML_RELAX_NGPARSER_CTXT_PTR {
+            for n_ctxt in 0..GEN_NB_XML_RELAXNG_PARSER_CTXT_PTR {
                 for n_flags in 0..GEN_NB_INT {
                     let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_relax_ngparser_ctxt_ptr(n_ctxt, 0);
+                    let ctxt = gen_xml_relaxng_parser_ctxt_ptr(n_ctxt, 0);
                     let flags = gen_int(n_flags, 1);
 
                     let ret_val = xml_relax_parser_set_flag(ctxt, flags);
                     desret_int(ret_val);
-                    des_xml_relax_ngparser_ctxt_ptr(n_ctxt, ctxt, 0);
+                    des_xml_relaxng_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_int(n_flags, flags, 1);
                     xmlResetLastError();
                     if mem_base != xml_mem_blocks() {
