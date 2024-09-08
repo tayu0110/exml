@@ -57,9 +57,9 @@ use exml::{
             XmlRelaxNG, XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr,
         },
         schematron::{
-            xmlSchematronFree, xmlSchematronFreeParserCtxt, xmlSchematronFreeValidCtxt,
-            xmlSchematronNewParserCtxt, xmlSchematronNewValidCtxt, xmlSchematronParse,
-            xmlSchematronValidateDoc, XmlSchematron, XmlSchematronParserCtxtPtr,
+            xml_schematron_free, xml_schematron_free_parser_ctxt, xml_schematron_free_valid_ctxt,
+            xml_schematron_new_parser_ctxt, xml_schematron_new_valid_ctxt, xml_schematron_parse,
+            xml_schematron_validate_doc, XmlSchematron, XmlSchematronParserCtxtPtr,
             XmlSchematronValidCtxtPtr, XmlSchematronValidOptions,
         },
         tree::{
@@ -3191,13 +3191,13 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             flag |= XmlSchematronValidOptions::XmlSchematronOutQuiet as i32;
         }
         let ctxt: XmlSchematronValidCtxtPtr =
-            xmlSchematronNewValidCtxt(WXSCHEMATRON.load(Ordering::Relaxed), flag);
+            xml_schematron_new_valid_ctxt(WXSCHEMATRON.load(Ordering::Relaxed), flag);
         if ctxt.is_null() {
             PROGRESULT = XmllintReturnCode::ErrMem;
             xml_free_doc(doc);
             return;
         }
-        match xmlSchematronValidateDoc(ctxt, doc).cmp(&0) {
+        match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
                 if QUIET == 0 {
                     eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
@@ -3218,7 +3218,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
         }
-        xmlSchematronFreeValidCtxt(ctxt);
+        xml_schematron_free_valid_ctxt(ctxt);
         if TIMING != 0 && REPEAT == 0 {
             end_timer!("Validating");
         }
@@ -4083,7 +4083,7 @@ fn main() {
                 if TIMING != 0 {
                     start_timer();
                 }
-                let ctxt: XmlSchematronParserCtxtPtr = xmlSchematronNewParserCtxt(s.as_ptr());
+                let ctxt: XmlSchematronParserCtxtPtr = xml_schematron_new_parser_ctxt(s.as_ptr());
                 if ctxt.is_null() {
                     PROGRESULT = XmllintReturnCode::ErrMem;
                     // goto error;
@@ -4091,7 +4091,7 @@ fn main() {
                     xml_memory_dump();
                     exit(PROGRESULT as i32);
                 }
-                WXSCHEMATRON.store(xmlSchematronParse(ctxt), Ordering::Relaxed);
+                WXSCHEMATRON.store(xml_schematron_parse(ctxt), Ordering::Relaxed);
                 if WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
                     xml_generic_error!(
                         xml_generic_error_context(),
@@ -4101,7 +4101,7 @@ fn main() {
                     PROGRESULT = XmllintReturnCode::ErrSchemacomp;
                     *schematron = None;
                 }
-                xmlSchematronFreeParserCtxt(ctxt);
+                xml_schematron_free_parser_ctxt(ctxt);
                 if TIMING != 0 {
                     end_timer!("Compiling the schemas");
                 }
@@ -4282,7 +4282,7 @@ fn main() {
         {
             let wxschematron = WXSCHEMATRON.load(Ordering::Relaxed);
             if !wxschematron.is_null() {
-                xmlSchematronFree(wxschematron);
+                xml_schematron_free(wxschematron);
             }
         }
         #[cfg(feature = "schema")]
