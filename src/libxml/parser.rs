@@ -9372,7 +9372,7 @@ unsafe extern "C" fn xml_check_cdata_push(
     len: c_int,
     complete: c_int,
 ) -> c_int {
-    use crate::xmlIsCharQ;
+    use crate::xml_is_char_q;
 
     let mut ix: c_int;
     let mut c: c_uchar;
@@ -9403,7 +9403,7 @@ unsafe extern "C" fn xml_check_cdata_push(
             }
             codepoint = (*utf.add(ix as usize) as i32 & 0x1f) << 6;
             codepoint |= *utf.add(ix as usize + 1) as i32 & 0x3f;
-            if !xmlIsCharQ!(codepoint) {
+            if !xml_is_char_q!(codepoint) {
                 return -ix;
             }
             ix += 2;
@@ -9419,7 +9419,7 @@ unsafe extern "C" fn xml_check_cdata_push(
             codepoint = (*utf.add(ix as usize) as i32 & 0xf) << 12;
             codepoint |= (*utf.add(ix as usize + 1) as i32 & 0x3f) << 6;
             codepoint |= *utf.add(ix as usize + 2) as i32 & 0x3f;
-            if !xmlIsCharQ!(codepoint) {
+            if !xml_is_char_q!(codepoint) {
                 return -ix;
             }
             ix += 3;
@@ -9438,7 +9438,7 @@ unsafe extern "C" fn xml_check_cdata_push(
             codepoint |= (*utf.add(ix as usize + 1) as i32 & 0x3f) << 12;
             codepoint |= (*utf.add(ix as usize + 2) as i32 & 0x3f) << 6;
             codepoint |= *utf.add(ix as usize + 3) as i32 & 0x3f;
-            if !xmlIsCharQ!(codepoint) {
+            if !xml_is_char_q!(codepoint) {
                 return -ix;
             }
             ix += 4;

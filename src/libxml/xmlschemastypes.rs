@@ -52,7 +52,7 @@ use crate::{
         xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
     },
     private::error::__xml_simple_error,
-    xmlIsDigit_ch, IS_BLANK_CH,
+    xml_is_digit_ch, IS_BLANK_CH,
 };
 
 #[repr(C)]
@@ -2206,7 +2206,7 @@ unsafe extern "C" fn xml_schema_check_language_type(value: *const XmlChar) -> c_
         if !((*cur.add(0) >= b'a' && *cur.add(0) <= b'z')
             || (*cur.add(0) >= b'A' && *cur.add(0) <= b'Z')
             || *cur.add(0) == b'-'
-            || (first == 0 && xmlIsDigit_ch!(*cur.add(0))))
+            || (first == 0 && xml_is_digit_ch!(*cur.add(0))))
         {
             return 0;
         }

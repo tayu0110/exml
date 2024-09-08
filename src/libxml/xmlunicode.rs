@@ -10,7 +10,7 @@ use std::{
 
 use libc::strcmp;
 
-use super::chvalid::{xmlCharInRange, XmlChLRange, XmlChRangeGroup, XmlChSRange};
+use super::chvalid::{xml_char_in_range, XmlChLRange, XmlChRangeGroup, XmlChSRange};
 
 pub type XmlIntFunc = unsafe extern "C" fn(c_int) -> c_int; /* just to keep one's mind untwisted */
 
@@ -12652,7 +12652,7 @@ pub unsafe extern "C" fn xmlUCSIsBlock(code: c_int, block: *const c_char) -> c_i
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatC(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_CG) as i32
+    xml_char_in_range(code as c_uint, &XML_CG) as i32
 }
 
 /**
@@ -12676,7 +12676,7 @@ pub unsafe extern "C" fn xmlUCSIsCatCc(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatCf(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_CF_G) as i32
+    xml_char_in_range(code as c_uint, &XML_CF_G) as i32
 }
 
 /**
@@ -12720,7 +12720,7 @@ pub unsafe extern "C" fn xmlUCSIsCatCs(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatL(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_LG)
+    xml_char_in_range(code as c_uint, &XML_LG)
 }
 
 /**
@@ -12732,7 +12732,7 @@ pub unsafe extern "C" fn xmlUCSIsCatL(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatLl(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_LL_G)
+    xml_char_in_range(code as c_uint, &XML_LL_G)
 }
 
 /**
@@ -12744,7 +12744,7 @@ pub unsafe extern "C" fn xmlUCSIsCatLl(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatLm(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_LM_G)
+    xml_char_in_range(code as c_uint, &XML_LM_G)
 }
 
 /**
@@ -12756,7 +12756,7 @@ pub unsafe extern "C" fn xmlUCSIsCatLm(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatLo(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_LO_G)
+    xml_char_in_range(code as c_uint, &XML_LO_G)
 }
 
 /**
@@ -12768,7 +12768,7 @@ pub unsafe extern "C" fn xmlUCSIsCatLo(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatLt(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_LT_G)
+    xml_char_in_range(code as c_uint, &XML_LT_G)
 }
 
 /**
@@ -12780,7 +12780,7 @@ pub unsafe extern "C" fn xmlUCSIsCatLt(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatLu(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_LU_G)
+    xml_char_in_range(code as c_uint, &XML_LU_G)
 }
 
 /**
@@ -12792,7 +12792,7 @@ pub unsafe extern "C" fn xmlUCSIsCatLu(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatM(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_MG)
+    xml_char_in_range(code as c_uint, &XML_MG)
 }
 
 /**
@@ -12804,7 +12804,7 @@ pub unsafe extern "C" fn xmlUCSIsCatM(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatMc(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_MC_G)
+    xml_char_in_range(code as c_uint, &XML_MC_G)
 }
 
 /**
@@ -12831,7 +12831,7 @@ pub unsafe extern "C" fn xmlUCSIsCatMe(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatMn(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_MN_G)
+    xml_char_in_range(code as c_uint, &XML_MN_G)
 }
 
 /**
@@ -12843,7 +12843,7 @@ pub unsafe extern "C" fn xmlUCSIsCatMn(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatN(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_NG)
+    xml_char_in_range(code as c_uint, &XML_NG)
 }
 
 /**
@@ -12855,7 +12855,7 @@ pub unsafe extern "C" fn xmlUCSIsCatN(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatNd(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_ND_G)
+    xml_char_in_range(code as c_uint, &XML_ND_G)
 }
 
 /**
@@ -12884,7 +12884,7 @@ pub unsafe extern "C" fn xmlUCSIsCatNl(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatNo(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_NO_G)
+    xml_char_in_range(code as c_uint, &XML_NO_G)
 }
 
 /**
@@ -12896,7 +12896,7 @@ pub unsafe extern "C" fn xmlUCSIsCatNo(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatP(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_PG)
+    xml_char_in_range(code as c_uint, &XML_PG)
 }
 
 /**
@@ -12927,7 +12927,7 @@ pub unsafe extern "C" fn xmlUCSIsCatPc(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatPd(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_PD_G)
+    xml_char_in_range(code as c_uint, &XML_PD_G)
 }
 
 /**
@@ -12939,7 +12939,7 @@ pub unsafe extern "C" fn xmlUCSIsCatPd(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatPe(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_PE_G)
+    xml_char_in_range(code as c_uint, &XML_PE_G)
 }
 
 /**
@@ -12979,7 +12979,7 @@ pub unsafe extern "C" fn xmlUCSIsCatPi(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatPo(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_PO_G)
+    xml_char_in_range(code as c_uint, &XML_PO_G)
 }
 
 /**
@@ -12991,7 +12991,7 @@ pub unsafe extern "C" fn xmlUCSIsCatPo(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatPs(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_PS_G)
+    xml_char_in_range(code as c_uint, &XML_PS_G)
 }
 
 /**
@@ -13003,7 +13003,7 @@ pub unsafe extern "C" fn xmlUCSIsCatPs(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatS(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_SG)
+    xml_char_in_range(code as c_uint, &XML_SG)
 }
 
 /**
@@ -13015,7 +13015,7 @@ pub unsafe extern "C" fn xmlUCSIsCatS(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatSc(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_SC_G)
+    xml_char_in_range(code as c_uint, &XML_SC_G)
 }
 
 /**
@@ -13027,7 +13027,7 @@ pub unsafe extern "C" fn xmlUCSIsCatSc(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatSk(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_SK_G)
+    xml_char_in_range(code as c_uint, &XML_SK_G)
 }
 
 /**
@@ -13039,7 +13039,7 @@ pub unsafe extern "C" fn xmlUCSIsCatSk(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatSm(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_SM_G)
+    xml_char_in_range(code as c_uint, &XML_SM_G)
 }
 
 /**
@@ -13051,7 +13051,7 @@ pub unsafe extern "C" fn xmlUCSIsCatSm(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatSo(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_SO_G)
+    xml_char_in_range(code as c_uint, &XML_SO_G)
 }
 
 /**
@@ -13063,7 +13063,7 @@ pub unsafe extern "C" fn xmlUCSIsCatSo(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xmlUCSIsCatZ(code: c_int) -> c_int {
-    xmlCharInRange(code as c_uint, &XML_ZG)
+    xml_char_in_range(code as c_uint, &XML_ZG)
 }
 
 /**

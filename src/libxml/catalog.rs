@@ -26,7 +26,8 @@ use crate::{
         xmlstring::xml_str_equal,
     },
     private::buf::xml_buf_reset_input,
-    xml_generic_error, XmlIsBlankCh, IS_BLANK_CH, IS_DIGIT, IS_LETTER, IS_PUBIDCHAR_CH, SYSCONFDIR,
+    xml_generic_error, xml_is_blank_ch, IS_BLANK_CH, IS_DIGIT, IS_LETTER, IS_PUBIDCHAR_CH,
+    SYSCONFDIR,
 };
 
 use super::{
@@ -492,7 +493,7 @@ unsafe extern "C" fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mu
     white = 1;
     let mut p = pub_id;
     while *p != 0 && ok != 0 {
-        if !XmlIsBlankCh!(*p) {
+        if !xml_is_blank_ch!(*p) {
             white = 0;
         } else if *p == 0x20 && white == 0 {
             white = 1;
@@ -511,7 +512,7 @@ unsafe extern "C" fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mu
     white = 0;
     p = pub_id;
     while *p != 0 {
-        if XmlIsBlankCh!(*p) {
+        if xml_is_blank_ch!(*p) {
             if q != ret {
                 white = 1;
             }
@@ -3529,12 +3530,12 @@ pub unsafe extern "C" fn xml_initialize_catalog() {
             cur = catalogs;
             nextent = addr_of_mut!((*catal).xml);
             while *cur != b'\0' as i8 {
-                while XmlIsBlankCh!(*cur) {
+                while xml_is_blank_ch!(*cur) {
                     cur = cur.add(1);
                 }
                 if *cur != 0 {
                     paths = cur;
-                    while *cur != 0 && !XmlIsBlankCh!(*cur) {
+                    while *cur != 0 && !xml_is_blank_ch!(*cur) {
                         cur = cur.add(1);
                     }
                     path = xml_strndup(paths as _, cur.offset_from(paths) as _) as _;
@@ -3629,12 +3630,12 @@ pub unsafe extern "C" fn xml_load_catalogs(pathss: *const c_char) {
 
     cur = pathss;
     while *cur != 0 {
-        while XmlIsBlankCh!(*cur) {
+        while xml_is_blank_ch!(*cur) {
             cur = cur.add(1);
         }
         if *cur != 0 {
             paths = cur;
-            while *cur != 0 && *cur != PATH_SEPARATOR as i8 && !XmlIsBlankCh!(*cur) {
+            while *cur != 0 && *cur != PATH_SEPARATOR as i8 && !xml_is_blank_ch!(*cur) {
                 cur = cur.add(1);
             }
             path = xml_strndup(paths as _, cur.offset_from(paths) as _);
