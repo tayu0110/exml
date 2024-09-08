@@ -18,7 +18,7 @@ use crate::{
     __xml_raise_error,
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
-        globals::{xmlGenericErrorContext, xml_free, xml_malloc},
+        globals::{xml_free, xml_malloc},
         hash::{
             xml_hash_add_entry, xml_hash_copy, xml_hash_create, xml_hash_create_dict,
             xml_hash_free, xml_hash_lookup, xml_hash_scan, XmlHashTable,
@@ -35,7 +35,7 @@ use crate::{
         },
     },
     private::error::__xml_simple_error,
-    xml_generic_error, IS_BYTE_CHAR, IS_CHAR,
+    IS_BYTE_CHAR, IS_CHAR,
 };
 
 /*

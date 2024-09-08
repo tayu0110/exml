@@ -6,7 +6,6 @@
 use std::{
     ffi::{c_int, c_uint, c_ulong},
     mem::{size_of, zeroed},
-    ops::Add,
     ptr::{addr_of_mut, null, null_mut},
 };
 
