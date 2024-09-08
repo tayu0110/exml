@@ -29,515 +29,515 @@ pub struct XmlUnicodeNameTable {
 const XML_UNICODE_BLOCKS: *const XmlUnicodeRange = [
     XmlUnicodeRange {
         rangename: c"AegeanNumbers".as_ptr(),
-        func: xmlUCSIsAegeanNumbers,
+        func: xml_ucs_is_aegean_numbers,
     },
     XmlUnicodeRange {
         rangename: c"AlphabeticPresentationForms".as_ptr(),
-        func: xmlUCSIsAlphabeticPresentationForms,
+        func: xml_ucs_is_alphabetic_presentation_forms,
     },
     XmlUnicodeRange {
         rangename: c"Arabic".as_ptr(),
-        func: xmlUCSIsArabic,
+        func: xml_ucs_is_arabic,
     },
     XmlUnicodeRange {
         rangename: c"ArabicPresentationForms-A".as_ptr(),
-        func: xmlUCSIsArabicPresentationFormsA,
+        func: xml_ucs_is_arabic_presentation_forms_a,
     },
     XmlUnicodeRange {
         rangename: c"ArabicPresentationForms-B".as_ptr(),
-        func: xmlUCSIsArabicPresentationFormsB,
+        func: xml_ucs_is_arabic_presentation_forms_b,
     },
     XmlUnicodeRange {
         rangename: c"Armenian".as_ptr(),
-        func: xmlUCSIsArmenian,
+        func: xml_ucs_is_armenian,
     },
     XmlUnicodeRange {
         rangename: c"Arrows".as_ptr(),
-        func: xmlUCSIsArrows,
+        func: xml_ucs_is_arrows,
     },
     XmlUnicodeRange {
         rangename: c"BasicLatin".as_ptr(),
-        func: xmlUCSIsBasicLatin,
+        func: xml_ucs_is_basic_latin,
     },
     XmlUnicodeRange {
         rangename: c"Bengali".as_ptr(),
-        func: xmlUCSIsBengali,
+        func: xml_ucs_is_bengali,
     },
     XmlUnicodeRange {
         rangename: c"BlockElements".as_ptr(),
-        func: xmlUCSIsBlockElements,
+        func: xml_ucs_is_block_elements,
     },
     XmlUnicodeRange {
         rangename: c"Bopomofo".as_ptr(),
-        func: xmlUCSIsBopomofo,
+        func: xml_ucs_is_bopomofo,
     },
     XmlUnicodeRange {
         rangename: c"BopomofoExtended".as_ptr(),
-        func: xmlUCSIsBopomofoExtended,
+        func: xml_ucs_is_bopomofo_extended,
     },
     XmlUnicodeRange {
         rangename: c"BoxDrawing".as_ptr(),
-        func: xmlUCSIsBoxDrawing,
+        func: xml_ucs_is_box_drawing,
     },
     XmlUnicodeRange {
         rangename: c"BraillePatterns".as_ptr(),
-        func: xmlUCSIsBraillePatterns,
+        func: xml_ucs_is_braille_patterns,
     },
     XmlUnicodeRange {
         rangename: c"Buhid".as_ptr(),
-        func: xmlUCSIsBuhid,
+        func: xml_ucs_is_buhid,
     },
     XmlUnicodeRange {
         rangename: c"ByzantineMusicalSymbols".as_ptr(),
-        func: xmlUCSIsByzantineMusicalSymbols,
+        func: xml_ucs_is_byzantine_musical_symbols,
     },
     XmlUnicodeRange {
         rangename: c"CJKCompatibility".as_ptr(),
-        func: xmlUCSIsCJKCompatibility,
+        func: xml_ucs_is_cjk_compatibility,
     },
     XmlUnicodeRange {
         rangename: c"CJKCompatibilityForms".as_ptr(),
-        func: xmlUCSIsCJKCompatibilityForms,
+        func: xml_ucs_is_cjk_compatibility_forms,
     },
     XmlUnicodeRange {
         rangename: c"CJKCompatibilityIdeographs".as_ptr(),
-        func: xmlUCSIsCJKCompatibilityIdeographs,
+        func: xml_ucs_is_cjk_compatibility_ideographs,
     },
     XmlUnicodeRange {
         rangename: c"CJKCompatibilityIdeographsSupplement".as_ptr(),
-        func: xmlUCSIsCJKCompatibilityIdeographsSupplement,
+        func: xml_ucs_is_cjk_compatibility_ideographs_supplement,
     },
     XmlUnicodeRange {
         rangename: c"CJKRadicalsSupplement".as_ptr(),
-        func: xmlUCSIsCJKRadicalsSupplement,
+        func: xml_ucs_is_cjk_radicals_supplement,
     },
     XmlUnicodeRange {
         rangename: c"CJKSymbolsandPunctuation".as_ptr(),
-        func: xmlUCSIsCJKSymbolsandPunctuation,
+        func: xml_ucs_is_cjk_symbolsand_punctuation,
     },
     XmlUnicodeRange {
         rangename: c"CJKUnifiedIdeographs".as_ptr(),
-        func: xmlUCSIsCJKUnifiedIdeographs,
+        func: xml_ucs_is_cjk_unified_ideographs,
     },
     XmlUnicodeRange {
         rangename: c"CJKUnifiedIdeographsExtensionA".as_ptr(),
-        func: xmlUCSIsCJKUnifiedIdeographsExtensionA,
+        func: xml_ucs_is_cjk_unified_ideographs_extension_a,
     },
     XmlUnicodeRange {
         rangename: c"CJKUnifiedIdeographsExtensionB".as_ptr(),
-        func: xmlUCSIsCJKUnifiedIdeographsExtensionB,
+        func: xml_ucs_is_cjk_unified_ideographs_extension_b,
     },
     XmlUnicodeRange {
         rangename: c"Cherokee".as_ptr(),
-        func: xmlUCSIsCherokee,
+        func: xml_ucs_is_cherokee,
     },
     XmlUnicodeRange {
         rangename: c"CombiningDiacriticalMarks".as_ptr(),
-        func: xmlUCSIsCombiningDiacriticalMarks,
+        func: xml_ucs_is_combining_diacritical_marks,
     },
     XmlUnicodeRange {
         rangename: c"CombiningDiacriticalMarksforSymbols".as_ptr(),
-        func: xmlUCSIsCombiningDiacriticalMarksforSymbols,
+        func: xml_ucs_is_combining_diacritical_marksfor_symbols,
     },
     XmlUnicodeRange {
         rangename: c"CombiningHalfMarks".as_ptr(),
-        func: xmlUCSIsCombiningHalfMarks,
+        func: xml_ucs_is_combining_half_marks,
     },
     XmlUnicodeRange {
         rangename: c"CombiningMarksforSymbols".as_ptr(),
-        func: xmlUCSIsCombiningMarksforSymbols,
+        func: xml_ucs_is_combining_marksfor_symbols,
     },
     XmlUnicodeRange {
         rangename: c"ControlPictures".as_ptr(),
-        func: xmlUCSIsControlPictures,
+        func: xml_ucs_is_control_pictures,
     },
     XmlUnicodeRange {
         rangename: c"CurrencySymbols".as_ptr(),
-        func: xmlUCSIsCurrencySymbols,
+        func: xml_ucs_is_currency_symbols,
     },
     XmlUnicodeRange {
         rangename: c"CypriotSyllabary".as_ptr(),
-        func: xmlUCSIsCypriotSyllabary,
+        func: xml_ucs_is_cypriot_syllabary,
     },
     XmlUnicodeRange {
         rangename: c"Cyrillic".as_ptr(),
-        func: xmlUCSIsCyrillic,
+        func: xml_ucs_is_cyrillic,
     },
     XmlUnicodeRange {
         rangename: c"CyrillicSupplement".as_ptr(),
-        func: xmlUCSIsCyrillicSupplement,
+        func: xml_ucs_is_cyrillic_supplement,
     },
     XmlUnicodeRange {
         rangename: c"Deseret".as_ptr(),
-        func: xmlUCSIsDeseret,
+        func: xml_ucs_is_deseret,
     },
     XmlUnicodeRange {
         rangename: c"Devanagari".as_ptr(),
-        func: xmlUCSIsDevanagari,
+        func: xml_ucs_is_devanagari,
     },
     XmlUnicodeRange {
         rangename: c"Dingbats".as_ptr(),
-        func: xmlUCSIsDingbats,
+        func: xml_ucs_is_dingbats,
     },
     XmlUnicodeRange {
         rangename: c"EnclosedAlphanumerics".as_ptr(),
-        func: xmlUCSIsEnclosedAlphanumerics,
+        func: xml_ucs_is_enclosed_alphanumerics,
     },
     XmlUnicodeRange {
         rangename: c"EnclosedCJKLettersandMonths".as_ptr(),
-        func: xmlUCSIsEnclosedCJKLettersandMonths,
+        func: xml_ucs_is_enclosed_cjk_lettersand_months,
     },
     XmlUnicodeRange {
         rangename: c"Ethiopic".as_ptr(),
-        func: xmlUCSIsEthiopic,
+        func: xml_ucs_is_ethiopic,
     },
     XmlUnicodeRange {
         rangename: c"GeneralPunctuation".as_ptr(),
-        func: xmlUCSIsGeneralPunctuation,
+        func: xml_ucs_is_general_punctuation,
     },
     XmlUnicodeRange {
         rangename: c"GeometricShapes".as_ptr(),
-        func: xmlUCSIsGeometricShapes,
+        func: xml_ucs_is_geometric_shapes,
     },
     XmlUnicodeRange {
         rangename: c"Georgian".as_ptr(),
-        func: xmlUCSIsGeorgian,
+        func: xml_ucs_is_georgian,
     },
     XmlUnicodeRange {
         rangename: c"Gothic".as_ptr(),
-        func: xmlUCSIsGothic,
+        func: xml_ucs_is_gothic,
     },
     XmlUnicodeRange {
         rangename: c"Greek".as_ptr(),
-        func: xmlUCSIsGreek,
+        func: xml_ucs_is_greek,
     },
     XmlUnicodeRange {
         rangename: c"GreekExtended".as_ptr(),
-        func: xmlUCSIsGreekExtended,
+        func: xml_ucs_is_greek_extended,
     },
     XmlUnicodeRange {
         rangename: c"GreekandCoptic".as_ptr(),
-        func: xmlUCSIsGreekandCoptic,
+        func: xml_ucs_is_greekand_coptic,
     },
     XmlUnicodeRange {
         rangename: c"Gujarati".as_ptr(),
-        func: xmlUCSIsGujarati,
+        func: xml_ucs_is_gujarati,
     },
     XmlUnicodeRange {
         rangename: c"Gurmukhi".as_ptr(),
-        func: xmlUCSIsGurmukhi,
+        func: xml_ucs_is_gurmukhi,
     },
     XmlUnicodeRange {
         rangename: c"HalfwidthandFullwidthForms".as_ptr(),
-        func: xmlUCSIsHalfwidthandFullwidthForms,
+        func: xml_ucs_is_halfwidthand_fullwidth_forms,
     },
     XmlUnicodeRange {
         rangename: c"HangulCompatibilityJamo".as_ptr(),
-        func: xmlUCSIsHangulCompatibilityJamo,
+        func: xml_ucs_is_hangul_compatibility_jamo,
     },
     XmlUnicodeRange {
         rangename: c"HangulJamo".as_ptr(),
-        func: xmlUCSIsHangulJamo,
+        func: xml_ucs_is_hangul_jamo,
     },
     XmlUnicodeRange {
         rangename: c"HangulSyllables".as_ptr(),
-        func: xmlUCSIsHangulSyllables,
+        func: xml_ucs_is_hangul_syllables,
     },
     XmlUnicodeRange {
         rangename: c"Hanunoo".as_ptr(),
-        func: xmlUCSIsHanunoo,
+        func: xml_ucs_is_hanunoo,
     },
     XmlUnicodeRange {
         rangename: c"Hebrew".as_ptr(),
-        func: xmlUCSIsHebrew,
+        func: xml_ucs_is_hebrew,
     },
     XmlUnicodeRange {
         rangename: c"HighPrivateUseSurrogates".as_ptr(),
-        func: xmlUCSIsHighPrivateUseSurrogates,
+        func: xml_ucs_is_high_private_use_surrogates,
     },
     XmlUnicodeRange {
         rangename: c"HighSurrogates".as_ptr(),
-        func: xmlUCSIsHighSurrogates,
+        func: xml_ucs_is_high_surrogates,
     },
     XmlUnicodeRange {
         rangename: c"Hiragana".as_ptr(),
-        func: xmlUCSIsHiragana,
+        func: xml_ucs_is_hiragana,
     },
     XmlUnicodeRange {
         rangename: c"IPAExtensions".as_ptr(),
-        func: xmlUCSIsIPAExtensions,
+        func: xml_ucs_is_ipa_extensions,
     },
     XmlUnicodeRange {
         rangename: c"IdeographicDescriptionCharacters".as_ptr(),
-        func: xmlUCSIsIdeographicDescriptionCharacters,
+        func: xml_ucs_is_ideographic_description_characters,
     },
     XmlUnicodeRange {
         rangename: c"Kanbun".as_ptr(),
-        func: xmlUCSIsKanbun,
+        func: xml_ucs_is_kanbun,
     },
     XmlUnicodeRange {
         rangename: c"KangxiRadicals".as_ptr(),
-        func: xmlUCSIsKangxiRadicals,
+        func: xml_ucs_is_kangxi_radicals,
     },
     XmlUnicodeRange {
         rangename: c"Kannada".as_ptr(),
-        func: xmlUCSIsKannada,
+        func: xml_ucs_is_kannada,
     },
     XmlUnicodeRange {
         rangename: c"Katakana".as_ptr(),
-        func: xmlUCSIsKatakana,
+        func: xml_ucs_is_katakana,
     },
     XmlUnicodeRange {
         rangename: c"KatakanaPhoneticExtensions".as_ptr(),
-        func: xmlUCSIsKatakanaPhoneticExtensions,
+        func: xml_ucs_is_katakana_phonetic_extensions,
     },
     XmlUnicodeRange {
         rangename: c"Khmer".as_ptr(),
-        func: xmlUCSIsKhmer,
+        func: xml_ucs_is_khmer,
     },
     XmlUnicodeRange {
         rangename: c"KhmerSymbols".as_ptr(),
-        func: xmlUCSIsKhmerSymbols,
+        func: xml_ucs_is_khmer_symbols,
     },
     XmlUnicodeRange {
         rangename: c"Lao".as_ptr(),
-        func: xmlUCSIsLao,
+        func: xml_ucs_is_lao,
     },
     XmlUnicodeRange {
         rangename: c"Latin-1Supplement".as_ptr(),
-        func: xmlUCSIsLatin1Supplement,
+        func: xml_ucs_is_latin1_supplement,
     },
     XmlUnicodeRange {
         rangename: c"LatinExtended-A".as_ptr(),
-        func: xmlUCSIsLatinExtendedA,
+        func: xml_ucs_is_latin_extended_a,
     },
     XmlUnicodeRange {
         rangename: c"LatinExtended-B".as_ptr(),
-        func: xmlUCSIsLatinExtendedB,
+        func: xml_ucs_is_latin_extended_b,
     },
     XmlUnicodeRange {
         rangename: c"LatinExtendedAdditional".as_ptr(),
-        func: xmlUCSIsLatinExtendedAdditional,
+        func: xml_ucs_is_latin_extended_additional,
     },
     XmlUnicodeRange {
         rangename: c"LetterlikeSymbols".as_ptr(),
-        func: xmlUCSIsLetterlikeSymbols,
+        func: xml_ucs_is_letterlike_symbols,
     },
     XmlUnicodeRange {
         rangename: c"Limbu".as_ptr(),
-        func: xmlUCSIsLimbu,
+        func: xml_ucs_is_limbu,
     },
     XmlUnicodeRange {
         rangename: c"LinearBIdeograms".as_ptr(),
-        func: xmlUCSIsLinearBIdeograms,
+        func: xml_ucs_is_linear_bideograms,
     },
     XmlUnicodeRange {
         rangename: c"LinearBSyllabary".as_ptr(),
-        func: xmlUCSIsLinearBSyllabary,
+        func: xml_ucs_is_linear_bsyllabary,
     },
     XmlUnicodeRange {
         rangename: c"LowSurrogates".as_ptr(),
-        func: xmlUCSIsLowSurrogates,
+        func: xml_ucs_is_low_surrogates,
     },
     XmlUnicodeRange {
         rangename: c"Malayalam".as_ptr(),
-        func: xmlUCSIsMalayalam,
+        func: xml_ucs_is_malayalam,
     },
     XmlUnicodeRange {
         rangename: c"MathematicalAlphanumericSymbols".as_ptr(),
-        func: xmlUCSIsMathematicalAlphanumericSymbols,
+        func: xml_ucs_is_mathematical_alphanumeric_symbols,
     },
     XmlUnicodeRange {
         rangename: c"MathematicalOperators".as_ptr(),
-        func: xmlUCSIsMathematicalOperators,
+        func: xml_ucs_is_mathematical_operators,
     },
     XmlUnicodeRange {
         rangename: c"MiscellaneousMathematicalSymbols-A".as_ptr(),
-        func: xmlUCSIsMiscellaneousMathematicalSymbolsA,
+        func: xml_ucs_is_miscellaneous_mathematical_symbols_a,
     },
     XmlUnicodeRange {
         rangename: c"MiscellaneousMathematicalSymbols-B".as_ptr(),
-        func: xmlUCSIsMiscellaneousMathematicalSymbolsB,
+        func: xml_ucs_is_miscellaneous_mathematical_symbols_b,
     },
     XmlUnicodeRange {
         rangename: c"MiscellaneousSymbols".as_ptr(),
-        func: xmlUCSIsMiscellaneousSymbols,
+        func: xml_ucs_is_miscellaneous_symbols,
     },
     XmlUnicodeRange {
         rangename: c"MiscellaneousSymbolsandArrows".as_ptr(),
-        func: xmlUCSIsMiscellaneousSymbolsandArrows,
+        func: xml_ucs_is_miscellaneous_symbolsand_arrows,
     },
     XmlUnicodeRange {
         rangename: c"MiscellaneousTechnical".as_ptr(),
-        func: xmlUCSIsMiscellaneousTechnical,
+        func: xml_ucs_is_miscellaneous_technical,
     },
     XmlUnicodeRange {
         rangename: c"Mongolian".as_ptr(),
-        func: xmlUCSIsMongolian,
+        func: xml_ucs_is_mongolian,
     },
     XmlUnicodeRange {
         rangename: c"MusicalSymbols".as_ptr(),
-        func: xmlUCSIsMusicalSymbols,
+        func: xml_ucs_is_musical_symbols,
     },
     XmlUnicodeRange {
         rangename: c"Myanmar".as_ptr(),
-        func: xmlUCSIsMyanmar,
+        func: xml_ucs_is_myanmar,
     },
     XmlUnicodeRange {
         rangename: c"NumberForms".as_ptr(),
-        func: xmlUCSIsNumberForms,
+        func: xml_ucs_is_number_forms,
     },
     XmlUnicodeRange {
         rangename: c"Ogham".as_ptr(),
-        func: xmlUCSIsOgham,
+        func: xml_ucs_is_ogham,
     },
     XmlUnicodeRange {
         rangename: c"OldItalic".as_ptr(),
-        func: xmlUCSIsOldItalic,
+        func: xml_ucs_is_old_italic,
     },
     XmlUnicodeRange {
         rangename: c"OpticalCharacterRecognition".as_ptr(),
-        func: xmlUCSIsOpticalCharacterRecognition,
+        func: xml_ucs_is_optical_character_recognition,
     },
     XmlUnicodeRange {
         rangename: c"Oriya".as_ptr(),
-        func: xmlUCSIsOriya,
+        func: xml_ucs_is_oriya,
     },
     XmlUnicodeRange {
         rangename: c"Osmanya".as_ptr(),
-        func: xmlUCSIsOsmanya,
+        func: xml_ucs_is_osmanya,
     },
     XmlUnicodeRange {
         rangename: c"PhoneticExtensions".as_ptr(),
-        func: xmlUCSIsPhoneticExtensions,
+        func: xml_ucs_is_phonetic_extensions,
     },
     XmlUnicodeRange {
         rangename: c"PrivateUse".as_ptr(),
-        func: xmlUCSIsPrivateUse,
+        func: xml_ucs_is_private_use,
     },
     XmlUnicodeRange {
         rangename: c"PrivateUseArea".as_ptr(),
-        func: xmlUCSIsPrivateUseArea,
+        func: xml_ucs_is_private_use_area,
     },
     XmlUnicodeRange {
         rangename: c"Runic".as_ptr(),
-        func: xmlUCSIsRunic,
+        func: xml_ucs_is_runic,
     },
     XmlUnicodeRange {
         rangename: c"Shavian".as_ptr(),
-        func: xmlUCSIsShavian,
+        func: xml_ucs_is_shavian,
     },
     XmlUnicodeRange {
         rangename: c"Sinhala".as_ptr(),
-        func: xmlUCSIsSinhala,
+        func: xml_ucs_is_sinhala,
     },
     XmlUnicodeRange {
         rangename: c"SmallFormVariants".as_ptr(),
-        func: xmlUCSIsSmallFormVariants,
+        func: xml_ucs_is_small_form_variants,
     },
     XmlUnicodeRange {
         rangename: c"SpacingModifierLetters".as_ptr(),
-        func: xmlUCSIsSpacingModifierLetters,
+        func: xml_ucs_is_spacing_modifier_letters,
     },
     XmlUnicodeRange {
         rangename: c"Specials".as_ptr(),
-        func: xmlUCSIsSpecials,
+        func: xml_ucs_is_specials,
     },
     XmlUnicodeRange {
         rangename: c"SuperscriptsandSubscripts".as_ptr(),
-        func: xmlUCSIsSuperscriptsandSubscripts,
+        func: xml_ucs_is_superscriptsand_subscripts,
     },
     XmlUnicodeRange {
         rangename: c"SupplementalArrows-A".as_ptr(),
-        func: xmlUCSIsSupplementalArrowsA,
+        func: xml_ucs_is_supplemental_arrows_a,
     },
     XmlUnicodeRange {
         rangename: c"SupplementalArrows-B".as_ptr(),
-        func: xmlUCSIsSupplementalArrowsB,
+        func: xml_ucs_is_supplemental_arrows_b,
     },
     XmlUnicodeRange {
         rangename: c"SupplementalMathematicalOperators".as_ptr(),
-        func: xmlUCSIsSupplementalMathematicalOperators,
+        func: xml_ucs_is_supplemental_mathematical_operators,
     },
     XmlUnicodeRange {
         rangename: c"SupplementaryPrivateUseArea-A".as_ptr(),
-        func: xmlUCSIsSupplementaryPrivateUseAreaA,
+        func: xml_ucs_is_supplementary_private_use_area_a,
     },
     XmlUnicodeRange {
         rangename: c"SupplementaryPrivateUseArea-B".as_ptr(),
-        func: xmlUCSIsSupplementaryPrivateUseAreaB,
+        func: xml_ucs_is_supplementary_private_use_area_b,
     },
     XmlUnicodeRange {
         rangename: c"Syriac".as_ptr(),
-        func: xmlUCSIsSyriac,
+        func: xml_ucs_is_syriac,
     },
     XmlUnicodeRange {
         rangename: c"Tagalog".as_ptr(),
-        func: xmlUCSIsTagalog,
+        func: xml_ucs_is_tagalog,
     },
     XmlUnicodeRange {
         rangename: c"Tagbanwa".as_ptr(),
-        func: xmlUCSIsTagbanwa,
+        func: xml_ucs_is_tagbanwa,
     },
     XmlUnicodeRange {
         rangename: c"Tags".as_ptr(),
-        func: xmlUCSIsTags,
+        func: xml_ucs_is_tags,
     },
     XmlUnicodeRange {
         rangename: c"TaiLe".as_ptr(),
-        func: xmlUCSIsTaiLe,
+        func: xml_ucs_is_tai_le,
     },
     XmlUnicodeRange {
         rangename: c"TaiXuanJingSymbols".as_ptr(),
-        func: xmlUCSIsTaiXuanJingSymbols,
+        func: xml_ucs_is_tai_xuan_jing_symbols,
     },
     XmlUnicodeRange {
         rangename: c"Tamil".as_ptr(),
-        func: xmlUCSIsTamil,
+        func: xml_ucs_is_tamil,
     },
     XmlUnicodeRange {
         rangename: c"Telugu".as_ptr(),
-        func: xmlUCSIsTelugu,
+        func: xml_ucs_is_telugu,
     },
     XmlUnicodeRange {
         rangename: c"Thaana".as_ptr(),
-        func: xmlUCSIsThaana,
+        func: xml_ucs_is_thaana,
     },
     XmlUnicodeRange {
         rangename: c"Thai".as_ptr(),
-        func: xmlUCSIsThai,
+        func: xml_ucs_is_thai,
     },
     XmlUnicodeRange {
         rangename: c"Tibetan".as_ptr(),
-        func: xmlUCSIsTibetan,
+        func: xml_ucs_is_tibetan,
     },
     XmlUnicodeRange {
         rangename: c"Ugaritic".as_ptr(),
-        func: xmlUCSIsUgaritic,
+        func: xml_ucs_is_ugaritic,
     },
     XmlUnicodeRange {
         rangename: c"UnifiedCanadianAboriginalSyllabics".as_ptr(),
-        func: xmlUCSIsUnifiedCanadianAboriginalSyllabics,
+        func: xml_ucs_is_unified_canadian_aboriginal_syllabics,
     },
     XmlUnicodeRange {
         rangename: c"VariationSelectors".as_ptr(),
-        func: xmlUCSIsVariationSelectors,
+        func: xml_ucs_is_variation_selectors,
     },
     XmlUnicodeRange {
         rangename: c"VariationSelectorsSupplement".as_ptr(),
-        func: xmlUCSIsVariationSelectorsSupplement,
+        func: xml_ucs_is_variation_selectors_supplement,
     },
     XmlUnicodeRange {
         rangename: c"YiRadicals".as_ptr(),
-        func: xmlUCSIsYiRadicals,
+        func: xml_ucs_is_yi_radicals,
     },
     XmlUnicodeRange {
         rangename: c"YiSyllables".as_ptr(),
-        func: xmlUCSIsYiSyllables,
+        func: xml_ucs_is_yi_syllables,
     },
     XmlUnicodeRange {
         rangename: c"YijingHexagramSymbols".as_ptr(),
-        func: xmlUCSIsYijingHexagramSymbols,
+        func: xml_ucs_is_yijing_hexagram_symbols,
     },
 ]
 .as_ptr();
@@ -545,147 +545,147 @@ const XML_UNICODE_BLOCKS: *const XmlUnicodeRange = [
 const XML_UNICODE_CATS: *const XmlUnicodeRange = [
     XmlUnicodeRange {
         rangename: c"C".as_ptr(),
-        func: xmlUCSIsCatC,
+        func: xml_ucs_is_cat_c,
     },
     XmlUnicodeRange {
         rangename: c"Cc".as_ptr(),
-        func: xmlUCSIsCatCc,
+        func: xml_ucs_is_cat_cc,
     },
     XmlUnicodeRange {
         rangename: c"Cf".as_ptr(),
-        func: xmlUCSIsCatCf,
+        func: xml_ucs_is_cat_cf,
     },
     XmlUnicodeRange {
         rangename: c"Co".as_ptr(),
-        func: xmlUCSIsCatCo,
+        func: xml_ucs_is_cat_co,
     },
     XmlUnicodeRange {
         rangename: c"Cs".as_ptr(),
-        func: xmlUCSIsCatCs,
+        func: xml_ucs_is_cat_cs,
     },
     XmlUnicodeRange {
         rangename: c"L".as_ptr(),
-        func: xmlUCSIsCatL,
+        func: xml_ucs_is_cat_l,
     },
     XmlUnicodeRange {
         rangename: c"Ll".as_ptr(),
-        func: xmlUCSIsCatLl,
+        func: xml_ucs_is_cat_ll,
     },
     XmlUnicodeRange {
         rangename: c"Lm".as_ptr(),
-        func: xmlUCSIsCatLm,
+        func: xml_ucs_is_cat_lm,
     },
     XmlUnicodeRange {
         rangename: c"Lo".as_ptr(),
-        func: xmlUCSIsCatLo,
+        func: xml_ucs_is_cat_lo,
     },
     XmlUnicodeRange {
         rangename: c"Lt".as_ptr(),
-        func: xmlUCSIsCatLt,
+        func: xml_ucs_is_cat_lt,
     },
     XmlUnicodeRange {
         rangename: c"Lu".as_ptr(),
-        func: xmlUCSIsCatLu,
+        func: xml_ucs_is_cat_lu,
     },
     XmlUnicodeRange {
         rangename: c"M".as_ptr(),
-        func: xmlUCSIsCatM,
+        func: xml_ucs_is_cat_m,
     },
     XmlUnicodeRange {
         rangename: c"Mc".as_ptr(),
-        func: xmlUCSIsCatMc,
+        func: xml_ucs_is_cat_mc,
     },
     XmlUnicodeRange {
         rangename: c"Me".as_ptr(),
-        func: xmlUCSIsCatMe,
+        func: xml_ucs_is_cat_me,
     },
     XmlUnicodeRange {
         rangename: c"Mn".as_ptr(),
-        func: xmlUCSIsCatMn,
+        func: xml_ucs_is_cat_mn,
     },
     XmlUnicodeRange {
         rangename: c"N".as_ptr(),
-        func: xmlUCSIsCatN,
+        func: xml_ucs_is_cat_n,
     },
     XmlUnicodeRange {
         rangename: c"Nd".as_ptr(),
-        func: xmlUCSIsCatNd,
+        func: xml_ucs_is_cat_nd,
     },
     XmlUnicodeRange {
         rangename: c"Nl".as_ptr(),
-        func: xmlUCSIsCatNl,
+        func: xml_ucs_is_cat_nl,
     },
     XmlUnicodeRange {
         rangename: c"No".as_ptr(),
-        func: xmlUCSIsCatNo,
+        func: xml_ucs_is_cat_no,
     },
     XmlUnicodeRange {
         rangename: c"P".as_ptr(),
-        func: xmlUCSIsCatP,
+        func: xml_ucs_is_cat_p,
     },
     XmlUnicodeRange {
         rangename: c"Pc".as_ptr(),
-        func: xmlUCSIsCatPc,
+        func: xml_ucs_is_cat_pc,
     },
     XmlUnicodeRange {
         rangename: c"Pd".as_ptr(),
-        func: xmlUCSIsCatPd,
+        func: xml_ucs_is_cat_pd,
     },
     XmlUnicodeRange {
         rangename: c"Pe".as_ptr(),
-        func: xmlUCSIsCatPe,
+        func: xml_ucs_is_cat_pe,
     },
     XmlUnicodeRange {
         rangename: c"Pf".as_ptr(),
-        func: xmlUCSIsCatPf,
+        func: xml_ucs_is_cat_pf,
     },
     XmlUnicodeRange {
         rangename: c"Pi".as_ptr(),
-        func: xmlUCSIsCatPi,
+        func: xml_ucs_is_cat_pi,
     },
     XmlUnicodeRange {
         rangename: c"Po".as_ptr(),
-        func: xmlUCSIsCatPo,
+        func: xml_ucs_is_cat_po,
     },
     XmlUnicodeRange {
         rangename: c"Ps".as_ptr(),
-        func: xmlUCSIsCatPs,
+        func: xml_ucs_is_cat_ps,
     },
     XmlUnicodeRange {
         rangename: c"S".as_ptr(),
-        func: xmlUCSIsCatS,
+        func: xml_ucs_is_cat_s,
     },
     XmlUnicodeRange {
         rangename: c"Sc".as_ptr(),
-        func: xmlUCSIsCatSc,
+        func: xml_ucs_is_cat_sc,
     },
     XmlUnicodeRange {
         rangename: c"Sk".as_ptr(),
-        func: xmlUCSIsCatSk,
+        func: xml_ucs_is_cat_sk,
     },
     XmlUnicodeRange {
         rangename: c"Sm".as_ptr(),
-        func: xmlUCSIsCatSm,
+        func: xml_ucs_is_cat_sm,
     },
     XmlUnicodeRange {
         rangename: c"So".as_ptr(),
-        func: xmlUCSIsCatSo,
+        func: xml_ucs_is_cat_so,
     },
     XmlUnicodeRange {
         rangename: c"Z".as_ptr(),
-        func: xmlUCSIsCatZ,
+        func: xml_ucs_is_cat_z,
     },
     XmlUnicodeRange {
         rangename: c"Zl".as_ptr(),
-        func: xmlUCSIsCatZl,
+        func: xml_ucs_is_cat_zl,
     },
     XmlUnicodeRange {
         rangename: c"Zp".as_ptr(),
-        func: xmlUCSIsCatZp,
+        func: xml_ucs_is_cat_zp,
     },
     XmlUnicodeRange {
         rangename: c"Zs".as_ptr(),
-        func: xmlUCSIsCatZs,
+        func: xml_ucs_is_cat_zs,
     },
 ]
 .as_ptr();
@@ -11089,1545 +11089,1545 @@ const XML_UNICODE_CAT_TBL: XmlUnicodeNameTable = XmlUnicodeNameTable {
 };
 
 /**
- * xmlUCSIsAegeanNumbers:
+ * xml_ucs_isAegeanNumbers:
  * @code: UCS code point
  *
  * Check whether the character is part of AegeanNumbers UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsAegeanNumbers(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_aegean_numbers(code: c_int) -> c_int {
     (0x10100..=0x1013F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsAlphabeticPresentationForms:
+ * xml_ucs_isAlphabeticPresentationForms:
  * @code: UCS code point
  *
  * Check whether the character is part of AlphabeticPresentationForms UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsAlphabeticPresentationForms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_alphabetic_presentation_forms(code: c_int) -> c_int {
     (0xFB00..=0xFB4F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsArabic:
+ * xml_ucs_isArabic:
  * @code: UCS code point
  *
  * Check whether the character is part of Arabic UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsArabic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_arabic(code: c_int) -> c_int {
     (0x0600..=0x06FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsArabicPresentationFormsA:
+ * xml_ucs_isArabicPresentationFormsA:
  * @code: UCS code point
  *
  * Check whether the character is part of ArabicPresentationForms-A UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsArabicPresentationFormsA(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_a(code: c_int) -> c_int {
     (0xFB50..=0xFDFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsArabicPresentationFormsB:
+ * xml_ucs_isArabicPresentationFormsB:
  * @code: UCS code point
  *
  * Check whether the character is part of ArabicPresentationForms-B UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsArabicPresentationFormsB(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_b(code: c_int) -> c_int {
     (0xFE70..=0xFEFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsArmenian:
+ * xml_ucs_isArmenian:
  * @code: UCS code point
  *
  * Check whether the character is part of Armenian UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsArmenian(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_armenian(code: c_int) -> c_int {
     (0x0530..=0x058F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsArrows:
+ * xml_ucs_isArrows:
  * @code: UCS code point
  *
  * Check whether the character is part of Arrows UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsArrows(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_arrows(code: c_int) -> c_int {
     (0x2190..=0x21FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBasicLatin:
+ * xml_ucs_isBasicLatin:
  * @code: UCS code point
  *
  * Check whether the character is part of BasicLatin UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsBasicLatin(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_basic_latin(code: c_int) -> c_int {
     (0x0000..=0x007F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBengali:
+ * xml_ucs_isBengali:
  * @code: UCS code point
  *
  * Check whether the character is part of Bengali UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsBengali(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_bengali(code: c_int) -> c_int {
     (0x0980..=0x09FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBlockElements:
+ * xml_ucs_isBlockElements:
  * @code: UCS code point
  *
  * Check whether the character is part of BlockElements UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsBlockElements(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_block_elements(code: c_int) -> c_int {
     (0x2580..=0x259F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBopomofo:
+ * xml_ucs_isBopomofo:
  * @code: UCS code point
  *
  * Check whether the character is part of Bopomofo UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsBopomofo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_bopomofo(code: c_int) -> c_int {
     (0x3100..=0x312F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBopomofoExtended:
+ * xml_ucs_isBopomofoExtended:
  * @code: UCS code point
  *
  * Check whether the character is part of BopomofoExtended UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsBopomofoExtended(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_bopomofo_extended(code: c_int) -> c_int {
     (0x31A0..=0x31BF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBoxDrawing:
+ * xml_ucs_isBoxDrawing:
  * @code: UCS code point
  *
  * Check whether the character is part of BoxDrawing UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsBoxDrawing(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_box_drawing(code: c_int) -> c_int {
     (0x2500..=0x257F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBraillePatterns:
+ * xml_ucs_isBraillePatterns:
  * @code: UCS code point
  *
  * Check whether the character is part of BraillePatterns UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsBraillePatterns(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_braille_patterns(code: c_int) -> c_int {
     (0x2800..=0x28FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBuhid:
+ * xml_ucs_isBuhid:
  * @code: UCS code point
  *
  * Check whether the character is part of Buhid UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsBuhid(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_buhid(code: c_int) -> c_int {
     (0x1740..=0x175F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsByzantineMusicalSymbols:
+ * xml_ucs_isByzantineMusicalSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of ByzantineMusicalSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsByzantineMusicalSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_byzantine_musical_symbols(code: c_int) -> c_int {
     (0x1D000..=0x1D0FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKCompatibility:
+ * xml_ucs_isCJKCompatibility:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKCompatibility UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKCompatibility(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility(code: c_int) -> c_int {
     (0x3300..=0x33FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKCompatibilityForms:
+ * xml_ucs_isCJKCompatibilityForms:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKCompatibilityForms UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKCompatibilityForms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_forms(code: c_int) -> c_int {
     (0xFE30..=0xFE4F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKCompatibilityIdeographs:
+ * xml_ucs_isCJKCompatibilityIdeographs:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKCompatibilityIdeographs UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKCompatibilityIdeographs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs(code: c_int) -> c_int {
     (0xF900..=0xFAFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKCompatibilityIdeographsSupplement:
+ * xml_ucs_isCJKCompatibilityIdeographsSupplement:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKCompatibilityIdeographsSupplement UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKCompatibilityIdeographsSupplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs_supplement(code: c_int) -> c_int {
     (0x2F800..=0x2FA1F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKRadicalsSupplement:
+ * xml_ucs_isCJKRadicalsSupplement:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKRadicalsSupplement UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKRadicalsSupplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_radicals_supplement(code: c_int) -> c_int {
     (0x2E80..=0x2EFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKSymbolsandPunctuation:
+ * xml_ucs_isCJKSymbolsandPunctuation:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKSymbolsandPunctuation UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKSymbolsandPunctuation(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_symbolsand_punctuation(code: c_int) -> c_int {
     (0x3000..=0x303F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKUnifiedIdeographs:
+ * xml_ucs_isCJKUnifiedIdeographs:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKUnifiedIdeographs UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKUnifiedIdeographs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs(code: c_int) -> c_int {
     (0x4E00..=0x9FFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKUnifiedIdeographsExtensionA:
+ * xml_ucs_isCJKUnifiedIdeographsExtensionA:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKUnifiedIdeographsExtensionA UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKUnifiedIdeographsExtensionA(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_a(code: c_int) -> c_int {
     (0x3400..=0x4DBF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCJKUnifiedIdeographsExtensionB:
+ * xml_ucs_isCJKUnifiedIdeographsExtensionB:
  * @code: UCS code point
  *
  * Check whether the character is part of CJKUnifiedIdeographsExtensionB UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCJKUnifiedIdeographsExtensionB(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_b(code: c_int) -> c_int {
     (0x20000..=0x2A6DF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCherokee:
+ * xml_ucs_isCherokee:
  * @code: UCS code point
  *
  * Check whether the character is part of Cherokee UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCherokee(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cherokee(code: c_int) -> c_int {
     (0x13A0..=0x13FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCombiningDiacriticalMarks:
+ * xml_ucs_isCombiningDiacriticalMarks:
  * @code: UCS code point
  *
  * Check whether the character is part of CombiningDiacriticalMarks UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCombiningDiacriticalMarks(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marks(code: c_int) -> c_int {
     (0x0300..=0x036F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCombiningDiacriticalMarksforSymbols:
+ * xml_ucs_isCombiningDiacriticalMarksforSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of CombiningDiacriticalMarksforSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCombiningDiacriticalMarksforSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marksfor_symbols(code: c_int) -> c_int {
     (0x20D0..=0x20FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCombiningHalfMarks:
+ * xml_ucs_isCombiningHalfMarks:
  * @code: UCS code point
  *
  * Check whether the character is part of CombiningHalfMarks UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCombiningHalfMarks(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_combining_half_marks(code: c_int) -> c_int {
     (0xFE20..=0xFE2F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCombiningMarksforSymbols:
+ * xml_ucs_isCombiningMarksforSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of CombiningMarksforSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCombiningMarksforSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_combining_marksfor_symbols(code: c_int) -> c_int {
     (0x20D0..=0x20FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsControlPictures:
+ * xml_ucs_isControlPictures:
  * @code: UCS code point
  *
  * Check whether the character is part of ControlPictures UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsControlPictures(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_control_pictures(code: c_int) -> c_int {
     (0x2400..=0x243F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCurrencySymbols:
+ * xml_ucs_isCurrencySymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of CurrencySymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCurrencySymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_currency_symbols(code: c_int) -> c_int {
     (0x20A0..=0x20CF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCypriotSyllabary:
+ * xml_ucs_isCypriotSyllabary:
  * @code: UCS code point
  *
  * Check whether the character is part of CypriotSyllabary UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCypriotSyllabary(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cypriot_syllabary(code: c_int) -> c_int {
     (0x10800..=0x1083F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCyrillic:
+ * xml_ucs_isCyrillic:
  * @code: UCS code point
  *
  * Check whether the character is part of Cyrillic UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCyrillic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cyrillic(code: c_int) -> c_int {
     (0x0400..=0x04FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsCyrillicSupplement:
+ * xml_ucs_isCyrillicSupplement:
  * @code: UCS code point
  *
  * Check whether the character is part of CyrillicSupplement UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCyrillicSupplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cyrillic_supplement(code: c_int) -> c_int {
     (0x0500..=0x052F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsDeseret:
+ * xml_ucs_isDeseret:
  * @code: UCS code point
  *
  * Check whether the character is part of Deseret UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsDeseret(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_deseret(code: c_int) -> c_int {
     (0x10400..=0x1044F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsDevanagari:
+ * xml_ucs_isDevanagari:
  * @code: UCS code point
  *
  * Check whether the character is part of Devanagari UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsDevanagari(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_devanagari(code: c_int) -> c_int {
     (0x0900..=0x097F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsDingbats:
+ * xml_ucs_isDingbats:
  * @code: UCS code point
  *
  * Check whether the character is part of Dingbats UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsDingbats(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_dingbats(code: c_int) -> c_int {
     (0x2700..=0x27BF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsEnclosedAlphanumerics:
+ * xml_ucs_isEnclosedAlphanumerics:
  * @code: UCS code point
  *
  * Check whether the character is part of EnclosedAlphanumerics UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsEnclosedAlphanumerics(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_enclosed_alphanumerics(code: c_int) -> c_int {
     (0x2460..=0x24FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsEnclosedCJKLettersandMonths:
+ * xml_ucs_isEnclosedCJKLettersandMonths:
  * @code: UCS code point
  *
  * Check whether the character is part of EnclosedCJKLettersandMonths UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsEnclosedCJKLettersandMonths(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_enclosed_cjk_lettersand_months(code: c_int) -> c_int {
     (0x3200..=0x32FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsEthiopic:
+ * xml_ucs_isEthiopic:
  * @code: UCS code point
  *
  * Check whether the character is part of Ethiopic UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsEthiopic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ethiopic(code: c_int) -> c_int {
     (0x1200..=0x137F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGeneralPunctuation:
+ * xml_ucs_isGeneralPunctuation:
  * @code: UCS code point
  *
  * Check whether the character is part of GeneralPunctuation UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGeneralPunctuation(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_general_punctuation(code: c_int) -> c_int {
     (0x2000..=0x206F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGeometricShapes:
+ * xml_ucs_isGeometricShapes:
  * @code: UCS code point
  *
  * Check whether the character is part of GeometricShapes UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGeometricShapes(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_geometric_shapes(code: c_int) -> c_int {
     (0x25A0..=0x25FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGeorgian:
+ * xml_ucs_isGeorgian:
  * @code: UCS code point
  *
  * Check whether the character is part of Georgian UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGeorgian(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_georgian(code: c_int) -> c_int {
     (0x10A0..=0x10FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGothic:
+ * xml_ucs_isGothic:
  * @code: UCS code point
  *
  * Check whether the character is part of Gothic UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGothic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_gothic(code: c_int) -> c_int {
     (0x10330..=0x1034F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGreek:
+ * xml_ucs_isGreek:
  * @code: UCS code point
  *
  * Check whether the character is part of Greek UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGreek(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_greek(code: c_int) -> c_int {
     (0x0370..=0x03FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGreekExtended:
+ * xml_ucs_isGreekExtended:
  * @code: UCS code point
  *
  * Check whether the character is part of GreekExtended UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGreekExtended(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_greek_extended(code: c_int) -> c_int {
     (0x1F00..=0x1FFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGreekandCoptic:
+ * xml_ucs_isGreekandCoptic:
  * @code: UCS code point
  *
  * Check whether the character is part of GreekandCoptic UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGreekandCoptic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_greekand_coptic(code: c_int) -> c_int {
     (0x0370..=0x03FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGujarati:
+ * xml_ucs_isGujarati:
  * @code: UCS code point
  *
  * Check whether the character is part of Gujarati UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGujarati(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_gujarati(code: c_int) -> c_int {
     (0x0A80..=0x0AFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsGurmukhi:
+ * xml_ucs_isGurmukhi:
  * @code: UCS code point
  *
  * Check whether the character is part of Gurmukhi UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsGurmukhi(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_gurmukhi(code: c_int) -> c_int {
     (0x0A00..=0x0A7F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHalfwidthandFullwidthForms:
+ * xml_ucs_isHalfwidthandFullwidthForms:
  * @code: UCS code point
  *
  * Check whether the character is part of HalfwidthandFullwidthForms UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHalfwidthandFullwidthForms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_halfwidthand_fullwidth_forms(code: c_int) -> c_int {
     (0xFF00..=0xFFEF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHangulCompatibilityJamo:
+ * xml_ucs_isHangulCompatibilityJamo:
  * @code: UCS code point
  *
  * Check whether the character is part of HangulCompatibilityJamo UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHangulCompatibilityJamo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hangul_compatibility_jamo(code: c_int) -> c_int {
     (0x3130..=0x318F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHangulJamo:
+ * xml_ucs_isHangulJamo:
  * @code: UCS code point
  *
  * Check whether the character is part of HangulJamo UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHangulJamo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hangul_jamo(code: c_int) -> c_int {
     (0x1100..=0x11FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHangulSyllables:
+ * xml_ucs_isHangulSyllables:
  * @code: UCS code point
  *
  * Check whether the character is part of HangulSyllables UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHangulSyllables(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hangul_syllables(code: c_int) -> c_int {
     (0xAC00..=0xD7AF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHanunoo:
+ * xml_ucs_isHanunoo:
  * @code: UCS code point
  *
  * Check whether the character is part of Hanunoo UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHanunoo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hanunoo(code: c_int) -> c_int {
     (0x1720..=0x173F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHebrew:
+ * xml_ucs_isHebrew:
  * @code: UCS code point
  *
  * Check whether the character is part of Hebrew UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHebrew(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hebrew(code: c_int) -> c_int {
     (0x0590..=0x05FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHighPrivateUseSurrogates:
+ * xml_ucs_isHighPrivateUseSurrogates:
  * @code: UCS code point
  *
  * Check whether the character is part of HighPrivateUseSurrogates UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHighPrivateUseSurrogates(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_high_private_use_surrogates(code: c_int) -> c_int {
     (0xDB80..=0xDBFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHighSurrogates:
+ * xml_ucs_isHighSurrogates:
  * @code: UCS code point
  *
  * Check whether the character is part of HighSurrogates UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHighSurrogates(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_high_surrogates(code: c_int) -> c_int {
     (0xD800..=0xDB7F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsHiragana:
+ * xml_ucs_isHiragana:
  * @code: UCS code point
  *
  * Check whether the character is part of Hiragana UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsHiragana(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hiragana(code: c_int) -> c_int {
     (0x3040..=0x309F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsIPAExtensions:
+ * xml_ucs_isIPAExtensions:
  * @code: UCS code point
  *
  * Check whether the character is part of IPAExtensions UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsIPAExtensions(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ipa_extensions(code: c_int) -> c_int {
     (0x0250..=0x02AF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsIdeographicDescriptionCharacters:
+ * xml_ucs_isIdeographicDescriptionCharacters:
  * @code: UCS code point
  *
  * Check whether the character is part of IdeographicDescriptionCharacters UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsIdeographicDescriptionCharacters(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ideographic_description_characters(code: c_int) -> c_int {
     (0x2FF0..=0x2FFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsKanbun:
+ * xml_ucs_isKanbun:
  * @code: UCS code point
  *
  * Check whether the character is part of Kanbun UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsKanbun(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_kanbun(code: c_int) -> c_int {
     (0x3190..=0x319F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsKangxiRadicals:
+ * xml_ucs_isKangxiRadicals:
  * @code: UCS code point
  *
  * Check whether the character is part of KangxiRadicals UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsKangxiRadicals(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_kangxi_radicals(code: c_int) -> c_int {
     (0x2F00..=0x2FDF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsKannada:
+ * xml_ucs_isKannada:
  * @code: UCS code point
  *
  * Check whether the character is part of Kannada UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsKannada(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_kannada(code: c_int) -> c_int {
     (0x0C80..=0x0CFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsKatakana:
+ * xml_ucs_isKatakana:
  * @code: UCS code point
  *
  * Check whether the character is part of Katakana UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsKatakana(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_katakana(code: c_int) -> c_int {
     (0x30A0..=0x30FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsKatakanaPhoneticExtensions:
+ * xml_ucs_isKatakanaPhoneticExtensions:
  * @code: UCS code point
  *
  * Check whether the character is part of KatakanaPhoneticExtensions UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsKatakanaPhoneticExtensions(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_katakana_phonetic_extensions(code: c_int) -> c_int {
     (0x31F0..=0x31FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsKhmer:
+ * xml_ucs_isKhmer:
  * @code: UCS code point
  *
  * Check whether the character is part of Khmer UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsKhmer(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_khmer(code: c_int) -> c_int {
     (0x1780..=0x17FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsKhmerSymbols:
+ * xml_ucs_isKhmerSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of KhmerSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsKhmerSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_khmer_symbols(code: c_int) -> c_int {
     (0x19E0..=0x19FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLao:
+ * xml_ucs_isLao:
  * @code: UCS code point
  *
  * Check whether the character is part of Lao UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLao(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_lao(code: c_int) -> c_int {
     (0x0E80..=0x0EFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLatin1Supplement:
+ * xml_ucs_isLatin1Supplement:
  * @code: UCS code point
  *
  * Check whether the character is part of Latin-1Supplement UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLatin1Supplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_latin1_supplement(code: c_int) -> c_int {
     (0x0080..=0x00FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLatinExtendedA:
+ * xml_ucs_isLatinExtendedA:
  * @code: UCS code point
  *
  * Check whether the character is part of LatinExtended-A UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLatinExtendedA(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_latin_extended_a(code: c_int) -> c_int {
     (0x0100..=0x017F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLatinExtendedB:
+ * xml_ucs_isLatinExtendedB:
  * @code: UCS code point
  *
  * Check whether the character is part of LatinExtended-B UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLatinExtendedB(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_latin_extended_b(code: c_int) -> c_int {
     (0x0180..=0x024F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLatinExtendedAdditional:
+ * xml_ucs_isLatinExtendedAdditional:
  * @code: UCS code point
  *
  * Check whether the character is part of LatinExtendedAdditional UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLatinExtendedAdditional(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_latin_extended_additional(code: c_int) -> c_int {
     (0x1E00..=0x1EFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLetterlikeSymbols:
+ * xml_ucs_isLetterlikeSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of LetterlikeSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLetterlikeSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_letterlike_symbols(code: c_int) -> c_int {
     (0x2100..=0x214F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLimbu:
+ * xml_ucs_isLimbu:
  * @code: UCS code point
  *
  * Check whether the character is part of Limbu UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLimbu(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_limbu(code: c_int) -> c_int {
     (0x1900..=0x194F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLinearBIdeograms:
+ * xml_ucs_isLinearBIdeograms:
  * @code: UCS code point
  *
  * Check whether the character is part of LinearBIdeograms UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLinearBIdeograms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_linear_bideograms(code: c_int) -> c_int {
     (0x10080..=0x100FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLinearBSyllabary:
+ * xml_ucs_isLinearBSyllabary:
  * @code: UCS code point
  *
  * Check whether the character is part of LinearBSyllabary UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLinearBSyllabary(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_linear_bsyllabary(code: c_int) -> c_int {
     (0x10000..=0x1007F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsLowSurrogates:
+ * xml_ucs_isLowSurrogates:
  * @code: UCS code point
  *
  * Check whether the character is part of LowSurrogates UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsLowSurrogates(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_low_surrogates(code: c_int) -> c_int {
     (0xDC00..=0xDFFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMalayalam:
+ * xml_ucs_isMalayalam:
  * @code: UCS code point
  *
  * Check whether the character is part of Malayalam UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMalayalam(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_malayalam(code: c_int) -> c_int {
     (0x0D00..=0x0D7F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMathematicalAlphanumericSymbols:
+ * xml_ucs_isMathematicalAlphanumericSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of MathematicalAlphanumericSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMathematicalAlphanumericSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_mathematical_alphanumeric_symbols(code: c_int) -> c_int {
     (0x1D400..=0x1D7FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMathematicalOperators:
+ * xml_ucs_isMathematicalOperators:
  * @code: UCS code point
  *
  * Check whether the character is part of MathematicalOperators UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMathematicalOperators(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_mathematical_operators(code: c_int) -> c_int {
     (0x2200..=0x22FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMiscellaneousMathematicalSymbolsA:
+ * xml_ucs_isMiscellaneousMathematicalSymbolsA:
  * @code: UCS code point
  *
  * Check whether the character is part of MiscellaneousMathematicalSymbols-A UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMiscellaneousMathematicalSymbolsA(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_a(code: c_int) -> c_int {
     (0x27C0..=0x27EF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMiscellaneousMathematicalSymbolsB:
+ * xml_ucs_isMiscellaneousMathematicalSymbolsB:
  * @code: UCS code point
  *
  * Check whether the character is part of MiscellaneousMathematicalSymbols-B UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMiscellaneousMathematicalSymbolsB(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_b(code: c_int) -> c_int {
     (0x2980..=0x29FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMiscellaneousSymbols:
+ * xml_ucs_isMiscellaneousSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of MiscellaneousSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMiscellaneousSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbols(code: c_int) -> c_int {
     (0x2600..=0x26FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMiscellaneousSymbolsandArrows:
+ * xml_ucs_isMiscellaneousSymbolsandArrows:
  * @code: UCS code point
  *
  * Check whether the character is part of MiscellaneousSymbolsandArrows UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMiscellaneousSymbolsandArrows(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbolsand_arrows(code: c_int) -> c_int {
     (0x2B00..=0x2BFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMiscellaneousTechnical:
+ * xml_ucs_isMiscellaneousTechnical:
  * @code: UCS code point
  *
  * Check whether the character is part of MiscellaneousTechnical UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMiscellaneousTechnical(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_technical(code: c_int) -> c_int {
     (0x2300..=0x23FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMongolian:
+ * xml_ucs_isMongolian:
  * @code: UCS code point
  *
  * Check whether the character is part of Mongolian UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMongolian(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_mongolian(code: c_int) -> c_int {
     (0x1800..=0x18AF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMusicalSymbols:
+ * xml_ucs_isMusicalSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of MusicalSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMusicalSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_musical_symbols(code: c_int) -> c_int {
     (0x1D100..=0x1D1FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsMyanmar:
+ * xml_ucs_isMyanmar:
  * @code: UCS code point
  *
  * Check whether the character is part of Myanmar UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsMyanmar(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_myanmar(code: c_int) -> c_int {
     (0x1000..=0x109F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsNumberForms:
+ * xml_ucs_isNumberForms:
  * @code: UCS code point
  *
  * Check whether the character is part of NumberForms UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsNumberForms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_number_forms(code: c_int) -> c_int {
     (0x2150..=0x218F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsOgham:
+ * xml_ucs_isOgham:
  * @code: UCS code point
  *
  * Check whether the character is part of Ogham UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsOgham(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ogham(code: c_int) -> c_int {
     (0x1680..=0x169F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsOldItalic:
+ * xml_ucs_isOldItalic:
  * @code: UCS code point
  *
  * Check whether the character is part of OldItalic UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsOldItalic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_old_italic(code: c_int) -> c_int {
     (0x10300..=0x1032F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsOpticalCharacterRecognition:
+ * xml_ucs_isOpticalCharacterRecognition:
  * @code: UCS code point
  *
  * Check whether the character is part of OpticalCharacterRecognition UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsOpticalCharacterRecognition(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_optical_character_recognition(code: c_int) -> c_int {
     (0x2440..=0x245F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsOriya:
+ * xml_ucs_isOriya:
  * @code: UCS code point
  *
  * Check whether the character is part of Oriya UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsOriya(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_oriya(code: c_int) -> c_int {
     (0x0B00..=0x0B7F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsOsmanya:
+ * xml_ucs_isOsmanya:
  * @code: UCS code point
  *
  * Check whether the character is part of Osmanya UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsOsmanya(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_osmanya(code: c_int) -> c_int {
     (0x10480..=0x104AF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsPhoneticExtensions:
+ * xml_ucs_isPhoneticExtensions:
  * @code: UCS code point
  *
  * Check whether the character is part of PhoneticExtensions UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsPhoneticExtensions(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_phonetic_extensions(code: c_int) -> c_int {
     (0x1D00..=0x1D7F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsPrivateUse:
+ * xml_ucs_isPrivateUse:
  * @code: UCS code point
  *
  * Check whether the character is part of PrivateUse UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsPrivateUse(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_private_use(code: c_int) -> c_int {
     ((0xE000..=0xF8FF).contains(&code)
         || (0xF0000..=0xFFFFF).contains(&code)
         || (0x100000..=0x10FFFF).contains(&code)) as i32
 }
 
 /**
- * xmlUCSIsPrivateUseArea:
+ * xml_ucs_isPrivateUseArea:
  * @code: UCS code point
  *
  * Check whether the character is part of PrivateUseArea UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsPrivateUseArea(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_private_use_area(code: c_int) -> c_int {
     (0xE000..=0xF8FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsRunic:
+ * xml_ucs_isRunic:
  * @code: UCS code point
  *
  * Check whether the character is part of Runic UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsRunic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_runic(code: c_int) -> c_int {
     (0x16A0..=0x16FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsShavian:
+ * xml_ucs_isShavian:
  * @code: UCS code point
  *
  * Check whether the character is part of Shavian UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsShavian(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_shavian(code: c_int) -> c_int {
     (0x10450..=0x1047F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSinhala:
+ * xml_ucs_isSinhala:
  * @code: UCS code point
  *
  * Check whether the character is part of Sinhala UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSinhala(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_sinhala(code: c_int) -> c_int {
     (0x0D80..=0x0DFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSmallFormVariants:
+ * xml_ucs_isSmallFormVariants:
  * @code: UCS code point
  *
  * Check whether the character is part of SmallFormVariants UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSmallFormVariants(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_small_form_variants(code: c_int) -> c_int {
     (0xFE50..=0xFE6F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSpacingModifierLetters:
+ * xml_ucs_isSpacingModifierLetters:
  * @code: UCS code point
  *
  * Check whether the character is part of SpacingModifierLetters UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSpacingModifierLetters(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_spacing_modifier_letters(code: c_int) -> c_int {
     (0x02B0..=0x02FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSpecials:
+ * xml_ucs_isSpecials:
  * @code: UCS code point
  *
  * Check whether the character is part of Specials UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSpecials(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_specials(code: c_int) -> c_int {
     (0xFFF0..=0xFFFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSuperscriptsandSubscripts:
+ * xml_ucs_isSuperscriptsandSubscripts:
  * @code: UCS code point
  *
  * Check whether the character is part of SuperscriptsandSubscripts UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSuperscriptsandSubscripts(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_superscriptsand_subscripts(code: c_int) -> c_int {
     (0x2070..=0x209F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSupplementalArrowsA:
+ * xml_ucs_isSupplementalArrowsA:
  * @code: UCS code point
  *
  * Check whether the character is part of SupplementalArrows-A UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSupplementalArrowsA(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_a(code: c_int) -> c_int {
     (0x27F0..=0x27FF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSupplementalArrowsB:
+ * xml_ucs_isSupplementalArrowsB:
  * @code: UCS code point
  *
  * Check whether the character is part of SupplementalArrows-B UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSupplementalArrowsB(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_b(code: c_int) -> c_int {
     (0x2900..=0x297F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSupplementalMathematicalOperators:
+ * xml_ucs_isSupplementalMathematicalOperators:
  * @code: UCS code point
  *
  * Check whether the character is part of SupplementalMathematicalOperators UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSupplementalMathematicalOperators(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplemental_mathematical_operators(code: c_int) -> c_int {
     (0x2A00..=0x2AFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSupplementaryPrivateUseAreaA:
+ * xml_ucs_isSupplementaryPrivateUseAreaA:
  * @code: UCS code point
  *
  * Check whether the character is part of SupplementaryPrivateUseArea-A UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSupplementaryPrivateUseAreaA(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_a(code: c_int) -> c_int {
     (0xF0000..=0xFFFFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSupplementaryPrivateUseAreaB:
+ * xml_ucs_isSupplementaryPrivateUseAreaB:
  * @code: UCS code point
  *
  * Check whether the character is part of SupplementaryPrivateUseArea-B UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSupplementaryPrivateUseAreaB(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_b(code: c_int) -> c_int {
     (0x100000..=0x10FFFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsSyriac:
+ * xml_ucs_isSyriac:
  * @code: UCS code point
  *
  * Check whether the character is part of Syriac UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsSyriac(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_syriac(code: c_int) -> c_int {
     (0x0700..=0x074F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsTagalog:
+ * xml_ucs_isTagalog:
  * @code: UCS code point
  *
  * Check whether the character is part of Tagalog UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsTagalog(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tagalog(code: c_int) -> c_int {
     (0x1700..=0x171F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsTagbanwa:
+ * xml_ucs_isTagbanwa:
  * @code: UCS code point
  *
  * Check whether the character is part of Tagbanwa UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsTagbanwa(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tagbanwa(code: c_int) -> c_int {
     (0x1760..=0x177F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsTags:
+ * xml_ucs_isTags:
  * @code: UCS code point
  *
  * Check whether the character is part of Tags UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsTags(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tags(code: c_int) -> c_int {
     (0xE0000..=0xE007F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsTaiLe:
+ * xml_ucs_isTaiLe:
  * @code: UCS code point
  *
  * Check whether the character is part of TaiLe UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsTaiLe(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tai_le(code: c_int) -> c_int {
     (0x1950..=0x197F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsTaiXuanJingSymbols:
+ * xml_ucs_isTaiXuanJingSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of TaiXuanJingSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsTaiXuanJingSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tai_xuan_jing_symbols(code: c_int) -> c_int {
     (0x1D300..=0x1D35F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsTamil:
+ * xml_ucs_isTamil:
  * @code: UCS code point
  *
  * Check whether the character is part of Tamil UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsTamil(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tamil(code: c_int) -> c_int {
     (0x0B80..=0x0BFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsTelugu:
+ * xml_ucs_isTelugu:
  * @code: UCS code point
  *
  * Check whether the character is part of Telugu UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsTelugu(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_telugu(code: c_int) -> c_int {
     (0x0C00..=0x0C7F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsThaana:
+ * xml_ucs_isThaana:
  * @code: UCS code point
  *
  * Check whether the character is part of Thaana UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsThaana(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_thaana(code: c_int) -> c_int {
     (0x0780..=0x07BF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsThai:
+ * xml_ucs_isThai:
  * @code: UCS code point
  *
  * Check whether the character is part of Thai UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsThai(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_thai(code: c_int) -> c_int {
     (0x0E00..=0x0E7F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsTibetan:
+ * xml_ucs_isTibetan:
  * @code: UCS code point
  *
  * Check whether the character is part of Tibetan UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsTibetan(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tibetan(code: c_int) -> c_int {
     (0x0F00..=0x0FFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsUgaritic:
+ * xml_ucs_isUgaritic:
  * @code: UCS code point
  *
  * Check whether the character is part of Ugaritic UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsUgaritic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ugaritic(code: c_int) -> c_int {
     (0x10380..=0x1039F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsUnifiedCanadianAboriginalSyllabics:
+ * xml_ucs_isUnifiedCanadianAboriginalSyllabics:
  * @code: UCS code point
  *
  * Check whether the character is part of UnifiedCanadianAboriginalSyllabics UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsUnifiedCanadianAboriginalSyllabics(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_unified_canadian_aboriginal_syllabics(code: c_int) -> c_int {
     (0x1400..=0x167F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsVariationSelectors:
+ * xml_ucs_isVariationSelectors:
  * @code: UCS code point
  *
  * Check whether the character is part of VariationSelectors UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsVariationSelectors(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_variation_selectors(code: c_int) -> c_int {
     (0xFE00..=0xFE0F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsVariationSelectorsSupplement:
+ * xml_ucs_isVariationSelectorsSupplement:
  * @code: UCS code point
  *
  * Check whether the character is part of VariationSelectorsSupplement UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsVariationSelectorsSupplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_variation_selectors_supplement(code: c_int) -> c_int {
     (0xE0100..=0xE01EF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsYiRadicals:
+ * xml_ucs_isYiRadicals:
  * @code: UCS code point
  *
  * Check whether the character is part of YiRadicals UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsYiRadicals(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_yi_radicals(code: c_int) -> c_int {
     (0xA490..=0xA4CF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsYiSyllables:
+ * xml_ucs_isYiSyllables:
  * @code: UCS code point
  *
  * Check whether the character is part of YiSyllables UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsYiSyllables(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_yi_syllables(code: c_int) -> c_int {
     (0xA000..=0xA48F).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsYijingHexagramSymbols:
+ * xml_ucs_isYijingHexagramSymbols:
  * @code: UCS code point
  *
  * Check whether the character is part of YijingHexagramSymbols UCS Block
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsYijingHexagramSymbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_yijing_hexagram_symbols(code: c_int) -> c_int {
     (0x4DC0..=0x4DFF).contains(&code) as i32
 }
 
 /**
- * xmlUCSIsBlock:
+ * xml_ucs_isBlock:
  * @code: UCS code point
  * @block: UCS block name
  *
@@ -12635,8 +12635,8 @@ pub unsafe extern "C" fn xmlUCSIsYijingHexagramSymbols(code: c_int) -> c_int {
  *
  * Returns 1 if true, 0 if false and -1 on unknown block
  */
-pub unsafe extern "C" fn xmlUCSIsBlock(code: c_int, block: *const c_char) -> c_int {
-    if let Some(func) = xmlUnicodeLookup(&XML_UNICODE_BLOCK_TBL, block) {
+pub unsafe extern "C" fn xml_ucs_is_block(code: c_int, block: *const c_char) -> c_int {
+    if let Some(func) = xml_unicode_lookup(&XML_UNICODE_BLOCK_TBL, block) {
         func(code)
     } else {
         -1
@@ -12644,50 +12644,50 @@ pub unsafe extern "C" fn xmlUCSIsBlock(code: c_int, block: *const c_char) -> c_i
 }
 
 /**
- * xmlUCSIsCatC:
+ * xml_ucs_isCatC:
  * @code: UCS code point
  *
  * Check whether the character is part of C UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatC(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_c(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_CG) as i32
 }
 
 /**
- * xmlUCSIsCatCc:
+ * xml_ucs_isCatCc:
  * @code: UCS code point
  *
  * Check whether the character is part of Cc UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatCc(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_cc(code: c_int) -> c_int {
     ((0x0..=0x1f).contains(&code) || (0x7f..=0x9f).contains(&code)) as i32
 }
 
 /**
- * xmlUCSIsCatCf:
+ * xml_ucs_isCatCf:
  * @code: UCS code point
  *
  * Check whether the character is part of Cf UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatCf(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_cf(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_CF_G) as i32
 }
 
 /**
- * xmlUCSIsCatCo:
+ * xml_ucs_isCatCo:
  * @code: UCS code point
  *
  * Check whether the character is part of Co UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatCo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_co(code: c_int) -> c_int {
     ((code == 0xe000)
         || (code == 0xf8ff)
         || (code == 0xf0000)
@@ -12697,14 +12697,14 @@ pub unsafe extern "C" fn xmlUCSIsCatCo(code: c_int) -> c_int {
 }
 
 /**
- * xmlUCSIsCatCs:
+ * xml_ucs_isCatCs:
  * @code: UCS code point
  *
  * Check whether the character is part of Cs UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatCs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_cs(code: c_int) -> c_int {
     ((code == 0xd800)
         || (0xdb7f..=0xdb80).contains(&code)
         || (0xdbff..=0xdc00).contains(&code)
@@ -12712,110 +12712,110 @@ pub unsafe extern "C" fn xmlUCSIsCatCs(code: c_int) -> c_int {
 }
 
 /**
- * xmlUCSIsCatL:
+ * xml_ucs_isCatL:
  * @code: UCS code point
  *
  * Check whether the character is part of L UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatL(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_l(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_LG)
 }
 
 /**
- * xmlUCSIsCatLl:
+ * xml_ucs_isCatLl:
  * @code: UCS code point
  *
  * Check whether the character is part of Ll UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatLl(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_ll(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_LL_G)
 }
 
 /**
- * xmlUCSIsCatLm:
+ * xml_ucs_isCatLm:
  * @code: UCS code point
  *
  * Check whether the character is part of Lm UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatLm(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_lm(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_LM_G)
 }
 
 /**
- * xmlUCSIsCatLo:
+ * xml_ucs_isCatLo:
  * @code: UCS code point
  *
  * Check whether the character is part of Lo UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatLo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_lo(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_LO_G)
 }
 
 /**
- * xmlUCSIsCatLt:
+ * xml_ucs_isCatLt:
  * @code: UCS code point
  *
  * Check whether the character is part of Lt UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatLt(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_lt(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_LT_G)
 }
 
 /**
- * xmlUCSIsCatLu:
+ * xml_ucs_isCatLu:
  * @code: UCS code point
  *
  * Check whether the character is part of Lu UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatLu(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_lu(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_LU_G)
 }
 
 /**
- * xmlUCSIsCatM:
+ * xml_ucs_isCatM:
  * @code: UCS code point
  *
  * Check whether the character is part of M UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatM(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_m(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_MG)
 }
 
 /**
- * xmlUCSIsCatMc:
+ * xml_ucs_isCatMc:
  * @code: UCS code point
  *
  * Check whether the character is part of Mc UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatMc(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_mc(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_MC_G)
 }
 
 /**
- * xmlUCSIsCatMe:
+ * xml_ucs_isCatMe:
  * @code: UCS code point
  *
  * Check whether the character is part of Me UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatMe(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_me(code: c_int) -> c_int {
     ((0x488..=0x489).contains(&code)
         || (code == 0x6de)
         || (0x20dd..=0x20e0).contains(&code)
@@ -12823,50 +12823,50 @@ pub unsafe extern "C" fn xmlUCSIsCatMe(code: c_int) -> c_int {
 }
 
 /**
- * xmlUCSIsCatMn:
+ * xml_ucs_isCatMn:
  * @code: UCS code point
  *
  * Check whether the character is part of Mn UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatMn(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_mn(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_MN_G)
 }
 
 /**
- * xmlUCSIsCatN:
+ * xml_ucs_isCatN:
  * @code: UCS code point
  *
  * Check whether the character is part of N UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatN(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_n(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_NG)
 }
 
 /**
- * xmlUCSIsCatNd:
+ * xml_ucs_isCatNd:
  * @code: UCS code point
  *
  * Check whether the character is part of Nd UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatNd(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_nd(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_ND_G)
 }
 
 /**
- * xmlUCSIsCatNl:
+ * xml_ucs_isCatNl:
  * @code: UCS code point
  *
  * Check whether the character is part of Nl UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatNl(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_nl(code: c_int) -> c_int {
     ((0x16ee..=0x16f0).contains(&code)
         || (0x2160..=0x2183).contains(&code)
         || (code == 0x3007)
@@ -12876,38 +12876,38 @@ pub unsafe extern "C" fn xmlUCSIsCatNl(code: c_int) -> c_int {
 }
 
 /**
- * xmlUCSIsCatNo:
+ * xml_ucs_isCatNo:
  * @code: UCS code point
  *
  * Check whether the character is part of No UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatNo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_no(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_NO_G)
 }
 
 /**
- * xmlUCSIsCatP:
+ * xml_ucs_isCatP:
  * @code: UCS code point
  *
  * Check whether the character is part of P UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatP(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_p(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_PG)
 }
 
 /**
- * xmlUCSIsCatPc:
+ * xml_ucs_isCatPc:
  * @code: UCS code point
  *
  * Check whether the character is part of Pc UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatPc(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_pc(code: c_int) -> c_int {
     ((code == 0x5f)
         || (0x203f..=0x2040).contains(&code)
         || (code == 0x2054)
@@ -12919,50 +12919,50 @@ pub unsafe extern "C" fn xmlUCSIsCatPc(code: c_int) -> c_int {
 }
 
 /**
- * xmlUCSIsCatPd:
+ * xml_ucs_isCatPd:
  * @code: UCS code point
  *
  * Check whether the character is part of Pd UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatPd(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_pd(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_PD_G)
 }
 
 /**
- * xmlUCSIsCatPe:
+ * xml_ucs_isCatPe:
  * @code: UCS code point
  *
  * Check whether the character is part of Pe UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatPe(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_pe(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_PE_G)
 }
 
 /**
- * xmlUCSIsCatPf:
+ * xml_ucs_isCatPf:
  * @code: UCS code point
  *
  * Check whether the character is part of Pf UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatPf(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_pf(code: c_int) -> c_int {
     ((code == 0xbb) || (code == 0x2019) || (code == 0x201d) || (code == 0x203a)) as i32
 }
 
 /**
- * xmlUCSIsCatPi:
+ * xml_ucs_isCatPi:
  * @code: UCS code point
  *
  * Check whether the character is part of Pi UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatPi(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_pi(code: c_int) -> c_int {
     ((code == 0xab)
         || (code == 0x2018)
         || (0x201b..=0x201c).contains(&code)
@@ -12971,134 +12971,134 @@ pub unsafe extern "C" fn xmlUCSIsCatPi(code: c_int) -> c_int {
 }
 
 /**
- * xmlUCSIsCatPo:
+ * xml_ucs_isCatPo:
  * @code: UCS code point
  *
  * Check whether the character is part of Po UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatPo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_po(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_PO_G)
 }
 
 /**
- * xmlUCSIsCatPs:
+ * xml_ucs_isCatPs:
  * @code: UCS code point
  *
  * Check whether the character is part of Ps UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatPs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_ps(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_PS_G)
 }
 
 /**
- * xmlUCSIsCatS:
+ * xml_ucs_isCatS:
  * @code: UCS code point
  *
  * Check whether the character is part of S UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatS(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_s(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_SG)
 }
 
 /**
- * xmlUCSIsCatSc:
+ * xml_ucs_isCatSc:
  * @code: UCS code point
  *
  * Check whether the character is part of Sc UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatSc(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_sc(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_SC_G)
 }
 
 /**
- * xmlUCSIsCatSk:
+ * xml_ucs_isCatSk:
  * @code: UCS code point
  *
  * Check whether the character is part of Sk UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatSk(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_sk(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_SK_G)
 }
 
 /**
- * xmlUCSIsCatSm:
+ * xml_ucs_isCatSm:
  * @code: UCS code point
  *
  * Check whether the character is part of Sm UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatSm(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_sm(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_SM_G)
 }
 
 /**
- * xmlUCSIsCatSo:
+ * xml_ucs_isCatSo:
  * @code: UCS code point
  *
  * Check whether the character is part of So UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatSo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_so(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_SO_G)
 }
 
 /**
- * xmlUCSIsCatZ:
+ * xml_ucs_isCatZ:
  * @code: UCS code point
  *
  * Check whether the character is part of Z UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatZ(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_z(code: c_int) -> c_int {
     xml_char_in_range(code as c_uint, &XML_ZG)
 }
 
 /**
- * xmlUCSIsCatZl:
+ * xml_ucs_isCatZl:
  * @code: UCS code point
  *
  * Check whether the character is part of Zl UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatZl(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_zl(code: c_int) -> c_int {
     (code == 0x2028) as i32
 }
 
 /**
- * xmlUCSIsCatZp:
+ * xml_ucs_isCatZp:
  * @code: UCS code point
  *
  * Check whether the character is part of Zp UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatZp(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_zp(code: c_int) -> c_int {
     (code == 0x2029) as i32
 }
 
 /**
- * xmlUCSIsCatZs:
+ * xml_ucs_isCatZs:
  * @code: UCS code point
  *
  * Check whether the character is part of Zs UCS Category
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xmlUCSIsCatZs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_zs(code: c_int) -> c_int {
     ((code == 0x20)
         || (code == 0xa0)
         || (code == 0x1680)
@@ -13110,7 +13110,7 @@ pub unsafe extern "C" fn xmlUCSIsCatZs(code: c_int) -> c_int {
 }
 
 /**
- * xmlUCSIsCat:
+ * xml_ucs_isCat:
  * @code: UCS code point
  * @cat: UCS Category name
  *
@@ -13118,8 +13118,8 @@ pub unsafe extern "C" fn xmlUCSIsCatZs(code: c_int) -> c_int {
  *
  * Returns 1 if true, 0 if false and -1 on unknown category
  */
-pub unsafe extern "C" fn xmlUCSIsCat(code: c_int, cat: *const c_char) -> c_int {
-    if let Some(func) = xmlUnicodeLookup(&XML_UNICODE_CAT_TBL, cat) {
+pub unsafe extern "C" fn xml_ucs_is_cat(code: c_int, cat: *const c_char) -> c_int {
+    if let Some(func) = xml_unicode_lookup(&XML_UNICODE_CAT_TBL, cat) {
         func(code)
     } else {
         -1
@@ -13135,7 +13135,7 @@ pub unsafe extern "C" fn xmlUCSIsCat(code: c_int, cat: *const c_char) -> c_int {
  *
  * Returns pointer to range function if found, otherwise NULL
  */
-unsafe extern "C" fn xmlUnicodeLookup(
+unsafe extern "C" fn xml_unicode_lookup(
     tptr: *const XmlUnicodeNameTable,
     tname: *const c_char,
 ) -> Option<XmlIntFunc> {
@@ -13188,7 +13188,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsAegeanNumbers(code);
+                let ret_val = xml_ucs_is_aegean_numbers(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13218,7 +13218,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsAlphabeticPresentationForms(code);
+                let ret_val = xml_ucs_is_alphabetic_presentation_forms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13248,7 +13248,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsArabic(code);
+                let ret_val = xml_ucs_is_arabic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13275,7 +13275,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsArabicPresentationFormsA(code);
+                let ret_val = xml_ucs_is_arabic_presentation_forms_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13305,7 +13305,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsArabicPresentationFormsB(code);
+                let ret_val = xml_ucs_is_arabic_presentation_forms_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13335,7 +13335,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsArmenian(code);
+                let ret_val = xml_ucs_is_armenian(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13362,7 +13362,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsArrows(code);
+                let ret_val = xml_ucs_is_arrows(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13389,7 +13389,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsBasicLatin(code);
+                let ret_val = xml_ucs_is_basic_latin(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13419,7 +13419,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsBengali(code);
+                let ret_val = xml_ucs_is_bengali(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13448,7 +13448,7 @@ mod tests {
                     let code = gen_int(n_code, 0);
                     let block = gen_const_char_ptr(n_block, 1);
 
-                    let ret_val = xmlUCSIsBlock(code, block);
+                    let ret_val = xml_ucs_is_block(code, block);
                     desret_int(ret_val);
                     des_int(n_code, code, 0);
                     des_const_char_ptr(n_block, block, 1);
@@ -13478,7 +13478,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsBlockElements(code);
+                let ret_val = xml_ucs_is_block_elements(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13508,7 +13508,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsBopomofo(code);
+                let ret_val = xml_ucs_is_bopomofo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13535,7 +13535,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsBopomofoExtended(code);
+                let ret_val = xml_ucs_is_bopomofo_extended(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13565,7 +13565,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsBoxDrawing(code);
+                let ret_val = xml_ucs_is_box_drawing(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13595,7 +13595,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsBraillePatterns(code);
+                let ret_val = xml_ucs_is_braille_patterns(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13625,7 +13625,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsBuhid(code);
+                let ret_val = xml_ucs_is_buhid(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13652,7 +13652,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsByzantineMusicalSymbols(code);
+                let ret_val = xml_ucs_is_byzantine_musical_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13682,7 +13682,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKCompatibility(code);
+                let ret_val = xml_ucs_is_cjk_compatibility(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13712,7 +13712,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKCompatibilityForms(code);
+                let ret_val = xml_ucs_is_cjk_compatibility_forms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13742,7 +13742,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKCompatibilityIdeographs(code);
+                let ret_val = xml_ucs_is_cjk_compatibility_ideographs(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13772,7 +13772,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKCompatibilityIdeographsSupplement(code);
+                let ret_val = xml_ucs_is_cjk_compatibility_ideographs_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13802,7 +13802,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKRadicalsSupplement(code);
+                let ret_val = xml_ucs_is_cjk_radicals_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13832,7 +13832,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKSymbolsandPunctuation(code);
+                let ret_val = xml_ucs_is_cjk_symbolsand_punctuation(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13862,7 +13862,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKUnifiedIdeographs(code);
+                let ret_val = xml_ucs_is_cjk_unified_ideographs(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13892,7 +13892,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKUnifiedIdeographsExtensionA(code);
+                let ret_val = xml_ucs_is_cjk_unified_ideographs_extension_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13922,7 +13922,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCJKUnifiedIdeographsExtensionB(code);
+                let ret_val = xml_ucs_is_cjk_unified_ideographs_extension_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -13954,7 +13954,7 @@ mod tests {
                     let code = gen_int(n_code, 0);
                     let cat = gen_const_char_ptr(n_cat, 1);
 
-                    let ret_val = xmlUCSIsCat(code, cat);
+                    let ret_val = xml_ucs_is_cat(code, cat);
                     desret_int(ret_val);
                     des_int(n_code, code, 0);
                     des_const_char_ptr(n_cat, cat, 1);
@@ -13984,7 +13984,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatC(code);
+                let ret_val = xml_ucs_is_cat_c(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14011,7 +14011,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatCc(code);
+                let ret_val = xml_ucs_is_cat_cc(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14038,7 +14038,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatCf(code);
+                let ret_val = xml_ucs_is_cat_cf(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14065,7 +14065,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatCo(code);
+                let ret_val = xml_ucs_is_cat_co(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14092,7 +14092,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatCs(code);
+                let ret_val = xml_ucs_is_cat_cs(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14119,7 +14119,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatL(code);
+                let ret_val = xml_ucs_is_cat_l(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14146,7 +14146,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatLl(code);
+                let ret_val = xml_ucs_is_cat_ll(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14173,7 +14173,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatLm(code);
+                let ret_val = xml_ucs_is_cat_lm(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14200,7 +14200,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatLo(code);
+                let ret_val = xml_ucs_is_cat_lo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14227,7 +14227,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatLt(code);
+                let ret_val = xml_ucs_is_cat_lt(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14254,7 +14254,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatLu(code);
+                let ret_val = xml_ucs_is_cat_lu(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14281,7 +14281,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatM(code);
+                let ret_val = xml_ucs_is_cat_m(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14308,7 +14308,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatMc(code);
+                let ret_val = xml_ucs_is_cat_mc(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14335,7 +14335,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatMe(code);
+                let ret_val = xml_ucs_is_cat_me(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14362,7 +14362,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatMn(code);
+                let ret_val = xml_ucs_is_cat_mn(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14389,7 +14389,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatN(code);
+                let ret_val = xml_ucs_is_cat_n(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14416,7 +14416,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatNd(code);
+                let ret_val = xml_ucs_is_cat_nd(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14443,7 +14443,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatNl(code);
+                let ret_val = xml_ucs_is_cat_nl(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14470,7 +14470,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatNo(code);
+                let ret_val = xml_ucs_is_cat_no(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14497,7 +14497,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatP(code);
+                let ret_val = xml_ucs_is_cat_p(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14524,7 +14524,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatPc(code);
+                let ret_val = xml_ucs_is_cat_pc(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14551,7 +14551,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatPd(code);
+                let ret_val = xml_ucs_is_cat_pd(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14578,7 +14578,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatPe(code);
+                let ret_val = xml_ucs_is_cat_pe(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14605,7 +14605,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatPf(code);
+                let ret_val = xml_ucs_is_cat_pf(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14632,7 +14632,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatPi(code);
+                let ret_val = xml_ucs_is_cat_pi(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14659,7 +14659,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatPo(code);
+                let ret_val = xml_ucs_is_cat_po(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14686,7 +14686,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatPs(code);
+                let ret_val = xml_ucs_is_cat_ps(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14713,7 +14713,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatS(code);
+                let ret_val = xml_ucs_is_cat_s(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14740,7 +14740,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatSc(code);
+                let ret_val = xml_ucs_is_cat_sc(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14767,7 +14767,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatSk(code);
+                let ret_val = xml_ucs_is_cat_sk(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14794,7 +14794,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatSm(code);
+                let ret_val = xml_ucs_is_cat_sm(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14821,7 +14821,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatSo(code);
+                let ret_val = xml_ucs_is_cat_so(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14848,7 +14848,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatZ(code);
+                let ret_val = xml_ucs_is_cat_z(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14875,7 +14875,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatZl(code);
+                let ret_val = xml_ucs_is_cat_zl(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14902,7 +14902,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatZp(code);
+                let ret_val = xml_ucs_is_cat_zp(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14929,7 +14929,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCatZs(code);
+                let ret_val = xml_ucs_is_cat_zs(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14956,7 +14956,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCherokee(code);
+                let ret_val = xml_ucs_is_cherokee(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -14983,7 +14983,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCombiningDiacriticalMarks(code);
+                let ret_val = xml_ucs_is_combining_diacritical_marks(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15013,7 +15013,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCombiningDiacriticalMarksforSymbols(code);
+                let ret_val = xml_ucs_is_combining_diacritical_marksfor_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15043,7 +15043,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCombiningHalfMarks(code);
+                let ret_val = xml_ucs_is_combining_half_marks(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15073,7 +15073,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCombiningMarksforSymbols(code);
+                let ret_val = xml_ucs_is_combining_marksfor_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15103,7 +15103,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsControlPictures(code);
+                let ret_val = xml_ucs_is_control_pictures(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15133,7 +15133,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCurrencySymbols(code);
+                let ret_val = xml_ucs_is_currency_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15163,7 +15163,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCypriotSyllabary(code);
+                let ret_val = xml_ucs_is_cypriot_syllabary(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15193,7 +15193,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCyrillic(code);
+                let ret_val = xml_ucs_is_cyrillic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15220,7 +15220,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsCyrillicSupplement(code);
+                let ret_val = xml_ucs_is_cyrillic_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15250,7 +15250,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsDeseret(code);
+                let ret_val = xml_ucs_is_deseret(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15277,7 +15277,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsDevanagari(code);
+                let ret_val = xml_ucs_is_devanagari(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15307,7 +15307,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsDingbats(code);
+                let ret_val = xml_ucs_is_dingbats(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15334,7 +15334,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsEnclosedAlphanumerics(code);
+                let ret_val = xml_ucs_is_enclosed_alphanumerics(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15364,7 +15364,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsEnclosedCJKLettersandMonths(code);
+                let ret_val = xml_ucs_is_enclosed_cjk_lettersand_months(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15394,7 +15394,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsEthiopic(code);
+                let ret_val = xml_ucs_is_ethiopic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15421,7 +15421,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGeneralPunctuation(code);
+                let ret_val = xml_ucs_is_general_punctuation(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15451,7 +15451,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGeometricShapes(code);
+                let ret_val = xml_ucs_is_geometric_shapes(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15481,7 +15481,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGeorgian(code);
+                let ret_val = xml_ucs_is_georgian(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15508,7 +15508,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGothic(code);
+                let ret_val = xml_ucs_is_gothic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15535,7 +15535,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGreek(code);
+                let ret_val = xml_ucs_is_greek(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15562,7 +15562,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGreekExtended(code);
+                let ret_val = xml_ucs_is_greek_extended(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15592,7 +15592,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGreekandCoptic(code);
+                let ret_val = xml_ucs_is_greekand_coptic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15622,7 +15622,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGujarati(code);
+                let ret_val = xml_ucs_is_gujarati(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15649,7 +15649,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsGurmukhi(code);
+                let ret_val = xml_ucs_is_gurmukhi(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15676,7 +15676,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHalfwidthandFullwidthForms(code);
+                let ret_val = xml_ucs_is_halfwidthand_fullwidth_forms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15706,7 +15706,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHangulCompatibilityJamo(code);
+                let ret_val = xml_ucs_is_hangul_compatibility_jamo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15736,7 +15736,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHangulJamo(code);
+                let ret_val = xml_ucs_is_hangul_jamo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15766,7 +15766,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHangulSyllables(code);
+                let ret_val = xml_ucs_is_hangul_syllables(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15796,7 +15796,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHanunoo(code);
+                let ret_val = xml_ucs_is_hanunoo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15823,7 +15823,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHebrew(code);
+                let ret_val = xml_ucs_is_hebrew(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15850,7 +15850,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHighPrivateUseSurrogates(code);
+                let ret_val = xml_ucs_is_high_private_use_surrogates(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15880,7 +15880,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHighSurrogates(code);
+                let ret_val = xml_ucs_is_high_surrogates(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15910,7 +15910,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsHiragana(code);
+                let ret_val = xml_ucs_is_hiragana(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15937,7 +15937,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsIPAExtensions(code);
+                let ret_val = xml_ucs_is_ipa_extensions(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15967,7 +15967,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsIdeographicDescriptionCharacters(code);
+                let ret_val = xml_ucs_is_ideographic_description_characters(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -15997,7 +15997,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsKanbun(code);
+                let ret_val = xml_ucs_is_kanbun(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16024,7 +16024,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsKangxiRadicals(code);
+                let ret_val = xml_ucs_is_kangxi_radicals(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16054,7 +16054,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsKannada(code);
+                let ret_val = xml_ucs_is_kannada(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16081,7 +16081,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsKatakana(code);
+                let ret_val = xml_ucs_is_katakana(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16108,7 +16108,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsKatakanaPhoneticExtensions(code);
+                let ret_val = xml_ucs_is_katakana_phonetic_extensions(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16138,7 +16138,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsKhmer(code);
+                let ret_val = xml_ucs_is_khmer(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16165,7 +16165,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsKhmerSymbols(code);
+                let ret_val = xml_ucs_is_khmer_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16195,7 +16195,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLao(code);
+                let ret_val = xml_ucs_is_lao(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16222,7 +16222,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLatin1Supplement(code);
+                let ret_val = xml_ucs_is_latin1_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16252,7 +16252,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLatinExtendedA(code);
+                let ret_val = xml_ucs_is_latin_extended_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16282,7 +16282,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLatinExtendedAdditional(code);
+                let ret_val = xml_ucs_is_latin_extended_additional(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16312,7 +16312,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLatinExtendedB(code);
+                let ret_val = xml_ucs_is_latin_extended_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16342,7 +16342,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLetterlikeSymbols(code);
+                let ret_val = xml_ucs_is_letterlike_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16372,7 +16372,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLimbu(code);
+                let ret_val = xml_ucs_is_limbu(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16399,7 +16399,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLinearBIdeograms(code);
+                let ret_val = xml_ucs_is_linear_bideograms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16429,7 +16429,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLinearBSyllabary(code);
+                let ret_val = xml_ucs_is_linear_bsyllabary(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16459,7 +16459,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsLowSurrogates(code);
+                let ret_val = xml_ucs_is_low_surrogates(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16489,7 +16489,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMalayalam(code);
+                let ret_val = xml_ucs_is_malayalam(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16516,7 +16516,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMathematicalAlphanumericSymbols(code);
+                let ret_val = xml_ucs_is_mathematical_alphanumeric_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16546,7 +16546,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMathematicalOperators(code);
+                let ret_val = xml_ucs_is_mathematical_operators(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16576,7 +16576,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMiscellaneousMathematicalSymbolsA(code);
+                let ret_val = xml_ucs_is_miscellaneous_mathematical_symbols_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16606,7 +16606,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMiscellaneousMathematicalSymbolsB(code);
+                let ret_val = xml_ucs_is_miscellaneous_mathematical_symbols_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16636,7 +16636,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMiscellaneousSymbols(code);
+                let ret_val = xml_ucs_is_miscellaneous_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16666,7 +16666,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMiscellaneousSymbolsandArrows(code);
+                let ret_val = xml_ucs_is_miscellaneous_symbolsand_arrows(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16696,7 +16696,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMiscellaneousTechnical(code);
+                let ret_val = xml_ucs_is_miscellaneous_technical(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16726,7 +16726,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMongolian(code);
+                let ret_val = xml_ucs_is_mongolian(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16753,7 +16753,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMusicalSymbols(code);
+                let ret_val = xml_ucs_is_musical_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16783,7 +16783,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsMyanmar(code);
+                let ret_val = xml_ucs_is_myanmar(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16810,7 +16810,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsNumberForms(code);
+                let ret_val = xml_ucs_is_number_forms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16840,7 +16840,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsOgham(code);
+                let ret_val = xml_ucs_is_ogham(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16867,7 +16867,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsOldItalic(code);
+                let ret_val = xml_ucs_is_old_italic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16894,7 +16894,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsOpticalCharacterRecognition(code);
+                let ret_val = xml_ucs_is_optical_character_recognition(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16924,7 +16924,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsOriya(code);
+                let ret_val = xml_ucs_is_oriya(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16951,7 +16951,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsOsmanya(code);
+                let ret_val = xml_ucs_is_osmanya(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -16978,7 +16978,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsPhoneticExtensions(code);
+                let ret_val = xml_ucs_is_phonetic_extensions(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17008,7 +17008,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsPrivateUse(code);
+                let ret_val = xml_ucs_is_private_use(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17038,7 +17038,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsPrivateUseArea(code);
+                let ret_val = xml_ucs_is_private_use_area(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17068,7 +17068,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsRunic(code);
+                let ret_val = xml_ucs_is_runic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17095,7 +17095,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsShavian(code);
+                let ret_val = xml_ucs_is_shavian(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17122,7 +17122,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSinhala(code);
+                let ret_val = xml_ucs_is_sinhala(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17149,7 +17149,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSmallFormVariants(code);
+                let ret_val = xml_ucs_is_small_form_variants(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17179,7 +17179,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSpacingModifierLetters(code);
+                let ret_val = xml_ucs_is_spacing_modifier_letters(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17209,7 +17209,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSpecials(code);
+                let ret_val = xml_ucs_is_specials(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17236,7 +17236,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSuperscriptsandSubscripts(code);
+                let ret_val = xml_ucs_is_superscriptsand_subscripts(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17266,7 +17266,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSupplementalArrowsA(code);
+                let ret_val = xml_ucs_is_supplemental_arrows_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17296,7 +17296,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSupplementalArrowsB(code);
+                let ret_val = xml_ucs_is_supplemental_arrows_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17326,7 +17326,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSupplementalMathematicalOperators(code);
+                let ret_val = xml_ucs_is_supplemental_mathematical_operators(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17356,7 +17356,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSupplementaryPrivateUseAreaA(code);
+                let ret_val = xml_ucs_is_supplementary_private_use_area_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17386,7 +17386,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSupplementaryPrivateUseAreaB(code);
+                let ret_val = xml_ucs_is_supplementary_private_use_area_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17416,7 +17416,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsSyriac(code);
+                let ret_val = xml_ucs_is_syriac(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17443,7 +17443,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsTagalog(code);
+                let ret_val = xml_ucs_is_tagalog(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17470,7 +17470,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsTagbanwa(code);
+                let ret_val = xml_ucs_is_tagbanwa(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17497,7 +17497,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsTags(code);
+                let ret_val = xml_ucs_is_tags(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17524,7 +17524,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsTaiLe(code);
+                let ret_val = xml_ucs_is_tai_le(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17551,7 +17551,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsTaiXuanJingSymbols(code);
+                let ret_val = xml_ucs_is_tai_xuan_jing_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17581,7 +17581,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsTamil(code);
+                let ret_val = xml_ucs_is_tamil(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17608,7 +17608,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsTelugu(code);
+                let ret_val = xml_ucs_is_telugu(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17635,7 +17635,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsThaana(code);
+                let ret_val = xml_ucs_is_thaana(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17662,7 +17662,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsThai(code);
+                let ret_val = xml_ucs_is_thai(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17689,7 +17689,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsTibetan(code);
+                let ret_val = xml_ucs_is_tibetan(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17716,7 +17716,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsUgaritic(code);
+                let ret_val = xml_ucs_is_ugaritic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17743,7 +17743,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsUnifiedCanadianAboriginalSyllabics(code);
+                let ret_val = xml_ucs_is_unified_canadian_aboriginal_syllabics(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17773,7 +17773,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsVariationSelectors(code);
+                let ret_val = xml_ucs_is_variation_selectors(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17803,7 +17803,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsVariationSelectorsSupplement(code);
+                let ret_val = xml_ucs_is_variation_selectors_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17833,7 +17833,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsYiRadicals(code);
+                let ret_val = xml_ucs_is_yi_radicals(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17863,7 +17863,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsYiSyllables(code);
+                let ret_val = xml_ucs_is_yi_syllables(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
@@ -17893,7 +17893,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let code = gen_int(n_code, 0);
 
-                let ret_val = xmlUCSIsYijingHexagramSymbols(code);
+                let ret_val = xml_ucs_is_yijing_hexagram_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
                 xml_reset_last_error();
