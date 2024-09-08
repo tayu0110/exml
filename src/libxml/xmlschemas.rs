@@ -2909,7 +2909,7 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
     let list: c_int = (!xml_schema_value_get_next(val).is_null()) as i32;
     *ret_value = null_mut();
     while {
-        value = null_mut();
+        // value = null_mut();
         val_type = xml_schema_get_val_type(val);
         match val_type {
             XmlSchemaValType::XmlSchemasString
@@ -3406,7 +3406,7 @@ unsafe extern "C" fn xml_schema_validate_facets(
                 val_type = xml_schema_get_val_type(val);
             }
 
-            ret = 0;
+            // ret = 0;
             facet_link = (*typ).facet_set;
             while !facet_link.is_null() {
                 'to_continue: {
@@ -3475,7 +3475,7 @@ unsafe extern "C" fn xml_schema_validate_facets(
                         }
                         _ => {}
                     }
-                    ret = 0;
+                    // ret = 0;
                 }
                 facet_link = (*facet_link).next;
             }
@@ -3488,7 +3488,7 @@ unsafe extern "C" fn xml_schema_validate_facets(
         /*
          * "length", "minLength" and "maxLength" of list types.
          */
-        ret = 0;
+        // ret = 0;
         facet_link = (*typ).facet_set;
         while !facet_link.is_null() {
             'to_continue: {
@@ -3539,7 +3539,7 @@ unsafe extern "C" fn xml_schema_validate_facets(
                     }
                     _ => {}
                 }
-                ret = 0;
+                // ret = 0;
             }
             facet_link = (*facet_link).next;
         }
@@ -10439,7 +10439,7 @@ unsafe extern "C" fn xml_schema_parse_complex_type(
         if typ.is_null() {
             return null_mut();
         }
-        name = (*typ).name;
+        // name = (*typ).name;
         (*typ).node = node;
         (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeComplex;
     /*
@@ -15147,7 +15147,7 @@ unsafe extern "C" fn xml_schema_add_components(
 
     for i in 0..(*(*bucket).globals).nb_items {
         item = *(*(*bucket).globals).items.add(i as usize) as _;
-        table = null_mut();
+        // table = null_mut();
         match (*item).typ {
             XmlSchemaTypeType::XmlSchemaTypeComplex | XmlSchemaTypeType::XmlSchemaTypeSimple => {
                 if WXS_REDEFINED_TYPE!(item) {
@@ -25829,7 +25829,7 @@ unsafe extern "C" fn xml_schema_complex_type_err(
         } else {
             str = xml_strdup(c" Expected is ( ".as_ptr() as _);
         }
-        ns_name = null_mut();
+        // ns_name = null_mut();
 
         for i in 0..nbval + nbneg {
             cur = *values.add(i as usize);
@@ -28026,7 +28026,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
             }
 
             ACTIVATE_ATTRIBUTE!(vctxt, iattr);
-            fixed = 0;
+            // fixed = 0;
             xpath_res = 0;
 
             if !(*vctxt).xpath_states.is_null() {

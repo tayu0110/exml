@@ -441,7 +441,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             XmlParserErrors::XmlCheckNoDoc as i32,
             c"Node has no doc\n".as_ptr(),
         );
-        dict = null_mut();
+        // dict = null_mut();
     } else {
         dict = (*doc).dict;
         if dict.is_null() && (*ctxt).nodict == 0 {
@@ -4477,8 +4477,8 @@ pub unsafe extern "C" fn xml_shell(
                 command
             );
         }
-        free(cmdline as _); /* not xmlFree here !  as _*/
-        cmdline = null_mut();
+        free(cmdline as _); /* not xmlFree here ! */
+        // cmdline = null_mut();
     }
     #[cfg(feature = "xpath")]
     {
@@ -4492,7 +4492,7 @@ pub unsafe extern "C" fn xml_shell(
     }
     xml_free(ctxt as _);
     if !cmdline.is_null() {
-        free(cmdline as _); /* not xmlFree here !  as _*/
+        free(cmdline as _); /* not xmlFree here ! */
     }
 }
 

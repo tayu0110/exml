@@ -1286,7 +1286,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
         }
         if !ns.is_null() {
             xml_free(ns as _);
-            ns = null_mut();
+            // ns = null_mut();
         }
     } else {
         ret = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
@@ -5818,14 +5818,16 @@ unsafe extern "C" fn xml_validate_element_content(
                                         ret = -1;
                                         break 'fail;
                                     }
-                                    ret = xml_reg_exec_push_string(exec, fullname, null_mut());
+                                    // ret =
+                                    xml_reg_exec_push_string(exec, fullname, null_mut());
                                     if fullname != fname.as_ptr() as _
                                         && fullname != (*cur).name as _
                                     {
                                         xml_free(fullname as _);
                                     }
                                 } else {
-                                    ret = xml_reg_exec_push_string(exec, (*cur).name, null_mut());
+                                    // ret =
+                                    xml_reg_exec_push_string(exec, (*cur).name, null_mut());
                                 }
                             }
                             _ => {}
@@ -6455,7 +6457,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     }
                 }
                 child = (*elem).children;
-                cont = (*elem_decl).content;
+                // cont = (*elem_decl).content;
                 tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem);
                 if tmp <= 0 {
                     ret = tmp;

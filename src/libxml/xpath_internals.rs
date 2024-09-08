@@ -4519,7 +4519,7 @@ unsafe extern "C" fn xml_xpath_current_char(
     ctxt: XmlXPathParserContextPtr,
     len: *mut c_int,
 ) -> c_int {
-    let mut val: c_uint = 0;
+    let mut val: c_uint;
 
     if ctxt.is_null() {
         return 0;
@@ -5062,7 +5062,7 @@ unsafe extern "C" fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
         let mut name: *mut XmlChar = null_mut();
         let mut prefix: *mut XmlChar = null_mut();
         let mut test: XmlXPathTestVal = XmlXPathTestVal::NodeTestNone;
-        let mut axis: Option<XmlXPathAxisVal> = None;
+        let mut axis: Option<XmlXPathAxisVal>;
         let mut typ: XmlXPathTypeVal = XmlXPathTypeVal::NodeTypeNode;
 
         /*
@@ -6490,7 +6490,8 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                 }
                             }
                             if (*cur).children.is_null() || depth >= max_depth {
-                                ret = xml_stream_pop(patstream);
+                                // ret =
+                                xml_stream_pop(patstream);
                                 while !(*cur).next.is_null() {
                                     cur = (*cur).next;
                                     if !matches!(
@@ -6566,7 +6567,8 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                 | XmlElementType::XmlPiNode
                         ))
                 {
-                    ret = xml_stream_pop(patstream);
+                    // ret =
+                    xml_stream_pop(patstream);
                 };
                 if !(*cur).next.is_null() {
                     cur = (*cur).next;
@@ -7360,6 +7362,7 @@ macro_rules! xp_test_hit_ns {
         $break_on_first_hit:expr,
         $label:tt
     ) => {
+        #[allow(unused_assignments)]
         if $has_axis_range != 0 {
             $pos += 1;
             if $pos == $max_pos {

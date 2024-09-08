@@ -3104,7 +3104,7 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
                     // goto get_more;
                     continue 'get_more;
                 }
-                input = input.sub(1);
+                // input = input.sub(1);
             }
             SHRINK!(ctxt);
             GROW!(ctxt);
@@ -5209,7 +5209,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             if (list.is_null() && (*ent).owner == 0)
                 || matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
             {
-                let mut nw: XmlNodePtr = null_mut();
+                let mut nw: XmlNodePtr;
                 let mut cur: XmlNodePtr;
                 let mut first_child: XmlNodePtr = null_mut();
 
@@ -5257,7 +5257,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     xml_add_entity_reference(ent, first_child, nw);
                 }
             } else if list.is_null() || (*ctxt).input_nr > 0 {
-                let mut nw: XmlNodePtr = null_mut();
+                let mut nw: XmlNodePtr;
                 let mut cur: XmlNodePtr;
                 let mut next: XmlNodePtr;
                 let mut first_child: XmlNodePtr = null_mut();

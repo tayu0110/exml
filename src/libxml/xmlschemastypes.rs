@@ -7360,7 +7360,7 @@ pub unsafe extern "C" fn xml_schema_get_canon_value(
                     *offs = b'0' as _;
                     offs = offs.sub(1);
                     *offs = b'.' as _;
-                    offs = offs.sub(1);
+                    // offs = offs.sub(1);
                 }
                 *ret_value = buf as _;
             }

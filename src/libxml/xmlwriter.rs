@@ -1533,7 +1533,8 @@ pub unsafe extern "C" fn xml_text_writer_start_element(
                     }
                     sum += count;
                     if (*writer).indent != 0 {
-                        count = xml_output_buffer_write_string((*writer).out, c"\n".as_ptr() as _);
+                        // count =
+                        xml_output_buffer_write_string((*writer).out, c"\n".as_ptr() as _);
                     }
                     (*p).state = XmlTextWriterState::XmlTextwriterText;
                 }

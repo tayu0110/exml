@@ -7077,7 +7077,7 @@ unsafe extern "C" fn xml_relaxng_generate_attributes(
         return -1;
     }
 
-    parent = null_mut();
+    // parent = null_mut();
     cur = def;
     while !cur.is_null() {
         if matches!(
@@ -7729,7 +7729,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
     let mut val: XmlRelaxNGContentType = XmlRelaxNGContentType::Empty;
 
     while !cur.is_null() {
-        ret = XmlRelaxNGContentType::Empty;
+        // ret = XmlRelaxNGContentType::Empty;
         if matches!((*cur).typ, XmlRelaxNGType::Ref | XmlRelaxNGType::Parentref) {
             /*
              * This should actually be caught by list//element(ref) at the
@@ -8186,7 +8186,8 @@ unsafe extern "C" fn xml_relaxng_check_rules(
              */
             tmp = xml_relaxng_group_content_type(val, ret);
             if tmp != XmlRelaxNGContentType::Error {
-                tmp = xml_relaxng_max_content_type(val, ret);
+                // tmp =
+                xml_relaxng_max_content_type(val, ret);
             }
         } else if ptype == XmlRelaxNGType::Choice {
             val = xml_relaxng_max_content_type(val, ret);
@@ -11013,7 +11014,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
     define: XmlRelaxNGDefinePtr,
 ) -> c_int {
     let mut ret: c_int = 0;
-    let mut i: c_int = 0;
+    let mut i: c_int;
     let nbgroups: c_int;
     let err_nr: c_int = (*ctxt).err_nr;
     let mut oldstate: XmlRelaxNGValidStatePtr;
@@ -11728,7 +11729,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             let mut states: XmlRelaxNGStatesPtr = null_mut();
             let mut base: c_int;
 
-            err_nr = (*ctxt).err_nr;
+            // err_nr = (*ctxt).err_nr;
             let res: XmlRelaxNGStatesPtr = xml_relaxng_new_states(ctxt, 1);
             if res.is_null() {
                 ret = -1;
@@ -11841,7 +11842,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                             xml_relaxng_new_states(ctxt, (*res).nb_state - base);
                             states = (*ctxt).states;
                             if states.is_null() {
-                                progress = 0;
+                                // progress = 0;
                                 break 'lp;
                             }
                         }
@@ -12516,7 +12517,7 @@ pub unsafe extern "C" fn xml_relaxng_validate_doc(
 * some of the in/out information are passed via the context in @inputdata.
 */
 unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
-    mut exec: XmlRegExecCtxtPtr,
+    _exec: XmlRegExecCtxtPtr,
     token: *const XmlChar,
     transdata: *mut c_void,
     inputdata: *mut c_void,
@@ -12606,7 +12607,7 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
         (*ctxt).pdef = define;
         return;
     }
-    exec = xml_reg_new_exec_ctxt(
+    let exec = xml_reg_new_exec_ctxt(
         (*define).cont_model,
         Some(xml_relaxng_validate_progressive_callback),
         ctxt as _,

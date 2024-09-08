@@ -865,7 +865,7 @@ pub unsafe extern "C" fn xml_dict_exists(
     let okey: c_ulong = xml_dict_compute_key!(dict, name, l as _);
     key = okey % (*dict).size as u64;
     if (*(*dict).dict.add(key as usize)).valid == 0 {
-        insert = null_mut();
+        // insert = null_mut();
     } else {
         insert = (*dict).dict.add(key as usize);
         while !(*insert).next.is_null() {

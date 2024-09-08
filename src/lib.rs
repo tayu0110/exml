@@ -4,6 +4,12 @@
 #![allow(unused_assignments)]
 #![allow(deprecated)]
 #![allow(unused)]
+#![warn(unused_assignments)]
+#![warn(unused_mut)]
+#![warn(unused_imports)]
+#![warn(unused_labels)]
+#![warn(unused_parens)]
+#![warn(unused_variables)]
 
 pub mod libxml;
 pub mod private;

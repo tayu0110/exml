@@ -282,7 +282,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
                 if xlink.is_null() {
                     /* Humm, fallback method */
                     if xml_str_equal(role, c"xlink:external-linkset".as_ptr() as _) != 0 {
-                        ret = XlinkType::XlinkTypeExtendedSet;
+                        // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 } else {
                     let mut buf: [XmlChar; 200] = [0; 200];
@@ -294,7 +294,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
                     );
                     buf[buf.len() - 1] = 0;
                     if xml_str_equal(role, buf.as_ptr() as _) != 0 {
-                        ret = XlinkType::XlinkTypeExtendedSet;
+                        // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 }
             }

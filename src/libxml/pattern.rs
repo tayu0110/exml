@@ -1534,7 +1534,7 @@ pub unsafe extern "C" fn xml_patterncompile(
             }
             if !tmp.is_null() {
                 xml_free(tmp as _);
-                tmp = null_mut();
+                // tmp = null_mut();
             }
             start = or;
         }
@@ -2335,7 +2335,7 @@ unsafe extern "C" fn xml_stream_push_internal(
                         {
                             return -1;
                         }
-                        desc = 0;
+                        // desc = 0;
                         /* loop-stopper */
                         i = m;
                     } else {
