@@ -32,7 +32,7 @@ use crate::{
 };
 
 use super::{
-    dict::{xmlDictLookup, xmlDictOwns, xmlDictQLookup, xmlDictReference},
+    dict::{xml_dict_lookup, xml_dict_owns, xml_dict_qlookup, xml_dict_reference},
     encoding::xmlDetectCharEncoding,
     entities::{
         xml_add_doc_entity, xml_add_dtd_entity, xml_get_doc_entity, xml_get_parameter_entity,
@@ -440,7 +440,7 @@ pub unsafe extern "C" fn xmlSAX2ExternalSubset(
         (*ctxt).input_tab = oldinput_tab;
         (*ctxt).charset = oldcharset;
         if !(*ctxt).encoding.is_null()
-            && ((*ctxt).dict.is_null() || xmlDictOwns((*ctxt).dict, (*ctxt).encoding) == 0)
+            && ((*ctxt).dict.is_null() || xml_dict_owns((*ctxt).dict, (*ctxt).encoding) == 0)
         {
             xml_free((*ctxt).encoding as _);
         }
@@ -1273,7 +1273,7 @@ pub unsafe extern "C" fn xmlSAX2StartDocument(ctx: *mut c_void) {
         }
         if (*ctxt).dict_names != 0 && !doc.is_null() {
             (*doc).dict = (*ctxt).dict;
-            xmlDictReference((*doc).dict);
+            xml_dict_reference((*doc).dict);
         }
     }
     if !(*ctxt).my_doc.is_null()
@@ -2529,7 +2529,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
      */
     if !prefix.is_null() && orig_uri.is_null() {
         if (*ctxt).dict_names != 0 {
-            let fullname: *const XmlChar = xmlDictQLookup((*ctxt).dict, prefix, localname);
+            let fullname: *const XmlChar = xml_dict_qlookup((*ctxt).dict, prefix, localname);
             if !fullname.is_null() {
                 localname = fullname;
             }
@@ -2714,7 +2714,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
             if !(*attributes.add(j + 1)).is_null() && (*attributes.add(j + 2)).is_null() {
                 if (*ctxt).dict_names != 0 {
                     let fullname: *const XmlChar =
-                        xmlDictQLookup((*ctxt).dict, *attributes.add(j + 1), *attributes.add(j));
+                        xml_dict_qlookup((*ctxt).dict, *attributes.add(j + 1), *attributes.add(j));
                     if !fullname.is_null() {
                         xmlSAX2AttributeNs(
                             ctxt,
@@ -2823,7 +2823,7 @@ unsafe extern "C" fn xmlSAX2TextNode(
         } else if len <= 3
             && (cur == b'"' || cur == b'\'' || (cur == b'<' && *str.add(len as usize + 1) != b'!'))
         {
-            intern = xmlDictLookup((*ctxt).dict, str, len);
+            intern = xml_dict_lookup((*ctxt).dict, str, len);
         } else if IS_BLANK_CH!(*str)
             && len < 60
             && cur == b'<'
@@ -2838,7 +2838,7 @@ unsafe extern "C" fn xmlSAX2TextNode(
                 }
             }
             if !skip {
-                intern = xmlDictLookup((*ctxt).dict, str, len);
+                intern = xml_dict_lookup((*ctxt).dict, str, len);
             }
         }
     }
@@ -3374,7 +3374,7 @@ unsafe extern "C" fn xmlSAX2Text(
                 (*last_child).content = xml_strdup((*last_child).content);
                 (*last_child).properties = null_mut();
             } else if (*ctxt).nodemem == (*ctxt).nodelen + 1
-                && xmlDictOwns((*ctxt).dict, (*last_child).content) != 0
+                && xml_dict_owns((*ctxt).dict, (*last_child).content) != 0
             {
                 (*last_child).content = xml_strdup((*last_child).content);
             }

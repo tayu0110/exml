@@ -11,7 +11,7 @@ use crate::libxml::{
     catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
     chvalid::XmlChRangeGroup,
     debug_xml::XmlShellCtxtPtr,
-    dict::{xmlDictCreate, xmlDictFree, XmlDictPtr},
+    dict::{xml_dict_create, xml_dict_free, XmlDictPtr},
     encoding::{XmlCharEncoding, XmlCharEncodingHandlerPtr},
     entities::{XmlEntitiesTablePtr, XmlEntityPtr},
     globals::xml_free,
@@ -1568,14 +1568,14 @@ pub(crate) fn des_xml_char_encoding_handler_ptr(
 
 pub(crate) unsafe extern "C" fn gen_xml_dict_ptr(no: c_int, _nr: c_int) -> XmlDictPtr {
     if no == 0 {
-        return xmlDictCreate();
+        return xml_dict_create();
     }
     null_mut()
 }
 
 pub(crate) unsafe extern "C" fn des_xml_dict_ptr(_no: c_int, val: XmlDictPtr, _nr: c_int) {
     if !val.is_null() {
-        xmlDictFree(val);
+        xml_dict_free(val);
     }
 }
 
@@ -1592,7 +1592,7 @@ pub(crate) unsafe extern "C" fn desret_xml_doc_ptr(val: XmlDocPtr) {
 }
 
 pub(crate) unsafe extern "C" fn desret_xml_dict_ptr(val: XmlDictPtr) {
-    xmlDictFree(val);
+    xml_dict_free(val);
 }
 
 #[cfg(feature = "catalog")]

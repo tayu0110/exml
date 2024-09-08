@@ -16,7 +16,7 @@ use libc::{fprintf, memcpy, memset, size_t, snprintf, strchr, FILE};
 use crate::{
     __xml_raise_error,
     libxml::{
-        dict::{xmlDictCreate, xmlDictFree, xmlDictLookup, xmlDictReference, XmlDictPtr},
+        dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         encoding::XmlCharEncoding,
         entities::XmlEntityPtr,
         globals::{xmlGenericErrorContext, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -2602,7 +2602,7 @@ unsafe extern "C" fn xml_schema_lookup_namespace(
         {
             let ns_name: *mut XmlChar = xml_text_reader_lookup_namespace((*vctxt).reader, prefix);
             if !ns_name.is_null() {
-                let ret: *const XmlChar = xmlDictLookup((*vctxt).dict, ns_name, -1);
+                let ret: *const XmlChar = xml_dict_lookup((*vctxt).dict, ns_name, -1);
                 xml_free(ns_name as _);
                 return ret;
             } else {
@@ -4465,8 +4465,8 @@ pub unsafe extern "C" fn xml_schema_new_parser_ctxt(url: *const c_char) -> XmlSc
     if ret.is_null() {
         return null_mut();
     }
-    (*ret).dict = xmlDictCreate();
-    (*ret).url = xmlDictLookup((*ret).dict, url as _, -1);
+    (*ret).dict = xml_dict_create();
+    (*ret).url = xml_dict_lookup((*ret).dict, url as _, -1);
     ret
 }
 
@@ -4493,7 +4493,7 @@ pub unsafe extern "C" fn xml_schema_new_mem_parser_ctxt(
     }
     (*ret).buffer = buffer;
     (*ret).size = size;
-    (*ret).dict = xmlDictCreate();
+    (*ret).dict = xml_dict_create();
     ret
 }
 
@@ -4515,7 +4515,7 @@ pub unsafe extern "C" fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSc
         return null_mut();
     }
     (*ret).doc = doc;
-    (*ret).dict = xmlDictCreate();
+    (*ret).dict = xml_dict_create();
     /* The application has responsibility for the document */
     (*ret).preserve = 1;
 
@@ -4546,7 +4546,7 @@ pub unsafe extern "C" fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPt
     if !(*ctxt).attr_prohibs.is_null() {
         xml_schema_item_list_free((*ctxt).attr_prohibs);
     }
-    xmlDictFree((*ctxt).dict);
+    xml_dict_free((*ctxt).dict);
     xml_free(ctxt as _);
 }
 
@@ -4663,7 +4663,7 @@ unsafe extern "C" fn xml_schema_new_schema(ctxt: XmlSchemaParserCtxtPtr) -> XmlS
     }
     memset(ret as _, 0, size_of::<XmlSchema>());
     (*ret).dict = (*ctxt).dict;
-    xmlDictReference((*ret).dict);
+    xml_dict_reference((*ret).dict);
 
     ret
 }
@@ -4712,7 +4712,7 @@ unsafe extern "C" fn xml_schema_construction_ctxt_free(con: XmlSchemaConstructio
         xml_schema_redef_list_free((*con).redefs);
     }
     if !(*con).dict.is_null() {
-        xmlDictFree((*con).dict);
+        xml_dict_free((*con).dict);
     }
     xml_free(con as _);
 }
@@ -4753,7 +4753,7 @@ unsafe extern "C" fn xml_schema_construction_ctxt_create(
         return null_mut();
     }
     (*ret).dict = dict;
-    xmlDictReference(dict);
+    xml_dict_reference(dict);
     ret
 }
 
@@ -5403,7 +5403,7 @@ unsafe extern "C" fn xml_schema_get_prop(
     if val.is_null() {
         return null_mut();
     }
-    let ret: *const XmlChar = xmlDictLookup((*ctxt).dict, val, -1);
+    let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val, -1);
     xml_free(val as _);
     ret
 }
@@ -5838,7 +5838,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                     preserve_doc = 1;
                     /* TODO: Does the context or the doc hold the location? */
                     if !(*schema_doc).url.is_null() {
-                        schema_location = xmlDictLookup((*pctxt).dict, (*schema_doc).url, -1);
+                        schema_location = xml_dict_lookup((*pctxt).dict, (*schema_doc).url, -1);
                     } else {
                         schema_location = c"in_memory_buffer".as_ptr() as _;
                     }
@@ -5857,9 +5857,9 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                          * TODO: Do we have to burden the schema parser dict with all
                          * the content of the schema doc?
                          */
-                        xmlDictFree((*parser_ctxt).dict);
+                        xml_dict_free((*parser_ctxt).dict);
                         (*parser_ctxt).dict = (*pctxt).dict;
-                        xmlDictReference((*parser_ctxt).dict);
+                        xml_dict_reference((*parser_ctxt).dict);
                     }
                     if !schema_location.is_null() {
                         /* Parse from file. */
@@ -6395,7 +6395,7 @@ unsafe extern "C" fn xml_schema_get_node_content(
     if val.is_null() {
         val = xml_strdup(c"".as_ptr() as _);
     }
-    let ret: *const XmlChar = xmlDictLookup((*ctxt).dict, val, -1);
+    let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val, -1);
     xml_free(val as _);
     if ret.is_null() {
         xml_schema_perr_memory(ctxt, c"getting node content".as_ptr() as _, node);
@@ -7380,7 +7380,7 @@ unsafe extern "C" fn xml_schema_build_absolute_uri(
                 xml_free(base as _);
             }
             if !uri.is_null() {
-                ret = xmlDictLookup(dict, uri, -1);
+                ret = xml_dict_lookup(dict, uri, -1);
                 xml_free(uri as _);
                 return ret;
             }
@@ -7408,9 +7408,9 @@ unsafe extern "C" fn xml_schema_new_parser_ctxt_use_dict(
         return null_mut();
     }
     (*ret).dict = dict;
-    xmlDictReference(dict);
+    xml_dict_reference(dict);
     if !url.is_null() {
-        (*ret).url = xmlDictLookup(dict, url as _, -1);
+        (*ret).url = xml_dict_lookup(dict, url as _, -1);
     }
     ret
 }
@@ -7611,7 +7611,7 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
             // goto exit_failure;
             return -1;
         }
-        *schema_location = xmlDictLookup((*pctxt).dict, uri, -1) as _;
+        *schema_location = xml_dict_lookup((*pctxt).dict, uri, -1) as _;
         xml_free(uri as _);
     } else {
         xml_schema_pmissing_attr_err(
@@ -7810,7 +7810,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
             && !(*ns).href.load(Ordering::Relaxed).is_null()
             && *(*ns).href.load(Ordering::Relaxed).add(0) != 0
         {
-            *uri = xmlDictLookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
+            *uri = xml_dict_lookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
         } else if (*schema).flags & XML_SCHEMAS_INCLUDING_CONVERT_NS != 0 {
             /* TODO: move XML_SCHEMAS_INCLUDING_CONVERT_NS to the
              * parser context. */
@@ -7820,21 +7820,21 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
              */
             *uri = (*ctxt).target_namespace;
         }
-        *local = xmlDictLookup((*ctxt).dict, value, -1);
+        *local = xml_dict_lookup((*ctxt).dict, value, -1);
         return 0;
     }
     /*
      * At this point xmlSplitQName3 has to return a local name.
      */
     *local = xml_split_qname3(value, addr_of_mut!(len));
-    *local = xmlDictLookup((*ctxt).dict, *local, -1);
-    let pref: *const XmlChar = xmlDictLookup((*ctxt).dict, value, len);
+    *local = xml_dict_lookup((*ctxt).dict, *local, -1);
+    let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
     ns = xml_search_ns((*attr).doc, (*attr).parent, pref);
     if ns.is_null() {
         xml_schema_psimple_type_err(ctxt, XmlParserErrors::XmlSchemapS4sAttrInvalidValue, owner_item, attr as XmlNodePtr, xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname), null_mut(), value, c"The value '%s' of simple type 'xs:QName' has no corresponding namespace declaration in scope".as_ptr() as _, value, null_mut());
         return (*ctxt).err;
     } else {
-        *uri = xmlDictLookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
+        *uri = xml_dict_lookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
     }
     0
 }
@@ -9771,7 +9771,7 @@ unsafe extern "C" fn xml_schema_parse_wildcard_ns(
                         ns_item,
                         xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
                     );
-                    dictns_item = xmlDictLookup((*ctxt).dict, ns_item, -1);
+                    dictns_item = xml_dict_lookup((*ctxt).dict, ns_item, -1);
                 }
                 /*
                  * Avoid duplicate namespaces.
@@ -23955,7 +23955,7 @@ pub unsafe extern "C" fn xml_schema_free(schema: XmlSchemaPtr) {
     }
     /* Never free the doc here, since this will be done by the buckets. */
 
-    xmlDictFree((*schema).dict);
+    xml_dict_free((*schema).dict);
     xml_free(schema as _);
 }
 
@@ -24581,7 +24581,7 @@ pub unsafe extern "C" fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlS
     }
     memset(ret as _, 0, size_of::<XmlSchemaValidCtxt>());
     (*ret).typ = XML_SCHEMA_CTXT_VALIDATOR;
-    (*ret).dict = xmlDictCreate();
+    (*ret).dict = xml_dict_create();
     (*ret).node_qnames = xml_schema_item_list_create();
     (*ret).schema = schema;
     ret
@@ -24895,7 +24895,7 @@ pub unsafe extern "C" fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr)
         xml_schema_item_list_free((*ctxt).node_qnames);
     }
     if !(*ctxt).dict.is_null() {
-        xmlDictFree((*ctxt).dict);
+        xml_dict_free((*ctxt).dict);
     }
     if !(*ctxt).filename.is_null() {
         xml_free((*ctxt).filename as _);
@@ -25515,7 +25515,7 @@ unsafe extern "C" fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) ->
                 break;
             }
             /* TODO: Don't use the schema's dict. */
-            nsname = xmlDictLookup((*(*vctxt).schema).dict, cur, end.offset_from(cur) as _);
+            nsname = xml_dict_lookup((*(*vctxt).schema).dict, cur, end.offset_from(cur) as _);
             cur = end;
         }
         /*
@@ -25539,7 +25539,7 @@ unsafe extern "C" fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) ->
             break;
         }
         /* TODO: Don't use the schema's dict. */
-        location = xmlDictLookup((*(*vctxt).schema).dict, cur, end.offset_from(cur) as _);
+        location = xml_dict_lookup((*(*vctxt).schema).dict, cur, end.offset_from(cur) as _);
         cur = end;
         ret = xml_schema_assemble_by_location(
             vctxt,
@@ -25600,9 +25600,9 @@ unsafe extern "C" fn xml_schema_vexpand_qname(
          */
         let local: *mut XmlChar = xml_split_qname2(value, addr_of_mut!(prefix));
         if local.is_null() {
-            *local_name = xmlDictLookup((*vctxt).dict, value, -1);
+            *local_name = xml_dict_lookup((*vctxt).dict, value, -1);
         } else {
-            *local_name = xmlDictLookup((*vctxt).dict, local, -1);
+            *local_name = xml_dict_lookup((*vctxt).dict, local, -1);
             xml_free(local as _);
         }
 
@@ -27019,12 +27019,12 @@ unsafe extern "C" fn xml_schema_vadd_node_qname(
     mut lname: *const XmlChar,
     mut nsname: *const XmlChar,
 ) -> c_int {
-    lname = xmlDictLookup((*vctxt).dict, lname, -1);
+    lname = xml_dict_lookup((*vctxt).dict, lname, -1);
     if lname.is_null() {
         return -1;
     }
     if !nsname.is_null() {
-        nsname = xmlDictLookup((*vctxt).dict, nsname, -1);
+        nsname = xml_dict_lookup((*vctxt).dict, nsname, -1);
         if nsname.is_null() {
             return -1;
         }
@@ -30758,12 +30758,12 @@ unsafe extern "C" fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
     }
     xml_schema_item_list_clear((*vctxt).node_qnames);
     /* Recreate the dict. */
-    xmlDictFree((*vctxt).dict);
+    xml_dict_free((*vctxt).dict);
     /*
      * TODO: Is is save to recreate it? Do we have a scenario
      * where the user provides the dict?
      */
-    (*vctxt).dict = xmlDictCreate();
+    (*vctxt).dict = xml_dict_create();
 
     if !(*vctxt).filename.is_null() {
         xml_free((*vctxt).filename as _);

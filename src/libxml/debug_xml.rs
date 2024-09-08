@@ -22,7 +22,7 @@ use crate::{
 #[cfg(feature = "xpath")]
 use super::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr};
 use super::{
-    dict::{xmlDictLookup, xmlDictOwns, XmlDictPtr},
+    dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
     entities::{xml_get_doc_entity, XmlEntitiesTablePtr, XmlEntityType},
     hash::xmlHashScan,
     parser::{xml_parse_in_node_context, XmlParserOption},
@@ -407,7 +407,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
             );
         }
         if !(*ctxt).dict.is_null()
-            && xmlDictOwns((*ctxt).dict, name) == 0
+            && xml_dict_owns((*ctxt).dict, name) == 0
             && ((*ctxt).doc.is_null()
                 || (*(*ctxt).doc).parse_flags
                     & (XmlParserOption::XmlParseSax1 as i32
@@ -562,7 +562,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             } else {
                 /* some case of entity substitution can lead to this */
                 if !(*ctxt).dict.is_null()
-                    && ((*node).name == xmlDictLookup((*ctxt).dict, c"nbktext".as_ptr() as _, 7))
+                    && ((*node).name == xml_dict_lookup((*ctxt).dict, c"nbktext".as_ptr() as _, 7))
                 {
                     // break;
                 } else {
@@ -1168,7 +1168,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
                 if (*ctxt).options & DUMP_TEXT_TYPE != 0 {
                     if (*node).content == addr_of_mut!((*node).properties) as *mut XmlChar {
                         fprintf((*ctxt).output, c" compact\n".as_ptr());
-                    } else if xmlDictOwns((*ctxt).dict, (*node).content) == 1 {
+                    } else if xml_dict_owns((*ctxt).dict, (*node).content) == 1 {
                         fprintf((*ctxt).output, c" interned\n".as_ptr());
                     } else {
                         fprintf((*ctxt).output, c"\n".as_ptr());

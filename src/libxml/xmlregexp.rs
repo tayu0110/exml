@@ -15,10 +15,10 @@ use libc::{fprintf, memcpy, memset, printf, size_t, snprintf, strlen, FILE, INT_
 use crate::{
     __xml_raise_error,
     libxml::{
-        dict::{xmlDictLookup, XmlDictPtr},
+        dict::{xml_dict_lookup, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser_internals::xml_string_current_char,
-        tree::{xml_buffer_write_xml_char, xml_buffer_write_char, XmlBufferPtr},
+        tree::{xml_buffer_write_char, xml_buffer_write_xml_char, XmlBufferPtr},
         xmlautomata::{
             xml_free_automata, xml_new_automata, XmlAutomata, XmlAutomataPtr, XmlAutomataState,
         },
@@ -6260,12 +6260,12 @@ pub struct XmlExpCtxt {
  */
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_free_ctxt(ctxt: XmlExpCtxtPtr) {
-    use super::dict::xmlDictFree;
+    use super::dict::xml_dict_free;
 
     if ctxt.is_null() {
         return;
     }
-    xmlDictFree((*ctxt).dict);
+    xml_dict_free((*ctxt).dict);
     if !(*ctxt).table.is_null() {
         xml_free((*ctxt).table as _);
     }
@@ -6283,7 +6283,7 @@ pub unsafe extern "C" fn xml_exp_free_ctxt(ctxt: XmlExpCtxtPtr) {
  */
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_new_ctxt(mut max_nodes: c_int, dict: XmlDictPtr) -> XmlExpCtxtPtr {
-    use crate::libxml::dict::{xmlDictCreate, xmlDictReference};
+    use crate::libxml::dict::{xml_dict_create, xml_dict_reference};
 
     let size: c_int = 256;
 
@@ -6310,7 +6310,7 @@ pub unsafe extern "C" fn xml_exp_new_ctxt(mut max_nodes: c_int, dict: XmlDictPtr
         size as usize * size_of::<XmlExpNodePtr>(),
     );
     if dict.is_null() {
-        (*ret).dict = xmlDictCreate();
+        (*ret).dict = xml_dict_create();
         if (*ret).dict.is_null() {
             xml_free((*ret).table as _);
             xml_free(ret as _);
@@ -6318,7 +6318,7 @@ pub unsafe extern "C" fn xml_exp_new_ctxt(mut max_nodes: c_int, dict: XmlDictPtr
         }
     } else {
         (*ret).dict = dict;
-        xmlDictReference((*ret).dict);
+        xml_dict_reference((*ret).dict);
     }
     ret
 }
@@ -6542,7 +6542,7 @@ unsafe extern "C" fn xml_exp_parse_or(ctxt: XmlExpCtxtPtr) -> XmlExpNodePtr {
         {
             NEXT!(ctxt);
         }
-        val = xmlDictLookup((*ctxt).dict, base as _, (*ctxt).cur.offset_from(base) as _);
+        val = xml_dict_lookup((*ctxt).dict, base as _, (*ctxt).cur.offset_from(base) as _);
         if val.is_null() {
             return null_mut();
         }
@@ -7102,7 +7102,7 @@ pub unsafe extern "C" fn xml_exp_new_atom(
     if ctxt.is_null() || name.is_null() {
         return null_mut();
     }
-    name = xmlDictLookup((*ctxt).dict, name, len);
+    name = xml_dict_lookup((*ctxt).dict, name, len);
     if name.is_null() {
         return null_mut();
     }
@@ -7554,7 +7554,7 @@ pub unsafe extern "C" fn xml_exp_string_derive(
     str: *const XmlChar,
     len: c_int,
 ) -> XmlExpNodePtr {
-    use super::dict::xmlDictExists;
+    use super::dict::xml_dict_exists;
 
     if exp.is_null() || ctxt.is_null() || str.is_null() {
         return null_mut();
@@ -7563,7 +7563,7 @@ pub unsafe extern "C" fn xml_exp_string_derive(
      * check the string is in the dictionary, if yes use an interned
      * copy, otherwise we know it's not an acceptable input
      */
-    let input: *const XmlChar = xmlDictExists((*ctxt).dict, str, len);
+    let input: *const XmlChar = xml_dict_exists((*ctxt).dict, str, len);
     if input.is_null() {
         return FORBIDDEN_EXP;
     }

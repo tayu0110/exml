@@ -16,7 +16,7 @@ use libc::{fwrite, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen,
 
 use crate::{
     libxml::{
-        dict::xmlDictFree,
+        dict::xml_dict_free,
         entities::XmlEntityPtr,
         valid::{xml_free_id_table, xml_free_ref_table, xml_get_dtd_qattr_desc, xml_remove_id},
         xml_io::{XmlOutputBuffer, XmlOutputBufferPtr},
@@ -35,7 +35,7 @@ use crate::{
 };
 
 use super::{
-    dict::{xmlDictLookup, xmlDictOwns, XmlDict, XmlDictPtr},
+    dict::{xml_dict_lookup, xml_dict_owns, XmlDict, XmlDictPtr},
     encoding::XmlCharEncoding,
     entities::{
         xml_encode_entities_reentrant, xml_free_entities_table, xml_get_doc_entity,
@@ -2558,7 +2558,7 @@ pub unsafe extern "C" fn xml_get_int_subset(doc: *const XmlDoc) -> XmlDtdPtr {
 macro_rules! DICT_FREE {
     ($dict:expr, $str:expr) => {
         if !$str.is_null()
-            && ($dict.is_null() || crate::libxml::dict::xmlDictOwns($dict, $str as _) == 0)
+            && ($dict.is_null() || crate::libxml::dict::xml_dict_owns($dict, $str as _) == 0)
         {
             xml_free($str as _);
         }
@@ -2927,7 +2927,7 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
     DICT_FREE!(dict, (*cur).url);
     xml_free(cur as _);
     if !dict.is_null() {
-        xmlDictFree(dict);
+        xml_dict_free(dict);
     }
 }
 
@@ -2970,7 +2970,7 @@ pub unsafe extern "C" fn xml_new_doc_prop(
     (*cur).typ = XmlElementType::XmlAttributeNode;
 
     if !doc.is_null() && !(*doc).dict.is_null() {
-        (*cur).name = xmlDictLookup((*doc).dict, name, -1);
+        (*cur).name = xml_dict_lookup((*doc).dict, name, -1);
     } else {
         (*cur).name = xml_strdup(name);
     }
@@ -3012,7 +3012,7 @@ unsafe extern "C" fn xml_new_prop_internal(
         if eatname == 1
             && ((*node).doc.is_null()
                 || (*(*node).doc).dict.is_null()
-                || xmlDictOwns((*(*node).doc).dict, name) == 0)
+                || xml_dict_owns((*(*node).doc).dict, name) == 0)
         {
             xml_free(name as _);
         }
@@ -3028,7 +3028,7 @@ unsafe extern "C" fn xml_new_prop_internal(
             && (node.is_null()
                 || (*node).doc.is_null()
                 || (*(*node).doc).dict.is_null()
-                || xmlDictOwns((*(*node).doc).dict, name) == 0)
+                || xml_dict_owns((*(*node).doc).dict, name) == 0)
         {
             xml_free(name as _);
         }
@@ -3047,7 +3047,7 @@ unsafe extern "C" fn xml_new_prop_internal(
 
     if eatname == 0 {
         if !doc.is_null() && !(*doc).dict.is_null() {
-            (*cur).name = xmlDictLookup((*doc).dict, name, -1);
+            (*cur).name = xml_dict_lookup((*doc).dict, name, -1);
         } else {
             (*cur).name = xml_strdup(name);
         }
@@ -3409,7 +3409,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         (*ret).name = XML_STRING_COMMENT.as_ptr() as _;
     } else if !(*node).name.is_null() {
         if !doc.is_null() && !(*doc).dict.is_null() {
-            (*ret).name = xmlDictLookup((*doc).dict, (*node).name, -1);
+            (*ret).name = xml_dict_lookup((*doc).dict, (*node).name, -1);
         } else {
             (*ret).name = xml_strdup((*node).name);
         }
@@ -4087,7 +4087,7 @@ pub unsafe extern "C" fn xml_new_doc_node(
     content: *const XmlChar,
 ) -> XmlNodePtr {
     let cur = if !doc.is_null() && !(*doc).dict.is_null() {
-        xml_new_node_eat_name(ns, xmlDictLookup((*doc).dict, name, -1) as _)
+        xml_new_node_eat_name(ns, xml_dict_lookup((*doc).dict, name, -1) as _)
     } else {
         xml_new_node(ns, name)
     };
@@ -4134,7 +4134,7 @@ pub unsafe extern "C" fn xml_new_doc_node_eat_name(
     } else {
         /* if name don't come from the doc dictionary free it here */
         if !name.is_null()
-            && (doc.is_null() || (*doc).dict.is_null() || xmlDictOwns((*doc).dict, name) == 0)
+            && (doc.is_null() || (*doc).dict.is_null() || xml_dict_owns((*doc).dict, name) == 0)
         {
             xml_free(name as _);
         }
@@ -4406,7 +4406,7 @@ pub unsafe extern "C" fn xml_new_doc_pi(
     (*cur).typ = XmlElementType::XmlPiNode;
 
     if !doc.is_null() && !(*doc).dict.is_null() {
-        (*cur).name = xmlDictLookup((*doc).dict, name, -1);
+        (*cur).name = xml_dict_lookup((*doc).dict, name, -1);
     } else {
         (*cur).name = xml_strdup(name);
     }
@@ -5487,10 +5487,10 @@ pub unsafe extern "C" fn xml_node_set_name(cur: XmlNodePtr, name: *const XmlChar
         null_mut()
     };
     if !dict.is_null() {
-        if !(*cur).name.is_null() && xmlDictOwns(dict, (*cur).name) == 0 {
+        if !(*cur).name.is_null() && xml_dict_owns(dict, (*cur).name) == 0 {
             freeme = (*cur).name;
         }
-        (*cur).name = xmlDictLookup(dict, name, -1);
+        (*cur).name = xml_dict_lookup(dict, name, -1);
     } else {
         if !(*cur).name.is_null() {
             freeme = (*cur).name;
@@ -6277,7 +6277,7 @@ pub unsafe extern "C" fn xml_text_concat(
     if (*node).content == addr_of_mut!((*node).properties) as _
         || (!(*node).doc.is_null()
             && !(*(*node).doc).dict.is_null()
-            && xmlDictOwns((*(*node).doc).dict, (*node).content) != 0)
+            && xml_dict_owns((*(*node).doc).dict, (*node).content) != 0)
     {
         (*node).content = xml_strncat_new((*node).content, content, len);
     } else {
@@ -6475,10 +6475,10 @@ unsafe extern "C" fn _copy_string_for_new_dict_if_needed(
     let mut new_value: *const XmlChar = old_value;
     if !old_value.is_null() {
         let old_dict_owns_old_value: c_int =
-            (!old_dict.is_null() && xmlDictOwns(old_dict, old_value) == 1) as i32;
+            (!old_dict.is_null() && xml_dict_owns(old_dict, old_value) == 1) as i32;
         if old_dict_owns_old_value != 0 {
             if !new_dict.is_null() {
-                new_value = xmlDictLookup(new_dict, old_value, -1);
+                new_value = xml_dict_lookup(new_dict, old_value, -1);
             } else {
                 new_value = xml_strdup(old_value);
             }
@@ -8354,7 +8354,7 @@ pub unsafe extern "C" fn xml_node_set_content(cur: XmlNodePtr, content: *const X
                 && ((*cur).content != addr_of_mut!((*cur).properties) as _)
                 && !(!(*cur).doc.is_null()
                     && !(*(*cur).doc).dict.is_null()
-                    && xmlDictOwns((*(*cur).doc).dict, (*cur).content) != 0)
+                    && xml_dict_owns((*(*cur).doc).dict, (*cur).content) != 0)
             {
                 xml_free((*cur).content as _);
             }
@@ -8430,7 +8430,7 @@ pub unsafe extern "C" fn xml_node_set_content_len(
                 && ((*cur).content != addr_of_mut!((*cur).properties) as _))
                 && (!(!(*cur).doc.is_null()
                     && !(*(*cur).doc).dict.is_null()
-                    && xmlDictOwns((*(*cur).doc).dict, (*cur).content) != 0))
+                    && xml_dict_owns((*(*cur).doc).dict, (*cur).content) != 0))
             {
                 xml_free((*cur).content as _);
             }
@@ -8539,7 +8539,7 @@ pub unsafe extern "C" fn xml_node_add_content_len(
                 if ((*cur).content == addr_of_mut!((*cur).properties) as _)
                     || (!(*cur).doc.is_null()
                         && !(*(*cur).doc).dict.is_null()
-                        && xmlDictOwns((*(*cur).doc).dict, (*cur).content) != 0)
+                        && xml_dict_owns((*(*cur).doc).dict, (*cur).content) != 0)
                 {
                     (*cur).content = xml_strncat_new((*cur).content, content, len);
                     (*cur).properties = null_mut();
@@ -10554,16 +10554,16 @@ macro_rules! XML_TREE_ADOPT_STR {
         if $adoptStr != 0 && !$str.is_null() {
             if !(*$destDoc).dict.is_null() {
                 let old: *const XmlChar = $str;
-                $str = xmlDictLookup((*$destDoc).dict, $str, -1);
+                $str = xml_dict_lookup((*$destDoc).dict, $str, -1);
                 if $sourceDoc.is_null()
                     || (*$sourceDoc).dict.is_null()
-                    || xmlDictOwns((*$sourceDoc).dict, old) == 0
+                    || xml_dict_owns((*$sourceDoc).dict, old) == 0
                 {
                     xml_free(old as _);
                 }
             } else if !$sourceDoc.is_null()
                 && !(*$sourceDoc).dict.is_null()
-                && xmlDictOwns((*$sourceDoc).dict, $str) != 0
+                && xml_dict_owns((*$sourceDoc).dict, $str) != 0
             {
                 $str = xml_strdup($str);
             }
@@ -10581,10 +10581,10 @@ macro_rules! XML_TREE_ADOPT_STR_2 {
             && !$str.is_null()
             && !$sourceDoc.is_null()
             && !(*$sourceDoc).dict.is_null()
-            && xmlDictOwns((*$sourceDoc).dict, (*$cur).content) != 0
+            && xml_dict_owns((*$sourceDoc).dict, (*$cur).content) != 0
         {
             if !(*$destDoc).dict.is_null() {
-                (*$cur).content = xmlDictLookup((*$destDoc).dict, (*$cur).content, -1) as _;
+                (*$cur).content = xml_dict_lookup((*$destDoc).dict, (*$cur).content, -1) as _;
             } else {
                 (*$cur).content = xml_strdup((*$cur).content);
             }
@@ -12768,10 +12768,10 @@ macro_rules! DICT_COPY {
     ($dict:expr, $str:expr, $cpy:expr) => {
         if !$str.is_null() {
             if !$dict.is_null() {
-                if xmlDictOwns($dict, $str) != 0 {
+                if xml_dict_owns($dict, $str) != 0 {
                     $cpy = $str;
                 } else {
-                    $cpy = xmlDictLookup($dict, $str, -1) as _;
+                    $cpy = xml_dict_lookup($dict, $str, -1) as _;
                 }
             } else {
                 $cpy = xml_strdup($str);
@@ -12791,10 +12791,10 @@ macro_rules! DICT_CONST_COPY {
     ($dict:expr, $str:expr, $cpy:expr) => {
         if !$str.is_null() {
             if !$dict.is_null() {
-                if xmlDictOwns($dict, $str) != 0 {
+                if xml_dict_owns($dict, $str) != 0 {
                     $cpy = $str;
                 } else {
-                    $cpy = xmlDictLookup($dict, $str, -1);
+                    $cpy = xml_dict_lookup($dict, $str, -1);
                 }
             } else {
                 $cpy = xml_strdup($str);

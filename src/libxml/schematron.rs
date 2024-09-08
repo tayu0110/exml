@@ -24,7 +24,7 @@ use crate::{
 };
 
 use super::{
-    dict::{xmlDictCreate, xmlDictFree, xmlDictLookup, xmlDictReference, XmlDictPtr},
+    dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
     globals::{xml_free, xml_malloc, xml_realloc},
     parser::{xmlReadFile, xmlReadMemory, XmlParserOption},
     pattern::{
@@ -314,8 +314,8 @@ pub unsafe extern "C" fn xmlSchematronNewParserCtxt(
     }
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
     (*ret).typ = XML_STRON_CTXT_PARSER;
-    (*ret).dict = xmlDictCreate();
-    (*ret).url = xmlDictLookup((*ret).dict, URL as _, -1);
+    (*ret).dict = xml_dict_create();
+    (*ret).url = xml_dict_lookup((*ret).dict, URL as _, -1);
     (*ret).includes = null_mut();
     (*ret).xctxt = xml_xpath_new_context(null_mut());
     if (*ret).xctxt.is_null() {
@@ -362,7 +362,7 @@ pub unsafe extern "C" fn xmlSchematronNewMemParserCtxt(
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
     (*ret).buffer = buffer;
     (*ret).size = size;
-    (*ret).dict = xmlDictCreate();
+    (*ret).dict = xml_dict_create();
     (*ret).xctxt = xml_xpath_new_context(null_mut());
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
@@ -404,7 +404,7 @@ pub unsafe extern "C" fn xmlSchematronNewDocParserCtxt(
     }
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
     (*ret).doc = doc;
-    (*ret).dict = xmlDictCreate();
+    (*ret).dict = xml_dict_create();
     /* The application has responsibility for the document */
     (*ret).preserve = 1;
     (*ret).xctxt = xml_xpath_new_context(doc);
@@ -440,7 +440,7 @@ pub unsafe extern "C" fn xmlSchematronFreeParserCtxt(ctxt: XmlSchematronParserCt
     if !(*ctxt).namespaces.is_null() {
         xml_free((*ctxt).namespaces as _);
     }
-    xmlDictFree((*ctxt).dict);
+    xml_dict_free((*ctxt).dict);
     xml_free(ctxt as _);
 }
 
@@ -563,7 +563,7 @@ unsafe extern "C" fn xmlSchematronNewSchematron(
     }
     memset(ret as _, 0, size_of::<XmlSchematron>());
     (*ret).dict = (*ctxt).dict;
-    xmlDictReference((*ret).dict);
+    xml_dict_reference((*ret).dict);
 
     ret
 }
@@ -611,10 +611,10 @@ unsafe extern "C" fn xmlSchematronAddNamespace(
         (*ctxt).max_namespaces *= 2;
     }
     *(*ctxt).namespaces.add(2 * (*ctxt).nb_namespaces as usize) =
-        xmlDictLookup((*ctxt).dict, ns, -1);
+        xml_dict_lookup((*ctxt).dict, ns, -1);
     *(*ctxt)
         .namespaces
-        .add(2 * (*ctxt).nb_namespaces as usize + 1) = xmlDictLookup((*ctxt).dict, prefix, -1);
+        .add(2 * (*ctxt).nb_namespaces as usize + 1) = xml_dict_lookup((*ctxt).dict, prefix, -1);
     (*ctxt).nb_namespaces += 1;
     *(*ctxt).namespaces.add(2 * (*ctxt).nb_namespaces as usize) = null_mut();
     *(*ctxt)
@@ -1227,7 +1227,7 @@ pub unsafe extern "C" fn xmlSchematronParse(ctxt: XmlSchematronParserCtxtPtr) ->
             return null_mut();
         }
         (*doc).url = xml_strdup(c"in_memory_buffer".as_ptr() as _);
-        (*ctxt).url = xmlDictLookup((*ctxt).dict, c"in_memory_buffer".as_ptr() as _, -1);
+        (*ctxt).url = xml_dict_lookup((*ctxt).dict, c"in_memory_buffer".as_ptr() as _, -1);
         (*ctxt).preserve = 0;
     } else if !(*ctxt).doc.is_null() {
         doc = (*ctxt).doc;
@@ -1289,7 +1289,7 @@ pub unsafe extern "C" fn xmlSchematronParse(ctxt: XmlSchematronParserCtxtPtr) ->
             if IS_SCHEMATRON!(cur, c"title".as_ptr() as _) {
                 let title: *mut XmlChar = xml_node_get_content(cur);
                 if !title.is_null() {
-                    (*ret).title = xmlDictLookup((*ret).dict, title, -1);
+                    (*ret).title = xml_dict_lookup((*ret).dict, title, -1);
                     xml_free(title as _);
                 }
                 cur = (*cur).next;
@@ -1505,7 +1505,7 @@ pub unsafe extern "C" fn xmlSchematronFree(schema: XmlSchematronPtr) {
 
     xmlSchematronFreeRules((*schema).rules);
     xmlSchematronFreePatterns((*schema).patterns);
-    xmlDictFree((*schema).dict);
+    xml_dict_free((*schema).dict);
     xml_free(schema as _);
 }
 
@@ -1637,7 +1637,7 @@ pub unsafe extern "C" fn xmlSchematronFreeValidCtxt(ctxt: XmlSchematronValidCtxt
         xml_xpath_free_context((*ctxt).xctxt);
     }
     if !(*ctxt).dict.is_null() {
-        xmlDictFree((*ctxt).dict);
+        xml_dict_free((*ctxt).dict);
     }
     xml_free(ctxt as _);
 }

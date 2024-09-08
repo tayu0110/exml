@@ -31,7 +31,7 @@ const MAX_DICT_HASH: usize = 8 * 2048;
  * Calculate a hash key using a fast hash function that works well
  * for low hash table fill.
  */
-unsafe extern "C" fn xmlDictComputeFastKey(
+unsafe extern "C" fn xml_dict_compute_fast_key(
     name: *const XmlChar,
     mut namelen: c_int,
     seed: c_int,
@@ -63,11 +63,7 @@ unsafe extern "C" fn xmlDictComputeFastKey(
  * http://burtleburtle.net/bob/hash/doobs.html
  */
 
-//  #ifdef __clang__
-//  ATTRIBUTE_NO_SANITIZE("unsigned-integer-overflow")
-//  ATTRIBUTE_NO_SANITIZE("unsigned-shift-base")
-//  #endif
-unsafe extern "C" fn xmlDictComputeBigKey(
+unsafe extern "C" fn xml_dict_compute_big_key(
     data: *const XmlChar,
     namelen: c_int,
     seed: c_int,
@@ -91,12 +87,12 @@ unsafe extern "C" fn xmlDictComputeBigKey(
     hash
 }
 
-macro_rules! xmlDictComputeKey {
+macro_rules! xml_dict_compute_key {
     ($dict:expr, $name:expr, $len:expr) => {
         if (*$dict).size == MIN_DICT_SIZE {
-            xmlDictComputeFastKey($name, $len, (*$dict).seed)
+            xml_dict_compute_fast_key($name, $len, (*$dict).seed)
         } else {
-            xmlDictComputeBigKey($name, $len, (*$dict).seed) as _
+            xml_dict_compute_big_key($name, $len, (*$dict).seed) as _
         }
     };
 }
@@ -109,7 +105,7 @@ macro_rules! xmlDictComputeKey {
  *
  * Neither of the two strings must be NULL.
  */
-unsafe extern "C" fn xmlDictComputeFastQKey(
+unsafe extern "C" fn xml_dict_compute_fast_qkey(
     prefix: *const XmlChar,
     mut plen: c_int,
     name: *const XmlChar,
@@ -161,11 +157,7 @@ unsafe extern "C" fn xmlDictComputeFastQKey(
  *
  * Neither of the two strings must be NULL.
  */
-// #ifdef __clang__
-// ATTRIBUTE_NO_SANITIZE("unsigned-integer-overflow")
-// ATTRIBUTE_NO_SANITIZE("unsigned-shift-base")
-// #endif
-unsafe extern "C" fn xmlDictComputeBigQKey(
+unsafe extern "C" fn xml_dict_compute_big_qkey(
     prefix: *const XmlChar,
     plen: c_int,
     name: *const XmlChar,
@@ -195,15 +187,15 @@ unsafe extern "C" fn xmlDictComputeBigQKey(
     hash as _
 }
 
-macro_rules! xmlDictComputeQKey {
+macro_rules! xml_dict_compute_qkey {
     ($dict:expr, $prefix:expr, $plen:expr, $name:expr, $len:expr) => {
         if $prefix.is_null() {
-            xmlDictComputeKey!($dict, $name, $len)
+            xml_dict_compute_key!($dict, $name, $len)
         } else {
             if (*$dict).size == MIN_DICT_SIZE {
-                xmlDictComputeFastQKey($prefix, $plen, $name, $len, (*$dict).seed)
+                xml_dict_compute_fast_qkey($prefix, $plen, $name, $len, (*$dict).seed)
             } else {
-                xmlDictComputeBigQKey($prefix, $plen, $name, $len, (*$dict).seed)
+                xml_dict_compute_big_qkey($prefix, $plen, $name, $len, (*$dict).seed)
             }
         }
     };
@@ -276,12 +268,12 @@ static mut XML_DICT_MUTEX: XmlMutex = unsafe { zeroed::<XmlMutex>() };
  * DEPRECATED: Alias for xmlInitParser.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlInitializeDict() -> c_int {
+pub unsafe extern "C" fn xml_initialize_dict() -> c_int {
     xml_init_parser();
     0
 }
 
-pub(crate) unsafe extern "C" fn __xmlRandom() -> c_int {
+pub(crate) unsafe extern "C" fn __xml_random() -> c_int {
     xmlMutexLock(addr_of_mut!(XML_DICT_MUTEX) as _);
     let ret = rand();
     xmlMutexUnlock(addr_of_mut!(XML_DICT_MUTEX) as _);
@@ -298,7 +290,7 @@ pub(crate) unsafe extern "C" fn __xmlRandom() -> c_int {
  *
  * Returns the newly created dictionary, or NULL if an error occurred.
  */
-pub unsafe extern "C" fn xmlDictCreate() -> XmlDictPtr {
+pub unsafe extern "C" fn xml_dict_create() -> XmlDictPtr {
     xml_init_parser();
 
     // #ifdef DICT_DEBUG_PATTERNS
@@ -321,7 +313,7 @@ pub unsafe extern "C" fn xmlDictCreate() -> XmlDictPtr {
                 0,
                 MIN_DICT_SIZE * size_of::<XmlDictEntry>(),
             );
-            (*dict).seed = __xmlRandom();
+            (*dict).seed = __xml_random();
             return dict;
         }
         xml_free(dict as _);
@@ -339,7 +331,7 @@ pub unsafe extern "C" fn xmlDictCreate() -> XmlDictPtr {
  *
  * Returns the previous limit of the dictionary or 0
  */
-pub unsafe extern "C" fn xmlDictSetLimit(dict: XmlDictPtr, limit: size_t) -> size_t {
+pub unsafe extern "C" fn xml_dict_set_limit(dict: XmlDictPtr, limit: size_t) -> size_t {
     if dict.is_null() {
         return 0;
     }
@@ -357,7 +349,7 @@ pub unsafe extern "C" fn xmlDictSetLimit(dict: XmlDictPtr, limit: size_t) -> siz
  *
  * Returns the amount of strings allocated
  */
-pub unsafe extern "C" fn xmlDictGetUsage(dict: XmlDictPtr) -> size_t {
+pub unsafe extern "C" fn xml_dict_get_usage(dict: XmlDictPtr) -> size_t {
     let mut pool: XmlDictStringsPtr;
     let mut limit: size_t = 0;
 
@@ -383,8 +375,8 @@ pub unsafe extern "C" fn xmlDictGetUsage(dict: XmlDictPtr) -> size_t {
  *
  * Returns the newly created dictionary, or NULL if an error occurred.
  */
-pub unsafe extern "C" fn xmlDictCreateSub(sub: XmlDictPtr) -> XmlDictPtr {
-    let dict: XmlDictPtr = xmlDictCreate();
+pub unsafe extern "C" fn xml_dict_create_sub(sub: XmlDictPtr) -> XmlDictPtr {
+    let dict: XmlDictPtr = xml_dict_create();
 
     if !dict.is_null() && !sub.is_null() {
         // #ifdef DICT_DEBUG_PATTERNS
@@ -392,7 +384,7 @@ pub unsafe extern "C" fn xmlDictCreateSub(sub: XmlDictPtr) -> XmlDictPtr {
         // #endif
         (*dict).seed = (*sub).seed;
         (*dict).subdict = sub;
-        xmlDictReference((*dict).subdict);
+        xml_dict_reference((*dict).subdict);
     }
     dict
 }
@@ -405,7 +397,7 @@ pub unsafe extern "C" fn xmlDictCreateSub(sub: XmlDictPtr) -> XmlDictPtr {
  *
  * Returns 0 in case of success and -1 in case of error
  */
-pub unsafe extern "C" fn xmlDictReference(dict: XmlDictPtr) -> c_int {
+pub unsafe extern "C" fn xml_dict_reference(dict: XmlDictPtr) -> c_int {
     if dict.is_null() {
         return -1;
     }
@@ -422,7 +414,7 @@ pub unsafe extern "C" fn xmlDictReference(dict: XmlDictPtr) -> c_int {
  * Free the hash @dict and its contents. The userdata is
  * deallocated with @f if provided.
  */
-pub unsafe extern "C" fn xmlDictFree(dict: XmlDictPtr) {
+pub unsafe extern "C" fn xml_dict_free(dict: XmlDictPtr) {
     let mut iter: XmlDictEntryPtr;
     let mut next: XmlDictEntryPtr;
     let mut inside_dict: c_int;
@@ -444,7 +436,7 @@ pub unsafe extern "C" fn xmlDictFree(dict: XmlDictPtr) {
     xmlMutexUnlock(addr_of_mut!(XML_DICT_MUTEX) as _);
 
     if !(*dict).subdict.is_null() {
-        xmlDictFree((*dict).subdict);
+        xml_dict_free((*dict).subdict);
     }
 
     if !(*dict).dict.is_null() {
@@ -489,13 +481,12 @@ pub unsafe extern "C" fn xmlDictFree(dict: XmlDictPtr) {
  *
  * Returns the pointer of the local string, or NULL in case of error.
  */
-unsafe extern "C" fn xmlDictAddString(
+unsafe extern "C" fn xml_dict_add_string(
     dict: XmlDictPtr,
     name: *const XmlChar,
     namelen: c_uint,
 ) -> *const XmlChar {
     let mut pool: XmlDictStringsPtr;
-    let ret: *const XmlChar;
     let mut size: size_t = 0; /* + sizeof(_xmlDictStrings) == 1024 */
     let mut limit: size_t = 0;
 
@@ -503,60 +494,55 @@ unsafe extern "C" fn xmlDictAddString(
     //     fprintf(stderr, "-");
     // #endif
     pool = (*dict).strings;
-    while !pool.is_null() {
-        if (*pool).end.offset_from((*pool).free) as size_t > namelen as size_t {
-            // goto found_pool;
-            ret = (*pool).free;
-            memcpy((*pool).free as _, name as _, namelen as usize);
-            (*pool).free = (*pool).free.add(namelen as usize);
-            *(*pool).free = 0;
-            (*pool).free = (*pool).free.add(1);
-            (*pool).nb_strings = (*pool).nb_strings.add(1);
-            return ret;
+    'found_pool: {
+        while !pool.is_null() {
+            if (*pool).end.offset_from((*pool).free) as size_t > namelen as size_t {
+                break 'found_pool;
+            }
+            if (*pool).size > size {
+                size = (*pool).size;
+            }
+            limit += (*pool).size;
+            pool = (*pool).next;
         }
-        if (*pool).size > size {
-            size = (*pool).size;
-        }
-        limit += (*pool).size;
-        pool = (*pool).next;
-    }
-    /*
-     * Not found, need to allocate
-     */
-    if pool.is_null() {
-        if (*dict).limit > 0 && limit > (*dict).limit {
-            return null();
-        }
-
-        if size == 0 {
-            size = 1000;
-        } else {
-            size *= 4; /* exponential growth */
-        }
-        if size < 4 * namelen as usize {
-            size = 4 * namelen as usize; /* just in case ! */
-        }
-        pool = xml_malloc(size_of::<XmlDictStrings>() + size) as XmlDictStringsPtr;
+        /*
+         * Not found, need to allocate
+         */
         if pool.is_null() {
-            return null();
+            if (*dict).limit > 0 && limit > (*dict).limit {
+                return null();
+            }
+
+            if size == 0 {
+                size = 1000;
+            } else {
+                size *= 4; /* exponential growth */
+            }
+            if size < 4 * namelen as usize {
+                size = 4 * namelen as usize; /* just in case ! */
+            }
+            pool = xml_malloc(size_of::<XmlDictStrings>() + size) as XmlDictStringsPtr;
+            if pool.is_null() {
+                return null();
+            }
+            (*pool).size = size;
+            (*pool).nb_strings = 0;
+            (*pool).free = addr_of_mut!((*pool).array[0]);
+            (*pool).end = addr_of_mut!((*pool).array[0]).add(size);
+            (*pool).next = (*dict).strings;
+            (*dict).strings = pool;
+            // #ifdef DICT_DEBUG_PATTERNS
+            //         fprintf(stderr, "+");
+            // #endif
         }
-        (*pool).size = size;
-        (*pool).nb_strings = 0;
-        (*pool).free = addr_of_mut!((*pool).array[0]);
-        (*pool).end = addr_of_mut!((*pool).array[0]).add(size);
-        (*pool).next = (*dict).strings;
-        (*dict).strings = pool;
-        // #ifdef DICT_DEBUG_PATTERNS
-        //         fprintf(stderr, "+");
-        // #endif
     }
     // found_pool:
-    ret = (*pool).free;
+    let ret: *const XmlChar = (*pool).free;
     memcpy((*pool).free as _, name as _, namelen as usize);
     (*pool).free = (*pool).free.add(namelen as usize);
     assert!(!pool.is_null());
     assert!(!(*pool).free.is_null());
-    *((*pool).free) = 0;
+    *(*pool).free = 0;
     (*pool).free = (*pool).free.add(1);
     (*pool).nb_strings += 1;
     ret
@@ -571,13 +557,11 @@ unsafe extern "C" fn xmlDictAddString(
  *
  * Returns 0 in case of success, -1 in case of failure
  */
-unsafe extern "C" fn xmlDictGrow(dict: XmlDictPtr, size: size_t) -> c_int {
+unsafe extern "C" fn xml_dict_grow(dict: XmlDictPtr, size: size_t) -> c_int {
     let mut key: c_ulong;
     let mut okey: c_ulong;
-
     let mut iter: XmlDictEntryPtr;
     let mut next: XmlDictEntryPtr;
-
     // #ifdef DEBUG_GROW
     //     unsigned long nbElem = 0;
     // #endif
@@ -629,8 +613,8 @@ unsafe extern "C" fn xmlDictGrow(dict: XmlDictPtr, size: size_t) -> c_int {
         if keep_keys != 0 {
             okey = (*olddict.add(i)).okey;
         } else {
-            okey =
-                xmlDictComputeKey!(dict, (*olddict.add(i)).name, (*olddict.add(i)).len as i32) as _;
+            okey = xml_dict_compute_key!(dict, (*olddict.add(i)).name, (*olddict.add(i)).len as i32)
+                as _;
         }
         key = okey % (*dict).size as u64;
 
@@ -676,7 +660,7 @@ unsafe extern "C" fn xmlDictGrow(dict: XmlDictPtr, size: size_t) -> c_int {
             if keep_keys != 0 {
                 okey = (*iter).okey;
             } else {
-                okey = xmlDictComputeKey!(dict, (*iter).name, (*iter).len as _);
+                okey = xml_dict_compute_key!(dict, (*iter).name, (*iter).len as _);
             }
             key = okey % (*dict).size as u64;
             if (*(*dict).dict.add(key as usize)).valid == 0 {
@@ -726,7 +710,7 @@ unsafe extern "C" fn xmlDictGrow(dict: XmlDictPtr, size: size_t) -> c_int {
  *
  * Returns the internal copy of the name or NULL in case of internal error
  */
-pub unsafe extern "C" fn xmlDictLookup(
+pub unsafe extern "C" fn xml_dict_lookup(
     dict: XmlDictPtr,
     name: *const XmlChar,
     len: c_int,
@@ -753,7 +737,7 @@ pub unsafe extern "C" fn xmlDictLookup(
     /*
      * Check for duplicate and insertion location.
      */
-    let okey: c_ulong = xmlDictComputeKey!(dict, name, l as _);
+    let okey: c_ulong = xml_dict_compute_key!(dict, name, l as _);
     key = okey % (*dict).size as u64;
     if (*(*dict).dict.add(key as usize)).valid == 0 {
         insert = null_mut();
@@ -780,10 +764,10 @@ pub unsafe extern "C" fn xmlDictLookup(
 
     if !(*dict).subdict.is_null() {
         /* we cannot always reuse the same okey for the subdict */
-        let skey = if (*dict).size == MIN_DICT_SIZE && (*(*dict).subdict).size != MIN_DICT_SIZE
+        let skey = if ((*dict).size == MIN_DICT_SIZE && (*(*dict).subdict).size != MIN_DICT_SIZE)
             || ((*dict).size != MIN_DICT_SIZE && (*(*dict).subdict).size == MIN_DICT_SIZE)
         {
-            xmlDictComputeKey!((*dict).subdict, name, l as _)
+            xml_dict_compute_key!((*dict).subdict, name, l as _)
         } else {
             okey
         };
@@ -810,7 +794,7 @@ pub unsafe extern "C" fn xmlDictLookup(
         key = okey % (*dict).size as u64;
     }
 
-    let ret: *const XmlChar = xmlDictAddString(dict, name, l);
+    let ret: *const XmlChar = xml_dict_add_string(dict, name, l);
     if ret.is_null() {
         return null();
     }
@@ -836,7 +820,7 @@ pub unsafe extern "C" fn xmlDictLookup(
 
     if nbi > MAX_HASH_LEN as u64
         && (*dict).size <= ((MAX_DICT_HASH / 2) / MAX_HASH_LEN)
-        && xmlDictGrow(dict, MAX_HASH_LEN * 2 * (*dict).size) != 0
+        && xml_dict_grow(dict, MAX_HASH_LEN * 2 * (*dict).size) != 0
     {
         return null();
     }
@@ -855,7 +839,7 @@ pub unsafe extern "C" fn xmlDictLookup(
  *
  * Returns the internal copy of the name or NULL if not found.
  */
-pub unsafe extern "C" fn xmlDictExists(
+pub unsafe extern "C" fn xml_dict_exists(
     dict: XmlDictPtr,
     name: *const XmlChar,
     len: c_int,
@@ -879,13 +863,13 @@ pub unsafe extern "C" fn xmlDictExists(
     /*
      * Check for duplicate and insertion location.
      */
-    let okey: c_ulong = xmlDictComputeKey!(dict, name, l as _);
+    let okey: c_ulong = xml_dict_compute_key!(dict, name, l as _);
     key = okey % (*dict).size as u64;
     if (*(*dict).dict.add(key as usize)).valid == 0 {
-        // insert = null_mut();
+        insert = null_mut();
     } else {
         insert = (*dict).dict.add(key as usize);
-        while !insert.is_null() {
+        while !(*insert).next.is_null() {
             if (*insert).okey == okey
                 && (*insert).len == l
                 && xml_strncmp((*insert).name, name, l as _) == 0
@@ -907,7 +891,7 @@ pub unsafe extern "C" fn xmlDictExists(
         let skey = if ((*dict).size == MIN_DICT_SIZE && (*(*dict).subdict).size != MIN_DICT_SIZE)
             || ((*dict).size != MIN_DICT_SIZE && (*(*dict).subdict).size == MIN_DICT_SIZE)
         {
-            xmlDictComputeKey!((*dict).subdict, name, l as _)
+            xml_dict_compute_key!((*dict).subdict, name, l as _)
         } else {
             okey
         };
@@ -916,7 +900,7 @@ pub unsafe extern "C" fn xmlDictExists(
         if (*(*(*dict).subdict).dict.add(key as usize)).valid != 0 {
             let mut tmp: XmlDictEntryPtr = (*(*dict).subdict).dict.add(key as usize);
 
-            while !tmp.is_null() {
+            while !(*tmp).next.is_null() {
                 if (*tmp).okey == skey
                     && (*tmp).len == l
                     && xml_strncmp((*tmp).name, name, l as _) == 0
@@ -956,72 +940,62 @@ unsafe extern "C" fn xmlDictAddQString(
     namelen: c_uint,
 ) -> *const XmlChar {
     let mut pool: XmlDictStringsPtr;
-    let ret: *const XmlChar;
     let mut size: size_t = 0; /* + sizeof(_xmlDictStrings) == 1024 */
     let mut limit: size_t = 0;
 
     if prefix.is_null() {
-        return xmlDictAddString(dict, name, namelen);
+        return xml_dict_add_string(dict, name, namelen);
     }
 
     // #ifdef DICT_DEBUG_PATTERNS
     //     fprintf(stderr, "=");
     // #endif
     pool = (*dict).strings;
-    while !pool.is_null() {
-        if (*pool).end.offset_from((*pool).free) as size_t > (namelen + plen + 1) as usize {
-            // goto found_pool;
-            ret = (*pool).free;
-            memcpy((*pool).free as _, prefix as _, plen as _);
-            (*pool).free = (*pool).free.add(plen as _);
-            *(*pool).free = b':' as _;
-            (*pool).free = (*pool).free.add(1);
-            memcpy((*pool).free as _, name as _, namelen as usize);
-            (*pool).free = (*pool).free.add(namelen as _);
-            *(*pool).free = 0;
-            (*pool).free = (*pool).free.add(1);
-            (*pool).nb_strings += 1;
-            return ret;
+    'found_pool: {
+        while !pool.is_null() {
+            if (*pool).end.offset_from((*pool).free) as size_t > (namelen + plen + 1) as usize {
+                break 'found_pool;
+            }
+            if (*pool).size > size {
+                size = (*pool).size;
+            }
+            limit += (*pool).size;
+            pool = (*pool).next;
         }
-        if (*pool).size > size {
-            size = (*pool).size;
-        }
-        limit += (*pool).size;
-        pool = (*pool).next;
-    }
-    /*
-     * Not found, need to allocate
-     */
-    if pool.is_null() {
-        if (*dict).limit > 0 && limit > (*dict).limit {
-            return null();
-        }
-
-        if size == 0 {
-            size = 1000;
-        } else {
-            size *= 4; /* exponential growth */
-        }
-        if size < 4 * (namelen + plen + 1) as usize {
-            size = 4 * (namelen + plen + 1) as usize; /* just in case ! */
-        }
-        pool = xml_malloc(size_of::<XmlDictStrings>() + size) as XmlDictStringsPtr;
+        /*
+         * Not found, need to allocate
+         */
         if pool.is_null() {
-            return null();
+            if (*dict).limit > 0 && limit > (*dict).limit {
+                return null();
+            }
+
+            if size == 0 {
+                size = 1000;
+            } else {
+                size *= 4; /* exponential growth */
+            }
+            if size < 4 * (namelen + plen + 1) as usize {
+                size = 4 * (namelen + plen + 1) as usize; /* just in case ! */
+            }
+            pool = xml_malloc(size_of::<XmlDictStrings>() + size) as XmlDictStringsPtr;
+            if pool.is_null() {
+                return null();
+            }
+            (*pool).size = size;
+            (*pool).nb_strings = 0;
+            (*pool).free = addr_of_mut!((*pool).array[0]);
+            (*pool).end = addr_of_mut!((*pool).array[0]).add(size);
+            (*pool).next = (*dict).strings;
+            (*dict).strings = pool;
+            // #ifdef DICT_DEBUG_PATTERNS
+            //         fprintf(stderr, "+");
+            // #endif
         }
-        (*pool).size = size;
-        (*pool).nb_strings = 0;
-        (*pool).free = addr_of_mut!((*pool).array[0]);
-        (*pool).end = addr_of_mut!((*pool).array[0]).add(size);
-        (*pool).next = (*dict).strings;
-        (*dict).strings = pool;
-        // #ifdef DICT_DEBUG_PATTERNS
-        //         fprintf(stderr, "+");
-        // #endif
     }
     // found_pool:
     assert!(!(*pool).free.is_null());
-    ret = (*pool).free;
+    let ret: *const XmlChar = (*pool).free;
     memcpy((*pool).free as _, prefix as _, plen as _);
     (*pool).free = (*pool).free.add(plen as _);
     *(*pool).free = b':' as _;
@@ -1044,7 +1018,7 @@ unsafe extern "C" fn xmlDictAddQString(
  *
  * Returns the internal copy of the QName or NULL in case of internal error
  */
-pub unsafe extern "C" fn xmlDictQLookup(
+pub unsafe extern "C" fn xml_dict_qlookup(
     dict: XmlDictPtr,
     prefix: *const XmlChar,
     name: *const XmlChar,
@@ -1053,14 +1027,13 @@ pub unsafe extern "C" fn xmlDictQLookup(
     let mut nbi: c_ulong = 0;
     let entry: XmlDictEntryPtr;
     let mut insert: XmlDictEntryPtr;
-
     let mut len: c_uint;
 
     if dict.is_null() || name.is_null() {
         return null();
     }
     if prefix.is_null() {
-        return xmlDictLookup(dict, name, -1);
+        return xml_dict_lookup(dict, name, -1);
     }
 
     let l: c_uint = strlen(name as _) as _;
@@ -1071,7 +1044,7 @@ pub unsafe extern "C" fn xmlDictQLookup(
     /*
      * Check for duplicate and insertion location.
      */
-    let okey: c_ulong = xmlDictComputeQKey!(dict, prefix, plen as _, name, l as _);
+    let okey: c_ulong = xml_dict_compute_qkey!(dict, prefix, plen as _, name, l as _);
     key = okey % (*dict).size as u64;
     if (*(*dict).dict.add(key as usize)).valid == 0 {
         insert = null_mut();
@@ -1100,7 +1073,7 @@ pub unsafe extern "C" fn xmlDictQLookup(
         let skey = if ((*dict).size == MIN_DICT_SIZE && (*(*dict).subdict).size != MIN_DICT_SIZE)
             || ((*dict).size != MIN_DICT_SIZE && (*(*dict).subdict).size == MIN_DICT_SIZE)
         {
-            xmlDictComputeQKey!((*dict).subdict, prefix, plen as _, name, l as _)
+            xml_dict_compute_qkey!((*dict).subdict, prefix, plen as _, name, l as _)
         } else {
             okey
         };
@@ -1153,7 +1126,7 @@ pub unsafe extern "C" fn xmlDictQLookup(
     (*dict).nb_elems += 1;
 
     if nbi > MAX_HASH_LEN as u64 && (*dict).size <= (MAX_DICT_HASH / 2) / MAX_HASH_LEN {
-        xmlDictGrow(dict, MAX_HASH_LEN * 2 * (*dict).size);
+        xml_dict_grow(dict, MAX_HASH_LEN * 2 * (*dict).size);
         /* Note that entry may have been freed at this point by xmlDictGrow */
     }
 
@@ -1170,7 +1143,7 @@ pub unsafe extern "C" fn xmlDictQLookup(
  * Returns 1 if true, 0 if false and -1 in case of error
  * -1 in case of error
  */
-pub unsafe extern "C" fn xmlDictOwns(dict: XmlDictPtr, str: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn xml_dict_owns(dict: XmlDictPtr, str: *const XmlChar) -> c_int {
     let mut pool: XmlDictStringsPtr;
 
     if dict.is_null() || str.is_null() {
@@ -1184,7 +1157,7 @@ pub unsafe extern "C" fn xmlDictOwns(dict: XmlDictPtr, str: *const XmlChar) -> c
         pool = (*pool).next;
     }
     if !(*dict).subdict.is_null() {
-        return xmlDictOwns((*dict).subdict, str);
+        return xml_dict_owns((*dict).subdict, str);
     }
     0
 }
@@ -1198,7 +1171,7 @@ pub unsafe extern "C" fn xmlDictOwns(dict: XmlDictPtr, str: *const XmlChar) -> c
  * Returns the number of elements in the dictionary or
  * -1 in case of error
  */
-pub unsafe extern "C" fn xmlDictSize(dict: XmlDictPtr) -> c_int {
+pub unsafe extern "C" fn xml_dict_size(dict: XmlDictPtr) -> c_int {
     if dict.is_null() {
         return -1;
     }
@@ -1220,7 +1193,7 @@ pub unsafe extern "C" fn xmlDictSize(dict: XmlDictPtr) -> c_int {
  * have call cleanup functions at all.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlDictCleanup() {}
+pub unsafe extern "C" fn xml_dict_cleanup() {}
 
 /**
  * __xmlInitializeDict:
@@ -1228,7 +1201,7 @@ pub unsafe extern "C" fn xmlDictCleanup() {}
  * This function is not public
  * Do the dictionary mutex initialization.
  */
-pub(crate) unsafe extern "C" fn __xmlInitializeDict() -> c_int {
+pub(crate) unsafe extern "C" fn __xml_initialize_dict() -> c_int {
     xml_init_mutex(addr_of_mut!(XML_DICT_MUTEX));
 
     // #ifdef DICT_RANDOMIZATION
@@ -1247,7 +1220,7 @@ pub(crate) unsafe extern "C" fn __xmlInitializeDict() -> c_int {
  *
  * Free the dictionary mutex.
  */
-pub(crate) unsafe extern "C" fn xmlCleanupDictInternal() {
+pub(crate) unsafe extern "C" fn xml_cleanup_dict_internal() {
     xml_cleanup_mutex(addr_of_mut!(XML_DICT_MUTEX));
 }
 
@@ -1266,7 +1239,7 @@ mod tests {
         unsafe {
             let mem_base = xml_mem_blocks();
 
-            xmlDictCleanup();
+            xml_dict_cleanup();
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -1285,7 +1258,7 @@ mod tests {
         unsafe {
             let mem_base = xml_mem_blocks();
 
-            let ret_val = xmlDictCreate();
+            let ret_val = xml_dict_create();
             desret_xml_dict_ptr(ret_val);
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {
@@ -1308,7 +1281,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let sub = gen_xml_dict_ptr(n_sub, 0);
 
-                let ret_val = xmlDictCreateSub(sub);
+                let ret_val = xml_dict_create_sub(sub);
                 desret_xml_dict_ptr(ret_val);
                 des_xml_dict_ptr(n_sub, sub, 0);
                 xmlResetLastError();
@@ -1341,7 +1314,7 @@ mod tests {
                             len = 0;
                         }
 
-                        let ret_val = xmlDictExists(dict, name, len);
+                        let ret_val = xml_dict_exists(dict, name, len);
                         desret_const_xml_char_ptr(ret_val);
                         des_xml_dict_ptr(n_dict, dict, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -1386,7 +1359,7 @@ mod tests {
                             len = 0;
                         }
 
-                        let ret_val = xmlDictLookup(dict, name, len);
+                        let ret_val = xml_dict_lookup(dict, name, len);
                         desret_const_xml_char_ptr(ret_val);
                         des_xml_dict_ptr(n_dict, dict, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -1420,7 +1393,7 @@ mod tests {
                     let dict = gen_xml_dict_ptr(n_dict, 0);
                     let str = gen_const_xml_char_ptr(n_str, 1);
 
-                    let ret_val = xmlDictOwns(dict, str);
+                    let ret_val = xml_dict_owns(dict, str);
                     desret_int(ret_val);
                     des_xml_dict_ptr(n_dict, dict, 0);
                     des_const_xml_char_ptr(n_str, str, 1);
@@ -1453,7 +1426,7 @@ mod tests {
                         let prefix = gen_const_xml_char_ptr(n_prefix, 1);
                         let name = gen_const_xml_char_ptr(n_name, 2);
 
-                        let ret_val = xmlDictQLookup(dict, prefix, name);
+                        let ret_val = xml_dict_qlookup(dict, prefix, name);
                         desret_const_xml_char_ptr(ret_val);
                         des_xml_dict_ptr(n_dict, dict, 0);
                         des_const_xml_char_ptr(n_prefix, prefix, 1);
@@ -1485,8 +1458,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let dict = gen_xml_dict_ptr(n_dict, 0);
 
-                let ret_val = xmlDictReference(dict);
-                xmlDictFree(dict);
+                let ret_val = xml_dict_reference(dict);
+                xml_dict_free(dict);
                 desret_int(ret_val);
                 des_xml_dict_ptr(n_dict, dict, 0);
                 xmlResetLastError();
@@ -1518,7 +1491,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let dict = gen_xml_dict_ptr(n_dict, 0);
 
-                let ret_val = xmlDictSize(dict);
+                let ret_val = xml_dict_size(dict);
                 desret_int(ret_val);
                 des_xml_dict_ptr(n_dict, dict, 0);
                 xmlResetLastError();
@@ -1541,7 +1514,7 @@ mod tests {
 
         unsafe {
             let mem_base = xml_mem_blocks();
-            let ret_val = xmlInitializeDict();
+            let ret_val = xml_initialize_dict();
             desret_int(ret_val);
             xmlResetLastError();
             if mem_base != xml_mem_blocks() {

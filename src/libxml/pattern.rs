@@ -15,7 +15,7 @@ use libc::memset;
 
 use crate::{
     libxml::{
-        dict::{xmlDictFree, xmlDictLookup, xmlDictReference, XmlDict, XmlDictPtr},
+        dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDict, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_realloc},
         parser_internals::xml_string_current_char,
         tree::{XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
@@ -149,7 +149,7 @@ unsafe extern "C" fn xml_free_stream_comp(comp: XmlStreamCompPtr) {
             xml_free((*comp).steps as _);
         }
         if !(*comp).dict.is_null() {
-            xmlDictFree((*comp).dict);
+            xml_dict_free((*comp).dict);
         }
         xml_free(comp as _);
     }
@@ -182,7 +182,7 @@ unsafe extern "C" fn xml_free_pattern_internal(comp: XmlPatternPtr) {
         xml_free((*comp).steps as _);
     }
     if !(*comp).dict.is_null() {
-        xmlDictFree((*comp).dict);
+        xml_dict_free((*comp).dict);
     }
 
     memset(comp as _, -1, size_of::<XmlPattern>());
@@ -410,7 +410,7 @@ macro_rules! XML_PAT_FREE_STRING {
 macro_rules! XML_PAT_COPY_NSNAME {
     ($c:expr, $r:expr, $nsname:expr) => {
         if !(*(*$c).comp).dict.is_null() {
-            $r = xmlDictLookup((*(*$c).comp).dict, $nsname, -1) as *mut XmlChar;
+            $r = xml_dict_lookup((*(*$c).comp).dict, $nsname, -1) as *mut XmlChar;
         } else {
             $r = xml_strdup($nsname);
         }
@@ -458,7 +458,7 @@ unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut X
         val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
     }
     let ret = if !(*ctxt).dict.is_null() {
-        xmlDictLookup((*ctxt).dict, q, cur.offset_from(q) as _) as *mut XmlChar
+        xml_dict_lookup((*ctxt).dict, q, cur.offset_from(q) as _) as *mut XmlChar
     } else {
         xml_strndup(q, cur.offset_from(q) as _)
     };
@@ -506,7 +506,7 @@ unsafe extern "C" fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut Xml
         val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
     }
     let ret = if !(*ctxt).dict.is_null() {
-        xmlDictLookup((*ctxt).dict, q, cur.offset_from(q) as _) as *mut XmlChar
+        xml_dict_lookup((*ctxt).dict, q, cur.offset_from(q) as _) as *mut XmlChar
     } else {
         xml_strndup(q, cur.offset_from(q) as _)
     };
@@ -1187,7 +1187,7 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> c_int {
     }
     if !(*comp).dict.is_null() {
         (*stream).dict = (*comp).dict;
-        xmlDictReference((*stream).dict);
+        xml_dict_reference((*stream).dict);
     }
 
     if (*comp).flags & PAT_FROM_ROOT as i32 != 0 {
@@ -1493,7 +1493,7 @@ pub unsafe extern "C" fn xml_patterncompile(
              */
             if !dict.is_null() {
                 (*cur).dict = dict;
-                xmlDictReference(dict);
+                xml_dict_reference(dict);
             }
             if ret.is_null() {
                 ret = cur;

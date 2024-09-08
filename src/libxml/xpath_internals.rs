@@ -24,7 +24,7 @@ use crate::libxml::xpointer::{
 use crate::{
     __xml_raise_error,
     libxml::{
-        dict::{xmlDictLookup, xmlDictReference, XmlDictPtr},
+        dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         globals::{
             xmlGenericError, xmlGenericErrorContext, xml_free, xml_malloc, xml_malloc_atomic,
             xml_realloc,
@@ -3020,7 +3020,7 @@ pub unsafe extern "C" fn xml_xpath_new_parser_context(
     }
     if !ctxt.is_null() && !(*ctxt).dict.is_null() {
         (*(*ret).comp).dict = (*ctxt).dict;
-        xmlDictReference((*(*ret).comp).dict);
+        xml_dict_reference((*(*ret).comp).dict);
     }
 
     ret
@@ -4171,7 +4171,7 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
             (*comp).stream = stream;
             (*comp).dict = dict;
             if !(*comp).dict.is_null() {
-                xmlDictReference((*comp).dict);
+                xml_dict_reference((*comp).dict);
             }
             return comp;
         }
@@ -4296,14 +4296,14 @@ unsafe extern "C" fn xml_xpath_comp_expr_add(
     {
         if !value4.is_null() {
             (*(*comp).steps.add((*comp).nb_step as usize)).value4 =
-                xmlDictLookup((*comp).dict, value4 as _, -1) as _;
+                xml_dict_lookup((*comp).dict, value4 as _, -1) as _;
             xml_free(value4 as _);
         } else {
             (*(*comp).steps.add((*comp).nb_step as usize)).value4 = null_mut();
         }
         if !value5.is_null() {
             (*(*comp).steps.add((*comp).nb_step as usize)).value5 =
-                xmlDictLookup((*comp).dict, value5 as _, -1) as _;
+                xml_dict_lookup((*comp).dict, value5 as _, -1) as _;
             xml_free(value5 as _);
         } else {
             (*(*comp).steps.add((*comp).nb_step as usize)).value5 = null_mut();

@@ -31,7 +31,7 @@ use crate::{
     __xml_raise_error,
     libxml::xmlerror::{XmlParserErrors, XmlStructuredErrorFunc},
     libxml::{
-        dict::{xmlDictLookup, xmlDictOwns, XmlDictPtr},
+        dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         entities::{xml_get_doc_entity, XmlEntitiesTablePtr, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
@@ -684,14 +684,14 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
             if dict.is_null() {
                 (*ret).name = xml_strdup(name);
             } else {
-                (*ret).name = xmlDictLookup(dict, name, -1);
+                (*ret).name = xml_dict_lookup(dict, name, -1);
             }
         } else if dict.is_null() {
             (*ret).prefix = xml_strndup(name, l);
             (*ret).name = xml_strdup(tmp);
         } else {
-            (*ret).prefix = xmlDictLookup(dict, name, l);
-            (*ret).name = xmlDictLookup(dict, tmp, -1);
+            (*ret).prefix = xml_dict_lookup(dict, name, l);
+            (*ret).name = xml_dict_lookup(dict, tmp, -1);
         }
     }
     ret
@@ -733,7 +733,7 @@ pub unsafe extern "C" fn xml_copy_doc_element_content(
     (*ret).ocur = (*cur).ocur;
     if !(*cur).name.is_null() {
         if !dict.is_null() {
-            (*ret).name = xmlDictLookup(dict, (*cur).name, -1);
+            (*ret).name = xml_dict_lookup(dict, (*cur).name, -1);
         } else {
             (*ret).name = xml_strdup((*cur).name);
         }
@@ -741,7 +741,7 @@ pub unsafe extern "C" fn xml_copy_doc_element_content(
 
     if !(*cur).prefix.is_null() {
         if !dict.is_null() {
-            (*ret).prefix = xmlDictLookup(dict, (*cur).prefix, -1);
+            (*ret).prefix = xml_dict_lookup(dict, (*cur).prefix, -1);
         } else {
             (*ret).prefix = xml_strdup((*cur).prefix);
         }
@@ -768,7 +768,7 @@ pub unsafe extern "C" fn xml_copy_doc_element_content(
             (*tmp).parent = prev;
             if !(*cur).name.is_null() {
                 if !dict.is_null() {
-                    (*tmp).name = xmlDictLookup(dict, (*cur).name, -1);
+                    (*tmp).name = xml_dict_lookup(dict, (*cur).name, -1);
                 } else {
                     (*tmp).name = xml_strdup((*cur).name);
                 }
@@ -776,7 +776,7 @@ pub unsafe extern "C" fn xml_copy_doc_element_content(
 
             if !(*cur).prefix.is_null() {
                 if !dict.is_null() {
-                    (*tmp).prefix = xmlDictLookup(dict, (*cur).prefix, -1);
+                    (*tmp).prefix = xml_dict_lookup(dict, (*cur).prefix, -1);
                 } else {
                     (*tmp).prefix = xml_strdup((*cur).prefix);
                 }
@@ -841,10 +841,10 @@ pub unsafe extern "C" fn xml_free_doc_element_content(
             }
         }
         if !dict.is_null() {
-            if !(*cur).name.is_null() && xmlDictOwns(dict, (*cur).name) == 0 {
+            if !(*cur).name.is_null() && xml_dict_owns(dict, (*cur).name) == 0 {
                 xml_free((*cur).name as _);
             }
-            if !(*cur).prefix.is_null() && xmlDictOwns(dict, (*cur).prefix) == 0 {
+            if !(*cur).prefix.is_null() && xml_dict_owns(dict, (*cur).prefix) == 0 {
                 xml_free((*cur).prefix as _);
             }
         } else {
@@ -2151,16 +2151,16 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
         xml_free_enumeration((*attr).tree);
     }
     if !dict.is_null() {
-        if !(*attr).elem.is_null() && xmlDictOwns(dict, (*attr).elem) == 0 {
+        if !(*attr).elem.is_null() && xml_dict_owns(dict, (*attr).elem) == 0 {
             xml_free((*attr).elem as _);
         }
-        if !(*attr).name.is_null() && xmlDictOwns(dict, (*attr).name) == 0 {
+        if !(*attr).name.is_null() && xml_dict_owns(dict, (*attr).name) == 0 {
             xml_free((*attr).name as _);
         }
-        if !(*attr).prefix.is_null() && xmlDictOwns(dict, (*attr).prefix) == 0 {
+        if !(*attr).prefix.is_null() && xml_dict_owns(dict, (*attr).prefix) == 0 {
             xml_free((*attr).prefix as _);
         }
-        if !(*attr).default_value.is_null() && xmlDictOwns(dict, (*attr).default_value) == 0 {
+        if !(*attr).default_value.is_null() && xml_dict_owns(dict, (*attr).default_value) == 0 {
             xml_free((*attr).default_value as _);
         }
     } else {
@@ -2465,9 +2465,9 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
      */
     (*ret).doc = (*dtd).doc;
     if !dict.is_null() {
-        (*ret).name = xmlDictLookup(dict, name, -1);
-        (*ret).prefix = xmlDictLookup(dict, ns, -1);
-        (*ret).elem = xmlDictLookup(dict, elem, -1);
+        (*ret).name = xml_dict_lookup(dict, name, -1);
+        (*ret).prefix = xml_dict_lookup(dict, ns, -1);
+        (*ret).elem = xml_dict_lookup(dict, elem, -1);
     } else {
         (*ret).name = xml_strdup(name);
         (*ret).prefix = xml_strdup(ns);
@@ -2477,7 +2477,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
     (*ret).tree = tree;
     if !default_value.is_null() {
         if !dict.is_null() {
-            (*ret).default_value = xmlDictLookup(dict, default_value, -1);
+            (*ret).default_value = xml_dict_lookup(dict, default_value, -1);
         } else {
             (*ret).default_value = xml_strdup(default_value);
         }
@@ -2813,7 +2813,8 @@ unsafe extern "C" fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> c_int {
  */
 macro_rules! DICT_FREE {
     ($str:expr, $dict:expr) => {
-        if !$str.is_null() && ($dict.is_null() || xmlDictOwns($dict, $str as *const XmlChar) == 0) {
+        if !$str.is_null() && ($dict.is_null() || xml_dict_owns($dict, $str as *const XmlChar) == 0)
+        {
             xml_free($str as _);
         }
     };
@@ -2904,7 +2905,7 @@ pub unsafe extern "C" fn xml_add_id(
          * Operating in streaming mode, attr is gonna disappear
          */
         if !(*doc).dict.is_null() {
-            (*ret).name = xmlDictLookup((*doc).dict, (*attr).name, -1);
+            (*ret).name = xml_dict_lookup((*doc).dict, (*attr).name, -1);
         } else {
             (*ret).name = xml_strdup((*attr).name);
         }

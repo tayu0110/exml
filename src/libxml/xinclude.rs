@@ -18,7 +18,7 @@ use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
     __xml_raise_error,
     libxml::{
-        dict::{xmlDictFree, xmlDictReference},
+        dict::{xml_dict_free, xml_dict_reference},
         encoding::{
             xmlCharEncCloseFunc, xmlGetCharEncodingHandler, xmlParseCharEncoding, XmlCharEncoding,
         },
@@ -777,10 +777,10 @@ unsafe extern "C" fn xml_xinclude_parse_file(
      */
     if !(*ctxt).doc.is_null() && !(*(*ctxt).doc).dict.is_null() {
         if !(*pctxt).dict.is_null() {
-            xmlDictFree((*pctxt).dict);
+            xml_dict_free((*pctxt).dict);
         }
         (*pctxt).dict = (*(*ctxt).doc).dict;
-        xmlDictReference((*pctxt).dict);
+        xml_dict_reference((*pctxt).dict);
     }
 
     xmlCtxtUseOptions(

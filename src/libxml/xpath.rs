@@ -20,7 +20,7 @@ use crate::libxml::xpointer::{
 };
 use crate::{
     libxml::{
-        dict::{xmlDictFree, XmlDictPtr},
+        dict::{xml_dict_free, XmlDictPtr},
         globals::{xmlGenericErrorContext, xml_free, xml_malloc},
         hash::{xmlHashCreate, XmlHashTablePtr},
         parser::xml_init_parser,
@@ -2475,7 +2475,7 @@ pub unsafe extern "C" fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
                 xml_xpath_free_object((*op).value4 as _);
             }
         }
-        xmlDictFree((*comp).dict);
+        xml_dict_free((*comp).dict);
     }
     if !(*comp).steps.is_null() {
         xml_free((*comp).steps as _);

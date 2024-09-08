@@ -17,7 +17,7 @@ use libc::{memset, size_t, snprintf, strchr};
 use crate::{
     __xml_raise_error,
     libxml::{
-        dict::{xmlDictLookup, xmlDictOwns, XmlDictPtr},
+        dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         globals::{xmlGenericErrorContext, xml_free, xml_malloc},
         hash::{
             xmlHashAddEntry, xmlHashCopy, xmlHashCreate, xmlHashCreateDict, xmlHashFree,
@@ -179,7 +179,7 @@ unsafe extern "C" fn xml_create_entity(
             (*ret).system_id = AtomicPtr::new(xml_strdup(system_id) as _);
         }
     } else {
-        (*ret).name = AtomicPtr::new(xmlDictLookup(dict, name, -1) as _);
+        (*ret).name = AtomicPtr::new(xml_dict_lookup(dict, name, -1) as _);
         (*ret).external_id = AtomicPtr::new(xml_strdup(external_id) as _);
         (*ret).system_id = AtomicPtr::new(xml_strdup(system_id) as _);
     }
@@ -311,7 +311,7 @@ unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
         xml_free_node_list((*entity).children.load(Ordering::Relaxed));
     }
     if !(*entity).name.load(Ordering::Relaxed).is_null()
-        && (dict.is_null() || xmlDictOwns(dict, (*entity).name.load(Ordering::Relaxed)) == 0)
+        && (dict.is_null() || xml_dict_owns(dict, (*entity).name.load(Ordering::Relaxed)) == 0)
     {
         xml_free((*entity).name.load(Ordering::Relaxed) as _);
     }

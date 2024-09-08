@@ -16,7 +16,7 @@ use libc::{memset, size_t};
 
 use crate::{
     libxml::{
-        dict::{xmlDictCreate, xmlDictFree, xmlDictLookup, XmlDictPtr},
+        dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         encoding::{xmlFindCharEncodingHandler, XmlCharEncoding, XmlCharEncodingHandlerPtr},
         globals::{xmlDeregisterNodeDefaultValue, xmlGenericErrorContext, xml_free, xml_malloc},
         parser::{
@@ -316,12 +316,12 @@ const NODE_IS_SPRESERVED: i32 = 0x4;
  */
 macro_rules! CONSTSTR {
     ($reader:expr, $str:expr) => {
-        xmlDictLookup((*$reader).dict, $str, -1)
+        xml_dict_lookup((*$reader).dict, $str, -1)
     };
 }
 macro_rules! CONSTQSTR {
     ($reader:expr, $p:expr, $str:expr) => {
-        $crate::libxml::dict::xmlDictQLookup((*$reader).dict, $p, $str)
+        $crate::libxml::dict::xml_dict_qlookup((*$reader).dict, $p, $str)
     };
 }
 
@@ -766,7 +766,7 @@ pub unsafe extern "C" fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         xml_free((*reader).ent_tab as _);
     }
     if !(*reader).dict.is_null() {
-        xmlDictFree((*reader).dict);
+        xml_dict_free((*reader).dict);
     }
     xml_free(reader as _);
 }
@@ -938,7 +938,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
     if !(*reader).dict.is_null() {
         if !(*(*reader).ctxt).dict.is_null() {
             if (*reader).dict != (*(*reader).ctxt).dict {
-                xmlDictFree((*reader).dict);
+                xml_dict_free((*reader).dict);
                 (*reader).dict = (*(*reader).ctxt).dict;
             }
         } else {
@@ -946,7 +946,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         }
     } else {
         if (*(*reader).ctxt).dict.is_null() {
-            (*(*reader).ctxt).dict = xmlDictCreate();
+            (*(*reader).ctxt).dict = xml_dict_create();
         }
         (*reader).dict = (*(*reader).ctxt).dict;
     }
@@ -968,7 +968,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         if options & XmlParserOption::XmlParseXinclude as i32 != 0 {
             (*reader).xinclude = 1;
             (*reader).xinclude_name =
-                xmlDictLookup((*reader).dict, XINCLUDE_NODE.as_ptr() as _, -1);
+                xml_dict_lookup((*reader).dict, XINCLUDE_NODE.as_ptr() as _, -1);
             options -= XmlParserOption::XmlParseXinclude as i32;
         } else {
             (*reader).xinclude = 0;
@@ -1321,7 +1321,7 @@ const MAX_FREE_NODES: i32 = 100;
 macro_rules! DICT_FREE {
     ($dict:expr, $str:expr) => {
         if !$str.is_null()
-            && ($dict.is_null() || $crate::libxml::dict::xmlDictOwns($dict, $str as _) == 0)
+            && ($dict.is_null() || $crate::libxml::dict::xml_dict_owns($dict, $str as _) == 0)
         {
             xml_free($str as _);
         }
@@ -3638,7 +3638,7 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: XmlTextReaderPtr, cur: Xml
         xml_free((*cur).url as _);
     }
     if !(*cur).dict.is_null() {
-        xmlDictFree((*cur).dict);
+        xml_dict_free((*cur).dict);
     }
 
     xml_free(cur as _);
@@ -5809,7 +5809,7 @@ pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     (*ret).allocs = XML_TEXTREADER_CTXT;
     (*ret).doc = doc;
     (*ret).state = XmlTextReaderState::Start;
-    (*ret).dict = xmlDictCreate();
+    (*ret).dict = xml_dict_create();
     ret
 }
 
@@ -6027,7 +6027,7 @@ pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: Xm
         if !(*reader).ctxt.is_null() && !(*(*reader).ctxt).dict.is_null() {
             (*reader).dict = (*(*reader).ctxt).dict;
         } else {
-            (*reader).dict = xmlDictCreate();
+            (*reader).dict = xml_dict_create();
         }
     }
     0

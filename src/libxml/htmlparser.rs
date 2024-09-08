@@ -18,7 +18,7 @@ use libc::{
 use crate::{
     __xml_raise_error,
     libxml::{
-        dict::{xmlDictCreate, xmlDictLookup, XmlDictPtr},
+        dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         encoding::{
             xmlDetectCharEncoding, xmlFindCharEncodingHandler, xmlParseCharEncoding,
             XmlCharEncoding, XmlCharEncodingHandlerPtr,
@@ -6197,7 +6197,7 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
         return null_mut();
     }
 
-    xmlDictLookup((*ctxt).dict, (*(*ctxt).input).cur.sub(len as usize), len)
+    xml_dict_lookup((*ctxt).dict, (*(*ctxt).input).cur.sub(len as usize), len)
 }
 
 /**
@@ -6242,7 +6242,7 @@ unsafe extern "C" fn html_parse_name(ctxt: HtmlParserCtxtPtr) -> *const XmlChar 
 
         if *input > 0 && *input < 0x80 {
             count = input.offset_from((*(*ctxt).input).cur) as _;
-            ret = xmlDictLookup((*ctxt).dict, (*(*ctxt).input).cur, count);
+            ret = xml_dict_lookup((*ctxt).dict, (*(*ctxt).input).cur, count);
             (*(*ctxt).input).cur = input;
             (*(*ctxt).input).col += count;
             return ret;
@@ -6542,7 +6542,7 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
         NEXT!(ctxt);
     }
 
-    let ret: *const XmlChar = xmlDictLookup((*ctxt).dict, loc.as_ptr() as _, i as i32);
+    let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, loc.as_ptr() as _, i as i32);
     if ret.is_null() {
         html_err_memory(ctxt, null_mut());
     }
@@ -7831,7 +7831,7 @@ unsafe extern "C" fn html_parse_html_name_non_invasive(ctxt: HtmlParserCtxtPtr) 
         i += 1;
     }
 
-    xmlDictLookup((*ctxt).dict, loc.as_ptr(), i as _)
+    xml_dict_lookup((*ctxt).dict, loc.as_ptr(), i as _)
 }
 
 /**
@@ -9372,7 +9372,7 @@ unsafe extern "C" fn html_init_parser_ctxt(
     }
     memset(ctxt as _, 0, size_of::<HtmlParserCtxt>());
 
-    (*ctxt).dict = xmlDictCreate();
+    (*ctxt).dict = xml_dict_create();
     if (*ctxt).dict.is_null() {
         html_err_memory(
             null_mut(),
@@ -11976,7 +11976,7 @@ pub enum HtmlParserOption {
 macro_rules! DICT_FREE {
     ($dict:expr, $str:expr) => {
         if !$str.is_null()
-            && ($dict.is_null() || crate::libxml::dict::xmlDictOwns($dict, $str) == 0)
+            && ($dict.is_null() || crate::libxml::dict::xml_dict_owns($dict, $str) == 0)
         {
             xml_free($str as _);
         }

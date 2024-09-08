@@ -18,8 +18,8 @@ use crate::{
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
         dict::{
-            __xmlInitializeDict, xmlCleanupDictInternal, xmlDictCreate, xmlDictFree, xmlDictLookup,
-            xmlDictReference, xmlDictSetLimit, XmlDictPtr,
+            __xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_create, xml_dict_free,
+            xml_dict_lookup, xml_dict_reference, xml_dict_set_limit, XmlDictPtr,
         },
         encoding::{
             xmlCleanupCharEncodingHandlers, xmlDetectCharEncoding, xmlEncOutputChunk,
@@ -1747,7 +1747,7 @@ pub unsafe extern "C" fn xml_init_parser() {
         xml_init_threads_internal();
         xmlInitGlobalsInternal();
         xml_init_memory_internal();
-        __xmlInitializeDict();
+        __xml_initialize_dict();
         xml_init_encoding_internal();
         xmlRegisterDefaultInputCallbacks();
         #[cfg(feature = "output")]
@@ -1798,7 +1798,7 @@ pub unsafe extern "C" fn xml_cleanup_parser() {
     {
         xml_catalog_cleanup();
     }
-    xmlCleanupDictInternal();
+    xml_cleanup_dict_internal();
     xmlCleanupInputCallbacks();
     #[cfg(feature = "output")]
     {
@@ -2144,9 +2144,9 @@ pub(crate) unsafe extern "C" fn xml_detect_sax2(ctxt: XmlParserCtxtPtr) {
         (*ctxt).sax2 = 1;
     }
 
-    (*ctxt).str_xml = xmlDictLookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
-    (*ctxt).str_xmlns = xmlDictLookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
-    (*ctxt).str_xml_ns = xmlDictLookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
+    (*ctxt).str_xml = xml_dict_lookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
+    (*ctxt).str_xmlns = xml_dict_lookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
+    (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
     if (*ctxt).str_xml.is_null() || (*ctxt).str_xmlns.is_null() || (*ctxt).str_xml_ns.is_null() {
         xml_err_memory(ctxt, null());
     }
@@ -3745,7 +3745,7 @@ pub unsafe extern "C" fn xml_parse_in_node_context(
      */
     if !(*doc).dict.is_null() {
         if !(*ctxt).dict.is_null() {
-            xmlDictFree((*ctxt).dict);
+            xml_dict_free((*ctxt).dict);
         }
         (*ctxt).dict = (*doc).dict;
     } else {
@@ -3793,8 +3793,9 @@ pub unsafe extern "C" fn xml_parse_in_node_context(
 
             while !ns.is_null() {
                 if !(*ctxt).dict.is_null() {
-                    iprefix = xmlDictLookup((*ctxt).dict, (*ns).prefix.load(Ordering::Relaxed), -1);
-                    ihref = xmlDictLookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
+                    iprefix =
+                        xml_dict_lookup((*ctxt).dict, (*ns).prefix.load(Ordering::Relaxed), -1);
+                    ihref = xml_dict_lookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
                 } else {
                     iprefix = (*ns).prefix.load(Ordering::Relaxed) as _;
                     ihref = (*ns).href.load(Ordering::Relaxed) as _;
@@ -3958,12 +3959,12 @@ pub unsafe extern "C" fn xml_parse_balanced_chunk_memory_recover(
     }
     (*new_doc).properties = XmlDocProperties::XmlDocInternal as i32;
     if !doc.is_null() && !(*doc).dict.is_null() {
-        xmlDictFree((*ctxt).dict);
+        xml_dict_free((*ctxt).dict);
         (*ctxt).dict = (*doc).dict;
-        xmlDictReference((*ctxt).dict);
-        (*ctxt).str_xml = xmlDictLookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
-        (*ctxt).str_xmlns = xmlDictLookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
-        (*ctxt).str_xml_ns = xmlDictLookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
+        xml_dict_reference((*ctxt).dict);
+        (*ctxt).str_xml = xml_dict_lookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
+        (*ctxt).str_xmlns = xml_dict_lookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
+        (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
         (*ctxt).dict_names = 1;
     } else {
         xml_ctxt_use_options_internal(ctxt, XmlParserOption::XmlParseNodict as i32, null());
@@ -4147,7 +4148,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
         (*new_doc).ext_subset = (*doc).ext_subset;
         if !(*doc).dict.is_null() {
             (*new_doc).dict = (*doc).dict;
-            xmlDictReference((*new_doc).dict);
+            xml_dict_reference((*new_doc).dict);
         }
         if !(*doc).url.is_null() {
             (*new_doc).url = xml_strdup((*doc).url);
@@ -4225,12 +4226,12 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
         }
         (*ctxt).external = (*oldctxt).external;
         if !(*ctxt).dict.is_null() {
-            xmlDictFree((*ctxt).dict);
+            xml_dict_free((*ctxt).dict);
         }
         (*ctxt).dict = (*oldctxt).dict;
-        (*ctxt).str_xml = xmlDictLookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
-        (*ctxt).str_xmlns = xmlDictLookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
-        (*ctxt).str_xml_ns = xmlDictLookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
+        (*ctxt).str_xml = xml_dict_lookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
+        (*ctxt).str_xmlns = xml_dict_lookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
+        (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
         (*ctxt).dict_names = (*oldctxt).dict_names;
         (*ctxt).atts_default = (*oldctxt).atts_default;
         (*ctxt).atts_special = (*oldctxt).atts_special;
@@ -4454,7 +4455,7 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
     xml_init_parser();
 
     if (*ctxt).dict.is_null() {
-        (*ctxt).dict = xmlDictCreate();
+        (*ctxt).dict = xml_dict_create();
     }
     if (*ctxt).dict.is_null() {
         xml_err_memory(
@@ -4463,7 +4464,7 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
         );
         return -1;
     }
-    xmlDictSetLimit((*ctxt).dict, XML_MAX_DICTIONARY_LIMIT);
+    xml_dict_set_limit((*ctxt).dict, XML_MAX_DICTIONARY_LIMIT);
 
     if (*ctxt).sax.is_null() {
         (*ctxt).sax = xml_malloc(size_of::<XmlSAXHandler>()) as _;
@@ -4784,7 +4785,7 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         xml_free((*ctxt).atts as _);
     }
     if !(*ctxt).dict.is_null() {
-        xmlDictFree((*ctxt).dict);
+        xml_dict_free((*ctxt).dict);
     }
     if !(*ctxt).ns_tab.is_null() {
         xml_free((*ctxt).ns_tab as _);
@@ -5518,7 +5519,7 @@ unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const 
         );
         return null_mut();
     }
-    xmlDictLookup((*ctxt).dict, BASE_PTR!(ctxt).add(start_position), len)
+    xml_dict_lookup((*ctxt).dict, BASE_PTR!(ctxt).add(start_position), len)
 }
 
 /**
@@ -5582,7 +5583,7 @@ unsafe extern "C" fn xml_parse_ncname(ctxt: XmlParserCtxtPtr) -> *const XmlChar 
                 );
                 return null_mut();
             }
-            ret = xmlDictLookup((*ctxt).dict, (*(*ctxt).input).cur, count as _);
+            ret = xml_dict_lookup((*ctxt).dict, (*(*ctxt).input).cur, count as _);
             (*(*ctxt).input).cur = input;
             (*(*ctxt).input).col += count as i32;
             if ret.is_null() {
@@ -5666,7 +5667,7 @@ unsafe extern "C" fn xml_parse_qname(
                 tmp = xml_build_qname(l, p, null_mut(), 0);
                 xml_free(l as _);
             }
-            p = xmlDictLookup((*ctxt).dict, tmp, -1);
+            p = xml_dict_lookup((*ctxt).dict, tmp, -1);
             if !tmp.is_null() {
                 xml_free(tmp as _);
             }
@@ -5688,7 +5689,7 @@ unsafe extern "C" fn xml_parse_qname(
             tmp = xml_parse_name(ctxt) as _;
             if !tmp.is_null() {
                 tmp = xml_build_qname(tmp, l, null_mut(), 0);
-                l = xmlDictLookup((*ctxt).dict, tmp, -1);
+                l = xml_dict_lookup((*ctxt).dict, tmp, -1);
                 if !tmp.is_null() {
                     xml_free(tmp as _);
                 }
@@ -5699,7 +5700,7 @@ unsafe extern "C" fn xml_parse_qname(
                 return null_mut();
             }
             tmp = xml_build_qname(c"".as_ptr() as _, l, null_mut(), 0);
-            l = xmlDictLookup((*ctxt).dict, tmp, -1);
+            l = xml_dict_lookup((*ctxt).dict, tmp, -1);
             if !tmp.is_null() {
                 xml_free(tmp as _);
             }
@@ -8018,7 +8019,7 @@ pub(crate) unsafe extern "C" fn xmlParseStartTag2(
                 }
 
                 if attname == (*ctxt).str_xmlns && aprefix.is_null() {
-                    let url: *const XmlChar = xmlDictLookup((*ctxt).dict, attvalue, len);
+                    let url: *const XmlChar = xml_dict_lookup((*ctxt).dict, attvalue, len);
                     let uri: XmlURIPtr;
 
                     if url.is_null() {
@@ -8100,7 +8101,7 @@ pub(crate) unsafe extern "C" fn xmlParseStartTag2(
                         nb_ns += 1;
                     }
                 } else if aprefix == (*ctxt).str_xmlns {
-                    let url: *const XmlChar = xmlDictLookup((*ctxt).dict, attvalue, len);
+                    let url: *const XmlChar = xml_dict_lookup((*ctxt).dict, attvalue, len);
 
                     if attname == (*ctxt).str_xml {
                         if url != (*ctxt).str_xml_ns {
@@ -11085,7 +11086,7 @@ pub enum XmlParserOption {
 macro_rules! DICT_FREE {
     ($dict:expr, $str:expr) => {
         if !$str.is_null()
-            && ($dict.is_null() || crate::libxml::dict::xmlDictOwns($dict, $str as _) == 0)
+            && ($dict.is_null() || crate::libxml::dict::xml_dict_owns($dict, $str as _) == 0)
         {
             xml_free($str as _);
         }

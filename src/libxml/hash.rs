@@ -12,7 +12,9 @@ use std::{
 use libc::{memcpy, memset};
 
 use crate::libxml::{
-    dict::{__xmlRandom, xmlDictFree, xmlDictLookup, xmlDictOwns, xmlDictReference, XmlDictPtr},
+    dict::{
+        __xml_random, xml_dict_free, xml_dict_lookup, xml_dict_owns, xml_dict_reference, XmlDictPtr,
+    },
     globals::{xml_free, xml_malloc},
     parser::xml_init_parser,
     xmlstring::{xml_str_equal, xml_str_qequal, xml_strdup, XmlChar},
@@ -154,7 +156,7 @@ pub unsafe extern "C" fn xmlHashCreate(mut size: c_int) -> XmlHashTablePtr {
                 0,
                 size as usize * size_of::<XmlHashEntry>(),
             );
-            (*table).random_seed = __xmlRandom();
+            (*table).random_seed = __xml_random();
             return table;
         }
         xml_free(table as _);
@@ -175,7 +177,7 @@ pub unsafe extern "C" fn xmlHashCreateDict(size: c_int, dict: XmlDictPtr) -> Xml
     let table: XmlHashTablePtr = xmlHashCreate(size);
     if !table.is_null() {
         (*table).dict = dict;
-        xmlDictReference(dict);
+        xml_dict_reference(dict);
     }
     table
 }
@@ -239,7 +241,7 @@ pub unsafe extern "C" fn xmlHashFree(table: XmlHashTablePtr, f: Option<XmlHashDe
         xml_free((*table).table as _);
     }
     if !(*table).dict.is_null() {
-        xmlDictFree((*table).dict);
+        xml_dict_free((*table).dict);
     }
     xml_free(table as _);
 }
@@ -548,20 +550,20 @@ pub unsafe extern "C" fn xmlHashAddEntry3(
      * If using a dict internalize if needed
      */
     if !(*table).dict.is_null() {
-        if xmlDictOwns((*table).dict, name) == 0 {
-            name = xmlDictLookup((*table).dict, name, -1);
+        if xml_dict_owns((*table).dict, name) == 0 {
+            name = xml_dict_lookup((*table).dict, name, -1);
             if name.is_null() {
                 return -1;
             }
         }
-        if !name2.is_null() && xmlDictOwns((*table).dict, name2) == 0 {
-            name2 = xmlDictLookup((*table).dict, name2, -1);
+        if !name2.is_null() && xml_dict_owns((*table).dict, name2) == 0 {
+            name2 = xml_dict_lookup((*table).dict, name2, -1);
             if name2.is_null() {
                 return -1;
             }
         }
-        if !name3.is_null() && xmlDictOwns((*table).dict, name3) == 0 {
-            name3 = xmlDictLookup((*table).dict, name3, -1);
+        if !name3.is_null() && xml_dict_owns((*table).dict, name3) == 0 {
+            name3 = xml_dict_lookup((*table).dict, name3, -1);
             if name3.is_null() {
                 return -1;
             }
@@ -725,20 +727,20 @@ pub unsafe extern "C" fn xmlHashUpdateEntry3(
      * If using a dict internalize if needed
      */
     if !(*table).dict.is_null() {
-        if xmlDictOwns((*table).dict, name) == 0 {
-            name = xmlDictLookup((*table).dict, name, -1);
+        if xml_dict_owns((*table).dict, name) == 0 {
+            name = xml_dict_lookup((*table).dict, name, -1);
             if name.is_null() {
                 return -1;
             }
         }
-        if !name2.is_null() && xmlDictOwns((*table).dict, name2) == 0 {
-            name2 = xmlDictLookup((*table).dict, name2, -1);
+        if !name2.is_null() && xml_dict_owns((*table).dict, name2) == 0 {
+            name2 = xml_dict_lookup((*table).dict, name2, -1);
             if name2.is_null() {
                 return -1;
             }
         }
-        if !name3.is_null() && xmlDictOwns((*table).dict, name3) == 0 {
-            name3 = xmlDictLookup((*table).dict, name3, -1);
+        if !name3.is_null() && xml_dict_owns((*table).dict, name3) == 0 {
+            name3 = xml_dict_lookup((*table).dict, name3, -1);
             if name3.is_null() {
                 return -1;
             }

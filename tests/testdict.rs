@@ -5,8 +5,8 @@ use std::{
 
 use exml::libxml::{
     dict::{
-        xmlDictCreate, xmlDictCreateSub, xmlDictFree, xmlDictLookup, xmlDictOwns, xmlDictQLookup,
-        XmlDictPtr,
+        xml_dict_create, xml_dict_create_sub, xml_dict_free, xml_dict_lookup, xml_dict_owns,
+        xml_dict_qlookup, XmlDictPtr,
     },
     globals::xml_free,
     parser::xml_cleanup_parser,
@@ -179,7 +179,7 @@ unsafe fn run_test2(
     let mut pref: *mut XmlChar;
     let mut tmp: *const XmlChar;
 
-    let dict: XmlDictPtr = xmlDictCreateSub(parent);
+    let dict: XmlDictPtr = xml_dict_create_sub(parent);
     assert!(
         !dict.is_null(),
         "Out of memory while creating sub-dictionary"
@@ -195,7 +195,7 @@ unsafe fn run_test2(
      * they are allocated in the main dictionary, not coming from the parent
      */
     for i in 0..NB_STRINGS_MIN {
-        test2[i] = xmlDictLookup(dict, strings2[i], -1);
+        test2[i] = xml_dict_lookup(dict, strings2[i], -1);
         assert!(
             !test2[i].is_null(),
             "Failed lookup for '{}'\n",
@@ -204,7 +204,7 @@ unsafe fn run_test2(
     }
     /* ":foo" like strings2 */
     for (_, j) in (0..NB_STRINGS_MIN).zip(NB_STRINGS_MAX - NB_STRINGS_NS..) {
-        test2[j] = xmlDictLookup(dict, strings2[j], xml_strlen(strings2[j]));
+        test2[j] = xml_dict_lookup(dict, strings2[j], xml_strlen(strings2[j]));
         assert!(
             !test2[j].is_null(),
             "Failed lookup for '{}'",
@@ -213,7 +213,7 @@ unsafe fn run_test2(
     }
     /* "a:foo" like strings2 */
     for (_, j) in (0..NB_STRINGS_MIN).zip(NB_STRINGS_MAX - NB_STRINGS_MIN..) {
-        test2[j] = xmlDictLookup(dict, strings2[j], xml_strlen(strings2[j]));
+        test2[j] = xml_dict_lookup(dict, strings2[j], xml_strlen(strings2[j]));
         assert!(
             !test2[j].is_null(),
             "Failed lookup for '{}'",
@@ -230,7 +230,7 @@ unsafe fn run_test2(
         if !test2[i].is_null() {
             continue;
         }
-        test2[i] = xmlDictLookup(dict, strings2[i], -1);
+        test2[i] = xml_dict_lookup(dict, strings2[i], -1);
         assert!(
             !test2[i].is_null(),
             "Failed lookup for '{}'",
@@ -244,12 +244,12 @@ unsafe fn run_test2(
      */
     for i in 0..NB_STRINGS_MAX {
         assert!(
-            xmlDictOwns(dict, test2[i]) != 0,
+            xml_dict_owns(dict, test2[i]) != 0,
             "Failed ownership failure for '{}'",
             CStr::from_ptr(strings2[i] as _).to_string_lossy()
         );
         assert!(
-            xmlDictOwns(parent, test2[i]) == 0,
+            xml_dict_owns(parent, test2[i]) == 0,
             "Failed parent ownership failure for '{}'",
             CStr::from_ptr(strings2[i] as _).to_string_lossy(),
         );
@@ -260,7 +260,7 @@ unsafe fn run_test2(
      */
     for i in 0..NB_STRINGS_MAX {
         assert!(
-            xmlDictOwns(dict, test1[i]) != 0,
+            xml_dict_owns(dict, test1[i]) != 0,
             "Failed sub-ownership failure for '{}'",
             CStr::from_ptr(strings1[i] as _).to_string_lossy(),
         );
@@ -271,7 +271,7 @@ unsafe fn run_test2(
      */
     for i in 0..NB_STRINGS_MAX {
         assert!(
-            xmlDictLookup(dict, strings2[i], -1) == test2[i],
+            xml_dict_lookup(dict, strings2[i], -1) == test2[i],
             "Failed re-lookup check for {i}, '{}'",
             CStr::from_ptr(strings2[i] as _).to_string_lossy(),
         );
@@ -282,7 +282,7 @@ unsafe fn run_test2(
      */
     for i in 0..NB_STRINGS_MAX {
         assert!(
-            xmlDictLookup(dict, strings1[i], -1) == test1[i],
+            xml_dict_lookup(dict, strings1[i], -1) == test1[i],
             "Failed parent string lookup check for {i}, '{}'",
             CStr::from_ptr(strings1[i] as _).to_string_lossy(),
         );
@@ -301,7 +301,7 @@ unsafe fn run_test2(
         }
         cur = cur.add(1);
         *pref = 0;
-        tmp = xmlDictQLookup(dict, addr_of_mut!(prefix[0]), cur);
+        tmp = xml_dict_qlookup(dict, addr_of_mut!(prefix[0]), cur);
         eprintln!("prefix: {:?}", prefix);
         assert!(
             tmp == test2[i],
@@ -323,7 +323,7 @@ unsafe fn run_test2(
         }
         cur = cur.add(1);
         *pref = 0;
-        tmp = xmlDictQLookup(dict, addr_of_mut!(prefix[0]), cur);
+        tmp = xml_dict_qlookup(dict, addr_of_mut!(prefix[0]), cur);
         assert!(
             tmp == test1[i],
             "Failed parent lookup check for '{}':'{}'",
@@ -332,7 +332,7 @@ unsafe fn run_test2(
         );
     }
 
-    xmlDictFree(dict);
+    xml_dict_free(dict);
     0
 }
 
@@ -350,7 +350,7 @@ unsafe fn run_test1(
     let mut pref: *mut XmlChar;
     let mut tmp: *const XmlChar;
 
-    let dict: XmlDictPtr = xmlDictCreate();
+    let dict: XmlDictPtr = xml_dict_create();
     assert!(!dict.is_null(), "Out of memory while creating dictionary");
     /* Cast to avoid buggy warning on MSVC. */
     memset(test1.as_mut_ptr() as _, 0, test1.len());
@@ -360,7 +360,7 @@ unsafe fn run_test1(
      * and we allocate all those doing the fast key computations
      */
     for i in 0..NB_STRINGS_MIN {
-        test1[i] = xmlDictLookup(dict, strings1[i], -1);
+        test1[i] = xml_dict_lookup(dict, strings1[i], -1);
         assert!(
             !test1[i].is_null(),
             "Failed lookup for '{}'",
@@ -369,7 +369,7 @@ unsafe fn run_test1(
     }
     /* ":foo" like strings1 */
     for (_, j) in (0..NB_STRINGS_MIN).zip(NB_STRINGS_MAX - NB_STRINGS_NS..) {
-        test1[j] = xmlDictLookup(dict, strings1[j], xml_strlen(strings1[j]));
+        test1[j] = xml_dict_lookup(dict, strings1[j], xml_strlen(strings1[j]));
         assert!(
             !test1[j].is_null(),
             "Failed lookup for '{}'",
@@ -378,7 +378,7 @@ unsafe fn run_test1(
     }
     /* "a:foo" like strings1 */
     for (_, j) in (0..NB_STRINGS_MIN).zip(NB_STRINGS_MAX - NB_STRINGS_MIN..) {
-        test1[j] = xmlDictLookup(dict, strings1[j], xml_strlen(strings1[j]));
+        test1[j] = xml_dict_lookup(dict, strings1[j], xml_strlen(strings1[j]));
         assert!(
             !test1[j].is_null(),
             "Failed lookup for '{}'",
@@ -395,7 +395,7 @@ unsafe fn run_test1(
         if !test1[i].is_null() {
             continue;
         }
-        test1[i] = xmlDictLookup(dict, strings1[i], -1);
+        test1[i] = xml_dict_lookup(dict, strings1[i], -1);
         assert!(
             !test1[i].is_null(),
             "Failed lookup for '{}'",
@@ -409,7 +409,7 @@ unsafe fn run_test1(
      */
     for i in 0..NB_STRINGS_MAX {
         assert!(
-            xmlDictOwns(dict, test1[i]) != 0,
+            xml_dict_owns(dict, test1[i]) != 0,
             "Failed ownership failure for '{}'",
             CStr::from_ptr(strings1[i] as _).to_string_lossy()
         );
@@ -420,7 +420,7 @@ unsafe fn run_test1(
      */
     for i in 0..NB_STRINGS_MAX {
         assert!(
-            xmlDictLookup(dict, strings1[i], -1) == test1[i],
+            xml_dict_lookup(dict, strings1[i], -1) == test1[i],
             "Failed re-lookup check for {i}, '{}'",
             CStr::from_ptr(strings1[i] as _).to_string_lossy()
         );
@@ -439,7 +439,7 @@ unsafe fn run_test1(
         }
         cur = cur.add(1);
         *pref = 0;
-        tmp = xmlDictQLookup(dict, addr_of_mut!(prefix[0]), cur);
+        tmp = xml_dict_qlookup(dict, addr_of_mut!(prefix[0]), cur);
         assert!(
             tmp == test1[i],
             "Failed lookup check for '{}':'{}'\n",
@@ -450,7 +450,7 @@ unsafe fn run_test1(
 
     assert!(run_test2(dict, strings1, strings2, test1, test2) == 0);
 
-    xmlDictFree(dict);
+    xml_dict_free(dict);
     0
 }
 
