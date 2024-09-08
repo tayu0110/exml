@@ -40,13 +40,14 @@ use exml::{
         },
         htmltree::{htmlDocDump, htmlSaveFile, htmlSaveFileFormat},
         parser::{
-            xmlCtxtReadFile, xmlCtxtReadIO, xmlCtxtReadMemory, xmlCtxtUseOptions, xmlHasFeature,
-            xmlReadFd, xmlReadFile, xmlReadIO, xmlReadMemory, xml_cleanup_parser,
-            xml_create_push_parser_ctxt, xml_free_parser_ctxt, xml_get_external_entity_loader,
-            xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd,
-            xml_set_external_entity_loader, ErrorSAXFunc, WarningSAXFunc, XmlExternalEntityLoader,
-            XmlFeature, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption, XmlSAXHandler,
-            XmlSAXHandlerPtr, XmlSaxlocatorPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
+            xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_read_file, xml_ctxt_read_io,
+            xml_ctxt_read_memory, xml_ctxt_use_options, xml_free_parser_ctxt,
+            xml_get_external_entity_loader, xml_has_feature, xml_new_parser_ctxt,
+            xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd, xml_read_fd, xml_read_file,
+            xml_read_io, xml_read_memory, xml_set_external_entity_loader, ErrorSAXFunc,
+            WarningSAXFunc, XmlExternalEntityLoader, XmlFeature, XmlParserCtxtPtr,
+            XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr,
+            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
@@ -1768,7 +1769,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
             PROGRESULT = XmllintReturnCode::ErrMem;
             return;
         }
-        xmlCtxtReadFile(ctxt, filename, null_mut(), OPTIONS);
+        xml_ctxt_read_file(ctxt, filename, null_mut(), OPTIONS);
 
         if !(*ctxt).my_doc.is_null() {
             eprintln!("SAX generated a doc !");
@@ -2495,7 +2496,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         }
                         return;
                     }
-                    xmlCtxtUseOptions(ctxt, OPTIONS);
+                    xml_ctxt_use_options(ctxt, OPTIONS);
                     while {
                         res = fread(chars.as_mut_ptr() as _, 1, size as _, f) as i32;
                         res > 0
@@ -2518,12 +2519,12 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         }
     } else if TEST_IO != 0 {
         if *filename.add(0) == b'-' as i8 && *filename.add(1) == 0 {
-            doc = xmlReadFd(0, null_mut(), null_mut(), OPTIONS);
+            doc = xml_read_fd(0, null_mut(), null_mut(), OPTIONS);
         } else {
             let f: *mut FILE = fopen(filename, c"rb".as_ptr());
             if !f.is_null() {
                 if rectxt.is_null() {
-                    doc = xmlReadIO(
+                    doc = xml_read_io(
                         Some(my_read),
                         Some(my_close),
                         f as _,
@@ -2532,7 +2533,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         OPTIONS,
                     );
                 } else {
-                    doc = xmlCtxtReadIO(
+                    doc = xml_ctxt_read_io(
                         rectxt,
                         Some(my_read),
                         Some(my_close),
@@ -2564,7 +2565,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         (*ctxt).vctxt.error = Some(xml_html_validity_error);
         (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 
-        doc = xmlCtxtReadFile(ctxt, filename, null_mut(), OPTIONS);
+        doc = xml_ctxt_read_file(ctxt, filename, null_mut(), OPTIONS);
 
         if rectxt.is_null() {
             xml_free_parser_ctxt(ctxt);
@@ -2592,9 +2593,9 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         }
 
         if rectxt.is_null() {
-            doc = xmlReadMemory(base, info.st_size as _, filename, null_mut(), OPTIONS);
+            doc = xml_read_memory(base, info.st_size as _, filename, null_mut(), OPTIONS);
         } else {
-            doc = xmlCtxtReadMemory(
+            doc = xml_ctxt_read_memory(
                 rectxt,
                 base,
                 info.st_size as _,
@@ -2621,7 +2622,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 ctxt = rectxt;
             }
 
-            doc = xmlCtxtReadFile(ctxt, filename, null_mut(), OPTIONS);
+            doc = xml_ctxt_read_file(ctxt, filename, null_mut(), OPTIONS);
 
             if (*ctxt).valid == 0 {
                 PROGRESULT = XmllintReturnCode::ErrRdfile;
@@ -2631,9 +2632,9 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             }
         }
     } else if !rectxt.is_null() {
-        doc = xmlCtxtReadFile(rectxt, filename, null_mut(), OPTIONS);
+        doc = xml_ctxt_read_file(rectxt, filename, null_mut(), OPTIONS);
     } else {
-        doc = xmlReadFile(filename, null_mut(), OPTIONS);
+        doc = xml_read_file(filename, null_mut(), OPTIONS);
     }
 
     /*
@@ -3344,103 +3345,103 @@ fn show_version(name: &str) {
         env!("CARGO_PKG_VERSION")
     );
     eprint!("   compiled with: ");
-    if xmlHasFeature(Some(XmlFeature::XmlWithThread)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithThread)) {
         eprint!("Threads ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithTree)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithTree)) {
         eprint!("Tree ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithOutput)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithOutput)) {
         eprint!("Output ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithPush)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithPush)) {
         eprint!("Push ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithReader)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithReader)) {
         eprint!("Reader ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithPattern)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithPattern)) {
         eprint!("Patterns ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithWriter)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithWriter)) {
         eprint!("Writer ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithSax1)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithSax1)) {
         eprint!("SAXv1 ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithFtp)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithFtp)) {
         eprint!("FTP ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithHttp)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithHttp)) {
         eprint!("HTTP ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithValid)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithValid)) {
         eprint!("DTDValid ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithHtml)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithHtml)) {
         eprint!("HTML ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithLegacy)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithLegacy)) {
         eprint!("Legacy ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithC14n)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithC14n)) {
         eprint!("C14N ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithCatalog)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithCatalog)) {
         eprint!("Catalog ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithXpath)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithXpath)) {
         eprint!("XPath ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithXptr)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithXptr)) {
         eprint!("XPointer ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithXinclude)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithXinclude)) {
         eprint!("XInclude ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithIconv)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithIconv)) {
         eprint!("Iconv ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithIcu)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithIcu)) {
         eprint!("ICU ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithIso8859x)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithIso8859x)) {
         eprint!("ISO8859X ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithUnicode)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithUnicode)) {
         eprint!("Unicode ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithRegexp)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithRegexp)) {
         eprint!("Regexps ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithAutomata)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithAutomata)) {
         eprint!("Automata ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithExpr)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithExpr)) {
         eprint!("Expr ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithSchemas)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithSchemas)) {
         eprint!("Schemas ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithSchematron)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithSchematron)) {
         eprint!("Schematron ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithModules)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithModules)) {
         eprint!("Modules ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithDebug)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithDebug)) {
         eprint!("Debug ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithDebugMem)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithDebugMem)) {
         eprint!("MemDebug ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithDebugRun)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithDebugRun)) {
         eprint!("RunDebug ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithZlib)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithZlib)) {
         eprint!("Zlib ");
     }
-    if xmlHasFeature(Some(XmlFeature::XmlWithLzma)) {
+    if xml_has_feature(Some(XmlFeature::XmlWithLzma)) {
         eprint!("Lzma ");
     }
     eprintln!();

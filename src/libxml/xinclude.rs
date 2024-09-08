@@ -26,7 +26,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{xml_hash_scan, XmlHashTablePtr},
         parser::{
-            xmlCtxtUseOptions, xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
+            xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
             xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr, XmlParserInputPtr,
             XmlParserOption, XML_DETECT_IDS,
         },
@@ -783,7 +783,7 @@ unsafe extern "C" fn xml_xinclude_parse_file(
         xml_dict_reference((*pctxt).dict);
     }
 
-    xmlCtxtUseOptions(
+    xml_ctxt_use_options(
         pctxt,
         (*ctxt).parse_flags | XmlParserOption::XmlParseDtdload as i32,
     );

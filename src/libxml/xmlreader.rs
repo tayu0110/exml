@@ -22,7 +22,7 @@ use crate::{
             xml_deregister_node_default_value, xml_free, xml_generic_error_context, xml_malloc,
         },
         parser::{
-            xmlCtxtReset, xmlCtxtUseOptions, xml_byte_consumed, xml_create_push_parser_ctxt,
+            xml_byte_consumed, xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options,
             xml_free_parser_ctxt, xml_parse_chunk, xml_stop_parser, CdataBlockSAXFunc,
             CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func,
             StartElementSAXFunc, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState,
@@ -907,7 +907,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         } else {
             let enc: XmlCharEncoding = XmlCharEncoding::XmlCharEncodingNone;
 
-            xmlCtxtReset((*reader).ctxt);
+            xml_ctxt_reset((*reader).ctxt);
             let buf: XmlParserInputBufferPtr = xmlAllocParserInputBuffer(enc);
             if buf.is_null() {
                 return -1;
@@ -996,7 +996,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         (*reader).validate = XmlTextReaderValidate::ValidateDtd;
     }
 
-    xmlCtxtUseOptions((*reader).ctxt, options);
+    xml_ctxt_use_options((*reader).ctxt, options);
     if !encoding.is_null() {
         let hdlr: XmlCharEncodingHandlerPtr = xmlFindCharEncodingHandler(encoding);
         if !hdlr.is_null() {
@@ -6012,7 +6012,7 @@ pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: Xm
         xmlFreeParserInputBuffer((*reader).input);
     }
     if !(*reader).ctxt.is_null() {
-        xmlCtxtReset((*reader).ctxt);
+        xml_ctxt_reset((*reader).ctxt);
     }
 
     (*reader).ent_nr = 0;

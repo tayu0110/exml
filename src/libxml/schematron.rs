@@ -26,7 +26,7 @@ use crate::{
 use super::{
     dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
     globals::{xml_free, xml_malloc, xml_realloc},
-    parser::{xmlReadFile, xmlReadMemory, XmlParserOption},
+    parser::{xml_read_file, xml_read_memory, XmlParserOption},
     pattern::{
         xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternFlags, XmlPatternPtr,
     },
@@ -1190,7 +1190,7 @@ pub unsafe extern "C" fn xmlSchematronParse(ctxt: XmlSchematronParserCtxtPtr) ->
      * First step is to parse the input document into an DOM/Infoset
      */
     if !(*ctxt).url.is_null() {
-        doc = xmlReadFile(
+        doc = xml_read_file(
             (*ctxt).url as _,
             null_mut(),
             SCHEMATRON_PARSE_OPTIONS as i32,
@@ -1208,7 +1208,7 @@ pub unsafe extern "C" fn xmlSchematronParse(ctxt: XmlSchematronParserCtxtPtr) ->
         }
         (*ctxt).preserve = 0;
     } else if !(*ctxt).buffer.is_null() {
-        doc = xmlReadMemory(
+        doc = xml_read_memory(
             (*ctxt).buffer,
             (*ctxt).size,
             null_mut(),

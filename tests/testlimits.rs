@@ -24,7 +24,7 @@ use exml::{
         entities::XmlEntityPtr,
         globals::xml_get_warnings_default_value,
         parser::{
-            xmlCtxtReadFile, xml_cleanup_parser, xml_free_parser_ctxt, xml_init_parser,
+            xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_sax_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSaxlocatorPtr,
             XML_SAX2_MAGIC,
@@ -1278,7 +1278,7 @@ unsafe extern "C" fn sax_test(
         eprintln!("Failed to create parser context");
         return 1;
     }
-    let doc: XmlDocPtr = xmlCtxtReadFile(ctxt, filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), options);
 
     if !doc.is_null() {
         eprintln!("SAX parsing generated a document !");

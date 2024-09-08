@@ -18,9 +18,9 @@ use std::{
 use exml::libxml::{
     globals::{xml_free, xml_get_warnings_default_value, xml_last_error},
     parser::{
-        xmlCtxtReadFile, xmlReadFile, xml_cleanup_parser, xml_free_parser_ctxt, xml_init_parser,
-        xml_new_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
-        XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
+        xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
+        xml_new_parser_ctxt, xml_pedantic_parser_default, xml_read_file,
+        xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
     },
     parser_internals::xml_new_input_from_file,
     tree::{
@@ -220,7 +220,7 @@ unsafe extern "C" fn xmlconf_test_invalid(
         );
         return 0;
     }
-    let doc: XmlDocPtr = xmlCtxtReadFile(ctxt, filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -264,7 +264,7 @@ unsafe extern "C" fn xmlconf_test_valid(
         );
         return 0;
     }
-    let doc: XmlDocPtr = xmlCtxtReadFile(ctxt, filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -304,7 +304,7 @@ unsafe extern "C" fn xmlconf_test_not_nswf(
      * In case of Namespace errors, libxml2 will still parse the document
      * but log a Namespace error.
      */
-    let doc: XmlDocPtr = xmlReadFile(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -340,7 +340,7 @@ unsafe extern "C" fn xmlconf_test_not_wf(
 ) -> c_int {
     let mut ret: c_int = 1;
 
-    let doc: XmlDocPtr = xmlReadFile(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
     if !doc.is_null() {
         test_log!(
             logfile,
@@ -833,7 +833,7 @@ unsafe extern "C" fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         xmlconf_info();
         return -1;
     }
-    let doc: XmlDocPtr = xmlReadFile(
+    let doc: XmlDocPtr = xml_read_file(
         confxml.as_ptr(),
         null_mut(),
         XmlParserOption::XmlParseNoent as i32,

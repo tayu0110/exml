@@ -1164,7 +1164,7 @@ macro_rules! GROW {
 
 macro_rules! SKIP_BLANKS {
     ($ctxt:expr) => {
-        xmlSkipBlankChars($ctxt)
+        xml_skip_blank_chars($ctxt)
     };
 }
 
@@ -2514,7 +2514,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
         /*
          * Note that we will switch encoding on the fly.
          */
-        xmlParseXMLDecl(ctxt);
+        xml_parse_xmldecl(ctxt);
         if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32
             || matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
@@ -2613,7 +2613,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
         );
     } else {
         (*ctxt).instate = XmlParserInputState::XmlParserContent;
-        xmlParseElement(ctxt);
+        xml_parse_element(ctxt);
         (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
 
         /*
@@ -2727,7 +2727,7 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> c_i
         /*
          * Note that we will switch encoding on the fly.
          */
-        xmlParseXMLDecl(ctxt);
+        xml_parse_xmldecl(ctxt);
         if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
             /*
              * The XML REC instructs us to stop parsing right here
@@ -4198,7 +4198,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
      * Parse a possible text declaration first
      */
     if CMP5!(CUR_PTR!(ctxt), b'<', b'?', b'x', b'm', b'l') && IS_BLANK_CH!(NXT!(ctxt, 5)) {
-        xmlParseTextDecl(ctxt);
+        xml_parse_text_decl(ctxt);
         /*
          * An XML-1.0 document can't reference an entity not XML-1.0
          */
@@ -4715,7 +4715,7 @@ pub unsafe extern "C" fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         return;
     }
     xml_clear_node_info_seq(addr_of_mut!((*ctxt).node_seq));
-    xmlCtxtReset(ctxt);
+    xml_ctxt_reset(ctxt);
 }
 
 /**
@@ -6588,7 +6588,7 @@ macro_rules! grow_buffer {
  * @end3:  an end marker XmlChar, 0 if none
  * @check:  whether to perform entity checks
  */
-pub(crate) unsafe extern "C" fn xmlStringDecodeEntitiesInt(
+pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
     ctxt: XmlParserCtxtPtr,
     mut str: *const XmlChar,
     len: c_int,
@@ -6715,7 +6715,7 @@ pub(crate) unsafe extern "C" fn xmlStringDecodeEntitiesInt(
 
                         (*ent).flags |= XML_ENT_EXPANDING as i32;
                         (*ctxt).depth += 1;
-                        rep = xmlStringDecodeEntitiesInt(
+                        rep = xml_string_decode_entities_int(
                             ctxt,
                             (*ent).content.load(Ordering::Relaxed) as _,
                             (*ent).length,
@@ -6823,7 +6823,7 @@ pub(crate) unsafe extern "C" fn xmlStringDecodeEntitiesInt(
 
                         (*ent).flags |= XML_ENT_EXPANDING as i32;
                         (*ctxt).depth += 1;
-                        rep = xmlStringDecodeEntitiesInt(
+                        rep = xml_string_decode_entities_int(
                             ctxt,
                             (*ent).content.load(Ordering::Relaxed) as _,
                             (*ent).length,
@@ -6958,7 +6958,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                 if c == b'&' as i32 {
                     in_space = 0;
                     if NXT!(ctxt, 1) == b'#' {
-                        let val: c_int = xmlParseCharRef(ctxt);
+                        let val: c_int = xml_parse_char_ref(ctxt);
 
                         if val == b'&' as i32 {
                             if (*ctxt).replace_entities != 0 {
@@ -7031,7 +7031,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                                 }
 
                                 (*ctxt).depth += 1;
-                                rep = xmlStringDecodeEntitiesInt(
+                                rep = xml_string_decode_entities_int(
                                     ctxt,
                                     (*ent).content.load(Ordering::Relaxed),
                                     (*ent).length,
@@ -7092,7 +7092,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                                     (*ctxt).sizeentcopy = (*ent).length as _;
 
                                     (*ctxt).depth += 1;
-                                    rep = xmlStringDecodeEntitiesInt(
+                                    rep = xml_string_decode_entities_int(
                                         ctxt,
                                         (*ent).content.load(Ordering::Relaxed),
                                         (*ent).length,
@@ -7937,7 +7937,7 @@ unsafe extern "C" fn xml_ctxt_grow_attrs(ctxt: XmlParserCtxtPtr, nr: c_int) -> c
  *
  * Returns the element name parsed
  */
-pub(crate) unsafe extern "C" fn xmlParseStartTag2(
+pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     ctxt: XmlParserCtxtPtr,
     pref: *mut *const XmlChar,
     uri: *mut *const XmlChar,
@@ -9766,7 +9766,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             // 			xmlGenericError(xmlGenericErrorContext,
                             // 				c"PP: Parsing XML Decl\n".as_ptr() as _);
                             // #endif
-                            xmlParseXMLDecl(ctxt);
+                            xml_parse_xmldecl(ctxt);
                             if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
                                 /*
                                  * The XML REC instructs us to stop parsing right
@@ -9862,7 +9862,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     #[cfg(feature = "sax1")]
                     {
                         if (*ctxt).sax2 != 0 {
-                            name = xmlParseStartTag2(
+                            name = xml_parse_start_tag2(
                                 ctxt,
                                 addr_of_mut!(prefix),
                                 addr_of_mut!(uri),
@@ -9874,7 +9874,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     }
                     #[cfg(not(feature = "sax1"))]
                     {
-                        name = xmlParseStartTag2(
+                        name = xml_parse_start_tag2(
                             ctxt,
                             addr_of_mut!(prefix),
                             addr_of_mut!(uri),
@@ -11102,7 +11102,7 @@ macro_rules! DICT_FREE {
  *
  * Reset a parser context
  */
-pub unsafe extern "C" fn xmlCtxtReset(ctxt: XmlParserCtxtPtr) {
+pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     let mut input: XmlParserInputPtr;
 
     if ctxt.is_null() {
@@ -11213,7 +11213,7 @@ pub unsafe extern "C" fn xmlCtxtReset(ctxt: XmlParserCtxtPtr) {
  *
  * Returns 0 in case of success and 1 in case of error
  */
-pub unsafe extern "C" fn xmlCtxtResetPush(
+pub unsafe extern "C" fn xml_ctxt_reset_push(
     ctxt: XmlParserCtxtPtr,
     chunk: *const c_char,
     size: c_int,
@@ -11240,7 +11240,7 @@ pub unsafe extern "C" fn xmlCtxtResetPush(
         return 1;
     }
 
-    xmlCtxtReset(ctxt);
+    xml_ctxt_reset(ctxt);
 
     if filename.is_null() {
         (*ctxt).directory = null_mut();
@@ -11310,7 +11310,7 @@ pub unsafe extern "C" fn xmlCtxtResetPush(
  * Returns 0 in case of success, the set of unknown or unimplemented options
  *         in case of error.
  */
-pub unsafe extern "C" fn xmlCtxtUseOptions(ctxt: XmlParserCtxtPtr, options: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ctxt_use_options(ctxt: XmlParserCtxtPtr, options: c_int) -> c_int {
     xml_ctxt_use_options_internal(ctxt, options, null())
 }
 
@@ -11326,7 +11326,7 @@ pub unsafe extern "C" fn xmlCtxtUseOptions(ctxt: XmlParserCtxtPtr, options: c_in
  *
  * Returns the resulting document tree or NULL
  */
-unsafe extern "C" fn xmlDoRead(
+unsafe extern "C" fn xml_do_read(
     ctxt: XmlParserCtxtPtr,
     url: *const c_char,
     encoding: *const c_char,
@@ -11379,7 +11379,7 @@ unsafe extern "C" fn xmlDoRead(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlReadDoc(
+pub unsafe extern "C" fn xml_read_doc(
     cur: *const XmlChar,
     url: *const c_char,
     encoding: *const c_char,
@@ -11394,7 +11394,7 @@ pub unsafe extern "C" fn xmlReadDoc(
     if ctxt.is_null() {
         return null_mut();
     }
-    xmlDoRead(ctxt, url, encoding, options, 0)
+    xml_do_read(ctxt, url, encoding, options, 0)
 }
 
 /**
@@ -11407,7 +11407,7 @@ pub unsafe extern "C" fn xmlReadDoc(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlReadFile(
+pub unsafe extern "C" fn xml_read_file(
     filename: *const c_char,
     encoding: *const c_char,
     options: c_int,
@@ -11417,7 +11417,7 @@ pub unsafe extern "C" fn xmlReadFile(
     if ctxt.is_null() {
         return null_mut();
     }
-    xmlDoRead(ctxt, null_mut(), encoding, options, 0)
+    xml_do_read(ctxt, null_mut(), encoding, options, 0)
 }
 
 /**
@@ -11432,7 +11432,7 @@ pub unsafe extern "C" fn xmlReadFile(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlReadMemory(
+pub unsafe extern "C" fn xml_read_memory(
     buffer: *const c_char,
     size: c_int,
     url: *const c_char,
@@ -11445,7 +11445,7 @@ pub unsafe extern "C" fn xmlReadMemory(
     if ctxt.is_null() {
         return null_mut();
     }
-    xmlDoRead(ctxt, url, encoding, options, 0)
+    xml_do_read(ctxt, url, encoding, options, 0)
 }
 
 /**
@@ -11461,7 +11461,7 @@ pub unsafe extern "C" fn xmlReadMemory(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlReadFd(
+pub unsafe extern "C" fn xml_read_fd(
     fd: c_int,
     url: *const c_char,
     encoding: *const c_char,
@@ -11491,7 +11491,7 @@ pub unsafe extern "C" fn xmlReadFd(
         return null_mut();
     }
     input_push(ctxt, stream);
-    xmlDoRead(ctxt, url, encoding, options, 0)
+    xml_do_read(ctxt, url, encoding, options, 0)
 }
 
 /**
@@ -11507,7 +11507,7 @@ pub unsafe extern "C" fn xmlReadFd(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlReadIO(
+pub unsafe extern "C" fn xml_read_io(
     ioread: Option<XmlInputReadCallback>,
     ioclose: Option<XmlInputCloseCallback>,
     ioctx: *mut c_void,
@@ -11541,7 +11541,7 @@ pub unsafe extern "C" fn xmlReadIO(
         return null_mut();
     }
     input_push(ctxt, stream);
-    xmlDoRead(ctxt, url, encoding, options, 0)
+    xml_do_read(ctxt, url, encoding, options, 0)
 }
 
 /**
@@ -11557,7 +11557,7 @@ pub unsafe extern "C" fn xmlReadIO(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlCtxtReadDoc(
+pub unsafe extern "C" fn xml_ctxt_read_doc(
     ctxt: XmlParserCtxtPtr,
     cur: *const XmlChar,
     url: *const c_char,
@@ -11567,7 +11567,7 @@ pub unsafe extern "C" fn xmlCtxtReadDoc(
     if cur.is_null() {
         return null_mut();
     }
-    xmlCtxtReadMemory(ctxt, cur as _, xml_strlen(cur), url, encoding, options)
+    xml_ctxt_read_memory(ctxt, cur as _, xml_strlen(cur), url, encoding, options)
 }
 
 /**
@@ -11582,7 +11582,7 @@ pub unsafe extern "C" fn xmlCtxtReadDoc(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlCtxtReadFile(
+pub unsafe extern "C" fn xml_ctxt_read_file(
     ctxt: XmlParserCtxtPtr,
     filename: *const c_char,
     encoding: *const c_char,
@@ -11596,14 +11596,14 @@ pub unsafe extern "C" fn xmlCtxtReadFile(
     }
     xml_init_parser();
 
-    xmlCtxtReset(ctxt);
+    xml_ctxt_reset(ctxt);
 
     let stream: XmlParserInputPtr = xml_load_external_entity(filename, null(), ctxt);
     if stream.is_null() {
         return null_mut();
     }
     input_push(ctxt, stream);
-    xmlDoRead(ctxt, null_mut(), encoding, options, 1)
+    xml_do_read(ctxt, null_mut(), encoding, options, 1)
 }
 
 /**
@@ -11620,7 +11620,7 @@ pub unsafe extern "C" fn xmlCtxtReadFile(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlCtxtReadMemory(
+pub unsafe extern "C" fn xml_ctxt_read_memory(
     ctxt: XmlParserCtxtPtr,
     buffer: *const c_char,
     size: c_int,
@@ -11636,7 +11636,7 @@ pub unsafe extern "C" fn xmlCtxtReadMemory(
     }
     xml_init_parser();
 
-    xmlCtxtReset(ctxt);
+    xml_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
         xmlParserInputBufferCreateMem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
@@ -11652,7 +11652,7 @@ pub unsafe extern "C" fn xmlCtxtReadMemory(
     }
 
     input_push(ctxt, stream);
-    xmlDoRead(ctxt, url, encoding, options, 1)
+    xml_do_read(ctxt, url, encoding, options, 1)
 }
 
 /**
@@ -11670,7 +11670,7 @@ pub unsafe extern "C" fn xmlCtxtReadMemory(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlCtxtReadFd(
+pub unsafe extern "C" fn xml_ctxt_read_fd(
     ctxt: XmlParserCtxtPtr,
     fd: c_int,
     url: *const c_char,
@@ -11685,7 +11685,7 @@ pub unsafe extern "C" fn xmlCtxtReadFd(
     }
     xml_init_parser();
 
-    xmlCtxtReset(ctxt);
+    xml_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
         xmlParserInputBufferCreateFd(fd, XmlCharEncoding::XmlCharEncodingNone);
@@ -11700,7 +11700,7 @@ pub unsafe extern "C" fn xmlCtxtReadFd(
         return null_mut();
     }
     input_push(ctxt, stream);
-    xmlDoRead(ctxt, url, encoding, options, 1)
+    xml_do_read(ctxt, url, encoding, options, 1)
 }
 
 /**
@@ -11718,7 +11718,7 @@ pub unsafe extern "C" fn xmlCtxtReadFd(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xmlCtxtReadIO(
+pub unsafe extern "C" fn xml_ctxt_read_io(
     ctxt: XmlParserCtxtPtr,
     ioread: Option<XmlInputReadCallback>,
     ioclose: Option<XmlInputCloseCallback>,
@@ -11735,7 +11735,7 @@ pub unsafe extern "C" fn xmlCtxtReadIO(
     }
     xml_init_parser();
 
-    xmlCtxtReset(ctxt);
+    xml_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
         xmlParserInputBufferCreateIO(ioread, ioclose, ioctx, XmlCharEncoding::XmlCharEncodingNone);
@@ -11752,7 +11752,7 @@ pub unsafe extern "C" fn xmlCtxtReadIO(
         return null_mut();
     }
     input_push(ctxt, stream);
-    xmlDoRead(ctxt, url, encoding, options, 1)
+    xml_do_read(ctxt, url, encoding, options, 1)
 }
 
 /*
@@ -11814,7 +11814,7 @@ pub enum XmlFeature {
  * Returns zero (0) if the feature does not exist or an unknown
  * unknown feature is requested, non-zero otherwise.
  */
-pub fn xmlHasFeature(feature: Option<XmlFeature>) -> bool {
+pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
     match feature {
         Some(XmlFeature::XmlWithThread) => {
             cfg!(feature = "thread")
@@ -11924,7 +11924,7 @@ pub fn xmlHasFeature(feature: Option<XmlFeature>) -> bool {
  *                case publicID receives PubidLiteral, is strict is off
  *                it is possible to return NULL and have publicID set.
  */
-pub(crate) unsafe extern "C" fn xmlParseExternalID(
+pub(crate) unsafe extern "C" fn xml_parse_external_id(
     ctxt: XmlParserCtxtPtr,
     public_id: *mut *mut XmlChar,
     strict: c_int,
@@ -11954,7 +11954,7 @@ pub(crate) unsafe extern "C" fn xmlParseExternalID(
                 c"Space required after 'PUBLIC'\n".as_ptr() as _,
             );
         }
-        *public_id = xmlParsePubidLiteral(ctxt);
+        *public_id = xml_parse_pubid_literal(ctxt);
         if (*public_id).is_null() {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrPubidRequired, null());
         }
@@ -12003,7 +12003,7 @@ pub(crate) unsafe extern "C" fn xmlParseExternalID(
  *
  * Returns the PubidLiteral parsed or NULL.
  */
-pub(crate) unsafe extern "C" fn xmlParsePubidLiteral(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
+pub(crate) unsafe extern "C" fn xml_parse_pubid_literal(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: *mut XmlChar;
     let mut len: c_int = 0;
     let mut size: c_int = XML_PARSER_BUFFER_SIZE as i32;
@@ -12090,7 +12090,7 @@ pub(crate) unsafe extern "C" fn xmlParsePubidLiteral(ctxt: XmlParserCtxtPtr) -> 
  *
  * See the NOTE on xmlParseExternalID().
  */
-pub(crate) unsafe extern "C" fn xmlParseNotationDecl(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
     let name: *const XmlChar;
     let mut pubid: *mut XmlChar = null_mut();
     let systemid: *mut XmlChar;
@@ -12149,7 +12149,7 @@ pub(crate) unsafe extern "C" fn xmlParseNotationDecl(ctxt: XmlParserCtxtPtr) {
         /*
          * Parse the IDs.
          */
-        systemid = xmlParseExternalID(ctxt, addr_of_mut!(pubid), 0);
+        systemid = xml_parse_external_id(ctxt, addr_of_mut!(pubid), 0);
         SKIP_BLANKS!(ctxt);
 
         if RAW!(ctxt) == b'>' {
@@ -12202,7 +12202,7 @@ pub(crate) unsafe extern "C" fn xmlParseNotationDecl(ctxt: XmlParserCtxtPtr) {
  * [ VC: Notation Declared ]
  * The Name must match the declared name of a notation.
  */
-pub(crate) unsafe extern "C" fn xmlParseEntityDecl(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
     let name: *const XmlChar;
     let mut value: *mut XmlChar = null_mut();
     let mut uri: *mut XmlChar = null_mut();
@@ -12287,7 +12287,7 @@ pub(crate) unsafe extern "C" fn xmlParseEntityDecl(ctxt: XmlParserCtxtPtr) {
                     }
                 }
             } else {
-                uri = xmlParseExternalID(ctxt, addr_of_mut!(literal), 1);
+                uri = xml_parse_external_id(ctxt, addr_of_mut!(literal), 1);
                 if uri.is_null() && literal.is_null() {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrValueRequired, null());
                 }
@@ -12384,7 +12384,7 @@ pub(crate) unsafe extern "C" fn xmlParseEntityDecl(ctxt: XmlParserCtxtPtr) {
                 );
             }
         } else {
-            uri = xmlParseExternalID(ctxt, addr_of_mut!(literal), 1);
+            uri = xml_parse_external_id(ctxt, addr_of_mut!(literal), 1);
             if uri.is_null() && literal.is_null() {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrValueRequired, null());
             }
@@ -12770,7 +12770,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
  * Returns the tree of xmlElementContentPtr describing the element
  *          hierarchy.
  */
-pub(crate) unsafe extern "C" fn xmlParseElementChildrenContentDeclPriv(
+pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl_priv(
     ctxt: XmlParserCtxtPtr,
     inputchk: c_int,
     depth: c_int,
@@ -12797,7 +12797,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
         /* Recurse on first child */
         NEXT!(ctxt);
         SKIP_BLANKS!(ctxt);
-        cur = xmlParseElementChildrenContentDeclPriv(ctxt, inputid, depth + 1);
+        cur = xml_parse_element_children_content_decl_priv(ctxt, inputid, depth + 1);
         ret = cur;
         if cur.is_null() {
             return null_mut();
@@ -12971,7 +12971,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
             /* Recurse on second child */
             NEXT!(ctxt);
             SKIP_BLANKS!(ctxt);
-            last = xmlParseElementChildrenContentDeclPriv(ctxt, inputid, depth + 1);
+            last = xml_parse_element_children_content_decl_priv(ctxt, inputid, depth + 1);
             if last.is_null() {
                 if !ret.is_null() {
                     xml_free_doc_element_content((*ctxt).my_doc, ret);
@@ -13145,7 +13145,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
  *
  * Returns the type of the element, or -1 in case of error
  */
-pub(crate) unsafe extern "C" fn xmlParseElementDecl(ctxt: XmlParserCtxtPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> c_int {
     let name: *const XmlChar;
     let mut ret: c_int = -1;
     let mut content: XmlElementContentPtr = null_mut();
@@ -13292,9 +13292,9 @@ pub(crate) unsafe extern "C" fn xml_parse_markup_decl(ctxt: XmlParserCtxtPtr) {
             match NXT!(ctxt, 2) {
                 b'E' => {
                     if NXT!(ctxt, 3) == b'L' {
-                        xmlParseElementDecl(ctxt);
+                        xml_parse_element_decl(ctxt);
                     } else if NXT!(ctxt, 3) == b'N' {
-                        xmlParseEntityDecl(ctxt);
+                        xml_parse_entity_decl(ctxt);
                     } else {
                         SKIP!(ctxt, 2);
                     }
@@ -13303,7 +13303,7 @@ pub(crate) unsafe extern "C" fn xml_parse_markup_decl(ctxt: XmlParserCtxtPtr) {
                     xml_parse_attribute_list_decl(ctxt);
                 }
                 b'N' => {
-                    xmlParseNotationDecl(ctxt);
+                    xml_parse_notation_decl(ctxt);
                 }
                 b'-' => {
                     xml_parse_comment(ctxt);
@@ -13346,7 +13346,7 @@ pub(crate) unsafe extern "C" fn xml_parse_markup_decl(ctxt: XmlParserCtxtPtr) {
  *
  * Returns the value parsed (as an c_int), 0 in case of error
  */
-pub(crate) unsafe extern "C" fn xmlParseCharRef(ctxt: XmlParserCtxtPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> c_int {
     let mut val: c_int = 0;
     let mut count: c_int = 0;
 
@@ -13479,7 +13479,7 @@ pub(crate) unsafe extern "C" fn xmlParseCharRef(ctxt: XmlParserCtxtPtr) -> c_int
  *
  * [21] CDEnd ::= ']]>'
  */
-pub(crate) unsafe extern "C" fn xmlParseCDSect(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
     let mut buf: *mut XmlChar = null_mut();
     let mut len: c_int = 0;
     let mut size: c_int = XML_PARSER_BUFFER_SIZE as i32;
@@ -13629,7 +13629,7 @@ pub(crate) unsafe extern "C" fn xmlParseCDSect(ctxt: XmlParserCtxtPtr) {
  * start-tag.
  *
  */
-pub(crate) unsafe extern "C" fn xmlParseElement(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe extern "C" fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
     if xml_parse_element_start(ctxt) != 0 {
         return;
     }
@@ -13670,7 +13670,7 @@ pub(crate) unsafe extern "C" fn xmlParseElement(ctxt: XmlParserCtxtPtr) {
  *
  * Returns the string giving the XML version number, or NULL
  */
-pub(crate) unsafe extern "C" fn xmlParseVersionNum(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
+pub(crate) unsafe extern "C" fn xml_parse_version_num(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: *mut XmlChar;
     let mut len: c_int = 0;
     let mut size: c_int = 10;
@@ -13730,7 +13730,7 @@ pub(crate) unsafe extern "C" fn xmlParseVersionNum(ctxt: XmlParserCtxtPtr) -> *m
  *
  * Returns the encoding name value or NULL
  */
-pub(crate) unsafe extern "C" fn xmlParseEncName(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
+pub(crate) unsafe extern "C" fn xml_parse_enc_name(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: *mut XmlChar = null_mut();
     let mut len: c_int = 0;
     let mut size: c_int = 10;
@@ -13801,7 +13801,7 @@ pub(crate) unsafe extern "C" fn xmlParseEncName(ctxt: XmlParserCtxtPtr) -> *mut 
  *
  * [23] XMLDecl ::= '<?xml' VersionInfo EncodingDecl? SDDecl? S? '?>'
  */
-pub(crate) unsafe extern "C" fn xmlParseXMLDecl(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
     /*
      * This value for standalone indicates that the document has an
      * XML declaration but it does not have a standalone attribute.
@@ -13944,7 +13944,7 @@ pub(crate) unsafe extern "C" fn xmlParseXMLDecl(ctxt: XmlParserCtxtPtr) {
  *
  * [77] TextDecl ::= '<?xml' VersionInfo? EncodingDecl S? '?>'
  */
-pub(crate) unsafe extern "C" fn xmlParseTextDecl(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
     let mut version: *mut XmlChar;
 
     /*
@@ -14042,7 +14042,7 @@ pub(crate) unsafe extern "C" fn xmlParseTextDecl(ctxt: XmlParserCtxtPtr) {
  *
  * Returns the number of space chars skipped
  */
-pub(crate) unsafe extern "C" fn xmlSkipBlankChars(ctxt: XmlParserCtxtPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> c_int {
     let mut res: c_int = 0;
 
     /*
@@ -14329,7 +14329,7 @@ mod tests {
                                 let encoding = gen_const_char_ptr(n_encoding, 3);
                                 let options = gen_parseroptions(n_options, 4);
 
-                                let ret_val = xmlCtxtReadDoc(ctxt, cur, url, encoding, options);
+                                let ret_val = xml_ctxt_read_doc(ctxt, cur, url, encoding, options);
                                 desret_xml_doc_ptr(ret_val);
                                 des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                                 des_const_xml_char_ptr(n_cur, cur, 1);
@@ -14373,7 +14373,7 @@ mod tests {
                             let encoding = gen_const_char_ptr(n_encoding, 2);
                             let options = gen_parseroptions(n_options, 3);
 
-                            let ret_val = xmlCtxtReadFile(ctxt, filename, encoding, options);
+                            let ret_val = xml_ctxt_read_file(ctxt, filename, encoding, options);
                             desret_xml_doc_ptr(ret_val);
                             des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                             des_filepath(n_filename, filename, 1);
@@ -14421,7 +14421,7 @@ mod tests {
                                         size = 0;
                                     }
 
-                                    let ret_val = xmlCtxtReadMemory(
+                                    let ret_val = xml_ctxt_read_memory(
                                         ctxt, buffer, size, url, encoding, options,
                                     );
                                     desret_xml_doc_ptr(ret_val);
@@ -14464,7 +14464,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
 
-                xmlCtxtReset(ctxt);
+                xml_ctxt_reset(ctxt);
                 des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                 xmlResetLastError();
                 if mem_base != xml_mem_blocks() {
@@ -14501,7 +14501,7 @@ mod tests {
                                 }
 
                                 let ret_val =
-                                    xmlCtxtResetPush(ctxt, chunk, size, filename, encoding);
+                                    xml_ctxt_reset_push(ctxt, chunk, size, filename, encoding);
                                 desret_int(ret_val);
                                 des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                                 des_const_char_ptr(n_chunk, chunk, 1);
@@ -14541,7 +14541,7 @@ mod tests {
                     let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
                     let options = gen_parseroptions(n_options, 1);
 
-                    let ret_val = xmlCtxtUseOptions(ctxt, options);
+                    let ret_val = xml_ctxt_use_options(ctxt, options);
                     desret_int(ret_val);
                     des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_parseroptions(n_options, options, 1);
@@ -14576,7 +14576,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let feature = gen_xml_feature(n_feature, 0);
 
-                let ret_val = xmlHasFeature(feature);
+                let ret_val = xml_has_feature(feature);
                 desret_int(ret_val as _);
                 des_xml_feature(n_feature, feature, 0);
                 xmlResetLastError();
@@ -15673,7 +15673,8 @@ mod tests {
                             let encoding = gen_const_char_ptr(n_encoding, 2);
                             let options = gen_parseroptions(n_options, 3);
 
-                            let ret_val = xmlReadDoc(cur as *const XmlChar, url, encoding, options);
+                            let ret_val =
+                                xml_read_doc(cur as *const XmlChar, url, encoding, options);
                             desret_xml_doc_ptr(ret_val);
                             des_const_xml_char_ptr(n_cur, cur, 0);
                             des_filepath(n_url, url, 1);
@@ -15712,7 +15713,7 @@ mod tests {
                         let encoding = gen_const_char_ptr(n_encoding, 1);
                         let options = gen_parseroptions(n_options, 2);
 
-                        let ret_val = xmlReadFile(filename, encoding, options);
+                        let ret_val = xml_read_file(filename, encoding, options);
                         desret_xml_doc_ptr(ret_val);
                         des_filepath(n_filename, filename, 0);
                         des_const_char_ptr(n_encoding, encoding, 1);
@@ -15755,7 +15756,7 @@ mod tests {
                                     size = 0;
                                 }
 
-                                let ret_val = xmlReadMemory(buffer, size, url, encoding, options);
+                                let ret_val = xml_read_memory(buffer, size, url, encoding, options);
                                 desret_xml_doc_ptr(ret_val);
                                 des_const_char_ptr(n_buffer, buffer, 0);
                                 des_int(n_size, size, 1);

@@ -8,8 +8,8 @@ use exml::libxml::{
     encoding::XmlCharEncoding,
     globals::{xml_free, xml_malloc},
     parser::{
-        xmlCtxtReset, xmlReadMemory, xml_cleanup_parser, xml_free_parser_ctxt, xml_new_parser_ctxt,
-        XmlParserCtxtPtr, XmlParserInputPtr,
+        xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt,
+        xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
     },
     parser_internals::{input_push, xml_current_char, xml_new_input_stream},
     tree::{xml_buf_content, xml_free_doc, XmlDocPtr},
@@ -68,11 +68,11 @@ unsafe extern "C" fn test_document_range_byte1(
 ) -> c_int {
     for i in 0u8..=0xFF {
         LAST_ERROR = 0;
-        xmlCtxtReset(ctxt);
+        xml_ctxt_reset(ctxt);
 
         *data.add(0) = i as c_char;
 
-        let res = xmlReadMemory(document, len, c"test".as_ptr() as _, null_mut(), 0);
+        let res = xml_read_memory(document, len, c"test".as_ptr() as _, null_mut(), 0);
 
         if i as i32 == forbid1 || i as i32 == forbid2 {
             assert!(
@@ -114,12 +114,12 @@ unsafe extern "C" fn test_document_range_byte2(
     for i in 0x80..=0xFF {
         for j in 0..=0xFF {
             LAST_ERROR = 0;
-            xmlCtxtReset(ctxt);
+            xml_ctxt_reset(ctxt);
 
             *data.add(0) = i as c_char;
             *data.add(1) = j as c_char;
 
-            let res = xmlReadMemory(document, len, c"test".as_ptr() as _, null_mut(), 0);
+            let res = xml_read_memory(document, len, c"test".as_ptr() as _, null_mut(), 0);
 
             #[allow(clippy::if_same_then_else)]
             /* if first bit of first c_char is set, then second bit must too */
@@ -813,7 +813,7 @@ unsafe extern "C" fn test_user_encoding() -> c_int {
         k += 1;
     }
 
-    let doc: XmlDocPtr = xmlReadMemory(
+    let doc: XmlDocPtr = xml_read_memory(
         buf as _,
         2 * total_size,
         null_mut(),

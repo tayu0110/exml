@@ -22,7 +22,7 @@ use crate::libxml::{
     },
     list::{xml_list_create, xml_list_delete, XmlLinkPtr, XmlList, XmlListPtr},
     parser::{
-        xmlReadMemory, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlFeature, XmlParserCtxt,
+        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_memory, XmlFeature, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq,
         XmlParserNodeInfoSeqPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
         XmlSaxlocatorPtr,
@@ -1730,7 +1730,7 @@ unsafe extern "C" fn get_api_root() -> XmlNodePtr {
 
 unsafe extern "C" fn get_api_doc() -> XmlDocPtr {
     if API_DOC.load(Ordering::Relaxed).is_null() {
-        API_DOC.store(xmlReadMemory(c"<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_ptr() as _, 88, c"root_test".as_ptr() as _, null_mut(), 0), Ordering::Relaxed);
+        API_DOC.store(xml_read_memory(c"<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_ptr() as _, 88, c"root_test".as_ptr() as _, null_mut(), 0), Ordering::Relaxed);
         API_ROOT.store(null_mut(), Ordering::Relaxed);
         API_ATTR.store(null_mut(), Ordering::Relaxed);
     }
@@ -2037,7 +2037,7 @@ pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: c_int, _nr: c_int) -> XmlDoc
         return xml_new_doc(c"1.0".as_ptr() as _);
     }
     if no == 1 {
-        return xmlReadMemory(
+        return xml_read_memory(
             c"<foo/>".as_ptr() as _,
             6,
             c"test".as_ptr() as _,
@@ -2046,7 +2046,7 @@ pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: c_int, _nr: c_int) -> XmlDoc
         );
     }
     if no == 2 {
-        return xmlReadMemory(
+        return xml_read_memory(
             c"<!DOCTYPE foo []> <foo/>".as_ptr() as _,
             24,
             c"test".as_ptr() as _,

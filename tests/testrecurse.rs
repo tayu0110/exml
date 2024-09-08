@@ -25,7 +25,7 @@ use exml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         globals::xml_get_warnings_default_value,
         parser::{
-            xmlCtxtReadFile, xml_cleanup_parser, xml_free_parser_ctxt, xml_init_parser,
+            xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
         },
@@ -695,7 +695,7 @@ unsafe extern "C" fn recursive_detect_test(
     /*
      * base of the test, parse with the old API
      */
-    let doc: XmlDocPtr = xmlCtxtReadFile(ctxt, filename, null_mut(), parser_options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), parser_options);
     if !doc.is_null() || (*ctxt).last_error.code != XmlParserErrors::XmlErrEntityLoop as i32 {
         eprintln!(
             "Failed to detect recursion in {}",
@@ -742,7 +742,7 @@ unsafe extern "C" fn not_recursive_detect_test(
     /*
      * base of the test, parse with the old API
      */
-    let doc: XmlDocPtr = xmlCtxtReadFile(ctxt, filename, null_mut(), parser_options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), parser_options);
     if doc.is_null() {
         eprintln!(
             "Failed to parse correct file {}",
@@ -786,7 +786,7 @@ unsafe extern "C" fn not_recursive_huge_test(
     if options & OPT_NO_SUBST == 0 {
         parser_options |= XmlParserOption::XmlParseNoent as i32;
     }
-    let doc: XmlDocPtr = xmlCtxtReadFile(
+    let doc: XmlDocPtr = xml_ctxt_read_file(
         ctxt,
         c"test/recurse/huge.xml".as_ptr(),
         null_mut(),
@@ -906,7 +906,7 @@ unsafe extern "C" fn huge_dtd_test(
     if options & OPT_NO_SUBST == 0 {
         parser_options |= XmlParserOption::XmlParseNoent as i32;
     }
-    let doc: XmlDocPtr = xmlCtxtReadFile(
+    let doc: XmlDocPtr = xml_ctxt_read_file(
         ctxt,
         c"test/recurse/huge_dtd.xml".as_ptr(),
         null_mut(),

@@ -27,10 +27,10 @@ use crate::{
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTablePtr,
         },
         parser::{
-            xmlCtxtReadFile, xmlCtxtReadMemory, xml_free_parser_ctxt, xml_new_io_input_stream,
-            xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_parse_document, xml_stop_parser,
-            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
-            XmlSaxlocatorPtr, XML_SAX2_MAGIC,
+            xml_ctxt_read_file, xml_ctxt_read_memory, xml_free_parser_ctxt,
+            xml_new_io_input_stream, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
+            xml_parse_document, xml_stop_parser, XmlParserCtxtPtr, XmlParserInputPtr,
+            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr, XML_SAX2_MAGIC,
         },
         parser_internals::input_push,
         pattern::{
@@ -5866,7 +5866,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                     }
                     if !schema_location.is_null() {
                         /* Parse from file. */
-                        doc = xmlCtxtReadFile(
+                        doc = xml_ctxt_read_file(
                             parser_ctxt,
                             schema_location as _,
                             null_mut(),
@@ -5874,7 +5874,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                         );
                     } else if !schema_buffer.is_null() {
                         /* Parse from memory buffer. */
-                        doc = xmlCtxtReadMemory(
+                        doc = xml_ctxt_read_memory(
                             parser_ctxt,
                             schema_buffer,
                             schema_buffer_len,

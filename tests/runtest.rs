@@ -41,9 +41,9 @@ use exml::{
         },
         htmltree::htmlDocDumpMemory,
         parser::{
-            xmlCtxtUseOptions, xmlReadFd, xmlReadFile, xmlReadMemory, xml_cleanup_parser,
-            xml_free_parser_ctxt, xml_init_parser, xml_parse_document, xml_parse_file,
-            xml_pedantic_parser_default, xml_set_external_entity_loader, XmlParserCtxtPtr,
+            xml_cleanup_parser, xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser,
+            xml_parse_document, xml_parse_file, xml_pedantic_parser_default, xml_read_fd,
+            xml_read_file, xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr,
             XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSaxlocatorPtr, XML_SAX2_MAGIC,
         },
         parser_internals::xml_create_file_parser_ctxt,
@@ -2010,7 +2010,7 @@ unsafe extern "C" fn sax_parse_test(
             addr_of_mut!(EMPTY_SAXHANDLER_STRUCT) as _,
             size_of::<XmlSAXHandler>(),
         );
-        xmlCtxtUseOptions(ctxt, options);
+        xml_ctxt_use_options(ctxt, options);
         xml_parse_document(ctxt);
         ret = if (*ctxt).well_formed != 0 {
             0
@@ -2029,7 +2029,7 @@ unsafe extern "C" fn sax_parse_test(
             addr_of_mut!(EMPTY_SAXHANDLER_STRUCT),
             sizeof(XmlSAXHandler),
         );
-        xmlCtxtUseOptions(ctxt, options);
+        xml_ctxt_use_options(ctxt, options);
         xml_parse_document(ctxt);
         ret = if (*ctxt).wellFormed { 0 } else { (*ctxt).errNo };
         xml_free_doc((*ctxt).myDoc);
@@ -2072,7 +2072,7 @@ unsafe extern "C" fn sax_parse_test(
                     size_of::<XmlSAXHandler>(),
                 );
             }
-            xmlCtxtUseOptions(ctxt, options);
+            xml_ctxt_use_options(ctxt, options);
             xml_parse_document(ctxt);
             ret = if (*ctxt).well_formed != 0 {
                 0
@@ -2099,7 +2099,7 @@ unsafe extern "C" fn sax_parse_test(
                     size_of::<XmlSAXHandler>(),
                 );
             }
-            xmlCtxtUseOptions(ctxt, options);
+            xml_ctxt_use_options(ctxt, options);
             xml_parse_document(ctxt);
             ret = if (*ctxt).well_formed != 0 {
                 0
@@ -2167,7 +2167,7 @@ unsafe extern "C" fn old_parse_test(
     #[cfg(feature = "sax1")]
     let mut doc = xml_parse_file(filename);
     #[cfg(not(feature = "sax1"))]
-    let doc = xmlReadFile(filename, NULL, 0);
+    let doc = xml_read_file(filename, NULL, 0);
     if doc.is_null() {
         return 1;
     }
@@ -2198,7 +2198,7 @@ unsafe extern "C" fn old_parse_test(
     }
     #[cfg(not(feature = "sax1"))]
     {
-        doc = xmlReadFile(temp, null_mut(), 0);
+        doc = xml_read_file(temp, null_mut(), 0);
     }
     if doc.is_null() {
         return 1;
@@ -2289,7 +2289,7 @@ unsafe extern "C" fn push_parse_test(
         chunk_size,
         filename,
     );
-    xmlCtxtUseOptions(ctxt, options);
+    xml_ctxt_use_options(ctxt, options);
     cur += chunk_size;
     chunk_size = 1024;
     'b: while {
@@ -2632,7 +2632,7 @@ unsafe extern "C" fn push_boundary_test(
     #[cfg(not(feature = "html"))]
     let ctxt =
         xml_create_push_parser_ctxt(addr_of_mut!(bndSAX) as _, null_mut(), base, 1, filename);
-    xmlCtxtUseOptions(ctxt, options);
+    xml_ctxt_use_options(ctxt, options);
     cur = 1;
     consumed = 0;
     num_callbacks = 0;
@@ -2869,7 +2869,7 @@ unsafe extern "C" fn mem_parse_test(
         return -1;
     }
 
-    let doc: XmlDocPtr = xmlReadMemory(base, size, filename, null_mut(), 0);
+    let doc: XmlDocPtr = xml_read_memory(base, size, filename, null_mut(), 0);
     unload_mem(base);
     if doc.is_null() {
         return 1;
@@ -2921,7 +2921,7 @@ unsafe extern "C" fn noent_parse_test(
     /*
      * base of the test, parse with the old API
      */
-    doc = xmlReadFile(filename, null_mut(), options);
+    doc = xml_read_file(filename, null_mut(), options);
     if doc.is_null() {
         return 1;
     }
@@ -2946,7 +2946,7 @@ unsafe extern "C" fn noent_parse_test(
     /*
      * Parse the saved result to make sure the round trip is okay
      */
-    doc = xmlReadFile(filename, null_mut(), options);
+    doc = xml_read_file(filename, null_mut(), options);
     if doc.is_null() {
         return 1;
     }
@@ -2994,14 +2994,14 @@ unsafe extern "C" fn err_parse_test(
     {
         #[cfg(feature = "xinclude")]
         {
-            doc = xmlReadFile(filename, null_mut(), options);
+            doc = xml_read_file(filename, null_mut(), options);
             if xml_xinclude_process_flags(doc, options) < 0 {
                 xml_free_doc(doc);
                 doc = null_mut();
             }
         }
     } else {
-        doc = xmlReadFile(filename, null_mut(), options);
+        doc = xml_read_file(filename, null_mut(), options);
     }
     if !result.is_null() {
         if doc.is_null() {
@@ -3092,10 +3092,10 @@ unsafe extern "C" fn fd_parse_test(
     let doc = if options & XML_PARSE_HTML != 0 {
         html_read_fd(fd, filename, null_mut(), options)
     } else {
-        xmlReadFd(fd, filename, null_mut(), options)
+        xml_read_fd(fd, filename, null_mut(), options)
     };
     #[cfg(not(feature = "html"))]
-    let doc = xmlReadFd(fd, filename, null_mut(), options);
+    let doc = xml_read_fd(fd, filename, null_mut(), options);
 
     close(fd);
     if !result.is_null() {
@@ -3381,7 +3381,7 @@ unsafe extern "C" fn walker_parse_test(
 ) -> c_int {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_walker};
 
-    let doc: XmlDocPtr = xmlReadFile(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
     if doc.is_null() {
         eprintln!(
             "Failed to parse {}",
@@ -3669,7 +3669,7 @@ unsafe extern "C" fn xpath_doc_test(
     let mut ret: c_int = 0;
     let mut res: c_int;
 
-    let xpath_document = xmlReadFile(
+    let xpath_document = xml_read_file(
         filename,
         null_mut(),
         options | XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
@@ -3749,7 +3749,7 @@ unsafe extern "C" fn xptr_doc_test(
         c"xptr".as_ptr()
     };
 
-    let xpath_document = xmlReadFile(
+    let xpath_document = xml_read_file(
         filename,
         null_mut(),
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
@@ -3821,7 +3821,7 @@ unsafe extern "C" fn xmlid_doc_test(
     let mut res: c_int = 0;
     let mut ret: c_int;
 
-    let xpath_document = xmlReadFile(
+    let xpath_document = xml_read_file(
         filename,
         null_mut(),
         options | XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
@@ -4232,7 +4232,7 @@ unsafe extern "C" fn urip_read(context: *mut c_void, buffer: *mut c_char, mut le
 }
 
 unsafe extern "C" fn urip_check_url(url: *const c_char) -> c_int {
-    let doc: XmlDocPtr = xmlReadFile(url, null_mut(), 0);
+    let doc: XmlDocPtr = xml_read_file(url, null_mut(), 0);
     if doc.is_null() {
         return -1;
     }
@@ -4319,7 +4319,7 @@ unsafe extern "C" fn schemas_one_test(
 
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xmlReadFile(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
     if doc.is_null() {
         eprintln!(
             "failed to parse instance {} for {}",
@@ -4576,7 +4576,7 @@ unsafe extern "C" fn rng_one_test(
 
     let mut ret: c_int;
 
-    let doc: XmlDocPtr = xmlReadFile(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
     if doc.is_null() {
         eprintln!(
             "failed to parse instance {} for {}",
@@ -5154,7 +5154,7 @@ unsafe extern "C" fn pattern_test(
                     size -= 1;
                     str[size] = 0;
                 }
-                doc = xmlReadFile(xml.as_ptr(), null_mut(), options);
+                doc = xml_read_file(xml.as_ptr(), null_mut(), options);
                 if doc.is_null() {
                     eprintln!(
                         "Failed to parse {}",
@@ -5282,7 +5282,7 @@ unsafe extern "C" fn load_xpath_expr(
     *xml_load_ext_dtd_default_value() = XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32;
     xml_substitute_entities_default(1);
 
-    let doc: XmlDocPtr = xmlReadFile(
+    let doc: XmlDocPtr = xml_read_file(
         filename,
         null_mut(),
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
@@ -5484,7 +5484,7 @@ unsafe extern "C" fn c14n_run_test(
     *xml_load_ext_dtd_default_value() = XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32;
     xml_substitute_entities_default(1);
 
-    let doc: XmlDocPtr = xmlReadFile(
+    let doc: XmlDocPtr = xml_read_file(
         xml_filename,
         null_mut(),
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
@@ -5832,7 +5832,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         }
         #[cfg(not(feature = "sax1"))]
         {
-            myDoc = xmlReadFile(filename, NULL, XML_WITH_CATALOG);
+            myDoc = xml_read_file(filename, NULL, XML_WITH_CATALOG);
         }
         if !my_doc.is_null() {
             xml_free_doc(my_doc);

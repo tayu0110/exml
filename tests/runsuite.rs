@@ -18,9 +18,9 @@ use std::{
 use exml::libxml::{
     globals::{xml_free, xml_get_warnings_default_value},
     parser::{
-        xmlReadFile, xmlReadMemory, xml_cleanup_parser, xml_init_parser,
-        xml_pedantic_parser_default, xml_set_external_entity_loader, XmlParserCtxtPtr,
-        XmlParserInputPtr, XmlParserOption,
+        xml_cleanup_parser, xml_init_parser, xml_pedantic_parser_default, xml_read_file,
+        xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr,
+        XmlParserOption,
     },
     parser_internals::xml_new_string_input_stream,
     relaxng::{
@@ -589,7 +589,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
              */
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
-            doc = xmlReadMemory(
+            doc = xml_read_memory(
                 (*buf).content as *const c_char,
                 (*buf).using as _,
                 c"test".as_ptr(),
@@ -672,7 +672,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
              */
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
-            doc = xmlReadMemory(
+            doc = xml_read_memory(
                 (*buf).content as *const c_char,
                 (*buf).using as _,
                 c"test".as_ptr() as _,
@@ -775,7 +775,7 @@ unsafe extern "C" fn xsd_test(logfile: &mut Option<File>) -> c_int {
     let filename: &CStr = c"test/xsdtest/xsdtestsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xmlReadFile(
+    let doc: XmlDocPtr = xml_read_file(
         filename.as_ptr() as _,
         null_mut(),
         XmlParserOption::XmlParseNoent as _,
@@ -846,7 +846,7 @@ unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
     let filename: &CStr = c"test/relaxng/OASIS/spectest.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xmlReadFile(
+    let doc: XmlDocPtr = xml_read_file(
         filename.as_ptr() as _,
         null_mut(),
         XmlParserOption::XmlParseNoent as _,
@@ -893,7 +893,7 @@ unsafe extern "C" fn rng_test2(logfile: &mut Option<File>) -> c_int {
     let filename: &CStr = c"test/relaxng/testsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xmlReadFile(
+    let doc: XmlDocPtr = xml_read_file(
         filename.as_ptr() as _,
         null_mut(),
         XmlParserOption::XmlParseNoent as _,
@@ -1000,7 +1000,7 @@ unsafe extern "C" fn xstc_test_instance(
                 // goto done;
             } else {
                 NB_TESTS += 1;
-                doc = xmlReadFile(
+                doc = xml_read_file(
                     path as *const c_char,
                     null_mut(),
                     XmlParserOption::XmlParseNoent as i32,
@@ -1294,7 +1294,7 @@ unsafe extern "C" fn xstc_metadata(
     let mut name: *mut XmlChar;
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xmlReadFile(metadata, null_mut(), XmlParserOption::XmlParseNoent as _);
+    let doc: XmlDocPtr = xml_read_file(metadata, null_mut(), XmlParserOption::XmlParseNoent as _);
     if doc.is_null() {
         eprintln!(
             "Failed to parse {}",

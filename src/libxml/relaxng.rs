@@ -24,7 +24,7 @@ use crate::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_free,
             xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTable, XmlHashTablePtr,
         },
-        parser::{xmlReadFile, xmlReadMemory},
+        parser::{xml_read_file, xml_read_memory},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
         tree::{
             xml_add_child, xml_add_next_sibling, xml_add_prev_sibling, xml_copy_doc,
@@ -3315,7 +3315,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
     /*
      * load the document
      */
-    doc = xmlReadFile(url as _, null_mut(), 0);
+    doc = xml_read_file(url as _, null_mut(), 0);
     if doc.is_null() {
         xml_rng_perr(
             ctxt,
@@ -3636,7 +3636,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
     /*
      * load the document
      */
-    doc = xmlReadFile(url as _, null_mut(), 0);
+    doc = xml_read_file(url as _, null_mut(), 0);
     if doc.is_null() {
         xml_rng_perr(
             ctxt,
@@ -8802,7 +8802,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
      * First step is to parse the input document into an DOM/Infoset
      */
     if !(*ctxt).url.is_null() {
-        doc = xmlReadFile((*ctxt).url as _, null_mut(), 0);
+        doc = xml_read_file((*ctxt).url as _, null_mut(), 0);
         if doc.is_null() {
             xml_rng_perr(
                 ctxt,
@@ -8815,7 +8815,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
             return null_mut();
         }
     } else if !(*ctxt).buffer.is_null() {
-        doc = xmlReadMemory((*ctxt).buffer, (*ctxt).size, null_mut(), null_mut(), 0);
+        doc = xml_read_memory((*ctxt).buffer, (*ctxt).size, null_mut(), null_mut(), 0);
         if doc.is_null() {
             xml_rng_perr(
                 ctxt,

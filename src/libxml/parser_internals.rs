@@ -20,11 +20,11 @@ use crate::libxml::encoding::{xmlDetectCharEncoding, xmlFindCharEncodingHandler}
 use crate::libxml::entities::{xml_get_predefined_entity, XmlEntityPtr};
 use crate::libxml::globals::xml_generic_error_context;
 use crate::libxml::parser::{
-    ns_pop, xmlParseCDSect, xmlParseEncName, xmlParseExternalID, xmlParseStartTag2,
-    xmlParseTextDecl, xmlParseVersionNum, xmlStringDecodeEntitiesInt, xml_err_msg_str,
-    xml_fatal_err_msg, xml_fatal_err_msg_int, xml_parse_conditional_sections,
-    xml_parse_markup_decl, xml_parse_string_name, xml_parser_add_node_info, xml_validity_error,
-    XmlParserInputState, XmlSAXHandlerPtr,
+    ns_pop, xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_parse_cdsect,
+    xml_parse_conditional_sections, xml_parse_enc_name, xml_parse_external_id,
+    xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name, xml_parse_text_decl,
+    xml_parse_version_num, xml_parser_add_node_info, xml_string_decode_entities_int,
+    xml_validity_error, XmlParserInputState, XmlSAXHandlerPtr,
 };
 use crate::libxml::sax2::{xmlSAX2EndElement, xmlSAX2GetEntity, xmlSAX2StartElement};
 use crate::libxml::tree::{
@@ -63,16 +63,16 @@ use super::hash::{
     xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
 };
 use super::parser::{
-    name_ns_push, ns_push, space_pop, space_push, xmlParseCharRef,
-    xmlParseElementChildrenContentDeclPriv, xml_detect_sax2, xml_fatal_err_msg_str,
+    name_ns_push, ns_push, space_pop, space_push, xml_detect_sax2, xml_fatal_err_msg_str,
     xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_is_name_char,
     xml_load_external_entity, xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
-    xml_parse_att_value_internal, xml_parse_char_data_internal, xml_parse_end_tag1,
-    xml_parse_end_tag2, xml_parse_external_entity_private, xml_parser_entity_check,
-    xml_parser_find_node_info, xml_saturated_add, xml_saturated_add_size_t, xml_stop_parser,
-    xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput,
-    XmlParserInputPtr, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption,
-    XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SKIP_IDS,
+    xml_parse_att_value_internal, xml_parse_char_data_internal, xml_parse_char_ref,
+    xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
+    xml_parse_external_entity_private, xml_parser_entity_check, xml_parser_find_node_info,
+    xml_saturated_add, xml_saturated_add_size_t, xml_stop_parser, xml_warning_msg, XmlDefAttrs,
+    XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserMode,
+    XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
+    XML_SKIP_IDS,
 };
 use super::sax2::xmlSAX2IgnorableWhitespace;
 use super::tree::{
@@ -2567,7 +2567,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
      * so XML_SUBSTITUTE_REF is not set here.
      */
     (*ctxt).depth += 1;
-    ret = xmlStringDecodeEntitiesInt(
+    ret = xml_string_decode_entities_int(
         ctxt,
         buf,
         len,
@@ -2784,7 +2784,7 @@ macro_rules! SKIP {
 
 macro_rules! SKIP_BLANKS {
     ($ctxt:expr) => {
-        $crate::libxml::parser::xmlSkipBlankChars($ctxt)
+        $crate::libxml::parser::xml_skip_blank_chars($ctxt)
     };
 }
 
@@ -4279,7 +4279,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl(
     inputchk: c_int,
 ) -> XmlElementContentPtr {
     /* stub left for API/ABI compat */
-    xmlParseElementChildrenContentDeclPriv(ctxt, inputchk, 1)
+    xml_parse_element_children_content_decl_priv(ctxt, inputchk, 1)
 }
 
 /**
@@ -4327,7 +4327,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
         tree = xml_parse_element_mixed_content_decl(ctxt, inputid);
         res = XmlElementTypeVal::XmlElementTypeMixed as i32;
     } else {
-        tree = xmlParseElementChildrenContentDeclPriv(ctxt, inputid, 1);
+        tree = xml_parse_element_children_content_decl_priv(ctxt, inputid, 1);
         res = XmlElementTypeVal::XmlElementTypeElement as i32;
     }
     SKIP_BLANKS!(ctxt);
@@ -4832,7 +4832,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         let mut i: c_int = 0;
         let mut out: [XmlChar; 16] = [0; 16];
         let hex: c_int = NXT!(ctxt, 2) as _;
-        let value: c_int = xmlParseCharRef(ctxt);
+        let value: c_int = xml_parse_char_ref(ctxt);
 
         if value == 0 {
             return;
@@ -5551,7 +5551,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 if CMP5!(CUR_PTR!(ctxt), b'<', b'?', b'x', b'm', b'l')
                     && IS_BLANK_CH!(NXT!(ctxt, 5))
                 {
-                    xmlParseTextDecl(ctxt);
+                    xml_parse_text_decl(ctxt);
                 }
             }
         }
@@ -5602,7 +5602,7 @@ pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) 
     /*
      * Check for SystemID and ExternalID
      */
-    let uri: *mut XmlChar = xmlParseExternalID(ctxt, addr_of_mut!(external_id), 1);
+    let uri: *mut XmlChar = xml_parse_external_id(ctxt, addr_of_mut!(external_id), 1);
 
     if !uri.is_null() || !external_id.is_null() {
         (*ctxt).has_external_subset = 1;
@@ -6007,7 +6007,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     #[cfg(feature = "sax1")]
     {
         if (*ctxt).sax2 != 0 {
-            name = xmlParseStartTag2(
+            name = xml_parse_start_tag2(
                 ctxt,
                 addr_of_mut!(prefix),
                 addr_of_mut!(uri),
@@ -6019,7 +6019,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     }
     #[cfg(not(feature = "sax1"))]
     {
-        name = xmlParseStartTag2(
+        name = xml_parse_start_tag2(
             ctxt,
             addr_of_mut!(prefix),
             addr_of_mut!(uri),
@@ -6198,7 +6198,7 @@ pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPt
             b'A',
             b'['
         ) {
-            xmlParseCDSect(ctxt);
+            xml_parse_cdsect(ctxt);
         }
         /*
          * Third case :  a comment
@@ -6298,7 +6298,7 @@ pub(crate) unsafe extern "C" fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) == b'"' {
             NEXT!(ctxt);
-            version = xmlParseVersionNum(ctxt);
+            version = xml_parse_version_num(ctxt);
             if RAW!(ctxt) != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
@@ -6306,7 +6306,7 @@ pub(crate) unsafe extern "C" fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -
             }
         } else if RAW!(ctxt) == b'\'' {
             NEXT!(ctxt);
-            version = xmlParseVersionNum(ctxt);
+            version = xml_parse_version_num(ctxt);
             if RAW!(ctxt) != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
@@ -6358,7 +6358,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) == b'"' {
             NEXT!(ctxt);
-            encoding = xmlParseEncName(ctxt);
+            encoding = xml_parse_enc_name(ctxt);
             if RAW!(ctxt) != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
                 xml_free(encoding as _);
@@ -6368,7 +6368,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
             }
         } else if RAW!(ctxt) == b'\'' {
             NEXT!(ctxt);
-            encoding = xmlParseEncName(ctxt);
+            encoding = xml_parse_enc_name(ctxt);
             if RAW!(ctxt) != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
                 xml_free(encoding as _);
@@ -6612,7 +6612,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
     }
 
     if CMP5!(CUR_PTR!(ctxt), b'<', b'?', b'x', b'm', b'l') {
-        xmlParseTextDecl(ctxt);
+        xml_parse_text_decl(ctxt);
         if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
             /*
              * The XML REC instructs us to stop parsing right here
@@ -6713,7 +6713,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities(
     if ctxt.is_null() || str.is_null() {
         return null_mut();
     }
-    xmlStringDecodeEntitiesInt(ctxt, str, xml_strlen(str), what, end, end2, end3, 0)
+    xml_string_decode_entities_int(ctxt, str, xml_strlen(str), what, end, end2, end3, 0)
 }
 
 /**
@@ -6749,7 +6749,7 @@ pub(crate) unsafe extern "C" fn xml_string_len_decode_entities(
     if ctxt.is_null() || str.is_null() || len < 0 {
         return null_mut();
     }
-    xmlStringDecodeEntitiesInt(ctxt, str, len, what, end, end2, end3, 0)
+    xml_string_decode_entities_int(ctxt, str, len, what, end, end2, end3, 0)
 }
 
 /*

@@ -2585,7 +2585,7 @@ pub unsafe extern "C" fn xml_shell_load(
     use crate::libxml::{
         globals::xml_free,
         htmlparser::html_parse_file,
-        parser::xmlReadFile,
+        parser::xml_read_file,
         uri::xml_canonic_path,
         xpath::{xml_xpath_free_context, xml_xpath_new_context},
     };
@@ -2613,7 +2613,7 @@ pub unsafe extern "C" fn xml_shell_load(
             doc = null_mut();
         }
     } else {
-        doc = xmlReadFile(filename, null_mut(), 0);
+        doc = xml_read_file(filename, null_mut(), 0);
     }
     if !doc.is_null() {
         if (*ctxt).loaded == 1 {
