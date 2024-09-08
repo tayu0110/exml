@@ -4828,7 +4828,7 @@ pub unsafe extern "C" fn xml_validate_element(
 
     elem = root;
     loop {
-        ret &= xmlValidateOneElement(ctxt, doc, elem);
+        ret &= xml_validate_one_element(ctxt, doc, elem);
 
         if matches!((*elem).typ, XmlElementType::XmlElementNode) {
             attr = (*elem).properties;
@@ -5102,7 +5102,7 @@ macro_rules! DEBUG_VALID_MSG {
  * This will dump the list of elements to the buffer
  * Intended just for the debug routine
  */
-unsafe extern "C" fn xmlSnprintfElements(
+unsafe extern "C" fn xml_snprintf_elements(
     buf: *mut c_char,
     size: c_int,
     node: XmlNodePtr,
@@ -6005,14 +6005,14 @@ unsafe extern "C" fn xml_validate_element_content(
                 #[cfg(not(feature = "regexp"))]
                 {
                     if !repl.is_null() {
-                        xmlSnprintfElements(list.as_mut_ptr().add(0) as _, 5000, repl, 1);
+                        xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, repl, 1);
                     } else {
-                        xmlSnprintfElements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
+                        xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
                     }
                 }
                 #[cfg(feature = "regexp")]
                 {
-                    xmlSnprintfElements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
+                    xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
                 }
 
                 if !name.is_null() {
@@ -6110,7 +6110,7 @@ unsafe extern "C" fn xml_validate_element_content(
  * returns 1 if valid or 0 otherwise
  */
 #[cfg(feature = "valid")]
-pub unsafe extern "C" fn xmlValidateOneElement(
+pub unsafe extern "C" fn xml_validate_one_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -7925,7 +7925,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
 
     for i in 0..nb_elements {
         (*test_node).name = elements[i as usize];
-        if xmlValidateOneElement(addr_of_mut!(vctxt) as _, (*parent).doc, parent) != 0 {
+        if xml_validate_one_element(addr_of_mut!(vctxt) as _, (*parent).doc, parent) != 0 {
             for j in 0..nb_valid_elements {
                 if xml_str_equal(elements[i as usize], *names.add(j as usize)) != 0 {
                     break;
@@ -10634,7 +10634,7 @@ mod tests {
                         let doc = gen_xml_doc_ptr(n_doc, 1);
                         let elem = gen_xml_node_ptr(n_elem, 2);
 
-                        let ret_val = xmlValidateOneElement(ctxt, doc, elem);
+                        let ret_val = xml_validate_one_element(ctxt, doc, elem);
                         desret_int(ret_val);
                         des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);

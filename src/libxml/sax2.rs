@@ -23,7 +23,9 @@ use crate::{
             xml_validate_ncname, XmlAttributePtr, XmlDocProperties, XmlElementPtr, XmlNode,
             XmlNsPtr,
         },
-        valid::{xmlValidateOneElement, xml_validate_attribute_decl, xml_validate_document_final},
+        valid::{
+            xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
+        },
         xmlerror::XmlStructuredErrorFunc,
         xmlstring::XmlChar,
     },
@@ -2451,7 +2453,7 @@ pub unsafe extern "C" fn xml_sax2_end_element(ctx: *mut c_void, _name: *const Xm
             && !(*(*ctxt).my_doc).int_subset.is_null()
         {
             (*ctxt).valid &=
-                xmlValidateOneElement(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, cur);
+                xml_validate_one_element(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, cur);
         }
     }
 
@@ -3248,7 +3250,7 @@ pub unsafe extern "C" fn xml_sax2_end_element_ns(
             && !(*ctxt).my_doc.is_null()
             && !(*(*ctxt).my_doc).int_subset.is_null()
         {
-            (*ctxt).valid &= xmlValidateOneElement(
+            (*ctxt).valid &= xml_validate_one_element(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
                 (*ctxt).node,
