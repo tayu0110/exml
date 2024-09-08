@@ -3084,7 +3084,7 @@ unsafe extern "C" fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
     // #endif
 }
 
-unsafe extern "C" fn xmlRegCheckCharacterRange(
+unsafe extern "C" fn xml_reg_check_character_range(
     typ: XmlRegAtomType,
     codepoint: c_int,
     mut neg: c_int,
@@ -3319,7 +3319,7 @@ unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: c_i
             for i in 0..(*atom).nb_ranges {
                 range = *(*atom).ranges.add(i as usize);
                 if (*range).neg == 2 {
-                    ret = xmlRegCheckCharacterRange(
+                    ret = xml_reg_check_character_range(
                         (*range).typ,
                         codepoint,
                         0,
@@ -3331,7 +3331,7 @@ unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: c_i
                         return 0; /* excluded char */
                     }
                 } else if (*range).neg != 0 {
-                    ret = xmlRegCheckCharacterRange(
+                    ret = xml_reg_check_character_range(
                         (*range).typ,
                         codepoint,
                         0,
@@ -3345,7 +3345,7 @@ unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: c_i
                         return 0;
                     }
                 } else {
-                    ret = xmlRegCheckCharacterRange(
+                    ret = xml_reg_check_character_range(
                         (*range).typ,
                         codepoint,
                         0,
@@ -3412,7 +3412,7 @@ unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: c_i
         | XmlRegAtomType::XmlRegexpOtherPrivate
         | XmlRegAtomType::XmlRegexpOtherNa
         | XmlRegAtomType::XmlRegexpBlockName => {
-            ret = xmlRegCheckCharacterRange(
+            ret = xml_reg_check_character_range(
                 (*atom).typ,
                 codepoint,
                 0,
@@ -3509,7 +3509,7 @@ unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
 
 pub(crate) const REGEXP_ALL_COUNTER: usize = 0x123456;
 
-unsafe extern "C" fn xmlFARegExec(comp: XmlRegexpPtr, content: *const XmlChar) -> c_int {
+unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> c_int {
     let mut execval: XmlRegExecCtxt = unsafe { zeroed() };
     let exec: XmlRegExecCtxtPtr = addr_of_mut!(execval);
     let mut ret: c_int;
@@ -3857,7 +3857,7 @@ pub unsafe extern "C" fn xml_regexp_exec(comp: XmlRegexpPtr, content: *const Xml
     if comp.is_null() || content.is_null() {
         return -1;
     }
-    xmlFARegExec(comp, content)
+    xml_fa_reg_exec(comp, content)
 }
 
 unsafe extern "C" fn xml_reg_print_atom_type(output: *mut FILE, typ: XmlRegAtomType) {
@@ -4266,7 +4266,7 @@ unsafe extern "C" fn xml_fa_equal_atoms(
  *
  * Returns 1 if they may intersect and 0 otherwise
  */
-unsafe extern "C" fn xmlFACompareAtomTypes(
+unsafe extern "C" fn xml_fa_compare_atom_types(
     mut type1: XmlRegAtomType,
     mut type2: XmlRegAtomType,
 ) -> c_int {
@@ -4561,7 +4561,7 @@ unsafe extern "C" fn xml_reg_str_equal_wildcard(
     }
 }
 
-unsafe extern "C" fn xmlFACompareRanges(
+unsafe extern "C" fn xml_fa_compare_ranges(
     mut range1: XmlRegRangePtr,
     mut range2: XmlRegRangePtr,
 ) -> c_int {
@@ -4616,7 +4616,7 @@ unsafe extern "C" fn xmlFACompareRanges(
         }
 
         for codepoint in (*range1).start..=(*range1).end {
-            ret = xmlRegCheckCharacterRange(
+            ret = xml_reg_check_character_range(
                 (*range2).typ,
                 codepoint,
                 0,
@@ -4776,7 +4776,7 @@ unsafe extern "C" fn xmlFACompareRanges(
  *
  * Returns 1 if yes and 0 otherwise
  */
-unsafe extern "C" fn xmlFACompareAtoms(
+unsafe extern "C" fn xml_fa_compare_atoms(
     mut atom1: XmlRegAtomPtr,
     mut atom2: XmlRegAtomPtr,
     deep: c_int,
@@ -4800,7 +4800,7 @@ unsafe extern "C" fn xmlFACompareAtoms(
         std::mem::swap(&mut atom1, &mut atom2);
     }
     if (*atom1).typ != (*atom2).typ {
-        ret = xmlFACompareAtomTypes((*atom1).typ, (*atom2).typ);
+        ret = xml_fa_compare_atom_types((*atom1).typ, (*atom2).typ);
         /* if they can't intersect at the type level break now */
         if ret == 0 {
             return 0;
@@ -4852,7 +4852,7 @@ unsafe extern "C" fn xmlFACompareAtoms(
                         for j in 0..(*atom2).nb_ranges {
                             r1 = *(*atom1).ranges.add(i as usize);
                             r2 = *(*atom2).ranges.add(j as usize);
-                            res = xmlFACompareRanges(r1, r2);
+                            res = xml_fa_compare_ranges(r1, r2);
                             if res == 1 {
                                 ret = 1;
                                 break 'done;
@@ -4935,7 +4935,7 @@ unsafe extern "C" fn xml_fa_recurse_determinism(
         if (*t1).to != to {
             continue;
         }
-        if xmlFACompareAtoms((*t1).atom, atom, deep) != 0 {
+        if xml_fa_compare_atoms((*t1).atom, atom, deep) != 0 {
             ret = 0;
             /* mark the transition as non-deterministic */
             (*t1).nd = 1;
@@ -5083,7 +5083,7 @@ pub(crate) unsafe extern "C" fn xml_fa_computes_determinism(ctxt: XmlRegParserCt
                      * But here we don't use deep because we want to
                      * find transitions which indicate a conflict
                      */
-                    if xmlFACompareAtoms((*t1).atom, (*t2).atom, 1) != 0 {
+                    if xml_fa_compare_atoms((*t1).atom, (*t2).atom, 1) != 0 {
                         ret = 0;
                         /* mark the transitions as non-deterministic ones */
                         (*t1).nd = 1;
@@ -5470,7 +5470,7 @@ unsafe extern "C" fn xml_fareg_exec_save_input_string(
  * Returns: 1 if the regexp reached a final state, 0 if non-final, and
  *     a negative value in case of error.
  */
-unsafe extern "C" fn xmlRegExecPushStringInternal(
+unsafe extern "C" fn xml_reg_exec_push_string_internal(
     exec: XmlRegExecCtxtPtr,
     mut value: *const XmlChar,
     mut data: *mut c_void,
@@ -5877,7 +5877,7 @@ pub unsafe extern "C" fn xml_reg_exec_push_string(
     value: *const XmlChar,
     data: *mut c_void,
 ) -> c_int {
-    xmlRegExecPushStringInternal(exec, value, data, 0)
+    xml_reg_exec_push_string_internal(exec, value, data, 0)
 }
 
 const XML_REG_STRING_SEPARATOR: c_char = b'|' as _;
@@ -5937,7 +5937,7 @@ pub unsafe extern "C" fn xml_reg_exec_push_string2(
     let ret = if !(*(*exec).comp).compact.is_null() {
         xml_reg_compact_push_string(exec, (*exec).comp, str, data)
     } else {
-        xmlRegExecPushStringInternal(exec, str, data, 1)
+        xml_reg_exec_push_string_internal(exec, str, data, 1)
     };
 
     if str != buf.as_mut_ptr() {
@@ -5960,7 +5960,7 @@ pub unsafe extern "C" fn xml_reg_exec_push_string2(
  *
  * Returns: 0 in case of success or -1 in case of error.
  */
-unsafe extern "C" fn xmlRegExecGetValues(
+unsafe extern "C" fn xml_reg_exec_get_values(
     exec: XmlRegExecCtxtPtr,
     err: c_int,
     nbval: *mut c_int,
@@ -6186,7 +6186,7 @@ pub unsafe extern "C" fn xml_reg_exec_next_values(
     values: *mut *mut XmlChar,
     terminal: *mut c_int,
 ) -> c_int {
-    xmlRegExecGetValues(exec, 0, nbval, nbneg, values, terminal)
+    xml_reg_exec_get_values(exec, 0, nbval, nbneg, values, terminal)
 }
 
 /**
@@ -6226,7 +6226,7 @@ pub unsafe extern "C" fn xml_reg_exec_err_info(
             *string = null_mut();
         }
     }
-    xmlRegExecGetValues(exec, 1, nbval, nbneg, values, terminal)
+    xml_reg_exec_get_values(exec, 1, nbval, nbneg, values, terminal)
 }
 
 /*
