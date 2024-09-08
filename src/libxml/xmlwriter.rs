@@ -116,7 +116,7 @@ pub struct XmlTextWriter {
  *
  * Free callback for the xmlList.
  */
-unsafe extern "C" fn xmlFreeTextWriterStackEntry(lk: XmlLinkPtr) {
+unsafe extern "C" fn xml_free_text_writer_stack_entry(lk: XmlLinkPtr) {
     let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
     if p.is_null() {
         return;
@@ -137,7 +137,7 @@ unsafe extern "C" fn xmlFreeTextWriterStackEntry(lk: XmlLinkPtr) {
  *
  * Returns -1, 0, 1
  */
-unsafe extern "C" fn xmlCmpTextWriterStackEntry(
+unsafe extern "C" fn xml_cmp_text_writer_stack_entry(
     data0: *const c_void,
     data1: *const c_void,
 ) -> c_int {
@@ -165,7 +165,7 @@ unsafe extern "C" fn xmlCmpTextWriterStackEntry(
  *
  * Free callback for the xmlList.
  */
-unsafe extern "C" fn xmlFreeTextWriterNsStackEntry(lk: XmlLinkPtr) {
+unsafe extern "C" fn xml_free_text_writer_ns_stack_entry(lk: XmlLinkPtr) {
     let p: *mut XmlTextWriterNsStackEntry = xml_link_get_data(lk) as *mut XmlTextWriterNsStackEntry;
     if p.is_null() {
         return;
@@ -190,7 +190,7 @@ unsafe extern "C" fn xmlFreeTextWriterNsStackEntry(lk: XmlLinkPtr) {
  *
  * Returns -1, 0, 1
  */
-unsafe extern "C" fn xmlCmpTextWriterNsStackEntry(
+unsafe extern "C" fn xml_cmp_text_writer_ns_stack_entry(
     data0: *const c_void,
     data1: *const c_void,
 ) -> c_int {
@@ -289,7 +289,7 @@ unsafe extern "C" fn xml_writer_err_msg(
  *
  * Returns the new xmlTextWriterPtr or NULL in case of error
  */
-pub unsafe extern "C" fn xmlNewTextWriter(out: XmlOutputBufferPtr) -> XmlTextWriterPtr {
+pub unsafe extern "C" fn xml_new_text_writer(out: XmlOutputBufferPtr) -> XmlTextWriterPtr {
     let ret: XmlTextWriterPtr = xml_malloc(size_of::<XmlTextWriter>()) as XmlTextWriterPtr;
     if ret.is_null() {
         xml_writer_err_msg(
@@ -302,8 +302,8 @@ pub unsafe extern "C" fn xmlNewTextWriter(out: XmlOutputBufferPtr) -> XmlTextWri
     memset(ret as _, 0, size_of::<XmlTextWriter>());
 
     (*ret).nodes = xml_list_create(
-        Some(xmlFreeTextWriterStackEntry),
-        Some(xmlCmpTextWriterStackEntry),
+        Some(xml_free_text_writer_stack_entry),
+        Some(xml_cmp_text_writer_stack_entry),
     );
     if (*ret).nodes.is_null() {
         xml_writer_err_msg(
@@ -316,8 +316,8 @@ pub unsafe extern "C" fn xmlNewTextWriter(out: XmlOutputBufferPtr) -> XmlTextWri
     }
 
     (*ret).nsstack = xml_list_create(
-        Some(xmlFreeTextWriterNsStackEntry),
-        Some(xmlCmpTextWriterNsStackEntry),
+        Some(xml_free_text_writer_ns_stack_entry),
+        Some(xml_cmp_text_writer_ns_stack_entry),
     );
     if (*ret).nsstack.is_null() {
         xml_writer_err_msg(
@@ -362,7 +362,7 @@ pub unsafe extern "C" fn xmlNewTextWriter(out: XmlOutputBufferPtr) -> XmlTextWri
  *
  * Returns the new xmlTextWriterPtr or NULL in case of error
  */
-pub unsafe extern "C" fn xmlNewTextWriterFilename(
+pub unsafe extern "C" fn xml_new_text_writer_filename(
     uri: *const c_char,
     compression: c_int,
 ) -> XmlTextWriterPtr {
@@ -376,7 +376,7 @@ pub unsafe extern "C" fn xmlNewTextWriterFilename(
         return null_mut();
     }
 
-    let ret: XmlTextWriterPtr = xmlNewTextWriter(out);
+    let ret: XmlTextWriterPtr = xml_new_text_writer(out);
     if ret.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -402,7 +402,7 @@ pub unsafe extern "C" fn xmlNewTextWriterFilename(
  *
  * Returns the new xmlTextWriterPtr or NULL in case of error
  */
-pub unsafe extern "C" fn xmlNewTextWriterMemory(
+pub unsafe extern "C" fn xml_new_text_writer_memory(
     buf: XmlBufferPtr,
     _compression: c_int,
 ) -> XmlTextWriterPtr {
@@ -418,7 +418,7 @@ pub unsafe extern "C" fn xmlNewTextWriterMemory(
         return null_mut();
     }
 
-    let ret: XmlTextWriterPtr = xmlNewTextWriter(out);
+    let ret: XmlTextWriterPtr = xml_new_text_writer(out);
     if ret.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -500,7 +500,7 @@ unsafe extern "C" fn xml_writer_err_msg_int(
  *
  * Returns -1, 0, 1
  */
-unsafe extern "C" fn xmlTextWriterWriteDocCallback(
+unsafe extern "C" fn xml_text_writer_write_doc_callback(
     context: *mut c_void,
     str: *const c_char,
     len: c_int,
@@ -533,7 +533,7 @@ unsafe extern "C" fn xmlTextWriterWriteDocCallback(
  *
  * Returns -1, 0, 1
  */
-unsafe extern "C" fn xmlTextWriterCloseDocCallback(context: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) -> c_int {
     let ctxt: XmlParserCtxtPtr = context as XmlParserCtxtPtr;
     let rc: c_int;
 
@@ -566,7 +566,7 @@ unsafe extern "C" fn xmlTextWriterCloseDocCallback(context: *mut c_void) -> c_in
  *
  * Returns the new xmlTextWriterPtr or NULL in case of error
  */
-pub unsafe extern "C" fn xmlNewTextWriterPushParser(
+pub unsafe extern "C" fn xml_new_text_writer_push_parser(
     ctxt: XmlParserCtxtPtr,
     _compression: c_int,
 ) -> XmlTextWriterPtr {
@@ -580,8 +580,8 @@ pub unsafe extern "C" fn xmlNewTextWriterPushParser(
     }
 
     let out: XmlOutputBufferPtr = xml_output_buffer_create_io(
-        Some(xmlTextWriterWriteDocCallback),
-        Some(xmlTextWriterCloseDocCallback),
+        Some(xml_text_writer_write_doc_callback),
+        Some(xml_text_writer_close_doc_callback),
         ctxt as _,
         null_mut(),
     );
@@ -594,7 +594,7 @@ pub unsafe extern "C" fn xmlNewTextWriterPushParser(
         return null_mut();
     }
 
-    let ret: XmlTextWriterPtr = xmlNewTextWriter(out);
+    let ret: XmlTextWriterPtr = xml_new_text_writer(out);
     if ret.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -616,7 +616,7 @@ pub unsafe extern "C" fn xmlNewTextWriterPushParser(
  *
  * called at the start of document processing.
  */
-unsafe extern "C" fn xmlTextWriterStartDocumentCallback(ctx: *mut c_void) {
+unsafe extern "C" fn xml_text_writer_start_document_callback(ctx: *mut c_void) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut doc: XmlDocPtr;
 
@@ -700,7 +700,7 @@ unsafe extern "C" fn xmlTextWriterStartDocumentCallback(ctx: *mut c_void) {
  *
  * Returns the new xmlTextWriterPtr or NULL in case of error
  */
-pub unsafe extern "C" fn xmlNewTextWriterDoc(
+pub unsafe extern "C" fn xml_new_text_writer_doc(
     doc: *mut XmlDocPtr,
     compression: c_int,
 ) -> XmlTextWriterPtr {
@@ -712,7 +712,7 @@ pub unsafe extern "C" fn xmlNewTextWriterDoc(
         size_of_val(&sax_handler),
     );
     xml_sax2_init_default_sax_handler(addr_of_mut!(sax_handler), 1);
-    sax_handler.start_document = Some(xmlTextWriterStartDocumentCallback);
+    sax_handler.start_document = Some(xml_text_writer_start_document_callback);
     sax_handler.start_element = Some(xml_sax2_start_element);
     sax_handler.end_element = Some(xml_sax2_end_element);
 
@@ -748,7 +748,7 @@ pub unsafe extern "C" fn xmlNewTextWriterDoc(
         return null_mut();
     }
 
-    let ret: XmlTextWriterPtr = xmlNewTextWriterPushParser(ctxt, compression);
+    let ret: XmlTextWriterPtr = xml_new_text_writer_push_parser(ctxt, compression);
     if ret.is_null() {
         xml_free_doc((*ctxt).my_doc);
         xml_free_parser_ctxt(ctxt);
@@ -781,7 +781,7 @@ pub unsafe extern "C" fn xmlNewTextWriterDoc(
  *
  * Returns the new xmlTextWriterPtr or NULL in case of error
  */
-pub unsafe extern "C" fn xmlNewTextWriterTree(
+pub unsafe extern "C" fn xml_new_text_writer_tree(
     doc: XmlDocPtr,
     node: XmlNodePtr,
     compression: c_int,
@@ -803,7 +803,7 @@ pub unsafe extern "C" fn xmlNewTextWriterTree(
         size_of_val(&sax_handler),
     );
     xml_sax2_init_default_sax_handler(addr_of_mut!(sax_handler), 1);
-    sax_handler.start_document = Some(xmlTextWriterStartDocumentCallback);
+    sax_handler.start_document = Some(xml_text_writer_start_document_callback);
     sax_handler.start_element = Some(xml_sax2_start_element);
     sax_handler.end_element = Some(xml_sax2_end_element);
 
@@ -828,7 +828,7 @@ pub unsafe extern "C" fn xmlNewTextWriterTree(
      */
     (*ctxt).dict_names = 0;
 
-    let ret: XmlTextWriterPtr = xmlNewTextWriterPushParser(ctxt, compression);
+    let ret: XmlTextWriterPtr = xml_new_text_writer_push_parser(ctxt, compression);
     if ret.is_null() {
         xml_free_parser_ctxt(ctxt);
         xml_writer_err_msg(
@@ -854,7 +854,7 @@ pub unsafe extern "C" fn xmlNewTextWriterTree(
  *
  * Deallocate all the resources associated to the writer
  */
-pub unsafe extern "C" fn xmlFreeTextWriter(writer: XmlTextWriterPtr) {
+pub unsafe extern "C" fn xml_free_text_writer(writer: XmlTextWriterPtr) {
     if writer.is_null() {
         return;
     }
@@ -907,7 +907,7 @@ pub unsafe extern "C" fn xmlFreeTextWriter(writer: XmlTextWriterPtr) {
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartDocument(
+pub unsafe extern "C" fn xml_text_writer_start_document(
     writer: XmlTextWriterPtr,
     version: *const c_char,
     encoding: *const c_char,
@@ -1055,7 +1055,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDocument(
  *
  * Returns the bytes written or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndDocument(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_document(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
     let mut lk: XmlLinkPtr;
@@ -1083,21 +1083,21 @@ pub unsafe extern "C" fn xmlTextWriterEndDocument(writer: XmlTextWriterPtr) -> c
             XmlTextWriterState::XmlTextwriterName
             | XmlTextWriterState::XmlTextwriterAttribute
             | XmlTextWriterState::XmlTextwriterText => {
-                count = xmlTextWriterEndElement(writer);
+                count = xml_text_writer_end_element(writer);
                 if count < 0 {
                     return -1;
                 }
                 sum += count;
             }
             XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
-                count = xmlTextWriterEndPI(writer);
+                count = xml_text_writer_end_pi(writer);
                 if count < 0 {
                     return -1;
                 }
                 sum += count;
             }
             XmlTextWriterState::XmlTextwriterCdata => {
-                count = xmlTextWriterEndCDATA(writer);
+                count = xml_text_writer_end_cdata(writer);
                 if count < 0 {
                     return -1;
                 }
@@ -1112,14 +1112,14 @@ pub unsafe extern "C" fn xmlTextWriterEndDocument(writer: XmlTextWriterPtr) -> c
             | XmlTextWriterState::XmlTextwriterDtdEnty
             | XmlTextWriterState::XmlTextwriterDtdEntyText
             | XmlTextWriterState::XmlTextwriterDtdPEnt => {
-                count = xmlTextWriterEndDTD(writer);
+                count = xml_text_writer_end_dtd(writer);
                 if count < 0 {
                     return -1;
                 }
                 sum += count;
             }
             XmlTextWriterState::XmlTextwriterComment => {
-                count = xmlTextWriterEndComment(writer);
+                count = xml_text_writer_end_comment(writer);
                 if count < 0 {
                     return -1;
                 }
@@ -1137,7 +1137,7 @@ pub unsafe extern "C" fn xmlTextWriterEndDocument(writer: XmlTextWriterPtr) -> c
         sum += count;
     }
 
-    sum += xmlTextWriterFlush(writer);
+    sum += xml_text_writer_flush(writer);
 
     sum
 }
@@ -1148,7 +1148,7 @@ pub unsafe extern "C" fn xmlTextWriterEndDocument(writer: XmlTextWriterPtr) -> c
  *
  * Output the current namespace declarations.
  */
-unsafe extern "C" fn xmlTextWriterOutputNSDecl(writer: XmlTextWriterPtr) -> c_int {
+unsafe extern "C" fn xml_text_writer_output_nsdecl(writer: XmlTextWriterPtr) -> c_int {
     let mut lk: XmlLinkPtr;
     let mut np: *mut XmlTextWriterNsStackEntry;
     let mut count: c_int;
@@ -1170,7 +1170,7 @@ unsafe extern "C" fn xmlTextWriterOutputNSDecl(writer: XmlTextWriterPtr) -> c_in
         xml_list_pop_front((*writer).nsstack);
 
         if !np.is_null() {
-            count = xmlTextWriterWriteAttribute(writer, prefix, namespace_uri);
+            count = xml_text_writer_write_attribute(writer, prefix, namespace_uri);
             xml_free(namespace_uri as _);
             xml_free(prefix as _);
 
@@ -1193,7 +1193,7 @@ unsafe extern "C" fn xmlTextWriterOutputNSDecl(writer: XmlTextWriterPtr) -> c_in
  *
  * Returns -1 on error or the number of strings written.
  */
-unsafe extern "C" fn xmlTextWriterWriteIndent(writer: XmlTextWriterPtr) -> c_int {
+unsafe extern "C" fn xml_text_writer_write_indent(writer: XmlTextWriterPtr) -> c_int {
     let mut ret: c_int;
 
     let lksize: c_int = xml_list_size((*writer).nodes);
@@ -1221,7 +1221,7 @@ unsafe extern "C" fn xmlTextWriterWriteIndent(writer: XmlTextWriterPtr) -> c_int
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartComment(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_start_comment(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
     let mut p: *mut XmlTextWriterStackEntry;
@@ -1244,7 +1244,7 @@ pub unsafe extern "C" fn xmlTextWriterStartComment(writer: XmlTextWriterPtr) -> 
                 XmlTextWriterState::XmlTextwriterText | XmlTextWriterState::XmlTextwriterNone => {}
                 XmlTextWriterState::XmlTextwriterName => {
                     /* Output namespace declarations */
-                    count = xmlTextWriterOutputNSDecl(writer);
+                    count = xml_text_writer_output_nsdecl(writer);
                     if count < 0 {
                         return -1;
                     }
@@ -1286,7 +1286,7 @@ pub unsafe extern "C" fn xmlTextWriterStartComment(writer: XmlTextWriterPtr) -> 
     xml_list_push_front((*writer).nodes, p as _);
 
     if (*writer).indent != 0 {
-        count = xmlTextWriterWriteIndent(writer);
+        count = xml_text_writer_write_indent(writer);
         if count < 0 {
             return -1;
         }
@@ -1310,7 +1310,7 @@ pub unsafe extern "C" fn xmlTextWriterStartComment(writer: XmlTextWriterPtr) -> 
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndComment(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
 
@@ -1450,7 +1450,7 @@ pub unsafe extern "C" fn xmlTextWriterEndComment(writer: XmlTextWriterPtr) -> c_
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteComment(
+pub unsafe extern "C" fn xml_text_writer_write_comment(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
 ) -> c_int {
@@ -1458,17 +1458,17 @@ pub unsafe extern "C" fn xmlTextWriterWriteComment(
     let mut sum: c_int;
 
     sum = 0;
-    count = xmlTextWriterStartComment(writer);
+    count = xml_text_writer_start_comment(writer);
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xmlTextWriterWriteString(writer, content);
+    count = xml_text_writer_write_string(writer, content);
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xmlTextWriterEndComment(writer);
+    count = xml_text_writer_end_comment(writer);
     if count < 0 {
         return -1;
     }
@@ -1489,7 +1489,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteComment(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartElement(
+pub unsafe extern "C" fn xml_text_writer_start_element(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
 ) -> c_int {
@@ -1514,7 +1514,7 @@ pub unsafe extern "C" fn xmlTextWriterStartElement(
                 ty @ XmlTextWriterState::XmlTextwriterAttribute
                 | ty @ XmlTextWriterState::XmlTextwriterName => {
                     if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        count = xmlTextWriterEndAttribute(writer);
+                        count = xml_text_writer_end_attribute(writer);
                         if count < 0 {
                             return -1;
                         }
@@ -1522,7 +1522,7 @@ pub unsafe extern "C" fn xmlTextWriterStartElement(
                     }
 
                     /* Output namespace declarations */
-                    count = xmlTextWriterOutputNSDecl(writer);
+                    count = xml_text_writer_output_nsdecl(writer);
                     if count < 0 {
                         return -1;
                     }
@@ -1567,7 +1567,7 @@ pub unsafe extern "C" fn xmlTextWriterStartElement(
     xml_list_push_front((*writer).nodes, p as _);
 
     if (*writer).indent != 0 {
-        count = xmlTextWriterWriteIndent(writer);
+        count = xml_text_writer_write_indent(writer);
         sum += count;
     }
 
@@ -1596,7 +1596,7 @@ pub unsafe extern "C" fn xmlTextWriterStartElement(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartElementNS(
+pub unsafe extern "C" fn xml_text_writer_start_element_ns(
     writer: XmlTextWriterPtr,
     prefix: *const XmlChar,
     name: *const XmlChar,
@@ -1617,7 +1617,7 @@ pub unsafe extern "C" fn xmlTextWriterStartElementNS(
     buf = xml_strcat(buf, name);
 
     sum = 0;
-    let count: c_int = xmlTextWriterStartElement(writer, buf);
+    let count: c_int = xml_text_writer_start_element(writer, buf);
     xml_free(buf as _);
     if count < 0 {
         return -1;
@@ -1669,7 +1669,7 @@ pub unsafe extern "C" fn xmlTextWriterStartElementNS(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndElement(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
 
@@ -1696,7 +1696,7 @@ pub unsafe extern "C" fn xmlTextWriterEndElement(writer: XmlTextWriterPtr) -> c_
         ty @ XmlTextWriterState::XmlTextwriterAttribute
         | ty @ XmlTextWriterState::XmlTextwriterName => {
             if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                count = xmlTextWriterEndAttribute(writer);
+                count = xml_text_writer_end_attribute(writer);
                 if count < 0 {
                     xml_list_delete((*writer).nsstack);
                     (*writer).nsstack = null_mut();
@@ -1706,7 +1706,7 @@ pub unsafe extern "C" fn xmlTextWriterEndElement(writer: XmlTextWriterPtr) -> c_
             }
 
             /* Output namespace declarations */
-            count = xmlTextWriterOutputNSDecl(writer);
+            count = xml_text_writer_output_nsdecl(writer);
             if count < 0 {
                 return -1;
             }
@@ -1725,7 +1725,7 @@ pub unsafe extern "C" fn xmlTextWriterEndElement(writer: XmlTextWriterPtr) -> c_
         }
         XmlTextWriterState::XmlTextwriterText => {
             if (*writer).indent != 0 && (*writer).doindent != 0 {
-                count = xmlTextWriterWriteIndent(writer);
+                count = xml_text_writer_write_indent(writer);
                 sum += count;
                 (*writer).doindent = 1;
             } else {
@@ -1769,7 +1769,7 @@ pub unsafe extern "C" fn xmlTextWriterEndElement(writer: XmlTextWriterPtr) -> c_
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterFullEndElement(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
 
@@ -1793,7 +1793,7 @@ pub unsafe extern "C" fn xmlTextWriterFullEndElement(writer: XmlTextWriterPtr) -
         | ty @ XmlTextWriterState::XmlTextwriterName
         | ty @ XmlTextWriterState::XmlTextwriterText => {
             if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                count = xmlTextWriterEndAttribute(writer);
+                count = xml_text_writer_end_attribute(writer);
                 if count < 0 {
                     return -1;
                 }
@@ -1805,7 +1805,7 @@ pub unsafe extern "C" fn xmlTextWriterFullEndElement(writer: XmlTextWriterPtr) -
                 XmlTextWriterState::XmlTextwriterAttribute | XmlTextWriterState::XmlTextwriterName
             ) {
                 /* Output namespace declarations */
-                count = xmlTextWriterOutputNSDecl(writer);
+                count = xml_text_writer_output_nsdecl(writer);
                 if count < 0 {
                     return -1;
                 }
@@ -1822,7 +1822,7 @@ pub unsafe extern "C" fn xmlTextWriterFullEndElement(writer: XmlTextWriterPtr) -
             }
 
             if (*writer).indent != 0 && (*writer).doindent != 0 {
-                count = xmlTextWriterWriteIndent(writer);
+                count = xml_text_writer_write_indent(writer);
                 sum += count;
                 (*writer).doindent = 1;
             } else {
@@ -1942,7 +1942,7 @@ pub unsafe extern "C" fn xmlTextWriterFullEndElement(writer: XmlTextWriterPtr) -
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteElement(
+pub unsafe extern "C" fn xml_text_writer_write_element(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     content: *const XmlChar,
@@ -1951,19 +1951,19 @@ pub unsafe extern "C" fn xmlTextWriterWriteElement(
     let mut sum: c_int;
 
     sum = 0;
-    count = xmlTextWriterStartElement(writer, name);
+    count = xml_text_writer_start_element(writer, name);
     if count == -1 {
         return -1;
     }
     sum += count;
     if !content.is_null() {
-        count = xmlTextWriterWriteString(writer, content);
+        count = xml_text_writer_write_string(writer, content);
         if count == -1 {
             return -1;
         }
         sum += count;
     }
-    count = xmlTextWriterEndElement(writer);
+    count = xml_text_writer_end_element(writer);
     if count == -1 {
         return -1;
     }
@@ -2064,7 +2064,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteElement(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteElementNS(
+pub unsafe extern "C" fn xml_text_writer_write_element_ns(
     writer: XmlTextWriterPtr,
     prefix: *const XmlChar,
     name: *const XmlChar,
@@ -2079,17 +2079,17 @@ pub unsafe extern "C" fn xmlTextWriterWriteElementNS(
     }
 
     sum = 0;
-    count = xmlTextWriterStartElementNS(writer, prefix, name, namespace_uri);
+    count = xml_text_writer_start_element_ns(writer, prefix, name, namespace_uri);
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xmlTextWriterWriteString(writer, content);
+    count = xml_text_writer_write_string(writer, content);
     if count == -1 {
         return -1;
     }
     sum += count;
-    count = xmlTextWriterEndElement(writer);
+    count = xml_text_writer_end_element(writer);
     if count == -1 {
         return -1;
     }
@@ -2175,7 +2175,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteElementNS(
  *
  * Returns -1 on error or the number of characters written.
  */
-unsafe extern "C" fn xmlTextWriterHandleStateDependencies(
+unsafe extern "C" fn xml_text_writer_handle_state_dependencies(
     writer: XmlTextWriterPtr,
     p: *mut XmlTextWriterStackEntry,
 ) -> c_int {
@@ -2200,7 +2200,7 @@ unsafe extern "C" fn xmlTextWriterHandleStateDependencies(
         match (*p).state {
             XmlTextWriterState::XmlTextwriterName => {
                 /* Output namespace declarations */
-                count = xmlTextWriterOutputNSDecl(writer);
+                count = xml_text_writer_output_nsdecl(writer);
                 if count < 0 {
                     return -1;
                 }
@@ -2256,7 +2256,7 @@ unsafe extern "C" fn xmlTextWriterHandleStateDependencies(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteRawLen(
+pub unsafe extern "C" fn xml_text_writer_write_raw_len(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
     len: c_int,
@@ -2287,7 +2287,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteRawLen(
     let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
     if !lk.is_null() {
         p = xml_link_get_data(lk) as _;
-        count = xmlTextWriterHandleStateDependencies(writer, p);
+        count = xml_text_writer_handle_state_dependencies(writer, p);
         if count < 0 {
             return -1;
         }
@@ -2318,11 +2318,11 @@ pub unsafe extern "C" fn xmlTextWriterWriteRawLen(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteRaw(
+pub unsafe extern "C" fn xml_text_writer_write_raw(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
 ) -> c_int {
-    xmlTextWriterWriteRawLen(writer, content, xml_strlen(content))
+    xml_text_writer_write_raw_len(writer, content, xml_strlen(content))
 }
 
 // /**
@@ -2406,7 +2406,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteRaw(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteString(
+pub unsafe extern "C" fn xml_text_writer_write_string(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
 ) -> c_int {
@@ -2448,7 +2448,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteString(
     }
 
     if !buf.is_null() {
-        count = xmlTextWriterWriteRaw(writer, buf);
+        count = xml_text_writer_write_raw(writer, buf);
 
         if buf != content as _
         /* buf was allocated by us, so free it */
@@ -2479,7 +2479,7 @@ const B64CRLF: &CStr = c"\r\n";
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-unsafe extern "C" fn xmlOutputBufferWriteBase64(
+unsafe extern "C" fn xml_output_buffer_write_base64(
     out: XmlOutputBufferPtr,
     len: c_int,
     data: *const c_uchar,
@@ -2573,7 +2573,7 @@ unsafe extern "C" fn xmlOutputBufferWriteBase64(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteBase64(
+pub unsafe extern "C" fn xml_text_writer_write_base64(
     writer: XmlTextWriterPtr,
     data: *const c_char,
     start: c_int,
@@ -2592,7 +2592,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteBase64(
     if !lk.is_null() {
         p = xml_link_get_data(lk) as _;
         if !p.is_null() {
-            count = xmlTextWriterHandleStateDependencies(writer, p);
+            count = xml_text_writer_handle_state_dependencies(writer, p);
             if count < 0 {
                 return -1;
             }
@@ -2604,7 +2604,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteBase64(
         (*writer).doindent = 0;
     }
 
-    count = xmlOutputBufferWriteBase64((*writer).out, len, data.add(start as usize) as _);
+    count = xml_output_buffer_write_base64((*writer).out, len, data.add(start as usize) as _);
     if count < 0 {
         return -1;
     }
@@ -2625,7 +2625,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteBase64(
  * Returns the bytes written (may be 0 because of buffering)
  * or -1 in case of error
  */
-unsafe extern "C" fn xmlOutputBufferWriteBinHex(
+unsafe extern "C" fn xml_output_buffer_write_bin_hex(
     out: XmlOutputBufferPtr,
     len: c_int,
     data: *const c_uchar,
@@ -2668,7 +2668,7 @@ unsafe extern "C" fn xmlOutputBufferWriteBinHex(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteBinHex(
+pub unsafe extern "C" fn xml_text_writer_write_bin_hex(
     writer: XmlTextWriterPtr,
     data: *const c_char,
     start: c_int,
@@ -2687,7 +2687,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteBinHex(
     if !lk.is_null() {
         p = xml_link_get_data(lk) as _;
         if !p.is_null() {
-            count = xmlTextWriterHandleStateDependencies(writer, p);
+            count = xml_text_writer_handle_state_dependencies(writer, p);
             if count < 0 {
                 return -1;
             }
@@ -2699,7 +2699,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteBinHex(
         (*writer).doindent = 0;
     }
 
-    count = xmlOutputBufferWriteBinHex((*writer).out, len, data.add(start as usize) as _);
+    count = xml_output_buffer_write_bin_hex((*writer).out, len, data.add(start as usize) as _);
     if count < 0 {
         return -1;
     }
@@ -2720,7 +2720,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteBinHex(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartAttribute(
+pub unsafe extern "C" fn xml_text_writer_start_attribute(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
 ) -> c_int {
@@ -2746,7 +2746,7 @@ pub unsafe extern "C" fn xmlTextWriterStartAttribute(
         ty @ XmlTextWriterState::XmlTextwriterAttribute
         | ty @ XmlTextWriterState::XmlTextwriterName => {
             if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                count = xmlTextWriterEndAttribute(writer);
+                count = xml_text_writer_end_attribute(writer);
                 if count < 0 {
                     return -1;
                 }
@@ -2794,7 +2794,7 @@ pub unsafe extern "C" fn xmlTextWriterStartAttribute(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartAttributeNS(
+pub unsafe extern "C" fn xml_text_writer_start_attribute_ns(
     writer: XmlTextWriterPtr,
     prefix: *const XmlChar,
     name: *const XmlChar,
@@ -2874,7 +2874,7 @@ pub unsafe extern "C" fn xmlTextWriterStartAttributeNS(
     buf = xml_strcat(buf, name);
 
     sum = 0;
-    let count: c_int = xmlTextWriterStartAttribute(writer, buf);
+    let count: c_int = xml_text_writer_start_attribute(writer, buf);
     xml_free(buf as _);
     if count < 0 {
         return -1;
@@ -2892,7 +2892,7 @@ pub unsafe extern "C" fn xmlTextWriterStartAttributeNS(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndAttribute(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr) -> c_int {
     let count: c_int;
     let mut sum: c_int;
 
@@ -3012,7 +3012,7 @@ pub unsafe extern "C" fn xmlTextWriterEndAttribute(writer: XmlTextWriterPtr) -> 
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteAttribute(
+pub unsafe extern "C" fn xml_text_writer_write_attribute(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     content: *const XmlChar,
@@ -3021,17 +3021,17 @@ pub unsafe extern "C" fn xmlTextWriterWriteAttribute(
     let mut sum: c_int;
 
     sum = 0;
-    count = xmlTextWriterStartAttribute(writer, name);
+    count = xml_text_writer_start_attribute(writer, name);
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xmlTextWriterWriteString(writer, content);
+    count = xml_text_writer_write_string(writer, content);
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xmlTextWriterEndAttribute(writer);
+    count = xml_text_writer_end_attribute(writer);
     if count < 0 {
         return -1;
     }
@@ -3130,7 +3130,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteAttribute(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteAttributeNS(
+pub unsafe extern "C" fn xml_text_writer_write_attribute_ns(
     writer: XmlTextWriterPtr,
     prefix: *const XmlChar,
     name: *const XmlChar,
@@ -3145,17 +3145,17 @@ pub unsafe extern "C" fn xmlTextWriterWriteAttributeNS(
     }
 
     sum = 0;
-    count = xmlTextWriterStartAttributeNS(writer, prefix, name, namespace_uri);
+    count = xml_text_writer_start_attribute_ns(writer, prefix, name, namespace_uri);
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xmlTextWriterWriteString(writer, content);
+    count = xml_text_writer_write_string(writer, content);
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xmlTextWriterEndAttribute(writer);
+    count = xml_text_writer_end_attribute(writer);
     if count < 0 {
         return -1;
     }
@@ -3176,7 +3176,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteAttributeNS(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartPI(
+pub unsafe extern "C" fn xml_text_writer_start_pi(
     writer: XmlTextWriterPtr,
     target: *const XmlChar,
 ) -> c_int {
@@ -3203,14 +3203,14 @@ pub unsafe extern "C" fn xmlTextWriterStartPI(
                 ty @ XmlTextWriterState::XmlTextwriterAttribute
                 | ty @ XmlTextWriterState::XmlTextwriterName => {
                     if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        count = xmlTextWriterEndAttribute(writer);
+                        count = xml_text_writer_end_attribute(writer);
                         if count < 0 {
                             return -1;
                         }
                         sum += count;
                     }
                     /* Output namespace declarations */
-                    count = xmlTextWriterOutputNSDecl(writer);
+                    count = xml_text_writer_output_nsdecl(writer);
                     if count < 0 {
                         return -1;
                     }
@@ -3286,7 +3286,7 @@ pub unsafe extern "C" fn xmlTextWriterStartPI(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndPI(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
 
@@ -3411,7 +3411,7 @@ pub unsafe extern "C" fn xmlTextWriterEndPI(writer: XmlTextWriterPtr) -> c_int {
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWritePI(
+pub unsafe extern "C" fn xml_text_writer_write_pi(
     writer: XmlTextWriterPtr,
     target: *const XmlChar,
     content: *const XmlChar,
@@ -3420,19 +3420,19 @@ pub unsafe extern "C" fn xmlTextWriterWritePI(
     let mut sum: c_int;
 
     sum = 0;
-    count = xmlTextWriterStartPI(writer, target);
+    count = xml_text_writer_start_pi(writer, target);
     if count == -1 {
         return -1;
     }
     sum += count;
     if !content.is_null() {
-        count = xmlTextWriterWriteString(writer, content);
+        count = xml_text_writer_write_string(writer, content);
         if count == -1 {
             return -1;
         }
         sum += count;
     }
-    count = xmlTextWriterEndPI(writer);
+    count = xml_text_writer_end_pi(writer);
     if count == -1 {
         return -1;
     }
@@ -3450,7 +3450,7 @@ const XML_TEXT_WRITER_WRITE_PROCESSING_INSTRUCTION: unsafe extern "C" fn(
     writer: XmlTextWriterPtr,
     target: *const XmlChar,
     content: *const XmlChar,
-) -> c_int = xmlTextWriterWritePI;
+) -> c_int = xml_text_writer_write_pi;
 
 /*
  * CDATA
@@ -3463,7 +3463,7 @@ const XML_TEXT_WRITER_WRITE_PROCESSING_INSTRUCTION: unsafe extern "C" fn(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartCDATA(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
     let mut p: *mut XmlTextWriterStackEntry;
@@ -3485,7 +3485,7 @@ pub unsafe extern "C" fn xmlTextWriterStartCDATA(writer: XmlTextWriterPtr) -> c_
                 ty @ XmlTextWriterState::XmlTextwriterAttribute
                 | ty @ XmlTextWriterState::XmlTextwriterName => {
                     if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        count = xmlTextWriterEndAttribute(writer);
+                        count = xml_text_writer_end_attribute(writer);
                         if count < 0 {
                             return -1;
                         }
@@ -3493,7 +3493,7 @@ pub unsafe extern "C" fn xmlTextWriterStartCDATA(writer: XmlTextWriterPtr) -> c_
                     }
 
                     /* Output namespace declarations */
-                    count = xmlTextWriterOutputNSDecl(writer);
+                    count = xml_text_writer_output_nsdecl(writer);
                     if count < 0 {
                         return -1;
                     }
@@ -3553,7 +3553,7 @@ pub unsafe extern "C" fn xmlTextWriterStartCDATA(writer: XmlTextWriterPtr) -> c_
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndCDATA(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> c_int {
     let count: c_int;
     let mut sum: c_int;
 
@@ -3611,7 +3611,7 @@ pub unsafe extern "C" fn xmlTextWriterEndCDATA(writer: XmlTextWriterPtr) -> c_in
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteCDATA(
+pub unsafe extern "C" fn xml_text_writer_write_cdata(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
 ) -> c_int {
@@ -3619,19 +3619,19 @@ pub unsafe extern "C" fn xmlTextWriterWriteCDATA(
     let mut sum: c_int;
 
     sum = 0;
-    count = xmlTextWriterStartCDATA(writer);
+    count = xml_text_writer_start_cdata(writer);
     if count == -1 {
         return -1;
     }
     sum += count;
     if !content.is_null() {
-        count = xmlTextWriterWriteString(writer, content);
+        count = xml_text_writer_write_string(writer, content);
         if count == -1 {
             return -1;
         }
         sum += count;
     }
-    count = xmlTextWriterEndCDATA(writer);
+    count = xml_text_writer_end_cdata(writer);
     if count == -1 {
         return -1;
     }
@@ -3654,7 +3654,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteCDATA(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartDTD(
+pub unsafe extern "C" fn xml_text_writer_start_dtd(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     pubid: *const XmlChar,
@@ -3817,7 +3817,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDTD(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndDTD(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> c_int {
     let mut do_loop: c_int;
     let mut count: c_int;
     let mut sum: c_int;
@@ -3864,19 +3864,19 @@ pub unsafe extern "C" fn xmlTextWriterEndDTD(writer: XmlTextWriterPtr) -> c_int 
             }
             XmlTextWriterState::XmlTextwriterDtdElem
             | XmlTextWriterState::XmlTextwriterDtdElemText => {
-                count = xmlTextWriterEndDTDElement(writer);
+                count = xml_text_writer_end_dtdelement(writer);
             }
             XmlTextWriterState::XmlTextwriterDtdAttl
             | XmlTextWriterState::XmlTextwriterDtdAttlText => {
-                count = xmlTextWriterEndDTDAttlist(writer);
+                count = xml_text_writer_end_dtd_attlist(writer);
             }
             XmlTextWriterState::XmlTextwriterDtdEnty
             | XmlTextWriterState::XmlTextwriterDtdPEnt
             | XmlTextWriterState::XmlTextwriterDtdEntyText => {
-                count = xmlTextWriterEndDTDEntity(writer);
+                count = xml_text_writer_end_dtd_entity(writer);
             }
             XmlTextWriterState::XmlTextwriterComment => {
-                count = xmlTextWriterEndComment(writer);
+                count = xml_text_writer_end_comment(writer);
             }
             _ => {
                 do_loop = 0;
@@ -3924,7 +3924,7 @@ pub unsafe extern "C" fn xmlTextWriterEndDTD(writer: XmlTextWriterPtr) -> c_int 
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteDTD(
+pub unsafe extern "C" fn xml_text_writer_write_dtd(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     pubid: *const XmlChar,
@@ -3935,19 +3935,19 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTD(
     let mut sum: c_int;
 
     sum = 0;
-    count = xmlTextWriterStartDTD(writer, name, pubid, sysid);
+    count = xml_text_writer_start_dtd(writer, name, pubid, sysid);
     if count == -1 {
         return -1;
     }
     sum += count;
     if !subset.is_null() {
-        count = xmlTextWriterWriteString(writer, subset);
+        count = xml_text_writer_write_string(writer, subset);
         if count == -1 {
             return -1;
         }
         sum += count;
     }
-    count = xmlTextWriterEndDTD(writer);
+    count = xml_text_writer_end_dtd(writer);
     if count == -1 {
         return -1;
     }
@@ -3967,7 +3967,7 @@ const XML_TEXT_WRITER_WRITE_DOC_TYPE: unsafe extern "C" fn(
     pubid: *const XmlChar,
     sysid: *const XmlChar,
     subset: *const XmlChar,
-) -> c_int = xmlTextWriterWriteDTD;
+) -> c_int = xml_text_writer_write_dtd;
 
 /*
  * DTD element definition
@@ -3981,7 +3981,7 @@ const XML_TEXT_WRITER_WRITE_DOC_TYPE: unsafe extern "C" fn(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartDTDElement(
+pub unsafe extern "C" fn xml_text_writer_start_dtdelement(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
 ) -> c_int {
@@ -4049,7 +4049,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDTDElement(
     xml_list_push_front((*writer).nodes, p as _);
 
     if (*writer).indent != 0 {
-        count = xmlTextWriterWriteIndent(writer);
+        count = xml_text_writer_write_indent(writer);
         if count < 0 {
             return -1;
         }
@@ -4078,7 +4078,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDTDElement(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndDTDElement(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
 
@@ -4148,7 +4148,7 @@ pub unsafe extern "C" fn xmlTextWriterEndDTDElement(writer: XmlTextWriterPtr) ->
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteDTDElement(
+pub unsafe extern "C" fn xml_text_writer_write_dtdelement(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     content: *const XmlChar,
@@ -4161,19 +4161,19 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDElement(
     }
 
     sum = 0;
-    count = xmlTextWriterStartDTDElement(writer, name);
+    count = xml_text_writer_start_dtdelement(writer, name);
     if count == -1 {
         return -1;
     }
     sum += count;
 
-    count = xmlTextWriterWriteString(writer, content);
+    count = xml_text_writer_write_string(writer, content);
     if count == -1 {
         return -1;
     }
     sum += count;
 
-    count = xmlTextWriterEndDTDElement(writer);
+    count = xml_text_writer_end_dtdelement(writer);
     if count == -1 {
         return -1;
     }
@@ -4194,7 +4194,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDElement(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartDTDAttlist(
+pub unsafe extern "C" fn xml_text_writer_start_dtdattlist(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
 ) -> c_int {
@@ -4262,7 +4262,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDTDAttlist(
     xml_list_push_front((*writer).nodes, p as _);
 
     if (*writer).indent != 0 {
-        count = xmlTextWriterWriteIndent(writer);
+        count = xml_text_writer_write_indent(writer);
         if count < 0 {
             return -1;
         }
@@ -4291,7 +4291,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDTDAttlist(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndDTDAttlist(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
 
@@ -4360,7 +4360,7 @@ pub unsafe extern "C" fn xmlTextWriterEndDTDAttlist(writer: XmlTextWriterPtr) ->
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteDTDAttlist(
+pub unsafe extern "C" fn xml_text_writer_write_dtd_attlist(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     content: *const XmlChar,
@@ -4373,19 +4373,19 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDAttlist(
     }
 
     sum = 0;
-    count = xmlTextWriterStartDTDAttlist(writer, name);
+    count = xml_text_writer_start_dtdattlist(writer, name);
     if count == -1 {
         return -1;
     }
     sum += count;
 
-    count = xmlTextWriterWriteString(writer, content);
+    count = xml_text_writer_write_string(writer, content);
     if count == -1 {
         return -1;
     }
     sum += count;
 
-    count = xmlTextWriterEndDTDAttlist(writer);
+    count = xml_text_writer_end_dtd_attlist(writer);
     if count == -1 {
         return -1;
     }
@@ -4407,7 +4407,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDAttlist(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterStartDTDEntity(
+pub unsafe extern "C" fn xml_text_writer_start_dtd_entity(
     writer: XmlTextWriterPtr,
     pe: c_int,
     name: *const XmlChar,
@@ -4480,7 +4480,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDTDEntity(
     xml_list_push_front((*writer).nodes, p as _);
 
     if (*writer).indent != 0 {
-        count = xmlTextWriterWriteIndent(writer);
+        count = xml_text_writer_write_indent(writer);
         if count < 0 {
             return -1;
         }
@@ -4518,7 +4518,7 @@ pub unsafe extern "C" fn xmlTextWriterStartDTDEntity(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterEndDTDEntity(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
 
@@ -4600,7 +4600,7 @@ pub unsafe extern "C" fn xmlTextWriterEndDTDEntity(writer: XmlTextWriterPtr) -> 
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteDTDInternalEntity(
+pub unsafe extern "C" fn xml_text_writer_write_dtd_internal_entity(
     writer: XmlTextWriterPtr,
     pe: c_int,
     name: *const XmlChar,
@@ -4614,19 +4614,19 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDInternalEntity(
     }
 
     sum = 0;
-    count = xmlTextWriterStartDTDEntity(writer, pe, name);
+    count = xml_text_writer_start_dtd_entity(writer, pe, name);
     if count == -1 {
         return -1;
     }
     sum += count;
 
-    count = xmlTextWriterWriteString(writer, content);
+    count = xml_text_writer_write_string(writer, content);
     if count == -1 {
         return -1;
     }
     sum += count;
 
-    count = xmlTextWriterEndDTDEntity(writer);
+    count = xml_text_writer_end_dtd_entity(writer);
     if count == -1 {
         return -1;
     }
@@ -4648,7 +4648,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDInternalEntity(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteDTDExternalEntity(
+pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity(
     writer: XmlTextWriterPtr,
     pe: c_int,
     name: *const XmlChar,
@@ -4667,19 +4667,19 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDExternalEntity(
     }
 
     sum = 0;
-    count = xmlTextWriterStartDTDEntity(writer, pe, name);
+    count = xml_text_writer_start_dtd_entity(writer, pe, name);
     if count == -1 {
         return -1;
     }
     sum += count;
 
-    count = xmlTextWriterWriteDTDExternalEntityContents(writer, pubid, sysid, ndataid);
+    count = xml_text_writer_write_dtd_external_entity_contents(writer, pubid, sysid, ndataid);
     if count < 0 {
         return -1;
     }
     sum += count;
 
-    count = xmlTextWriterEndDTDEntity(writer);
+    count = xml_text_writer_end_dtd_entity(writer);
     if count == -1 {
         return -1;
     }
@@ -4699,7 +4699,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDExternalEntity(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteDTDExternalEntityContents(
+pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
     writer: XmlTextWriterPtr,
     pubid: *const XmlChar,
     sysid: *const XmlChar,
@@ -4848,7 +4848,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDExternalEntityContents(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteDTDEntity(
+pub unsafe extern "C" fn xml_text_writer_write_dtd_entity(
     writer: XmlTextWriterPtr,
     pe: c_int,
     name: *const XmlChar,
@@ -4865,10 +4865,10 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDEntity(
     }
 
     if pubid.is_null() && sysid.is_null() {
-        return xmlTextWriterWriteDTDInternalEntity(writer, pe, name, content);
+        return xml_text_writer_write_dtd_internal_entity(writer, pe, name, content);
     }
 
-    xmlTextWriterWriteDTDExternalEntity(writer, pe, name, pubid, sysid, ndataid)
+    xml_text_writer_write_dtd_external_entity(writer, pe, name, pubid, sysid, ndataid)
 }
 
 /*
@@ -4885,7 +4885,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDEntity(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterWriteDTDNotation(
+pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     pubid: *const XmlChar,
@@ -4930,7 +4930,7 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDNotation(
     }
 
     if (*writer).indent != 0 {
-        count = xmlTextWriterWriteIndent(writer);
+        count = xml_text_writer_write_indent(writer);
         if count < 0 {
             return -1;
         }
@@ -5022,7 +5022,10 @@ pub unsafe extern "C" fn xmlTextWriterWriteDTDNotation(
  *
  * Returns -1 on error or 0 otherwise.
  */
-pub unsafe extern "C" fn xmlTextWriterSetIndent(writer: XmlTextWriterPtr, indent: c_int) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_set_indent(
+    writer: XmlTextWriterPtr,
+    indent: c_int,
+) -> c_int {
     if writer.is_null() || indent < 0 {
         return -1;
     }
@@ -5042,7 +5045,7 @@ pub unsafe extern "C" fn xmlTextWriterSetIndent(writer: XmlTextWriterPtr, indent
  *
  * Returns -1 on error or 0 otherwise.
  */
-pub unsafe extern "C" fn xmlTextWriterSetIndentString(
+pub unsafe extern "C" fn xml_text_writer_set_indent_string(
     writer: XmlTextWriterPtr,
     str: *const XmlChar,
 ) -> c_int {
@@ -5071,7 +5074,7 @@ pub unsafe extern "C" fn xmlTextWriterSetIndentString(
  *
  * Returns -1 on error or 0 otherwise.
  */
-pub unsafe extern "C" fn xmlTextWriterSetQuoteChar(
+pub unsafe extern "C" fn xml_text_writer_set_quote_char(
     writer: XmlTextWriterPtr,
     quotechar: XmlChar,
 ) -> c_int {
@@ -5095,7 +5098,7 @@ pub unsafe extern "C" fn xmlTextWriterSetQuoteChar(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xmlTextWriterFlush(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_flush(writer: XmlTextWriterPtr) -> c_int {
     if writer.is_null() {
         return -1;
     }
@@ -5126,7 +5129,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let mut out = gen_xml_output_buffer_ptr(n_out, 0);
 
-                let ret_val = xmlNewTextWriter(out);
+                let ret_val = xml_new_text_writer(out);
                 if !ret_val.is_null() {
                     out = null_mut();
                 }
@@ -5158,7 +5161,7 @@ mod tests {
                     let uri = gen_fileoutput(n_uri, 0);
                     let compression = gen_int(n_compression, 1);
 
-                    let ret_val = xmlNewTextWriterFilename(uri, compression);
+                    let ret_val = xml_new_text_writer_filename(uri, compression);
                     desret_xml_text_writer_ptr(ret_val);
                     des_fileoutput(n_uri, uri, 0);
                     des_int(n_compression, compression, 1);
@@ -5193,7 +5196,7 @@ mod tests {
                     let buf = gen_xml_buffer_ptr(n_buf, 0);
                     let compression = gen_int(n_compression, 1);
 
-                    let ret_val = xmlNewTextWriterMemory(buf, compression);
+                    let ret_val = xml_new_text_writer_memory(buf, compression);
                     desret_xml_text_writer_ptr(ret_val);
                     des_xml_buffer_ptr(n_buf, buf, 0);
                     des_int(n_compression, compression, 1);
@@ -5228,7 +5231,7 @@ mod tests {
                     let mut ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
                     let compression = gen_int(n_compression, 1);
 
-                    let ret_val = xmlNewTextWriterPushParser(ctxt, compression);
+                    let ret_val = xml_new_text_writer_push_parser(ctxt, compression);
                     if !ctxt.is_null() {
                         xml_free_doc((*ctxt).my_doc);
                         (*ctxt).my_doc = null_mut();
@@ -5272,7 +5275,7 @@ mod tests {
                         let node = gen_xml_node_ptr(n_node, 1);
                         let compression = gen_int(n_compression, 2);
 
-                        let ret_val = xmlNewTextWriterTree(doc, node, compression);
+                        let ret_val = xml_new_text_writer_tree(doc, node, compression);
                         desret_xml_text_writer_ptr(ret_val);
                         des_xml_doc_ptr(n_doc, doc, 0);
                         des_xml_node_ptr(n_node, node, 1);
@@ -5308,7 +5311,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndAttribute(writer);
+                let ret_val = xml_text_writer_end_attribute(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5338,7 +5341,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndCDATA(writer);
+                let ret_val = xml_text_writer_end_cdata(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5368,7 +5371,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndComment(writer);
+                let ret_val = xml_text_writer_end_comment(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5398,7 +5401,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndDTD(writer);
+                let ret_val = xml_text_writer_end_dtd(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5428,7 +5431,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndDTDAttlist(writer);
+                let ret_val = xml_text_writer_end_dtd_attlist(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5458,7 +5461,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndDTDElement(writer);
+                let ret_val = xml_text_writer_end_dtdelement(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5488,7 +5491,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndDTDEntity(writer);
+                let ret_val = xml_text_writer_end_dtd_entity(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5518,7 +5521,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndDocument(writer);
+                let ret_val = xml_text_writer_end_document(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5548,7 +5551,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndElement(writer);
+                let ret_val = xml_text_writer_end_element(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5578,7 +5581,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterEndPI(writer);
+                let ret_val = xml_text_writer_end_pi(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5608,7 +5611,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterFlush(writer);
+                let ret_val = xml_text_writer_flush(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5638,7 +5641,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterFullEndElement(writer);
+                let ret_val = xml_text_writer_full_end_element(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5670,7 +5673,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let indent = gen_int(n_indent, 1);
 
-                    let ret_val = xmlTextWriterSetIndent(writer, indent);
+                    let ret_val = xml_text_writer_set_indent(writer, indent);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_int(n_indent, indent, 1);
@@ -5705,7 +5708,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let str = gen_const_xml_char_ptr(n_str, 1);
 
-                    let ret_val = xmlTextWriterSetIndentString(writer, str);
+                    let ret_val = xml_text_writer_set_indent_string(writer, str);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_str, str, 1);
@@ -5740,7 +5743,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let quotechar = gen_xml_char(n_quotechar, 1);
 
-                    let ret_val = xmlTextWriterSetQuoteChar(writer, quotechar);
+                    let ret_val = xml_text_writer_set_quote_char(writer, quotechar);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_xml_char(n_quotechar, quotechar, 1);
@@ -5775,7 +5778,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    let ret_val = xmlTextWriterStartAttribute(writer, name);
+                    let ret_val = xml_text_writer_start_attribute(writer, name);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
@@ -5807,20 +5810,24 @@ mod tests {
             for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
                 for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_namespaceURI in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_namespace_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
                             let mem_base = xml_mem_blocks();
                             let writer = gen_xml_text_writer_ptr(n_writer, 0);
                             let prefix = gen_const_xml_char_ptr(n_prefix, 1);
                             let name = gen_const_xml_char_ptr(n_name, 2);
-                            let namespace_uri = gen_const_xml_char_ptr(n_namespaceURI, 3);
+                            let namespace_uri = gen_const_xml_char_ptr(n_namespace_uri, 3);
 
-                            let ret_val =
-                                xmlTextWriterStartAttributeNS(writer, prefix, name, namespace_uri);
+                            let ret_val = xml_text_writer_start_attribute_ns(
+                                writer,
+                                prefix,
+                                name,
+                                namespace_uri,
+                            );
                             desret_int(ret_val);
                             des_xml_text_writer_ptr(n_writer, writer, 0);
                             des_const_xml_char_ptr(n_prefix, prefix, 1);
                             des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_namespaceURI, namespace_uri, 3);
+                            des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 3);
                             xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
@@ -5835,7 +5842,7 @@ mod tests {
                                 eprint!(" {}", n_writer);
                                 eprint!(" {}", n_prefix);
                                 eprint!(" {}", n_name);
-                                eprintln!(" {}", n_namespaceURI);
+                                eprintln!(" {}", n_namespace_uri);
                             }
                         }
                     }
@@ -5854,7 +5861,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterStartCDATA(writer);
+                let ret_val = xml_text_writer_start_cdata(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5884,7 +5891,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
 
-                let ret_val = xmlTextWriterStartComment(writer);
+                let ret_val = xml_text_writer_start_comment(writer);
                 desret_int(ret_val);
                 des_xml_text_writer_ptr(n_writer, writer, 0);
                 xml_reset_last_error();
@@ -5920,7 +5927,7 @@ mod tests {
                             let pubid = gen_const_xml_char_ptr(n_pubid, 2);
                             let sysid = gen_const_xml_char_ptr(n_sysid, 3);
 
-                            let ret_val = xmlTextWriterStartDTD(writer, name, pubid, sysid);
+                            let ret_val = xml_text_writer_start_dtd(writer, name, pubid, sysid);
                             desret_int(ret_val);
                             des_xml_text_writer_ptr(n_writer, writer, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
@@ -5961,7 +5968,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    let ret_val = xmlTextWriterStartDTDAttlist(writer, name);
+                    let ret_val = xml_text_writer_start_dtdattlist(writer, name);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
@@ -5996,7 +6003,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    let ret_val = xmlTextWriterStartDTDElement(writer, name);
+                    let ret_val = xml_text_writer_start_dtdelement(writer, name);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
@@ -6033,7 +6040,7 @@ mod tests {
                         let pe = gen_int(n_pe, 1);
                         let name = gen_const_xml_char_ptr(n_name, 2);
 
-                        let ret_val = xmlTextWriterStartDTDEntity(writer, pe, name);
+                        let ret_val = xml_text_writer_start_dtd_entity(writer, pe, name);
                         desret_int(ret_val);
                         des_xml_text_writer_ptr(n_writer, writer, 0);
                         des_int(n_pe, pe, 1);
@@ -6075,8 +6082,9 @@ mod tests {
                             let encoding = gen_const_char_ptr(n_encoding, 2);
                             let standalone = gen_const_char_ptr(n_standalone, 3);
 
-                            let ret_val =
-                                xmlTextWriterStartDocument(writer, version, encoding, standalone);
+                            let ret_val = xml_text_writer_start_document(
+                                writer, version, encoding, standalone,
+                            );
                             desret_int(ret_val);
                             des_xml_text_writer_ptr(n_writer, writer, 0);
                             des_const_char_ptr(n_version, version, 1);
@@ -6117,7 +6125,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let name = gen_const_xml_char_ptr(n_name, 1);
 
-                    let ret_val = xmlTextWriterStartElement(writer, name);
+                    let ret_val = xml_text_writer_start_element(writer, name);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
@@ -6149,20 +6157,24 @@ mod tests {
             for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
                 for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_namespaceURI in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_namespace_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
                             let mem_base = xml_mem_blocks();
                             let writer = gen_xml_text_writer_ptr(n_writer, 0);
                             let prefix = gen_const_xml_char_ptr(n_prefix, 1);
                             let name = gen_const_xml_char_ptr(n_name, 2);
-                            let namespace_uri = gen_const_xml_char_ptr(n_namespaceURI, 3);
+                            let namespace_uri = gen_const_xml_char_ptr(n_namespace_uri, 3);
 
-                            let ret_val =
-                                xmlTextWriterStartElementNS(writer, prefix, name, namespace_uri);
+                            let ret_val = xml_text_writer_start_element_ns(
+                                writer,
+                                prefix,
+                                name,
+                                namespace_uri,
+                            );
                             desret_int(ret_val);
                             des_xml_text_writer_ptr(n_writer, writer, 0);
                             des_const_xml_char_ptr(n_prefix, prefix, 1);
                             des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_namespaceURI, namespace_uri, 3);
+                            des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 3);
                             xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
@@ -6177,7 +6189,7 @@ mod tests {
                                 eprint!(" {}", n_writer);
                                 eprint!(" {}", n_prefix);
                                 eprint!(" {}", n_name);
-                                eprintln!(" {}", n_namespaceURI);
+                                eprintln!(" {}", n_namespace_uri);
                             }
                         }
                     }
@@ -6198,7 +6210,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let target = gen_const_xml_char_ptr(n_target, 1);
 
-                    let ret_val = xmlTextWriterStartPI(writer, target);
+                    let ret_val = xml_text_writer_start_pi(writer, target);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_target, target, 1);
@@ -6235,7 +6247,7 @@ mod tests {
                         let name = gen_const_xml_char_ptr(n_name, 1);
                         let content = gen_const_xml_char_ptr(n_content, 2);
 
-                        let ret_val = xmlTextWriterWriteAttribute(writer, name, content);
+                        let ret_val = xml_text_writer_write_attribute(writer, name, content);
                         desret_int(ret_val);
                         des_xml_text_writer_ptr(n_writer, writer, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -6270,16 +6282,16 @@ mod tests {
             for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
                 for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_namespaceURI in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_namespace_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
                             for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
                                 let mem_base = xml_mem_blocks();
                                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
                                 let prefix = gen_const_xml_char_ptr(n_prefix, 1);
                                 let name = gen_const_xml_char_ptr(n_name, 2);
-                                let namespace_uri = gen_const_xml_char_ptr(n_namespaceURI, 3);
+                                let namespace_uri = gen_const_xml_char_ptr(n_namespace_uri, 3);
                                 let content = gen_const_xml_char_ptr(n_content, 4);
 
-                                let ret_val = xmlTextWriterWriteAttributeNS(
+                                let ret_val = xml_text_writer_write_attribute_ns(
                                     writer,
                                     prefix,
                                     name,
@@ -6290,7 +6302,7 @@ mod tests {
                                 des_xml_text_writer_ptr(n_writer, writer, 0);
                                 des_const_xml_char_ptr(n_prefix, prefix, 1);
                                 des_const_xml_char_ptr(n_name, name, 2);
-                                des_const_xml_char_ptr(n_namespaceURI, namespace_uri, 3);
+                                des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 3);
                                 des_const_xml_char_ptr(n_content, content, 4);
                                 xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
@@ -6303,7 +6315,7 @@ mod tests {
                                     eprint!(" {}", n_writer);
                                     eprint!(" {}", n_prefix);
                                     eprint!(" {}", n_name);
-                                    eprint!(" {}", n_namespaceURI);
+                                    eprint!(" {}", n_namespace_uri);
                                     eprintln!(" {}", n_content);
                                 }
                             }
@@ -6336,7 +6348,7 @@ mod tests {
                                 len = 0;
                             }
 
-                            let ret_val = xmlTextWriterWriteBase64(writer, data, start, len);
+                            let ret_val = xml_text_writer_write_base64(writer, data, start, len);
                             desret_int(ret_val);
                             des_xml_text_writer_ptr(n_writer, writer, 0);
                             des_const_char_ptr(n_data, data, 1);
@@ -6387,7 +6399,7 @@ mod tests {
                                 len = 0;
                             }
 
-                            let ret_val = xmlTextWriterWriteBinHex(writer, data, start, len);
+                            let ret_val = xml_text_writer_write_bin_hex(writer, data, start, len);
                             desret_int(ret_val);
                             des_xml_text_writer_ptr(n_writer, writer, 0);
                             des_const_char_ptr(n_data, data, 1);
@@ -6428,7 +6440,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let content = gen_const_xml_char_ptr(n_content, 1);
 
-                    let ret_val = xmlTextWriterWriteCDATA(writer, content);
+                    let ret_val = xml_text_writer_write_cdata(writer, content);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_content, content, 1);
@@ -6463,7 +6475,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let content = gen_const_xml_char_ptr(n_content, 1);
 
-                    let ret_val = xmlTextWriterWriteComment(writer, content);
+                    let ret_val = xml_text_writer_write_comment(writer, content);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_content, content, 1);
@@ -6505,7 +6517,7 @@ mod tests {
                                 let subset = gen_const_xml_char_ptr(n_subset, 4);
 
                                 let ret_val =
-                                    xmlTextWriterWriteDTD(writer, name, pubid, sysid, subset);
+                                    xml_text_writer_write_dtd(writer, name, pubid, sysid, subset);
                                 desret_int(ret_val);
                                 des_xml_text_writer_ptr(n_writer, writer, 0);
                                 des_const_xml_char_ptr(n_name, name, 1);
@@ -6551,7 +6563,7 @@ mod tests {
                         let name = gen_const_xml_char_ptr(n_name, 1);
                         let content = gen_const_xml_char_ptr(n_content, 2);
 
-                        let ret_val = xmlTextWriterWriteDTDAttlist(writer, name, content);
+                        let ret_val = xml_text_writer_write_dtd_attlist(writer, name, content);
                         desret_int(ret_val);
                         des_xml_text_writer_ptr(n_writer, writer, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -6591,7 +6603,7 @@ mod tests {
                         let name = gen_const_xml_char_ptr(n_name, 1);
                         let content = gen_const_xml_char_ptr(n_content, 2);
 
-                        let ret_val = xmlTextWriterWriteDTDElement(writer, name, content);
+                        let ret_val = xml_text_writer_write_dtdelement(writer, name, content);
                         desret_int(ret_val);
                         des_xml_text_writer_ptr(n_writer, writer, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -6639,7 +6651,7 @@ mod tests {
                                         let ndataid = gen_const_xml_char_ptr(n_ndataid, 5);
                                         let content = gen_const_xml_char_ptr(n_content, 6);
 
-                                        let ret_val = xmlTextWriterWriteDTDEntity(
+                                        let ret_val = xml_text_writer_write_dtd_entity(
                                             writer, pe, name, pubid, sysid, ndataid, content,
                                         );
                                         desret_int(ret_val);
@@ -6693,7 +6705,7 @@ mod tests {
                                     let sysid = gen_const_xml_char_ptr(n_sysid, 4);
                                     let ndataid = gen_const_xml_char_ptr(n_ndataid, 5);
 
-                                    let ret_val = xmlTextWriterWriteDTDExternalEntity(
+                                    let ret_val = xml_text_writer_write_dtd_external_entity(
                                         writer, pe, name, pubid, sysid, ndataid,
                                     );
                                     desret_int(ret_val);
@@ -6740,7 +6752,7 @@ mod tests {
                             let sysid = gen_const_xml_char_ptr(n_sysid, 2);
                             let ndataid = gen_const_xml_char_ptr(n_ndataid, 3);
 
-                            let ret_val = xmlTextWriterWriteDTDExternalEntityContents(
+                            let ret_val = xml_text_writer_write_dtd_external_entity_contents(
                                 writer, pubid, sysid, ndataid,
                             );
                             desret_int(ret_val);
@@ -6781,8 +6793,9 @@ mod tests {
                             let name = gen_const_xml_char_ptr(n_name, 2);
                             let content = gen_const_xml_char_ptr(n_content, 3);
 
-                            let ret_val =
-                                xmlTextWriterWriteDTDInternalEntity(writer, pe, name, content);
+                            let ret_val = xml_text_writer_write_dtd_internal_entity(
+                                writer, pe, name, content,
+                            );
                             desret_int(ret_val);
                             des_xml_text_writer_ptr(n_writer, writer, 0);
                             des_int(n_pe, pe, 1);
@@ -6821,7 +6834,8 @@ mod tests {
                             let pubid = gen_const_xml_char_ptr(n_pubid, 2);
                             let sysid = gen_const_xml_char_ptr(n_sysid, 3);
 
-                            let ret_val = xmlTextWriterWriteDTDNotation(writer, name, pubid, sysid);
+                            let ret_val =
+                                xml_text_writer_write_dtd_notation(writer, name, pubid, sysid);
                             desret_int(ret_val);
                             des_xml_text_writer_ptr(n_writer, writer, 0);
                             des_const_xml_char_ptr(n_name, name, 1);
@@ -6864,7 +6878,7 @@ mod tests {
                         let name = gen_const_xml_char_ptr(n_name, 1);
                         let content = gen_const_xml_char_ptr(n_content, 2);
 
-                        let ret_val = xmlTextWriterWriteElement(writer, name, content);
+                        let ret_val = xml_text_writer_write_element(writer, name, content);
                         desret_int(ret_val);
                         des_xml_text_writer_ptr(n_writer, writer, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
@@ -6899,16 +6913,16 @@ mod tests {
             for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
                 for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_namespaceURI in 0..GEN_NB_CONST_XML_CHAR_PTR {
+                        for n_namespace_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
                             for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
                                 let mem_base = xml_mem_blocks();
                                 let writer = gen_xml_text_writer_ptr(n_writer, 0);
                                 let prefix = gen_const_xml_char_ptr(n_prefix, 1);
                                 let name = gen_const_xml_char_ptr(n_name, 2);
-                                let namespace_uri = gen_const_xml_char_ptr(n_namespaceURI, 3);
+                                let namespace_uri = gen_const_xml_char_ptr(n_namespace_uri, 3);
                                 let content = gen_const_xml_char_ptr(n_content, 4);
 
-                                let ret_val = xmlTextWriterWriteElementNS(
+                                let ret_val = xml_text_writer_write_element_ns(
                                     writer,
                                     prefix,
                                     name,
@@ -6919,7 +6933,7 @@ mod tests {
                                 des_xml_text_writer_ptr(n_writer, writer, 0);
                                 des_const_xml_char_ptr(n_prefix, prefix, 1);
                                 des_const_xml_char_ptr(n_name, name, 2);
-                                des_const_xml_char_ptr(n_namespaceURI, namespace_uri, 3);
+                                des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 3);
                                 des_const_xml_char_ptr(n_content, content, 4);
                                 xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
@@ -6935,7 +6949,7 @@ mod tests {
                                     eprint!(" {}", n_writer);
                                     eprint!(" {}", n_prefix);
                                     eprint!(" {}", n_name);
-                                    eprint!(" {}", n_namespaceURI);
+                                    eprint!(" {}", n_namespace_uri);
                                     eprintln!(" {}", n_content);
                                 }
                             }
@@ -7038,7 +7052,7 @@ mod tests {
                         let target = gen_const_xml_char_ptr(n_target, 1);
                         let content = gen_const_xml_char_ptr(n_content, 2);
 
-                        let ret_val = xmlTextWriterWritePI(writer, target, content);
+                        let ret_val = xml_text_writer_write_pi(writer, target, content);
                         desret_int(ret_val);
                         des_xml_text_writer_ptr(n_writer, writer, 0);
                         des_const_xml_char_ptr(n_target, target, 1);
@@ -7076,7 +7090,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let content = gen_const_xml_char_ptr(n_content, 1);
 
-                    let ret_val = xmlTextWriterWriteRaw(writer, content);
+                    let ret_val = xml_text_writer_write_raw(writer, content);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_content, content, 1);
@@ -7116,7 +7130,7 @@ mod tests {
                             len = 0;
                         }
 
-                        let ret_val = xmlTextWriterWriteRawLen(writer, content, len);
+                        let ret_val = xml_text_writer_write_raw_len(writer, content, len);
                         desret_int(ret_val);
                         des_xml_text_writer_ptr(n_writer, writer, 0);
                         des_const_xml_char_ptr(n_content, content, 1);
@@ -7154,7 +7168,7 @@ mod tests {
                     let writer = gen_xml_text_writer_ptr(n_writer, 0);
                     let content = gen_const_xml_char_ptr(n_content, 1);
 
-                    let ret_val = xmlTextWriterWriteString(writer, content);
+                    let ret_val = xml_text_writer_write_string(writer, content);
                     desret_int(ret_val);
                     des_xml_text_writer_ptr(n_writer, writer, 0);
                     des_const_xml_char_ptr(n_content, content, 1);

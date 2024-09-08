@@ -65,7 +65,7 @@ use crate::libxml::{
     },
     xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
     xmlstring::{xml_strdup, XmlChar},
-    xmlwriter::{xmlFreeTextWriter, XmlTextWriterPtr},
+    xmlwriter::{xml_free_text_writer, XmlTextWriterPtr},
     xpath::{
         XmlNodeSetPtr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
         XmlXPathParserContextPtr,
@@ -389,10 +389,10 @@ pub(crate) fn des_xml_xpath_context_ptr(_no: i32, _val: XmlXPathContextPtr, _nr:
 
 #[cfg(feature = "writer")]
 pub(crate) unsafe extern "C" fn gen_xml_text_writer_ptr(no: c_int, _nr: c_int) -> XmlTextWriterPtr {
-    use crate::libxml::xmlwriter::xmlNewTextWriterFilename;
+    use crate::libxml::xmlwriter::xml_new_text_writer_filename;
 
     if no == 0 {
-        return xmlNewTextWriterFilename(c"test.out".as_ptr() as _, 0);
+        return xml_new_text_writer_filename(c"test.out".as_ptr() as _, 0);
     }
     null_mut()
 }
@@ -404,13 +404,13 @@ pub(crate) unsafe extern "C" fn des_xml_text_writer_ptr(
     _nr: c_int,
 ) {
     if !val.is_null() {
-        xmlFreeTextWriter(val);
+        xml_free_text_writer(val);
     }
 }
 
 #[cfg(feature = "writer")]
 pub(crate) unsafe extern "C" fn desret_xml_text_writer_ptr(val: XmlTextWriterPtr) {
-    xmlFreeTextWriter(val);
+    xml_free_text_writer(val);
 }
 
 #[cfg(feature = "schema")]
