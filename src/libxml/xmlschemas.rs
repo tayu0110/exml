@@ -3341,7 +3341,7 @@ macro_rules! ACTIVATE_PARENT_ELEM {
     };
 }
 
-unsafe extern "C" fn xmlSchemaValidateFacets(
+unsafe extern "C" fn xml_schema_validate_facets(
     actxt: XmlSchemaAbstractCtxtPtr,
     node: XmlNodePtr,
     typ: XmlSchemaTypePtr,
@@ -4005,7 +4005,7 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
                 /*
                  * Check facets.
                  */
-                ret = xmlSchemaValidateFacets(
+                ret = xml_schema_validate_facets(
                     actxt,
                     node,
                     typ,
@@ -4128,7 +4128,7 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
                 /*
                  * Apply facets (pattern, enumeration).
                  */
-                ret = xmlSchemaValidateFacets(
+                ret = xml_schema_validate_facets(
                     actxt,
                     node,
                     typ,
@@ -4248,7 +4248,7 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
                     is_normalized,
                     normalize
                 );
-                ret = xmlSchemaValidateFacets(
+                ret = xml_schema_validate_facets(
                     actxt,
                     node,
                     typ,
@@ -6865,7 +6865,7 @@ unsafe extern "C" fn xml_schema_parse_schema_element(
  *
  * Returns the newly allocated structure or NULL in case or error
  */
-unsafe extern "C" fn xmlSchemaNewAnnot(
+unsafe extern "C" fn xml_schema_new_annot(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlSchemaAnnotPtr {
@@ -7138,7 +7138,7 @@ unsafe extern "C" fn xml_schema_parse_annotation(
         return null_mut();
     }
     let ret = if needed != 0 {
-        xmlSchemaNewAnnot(ctxt, node)
+        xml_schema_new_annot(ctxt, node)
     } else {
         null_mut()
     };
@@ -16654,7 +16654,7 @@ unsafe extern "C" fn xml_schema_clone_wildcard_ns_constraints(
  * Returns a positive error code on failure, -1 in case of an
  * internal error, 0 otherwise.
  */
-unsafe extern "C" fn xmlSchemaIntersectWildcards(
+unsafe extern "C" fn xml_schema_intersect_wildcards(
     ctxt: XmlSchemaParserCtxtPtr,
     complete_wild: XmlSchemaWildcardPtr,
     cur_wild: XmlSchemaWildcardPtr,
@@ -16995,7 +16995,7 @@ unsafe extern "C" fn xml_schema_expand_attribute_group_refs(
                             created = 1;
                         }
 
-                        if xmlSchemaIntersectWildcards(
+                        if xml_schema_intersect_wildcards(
                             pctxt,
                             *complete_wild,
                             (*gr).attribute_wildcard,
@@ -27058,7 +27058,7 @@ unsafe extern "C" fn xml_schema_vadd_node_qname(
  *
  * Returns 0 on success and -1 on internal errors.
  */
-unsafe extern "C" fn xmlSchemaXPathProcessHistory(
+unsafe extern "C" fn xml_schema_xpath_process_history(
     vctxt: XmlSchemaValidCtxtPtr,
     depth: c_int,
 ) -> c_int {
@@ -28315,7 +28315,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
              * Evaluate IDCs.
              */
             if xpath_res != 0 {
-                if xmlSchemaXPathProcessHistory(vctxt, (*vctxt).depth + 1) == -1 {
+                if xml_schema_xpath_process_history(vctxt, (*vctxt).depth + 1) == -1 {
                     VERROR_INT!(
                         vctxt,
                         c"xmlSchemaVAttributesComplex".as_ptr() as _,
@@ -29060,7 +29060,7 @@ unsafe extern "C" fn xml_schema_idc_append_node_table_item(
     0
 }
 
-unsafe extern "C" fn xmlSchemaIDCFillNodeTables(
+unsafe extern "C" fn xml_schema_idc_fill_node_tables(
     vctxt: XmlSchemaValidCtxtPtr,
     ielem: XmlSchemaNodeInfoPtr,
 ) -> c_int {
@@ -29520,7 +29520,7 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
  *
  * Returns 0 if OK and -1 on internal errors.
  */
-unsafe extern "C" fn xmlSchemaBubbleIDCNodeTables(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
     let mut bind: XmlSchemaPSVIIDCBindingPtr; /* IDC bindings of the current node. */
     let mut par_bind: XmlSchemaPSVIIDCBindingPtr = null_mut(); /* parent IDC bindings. */
     let mut node: XmlSchemaPSVIIDCNodePtr;
@@ -29864,7 +29864,7 @@ unsafe extern "C" fn xmlSchemaBubbleIDCNodeTables(vctxt: XmlSchemaValidCtxtPtr) 
 /*
 * Process END of element.
 */
-unsafe extern "C" fn xmlSchemaValidatorPopElem(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
     let mut ret: c_int = 0;
     let inode: XmlSchemaNodeInfoPtr = (*vctxt).inode;
 
@@ -30294,7 +30294,8 @@ unsafe extern "C" fn xmlSchemaValidatorPopElem(vctxt: XmlSchemaValidCtxtPtr) -> 
         /*
          * Evaluate the history of XPath state objects.
          */
-        if (*inode).applied_xpath != 0 && xmlSchemaXPathProcessHistory(vctxt, (*vctxt).depth) == -1
+        if (*inode).applied_xpath != 0
+            && xml_schema_xpath_process_history(vctxt, (*vctxt).depth) == -1
         {
             break 'internal_error;
         }
@@ -30316,7 +30317,7 @@ unsafe extern "C" fn xmlSchemaValidatorPopElem(vctxt: XmlSchemaValidCtxtPtr) -> 
          */
         if !(*inode).idc_matchers.is_null()
             && ((*vctxt).has_keyrefs != 0 || (*vctxt).create_idcnode_tables != 0)
-            && xmlSchemaIDCFillNodeTables(vctxt, inode) == -1
+            && xml_schema_idc_fill_node_tables(vctxt, inode) == -1
         {
             break 'internal_error;
         }
@@ -30339,7 +30340,7 @@ unsafe extern "C" fn xmlSchemaValidatorPopElem(vctxt: XmlSchemaValidCtxtPtr) -> 
                 /*
                  * Merge the IDC node table with the table of the parent node.
                  */
-                if xmlSchemaBubbleIDCNodeTables(vctxt) == -1 {
+                if xml_schema_bubble_idc_node_tables(vctxt) == -1 {
                     break 'internal_error;
                 }
             }
@@ -30390,7 +30391,7 @@ unsafe extern "C" fn xmlSchemaValidatorPopElem(vctxt: XmlSchemaValidCtxtPtr) -> 
     -1
 }
 
-unsafe extern "C" fn xmlSchemaVDocWalk(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
     let mut attr: XmlAttrPtr;
     let mut ret: c_int = 0;
     let mut ielem: XmlSchemaNodeInfoPtr = null_mut();
@@ -30579,7 +30580,7 @@ unsafe extern "C" fn xmlSchemaVDocWalk(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
                     // goto internal_error;
                     return -1;
                 }
-                ret = xmlSchemaValidatorPopElem(vctxt);
+                ret = xml_schema_validator_pop_elem(vctxt);
                 if ret != 0 && ret < 0 {
                     VERROR_INT!(
                         vctxt,
@@ -30814,7 +30815,7 @@ unsafe extern "C" fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
         /*
          * Tree validation.
          */
-        ret = xmlSchemaVDocWalk(vctxt);
+        ret = xml_schema_vdoc_walk(vctxt);
     } else if f {
         /*
          * XML Reader validation.
@@ -31379,7 +31380,7 @@ unsafe extern "C" fn xml_schema_sax_handle_end_element_ns(
             c"elem pop mismatch".as_ptr() as _
         );
     }
-    let res: c_int = xmlSchemaValidatorPopElem(vctxt);
+    let res: c_int = xml_schema_validator_pop_elem(vctxt);
     if res != 0 && res < 0 {
         VERROR_INT!(
             vctxt,
