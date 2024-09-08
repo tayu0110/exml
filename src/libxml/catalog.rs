@@ -4385,7 +4385,7 @@ pub unsafe extern "C" fn xml_catalog_get_public(pub_id: *const XmlChar) -> *cons
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
         test_util::*,
     };
 
@@ -4413,7 +4413,7 @@ mod tests {
                             des_const_xml_char_ptr(n_type, typ, 1);
                             des_const_xml_char_ptr(n_orig, orig, 2);
                             des_const_xml_char_ptr(n_replace, replace, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -4448,7 +4448,7 @@ mod tests {
                     xml_a_catalog_dump(catal, out);
                     des_xml_catalog_ptr(n_catal, catal, 0);
                     des_file_ptr(n_out, out, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4480,7 +4480,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_catalog_ptr(n_catal, catal, 0);
                     des_const_xml_char_ptr(n_value, value, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4515,7 +4515,7 @@ mod tests {
                         des_xml_catalog_ptr(n_catal, catal, 0);
                         des_const_xml_char_ptr(n_pub_id, pub_id, 1);
                         des_const_xml_char_ptr(n_sys_id, sys_id, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4552,7 +4552,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_xml_catalog_ptr(n_catal, catal, 0);
                     des_const_xml_char_ptr(n_pub_id, pub_id, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4587,7 +4587,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_xml_catalog_ptr(n_catal, catal, 0);
                     des_const_xml_char_ptr(n_sys_id, sys_id, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4622,7 +4622,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_xml_catalog_ptr(n_catal, catal, 0);
                     des_const_xml_char_ptr(n_uri, uri, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4660,7 +4660,7 @@ mod tests {
                         des_const_xml_char_ptr(n_type, typ, 0);
                         des_const_xml_char_ptr(n_orig, orig, 1);
                         des_const_xml_char_ptr(n_replace, replace, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4683,7 +4683,7 @@ mod tests {
         #[cfg(feature = "catalog")]
         unsafe {
             xml_catalog_cleanup();
-            xmlResetLastError();
+            xml_reset_last_error();
         }
     }
 
@@ -4693,7 +4693,7 @@ mod tests {
         unsafe {
             let ret_val = xml_catalog_convert();
             desret_int(ret_val);
-            xmlResetLastError();
+            xml_reset_last_error();
         }
     }
 
@@ -4709,7 +4709,7 @@ mod tests {
 
                 xml_catalog_dump(out);
                 des_file_ptr(n_out, out, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4733,7 +4733,7 @@ mod tests {
 
             let ret_val = xml_catalog_get_defaults();
             desret_xml_catalog_allow(ret_val);
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -4761,7 +4761,7 @@ mod tests {
                 let ret_val = xml_catalog_is_empty(catal);
                 desret_int(ret_val);
                 des_xml_catalog_ptr(n_catal, catal, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4794,7 +4794,7 @@ mod tests {
                         des_void_ptr(n_catalogs, catalogs, 0);
                         des_const_xml_char_ptr(n_pub_id, pub_id, 1);
                         des_const_xml_char_ptr(n_sys_id, sys_id, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4831,7 +4831,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_void_ptr(n_catalogs, catalogs, 0);
                     des_const_xml_char_ptr(n_uri, uri, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4860,7 +4860,7 @@ mod tests {
                 let ret_val = xml_catalog_remove(value as *const XmlChar);
                 desret_int(ret_val);
                 des_const_xml_char_ptr(n_value, value, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
             }
         }
     }
@@ -4878,7 +4878,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_const_xml_char_ptr(n_pub_id, pub_id, 0);
                     des_const_xml_char_ptr(n_sys_id, sys_id, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                 }
             }
         }
@@ -4897,7 +4897,7 @@ mod tests {
                 let ret_val = xml_catalog_resolve_public(pub_id as *const XmlChar);
                 desret_xml_char_ptr(ret_val);
                 des_const_xml_char_ptr(n_pub_id, pub_id, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4927,7 +4927,7 @@ mod tests {
                 let ret_val = xml_catalog_resolve_system(sys_id as *const XmlChar);
                 desret_xml_char_ptr(ret_val);
                 des_const_xml_char_ptr(n_sys_id, sys_id, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4957,7 +4957,7 @@ mod tests {
                 let ret_val = xml_catalog_resolve_uri(uri as *const XmlChar);
                 desret_xml_char_ptr(ret_val);
                 des_const_xml_char_ptr(n_uri, uri, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4987,7 +4987,7 @@ mod tests {
                 let ret_val = xml_catalog_set_default_prefer(prefer);
                 desret_xml_catalog_prefer(ret_val);
                 des_xml_catalog_prefer(n_prefer, prefer, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -5016,7 +5016,7 @@ mod tests {
 
                 xml_catalog_set_defaults(allow);
                 des_xml_catalog_allow(n_allow, allow, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -5046,7 +5046,7 @@ mod tests {
                 let ret_val = xml_convert_sgmlcatalog(catal);
                 desret_int(ret_val);
                 des_xml_catalog_ptr(n_catal, catal, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -5072,7 +5072,7 @@ mod tests {
             let mem_base = xml_mem_blocks();
 
             xml_initialize_catalog();
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -5103,7 +5103,7 @@ mod tests {
                 let ret_val = xml_load_catalog(filename);
                 desret_int(ret_val);
                 des_filepath(n_filename, filename, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
             }
         }
     }
@@ -5117,7 +5117,7 @@ mod tests {
 
                 xml_load_catalogs(pathss);
                 des_const_char_ptr(n_pathss, pathss, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
             }
         }
     }
@@ -5147,7 +5147,7 @@ mod tests {
                 let ret_val = xml_parse_catalog_file(filename);
                 desret_xml_doc_ptr(ret_val);
                 des_filepath(n_filename, filename, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(

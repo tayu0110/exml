@@ -69,8 +69,8 @@ use crate::{
             XmlParserInputBufferPtr,
         },
         xmlerror::{
-            xmlParserError, xmlParserValidityError, xmlParserValidityWarning, xmlParserWarning,
-            XmlErrorPtr, XmlStructuredErrorFunc,
+            xml_parser_error, xml_parser_validity_error, xml_parser_validity_warning,
+            xml_parser_warning, XmlErrorPtr, XmlStructuredErrorFunc,
         },
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
@@ -6421,10 +6421,10 @@ pub unsafe extern "C" fn xml_text_reader_set_error_handler(
         }
     } else {
         /* restore defaults */
-        (*(*(*reader).ctxt).sax).error = Some(xmlParserError);
-        (*(*reader).ctxt).vctxt.error = Some(xmlParserValidityError);
-        (*(*(*reader).ctxt).sax).warning = Some(xmlParserWarning);
-        (*(*reader).ctxt).vctxt.warning = Some(xmlParserValidityWarning);
+        (*(*(*reader).ctxt).sax).error = Some(xml_parser_error);
+        (*(*reader).ctxt).vctxt.error = Some(xml_parser_validity_error);
+        (*(*(*reader).ctxt).sax).warning = Some(xml_parser_warning);
+        (*(*reader).ctxt).vctxt.warning = Some(xml_parser_validity_warning);
         (*reader).error_func = None;
         (*reader).serror_func = None;
         (*reader).error_func_arg = null_mut();
@@ -6492,11 +6492,11 @@ pub unsafe extern "C" fn xml_text_reader_set_structured_error_handler(
         }
     } else {
         /* restore defaults */
-        (*(*(*reader).ctxt).sax).error = Some(xmlParserError);
+        (*(*(*reader).ctxt).sax).error = Some(xml_parser_error);
         (*(*(*reader).ctxt).sax).serror = None;
-        (*(*reader).ctxt).vctxt.error = Some(xmlParserValidityError);
-        (*(*(*reader).ctxt).sax).warning = Some(xmlParserWarning);
-        (*(*reader).ctxt).vctxt.warning = Some(xmlParserValidityWarning);
+        (*(*reader).ctxt).vctxt.error = Some(xml_parser_validity_error);
+        (*(*(*reader).ctxt).sax).warning = Some(xml_parser_warning);
+        (*(*reader).ctxt).vctxt.warning = Some(xml_parser_validity_warning);
         (*reader).error_func = None;
         (*reader).serror_func = None;
         (*reader).error_func_arg = null_mut();
@@ -6543,7 +6543,7 @@ pub unsafe extern "C" fn xml_text_reader_get_error_handler(
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
         test_util::*,
     };
 
@@ -6565,7 +6565,7 @@ mod tests {
                     desret_xml_text_reader_ptr(ret_val);
                     des_xml_parser_input_buffer_ptr(n_input, input, 0);
                     des_filepath(n_uri, uri, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -6594,7 +6594,7 @@ mod tests {
                 let ret_val = xml_new_text_reader_filename(uri);
                 desret_xml_text_reader_ptr(ret_val);
                 des_filepath(n_uri, uri, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -6634,7 +6634,7 @@ mod tests {
                             des_filepath(n_url, url, 1);
                             des_const_char_ptr(n_encoding, encoding, 2);
                             des_parseroptions(n_options, options, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -6673,7 +6673,7 @@ mod tests {
                         des_filepath(n_filename, filename, 0);
                         des_const_char_ptr(n_encoding, encoding, 1);
                         des_parseroptions(n_options, options, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -6720,7 +6720,7 @@ mod tests {
                                 des_filepath(n_url, url, 2);
                                 des_const_char_ptr(n_encoding, encoding, 3);
                                 des_parseroptions(n_options, options, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -6771,7 +6771,7 @@ mod tests {
                                 des_filepath(n_url, url, 2);
                                 des_const_char_ptr(n_encoding, encoding, 3);
                                 des_parseroptions(n_options, options, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -6818,7 +6818,7 @@ mod tests {
                             des_filepath(n_filename, filename, 1);
                             des_const_char_ptr(n_encoding, encoding, 2);
                             des_parseroptions(n_options, options, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -6874,7 +6874,7 @@ mod tests {
                                     des_filepath(n_url, url, 3);
                                     des_const_char_ptr(n_encoding, encoding, 4);
                                     des_parseroptions(n_options, options, 5);
-                                    xmlResetLastError();
+                                    xml_reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!(
@@ -6917,7 +6917,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -6949,7 +6949,7 @@ mod tests {
                 let ret_val = xml_reader_walker(doc);
                 desret_xml_text_reader_ptr(ret_val);
                 des_xml_doc_ptr(n_doc, doc, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -6976,7 +6976,7 @@ mod tests {
                 let ret_val = xml_text_reader_attribute_count(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7006,7 +7006,7 @@ mod tests {
                 let ret_val = xml_text_reader_base_uri(reader);
                 desret_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7036,7 +7036,7 @@ mod tests {
                 let ret_val = xml_text_reader_byte_consumed(reader);
                 desret_long(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7066,7 +7066,7 @@ mod tests {
                 let ret_val = xml_text_reader_close(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7096,7 +7096,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_base_uri(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7126,7 +7126,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_encoding(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7156,7 +7156,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_local_name(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7186,7 +7186,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_name(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7216,7 +7216,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_namespace_uri(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7246,7 +7246,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_prefix(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7279,7 +7279,7 @@ mod tests {
                     desret_const_xml_char_ptr(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_const_xml_char_ptr(n_str, str, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -7311,7 +7311,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_value(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7341,7 +7341,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_xml_lang(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7371,7 +7371,7 @@ mod tests {
                 let ret_val = xml_text_reader_const_xml_version(reader);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7401,7 +7401,7 @@ mod tests {
                 let ret_val = xml_text_reader_current_doc(reader);
                 desret_xml_doc_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7431,7 +7431,7 @@ mod tests {
                 let ret_val = xml_text_reader_current_node(reader);
                 desret_xml_node_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7461,7 +7461,7 @@ mod tests {
                 let ret_val = xml_text_reader_depth(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7491,7 +7491,7 @@ mod tests {
                 let ret_val = xml_text_reader_expand(reader);
                 desret_xml_node_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7524,7 +7524,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -7559,7 +7559,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_int(n_no, no, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -7598,7 +7598,7 @@ mod tests {
                         des_xml_text_reader_ptr(n_reader, reader, 0);
                         des_const_xml_char_ptr(n_local_name, local_name, 1);
                         des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -7637,7 +7637,7 @@ mod tests {
                         des_xml_text_reader_ptr(n_reader, reader, 0);
                         des_xml_text_reader_error_func_ptr(n_f, f, 1);
                         des_void_ptr_ptr(n_arg, arg, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -7671,7 +7671,7 @@ mod tests {
                 let ret_val = xml_text_reader_get_parser_column_number(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7701,7 +7701,7 @@ mod tests {
                 let ret_val = xml_text_reader_get_parser_line_number(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7734,7 +7734,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_int(n_prop, prop, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -7766,7 +7766,7 @@ mod tests {
                 let ret_val = xml_text_reader_get_remainder(reader);
                 desret_xml_parser_input_buffer_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7796,7 +7796,7 @@ mod tests {
                 let ret_val = xml_text_reader_has_attributes(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7826,7 +7826,7 @@ mod tests {
                 let ret_val = xml_text_reader_has_value(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7856,7 +7856,7 @@ mod tests {
                 let ret_val = xml_text_reader_is_default(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7886,7 +7886,7 @@ mod tests {
                 let ret_val = xml_text_reader_is_empty_element(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7916,7 +7916,7 @@ mod tests {
                 let ret_val = xml_text_reader_is_namespace_decl(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7946,7 +7946,7 @@ mod tests {
                 let ret_val = xml_text_reader_is_valid(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -7976,7 +7976,7 @@ mod tests {
                 let ret_val = xml_text_reader_local_name(reader);
                 desret_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8006,7 +8006,7 @@ mod tests {
                 let ret_val = xml_text_reader_locator_base_uri(locator);
                 desret_xml_char_ptr(ret_val);
                 des_xml_text_reader_locator_ptr(n_locator, locator, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8036,7 +8036,7 @@ mod tests {
                 let ret_val = xml_text_reader_locator_line_number(locator);
                 desret_int(ret_val);
                 des_xml_text_reader_locator_ptr(n_locator, locator, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8069,7 +8069,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_const_xml_char_ptr(n_prefix, prefix, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8104,7 +8104,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8139,7 +8139,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_int(n_no, no, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8178,7 +8178,7 @@ mod tests {
                         des_xml_text_reader_ptr(n_reader, reader, 0);
                         des_const_xml_char_ptr(n_local_name, local_name, 1);
                         des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -8212,7 +8212,7 @@ mod tests {
                 let ret_val = xml_text_reader_move_to_element(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8242,7 +8242,7 @@ mod tests {
                 let ret_val = xml_text_reader_move_to_first_attribute(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8272,7 +8272,7 @@ mod tests {
                 let ret_val = xml_text_reader_move_to_next_attribute(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8302,7 +8302,7 @@ mod tests {
                 let ret_val = xml_text_reader_name(reader);
                 desret_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8329,7 +8329,7 @@ mod tests {
                 let ret_val = xml_text_reader_namespace_uri(reader);
                 desret_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8359,7 +8359,7 @@ mod tests {
                 let ret_val = xml_text_reader_next(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8386,7 +8386,7 @@ mod tests {
                 let ret_val = xml_text_reader_next_sibling(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8416,7 +8416,7 @@ mod tests {
                 let ret_val = xml_text_reader_node_type(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8446,7 +8446,7 @@ mod tests {
                 let ret_val = xml_text_reader_normalization(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8476,7 +8476,7 @@ mod tests {
                 let ret_val = xml_text_reader_prefix(reader);
                 desret_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8506,7 +8506,7 @@ mod tests {
                 let ret_val = xml_text_reader_preserve(reader);
                 desret_xml_node_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8550,7 +8550,7 @@ mod tests {
                             namespaces as *mut *const XmlChar,
                             2,
                         );
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -8584,7 +8584,7 @@ mod tests {
                 let ret_val = xml_text_reader_quote_char(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8614,7 +8614,7 @@ mod tests {
                 let ret_val = xml_text_reader_read(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8641,7 +8641,7 @@ mod tests {
                 let ret_val = xml_text_reader_read_attribute_value(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8671,7 +8671,7 @@ mod tests {
                 let ret_val = xml_text_reader_read_state(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8704,7 +8704,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_xml_relaxng_ptr(n_schema, schema, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8739,7 +8739,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_const_char_ptr(n_rng, rng, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8777,7 +8777,7 @@ mod tests {
                         des_xml_text_reader_ptr(n_reader, reader, 0);
                         des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 1);
                         des_parseroptions(n_options, options, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -8811,7 +8811,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_const_char_ptr(n_xsd, xsd, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                 }
             }
         }
@@ -8836,7 +8836,7 @@ mod tests {
                         des_xml_text_reader_ptr(n_reader, reader, 0);
                         des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 1);
                         des_parseroptions(n_options, options, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -8882,7 +8882,7 @@ mod tests {
                         des_xml_text_reader_ptr(n_reader, reader, 0);
                         des_int(n_prop, prop, 1);
                         des_int(n_value, value, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -8919,7 +8919,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_text_reader_ptr(n_reader, reader, 0);
                     des_xml_schema_ptr(n_schema, schema, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8969,7 +8969,7 @@ mod tests {
                                 des_filepath(n_url, url, 2);
                                 des_const_char_ptr(n_encoding, encoding, 3);
                                 des_parseroptions(n_options, options, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -9007,7 +9007,7 @@ mod tests {
                 let ret_val = xml_text_reader_standalone(reader);
                 desret_int(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -9037,7 +9037,7 @@ mod tests {
                 let ret_val = xml_text_reader_value(reader);
                 desret_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -9067,7 +9067,7 @@ mod tests {
                 let ret_val = xml_text_reader_xml_lang(reader);
                 desret_xml_char_ptr(ret_val);
                 des_xml_text_reader_ptr(n_reader, reader, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(

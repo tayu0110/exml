@@ -3905,7 +3905,7 @@ const XMLTRANSCODETABLE_ISO8859_16: [c_uchar; 48 + 9 * 64] = [
 mod tests {
     use crate::{
         libxml::{
-            htmlparser::utf8_to_html, xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks,
+            htmlparser::utf8_to_html, xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks,
         },
         test_util::*,
     };
@@ -3934,7 +3934,7 @@ mod tests {
                             des_int_ptr(n_outlen, outlen, 1);
                             des_const_unsigned_char_ptr(n_in, input, 2);
                             des_int_ptr(n_inlen, inlen, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 eprintln!("Leak of {} blocks found in UTF8ToHtml {n_out} {n_outlen} {n_in} {n_inlen}", xml_mem_blocks() - mem_base);
                                 leaks += 1;
@@ -3972,7 +3972,7 @@ mod tests {
                                 des_int_ptr(n_outlen, outlen, 1);
                                 des_const_unsigned_char_ptr(n_in, input as *const c_uchar, 2);
                                 des_int_ptr(n_inlen, inlen, 3);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -4015,7 +4015,7 @@ mod tests {
                             des_int_ptr(n_outlen, outlen, 1);
                             des_const_unsigned_char_ptr(n_in, input as *const c_uchar, 2);
                             des_int_ptr(n_inlen, inlen, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -4047,7 +4047,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_char_ptr(n_name, name, 0);
                     des_const_char_ptr(n_alias, alias, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                 }
             }
         }
@@ -4065,7 +4065,7 @@ mod tests {
                 let ret_val = xml_char_enc_close_func(handler);
                 desret_int(ret_val);
                 des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4100,7 +4100,7 @@ mod tests {
                         des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
                         des_xml_buffer_ptr(n_out, out, 1);
                         des_xml_buffer_ptr(n_in, input, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4140,7 +4140,7 @@ mod tests {
                         des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
                         des_xml_buffer_ptr(n_out, out, 1);
                         des_xml_buffer_ptr(n_in, input, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4175,7 +4175,7 @@ mod tests {
                         des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
                         des_xml_buffer_ptr(n_out, out, 1);
                         des_xml_buffer_ptr(n_in, input, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4198,7 +4198,7 @@ mod tests {
     fn test_xml_cleanup_char_encoding_handlers() {
         unsafe {
             xml_cleanup_char_encoding_handlers();
-            xmlResetLastError();
+            xml_reset_last_error();
         }
     }
 
@@ -4209,7 +4209,7 @@ mod tests {
             let mem_base = xml_mem_blocks();
 
             xml_cleanup_encoding_aliases();
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -4236,7 +4236,7 @@ mod tests {
                 let ret_val = xml_del_encoding_alias(alias);
                 desret_int(ret_val);
                 des_const_char_ptr(n_alias, alias, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4268,7 +4268,7 @@ mod tests {
                     desret_xml_char_encoding(ret_val);
                     des_const_unsigned_char_ptr(n_in, input as *const c_uchar, 0);
                     des_int(n_len, len, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4311,7 +4311,7 @@ mod tests {
                 let ret_val = xml_get_char_encoding_name(enc);
                 desret_const_char_ptr(ret_val);
                 des_xml_char_encoding(n_enc, enc, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4340,7 +4340,7 @@ mod tests {
                 let ret_val = xml_get_encoding_alias(alias);
                 desret_const_char_ptr(ret_val);
                 des_const_char_ptr(n_alias, alias, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4361,7 +4361,7 @@ mod tests {
     fn test_xml_init_char_encoding_handlers() {
         unsafe {
             xml_init_char_encoding_handlers();
-            xmlResetLastError();
+            xml_reset_last_error();
         }
     }
 
@@ -4383,7 +4383,7 @@ mod tests {
                 let ret_val = xml_parse_char_encoding(name);
                 desret_xml_char_encoding(ret_val);
                 des_const_char_ptr(n_name, name, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4411,7 +4411,7 @@ mod tests {
 
                 xml_register_char_encoding_handler(handler);
                 des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(

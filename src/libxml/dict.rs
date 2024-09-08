@@ -1226,7 +1226,9 @@ pub(crate) unsafe extern "C" fn xml_cleanup_dict_internal() {
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks, xmlstring::xml_strlen},
+        libxml::{
+            xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks, xmlstring::xml_strlen,
+        },
         test_util::*,
     };
 
@@ -1239,7 +1241,7 @@ mod tests {
             let mem_base = xml_mem_blocks();
 
             xml_dict_cleanup();
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -1259,7 +1261,7 @@ mod tests {
 
             let ret_val = xml_dict_create();
             desret_xml_dict_ptr(ret_val);
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -1283,7 +1285,7 @@ mod tests {
                 let ret_val = xml_dict_create_sub(sub);
                 desret_xml_dict_ptr(ret_val);
                 des_xml_dict_ptr(n_sub, sub, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1318,7 +1320,7 @@ mod tests {
                         des_xml_dict_ptr(n_dict, dict, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_int(n_len, len, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1363,7 +1365,7 @@ mod tests {
                         des_xml_dict_ptr(n_dict, dict, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_int(n_len, len, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1396,7 +1398,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_dict_ptr(n_dict, dict, 0);
                     des_const_xml_char_ptr(n_str, str, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1430,7 +1432,7 @@ mod tests {
                         des_xml_dict_ptr(n_dict, dict, 0);
                         des_const_xml_char_ptr(n_prefix, prefix, 1);
                         des_const_xml_char_ptr(n_name, name, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1461,7 +1463,7 @@ mod tests {
                 xml_dict_free(dict);
                 desret_int(ret_val);
                 des_xml_dict_ptr(n_dict, dict, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1493,7 +1495,7 @@ mod tests {
                 let ret_val = xml_dict_size(dict);
                 desret_int(ret_val);
                 des_xml_dict_ptr(n_dict, dict, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1515,7 +1517,7 @@ mod tests {
             let mem_base = xml_mem_blocks();
             let ret_val = xml_initialize_dict();
             desret_int(ret_val);
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(

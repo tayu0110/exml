@@ -16,7 +16,7 @@ use exml::libxml::{
     xml_io::{
         xml_free_parser_input_buffer, xml_parser_input_buffer_create_mem, XmlParserInputBufferPtr,
     },
-    xmlerror::{xmlSetStructuredErrorFunc, XmlErrorPtr, XmlParserErrors},
+    xmlerror::{xml_set_structured_error_func, XmlErrorPtr, XmlParserErrors},
     xmlmemory::xml_memory_dump,
     xmlstring::XmlChar,
 };
@@ -864,7 +864,7 @@ fn main() {
      */
 
     unsafe {
-        xmlSetStructuredErrorFunc(null_mut(), Some(error_handler));
+        xml_set_structured_error_func(null_mut(), Some(error_handler));
 
         /*
          * Run the tests

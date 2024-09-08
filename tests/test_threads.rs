@@ -9,7 +9,7 @@ use exml::libxml::{
     globals::{xml_do_validity_checking_default_value, xml_generic_error_context},
     parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
     tree::{xml_free_doc, XmlDocPtr},
-    xmlerror::xmlSetGenericErrorFunc,
+    xmlerror::xml_set_generic_error_func,
     xmlmemory::xml_memory_dump,
 };
 use libc::{memset, pthread_create, pthread_join, pthread_t, strcmp, FILE};
@@ -70,10 +70,10 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
 
         if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
             *xml_do_validity_checking_default_value() = 0;
-            xmlSetGenericErrorFunc(stdout as _, None);
+            xml_set_generic_error_func(stdout as _, None);
         } else {
             *xml_do_validity_checking_default_value() = 1;
-            xmlSetGenericErrorFunc(stderr as _, None);
+            xml_set_generic_error_func(stderr as _, None);
         }
         #[cfg(feature = "sax1")]
         {

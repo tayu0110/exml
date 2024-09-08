@@ -12961,7 +12961,7 @@ pub unsafe extern "C" fn xml_relaxng_validate_full_element(
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
         test_util::*,
     };
 
@@ -12982,7 +12982,7 @@ mod tests {
                     xml_relaxng_dump(output, schema);
                     des_file_ptr(n_output, output, 0);
                     des_xml_relaxng_ptr(n_schema, schema, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13013,7 +13013,7 @@ mod tests {
                     xml_relaxng_dump_tree(output, schema);
                     des_file_ptr(n_output, output, 0);
                     des_xml_relaxng_ptr(n_schema, schema, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13054,7 +13054,7 @@ mod tests {
                             des_xml_relaxng_validity_error_func_ptr(n_err, err, 1);
                             des_xml_relaxng_validity_warning_func_ptr(n_warn, warn, 2);
                             des_void_ptr_ptr(n_ctx, ctx, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -13099,7 +13099,7 @@ mod tests {
                             des_xml_relaxng_validity_error_func_ptr(n_err, err, 1);
                             des_xml_relaxng_validity_warning_func_ptr(n_warn, warn, 2);
                             des_void_ptr_ptr(n_ctx, ctx, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -13132,7 +13132,7 @@ mod tests {
 
             let ret_val = xml_relaxng_init_types();
             desret_int(ret_val);
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -13160,7 +13160,7 @@ mod tests {
                 let ret_val = xml_relaxng_new_doc_parser_ctxt(doc);
                 desret_xml_relaxng_parser_ctxt_ptr(ret_val);
                 des_xml_doc_ptr(n_doc, doc, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13196,7 +13196,7 @@ mod tests {
                     desret_xml_relaxng_parser_ctxt_ptr(ret_val);
                     des_const_char_ptr(n_buffer, buffer, 0);
                     des_int(n_size, size, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13228,7 +13228,7 @@ mod tests {
                 let ret_val = xml_relaxng_new_parser_ctxt(url);
                 desret_xml_relaxng_parser_ctxt_ptr(ret_val);
                 des_const_char_ptr(n_url, url, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13297,7 +13297,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13335,7 +13335,7 @@ mod tests {
                         des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_elem, elem, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -13375,7 +13375,7 @@ mod tests {
                         des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_elem, elem, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -13418,7 +13418,7 @@ mod tests {
                         des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_const_xml_char_ptr(n_data, data, 1);
                         des_int(n_len, len, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -13458,7 +13458,7 @@ mod tests {
                         des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_elem, elem, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -13495,7 +13495,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_relaxng_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_int(n_flags, flags, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(

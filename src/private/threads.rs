@@ -19,7 +19,7 @@ use crate::libxml::{
         XmlMutexPtr, GLOBALKEY, GLOBAL_INIT_LOCK, MAINTHREAD, XML_IS_NEVER_THREADED,
         XML_IS_THREADED,
     },
-    xmlerror::xmlResetError,
+    xmlerror::xml_reset_error,
 };
 
 /**
@@ -63,7 +63,7 @@ unsafe extern "C" fn xml_free_global_state(state: *mut c_void) {
     let gs: *mut XmlGlobalState = state as _;
 
     /* free any memory allocated in the thread's xmlLastError */
-    xmlResetError(&mut (*gs).xml_last_error as _);
+    xml_reset_error(&mut (*gs).xml_last_error as _);
     free(state);
 }
 

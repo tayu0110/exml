@@ -28,8 +28,8 @@ use exml::libxml::{
         XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
     },
     xmlerror::{
-        xmlResetLastError, xmlSetStructuredErrorFunc, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr,
-        XmlParserErrors,
+        xml_reset_last_error, xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel,
+        XmlErrorPtr, XmlParserErrors,
     },
     xmlmemory::{
         xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
@@ -193,7 +193,7 @@ unsafe extern "C" fn initialize_libxml2() {
     if !(*CTXT_XPATH.load(Ordering::Relaxed)).cache.is_null() {
         xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
     }
-    xmlSetStructuredErrorFunc(null_mut(), Some(test_error_handler));
+    xml_set_structured_error_func(null_mut(), Some(test_error_handler));
 }
 
 /************************************************************************
@@ -565,7 +565,7 @@ unsafe extern "C" fn xmlconf_test_item(
                     /*
                      * Reset errors and check memory usage before the test
                      */
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     TEST_ERRORS_SIZE = 0;
                     TEST_ERRORS[0] = 0;
                     mem = xml_mem_used();
@@ -681,7 +681,7 @@ unsafe extern "C" fn xmlconf_test_item(
                     /*
                      * Reset errors and check memory usage after the test
                      */
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     is_final = xml_mem_used();
                     if is_final > mem {
                         test_log!(

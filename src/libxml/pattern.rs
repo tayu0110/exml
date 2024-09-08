@@ -2721,7 +2721,7 @@ pub unsafe extern "C" fn xml_stream_wants_any_node(mut stream: XmlStreamCtxtPtr)
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
         test_util::*,
     };
 
@@ -2740,7 +2740,7 @@ mod tests {
                 let ret_val = xml_pattern_from_root(comp);
                 desret_int(ret_val);
                 des_xml_pattern_ptr(n_comp, comp, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2779,7 +2779,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_pattern_ptr(n_comp, comp, 0);
                     des_xml_node_ptr(n_node, node, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -2808,7 +2808,7 @@ mod tests {
                 let ret_val = xml_pattern_max_depth(comp);
                 desret_int(ret_val);
                 des_xml_pattern_ptr(n_comp, comp, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2838,7 +2838,7 @@ mod tests {
                 let ret_val = xml_pattern_min_depth(comp);
                 desret_int(ret_val);
                 des_xml_pattern_ptr(n_comp, comp, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2868,7 +2868,7 @@ mod tests {
                 let ret_val = xml_pattern_streamable(comp);
                 desret_int(ret_val);
                 des_xml_pattern_ptr(n_comp, comp, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2904,7 +2904,7 @@ mod tests {
                 let ret_val = xml_stream_pop(stream);
                 desret_int(ret_val);
                 des_xml_stream_ctxt_ptr(n_stream, stream, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2937,7 +2937,7 @@ mod tests {
                         des_xml_stream_ctxt_ptr(n_stream, stream, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_const_xml_char_ptr(n_ns, ns, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -2974,7 +2974,7 @@ mod tests {
                         des_xml_stream_ctxt_ptr(n_stream, stream, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_const_xml_char_ptr(n_ns, ns, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -3014,7 +3014,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_ns, ns, 2);
                             des_int(n_node_type, node_type, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -3050,7 +3050,7 @@ mod tests {
                 let ret_val = xml_stream_wants_any_node(stream_ctxt);
                 desret_int(ret_val);
                 des_xml_stream_ctxt_ptr(n_stream_ctxt, stream_ctxt, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(

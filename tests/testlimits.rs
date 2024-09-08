@@ -36,7 +36,7 @@ use exml::{
         },
         xml_io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
         xmlerror::{
-            xmlSetStructuredErrorFunc, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr,
+            xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr,
             XmlGenericErrorFunc, XmlParserErrors,
         },
         xmlmemory::{
@@ -764,7 +764,7 @@ unsafe extern "C" fn initialize_libxml2() {
     );
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
-    xmlSetStructuredErrorFunc(null_mut(), Some(test_structured_error_handler));
+    xml_set_structured_error_func(null_mut(), Some(test_structured_error_handler));
     /*
      * register the new I/O handlers
      */

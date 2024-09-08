@@ -53,7 +53,8 @@ use crate::{
             XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
         },
         xmlerror::{
-            xmlParserValidityError, xmlParserValidityWarning, xmlResetError, XmlParserErrors,
+            xml_parser_validity_error, xml_parser_validity_warning, xml_reset_error,
+            XmlParserErrors,
         },
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strcmp, xml_strdup, xml_strlen,
@@ -9477,8 +9478,8 @@ unsafe extern "C" fn html_init_parser_ctxt(
     (*ctxt).html = 1;
     (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
     (*ctxt).vctxt.user_data = ctxt as _;
-    (*ctxt).vctxt.error = Some(xmlParserValidityError);
-    (*ctxt).vctxt.warning = Some(xmlParserValidityWarning);
+    (*ctxt).vctxt.error = Some(xml_parser_validity_error);
+    (*ctxt).vctxt.warning = Some(xml_parser_validity_warning);
     (*ctxt).record_info = 0;
     (*ctxt).validate = 0;
     (*ctxt).check_index = 0;
@@ -12057,8 +12058,8 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).valid = 1;
     (*ctxt).vctxt.user_data = ctxt as _;
     (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
-    (*ctxt).vctxt.error = Some(xmlParserValidityError);
-    (*ctxt).vctxt.warning = Some(xmlParserValidityWarning);
+    (*ctxt).vctxt.error = Some(xml_parser_validity_error);
+    (*ctxt).vctxt.warning = Some(xml_parser_validity_warning);
     (*ctxt).record_info = 0;
     (*ctxt).check_index = 0;
     (*ctxt).end_check_state = 0;
@@ -12081,7 +12082,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).nb_errors = 0;
     (*ctxt).nb_warnings = 0;
     if (*ctxt).last_error.code != XmlParserErrors::XmlErrOK as i32 {
-        xmlResetError(addr_of_mut!((*ctxt).last_error));
+        xml_reset_error(addr_of_mut!((*ctxt).last_error));
     }
 }
 
@@ -12813,7 +12814,9 @@ pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: c_int) -> H
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks, xmlstring::xml_strlen},
+        libxml::{
+            xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks, xmlstring::xml_strlen,
+        },
         test_util::*,
     };
 
@@ -12835,7 +12838,7 @@ mod tests {
                     desret_html_parser_ctxt_ptr(ret_val);
                     des_const_html_saxhandler_ptr(n_sax, sax, 0);
                     des_userdata(n_user_data, user_data, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         eprintln!(
                             "Leak of {} blocks found in htmlNewSAXParserCtxt {n_sax} {n_user_data}",
@@ -12872,7 +12875,7 @@ mod tests {
                         des_html_doc_ptr(n_doc, doc, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_html_node_ptr(n_elem, elem, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             eprintln!("Leak of {} blocks found in htmlAutoCloseTag {n_doc} {n_name} {n_elem}", xml_mem_blocks() - mem_base);
                             leaks += 1;
@@ -12904,7 +12907,7 @@ mod tests {
                         des_const_html_elem_desc_ptr(n_elt, elt, 0);
                         des_const_xml_char_ptr(n_attr, attr, 1);
                         des_int(n_legacy, legacy, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             eprintln!("Leak of {} blocks found in htmlAttrAllowed {n_elt} {n_attr} {n_legacy}", xml_mem_blocks() - mem_base);
                             leaks += 1;
@@ -12932,7 +12935,7 @@ mod tests {
                     desret_html_parser_ctxt_ptr(ret_val);
                     des_fileoutput(n_filename, filename, 0);
                     des_const_char_ptr(n_encoding, encoding, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         eprintln!("Leak of {} blocks found in htmlCreateFileParserCtxt {n_filename} {n_encoding}", xml_mem_blocks() - mem_base);
                         leaks += 1;
@@ -12976,7 +12979,7 @@ mod tests {
                                 des_filepath(n_url, url, 2);
                                 des_const_char_ptr(n_encoding, encoding, 3);
                                 des_int(n_options, options, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     eprint!(
                                         "Leak of {} blocks found in htmlReadMemory",
@@ -13020,7 +13023,7 @@ mod tests {
                             des_const_char_ptr(n_encoding, encoding, 1);
                             des_html_saxhandler_ptr(n_sax, sax, 2);
                             des_userdata(n_user_data, user_data, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -13063,7 +13066,7 @@ mod tests {
                             des_const_char_ptr(n_encoding, encoding, 1);
                             des_html_saxhandler_ptr(n_sax, sax, 2);
                             des_userdata(n_user_data, user_data, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -13117,7 +13120,7 @@ mod tests {
                                     des_int(n_size, size, 3);
                                     des_fileoutput(n_filename, filename, 4);
                                     des_xml_char_encoding(n_enc, enc, 5);
-                                    xmlResetLastError();
+                                    xml_reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!(
@@ -13164,7 +13167,7 @@ mod tests {
                             des_filepath(n_filename, filename, 1);
                             des_const_char_ptr(n_encoding, encoding, 2);
                             des_int(n_options, options, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                         }
                     }
                 }
@@ -13197,7 +13200,7 @@ mod tests {
                                 des_filepath(n_url, url, 2);
                                 des_const_char_ptr(n_encoding, encoding, 3);
                                 des_int(n_options, options, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -13239,7 +13242,7 @@ mod tests {
                     desret_html_parser_ctxt_ptr(ret_val);
                     des_const_char_ptr(n_buffer, buffer, 0);
                     des_int(n_size, size, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13292,7 +13295,7 @@ mod tests {
                                     des_filepath(n_url, url, 3);
                                     des_const_char_ptr(n_encoding, encoding, 4);
                                     des_int(n_options, options, 5);
-                                    xmlResetLastError();
+                                    xml_reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!(
@@ -13332,7 +13335,7 @@ mod tests {
 
                 html_ctxt_reset(ctxt);
                 des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13362,7 +13365,7 @@ mod tests {
                     desret_int(ret_val);
                     des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_int(n_options, options, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13397,7 +13400,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_html_elem_desc_ptr(n_parent, parent, 0);
                     des_const_xml_char_ptr(n_elt, elt, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13432,7 +13435,7 @@ mod tests {
                     desret_html_status(ret_val);
                     des_const_html_elem_desc_ptr(n_parent, parent, 0);
                     des_const_html_elem_desc_ptr(n_elt, elt, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13482,7 +13485,7 @@ mod tests {
                                 des_const_unsigned_char_ptr(n_in, input as *const c_uchar, 2);
                                 des_int_ptr(n_inlen, inlen, 3);
                                 des_int(n_quote_char, quote_char, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -13520,7 +13523,7 @@ mod tests {
                 let ret_val = html_entity_lookup(name as *const XmlChar);
                 desret_const_html_entity_desc_ptr(ret_val);
                 des_const_xml_char_ptr(n_name, name, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13547,7 +13550,7 @@ mod tests {
                 let ret_val = html_entity_value_lookup(value);
                 desret_const_html_entity_desc_ptr(ret_val);
                 des_unsigned_int(n_value, value, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13577,7 +13580,7 @@ mod tests {
                 let ret_val = html_handle_omitted_elem(val);
                 desret_int(ret_val);
                 des_int(n_val, val, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13603,7 +13606,7 @@ mod tests {
             let mem_base = xml_mem_blocks();
 
             html_init_auto_close();
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -13631,7 +13634,7 @@ mod tests {
                     desret_int(ret_val);
                     des_html_doc_ptr(n_doc, doc, 0);
                     des_html_node_ptr(n_elem, elem, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13660,7 +13663,7 @@ mod tests {
                 let ret_val = html_is_script_attribute(name as *const XmlChar);
                 desret_int(ret_val);
                 des_const_xml_char_ptr(n_name, name, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13687,7 +13690,7 @@ mod tests {
 
             let ret_val = html_new_parser_ctxt();
             desret_html_parser_ctxt_ptr(ret_val);
-            xmlResetLastError();
+            xml_reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -13715,7 +13718,7 @@ mod tests {
                     desret_html_status(ret_val);
                     des_const_html_node_ptr(n_node, node as HtmlNodePtr, 0);
                     des_int(n_legacy, legacy, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13744,7 +13747,7 @@ mod tests {
                 let ret_val = html_parse_char_ref(ctxt);
                 desret_int(ret_val);
                 des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13787,7 +13790,7 @@ mod tests {
                             des_const_char_ptr(n_chunk, chunk, 1);
                             des_int(n_size, size, 2);
                             des_int(n_terminate, terminate, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -13823,7 +13826,7 @@ mod tests {
                     desret_html_doc_ptr(ret_val);
                     des_const_xml_char_ptr(n_cur, cur, 0);
                     des_const_char_ptr(n_encoding, encoding, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13856,7 +13859,7 @@ mod tests {
                 }
                 desret_int(ret_val);
                 des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13882,7 +13885,7 @@ mod tests {
 
                 html_parse_element(ctxt);
                 des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13912,7 +13915,7 @@ mod tests {
                     desret_const_html_entity_desc_ptr(ret_val);
                     des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_const_xml_char_ptr_ptr(n_str, str as *mut *const XmlChar, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13944,7 +13947,7 @@ mod tests {
                     desret_html_doc_ptr(ret_val);
                     des_filepath(n_filename, filename, 0);
                     des_const_char_ptr(n_encoding, encoding, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                 }
             }
         }
@@ -13973,7 +13976,7 @@ mod tests {
                             des_filepath(n_url, url, 1);
                             des_const_char_ptr(n_encoding, encoding, 2);
                             des_int(n_options, options, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -14012,7 +14015,7 @@ mod tests {
                         des_filepath(n_filename, filename, 0);
                         des_const_char_ptr(n_encoding, encoding, 1);
                         des_int(n_options, options, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(

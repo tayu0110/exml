@@ -1523,7 +1523,7 @@ pub unsafe extern "C" fn xml_hash_scan_full3(
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
         test_util::*,
     };
 
@@ -1547,7 +1547,7 @@ mod tests {
                         des_xml_hash_table_ptr(n_table, table, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_userdata(n_userdata, userdata, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1586,7 +1586,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_name2, name2, 2);
                             des_userdata(n_userdata, userdata, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -1631,7 +1631,7 @@ mod tests {
                                 des_const_xml_char_ptr(n_name2, name2, 2);
                                 des_const_xml_char_ptr(n_name3, name3, 3);
                                 des_userdata(n_userdata, userdata, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -1684,7 +1684,7 @@ mod tests {
                     xml_hash_default_deallocator(entry, name);
                     des_void_ptr(n_entry, entry, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1717,7 +1717,7 @@ mod tests {
                     desret_void_ptr(ret_val);
                     des_xml_hash_table_ptr(n_table, table, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1750,7 +1750,7 @@ mod tests {
                         des_xml_hash_table_ptr(n_table, table, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_const_xml_char_ptr(n_name2, name2, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1789,7 +1789,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_name2, name2, 2);
                             des_const_xml_char_ptr(n_name3, name3, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -1827,7 +1827,7 @@ mod tests {
                         des_xml_hash_table_ptr(n_table, table, 0);
                         des_const_xml_char_ptr(n_prefix, prefix, 1);
                         des_const_xml_char_ptr(n_name, name, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1870,7 +1870,7 @@ mod tests {
                                 des_const_xml_char_ptr(n_name, name, 2);
                                 des_const_xml_char_ptr(n_prefix2, prefix2, 3);
                                 des_const_xml_char_ptr(n_name2, name2, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -1924,7 +1924,7 @@ mod tests {
                                         des_const_xml_char_ptr(n_name2, name2, 4);
                                         des_const_xml_char_ptr(n_prefix3, prefix3, 5);
                                         des_const_xml_char_ptr(n_name3, name3, 6);
-                                        xmlResetLastError();
+                                        xml_reset_last_error();
                                         if mem_base != xml_mem_blocks() {
                                             leaks += 1;
                                             eprint!(
@@ -1967,7 +1967,7 @@ mod tests {
                         des_xml_hash_table_ptr(n_table, table, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_xml_hash_deallocator(n_f, f, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -2008,7 +2008,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_name2, name2, 2);
                             des_xml_hash_deallocator(n_f, f, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -2054,7 +2054,7 @@ mod tests {
                                 des_const_xml_char_ptr(n_name2, name2, 2);
                                 des_const_xml_char_ptr(n_name3, name3, 3);
                                 des_xml_hash_deallocator(n_f, f, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -2115,7 +2115,7 @@ mod tests {
                 let ret_val = xml_hash_size(table);
                 desret_int(ret_val);
                 des_xml_hash_table_ptr(n_table, table, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2149,7 +2149,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_userdata(n_userdata, userdata, 2);
                             des_xml_hash_deallocator(n_f, f, 3);
-                            xmlResetLastError();
+                            xml_reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -2196,7 +2196,7 @@ mod tests {
                                 des_const_xml_char_ptr(n_name2, name2, 2);
                                 des_userdata(n_userdata, userdata, 3);
                                 des_xml_hash_deallocator(n_f, f, 4);
-                                xmlResetLastError();
+                                xml_reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -2249,7 +2249,7 @@ mod tests {
                                     des_const_xml_char_ptr(n_name3, name3, 3);
                                     des_userdata(n_userdata, userdata, 4);
                                     des_xml_hash_deallocator(n_f, f, 5);
-                                    xmlResetLastError();
+                                    xml_reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!(

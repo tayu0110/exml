@@ -32,7 +32,7 @@ use exml::{
         tree::{xml_free_doc, XmlDocPtr, XmlElementType, XmlNodePtr},
         xml_io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
         xmlerror::{
-            xmlResetLastError, xmlSetStructuredErrorFunc, XmlErrorDomain, XmlErrorLevel,
+            xml_reset_last_error, xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel,
             XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors,
         },
         xmlmemory::{
@@ -560,7 +560,7 @@ unsafe extern "C" fn initialize_libxml2() {
     );
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
-    xmlSetStructuredErrorFunc(null_mut(), Some(test_structured_error_handler));
+    xml_set_structured_error_func(null_mut(), Some(test_structured_error_handler));
     /*
      * register the new I/O handlers
      */
@@ -1143,7 +1143,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                     error,
                     tst.options | XmlParserOption::XmlParseCompact as i32,
                 );
-                xmlResetLastError();
+                xml_reset_last_error();
                 if res != 0 {
                     eprintln!(
                         "File {} generated an error",

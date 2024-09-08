@@ -974,7 +974,7 @@ pub(crate) unsafe extern "C" fn xml_automata_set_flags(am: XmlAutomataPtr, flags
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
         test_util::*,
     };
 
@@ -1005,7 +1005,7 @@ mod tests {
                 let ret_val = xml_automata_is_determinist(am);
                 desret_int(ret_val);
                 des_xml_automata_ptr(n_am, am, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1065,7 +1065,7 @@ mod tests {
                         des_xml_automata_ptr(n_am, am, 0);
                         des_int(n_min, min, 1);
                         des_int(n_max, max, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1150,7 +1150,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_automata_ptr(n_am, am, 0);
                     des_xml_automata_state_ptr(n_state, state, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(

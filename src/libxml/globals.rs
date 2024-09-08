@@ -44,7 +44,8 @@ use super::{
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
     xml_io::__xml_parser_input_buffer_create_filename,
     xmlerror::{
-        xmlGenericErrorDefaultFunc, xmlParserError, xmlParserWarning, xmlResetError, XmlErrorPtr,
+        xml_generic_error_default_func, xml_parser_error, xml_parser_warning, xml_reset_error,
+        XmlErrorPtr,
     },
     xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
     xmlversion::LIBXML_VERSION_STRING,
@@ -369,9 +370,9 @@ static mut XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF: c_int = 0;
  * Global setting: function used for generic error callbacks
  */
 pub(crate) static mut _XML_GENERIC_ERROR: Option<XmlGenericErrorFunc> =
-    Some(xmlGenericErrorDefaultFunc);
+    Some(xml_generic_error_default_func);
 static mut XML_GENERIC_ERROR_THR_DEF: Option<XmlGenericErrorFunc> =
-    Some(xmlGenericErrorDefaultFunc);
+    Some(xml_generic_error_default_func);
 
 /**
  * xmlStructuredError:
@@ -530,7 +531,7 @@ pub unsafe extern "C" fn xml_thr_def_set_generic_error_func(
     if let Some(handler) = handler {
         XML_GENERIC_ERROR_THR_DEF = Some(handler);
     } else {
-        XML_GENERIC_ERROR_THR_DEF = Some(xmlGenericErrorDefaultFunc);
+        XML_GENERIC_ERROR_THR_DEF = Some(xml_generic_error_default_func);
     }
     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
@@ -892,9 +893,9 @@ static mut _HTML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
     ignorable_whitespace: Some(xml_sax2_ignorable_whitespace),
     processing_instruction: Some(xml_sax2_processing_instruction),
     comment: Some(xml_sax2_comment),
-    warning: Some(xmlParserWarning),
-    error: Some(xmlParserError),
-    fatal_error: Some(xmlParserError),
+    warning: Some(xml_parser_warning),
+    error: Some(xml_parser_error),
+    fatal_error: Some(xml_parser_error),
     get_parameter_entity: None,
     cdata_block: Some(xml_sax2_cdata_block),
     external_subset: None,
@@ -1072,9 +1073,9 @@ static mut _XML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
     ignorable_whitespace: Some(xml_sax2_characters),
     processing_instruction: Some(xml_sax2_processing_instruction),
     comment: Some(xml_sax2_comment),
-    warning: Some(xmlParserWarning),
-    error: Some(xmlParserError),
-    fatal_error: Some(xmlParserError),
+    warning: Some(xml_parser_warning),
+    error: Some(xml_parser_error),
+    fatal_error: Some(xml_parser_error),
     get_parameter_entity: Some(xml_sax2_get_parameter_entity),
     cdata_block: Some(xml_sax2_cdata_block),
     external_subset: Some(xml_sax2_external_subset),
@@ -1607,7 +1608,7 @@ pub(crate) unsafe extern "C" fn xml_init_globals_internal() {
  * Additional cleanup for multi-threading
  */
 pub(crate) unsafe extern "C" fn xml_cleanup_globals_internal() {
-    xmlResetError(xml_last_error());
+    xml_reset_error(xml_last_error());
 
     xml_cleanup_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
     __xml_global_init_mutex_destroy();

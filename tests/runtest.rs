@@ -64,8 +64,8 @@ use exml::{
             xml_register_input_callbacks,
         },
         xmlerror::{
-            xmlResetLastError, xmlSetGenericErrorFunc, xmlSetStructuredErrorFunc, XmlErrorDomain,
-            XmlErrorLevel, XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors,
+            xml_reset_last_error, xml_set_generic_error_func, xml_set_structured_error_func,
+            XmlErrorDomain, XmlErrorLevel, XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -509,7 +509,7 @@ unsafe extern "C" fn initialize_libxml2() {
     );
     xml_pedantic_parser_default(0);
     xml_set_external_entity_loader(test_external_entity_loader);
-    xmlSetStructuredErrorFunc(null_mut(), Some(test_structured_error_handler));
+    xml_set_structured_error_func(null_mut(), Some(test_structured_error_handler));
     #[cfg(feature = "schema")]
     {
         xmlSchemaInitTypes();
@@ -1996,8 +1996,8 @@ unsafe extern "C" fn sax_parse_test(
     *SAX_DEBUG.lock().unwrap() = Some(out);
 
     /* for SAX we really want the callbacks though the context handlers */
-    xmlSetStructuredErrorFunc(null_mut(), None);
-    xmlSetGenericErrorFunc(null_mut(), Some(test_error_handler));
+    xml_set_structured_error_func(null_mut(), None);
+    xml_set_generic_error_func(null_mut(), Some(test_error_handler));
 
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
@@ -2132,8 +2132,8 @@ unsafe extern "C" fn sax_parse_test(
     }
 
     /* switch back to structured error handling */
-    xmlSetGenericErrorFunc(null_mut(), None);
-    xmlSetStructuredErrorFunc(null_mut(), Some(test_structured_error_handler));
+    xml_set_generic_error_func(null_mut(), None);
+    xml_set_structured_error_func(null_mut(), Some(test_structured_error_handler));
 
     ret
 }
@@ -3470,7 +3470,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     let ctxt: XmlXPathContextPtr;
 
     /* Don't print generic errors to stderr. */
-    xmlSetGenericErrorFunc(null_mut(), Some(ignore_generic_error));
+    xml_set_generic_error_func(null_mut(), Some(ignore_generic_error));
 
     NB_TESTS += 1;
     if cfg!(feature = "libxml_xptr") && xptr != 0 {
@@ -3511,7 +3511,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     xml_xpath_free_context(ctxt);
 
     /* Reset generic error handler. */
-    xmlSetGenericErrorFunc(null_mut(), None);
+    xml_set_generic_error_func(null_mut(), None);
 }
 
 /**
@@ -7046,7 +7046,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                 error,
                 tst.options | XmlParserOption::XmlParseCompact as i32,
             );
-            xmlResetLastError();
+            xml_reset_last_error();
             if res != 0 {
                 eprintln!(
                     "File {} generated an error",

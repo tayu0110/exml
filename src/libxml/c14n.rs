@@ -2592,7 +2592,7 @@ pub unsafe extern "C" fn xml_c14n_execute(
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
         test_util::*,
     };
 
@@ -2638,7 +2638,7 @@ mod tests {
                                     );
                                     des_int(n_with_comments, with_comments, 4);
                                     des_xml_char_ptr_ptr(n_doc_txt_ptr, doc_txt_ptr, 5);
-                                    xmlResetLastError();
+                                    xml_reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!(
@@ -2709,7 +2709,7 @@ mod tests {
                                         des_int(n_with_comments, with_comments, 4);
                                         des_fileoutput(n_filename, filename, 5);
                                         des_int(n_compression, compression, 6);
-                                        xmlResetLastError();
+                                        xml_reset_last_error();
                                         if mem_base != xml_mem_blocks() {
                                             leaks += 1;
                                             eprint!(
@@ -2775,7 +2775,7 @@ mod tests {
                                     );
                                     des_int(n_with_comments, with_comments, 4);
                                     des_xml_output_buffer_ptr(n_buf, buf, 5);
-                                    xmlResetLastError();
+                                    xml_reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!(

@@ -3097,7 +3097,7 @@ pub(crate) unsafe extern "C" fn xml_xinclude_set_streaming_mode(
 #[cfg(test)]
 mod tests {
     use crate::{
-        libxml::{xmlerror::xmlResetLastError, xmlmemory::xml_mem_blocks},
+        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
         test_util::*,
     };
 
@@ -3122,7 +3122,7 @@ mod tests {
                 let ret_val = xml_xinclude_process(doc);
                 desret_int(ret_val);
                 des_xml_doc_ptr(n_doc, doc, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -3155,7 +3155,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_doc_ptr(n_doc, doc, 0);
                     des_int(n_flags, flags, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -3193,7 +3193,7 @@ mod tests {
                         des_xml_doc_ptr(n_doc, doc, 0);
                         des_int(n_flags, flags, 1);
                         des_userdata(n_data, data, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -3230,7 +3230,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_xinclude_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_node, node, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -3262,7 +3262,7 @@ mod tests {
                 let ret_val = xml_xinclude_process_tree(tree);
                 desret_int(ret_val);
                 des_xml_node_ptr(n_tree, tree, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -3295,7 +3295,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_node_ptr(n_tree, tree, 0);
                     des_int(n_flags, flags, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -3333,7 +3333,7 @@ mod tests {
                         des_xml_node_ptr(n_tree, tree, 0);
                         des_int(n_flags, flags, 1);
                         des_userdata(n_data, data, 2);
-                        xmlResetLastError();
+                        xml_reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -3370,7 +3370,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_xinclude_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_int(n_flags, flags, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(

@@ -58,9 +58,9 @@ macro_rules! __xml_raise_error {
                 XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr,
             },
             xmlerror::{
-                xmlCopyError, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr, xmlGenericErrorDefaultFunc, XmlGenericErrorFunc,
-                XmlParserErrors, xmlParserError, xmlParserValidityError, xmlParserValidityWarning, xmlParserWarning,
-                xmlReportError, xmlResetError, XmlStructuredErrorFunc, XML_MAX_ERRORS,
+                xml_copy_error, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr, xml_generic_error_default_func, XmlGenericErrorFunc,
+                XmlParserErrors, xml_parser_error, xml_parser_validity_error, xml_parser_validity_warning, xml_parser_warning,
+                xml_report_error, xml_reset_error, XmlStructuredErrorFunc, XML_MAX_ERRORS,
             },
             xmlstring::{
                 XmlChar, xml_strdup,
@@ -188,7 +188,7 @@ macro_rules! __xml_raise_error {
                 /*
                  * Save the information about the error
                  */
-                xmlResetError(to);
+                xml_reset_error(to);
                 (*to).domain = domain;
                 (*to).code = code;
                 (*to).message = str;
@@ -254,7 +254,7 @@ macro_rules! __xml_raise_error {
                 (*to).ctxt = ctx;
 
                 if to != xml_last_error() {
-                    xmlCopyError(to, xml_last_error());
+                    xml_copy_error(to, xml_last_error());
                 }
 
                 if let Some(schannel) = schannel {
@@ -285,13 +285,13 @@ macro_rules! __xml_raise_error {
                 }
 
                 let channel = channel.unwrap();
-                if channel as usize == xmlParserError as usize
-                    || channel as usize == xmlParserWarning as usize
-                    || channel as usize == xmlParserValidityError as usize
-                    || channel as usize == xmlParserValidityWarning as usize {
-                    xmlReportError(to, ctxt, str, None, null_mut());
-                } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */ channel as usize == xmlGenericErrorDefaultFunc as usize {
-                    xmlReportError(to, ctxt, str, Some(channel), data);
+                if channel as usize == xml_parser_error as usize
+                    || channel as usize == xml_parser_warning as usize
+                    || channel as usize == xml_parser_validity_error as usize
+                    || channel as usize == xml_parser_validity_warning as usize {
+                    xml_report_error(to, ctxt, str, None, null_mut());
+                } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */ channel as usize == xml_generic_error_default_func as usize {
+                    xml_report_error(to, ctxt, str, Some(channel), data);
                 } else {
                     $crate::xml_error_with_format!(channel, data, c"%s".as_ptr(), str);
                 }

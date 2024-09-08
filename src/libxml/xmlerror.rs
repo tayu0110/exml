@@ -969,7 +969,10 @@ pub type XmlStructuredErrorFunc = unsafe extern "C" fn(userData: *mut c_void, er
  *
  * Default handler for out of context error messages.
  */
-pub(crate) unsafe extern "C" fn xmlGenericErrorDefaultFunc(_ctx: *mut c_void, msg: *const c_char) {
+pub(crate) unsafe extern "C" fn xml_generic_error_default_func(
+    _ctx: *mut c_void,
+    msg: *const c_char,
+) {
     // va_list args;
 
     // if (xmlGenericErrorContext == null_mut())
@@ -1003,18 +1006,19 @@ pub(crate) unsafe extern "C" fn xmlGenericErrorDefaultFunc(_ctx: *mut c_void, ms
  * stderr by setting @ctx to this file handle and @handler to NULL.
  * For multi-threaded applications, this must be set separately for each thread.
  */
-pub unsafe extern "C" fn xmlSetGenericErrorFunc(
+pub unsafe extern "C" fn xml_set_generic_error_func(
     ctx: *mut c_void,
     handler: Option<XmlGenericErrorFunc>,
 ) {
     if xml_is_main_thread() != 0 {
         _XML_GENERIC_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
-        _XML_GENERIC_ERROR = handler.or(Some(xmlGenericErrorDefaultFunc));
+        _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
     } else {
         (*xml_get_global_state())
             .xml_generic_error_context
             .store(ctx, Ordering::Relaxed);
-        (*xml_get_global_state()).xml_generic_error = handler.or(Some(xmlGenericErrorDefaultFunc));
+        (*xml_get_global_state()).xml_generic_error =
+            handler.or(Some(xml_generic_error_default_func));
     }
 }
 
@@ -1028,8 +1032,8 @@ pub unsafe extern "C" fn xmlSetGenericErrorFunc(
  * to the builtin error function.
  */
 #[deprecated]
-pub unsafe extern "C" fn initGenericErrorDefaultFunc(handler: Option<XmlGenericErrorFunc>) {
-    _XML_GENERIC_ERROR = handler.or(Some(xmlGenericErrorDefaultFunc));
+pub unsafe extern "C" fn init_generic_error_default_func(handler: Option<XmlGenericErrorFunc>) {
+    _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
 }
 
 /**
@@ -1044,7 +1048,7 @@ pub unsafe extern "C" fn initGenericErrorDefaultFunc(handler: Option<XmlGenericE
  * be passed as first argument to @handler
  * For multi-threaded applications, this must be set separately for each thread.
  */
-pub unsafe extern "C" fn xmlSetStructuredErrorFunc(
+pub unsafe extern "C" fn xml_set_structured_error_func(
     ctx: *mut c_void,
     handler: Option<XmlStructuredErrorFunc>,
 ) {
@@ -1155,7 +1159,7 @@ macro_rules! xmlParserError {
         })($ctx, $msg)
     };
 }
-pub(crate) unsafe extern "C" fn xmlParserError(ctx: *mut c_void, msg: *const c_char) {
+pub(crate) unsafe extern "C" fn xml_parser_error(ctx: *mut c_void, msg: *const c_char) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut input: XmlParserInputPtr = null_mut();
     let mut cur: XmlParserInputPtr = null_mut();
@@ -1166,18 +1170,18 @@ pub(crate) unsafe extern "C" fn xmlParserError(ctx: *mut c_void, msg: *const c_c
             cur = input;
             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
         }
-        xmlParserPrintFileInfo(input);
+        xml_parser_print_file_info(input);
     }
 
     xml_generic_error(xml_generic_error_context(), c"error: ".as_ptr() as _);
     xml_generic_error(xml_generic_error_context(), msg as _);
 
     if !ctxt.is_null() {
-        xmlParserPrintFileContext(input);
+        xml_parser_print_file_context(input);
         if !cur.is_null() {
-            xmlParserPrintFileInfo(cur);
+            xml_parser_print_file_info(cur);
             xml_generic_error(xml_generic_error_context(), c"\n".as_ptr() as _);
-            xmlParserPrintFileContext(cur);
+            xml_parser_print_file_context(cur);
         }
     }
 }
@@ -1207,7 +1211,7 @@ macro_rules! xmlParserWarning {
     };
 }
 
-pub(crate) unsafe extern "C" fn xmlParserWarning(ctx: *mut c_void, msg: *const c_char) {
+pub(crate) unsafe extern "C" fn xml_parser_warning(ctx: *mut c_void, msg: *const c_char) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut input: XmlParserInputPtr = null_mut();
     let mut cur: XmlParserInputPtr = null_mut();
@@ -1218,18 +1222,18 @@ pub(crate) unsafe extern "C" fn xmlParserWarning(ctx: *mut c_void, msg: *const c
             cur = input;
             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
         }
-        xmlParserPrintFileInfo(input);
+        xml_parser_print_file_info(input);
     }
 
     xml_generic_error(xml_generic_error_context(), c"warning: ".as_ptr() as _);
     xml_generic_error(xml_generic_error_context(), msg as _);
 
     if !ctxt.is_null() {
-        xmlParserPrintFileContext(input);
+        xml_parser_print_file_context(input);
         if !cur.is_null() {
-            xmlParserPrintFileInfo(cur);
+            xml_parser_print_file_info(cur);
             xml_generic_error(xml_generic_error_context(), c"\n".as_ptr() as _);
-            xmlParserPrintFileContext(cur);
+            xml_parser_print_file_context(cur);
         }
     }
 }
@@ -1259,7 +1263,7 @@ macro_rules! xmlParserValidityError {
     };
 }
 
-pub(crate) unsafe extern "C" fn xmlParserValidityError(ctx: *mut c_void, msg: *const c_char) {
+pub(crate) unsafe extern "C" fn xml_parser_validity_error(ctx: *mut c_void, msg: *const c_char) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut input: XmlParserInputPtr = std::ptr::null_mut();
     let len: libc::c_int = xml_strlen(msg as *const XmlChar);
@@ -1273,7 +1277,7 @@ pub(crate) unsafe extern "C" fn xmlParserValidityError(ctx: *mut c_void, msg: *c
             }
 
             if !HAD_INFO.load(Ordering::Acquire) {
-                xmlParserPrintFileInfo(input);
+                xml_parser_print_file_info(input);
             }
         }
         xml_generic_error(
@@ -1288,7 +1292,7 @@ pub(crate) unsafe extern "C" fn xmlParserValidityError(ctx: *mut c_void, msg: *c
     xml_generic_error(xml_generic_error_context(), msg as _);
 
     if !ctxt.is_null() && !input.is_null() {
-        xmlParserPrintFileContext(input);
+        xml_parser_print_file_context(input);
     }
 }
 
@@ -1317,7 +1321,7 @@ macro_rules! xmlParserValidityWarning {
     };
 }
 
-pub(crate) unsafe extern "C" fn xmlParserValidityWarning(ctx: *mut c_void, msg: *const c_char) {
+pub(crate) unsafe extern "C" fn xml_parser_validity_warning(ctx: *mut c_void, msg: *const c_char) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut input: XmlParserInputPtr = std::ptr::null_mut();
     let len: c_int = xml_strlen(msg as *const XmlChar);
@@ -1328,7 +1332,7 @@ pub(crate) unsafe extern "C" fn xmlParserValidityWarning(ctx: *mut c_void, msg: 
             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
         }
 
-        xmlParserPrintFileInfo(input);
+        xml_parser_print_file_info(input);
     }
 
     xml_generic_error(
@@ -1338,7 +1342,7 @@ pub(crate) unsafe extern "C" fn xmlParserValidityWarning(ctx: *mut c_void, msg: 
     xml_generic_error(xml_generic_error_context(), msg as _);
 
     if !ctxt.is_null() {
-        xmlParserPrintFileContext(input);
+        xml_parser_print_file_context(input);
     }
 }
 
@@ -1351,7 +1355,7 @@ pub(crate) unsafe extern "C" fn xmlParserValidityWarning(ctx: *mut c_void, msg: 
 // static void
 // xmlParserPrintFileContextInternal(xmlParserInputPtr input ,
 // 		xmlGenericErrorFunc channel, void *data ) {
-unsafe extern "C" fn xmlParserPrintFileContextInternal(
+unsafe extern "C" fn xml_parser_print_file_context_internal(
     input: XmlParserInputPtr,
     channel: XmlGenericErrorFunc,
     data: *mut c_void,
@@ -1438,7 +1442,7 @@ unsafe extern "C" fn xmlParserPrintFileContextInternal(
  *
  * Displays the associated file and line information for the current input
  */
-pub unsafe extern "C" fn xmlParserPrintFileInfo(input: XmlParserInputPtr) {
+pub unsafe extern "C" fn xml_parser_print_file_info(input: XmlParserInputPtr) {
     if !input.is_null() {
         if !(*input).filename.is_null() {
             // xml_generic_error(xmlGenericErrorContext, c"%s:%d: ".as_ptr() as _, (*input).filename, (*input).line);
@@ -1467,8 +1471,8 @@ pub unsafe extern "C" fn xmlParserPrintFileInfo(input: XmlParserInputPtr) {
  *
  * Displays current context within the input content for error tracking
  */
-pub unsafe extern "C" fn xmlParserPrintFileContext(input: XmlParserInputPtr) {
-    xmlParserPrintFileContextInternal(input, xml_generic_error, xml_generic_error_context());
+pub unsafe extern "C" fn xml_parser_print_file_context(input: XmlParserInputPtr) {
+    xml_parser_print_file_context_internal(input, xml_generic_error, xml_generic_error_context());
 }
 
 /*
@@ -1482,7 +1486,7 @@ pub unsafe extern "C" fn xmlParserPrintFileContext(input: XmlParserInputPtr) {
  *
  * Returns NULL if no error occurred or a pointer to the error
  */
-pub unsafe extern "C" fn xmlGetLastError() -> XmlErrorPtr {
+pub unsafe extern "C" fn xml_get_last_error() -> XmlErrorPtr {
     if (*xml_last_error()).code == XmlParserErrors::XmlErrOK as _ {
         return null_mut();
     }
@@ -1495,11 +1499,11 @@ pub unsafe extern "C" fn xmlGetLastError() -> XmlErrorPtr {
  * Cleanup the last global error registered. For parsing error
  * this does not change the well-formedness result.
  */
-pub unsafe extern "C" fn xmlResetLastError() {
+pub unsafe extern "C" fn xml_reset_last_error() {
     if (*xml_last_error()).code == XmlParserErrors::XmlErrOK as _ {
         return;
     }
-    xmlResetError(xml_last_error());
+    xml_reset_error(xml_last_error());
 }
 
 /**
@@ -1510,7 +1514,7 @@ pub unsafe extern "C" fn xmlResetLastError() {
  *
  * Returns NULL if no error occurred or a pointer to the error
  */
-pub unsafe extern "C" fn xmlCtxtGetLastError(ctx: *mut c_void) -> XmlErrorPtr {
+pub unsafe extern "C" fn xml_ctxt_get_last_error(ctx: *mut c_void) -> XmlErrorPtr {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
 
     if ctxt.is_null() {
@@ -1529,7 +1533,7 @@ pub unsafe extern "C" fn xmlCtxtGetLastError(ctx: *mut c_void) -> XmlErrorPtr {
  * Cleanup the last global error registered. For parsing error
  * this does not change the well-formedness result.
  */
-pub unsafe extern "C" fn xmlCtxtResetLastError(ctx: *mut c_void) {
+pub unsafe extern "C" fn xml_ctxt_reset_last_error(ctx: *mut c_void) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
 
     if ctxt.is_null() {
@@ -1539,7 +1543,7 @@ pub unsafe extern "C" fn xmlCtxtResetLastError(ctx: *mut c_void) {
     if (*ctxt).last_error.code == XmlParserErrors::XmlErrOK as i32 {
         return;
     }
-    xmlResetError(addr_of_mut!((*ctxt).last_error));
+    xml_reset_error(addr_of_mut!((*ctxt).last_error));
 }
 
 /**
@@ -1548,7 +1552,7 @@ pub unsafe extern "C" fn xmlCtxtResetLastError(ctx: *mut c_void) {
  *
  * Cleanup the error.
  */
-pub unsafe extern "C" fn xmlResetError(err: XmlErrorPtr) {
+pub unsafe extern "C" fn xml_reset_error(err: XmlErrorPtr) {
     if err.is_null() {
         return;
     }
@@ -1583,7 +1587,7 @@ pub unsafe extern "C" fn xmlResetError(err: XmlErrorPtr) {
  *
  * Returns 0 in case of success and -1 in case of error.
  */
-pub unsafe extern "C" fn xmlCopyError(from: XmlErrorPtr, to: XmlErrorPtr) -> c_int {
+pub unsafe extern "C" fn xml_copy_error(from: XmlErrorPtr, to: XmlErrorPtr) -> c_int {
     if from.is_null() || to.is_null() {
         return -1;
     }
@@ -1636,7 +1640,7 @@ pub unsafe extern "C" fn xmlCopyError(from: XmlErrorPtr, to: XmlErrorPtr) -> c_i
  * Report an error with its context, replace the 4 old error/warning
  * routines.
  */
-pub unsafe extern "C" fn xmlReportError(
+pub unsafe extern "C" fn xml_report_error(
     err: XmlErrorPtr,
     ctxt: XmlParserCtxtPtr,
     str: *const c_char,
@@ -1817,7 +1821,7 @@ pub unsafe extern "C" fn xmlReportError(
     }
 
     if !ctxt.is_null() {
-        xmlParserPrintFileContextInternal(input, channel, data);
+        xml_parser_print_file_context_internal(input, channel, data);
         if !cur.is_null() {
             if !(*cur).filename.is_null() {
                 xml_error_with_format!(
@@ -1835,7 +1839,7 @@ pub unsafe extern "C" fn xmlReportError(
                     (*cur).line
                 );
             }
-            xmlParserPrintFileContextInternal(cur, channel, data);
+            xml_parser_print_file_context_internal(cur, channel, data);
         }
     }
     if domain == XmlErrorDomain::XmlFromXpath as i32
@@ -1870,9 +1874,9 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let handler = gen_xml_generic_error_func_ptr(n_handler, 0);
 
-                initGenericErrorDefaultFunc(handler);
+                init_generic_error_default_func(handler);
                 des_xml_generic_error_func_ptr(n_handler, handler, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1900,11 +1904,11 @@ mod tests {
                     let from = gen_xml_error_ptr(n_from, 0);
                     let to = gen_xml_error_ptr(n_to, 1);
 
-                    let ret_val = xmlCopyError(from, to);
+                    let ret_val = xml_copy_error(from, to);
                     desret_int(ret_val);
                     des_xml_error_ptr(n_from, from, 0);
                     des_xml_error_ptr(n_to, to, 1);
-                    xmlResetLastError();
+                    xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1935,9 +1939,9 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctx = gen_void_ptr(n_ctx, 0);
 
-                xmlCtxtResetLastError(ctx);
+                xml_ctxt_reset_last_error(ctx);
                 des_void_ptr(n_ctx, ctx, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1975,9 +1979,9 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let input = gen_xml_parser_input_ptr(n_input, 0);
 
-                xmlParserPrintFileContext(input);
+                xml_parser_print_file_context(input);
                 des_xml_parser_input_ptr(n_input, input, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2003,9 +2007,9 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let input = gen_xml_parser_input_ptr(n_input, 0);
 
-                xmlParserPrintFileInfo(input);
+                xml_parser_print_file_info(input);
                 des_xml_parser_input_ptr(n_input, input, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2049,9 +2053,9 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let err = gen_xml_error_ptr(n_err, 0);
 
-                xmlResetError(err);
+                xml_reset_error(err);
                 des_xml_error_ptr(n_err, err, 0);
-                xmlResetLastError();
+                xml_reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2068,8 +2072,8 @@ mod tests {
     #[test]
     fn test_xml_reset_last_error() {
         unsafe {
-            xmlResetLastError();
-            xmlResetLastError();
+            xml_reset_last_error();
+            xml_reset_last_error();
         }
     }
 
