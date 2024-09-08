@@ -512,7 +512,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_destroy(cur: XmlC14NVisibleNsStac
  *
  * Cleanups the C14N context object.
  */
-unsafe extern "C" fn xmlC14NFreeCtx(ctx: XmlC14NCtxPtr) {
+unsafe extern "C" fn xml_c14n_free_ctx(ctx: XmlC14NCtxPtr) {
     if ctx.is_null() {
         xml_c14n_err_param(c"freeing context".as_ptr() as _);
         return;
@@ -610,7 +610,7 @@ unsafe extern "C" fn xml_c14n_new_ctx(
             XmlParserErrors::XmlC14nCreateStack as i32,
             c"xmlC14NNewCtx: xmlC14NVisibleNsStackCreate failed\n".as_ptr() as _,
         );
-        xmlC14NFreeCtx(ctx);
+        xml_c14n_free_ctx(ctx);
         return null_mut();
     }
 
@@ -1171,13 +1171,12 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
  *
  * Returns 0 on success or -1 on fail.
  */
-unsafe extern "C" fn xmlExcC14NProcessNamespacesAxis(
+unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
     ctx: XmlC14NCtxPtr,
     cur: XmlNodePtr,
     visible: c_int,
 ) -> c_int {
     let mut ns: XmlNsPtr;
-
     let mut attr: XmlAttrPtr;
     let mut already_rendered: c_int;
     let mut has_empty_ns: c_int = 0;
@@ -2125,7 +2124,7 @@ unsafe extern "C" fn xml_c14n_process_element_node(
     if !xmlC14NIsExclusive!(ctx) {
         ret = xml_c14n_process_namespaces_axis(ctx, cur, visible);
     } else {
-        ret = xmlExcC14NProcessNamespacesAxis(ctx, cur, visible);
+        ret = xml_exc_c14n_process_namespaces_axis(ctx, cur, visible);
     }
     if ret < 0 {
         xml_c14n_err_internal(c"processing namespaces axis".as_ptr() as _);
@@ -2567,7 +2566,7 @@ pub unsafe extern "C" fn xml_c14n_execute(
         ret = xml_c14n_process_node_list(ctx, (*doc).children);
         if ret < 0 {
             xml_c14n_err_internal(c"processing docs children list".as_ptr() as _);
-            xmlC14NFreeCtx(ctx);
+            xml_c14n_free_ctx(ctx);
             return -1;
         }
     }
@@ -2578,14 +2577,14 @@ pub unsafe extern "C" fn xml_c14n_execute(
     ret = xmlOutputBufferFlush(buf);
     if ret < 0 {
         xml_c14n_err_internal(c"flushing output buffer".as_ptr() as _);
-        xmlC14NFreeCtx(ctx);
+        xml_c14n_free_ctx(ctx);
         return -1;
     }
 
     /*
      * Cleanup
      */
-    xmlC14NFreeCtx(ctx);
+    xml_c14n_free_ctx(ctx);
     ret
 }
 
@@ -2599,7 +2598,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_xml_c14_ndoc_dump_memory() {
+    fn test_xml_c14n_doc_dump_memory() {
         #[cfg(all(feature = "libxml_c14n", feature = "output"))]
         unsafe {
             let mut leaks = 0;
@@ -2666,7 +2665,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_c14_ndoc_save() {
+    fn test_xml_c14n_doc_save() {
         #[cfg(all(feature = "libxml_c14n", feature = "output"))]
         unsafe {
             let mut leaks = 0;
@@ -2736,7 +2735,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_c14_ndoc_save_to() {
+    fn test_xml_c14n_doc_save_to() {
         #[cfg(all(feature = "libxml_c14n", feature = "output"))]
         unsafe {
             let mut leaks = 0;
@@ -2800,7 +2799,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_c14_nexecute() {
+    fn test_xml_c14n_execute() {
 
         /* missing type support */
     }
