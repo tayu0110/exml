@@ -858,7 +858,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
  *
  * [5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )
  */
-unsafe extern "C" fn xmlCompileIDCXPathPath(ctxt: XmlPatParserContextPtr) {
+unsafe extern "C" fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     'error_unfinished: {
         'error: {
@@ -977,7 +977,7 @@ macro_rules! NXT {
  *
  * [5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )
  */
-unsafe extern "C" fn xmlCompilePathPattern(ctxt: XmlPatParserContextPtr) {
+unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'/' {
         (*(*ctxt).comp).flags |= PAT_FROM_ROOT as i32;
@@ -1505,9 +1505,9 @@ pub unsafe extern "C" fn xml_patterncompile(
             (*ctxt).comp = cur;
 
             if XML_STREAM_XS_IDC!(cur) {
-                xmlCompileIDCXPathPath(ctxt);
+                xml_compile_idc_xpath_path(ctxt);
             } else {
-                xmlCompilePathPattern(ctxt);
+                xml_compile_path_pattern(ctxt);
             }
             if (*ctxt).error != 0 {
                 break 'error;
@@ -1617,7 +1617,7 @@ unsafe extern "C" fn xml_pat_push_state(
  *
  * Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
  */
-unsafe extern "C" fn xmlPatMatch(comp: XmlPatternPtr, mut node: XmlNodePtr) -> c_int {
+unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> c_int {
     let mut i: c_int;
     let mut step: XmlStepOpPtr;
     let mut states: XmlStepStates = XmlStepStates {
@@ -1926,7 +1926,7 @@ pub unsafe extern "C" fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlNod
     }
 
     while !comp.is_null() {
-        ret = xmlPatMatch(comp, node);
+        ret = xml_pat_match(comp, node);
         if ret != 0 {
             return ret;
         }
@@ -2206,7 +2206,7 @@ unsafe extern "C" fn xml_stream_ctxt_add_state(
  * Returns: -1 in case of error, 1 if the current state in the stream is a
  *    is_match and 0 otherwise.
  */
-unsafe extern "C" fn xmlStreamPushInternal(
+unsafe extern "C" fn xml_stream_push_internal(
     mut stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -2594,7 +2594,7 @@ pub unsafe extern "C" fn xml_stream_push_node(
     ns: *const XmlChar,
     node_type: c_int,
 ) -> c_int {
-    xmlStreamPushInternal(stream, name, ns, node_type)
+    xml_stream_push_internal(stream, name, ns, node_type)
 }
 
 /**
@@ -2618,7 +2618,7 @@ pub unsafe extern "C" fn xml_stream_push(
     name: *const XmlChar,
     ns: *const XmlChar,
 ) -> c_int {
-    xmlStreamPushInternal(stream, name, ns, XmlElementType::XmlElementNode as i32)
+    xml_stream_push_internal(stream, name, ns, XmlElementType::XmlElementNode as i32)
 }
 
 /**
@@ -2642,7 +2642,7 @@ pub unsafe extern "C" fn xml_stream_push_attr(
     name: *const XmlChar,
     ns: *const XmlChar,
 ) -> c_int {
-    xmlStreamPushInternal(stream, name, ns, XmlElementType::XmlAttributeNode as i32)
+    xml_stream_push_internal(stream, name, ns, XmlElementType::XmlAttributeNode as i32)
 }
 
 /**
