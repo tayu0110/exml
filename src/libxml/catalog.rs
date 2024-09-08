@@ -674,7 +674,7 @@ unsafe extern "C" fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c
             return -1;
         }
 
-        ret = xmlParseSGMLCatalog(catal, content, filename, 0);
+        ret = xml_parse_sgml_catalog(catal, content, filename, 0);
         if ret < 0 {
             xml_free(content as _);
             return -1;
@@ -717,7 +717,7 @@ unsafe extern "C" fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c
  *
  * Returns 0 in case of success, -1 in case of error.
  */
-unsafe extern "C" fn xmlParseSGMLCatalog(
+unsafe extern "C" fn xml_parse_sgml_catalog(
     catal: XmlCatalogPtr,
     value: *const XmlChar,
     file: *const c_char,
@@ -979,7 +979,7 @@ pub unsafe extern "C" fn xml_load_a_catalog(filename: *const c_char) -> XmlCatal
             xml_free(content as _);
             return null_mut();
         }
-        ret = xmlParseSGMLCatalog(catal, content, filename, 0);
+        ret = xml_parse_sgml_catalog(catal, content, filename, 0);
         if ret < 0 {
             xml_free_catalog(catal);
             xml_free(content as _);
@@ -1032,7 +1032,7 @@ pub unsafe extern "C" fn xml_load_sgml_super_catalog(filename: *const c_char) ->
         return null_mut();
     }
 
-    let ret: c_int = xmlParseSGMLCatalog(catal, content, filename, 1);
+    let ret: c_int = xml_parse_sgml_catalog(catal, content, filename, 1);
     xml_free(content as _);
     if ret < 0 {
         xml_free_catalog(catal);
@@ -1764,7 +1764,7 @@ unsafe extern "C" fn xml_get_xml_catalog_entry_type(name: *const XmlChar) -> Xml
  *
  * Returns 0 if successful, -1 otherwise
  */
-unsafe extern "C" fn xml_add_xmlcatalog(
+unsafe extern "C" fn xml_add_xml_catalog(
     catal: XmlCatalogEntryPtr,
     typs: *const XmlChar,
     orig: *const XmlChar,
@@ -1917,7 +1917,7 @@ pub unsafe extern "C" fn xml_a_catalog_add(
     }
 
     if matches!((*catal).typ, XmlCatalogType::XmlXmlCatalogType) {
-        res = xml_add_xmlcatalog((*catal).xml, typ, orig, replace);
+        res = xml_add_xml_catalog((*catal).xml, typ, orig, replace);
     } else {
         let cattype: XmlCatalogEntryType = xml_get_sgml_catalog_entry_type(typ);
         if !matches!(cattype, XmlCatalogEntryType::XmlCataNone) {
