@@ -23,7 +23,7 @@ use std::{
 use exml::{
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
-        globals::xmlGetWarningsDefaultValue,
+        globals::xml_get_warnings_default_value,
         parser::{
             xmlCtxtReadFile, xml_cleanup_parser, xml_free_parser_ctxt, xml_init_parser,
             xml_new_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
@@ -549,7 +549,7 @@ unsafe extern "C" fn test_structured_error_handler(_ctx: *mut c_void, err: XmlEr
 }
 
 unsafe extern "C" fn initialize_libxml2() {
-    *xmlGetWarningsDefaultValue() = 0;
+    *xml_get_warnings_default_value() = 0;
     xml_pedantic_parser_default(0);
 
     xml_mem_setup(

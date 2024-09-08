@@ -3530,7 +3530,7 @@ unsafe extern "C" fn xpath_common_test(
 ) -> c_int {
     use std::io::{BufRead, BufReader};
 
-    use exml::{libxml::globals::xmlGenericErrorContext, xml_generic_error};
+    use exml::{libxml::globals::xml_generic_error_context, xml_generic_error};
 
     let mut ret: c_int = 0;
 
@@ -3566,7 +3566,7 @@ unsafe extern "C" fn xpath_common_test(
         Ok(file) => BufReader::new(file),
         _ => {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Cannot open %s for reading\n".as_ptr(),
                 filename
             );
@@ -5260,7 +5260,7 @@ unsafe extern "C" fn load_xpath_expr(
     use std::sync::atomic::Ordering;
 
     use exml::libxml::{
-        globals::xmlLoadExtDtdDefaultValue,
+        globals::xml_load_ext_dtd_default_value,
         parser::{
             xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
         },
@@ -5279,7 +5279,7 @@ unsafe extern "C" fn load_xpath_expr(
     /*
      * load XPath expr as a file
      */
-    *xmlLoadExtDtdDefaultValue() = XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32;
+    *xml_load_ext_dtd_default_value() = XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32;
     xml_substitute_entities_default(1);
 
     let doc: XmlDocPtr = xmlReadFile(
@@ -5462,7 +5462,7 @@ unsafe extern "C" fn c14n_run_test(
 ) -> c_int {
     use exml::libxml::{
         c14n::xml_c14n_doc_dump_memory,
-        globals::xmlLoadExtDtdDefaultValue,
+        globals::xml_load_ext_dtd_default_value,
         parser::{
             xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
         },
@@ -5481,7 +5481,7 @@ unsafe extern "C" fn c14n_run_test(
      * build an XML tree from a the file; we need to add default
      * attributes and resolve all character and entities references
      */
-    *xmlLoadExtDtdDefaultValue() = XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32;
+    *xml_load_ext_dtd_default_value() = XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32;
     xml_substitute_entities_default(1);
 
     let doc: XmlDocPtr = xmlReadFile(
@@ -5792,10 +5792,12 @@ static NUM_THREADS: usize = unsafe { THREAD_PARAMS.len() };
 
 #[cfg(all(feature = "thread", feature = "catalog"))]
 extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
-    use exml::libxml::globals::__xmlGenericErrorContext;
+    use exml::libxml::globals::__xml_generic_error_context;
 
     unsafe {
-        use exml::libxml::globals::{xmlDoValidityCheckingDefaultValue, xmlGenericErrorContext};
+        use exml::libxml::globals::{
+            xml_do_validity_checking_default_value, xml_generic_error_context,
+        };
 
         let my_doc: XmlDocPtr;
         let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
@@ -5818,11 +5820,11 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         }
 
         if strcmp(filename, c"./test/threads/invalid.xml".as_ptr()) == 0 {
-            *xmlDoValidityCheckingDefaultValue() = 0;
-            *__xmlGenericErrorContext() = stdout as _;
+            *xml_do_validity_checking_default_value() = 0;
+            *__xml_generic_error_context() = stdout as _;
         } else {
-            *xmlDoValidityCheckingDefaultValue() = 1;
-            *__xmlGenericErrorContext() = stderr as _;
+            *xml_do_validity_checking_default_value() = 1;
+            *__xml_generic_error_context() = stderr as _;
         }
         #[cfg(feature = "sax1")]
         {
@@ -5839,20 +5841,20 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             okay = 0;
         }
         if strcmp(filename, c"./test/threads/invalid.xml".as_ptr()) == 0 {
-            if *xmlDoValidityCheckingDefaultValue() != 0 {
+            if *xml_do_validity_checking_default_value() != 0 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
-            if xmlGenericErrorContext() != stdout as _ {
+            if xml_generic_error_context() != stdout as _ {
                 println!("xmlGenericErrorContext override failed");
                 okay = 0;
             }
         } else {
-            if *xmlDoValidityCheckingDefaultValue() != 1 {
+            if *xml_do_validity_checking_default_value() != 1 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
-            if xmlGenericErrorContext() != stderr as _ {
+            if xml_generic_error_context() != stderr as _ {
                 println!("xmlGenericErrorContext override failed");
                 okay = 0;
             }
@@ -5963,7 +5965,7 @@ unsafe extern "C" fn regexp_test(
 
     use exml::{
         libxml::{
-            globals::xmlGenericErrorContext,
+            globals::xml_generic_error_context,
             xmlregexp::{xml_reg_free_regexp, xml_regexp_compile},
         },
         xml_generic_error,
@@ -5980,7 +5982,7 @@ unsafe extern "C" fn regexp_test(
         Ok(file) => BufReader::new(file),
         _ => {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Cannot open %s for reading\n".as_ptr(),
                 filename
             );
@@ -6130,7 +6132,7 @@ unsafe extern "C" fn automata_test(
 
     use exml::{
         libxml::{
-            globals::xmlGenericErrorContext,
+            globals::xml_generic_error_context,
             xmlautomata::{
                 xml_automata_compile, xml_automata_get_init_state, xml_automata_new_count_trans,
                 xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
@@ -6158,7 +6160,7 @@ unsafe extern "C" fn automata_test(
         Ok(file) => BufReader::new(file),
         _ => {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Cannot open %s for reading\n".as_ptr(),
                 filename
             );
@@ -6187,7 +6189,7 @@ unsafe extern "C" fn automata_test(
     am = xml_new_automata();
     if am.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot create automata\n".as_ptr()
         );
         return -1;
@@ -6195,7 +6197,7 @@ unsafe extern "C" fn automata_test(
     states[0] = xml_automata_get_init_state(am);
     if states[0].is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot get start state\n".as_ptr()
         );
         xml_free_automata(am);
@@ -6235,7 +6237,7 @@ unsafe extern "C" fn automata_test(
                 let from: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Bad line %s\n".as_ptr(),
                         expr.as_ptr()
                     );
@@ -6248,7 +6250,7 @@ unsafe extern "C" fn automata_test(
                 let to: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Bad line %s\n".as_ptr(),
                         expr.as_ptr()
                     );
@@ -6265,7 +6267,7 @@ unsafe extern "C" fn automata_test(
                 let from: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Bad line %s\n".as_ptr(),
                         expr.as_ptr()
                     );
@@ -6286,7 +6288,7 @@ unsafe extern "C" fn automata_test(
                 let state: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if states[state].is_null() {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Bad state %d : %s\n".as_ptr(),
                         state,
                         expr.as_ptr()
@@ -6300,7 +6302,7 @@ unsafe extern "C" fn automata_test(
                 let from: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Bad line %s\n".as_ptr(),
                         expr.as_ptr()
                     );
@@ -6313,7 +6315,7 @@ unsafe extern "C" fn automata_test(
                 let to: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Bad line %s\n".as_ptr(),
                         expr.as_ptr()
                     );
@@ -6326,7 +6328,7 @@ unsafe extern "C" fn automata_test(
                 let min: c_int = scan_number(addr_of_mut!(ptr));
                 if *ptr != b' ' as i8 {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Bad line %s\n".as_ptr(),
                         expr.as_ptr()
                     );
@@ -6336,7 +6338,7 @@ unsafe extern "C" fn automata_test(
                 let max: c_int = scan_number(addr_of_mut!(ptr));
                 if *ptr != b' ' as i8 {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Bad line %s\n".as_ptr(),
                         expr.as_ptr()
                     );
@@ -6359,7 +6361,7 @@ unsafe extern "C" fn automata_test(
                 am = null_mut();
                 if regexp.is_null() {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Failed to compile the automata".as_ptr()
                     );
                     break;
@@ -6392,7 +6394,7 @@ unsafe extern "C" fn automata_test(
                 ret = xml_reg_exec_push_string(exec, expr.as_ptr(), null_mut());
             } else {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Unexpected line %s\n".as_ptr(),
                     expr.as_ptr()
                 );

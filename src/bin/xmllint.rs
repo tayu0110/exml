@@ -29,9 +29,9 @@ use exml::{
         encoding::{xmlAddEncodingAlias, XmlCharEncoding},
         entities::{xml_encode_entities_reentrant, XmlEntityPtr},
         globals::{
-            xmlDeregisterNodeDefault, xmlGenericError, xmlGenericErrorContext,
-            xmlLoadExtDtdDefaultValue, xmlParserDebugEntities, xmlRegisterNodeDefault,
-            xmlTreeIndentString, xml_free,
+            xml_deregister_node_default, xml_free, xml_generic_error, xml_generic_error_context,
+            xml_load_ext_dtd_default_value, xml_parser_debug_entities, xml_register_node_default,
+            xml_tree_indent_string,
         },
         htmlparser::{
             html_create_push_parser_ctxt, html_ctxt_use_options, html_free_parser_ctxt,
@@ -456,7 +456,7 @@ unsafe extern "C" fn xml_htmlencode_send() {
     let result: *mut c_char =
         xml_encode_entities_reentrant(null_mut(), BUFFER.as_ptr() as _) as *mut c_char;
     if !result.is_null() {
-        xml_generic_error!(xmlGenericErrorContext(), c"%s".as_ptr(), result);
+        xml_generic_error!(xml_generic_error_context(), c"%s".as_ptr(), result);
         xml_free(result as _);
     }
     BUFFER[0] = 0;
@@ -470,7 +470,7 @@ unsafe extern "C" fn xml_htmlencode_send() {
  */
 
 unsafe extern "C" fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
-    xml_generic_error!(xmlGenericErrorContext(), c"<p>".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"<p>".as_ptr());
 
     let len = strlen(BUFFER.as_ptr());
     if !input.is_null() {
@@ -509,7 +509,7 @@ unsafe extern "C" fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
     if input.is_null() {
         return;
     }
-    xml_generic_error!(xmlGenericErrorContext(), c"<pre>\n".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"<pre>\n".as_ptr());
     cur = (*input).cur;
     base = (*input).base;
     while cur > base && (*cur == b'\n' || *cur == b'\r') {
@@ -571,7 +571,7 @@ unsafe extern "C" fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
         c"^\n".as_ptr(),
     );
     xml_htmlencode_send();
-    xml_generic_error!(xmlGenericErrorContext(), c"</pre>".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"</pre>".as_ptr());
 }
 
 /**
@@ -595,11 +595,11 @@ unsafe extern "C" fn xml_html_error(ctx: *mut c_void, msg: *const c_char) {
 
     xml_htmlprint_file_info(input);
 
-    xml_generic_error!(xmlGenericErrorContext(), c"<b>error</b>: ".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"<b>error</b>: ".as_ptr());
     let len = strlen(BUFFER.as_ptr());
     snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
     xml_htmlencode_send();
-    xml_generic_error!(xmlGenericErrorContext(), c"</p>\n".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
 
     xml_htmlprint_file_context(input);
     xml_htmlencode_send();
@@ -626,11 +626,11 @@ unsafe extern "C" fn xml_html_warning(ctx: *mut c_void, msg: *const c_char) {
 
     xml_htmlprint_file_info(input);
 
-    xml_generic_error!(xmlGenericErrorContext(), c"<b>warning</b>: ".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"<b>warning</b>: ".as_ptr());
     let len = strlen(BUFFER.as_ptr());
     snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
     xml_htmlencode_send();
-    xml_generic_error!(xmlGenericErrorContext(), c"</p>\n".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
 
     xml_htmlprint_file_context(input);
     xml_htmlencode_send();
@@ -658,13 +658,13 @@ unsafe extern "C" fn xml_html_validity_error(ctx: *mut c_void, msg: *const c_cha
     xml_htmlprint_file_info(input);
 
     xml_generic_error!(
-        xmlGenericErrorContext(),
+        xml_generic_error_context(),
         c"<b>validity error</b>: ".as_ptr()
     );
     let len = strlen(BUFFER.as_ptr());
     snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
     xml_htmlencode_send();
-    xml_generic_error!(xmlGenericErrorContext(), c"</p>\n".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
 
     xml_htmlprint_file_context(input);
     xml_htmlencode_send();
@@ -693,13 +693,13 @@ unsafe extern "C" fn xml_html_validity_warning(ctx: *mut c_void, msg: *const c_c
     xml_htmlprint_file_info(input);
 
     xml_generic_error!(
-        xmlGenericErrorContext(),
+        xml_generic_error_context(),
         c"<b>validity warning</b>: ".as_ptr()
     );
     let len = strlen(BUFFER.as_ptr());
     snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
     xml_htmlencode_send();
-    xml_generic_error!(xmlGenericErrorContext(), c"</p>\n".as_ptr());
+    xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
 
     xml_htmlprint_file_context(input);
     xml_htmlencode_send();
@@ -1721,8 +1721,8 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
             }
             xml_schema_set_valid_errors(
                 vctxt,
-                Some(xmlGenericError),
-                Some(xmlGenericError),
+                Some(xml_generic_error),
+                Some(xml_generic_error),
                 null_mut(),
             );
             xml_schema_validate_set_filename(vctxt, filename);
@@ -1996,7 +1996,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             ret = xml_text_reader_relaxng_validate(reader, relaxng.as_ref().unwrap().as_ptr());
             if ret < 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Relax-NG schema %s failed to compile\n".as_ptr(),
                     relaxng.as_ref().unwrap().as_ptr()
                 );
@@ -2015,7 +2015,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             ret = xml_text_reader_schema_validate(reader, schema.as_ref().unwrap().as_ptr());
             if ret < 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"XSD schema %s failed to compile\n".as_ptr(),
                     schema.as_ref().unwrap().as_ptr()
                 );
@@ -2071,7 +2071,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         #[cfg(feature = "valid")]
         if VALID != 0 && xml_text_reader_is_valid(reader) != 1 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Document %s does not validate\n".as_ptr(),
                 filename
             );
@@ -2140,7 +2140,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
         let root: XmlNodePtr = xml_doc_get_root_element(doc);
         if root.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Document does not have a root element".as_ptr()
             );
             PROGRESULT = XmllintReturnCode::ErrUnclass;
@@ -2171,7 +2171,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
             );
             if PATTERNC.load(Ordering::Relaxed).is_null() {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Pattern %s failed to compile\n".as_ptr(),
                     PATTERN.lock().unwrap().as_ref().unwrap().as_ptr()
                 );
@@ -3092,13 +3092,13 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         if dtd.is_null() {
             if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Could not parse DTD %s\n".as_ptr(),
                     dtd_valid.as_ptr()
                 );
             } else {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Could not parse DTD %s\n".as_ptr(),
                     DTDVALIDFPI.lock().unwrap().as_ref().unwrap().as_ptr()
                 );
@@ -3108,15 +3108,15 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             let cvp = xml_new_valid_ctxt();
             if cvp.is_null() {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Couldn't allocate validation context\n".as_ptr()
                 );
                 PROGRESULT = XmllintReturnCode::ErrMem;
                 xml_free_dtd(dtd);
                 return;
             }
-            (*cvp).error = Some(xmlGenericError);
-            (*cvp).warning = Some(xmlGenericError);
+            (*cvp).error = Some(xml_generic_error);
+            (*cvp).warning = Some(xml_generic_error);
 
             if TIMING != 0 && REPEAT == 0 {
                 start_timer();
@@ -3124,14 +3124,14 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             if xml_validate_dtd(cvp, doc, dtd) == 0 {
                 if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Document %s does not validate against %s\n".as_ptr(),
                         filename,
                         dtd_valid.as_ptr()
                     );
                 } else {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Document %s does not validate against %s\n".as_ptr(),
                         filename,
                         DTDVALIDFPI.lock().unwrap().as_ref().unwrap().as_ptr()
@@ -3149,7 +3149,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         let cvp = xml_new_valid_ctxt();
         if cvp.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Couldn't allocate validation context\n".as_ptr()
             );
             PROGRESULT = XmllintReturnCode::ErrMem;
@@ -3160,11 +3160,11 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         if TIMING != 0 && REPEAT == 0 {
             start_timer();
         }
-        (*cvp).error = Some(xmlGenericError);
-        (*cvp).warning = Some(xmlGenericError);
+        (*cvp).error = Some(xml_generic_error);
+        (*cvp).warning = Some(xml_generic_error);
         if xml_validate_document(cvp, doc) == 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Document %s does not validate\n".as_ptr(),
                 filename
             );
@@ -3237,8 +3237,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         }
         xml_relaxng_set_valid_errors(
             ctxt,
-            Some(xmlGenericError),
-            Some(xmlGenericError),
+            Some(xml_generic_error),
+            Some(xml_generic_error),
             null_mut(),
         );
         match xml_relaxng_validate_doc(ctxt, doc).cmp(&0) {
@@ -3280,8 +3280,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         }
         xml_schema_set_valid_errors(
             ctxt,
-            Some(xmlGenericError),
-            Some(xmlGenericError),
+            Some(xml_generic_error),
+            Some(xml_generic_error),
             null_mut(),
         );
         match xml_schema_validate_doc(ctxt, doc).cmp(&0) {
@@ -3903,7 +3903,7 @@ fn main() {
             } else if cfg!(feature = "libxml_debug") && (arg == "-debugent" || arg == "--debugent")
             {
                 DEBUGENT += 1;
-                *xmlParserDebugEntities() = 1;
+                *xml_parser_debug_entities() = 1;
             } else if cfg!(feature = "libxml_c14n") && (arg == "-c14n" || arg == "--c14n") {
                 CANONICAL += 1;
                 OPTIONS |= XmlParserOption::XmlParseNoent as i32
@@ -4021,23 +4021,23 @@ fn main() {
         }
 
         if CHKREGISTER != 0 {
-            xmlRegisterNodeDefault(Some(register_node));
-            xmlDeregisterNodeDefault(deregister_node);
+            xml_register_node_default(Some(register_node));
+            xml_deregister_node_default(deregister_node);
         }
 
         if let Some(indent) = option_env!("XMLLINT_INDENT") {
             let indent = CString::new(indent).expect("Failed to construct Indent string");
-            *xmlTreeIndentString() = indent.as_ptr();
+            *xml_tree_indent_string() = indent.as_ptr();
         }
 
         DEFAULT_ENTITY_LOADER = Some(xml_get_external_entity_loader());
         xml_set_external_entity_loader(xmllint_external_entity_loader);
 
         if LOADDTD != 0 {
-            *xmlLoadExtDtdDefaultValue() |= XML_DETECT_IDS as i32;
+            *xml_load_ext_dtd_default_value() |= XML_DETECT_IDS as i32;
         }
         if DTDATTRS != 0 {
-            *xmlLoadExtDtdDefaultValue() |= XML_COMPLETE_ATTRS as i32;
+            *xml_load_ext_dtd_default_value() |= XML_COMPLETE_ATTRS as i32;
         }
         if NOENT != 0 {
             OPTIONS |= XmlParserOption::XmlParseNoent as i32;
@@ -4049,20 +4049,20 @@ fn main() {
             let program_name =
                 CString::new(program_name.as_bytes()).expect("Failed to construct program name");
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\"\n".as_ptr()
             );
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"\t\"http://www.w3.org/TR/REC-html40/loose.dtd\">\n".as_ptr()
             );
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"<html><head><title>%s output</title></head>\n".as_ptr(),
                 program_name.as_ptr()
             );
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"<body bgcolor=\"#ffffff\"><h1 align=\"center\">%s output</h1>\n".as_ptr(),
                 program_name.as_ptr()
             );
@@ -4077,7 +4077,7 @@ fn main() {
             let mut schematron = SCHEMATRON.lock().unwrap();
             if let Some(s) = schematron.as_ref() {
                 /* forces loading the DTDs */
-                *xmlLoadExtDtdDefaultValue() |= 1;
+                *xml_load_ext_dtd_default_value() |= 1;
                 OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
                 if TIMING != 0 {
                     start_timer();
@@ -4093,7 +4093,7 @@ fn main() {
                 WXSCHEMATRON.store(xmlSchematronParse(ctxt), Ordering::Relaxed);
                 if WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Schematron schema %s failed to compile\n".as_ptr(),
                         s.as_ptr()
                     );
@@ -4111,7 +4111,7 @@ fn main() {
             let mut relaxng = RELAXNG.lock().unwrap();
             if let Some(r) = relaxng.as_ref() {
                 /* forces loading the DTDs */
-                *xmlLoadExtDtdDefaultValue() |= 1;
+                *xml_load_ext_dtd_default_value() |= 1;
                 OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
                 if TIMING != 0 {
                     start_timer();
@@ -4126,14 +4126,14 @@ fn main() {
                 }
                 xml_relaxng_set_parser_errors(
                     ctxt,
-                    Some(xmlGenericError),
-                    Some(xmlGenericError),
+                    Some(xml_generic_error),
+                    Some(xml_generic_error),
                     null_mut(),
                 );
                 RELAXNGSCHEMAS.store(xml_relaxng_parse(ctxt), Ordering::Relaxed);
                 if RELAXNGSCHEMAS.load(Ordering::Relaxed).is_null() {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Relax-NG schema %s failed to compile\n".as_ptr(),
                         r.as_ptr()
                     );
@@ -4161,14 +4161,14 @@ fn main() {
                 }
                 xml_schema_set_parser_errors(
                     ctxt,
-                    Some(xmlGenericError),
-                    Some(xmlGenericError),
+                    Some(xml_generic_error),
+                    Some(xml_generic_error),
                     null_mut(),
                 );
                 let wxschemas = xml_schema_parse(ctxt);
                 if wxschemas.is_null() {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"WXS schema %s failed to compile\n".as_ptr(),
                         s.as_ptr()
                     );
@@ -4193,7 +4193,7 @@ fn main() {
                 );
                 if PATTERNC.load(Ordering::Relaxed).is_null() {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Pattern %s failed to compile\n".as_ptr(),
                         p.as_ptr()
                     );
@@ -4271,7 +4271,7 @@ fn main() {
             parse_and_print_file(null_mut(), null_mut());
         }
         if HTMLOUT != 0 && NOWRAP == 0 {
-            xml_generic_error!(xmlGenericErrorContext(), c"</body></html>\n".as_ptr());
+            xml_generic_error!(xml_generic_error_context(), c"</body></html>\n".as_ptr());
         }
         if files == 0 && GENERATE == 0 && version == 0 {
             usage(&mut stderr(), &program_name);

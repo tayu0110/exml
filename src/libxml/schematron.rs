@@ -16,7 +16,7 @@ use libc::{malloc, memset, snprintf, sprintf, FILE};
 use crate::{
     __xml_raise_error,
     libxml::{
-        globals::xmlGenericErrorContext, tree::XmlElementType, xmlerror::XmlGenericErrorFunc,
+        globals::xml_generic_error_context, tree::XmlElementType, xmlerror::XmlGenericErrorFunc,
         xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile,
     },
     private::error::__xml_simple_error,
@@ -1667,14 +1667,14 @@ unsafe extern "C" fn xmlSchematronRegisterVariables(
         let_eval = xml_xpath_compiled_eval((*letr).comp, ctxt);
         if let_eval.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Evaluation of compiled expression failed\n".as_ptr() as _
             );
             return -1;
         }
         if xml_xpath_register_variable_ns(ctxt, (*letr).name, null_mut(), let_eval) != 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Registering a let variable failed\n".as_ptr() as _
             );
             return -1;
@@ -1784,7 +1784,7 @@ unsafe extern "C" fn xmlSchematronFormatReport(
                         }
                     } else {
                         xml_generic_error!(
-                            xmlGenericErrorContext(),
+                            xml_generic_error_context(),
                             c"Empty node set\n".as_ptr() as _
                         );
                     }
@@ -1811,7 +1811,7 @@ unsafe extern "C" fn xmlSchematronFormatReport(
                 }
                 _ => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Unsupported XPATH Type: %d\n".as_ptr() as _,
                         (*eval).typ
                     );
@@ -2076,7 +2076,7 @@ unsafe extern "C" fn xmlSchematronUnregisterVariables(
     while !letr.is_null() {
         if xml_xpath_register_variable_ns(ctxt, (*letr).name, null_mut(), null_mut()) != 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Unregistering a let variable failed\n".as_ptr() as _
             );
             return -1;

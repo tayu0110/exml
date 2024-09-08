@@ -18,7 +18,7 @@ use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATA
 use crate::libxml::dict::xml_dict_owns;
 use crate::libxml::encoding::{xmlDetectCharEncoding, xmlFindCharEncodingHandler};
 use crate::libxml::entities::{xml_get_predefined_entity, XmlEntityPtr};
-use crate::libxml::globals::xmlGenericErrorContext;
+use crate::libxml::globals::xml_generic_error_context;
 use crate::libxml::parser::{
     ns_pop, xmlParseCDSect, xmlParseEncName, xmlParseExternalID, xmlParseStartTag2,
     xmlParseTextDecl, xmlParseVersionNum, xmlStringDecodeEntitiesInt, xml_err_msg_str,
@@ -57,7 +57,7 @@ use super::encoding::{
 };
 use super::entities::XmlEntityType;
 use super::globals::{
-    xmlParserDebugEntities, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc,
+    xml_free, xml_malloc, xml_malloc_atomic, xml_parser_debug_entities, xml_realloc,
 };
 use super::hash::{
     xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
@@ -1337,9 +1337,9 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
         );
         return null_mut();
     }
-    if *xmlParserDebugEntities() != 0 {
+    if *xml_parser_debug_entities() != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"new fixed input: %.30s\n".as_ptr() as _,
             buffer
         );
@@ -1392,9 +1392,9 @@ pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
         );
         return null_mut();
     }
-    if *xmlParserDebugEntities() != 0 {
+    if *xml_parser_debug_entities() != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"new input from entity: %s\n".as_ptr() as _,
             (*entity).name.load(Ordering::Relaxed)
         );
@@ -1683,17 +1683,17 @@ pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParser
         return -1;
     }
 
-    if *xmlParserDebugEntities() != 0 {
+    if *xml_parser_debug_entities() != 0 {
         if !(*ctxt).input.is_null() && !(*(*ctxt).input).filename.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"%s(%d): ".as_ptr() as _,
                 (*(*ctxt).input).filename,
                 (*(*ctxt).input).line
             );
         }
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Pushing input %d : %.30s\n".as_ptr() as _,
             (*ctxt).input_nr + 1,
             (*input).cur
@@ -1766,9 +1766,9 @@ pub unsafe extern "C" fn xml_new_input_from_file(
 ) -> XmlParserInputPtr {
     let mut input_stream: XmlParserInputPtr;
 
-    if *xmlParserDebugEntities() != 0 {
+    if *xml_parser_debug_entities() != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"new input from file: %s\n".as_ptr() as _,
             filename
         );
@@ -5385,9 +5385,9 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
         );
         return;
     }
-    if *xmlParserDebugEntities() != 0 {
+    if *xml_parser_debug_entities() != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"PEReference: %s\n".as_ptr() as _,
             name
         );
@@ -8065,7 +8065,7 @@ mod __parser_internal_for_legacy {
 
     use crate::{
         libxml::{
-            entities::XmlEntityPtr, globals::xmlGenericErrorContext, parser::XmlParserCtxtPtr,
+            entities::XmlEntityPtr, globals::xml_generic_error_context, parser::XmlParserCtxtPtr,
             tree::XmlNodePtr, xmlstring::XmlChar,
         },
         xml_generic_error,
@@ -8112,7 +8112,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlParseQuotedString() deprecated function reached\n".as_ptr()
             );
             DEPRECATED.store(true, Ordering::Release);
@@ -8140,7 +8140,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlParseNamespace() deprecated function reached\n".as_ptr() as _,
             );
             DEPRECATED.store(true, Ordering::Release);
@@ -8168,7 +8168,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlNamespaceParseNSDef() deprecated function reached\n".as_ptr() as _,
             );
             DEPRECATED.store(true, Ordering::Release);
@@ -8201,7 +8201,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlScanName() deprecated function reached\n".as_ptr() as _,
             );
             DEPRECATED.store(true, Ordering::Release);
@@ -8231,7 +8231,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlNamespaceParseNCName() deprecated function reached\n".as_ptr() as _,
             );
             DEPRECATED.store(true, Ordering::Release);
@@ -8272,7 +8272,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlParserHandleReference() deprecated function reached\n".as_ptr() as _,
             );
             DEPRECATED.store(true, Ordering::Release);
@@ -8307,7 +8307,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlNamespaceParseQName() deprecated function reached\n".as_ptr() as _,
             );
             DEPRECATED.store(true, Ordering::Release);
@@ -8352,7 +8352,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlDecodeEntities() deprecated function reached\n".as_ptr() as _,
             );
             DEPRECATED.store(true, Ordering::Release);
@@ -8376,7 +8376,7 @@ mod __parser_internal_for_legacy {
 
         if !DEPRECATED.load(Ordering::Acquire) {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlHandleEntity() deprecated function reached\n".as_ptr() as _,
             );
             DEPRECATED.store(true, Ordering::Release);

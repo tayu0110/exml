@@ -10,7 +10,7 @@ use std::{
 
 use crate::libxml::{
     entities::XmlEntityPtr,
-    globals::xmlGenericErrorContext,
+    globals::xml_generic_error_context,
     parser::{XmlParserInputPtr, XmlSAXHandlerV1, XmlSaxlocatorPtr},
     sax2::{
         xmlSAX2AttributeDecl, xmlSAX2CDataBlock, xmlSAX2Characters, xmlSAX2Comment,
@@ -31,7 +31,7 @@ macro_rules! DEPRECATED {
     ($n:literal) => {
         if DEPRECATED_V1_MSG == 0 {
             $crate::xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Use of deprecated SAXv1 function %s\n".as_ptr() as _,
                 $n.as_ptr()
             );

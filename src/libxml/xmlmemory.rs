@@ -13,7 +13,7 @@ use libc::{
 };
 
 use crate::libxml::globals::{
-    xmlGenericErrorContext, xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc,
+    xml_free, xml_generic_error_context, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc,
 };
 use crate::libxml::parser::xml_init_parser;
 use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
@@ -85,7 +85,7 @@ static mut XML_MEM_TRACE_BLOCK_AT: *mut c_void = null_mut();
  */
 unsafe extern "C" fn debugmem_tag_error(addr: *mut c_void) {
     xml_generic_error!(
-        xmlGenericErrorContext(),
+        xml_generic_error_context(),
         c"Memory tag error occurs :%p \n\t bye\n".as_ptr() as _,
         addr
     );
@@ -185,7 +185,7 @@ pub type XmlStrdupFunc = unsafe extern "C" fn(str: *const XmlChar) -> *mut XmlCh
  */
 pub unsafe extern "C" fn xml_malloc_breakpoint() {
     xml_generic_error!(
-        xmlGenericErrorContext(),
+        xml_generic_error_context(),
         c"xmlMallocBreakpoint reached on block %d\n".as_ptr() as _,
         XML_MEM_STOP_AT_BLOCK
     );
@@ -793,7 +793,7 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
     'error: {
         if ptr == -1 as _ {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"trying to free pointer from freed area\n".as_ptr() as _
             );
             break 'error;
@@ -801,7 +801,7 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
 
         if XML_MEM_TRACE_BLOCK_AT == ptr {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"%p : Freed()\n".as_ptr() as _,
                 XML_MEM_TRACE_BLOCK_AT
             );
@@ -849,7 +849,7 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
 
     // error:
     xml_generic_error!(
-        xmlGenericErrorContext(),
+        xml_generic_error_context(),
         c"xmlMemFree(%p) error\n".as_ptr() as _,
         ptr
     );
@@ -892,7 +892,7 @@ pub unsafe extern "C" fn xml_malloc_loc(
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlMallocLoc : Unsigned overflow\n".as_ptr() as _,
         );
         xml_memory_dump();
@@ -903,7 +903,7 @@ pub unsafe extern "C" fn xml_malloc_loc(
 
     if p.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlMallocLoc : Out of free space\n".as_ptr() as _
         );
         xml_memory_dump();
@@ -943,7 +943,7 @@ pub unsafe extern "C" fn xml_malloc_loc(
 
     if XML_MEM_TRACE_BLOCK_AT == ret {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"%p : Malloc(%lu) Ok\n".as_ptr() as _,
             XML_MEM_TRACE_BLOCK_AT,
             size as c_ulong
@@ -1010,7 +1010,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlReallocLoc : Unsigned overflow\n".as_ptr() as _
         );
         xml_memory_dump();
@@ -1026,7 +1026,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
     p = tmp;
     if XML_MEM_TRACE_BLOCK_AT == ptr {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"%p : Realloced(%lu -> %lu) Ok\n".as_ptr() as _,
             XML_MEM_TRACE_BLOCK_AT,
             (*p).mh_size as c_ulong,
@@ -1091,7 +1091,7 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlMallocAtomicLoc : Unsigned overflow\n".as_ptr() as _
         );
         xml_memory_dump();
@@ -1102,7 +1102,7 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
 
     if p.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlMallocAtomicLoc : Out of free space\n".as_ptr() as _
         );
         xml_memory_dump();
@@ -1142,7 +1142,7 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
 
     if XML_MEM_TRACE_BLOCK_AT == ret {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"%p : Malloc(%lu) Ok\n".as_ptr() as _,
             XML_MEM_TRACE_BLOCK_AT,
             size as c_ulong
@@ -1177,7 +1177,7 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlMemStrdupLoc : Unsigned overflow\n".as_ptr() as _
         );
         xml_memory_dump();
@@ -1218,7 +1218,7 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
 
     if XML_MEM_TRACE_BLOCK_AT == s as _ {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"%p : Strdup() Ok\n".as_ptr() as _,
             XML_MEM_TRACE_BLOCK_AT
         );

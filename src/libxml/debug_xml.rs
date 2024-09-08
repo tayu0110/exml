@@ -15,7 +15,7 @@ use libc::{fprintf, fputc, strlen, FILE};
 
 use crate::{
     __xml_raise_error,
-    libxml::{entities::XmlEntityPtr, globals::xmlGenericErrorContext},
+    libxml::{entities::XmlEntityPtr, globals::xml_generic_error_context},
     xml_generic_error, IS_BLANK_CH,
 };
 
@@ -2254,42 +2254,66 @@ pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: c_int, mut arg:
     match XmlXPathObjectType::try_from(error_type) {
         Ok(XmlXPathObjectType::XpathUndefined) => {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"%s: no such node\n".as_ptr(),
                 arg
             );
         }
         Ok(XmlXPathObjectType::XpathBoolean) => {
-            xml_generic_error!(xmlGenericErrorContext(), c"%s is a Boolean\n".as_ptr(), arg);
+            xml_generic_error!(
+                xml_generic_error_context(),
+                c"%s is a Boolean\n".as_ptr(),
+                arg
+            );
         }
         Ok(XmlXPathObjectType::XpathNumber) => {
-            xml_generic_error!(xmlGenericErrorContext(), c"%s is a number\n".as_ptr(), arg);
+            xml_generic_error!(
+                xml_generic_error_context(),
+                c"%s is a number\n".as_ptr(),
+                arg
+            );
         }
         Ok(XmlXPathObjectType::XpathString) => {
-            xml_generic_error!(xmlGenericErrorContext(), c"%s is a string\n".as_ptr(), arg);
+            xml_generic_error!(
+                xml_generic_error_context(),
+                c"%s is a string\n".as_ptr(),
+                arg
+            );
         }
         #[cfg(feature = "libxml_xptr_locs")]
         Ok(XmlXPathObjectType::XpathPoint) => {
-            xml_generic_error!(xmlGenericErrorContext(), c"%s is a point\n".as_ptr(), arg);
+            xml_generic_error!(
+                xml_generic_error_context(),
+                c"%s is a point\n".as_ptr(),
+                arg
+            );
         }
         #[cfg(feature = "libxml_xptr_locs")]
         Ok(XmlXPathObjectType::XpathRange) => {
-            xml_generic_error!(xmlGenericErrorContext(), c"%s is a range\n".as_ptr(), arg);
+            xml_generic_error!(
+                xml_generic_error_context(),
+                c"%s is a range\n".as_ptr(),
+                arg
+            );
         }
         #[cfg(feature = "libxml_xptr_locs")]
         Ok(XmlXPathObjectType::XpathLocationset) => {
-            xml_generic_error!(xmlGenericErrorContext(), c"%s is a range\n".as_ptr(), arg);
+            xml_generic_error!(
+                xml_generic_error_context(),
+                c"%s is a range\n".as_ptr(),
+                arg
+            );
         }
         Ok(XmlXPathObjectType::XpathUsers) => {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"%s is user-defined\n".as_ptr(),
                 arg
             );
         }
         Ok(XmlXPathObjectType::XpathXsltTree) => {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"%s is an XSLT value tree\n".as_ptr(),
                 arg
             );
@@ -2366,30 +2390,30 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
                         );
                     }
                 } else {
-                    xml_generic_error!(xmlGenericErrorContext(), c"Empty node set\n".as_ptr());
+                    xml_generic_error!(xml_generic_error_context(), c"Empty node set\n".as_ptr());
                 }
                 #[cfg(not(feature = "output"))]
                 {
-                    xml_generic_error!(xmlGenericErrorContext(), c"Node set\n".as_ptr());
+                    xml_generic_error!(xml_generic_error_context(), c"Node set\n".as_ptr());
                 }
             }
             XmlXPathObjectType::XpathBoolean => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Is a Boolean:%s\n".as_ptr(),
                     xml_bool_to_text((*list).boolval)
                 );
             }
             XmlXPathObjectType::XpathNumber => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Is a number:%0g\n".as_ptr(),
                     (*list).floatval
                 );
             }
             XmlXPathObjectType::XpathString => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Is a string:%s\n".as_ptr(),
                     (*list).stringval
                 );
@@ -2722,7 +2746,7 @@ pub unsafe extern "C" fn xml_shell_write(
         XmlElementType::XmlDocumentNode => {
             if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Failed to write to %s\n".as_ptr(),
                     filename
                 );
@@ -2733,7 +2757,7 @@ pub unsafe extern "C" fn xml_shell_write(
             #[cfg(feature = "html")]
             if htmlSaveFile(filename as *mut c_char, (*ctxt).doc) < 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Failed to write to %s\n".as_ptr(),
                     filename
                 );
@@ -2742,7 +2766,7 @@ pub unsafe extern "C" fn xml_shell_write(
             #[cfg(not(feature = "html"))]
             if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Failed to write to %s\n".as_ptr(),
                     filename
                 );
@@ -2753,7 +2777,7 @@ pub unsafe extern "C" fn xml_shell_write(
             let f: *mut FILE = fopen(filename as *mut c_char, c"w".as_ptr());
             if f.is_null() {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Failed to write to %s\n".as_ptr(),
                     filename
                 );
@@ -2808,7 +2832,7 @@ pub unsafe extern "C" fn xml_shell_save(
         XmlElementType::XmlDocumentNode => {
             if xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Failed to save to %s\n".as_ptr(),
                     filename
                 );
@@ -2818,7 +2842,7 @@ pub unsafe extern "C" fn xml_shell_save(
             #[cfg(feature = "html")]
             if htmlSaveFile(filename as *mut c_char, (*ctxt).doc) < 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Failed to save to %s\n".as_ptr(),
                     filename
                 );
@@ -2826,7 +2850,7 @@ pub unsafe extern "C" fn xml_shell_save(
             #[cfg(not(feature = "html"))]
             if (xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0) {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Failed to save to %s\n".as_ptr(),
                     filename
                 );
@@ -2834,7 +2858,7 @@ pub unsafe extern "C" fn xml_shell_save(
         }
         _ => {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"To save to subparts of a document use the 'write' command\n".as_ptr()
             );
             return -1;
@@ -2868,7 +2892,7 @@ pub unsafe extern "C" fn xml_shell_validate(
     use libc::memset;
 
     use crate::libxml::{
-        globals::xmlGenericError,
+        globals::xml_generic_error,
         parser::xml_parse_dtd,
         tree::xml_free_dtd,
         valid::{xml_validate_document, xml_validate_dtd},
@@ -2883,8 +2907,8 @@ pub unsafe extern "C" fn xml_shell_validate(
         return -1;
     }
     memset(addr_of_mut!(vctxt) as _, 0, size_of_val(&vctxt));
-    vctxt.error = Some(xmlGenericError);
-    vctxt.warning = Some(xmlGenericError);
+    vctxt.error = Some(xml_generic_error);
+    vctxt.warning = Some(xml_generic_error);
 
     if dtd.is_null() || *dtd.add(0) == 0 {
         res = xml_validate_document(addr_of_mut!(vctxt), (*ctxt).doc);
@@ -3064,7 +3088,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
     _node2: XmlNodePtr,
 ) -> c_int {
     use crate::libxml::{
-        globals::xmlGenericError,
+        globals::xml_generic_error,
         relaxng::{
             xmlRelaxNGNewParserCtxt, xml_relaxng_free, xml_relaxng_free_parser_ctxt,
             xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
@@ -3078,15 +3102,15 @@ unsafe extern "C" fn xml_shell_rng_validate(
     let ctxt: XmlRelaxNGParserCtxtPtr = xmlRelaxNGNewParserCtxt(schemas);
     xml_relaxng_set_parser_errors(
         ctxt,
-        Some(xmlGenericError),
-        Some(xmlGenericError),
+        Some(xml_generic_error),
+        Some(xml_generic_error),
         null_mut(),
     );
     let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
     xml_relaxng_free_parser_ctxt(ctxt);
     if relaxngschemas.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Relax-NG schema %s failed to compile\n".as_ptr(),
             schemas
         );
@@ -3095,8 +3119,8 @@ unsafe extern "C" fn xml_shell_rng_validate(
     let vctxt: XmlRelaxNGValidCtxtPtr = xml_relaxng_new_valid_ctxt(relaxngschemas);
     xml_relaxng_set_valid_errors(
         vctxt,
-        Some(xmlGenericError),
-        Some(xmlGenericError),
+        Some(xml_generic_error),
+        Some(xml_generic_error),
         null_mut(),
     );
     let ret: c_int = xml_relaxng_validate_doc(vctxt, (*sctxt).doc);
@@ -3744,7 +3768,7 @@ pub unsafe extern "C" fn xml_shell(
             #[cfg(feature = "output")]
             if arg[0] == 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Write command requires a filename argument\n".as_ptr()
                 );
             } else {
@@ -3785,7 +3809,7 @@ pub unsafe extern "C" fn xml_shell(
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s: no such node\n".as_ptr(),
                                 arg
                             );
@@ -3806,21 +3830,21 @@ pub unsafe extern "C" fn xml_shell(
                         }
                         XmlXPathObjectType::XpathBoolean => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a Boolean\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a number\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathString => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a string\n".as_ptr(),
                                 arg
                             );
@@ -3828,7 +3852,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a point\n".as_ptr(),
                                 arg
                             );
@@ -3836,7 +3860,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
@@ -3844,21 +3868,21 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is user-defined\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is an XSLT value tree\n".as_ptr(),
                                 arg
                             );
@@ -3870,7 +3894,7 @@ pub unsafe extern "C" fn xml_shell(
                     }
                 } else {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"%s: no such node\n".as_ptr(),
                         arg
                     );
@@ -3894,7 +3918,7 @@ pub unsafe extern "C" fn xml_shell(
             #[cfg(feature = "xpath")]
             if arg[0] == 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"setns: prefix=[nsuri] required\n".as_ptr()
                 );
             } else {
@@ -3928,7 +3952,7 @@ pub unsafe extern "C" fn xml_shell(
             #[cfg(feature = "xpath")]
             if arg[0] == 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"xpath: expression required\n".as_ptr()
                 );
             } else {
@@ -3977,7 +4001,7 @@ pub unsafe extern "C" fn xml_shell(
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s: no such node\n".as_ptr(),
                                 arg
                             );
@@ -4007,21 +4031,21 @@ pub unsafe extern "C" fn xml_shell(
                         }
                         XmlXPathObjectType::XpathBoolean => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a Boolean\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a number\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathString => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a string\n".as_ptr(),
                                 arg
                             );
@@ -4029,7 +4053,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a point\n".as_ptr(),
                                 arg
                             );
@@ -4037,7 +4061,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
@@ -4045,21 +4069,21 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is user-defined\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is an XSLT value tree\n".as_ptr(),
                                 arg
                             );
@@ -4071,7 +4095,7 @@ pub unsafe extern "C" fn xml_shell(
                     }
                 } else {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"%s: no such node\n".as_ptr(),
                         arg
                     );
@@ -4099,7 +4123,7 @@ pub unsafe extern "C" fn xml_shell(
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s: no such node\n".as_ptr(),
                                 arg
                             );
@@ -4123,21 +4147,21 @@ pub unsafe extern "C" fn xml_shell(
                         }
                         XmlXPathObjectType::XpathBoolean => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a Boolean\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a number\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathString => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a string\n".as_ptr(),
                                 arg
                             );
@@ -4145,7 +4169,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a point\n".as_ptr(),
                                 arg
                             );
@@ -4153,7 +4177,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
@@ -4161,21 +4185,21 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is user-defined\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is an XSLT value tree\n".as_ptr(),
                                 arg
                             );
@@ -4187,7 +4211,7 @@ pub unsafe extern "C" fn xml_shell(
                     }
                 } else {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"%s: no such node\n".as_ptr(),
                         arg
                     );
@@ -4215,7 +4239,7 @@ pub unsafe extern "C" fn xml_shell(
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s: no such node\n".as_ptr(),
                                 arg
                             );
@@ -4228,14 +4252,14 @@ pub unsafe extern "C" fn xml_shell(
                                         && ((*(*ctxt).node).typ == XmlElementType::XmlNamespaceDecl)
                                     {
                                         xml_generic_error!(
-                                            xmlGenericErrorContext(),
+                                            xml_generic_error_context(),
                                             c"cannot cd to namespace\n".as_ptr()
                                         );
                                         (*ctxt).node = null_mut();
                                     }
                                 } else {
                                     xml_generic_error!(
-                                        xmlGenericErrorContext(),
+                                        xml_generic_error_context(),
                                         c"%s is a %d Node Set\n".as_ptr(),
                                         arg,
                                         (*(*list).nodesetval).node_nr
@@ -4243,7 +4267,7 @@ pub unsafe extern "C" fn xml_shell(
                                 }
                             } else {
                                 xml_generic_error!(
-                                    xmlGenericErrorContext(),
+                                    xml_generic_error_context(),
                                     c"%s is an empty Node Set\n".as_ptr(),
                                     arg
                                 );
@@ -4251,21 +4275,21 @@ pub unsafe extern "C" fn xml_shell(
                         }
                         XmlXPathObjectType::XpathBoolean => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a Boolean\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a number\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathString => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a string\n".as_ptr(),
                                 arg
                             );
@@ -4273,7 +4297,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a point\n".as_ptr(),
                                 arg
                             );
@@ -4281,7 +4305,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
@@ -4289,21 +4313,21 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is user-defined\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is an XSLT value tree\n".as_ptr(),
                                 arg
                             );
@@ -4315,7 +4339,7 @@ pub unsafe extern "C" fn xml_shell(
                     }
                 } else {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"%s: no such node\n".as_ptr(),
                         arg
                     );
@@ -4351,7 +4375,7 @@ pub unsafe extern "C" fn xml_shell(
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s: no such node\n".as_ptr(),
                                 arg
                             );
@@ -4375,21 +4399,21 @@ pub unsafe extern "C" fn xml_shell(
                         }
                         XmlXPathObjectType::XpathBoolean => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a Boolean\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a number\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathString => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a string\n".as_ptr(),
                                 arg
                             );
@@ -4397,7 +4421,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a point\n".as_ptr(),
                                 arg
                             );
@@ -4405,7 +4429,7 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
@@ -4413,21 +4437,21 @@ pub unsafe extern "C" fn xml_shell(
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is a range\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is user-defined\n".as_ptr(),
                                 arg
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"%s is an XSLT value tree\n".as_ptr(),
                                 arg
                             );
@@ -4439,7 +4463,7 @@ pub unsafe extern "C" fn xml_shell(
                     }
                 } else {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"%s: no such node\n".as_ptr(),
                         arg
                     );
@@ -4448,7 +4472,7 @@ pub unsafe extern "C" fn xml_shell(
             }
         } else {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Unknown command %s\n".as_ptr(),
                 command
             );

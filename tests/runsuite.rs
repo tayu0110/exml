@@ -16,7 +16,7 @@ use std::{
 };
 
 use exml::libxml::{
-    globals::{xmlGetWarningsDefaultValue, xml_free},
+    globals::{xml_free, xml_get_warnings_default_value},
     parser::{
         xmlReadFile, xmlReadMemory, xml_cleanup_parser, xml_init_parser,
         xml_pedantic_parser_default, xml_set_external_entity_loader, XmlParserCtxtPtr,
@@ -229,7 +229,7 @@ unsafe extern "C" fn test_error_handler(_ctx: *mut c_void, msg: *const c_char) {
 static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
 
 unsafe extern "C" fn initialize_libxml2() {
-    *xmlGetWarningsDefaultValue() = 0;
+    *xml_get_warnings_default_value() = 0;
     xml_pedantic_parser_default(0);
 
     xml_mem_setup(

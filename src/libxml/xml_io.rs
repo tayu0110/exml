@@ -56,8 +56,8 @@ use super::{
         XmlCharEncodingOutputFunc,
     },
     globals::{
-        __xmlParserInputBufferCreateFilenameValue, xmlDefaultBufferSize,
-        xmlOutputBufferCreateFilenameValue, xml_free, xml_malloc,
+        __xml_parser_input_buffer_create_filename_value, xml_default_buffer_size, xml_free,
+        xml_malloc, xml_output_buffer_create_filename_value,
     },
     nanoftp::{xmlNanoFTPClose, xmlNanoFTPOpen, xmlNanoFTPRead},
     nanohttp::{
@@ -360,7 +360,7 @@ pub unsafe extern "C" fn xmlAllocParserInputBuffer(
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlParserInputBuffer>());
-    (*ret).buffer = xml_buf_create_size(2 * *xmlDefaultBufferSize() as usize);
+    (*ret).buffer = xml_buf_create_size(2 * *xml_default_buffer_size() as usize);
     if (*ret).buffer.is_null() {
         xml_free(ret as _);
         return null_mut();
@@ -371,7 +371,7 @@ pub unsafe extern "C" fn xmlAllocParserInputBuffer(
     );
     (*ret).encoder = xmlGetCharEncodingHandler(enc);
     if !(*ret).encoder.is_null() {
-        (*ret).raw = xml_buf_create_size(2 * *xmlDefaultBufferSize() as usize);
+        (*ret).raw = xml_buf_create_size(2 * *xml_default_buffer_size() as usize);
     } else {
         (*ret).raw = null_mut();
     }
@@ -401,7 +401,7 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateFilename(
     uri: *const c_char,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
-    if let Some(f) = __xmlParserInputBufferCreateFilenameValue() {
+    if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
         return f(uri, enc);
     }
     __xmlParserInputBufferCreateFilename(uri, enc)
@@ -1763,7 +1763,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFilename(
     // if let Some(f) = xmlOutputBufferCreateFilenameValue {
     //     return f(uri, encoder, compression);
     // }
-    xmlOutputBufferCreateFilenameValue(uri, encoder, compression);
+    xml_output_buffer_create_filename_value(uri, encoder, compression);
     __xmlOutputBufferCreateFilename(uri, encoder, compression)
 }
 

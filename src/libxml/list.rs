@@ -8,7 +8,7 @@ use std::{cmp::Ordering, ffi::c_int, mem::size_of, os::raw::c_void, ptr::null_mu
 use libc::memset;
 
 use crate::{
-    libxml::globals::{xmlGenericErrorContext, xml_free},
+    libxml::globals::{xml_free, xml_generic_error_context},
     xml_generic_error,
 };
 
@@ -97,7 +97,7 @@ pub unsafe extern "C" fn xml_list_create(
     let l: XmlListPtr = xml_malloc(size_of::<XmlList>()) as XmlListPtr;
     if l.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot initialize memory for list".as_ptr() as _
         );
         return null_mut();
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn xml_list_create(
     (*l).sentinel = xml_malloc(size_of::<XmlLink>()) as XmlLinkPtr;
     if (*l).sentinel.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot initialize memory for sentinel".as_ptr() as _
         );
         xml_free(l as _);
@@ -296,7 +296,7 @@ pub unsafe extern "C" fn xml_list_insert(l: XmlListPtr, data: *mut c_void) -> c_
     let lk_new: XmlLinkPtr = xml_malloc(size_of::<XmlLink>()) as XmlLinkPtr;
     if lk_new.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot initialize memory for new link".as_ptr() as _
         );
         return 1;
@@ -328,7 +328,7 @@ pub unsafe extern "C" fn xml_list_append(l: XmlListPtr, data: *mut c_void) -> c_
     let lk_new: XmlLinkPtr = xml_malloc(size_of::<XmlLink>()) as XmlLinkPtr;
     if lk_new.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot initialize memory for new link".as_ptr() as _
         );
         return 1;
@@ -555,7 +555,7 @@ pub unsafe extern "C" fn xml_list_push_front(l: XmlListPtr, data: *mut c_void) -
     let lk_new: XmlLinkPtr = xml_malloc(size_of::<XmlLink>()) as XmlLinkPtr;
     if lk_new.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot initialize memory for new link".as_ptr() as _
         );
         return 0;
@@ -586,7 +586,7 @@ pub unsafe extern "C" fn xml_list_push_back(l: XmlListPtr, data: *mut c_void) ->
     let lk_new: XmlLinkPtr = xml_malloc(size_of::<XmlLink>()) as XmlLinkPtr;
     if lk_new.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot initialize memory for new link".as_ptr() as _
         );
         return 0;

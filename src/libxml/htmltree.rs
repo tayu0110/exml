@@ -14,7 +14,7 @@ use libc::{memset, size_t, snprintf, FILE};
 
 use super::{
     encoding::XmlCharEncoding,
-    globals::{xmlRegisterNodeDefaultValue, xml_malloc},
+    globals::{xml_malloc, xml_register_node_default_value},
     htmlparser::{html_err_memory, HtmlDocPtr, HtmlNodePtr},
     tree::{
         xml_add_child, xml_add_prev_sibling, xml_create_int_subset, xml_free_node,
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn htmlNewDocNoDtD(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     /* && xmlRegisterNodeDefaultValue() */
     {
-        xmlRegisterNodeDefaultValue(cur as XmlNodePtr);
+        xml_register_node_default_value(cur as XmlNodePtr);
     }
     cur
 }

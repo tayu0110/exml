@@ -336,21 +336,21 @@ pub unsafe extern "C" fn xmlCleanupThreads() {}
  */
 #[cfg(feature = "thread")]
 unsafe extern "C" fn xmlNewGlobalState() -> XmlGlobalStatePtr {
-    use crate::{libxml::globals::xmlGenericErrorContext, xml_generic_error};
+    use crate::{libxml::globals::xml_generic_error_context, xml_generic_error};
 
-    use super::globals::xmlInitializeGlobalState;
+    use super::globals::xml_initialize_global_state;
 
     let gs: *mut XmlGlobalState = malloc(size_of::<XmlGlobalState>()) as _;
     if gs.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlGetGlobalState: out of memory\n".as_ptr() as _
         );
         return null_mut();
     }
 
     memset(gs as _, 0, size_of::<XmlGlobalState>());
-    xmlInitializeGlobalState(gs);
+    xml_initialize_global_state(gs);
     gs
 }
 
@@ -364,21 +364,28 @@ unsafe extern "C" fn xmlNewGlobalState() -> XmlGlobalStatePtr {
  * Returns the thread global state or NULL in case of error
  */
 pub(crate) unsafe extern "C" fn xmlGetGlobalState() -> XmlGlobalStatePtr {
-    if !XML_IS_THREADED {
-        return null_mut();
-    }
-
-    let globalval: *mut XmlGlobalState = pthread_getspecific(GLOBALKEY) as *mut XmlGlobalState;
-    if globalval.is_null() {
-        let tsd: *mut XmlGlobalState = xmlNewGlobalState();
-        if tsd.is_null() {
+    #[cfg(feature = "thread")]
+    {
+        if !XML_IS_THREADED {
             return null_mut();
         }
 
-        pthread_setspecific(GLOBALKEY, tsd as _);
-        return tsd;
+        let globalval: *mut XmlGlobalState = pthread_getspecific(GLOBALKEY) as *mut XmlGlobalState;
+        if globalval.is_null() {
+            let tsd: *mut XmlGlobalState = xmlNewGlobalState();
+            if tsd.is_null() {
+                return null_mut();
+            }
+
+            pthread_setspecific(GLOBALKEY, tsd as _);
+            return tsd;
+        }
+        globalval
     }
-    globalval
+    #[cfg(not(feature = "thread"))]
+    {
+        null_mut()
+    }
 }
 
 // #if defined(LIBXML_THREAD_ENABLED) && defined(_WIN32) && \

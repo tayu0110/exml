@@ -17,7 +17,7 @@ use libc::{close, fprintf, getenv, memset, open, read, snprintf, stat, FILE, O_R
 use crate::{
     __xml_raise_error,
     libxml::{
-        globals::{xmlGenericErrorContext, xml_realloc},
+        globals::{xml_generic_error_context, xml_realloc},
         hash::xml_hash_add_entry,
         threads::xmlGetThreadId,
         uri::xml_build_uri,
@@ -621,19 +621,19 @@ unsafe extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         if !(*ret).name.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Free catalog entry %s\n".as_ptr() as _,
                 (*ret).name
             );
         } else if !(*ret).value.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Free catalog entry %s\n".as_ptr() as _,
                 (*ret).value
             );
         } else {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Free catalog entry\n".as_ptr() as _
             );
         }
@@ -1126,7 +1126,7 @@ pub unsafe extern "C" fn xml_convert_sgmlcatalog(mut catal: XmlCatalogPtr) -> c_
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Converting SGML catalog to XML\n".as_ptr() as _
         );
     }
@@ -1266,7 +1266,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) > 1 {
             if !name_value.is_null() {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Found %s: '%s' '%s'\n".as_ptr() as _,
                     name,
                     name_value,
@@ -1274,7 +1274,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
                 );
             } else {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Found %s: '%s'\n".as_ptr() as _,
                     name,
                     url
@@ -1543,7 +1543,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
     if doc.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Failed to parse catalog %s\n".as_ptr() as _,
                 filename
             );
@@ -1553,7 +1553,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"%d Parsing catalog %s\n".as_ptr() as _,
             xmlGetThreadId(),
             filename
@@ -1656,7 +1656,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
         if !doc.is_null() {
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Found %s in file hash\n".as_ptr() as _,
                     (*catal).url
                 );
@@ -1673,7 +1673,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
         }
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"%s not found in file hash\n".as_ptr() as _,
                 (*catal).url
             );
@@ -1706,7 +1706,7 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> c_
     if !catalog_files.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"%s added to file hash\n".as_ptr() as _,
                 (*catal).url
             );
@@ -1792,7 +1792,7 @@ unsafe extern "C" fn xml_add_xmlcatalog(
     if matches!(typ, XmlCatalogEntryType::XmlCataNone) {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Failed to add unknown element %s to catalog\n".as_ptr() as _,
                 typs
             );
@@ -1809,7 +1809,7 @@ unsafe extern "C" fn xml_add_xmlcatalog(
             if !orig.is_null() && ((*cur).typ == typ) && xml_str_equal(orig, (*cur).name) != 0 {
                 if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Updating element %s to catalog\n".as_ptr() as _,
                         typs
                     );
@@ -1832,7 +1832,7 @@ unsafe extern "C" fn xml_add_xmlcatalog(
     }
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Adding element %s to catalog\n".as_ptr() as _,
             typs
         );
@@ -1984,13 +1984,13 @@ unsafe extern "C" fn xml_del_xml_catalog(
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                 if !(*cur).name.is_null() {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Removing element %s from catalog\n".as_ptr() as _,
                         (*cur).name
                     );
                 } else {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"Removing element %s from catalog\n".as_ptr() as _,
                         (*cur).value
                     );
@@ -2180,7 +2180,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
                     if xml_str_equal(sys_id, (*cur).name) != 0 {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"Found system match %s, using %s\n".as_ptr() as _,
                                 (*cur).name,
                                 (*cur).url
@@ -2212,7 +2212,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
         if !rewrite.is_null() {
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Using rewriting rule %s\n".as_ptr() as _,
                     (*rewrite).name
                 );
@@ -2254,7 +2254,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
                     if !(*cur).children.is_null() {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"Trying system delegate %s\n".as_ptr() as _,
                                 (*cur).url
                             );
@@ -2287,7 +2287,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
                     if xml_str_equal(pub_id, (*cur).name) != 0 {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"Found public match %s\n".as_ptr() as _,
                                 (*cur).name
                             );
@@ -2343,7 +2343,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
                     if !(*cur).children.is_null() {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             xml_generic_error!(
-                                xmlGenericErrorContext(),
+                                xml_generic_error_context(),
                                 c"Trying public delegate %s\n".as_ptr() as _,
                                 (*cur).url
                             );
@@ -2433,13 +2433,13 @@ unsafe extern "C" fn xml_catalog_list_xml_resolve(
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             if urn_id.is_null() {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Public URN ID %s expanded to null_mut()\n".as_ptr() as _,
                     pub_id
                 );
             } else {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Public URN ID expanded to %s\n".as_ptr() as _,
                     urn_id
                 );
@@ -2464,13 +2464,13 @@ unsafe extern "C" fn xml_catalog_list_xml_resolve(
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             if urn_id.is_null() {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"System URN ID %s expanded to null_mut()\n".as_ptr() as _,
                     sys_id
                 );
             } else {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"System URN ID expanded to %s\n".as_ptr() as _,
                     urn_id
                 );
@@ -2643,20 +2643,20 @@ pub unsafe extern "C" fn xml_a_catalog_resolve(
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         if !pub_id.is_null() && !sys_id.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Resolve: pubID %s sysID %s\n".as_ptr() as _,
                 pub_id,
                 sys_id
             );
         } else if !pub_id.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Resolve: pubID %s\n".as_ptr() as _,
                 pub_id
             );
         } else {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Resolve: sysID %s\n".as_ptr() as _,
                 sys_id
             );
@@ -2699,7 +2699,7 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_public(
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Resolve pubID %s\n".as_ptr() as _,
             pub_id
         );
@@ -2741,7 +2741,7 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_system(
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Resolve sysID %s\n".as_ptr() as _,
             sys_id
         );
@@ -2819,7 +2819,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
                 if xml_str_equal(uri, (*cur).name) != 0 {
                     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                         xml_generic_error!(
-                            xmlGenericErrorContext(),
+                            xml_generic_error_context(),
                             c"Found URI match %s\n".as_ptr() as _,
                             (*cur).name
                         );
@@ -2849,7 +2849,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
     if !rewrite.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Using rewriting rule %s\n".as_ptr() as _,
                 (*rewrite).name
             );
@@ -2893,7 +2893,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
                 if !(*cur).children.is_null() {
                     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                         xml_generic_error!(
-                            xmlGenericErrorContext(),
+                            xml_generic_error_context(),
                             c"Trying URI delegate %s\n".as_ptr() as _,
                             (*cur).url
                         );
@@ -2968,13 +2968,13 @@ unsafe extern "C" fn xml_catalog_list_xml_resolve_uri(
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             if urn_id.is_null() {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"URN ID %s expanded to null_mut()\n".as_ptr() as _,
                     uri
                 );
             } else {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"URN ID expanded to %s\n".as_ptr() as _,
                     urn_id
                 );
@@ -3025,7 +3025,7 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_uri(
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Resolve URI %s\n".as_ptr() as _,
             uri
         );
@@ -3700,7 +3700,7 @@ pub unsafe extern "C" fn xml_catalog_cleanup() {
     xmlRMutexLock(mutex);
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Catalogs cleanup\n".as_ptr() as _
         );
     }
@@ -4024,7 +4024,7 @@ pub unsafe extern "C" fn xml_catalog_add_local(
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Adding document catalog %s\n".as_ptr() as _,
             url
         );
@@ -4082,20 +4082,20 @@ pub unsafe extern "C" fn xml_catalog_local_resolve(
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         if !pub_id.is_null() && !sys_id.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Local Resolve: pubID %s sysID %s\n".as_ptr() as _,
                 pub_id,
                 sys_id
             );
         } else if !pub_id.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Local Resolve: pubID %s\n".as_ptr() as _,
                 pub_id
             );
         } else {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Local Resolve: sysID %s\n".as_ptr() as _,
                 sys_id
             );
@@ -4138,7 +4138,7 @@ pub unsafe extern "C" fn xml_catalog_local_resolve_uri(
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Resolve URI %s\n".as_ptr() as _,
             uri
         );
@@ -4201,13 +4201,13 @@ pub unsafe extern "C" fn xml_catalog_set_default_prefer(
         match prefer {
             XmlCatalogPrefer::Public => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Setting catalog preference to PUBLIC\n".as_ptr() as _
                 );
             }
             XmlCatalogPrefer::System => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Setting catalog preference to SYSTEM\n".as_ptr() as _
                 );
             }
@@ -4232,25 +4232,25 @@ pub unsafe extern "C" fn xml_catalog_set_defaults(allow: XmlCatalogAllow) {
         match allow {
             XmlCatalogAllow::None => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Disabling catalog usage\n".as_ptr() as _
                 );
             }
             XmlCatalogAllow::Global => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Allowing only global catalogs\n".as_ptr() as _
                 );
             }
             XmlCatalogAllow::Document => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Allowing only catalogs from the document\n".as_ptr() as _
                 );
             }
             XmlCatalogAllow::All => {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"Allowing all catalogs\n".as_ptr() as _
                 );
             }
@@ -4292,7 +4292,7 @@ pub unsafe extern "C" fn xml_catalog_get_system(sys_id: *const XmlChar) -> *cons
 
     if MSG.load(Ordering::Relaxed) == 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Use of deprecated xmlCatalogGetSystem() call\n".as_ptr() as _
         );
         MSG.fetch_add(1, Ordering::AcqRel);
@@ -4347,7 +4347,7 @@ pub unsafe extern "C" fn xml_catalog_get_public(pub_id: *const XmlChar) -> *cons
     let old = MSG.load(Ordering::Acquire);
     if old == 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Use of deprecated xmlCatalogGetPublic() call\n".as_ptr() as _
         );
         MSG.store(old + 1, Ordering::Release);

@@ -17,7 +17,9 @@ use libc::{fprintf, memcpy, memset, ptrdiff_t, snprintf, FILE};
 use crate::{
     __xml_raise_error,
     libxml::{
-        globals::{xmlGenericErrorContext, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{
+            xml_free, xml_generic_error_context, xml_malloc, xml_malloc_atomic, xml_realloc,
+        },
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_free,
             xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTable, XmlHashTablePtr,
@@ -61,7 +63,7 @@ use crate::{
     xml_generic_error, IS_BLANK_CH,
 };
 
-use super::globals::__xmlGenericError;
+use super::globals::__xml_generic_error;
 
 /**
  * xmlRelaxNGValidityErrorFunc:
@@ -1300,7 +1302,7 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     }
     if !xml_hash_lookup(registered_types, namespace).is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Relax-NG types library '%s' already registered\n".as_ptr() as _,
             namespace
         );
@@ -1322,7 +1324,7 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     let ret: c_int = xml_hash_add_entry(registered_types, namespace, lib as _);
     if ret < 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Relax-NG types library failed to register '%s'\n".as_ptr() as _,
             namespace
         );
@@ -1761,7 +1763,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> c_int {
     let registered_types = xml_hash_create(10);
     if registered_types.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Failed to allocate sh table for Relax-NG types\n".as_ptr() as _,
         );
         return -1;
@@ -1920,8 +1922,8 @@ pub unsafe extern "C" fn xmlRelaxNGNewParserCtxt(url: *const c_char) -> XmlRelax
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
     (*ret).url = xml_strdup(url as _) as _;
-    (*ret).error = Some(__xmlGenericError());
-    (*ret).user_data = xmlGenericErrorContext();
+    (*ret).error = Some(__xml_generic_error());
+    (*ret).user_data = xml_generic_error_context();
     ret
 }
 
@@ -1951,8 +1953,8 @@ pub unsafe extern "C" fn xmlRelaxNGNewMemParserCtxt(
     memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
     (*ret).buffer = buffer;
     (*ret).size = size;
-    (*ret).error = Some(__xmlGenericError());
-    (*ret).user_data = xmlGenericErrorContext();
+    (*ret).error = Some(__xml_generic_error());
+    (*ret).user_data = xml_generic_error_context();
     ret
 }
 
@@ -1986,7 +1988,7 @@ pub unsafe extern "C" fn xml_relaxng_new_doc_parser_ctxt(
     memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
     (*ret).document = copy;
     (*ret).freedoc = 1;
-    (*ret).user_data = xmlGenericErrorContext();
+    (*ret).user_data = xml_generic_error_context();
     ret
 }
 
@@ -9389,8 +9391,8 @@ pub unsafe extern "C" fn xml_relaxng_new_valid_ctxt(
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGValidCtxt>());
     (*ret).schema = schema;
-    (*ret).error = Some(__xmlGenericError());
-    (*ret).user_data = xmlGenericErrorContext();
+    (*ret).error = Some(__xml_generic_error());
+    (*ret).user_data = xml_generic_error_context();
     (*ret).err_nr = 0;
     (*ret).err_max = 0;
     (*ret).err = null_mut();

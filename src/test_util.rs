@@ -1331,8 +1331,8 @@ pub(crate) fn des_xml_feature(_no: c_int, _val: Option<XmlFeature>, _nr: c_int) 
 pub(crate) unsafe extern "C" fn gen_xml_saxhandler_ptr(no: c_int, _nr: c_int) -> XmlSAXHandlerPtr {
     #[cfg(feature = "sax1")]
     if no == 0 {
-        use crate::libxml::globals::xmlDefaultSAXHandler;
-        return xmlDefaultSAXHandler() as _;
+        use crate::libxml::globals::xml_default_sax_handler;
+        return xml_default_sax_handler() as _;
     }
     null_mut()
 }

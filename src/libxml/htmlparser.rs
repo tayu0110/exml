@@ -24,8 +24,8 @@ use crate::{
             XmlCharEncoding, XmlCharEncodingHandlerPtr,
         },
         globals::{
-            xmlDefaultSAXLocator, xmlKeepBlanksDefaultValue, xmlLineNumbersDefaultValue, xml_free,
-            xml_malloc, xml_malloc_atomic, xml_realloc,
+            xml_default_sax_locator, xml_free, xml_keep_blanks_default_value,
+            xml_line_numbers_default_value, xml_malloc, xml_malloc_atomic, xml_realloc,
         },
         hash::{xml_hash_default_deallocator, xml_hash_free},
         parser::{
@@ -9472,8 +9472,8 @@ unsafe extern "C" fn html_init_parser_ctxt(
     (*ctxt).my_doc = null_mut();
     (*ctxt).well_formed = 1;
     (*ctxt).replace_entities = 0;
-    (*ctxt).linenumbers = *xmlLineNumbersDefaultValue() as _;
-    (*ctxt).keep_blanks = *xmlKeepBlanksDefaultValue() as _;
+    (*ctxt).linenumbers = *xml_line_numbers_default_value() as _;
+    (*ctxt).keep_blanks = *xml_keep_blanks_default_value() as _;
     (*ctxt).html = 1;
     (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
     (*ctxt).vctxt.user_data = ctxt as _;
@@ -9969,7 +9969,10 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
      * SAX: beginning of the document processing.
      */
     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).set_document_locator.is_some() {
-        ((*(*ctxt).sax).set_document_locator.unwrap())((*ctxt).user_data, xmlDefaultSAXLocator());
+        ((*(*ctxt).sax).set_document_locator.unwrap())(
+            (*ctxt).user_data,
+            xml_default_sax_locator(),
+        );
     }
 
     if (*ctxt).encoding == XmlCharEncoding::XmlCharEncodingNone as usize as _
@@ -11049,7 +11052,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).set_document_locator.is_some() {
                     ((*(*ctxt).sax).set_document_locator.unwrap())(
                         (*ctxt).user_data,
-                        xmlDefaultSAXLocator(),
+                        xml_default_sax_locator(),
                     );
                 }
                 if !(*ctxt).sax.is_null()

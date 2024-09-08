@@ -14,7 +14,7 @@ use libc::{fwrite, memcpy, memmove, size_t, FILE};
 
 use crate::libxml::{
     globals::{
-        xmlBufferAllocScheme, xmlDefaultBufferSize, xml_free, xml_malloc, xml_malloc_atomic,
+        xml_buffer_alloc_scheme, xml_default_buffer_size, xml_free, xml_malloc, xml_malloc_atomic,
         xml_realloc,
     },
     parser::XmlParserInputPtr,
@@ -107,9 +107,9 @@ pub(crate) unsafe extern "C" fn xml_buf_create() -> XmlBufPtr {
     (*ret).using = 0;
     (*ret).error = 0;
     (*ret).buffer = null_mut();
-    (*ret).size = *xmlDefaultBufferSize() as _;
+    (*ret).size = *xml_default_buffer_size() as _;
     UPDATE_COMPAT!(ret);
-    (*ret).alloc = *xmlBufferAllocScheme();
+    (*ret).alloc = *xml_buffer_alloc_scheme();
     (*ret).content = xml_malloc_atomic((*ret).size) as *mut XmlChar;
     if (*ret).content.is_null() {
         xml_buf_memory_error(ret, c"creating buffer".as_ptr() as _);
@@ -140,7 +140,7 @@ pub(crate) unsafe extern "C" fn xml_buf_create_size(size: size_t) -> XmlBufPtr {
     (*ret).using = 0;
     (*ret).error = 0;
     (*ret).buffer = null_mut();
-    (*ret).alloc = *xmlBufferAllocScheme();
+    (*ret).alloc = *xml_buffer_alloc_scheme();
     (*ret).size = if size != 0 { size + 1 } else { 0 }; /* +1 for ending null */
     UPDATE_COMPAT!(ret);
     if (*ret).size != 0 {

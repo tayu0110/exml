@@ -14,6 +14,8 @@ use std::{
 
 use libc::{memcpy, memmove, memset, ptrdiff_t, snprintf, strlen, INT_MAX, INT_MIN};
 
+#[cfg(not(feature = "thread"))]
+use crate::libxml::xpath_internals::XML_XPATH_DISABLE_OPTIMIZER;
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{
     xml_xptr_free_location_set, xml_xptr_location_set_merge, XmlLocationSetPtr,
@@ -21,7 +23,7 @@ use crate::libxml::xpointer::{
 use crate::{
     libxml::{
         dict::{xml_dict_free, XmlDictPtr},
-        globals::{xmlGenericErrorContext, xml_free, xml_malloc},
+        globals::{xml_free, xml_generic_error_context, xml_malloc},
         hash::{xml_hash_create, XmlHashTablePtr},
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
@@ -872,7 +874,7 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
         }
         XmlXPathObjectType::XpathUndefined => {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlXPathObjectCopy: unsupported type %d\n".as_ptr(),
                 (*val).typ
             );
@@ -2056,12 +2058,12 @@ pub unsafe extern "C" fn xml_xpath_eval(
         res = value_pop(ctxt);
         if res.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlXPathCompiledEval: No result on the stack.\n".as_ptr() as _,
             );
         } else if (*ctxt).value_nr > 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlXPathCompiledEval: %d object(s) left on the stack.\n".as_ptr() as _,
                 (*ctxt).value_nr
             );
@@ -2135,7 +2137,7 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
         _ => {
             let file = CString::new(file!()).unwrap();
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"Internal error at %s:%d\n".as_ptr() as _,
                 file.as_ptr(),
                 line!()
@@ -2348,7 +2350,7 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
     {
         REENTANCE += 1;
         if REENTANCE > 1 {
-            xmlXPathDisableOptimizer = 1;
+            XML_XPATH_DISABLE_OPTIMIZER = 1;
         }
     }
 
@@ -2372,13 +2374,13 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
         if res_obj.is_null() {
             if to_bool == 0 {
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"xmlXPathCompiledEval: No result on the stack.\n".as_ptr() as _
                 );
             }
         } else if (*pctxt).value_nr > 0 {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlXPathCompiledEval: %d object(s) left on the stack.\n".as_ptr() as _,
                 (*pctxt).value_nr
             );

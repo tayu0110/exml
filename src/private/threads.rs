@@ -63,7 +63,7 @@ unsafe extern "C" fn xml_free_global_state(state: *mut c_void) {
     let gs: *mut XmlGlobalState = state as _;
 
     /* free any memory allocated in the thread's xmlLastError */
-    xmlResetError(&mut (*gs).xmlLastError as _);
+    xmlResetError(&mut (*gs).xml_last_error as _);
     free(state);
 }
 

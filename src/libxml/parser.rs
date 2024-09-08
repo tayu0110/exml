@@ -11,6 +11,8 @@ use std::{
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
+#[cfg(feature = "legacy")]
+use libc::strcmp;
 use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen, strncmp, strstr};
 
 use crate::{
@@ -28,12 +30,13 @@ use crate::{
         },
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
-            xmlCleanupGlobalsInternal, xmlDefaultSAXHandler, xmlDefaultSAXLocator,
-            xmlDoValidityCheckingDefaultValue, xmlGenericErrorContext, xmlGetWarningsDefaultValue,
-            xmlIndentTreeOutput, xmlInitGlobalsInternal, xmlKeepBlanksDefaultValue,
-            xmlLineNumbersDefaultValue, xmlLoadExtDtdDefaultValue, xmlParserDebugEntities,
-            xmlPedanticParserDefaultValue, xmlSubstituteEntitiesDefaultValue, xml_free, xml_malloc,
-            xml_malloc_atomic, xml_realloc,
+            xml_cleanup_globals_internal, xml_default_sax_handler, xml_default_sax_locator,
+            xml_do_validity_checking_default_value, xml_free, xml_generic_error_context,
+            xml_get_warnings_default_value, xml_indent_tree_output, xml_init_globals_internal,
+            xml_keep_blanks_default_value, xml_line_numbers_default_value,
+            xml_load_ext_dtd_default_value, xml_malloc, xml_malloc_atomic,
+            xml_parser_debug_entities, xml_pedantic_parser_default_value, xml_realloc,
+            xml_substitute_entities_default_value,
         },
         hash::{
             xml_hash_default_deallocator, xml_hash_free, xml_hash_lookup2, xml_hash_qlookup2,
@@ -1745,7 +1748,7 @@ pub unsafe extern "C" fn xml_init_parser() {
     }
     if !cfg!(feature = "thread") || !XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
         xml_init_threads_internal();
-        xmlInitGlobalsInternal();
+        xml_init_globals_internal();
         xml_init_memory_internal();
         __xml_initialize_dict();
         xml_init_encoding_internal();
@@ -1809,7 +1812,7 @@ pub unsafe extern "C" fn xml_cleanup_parser() {
         xml_schema_cleanup_types();
         xml_relaxng_cleanup_types();
     }
-    xmlCleanupGlobalsInternal();
+    xml_cleanup_globals_internal();
     xml_cleanup_threads_internal();
     xml_cleanup_memory_internal();
     XML_PARSER_INITIALIZED.store(false, Ordering::Release);
@@ -1967,9 +1970,9 @@ pub unsafe extern "C" fn xml_parse_memory(buffer: *const c_char, size: c_int) ->
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
 pub unsafe extern "C" fn xml_substitute_entities_default(val: c_int) -> c_int {
-    let old: c_int = *xmlSubstituteEntitiesDefaultValue();
+    let old: c_int = *xml_substitute_entities_default_value();
 
-    *xmlSubstituteEntitiesDefaultValue() = val;
+    *xml_substitute_entities_default_value() = val;
     old
 }
 
@@ -1999,11 +2002,11 @@ pub unsafe extern "C" fn xml_substitute_entities_default(val: c_int) -> c_int {
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
 pub unsafe extern "C" fn xml_keep_blanks_default(val: c_int) -> c_int {
-    let old: c_int = *xmlKeepBlanksDefaultValue();
+    let old: c_int = *xml_keep_blanks_default_value();
 
-    *xmlKeepBlanksDefaultValue() = val;
+    *xml_keep_blanks_default_value() = val;
     if val == 0 {
-        *xmlIndentTreeOutput() = 1;
+        *xml_indent_tree_output() = 1;
     }
     old
 }
@@ -2034,9 +2037,9 @@ pub unsafe extern "C" fn xml_stop_parser(ctxt: XmlParserCtxtPtr) {
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
 pub unsafe extern "C" fn xml_pedantic_parser_default(val: c_int) -> c_int {
-    let old: c_int = *xmlPedanticParserDefaultValue();
+    let old: c_int = *xml_pedantic_parser_default_value();
 
-    *xmlPedanticParserDefaultValue() = val;
+    *xml_pedantic_parser_default_value() = val;
     old
 }
 
@@ -2052,9 +2055,9 @@ pub unsafe extern "C" fn xml_pedantic_parser_default(val: c_int) -> c_int {
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
 pub unsafe extern "C" fn xml_line_numbers_default(val: c_int) -> c_int {
-    let old: c_int = *xmlLineNumbersDefaultValue();
+    let old: c_int = *xml_line_numbers_default_value();
 
-    *xmlLineNumbersDefaultValue() = val;
+    *xml_line_numbers_default_value() = val;
     old
 }
 
@@ -2478,7 +2481,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
      */
     if !(*ctxt).sax.is_null() {
         if let Some(set_document_locator) = (*(*ctxt).sax).set_document_locator {
-            set_document_locator((*ctxt).user_data, xmlDefaultSAXLocator());
+            set_document_locator((*ctxt).user_data, xml_default_sax_locator());
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2692,7 +2695,7 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> c_i
      */
     if !(*ctxt).sax.is_null() {
         if let Some(set_document_locator) = (*(*ctxt).sax).set_document_locator {
-            set_document_locator((*ctxt).user_data, xmlDefaultSAXLocator());
+            set_document_locator((*ctxt).user_data, xml_default_sax_locator());
         }
     }
 
@@ -2804,7 +2807,7 @@ pub unsafe extern "C" fn xml_sax_user_parse_file(
     if ctxt.is_null() {
         return -1;
     }
-    if (*ctxt).sax != xmlDefaultSAXHandler() as XmlSAXHandlerPtr {
+    if (*ctxt).sax != xml_default_sax_handler() as XmlSAXHandlerPtr {
         xml_free((*ctxt).sax as _);
     }
     (*ctxt).sax = sax;
@@ -2864,7 +2867,7 @@ pub unsafe extern "C" fn xml_sax_user_parse_memory(
     if ctxt.is_null() {
         return -1;
     }
-    if (*ctxt).sax != xmlDefaultSAXHandler() as XmlSAXHandlerPtr {
+    if (*ctxt).sax != xml_default_sax_handler() as XmlSAXHandlerPtr {
         xml_free((*ctxt).sax as _);
     }
     (*ctxt).sax = sax;
@@ -3624,7 +3627,7 @@ pub(crate) unsafe extern "C" fn ns_pop(ctxt: XmlParserCtxtPtr, mut nr: c_int) ->
     }
     if (*ctxt).ns_nr < nr {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Pbm popping %d NS\n".as_ptr() as _,
             nr
         );
@@ -4609,17 +4612,17 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
     (*ctxt).well_formed = 1;
     (*ctxt).ns_well_formed = 1;
     (*ctxt).valid = 1;
-    (*ctxt).loadsubset = *xmlLoadExtDtdDefaultValue();
+    (*ctxt).loadsubset = *xml_load_ext_dtd_default_value();
     if (*ctxt).loadsubset != 0 {
         (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
     }
-    (*ctxt).validate = *xmlDoValidityCheckingDefaultValue();
-    (*ctxt).pedantic = *xmlPedanticParserDefaultValue();
+    (*ctxt).validate = *xml_do_validity_checking_default_value();
+    (*ctxt).pedantic = *xml_pedantic_parser_default_value();
     if (*ctxt).pedantic != 0 {
         (*ctxt).options |= XmlParserOption::XmlParsePedantic as i32;
     }
-    (*ctxt).linenumbers = *xmlLineNumbersDefaultValue();
-    (*ctxt).keep_blanks = *xmlKeepBlanksDefaultValue();
+    (*ctxt).linenumbers = *xml_line_numbers_default_value();
+    (*ctxt).keep_blanks = *xml_keep_blanks_default_value();
     if (*ctxt).keep_blanks == 0 {
         (*(*ctxt).sax).ignorable_whitespace = Some(xmlSAX2IgnorableWhitespace);
         (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
@@ -4630,7 +4633,7 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
     (*ctxt).vctxt.error = Some(xmlParserValidityError);
     (*ctxt).vctxt.warning = Some(xmlParserValidityWarning);
     if (*ctxt).validate != 0 {
-        if *xmlGetWarningsDefaultValue() == 0 {
+        if *xml_get_warnings_default_value() == 0 {
             (*ctxt).vctxt.warning = None;
         } else {
             (*ctxt).vctxt.warning = Some(xmlParserValidityWarning);
@@ -4638,7 +4641,7 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
         (*ctxt).vctxt.node_max = 0;
         (*ctxt).options |= XmlParserOption::XmlParseDtdvalid as i32;
     }
-    (*ctxt).replace_entities = *xmlSubstituteEntitiesDefaultValue();
+    (*ctxt).replace_entities = *xml_substitute_entities_default_value();
     if (*ctxt).replace_entities != 0 {
         (*ctxt).options |= XmlParserOption::XmlParseNoent as i32;
     }
@@ -4765,7 +4768,7 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     }
     #[cfg(feature = "sax1")]
     {
-        if !(*ctxt).sax.is_null() && (*ctxt).sax != xmlDefaultSAXHandler() as _ {
+        if !(*ctxt).sax.is_null() && (*ctxt).sax != xml_default_sax_handler() as _ {
             xml_free((*ctxt).sax as _);
         }
     }
@@ -6414,9 +6417,9 @@ pub unsafe extern "C" fn xml_pop_input(ctxt: XmlParserCtxtPtr) -> XmlChar {
     if ctxt.is_null() || (*ctxt).input_nr <= 1 {
         return 0;
     }
-    if *xmlParserDebugEntities() != 0 {
+    if *xml_parser_debug_entities() != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Popping input %d\n".as_ptr() as _,
             (*ctxt).input_nr
         );
@@ -6477,9 +6480,9 @@ unsafe extern "C" fn xml_load_entity_content(
         return -1;
     }
 
-    if *xmlParserDebugEntities() != 0 {
+    if *xml_parser_debug_entities() != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Reading %s entity content input\n".as_ptr() as _,
             (*entity).name.load(Ordering::Relaxed)
         );
@@ -6659,9 +6662,9 @@ pub(crate) unsafe extern "C" fn xmlStringDecodeEntitiesInt(
                         grow_buffer!(ctxt, buffer, XML_PARSER_BUFFER_SIZE, buffer_size, rep, 'mem_error);
                     }
                 } else if c == b'&' as i32 && what & XML_SUBSTITUTE_REF as i32 != 0 {
-                    if *xmlParserDebugEntities() != 0 {
+                    if *xml_parser_debug_entities() != 0 {
                         xml_generic_error!(
-                            xmlGenericErrorContext(),
+                            xml_generic_error_context(),
                             c"String decoding Entity Reference: %.30s\n".as_ptr() as _,
                             str
                         );
@@ -6772,9 +6775,9 @@ pub(crate) unsafe extern "C" fn xmlStringDecodeEntitiesInt(
                         nbchars += 1;
                     }
                 } else if c == b'%' as i32 && what & XML_SUBSTITUTE_PEREF as i32 != 0 {
-                    if *xmlParserDebugEntities() != 0 {
+                    if *xml_parser_debug_entities() != 0 {
                         xml_generic_error!(
-                            xmlGenericErrorContext(),
+                            xml_generic_error_context(),
                             c"String decoding PE Reference: %.30s\n".as_ptr() as _,
                             str
                         );
@@ -9720,7 +9723,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).set_document_locator.is_some() {
                             ((*(*ctxt).sax).set_document_locator.unwrap())(
                                 (*ctxt).user_data,
-                                xmlDefaultSAXLocator(),
+                                xml_default_sax_locator(),
                             );
                         }
                         xml_fatal_err(ctxt, XmlParserErrors::XmlErrDocumentEmpty, null());
@@ -9750,7 +9753,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).set_document_locator.is_some() {
                             ((*(*ctxt).sax).set_document_locator.unwrap())(
                                 (*ctxt).user_data,
-                                xmlDefaultSAXLocator(),
+                                xml_default_sax_locator(),
                             );
                         }
                         if *(*(*ctxt).input).cur.add(2) == b'x'
@@ -9805,7 +9808,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).set_document_locator.is_some() {
                             ((*(*ctxt).sax).set_document_locator.unwrap())(
                                 (*ctxt).user_data,
-                                xmlDefaultSAXLocator(),
+                                xml_default_sax_locator(),
                             );
                         }
                         (*ctxt).version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
@@ -10356,7 +10359,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 }
                 XmlParserInputState::XmlParserComment => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"PP: internal error, state == COMMENT\n".as_ptr() as _,
                     );
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -10367,7 +10370,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 }
                 XmlParserInputState::XmlParserIgnore => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"PP: internal error, state == IGNORE".as_ptr() as _,
                     );
                     (*ctxt).instate = XmlParserInputState::XmlParserDTD;
@@ -10378,7 +10381,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 }
                 XmlParserInputState::XmlParserPI => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"PP: internal error, state == PI\n".as_ptr() as _,
                     );
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -10389,7 +10392,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 }
                 XmlParserInputState::XmlParserEntityDecl => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"PP: internal error, state == ENTITY_DECL\n".as_ptr() as _,
                     );
                     (*ctxt).instate = XmlParserInputState::XmlParserDTD;
@@ -10400,7 +10403,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 }
                 XmlParserInputState::XmlParserEntityValue => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"PP: internal error, state == ENTITY_VALUE\n".as_ptr() as _,
                     );
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -10411,7 +10414,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 }
                 XmlParserInputState::XmlParserAttributeValue => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"PP: internal error, state == ATTRIBUTE_VALUE\n".as_ptr() as _,
                     );
                     (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
@@ -10422,7 +10425,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 }
                 XmlParserInputState::XmlParserSystemLiteral => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"PP: internal error, state == SYSTEM_LITERAL\n".as_ptr() as _,
                     );
                     (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
@@ -10433,7 +10436,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 }
                 XmlParserInputState::XmlParserPublicLiteral => {
                     xml_generic_error!(
-                        xmlGenericErrorContext(),
+                        xml_generic_error_context(),
                         c"PP: internal error, state == PUBLIC_LITERAL\n".as_ptr() as _,
                     );
                     (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
@@ -10562,7 +10565,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
             if nbchars < 0 {
                 /* TODO 2.6.0 */
                 xml_generic_error!(
-                    xmlGenericErrorContext(),
+                    xml_generic_error_context(),
                     c"xmlParseChunk: encoder error\n".as_ptr() as _
                 );
                 xml_halt_parser(ctxt);
@@ -10703,9 +10706,9 @@ pub unsafe extern "C" fn xml_new_io_input_stream(
     if input.is_null() {
         return null_mut();
     }
-    if *xmlParserDebugEntities() != 0 {
+    if *xml_parser_debug_entities() != 0 {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"new input from I/O\n".as_ptr() as _
         )
     }
@@ -14899,7 +14902,7 @@ mod tests {
             let lst = gen_xml_node_ptr_ptr(0, 5);
 
             #[cfg(feature = "sax1")]
-            if sax == xmlDefaultSAXHandler() as XmlSAXHandlerPtr {
+            if sax == xml_default_sax_handler() as XmlSAXHandlerPtr {
                 user_data = null_mut();
             }
 
@@ -14941,7 +14944,7 @@ mod tests {
                                     let lst = gen_xml_node_ptr_ptr(n_lst, 5);
 
                                     #[cfg(feature = "sax1")]
-                                    if sax == xmlDefaultSAXHandler() as XmlSAXHandlerPtr {
+                                    if sax == xml_default_sax_handler() as XmlSAXHandlerPtr {
                                         user_data = null_mut();
                                     }
 
@@ -15001,7 +15004,7 @@ mod tests {
                                         let recover = gen_int(n_recover, 6);
 
                                         #[cfg(feature = "sax1")]
-                                        if sax == xmlDefaultSAXHandler() as XmlSAXHandlerPtr {
+                                        if sax == xml_default_sax_handler() as XmlSAXHandlerPtr {
                                             user_data = null_mut();
                                         }
 
@@ -16171,7 +16174,7 @@ mod tests {
                         let mut user_data = gen_userdata(n_user_data, 1);
                         let filename = gen_filepath(n_filename, 2);
 
-                        if sax == xmlDefaultSAXHandler() as XmlSAXHandlerPtr {
+                        if sax == xml_default_sax_handler() as XmlSAXHandlerPtr {
                             user_data = null_mut();
                         }
 
@@ -16219,7 +16222,7 @@ mod tests {
                                 size = 0;
                             }
 
-                            if sax == xmlDefaultSAXHandler() as XmlSAXHandlerPtr {
+                            if sax == xml_default_sax_handler() as XmlSAXHandlerPtr {
                                 user_data = null_mut();
                             }
 

@@ -38,7 +38,7 @@ use super::{
         xml_add_doc_entity, xml_add_dtd_entity, xml_get_doc_entity, xml_get_parameter_entity,
         xml_get_predefined_entity, XmlEntityType,
     },
-    globals::{xmlRegisterNodeDefaultValue, xml_free, xml_malloc, xml_realloc},
+    globals::{xml_free, xml_malloc, xml_realloc, xml_register_node_default_value},
     parser::{
         xml_load_external_entity, xml_pop_input, XmlParserOption, XmlSAXHandler,
         XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS,
@@ -2565,7 +2565,7 @@ pub unsafe extern "C" fn xmlSAX2StartElementNs(
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xmlRegisterNodeDefaultValue(ret);
+            xml_register_node_default_value(ret);
         }
     } else {
         if (*ctxt).dict_names != 0 {
@@ -2871,7 +2871,7 @@ unsafe extern "C" fn xmlSAX2TextNode(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(ret);
+        xml_register_node_default_value(ret);
     }
     ret
 }
@@ -2988,7 +2988,7 @@ unsafe extern "C" fn xmlSAX2AttributeNs(
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xmlRegisterNodeDefaultValue(ret as XmlNodePtr);
+            xml_register_node_default_value(ret as XmlNodePtr);
         }
     } else {
         if (*ctxt).dict_names != 0 {

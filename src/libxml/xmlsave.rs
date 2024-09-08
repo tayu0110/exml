@@ -21,8 +21,8 @@ use crate::{
         },
         entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{
-            xmlGenericErrorContext, xmlIndentTreeOutput, xmlSaveNoEmptyTags, xmlTreeIndentString,
-            xml_free, xml_malloc,
+            xml_free, xml_generic_error_context, xml_indent_tree_output, xml_malloc,
+            xml_save_no_empty_tags, xml_tree_indent_string,
         },
         htmltree::{htmlDocContentDumpFormatOutput, htmlGetMetaEncoding, htmlSetMetaEncoding},
         parser::xml_init_parser,
@@ -406,7 +406,7 @@ unsafe extern "C" fn xmlEscapeEntities(
             input = input.add(1);
         } else {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlEscapeEntities : char out of range\n".as_ptr() as _
             );
             input = input.add(1);
@@ -438,8 +438,8 @@ pub(crate) unsafe extern "C" fn xmlSaveCtxtInit(ctxt: XmlSaveCtxtPtr) {
     if (*ctxt).encoding.is_null() && (*ctxt).escape.is_none() {
         (*ctxt).escape = Some(xmlEscapeEntities);
     }
-    let len: c_int = xml_strlen(*xmlTreeIndentString() as _) as _;
-    if xmlTreeIndentString().is_null() || len == 0 {
+    let len: c_int = xml_strlen(*xml_tree_indent_string() as _) as _;
+    if xml_tree_indent_string().is_null() || len == 0 {
         memset(addr_of_mut!((*ctxt).indent[0]) as _, 0, MAX_INDENT + 1);
     } else {
         (*ctxt).indent_size = len;
@@ -450,14 +450,14 @@ pub(crate) unsafe extern "C" fn xmlSaveCtxtInit(ctxt: XmlSaveCtxtPtr) {
                     .indent
                     .as_mut_ptr()
                     .add(i as usize * (*ctxt).indent_size as usize) as _,
-                *xmlTreeIndentString() as _,
+                *xml_tree_indent_string() as _,
                 (*ctxt).indent_size as _,
             );
         }
         (*ctxt).indent[(*ctxt).indent_nr as usize * (*ctxt).indent_size as usize] = 0;
     }
 
-    if *xmlSaveNoEmptyTags() != 0 {
+    if *xml_save_no_empty_tags() != 0 {
         (*ctxt).options |= XmlSaveOption::XmlSaveNoEmpty as i32;
     }
 }
@@ -774,7 +774,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                 xmlBufDumpEntityDecl((*buf).buffer, cur as _);
             }
             XmlElementType::XmlElementNode => {
-                if cur != root && (*ctxt).format == 1 && *xmlIndentTreeOutput() != 0 {
+                if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
                     xmlOutputBufferWrite(
                         buf,
                         (*ctxt).indent_size
@@ -887,7 +887,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                 }
             }
             XmlElementType::XmlPiNode => {
-                if cur != root && (*ctxt).format == 1 && *xmlIndentTreeOutput() != 0 {
+                if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
                     xmlOutputBufferWrite(
                         buf,
                         (*ctxt).indent_size
@@ -922,7 +922,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                 }
             }
             XmlElementType::XmlCommentNode => {
-                if cur != root && (*ctxt).format == 1 && *xmlIndentTreeOutput() != 0 {
+                if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
                     xmlOutputBufferWrite(
                         buf,
                         (*ctxt).indent_size
@@ -1003,7 +1003,7 @@ pub(crate) unsafe extern "C" fn xmlNodeDumpOutputInternal(
                 if (*ctxt).level > 0 {
                     (*ctxt).level -= 1;
                 }
-                if *xmlIndentTreeOutput() != 0 && (*ctxt).format == 1 {
+                if *xml_indent_tree_output() != 0 && (*ctxt).format == 1 {
                     xmlOutputBufferWrite(
                         buf,
                         (*ctxt).indent_size
@@ -1367,7 +1367,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
             XmlElementType::XmlElementNode => {
                 addmeta = 0;
 
-                if cur != root && (*ctxt).format == 1 && *xmlIndentTreeOutput() != 0 {
+                if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
                     xmlOutputBufferWrite(
                         buf,
                         (*ctxt).indent_size
@@ -1458,7 +1458,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
                             xmlOutputBufferWrite(buf, 1, c">".as_ptr() as _);
                             if (*ctxt).format == 1 {
                                 xmlOutputBufferWrite(buf, 1, c"\n".as_ptr() as _);
-                                if *xmlIndentTreeOutput() != 0 {
+                                if *xml_indent_tree_output() != 0 {
                                     xmlOutputBufferWrite(
                                         buf,
                                         (*ctxt).indent_size
@@ -1509,7 +1509,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
                     if addmeta == 1 {
                         if (*ctxt).format == 1 {
                             xmlOutputBufferWrite(buf, 1, c"\n".as_ptr() as _);
-                            if *xmlIndentTreeOutput() != 0 {
+                            if *xml_indent_tree_output() != 0 {
                                 xmlOutputBufferWrite(
                                     buf,
                                     (*ctxt).indent_size
@@ -1651,7 +1651,7 @@ pub(crate) unsafe extern "C" fn xhtmlNodeDumpOutput(ctxt: XmlSaveCtxtPtr, mut cu
                 if (*ctxt).level > 0 {
                     (*ctxt).level -= 1;
                 }
-                if *xmlIndentTreeOutput() != 0 && (*ctxt).format == 1 {
+                if *xml_indent_tree_output() != 0 && (*ctxt).format == 1 {
                     xmlOutputBufferWrite(
                         buf,
                         (*ctxt).indent_size

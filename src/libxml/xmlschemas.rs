@@ -19,7 +19,9 @@ use crate::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         encoding::XmlCharEncoding,
         entities::XmlEntityPtr,
-        globals::{xmlGenericErrorContext, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{
+            xml_free, xml_generic_error_context, xml_malloc, xml_malloc_atomic, xml_realloc,
+        },
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_create_dict,
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTablePtr,
@@ -23224,7 +23226,7 @@ unsafe extern "C" fn xml_schema_build_content_model(
     (*ctxt).am = xml_new_automata();
     if (*ctxt).am.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"Cannot create automata for complex type %s\n".as_ptr() as _,
             (*typ).name
         );

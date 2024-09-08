@@ -42,8 +42,8 @@ use super::{
         XmlEntitiesTablePtr, XmlEntityType,
     },
     globals::{
-        xmlBufferAllocScheme, xmlDefaultBufferSize, xmlDeregisterNodeDefaultValue,
-        xmlRegisterNodeDefaultValue, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc,
+        xml_buffer_alloc_scheme, xml_default_buffer_size, xml_deregister_node_default_value,
+        xml_free, xml_malloc, xml_malloc_atomic, xml_realloc, xml_register_node_default_value,
     },
     hash::{xml_hash_lookup, xml_hash_remove_entry},
     parser_internals::{
@@ -1624,7 +1624,7 @@ pub unsafe extern "C" fn xml_set_buffer_allocation_scheme(scheme: XmlBufferAlloc
             | XmlBufferAllocationScheme::XmlBufferAllocDoubleit
             | XmlBufferAllocationScheme::XmlBufferAllocHybrid
     ) {
-        *xmlBufferAllocScheme() = scheme;
+        *xml_buffer_alloc_scheme() = scheme;
     }
 }
 
@@ -1642,7 +1642,7 @@ pub unsafe extern "C" fn xml_set_buffer_allocation_scheme(scheme: XmlBufferAlloc
  * Returns the current allocation scheme
  */
 pub unsafe extern "C" fn xml_get_buffer_allocation_scheme() -> XmlBufferAllocationScheme {
-    *xmlBufferAllocScheme()
+    *xml_buffer_alloc_scheme()
 }
 
 /**
@@ -1658,8 +1658,8 @@ pub unsafe extern "C" fn xml_buffer_create() -> XmlBufferPtr {
         return null_mut();
     }
     (*ret).using = 0;
-    (*ret).size = *xmlDefaultBufferSize() as _;
-    (*ret).alloc = *xmlBufferAllocScheme();
+    (*ret).size = *xml_default_buffer_size() as _;
+    (*ret).alloc = *xml_buffer_alloc_scheme();
     (*ret).content = xml_malloc_atomic((*ret).size as usize) as _;
     if (*ret).content.is_null() {
         xml_tree_err_memory(c"creating buffer".as_ptr() as _);
@@ -1688,7 +1688,7 @@ pub unsafe extern "C" fn xml_buffer_create_size(size: size_t) -> XmlBufferPtr {
         return null_mut();
     }
     (*ret).using = 0;
-    (*ret).alloc = *xmlBufferAllocScheme();
+    (*ret).alloc = *xml_buffer_alloc_scheme();
     (*ret).size = if size != 0 { size as u32 + 1 } else { 0 }; /* +1 for ending null */
     if (*ret).size != 0 {
         (*ret).content = xml_malloc_atomic((*ret).size as usize) as _;
@@ -2459,7 +2459,7 @@ pub unsafe extern "C" fn xml_create_int_subset(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -2520,7 +2520,7 @@ pub unsafe extern "C" fn xml_new_dtd(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -2584,7 +2584,7 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xmlDeregisterNodeDefaultValue(cur as _);
+        xml_deregister_node_default_value(cur as _);
     }
 
     if !(*cur).children.is_null() {
@@ -2653,13 +2653,13 @@ pub unsafe extern "C" fn xmlNewGlobalNs(
 ) -> XmlNsPtr {
     use std::sync::atomic::AtomicBool;
 
-    use crate::{libxml::globals::xmlGenericErrorContext, xml_generic_error};
+    use crate::{libxml::globals::xml_generic_error_context, xml_generic_error};
 
     static DEPRECATED: AtomicBool = AtomicBool::new(false);
 
     if !DEPRECATED.load(Ordering::Acquire) {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlNewGlobalNs() deprecated function reached\n".as_ptr() as _
         );
         DEPRECATED.store(true, Ordering::Release);
@@ -2854,7 +2854,7 @@ pub unsafe extern "C" fn xml_new_doc(mut version: *const XmlChar) -> XmlDocPtr {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -2884,7 +2884,7 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xmlDeregisterNodeDefaultValue(cur as _);
+        xml_deregister_node_default_value(cur as _);
     }
 
     /*
@@ -2994,7 +2994,7 @@ pub unsafe extern "C" fn xml_new_doc_prop(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -3094,7 +3094,7 @@ unsafe extern "C" fn xml_new_prop_internal(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -3216,7 +3216,7 @@ pub unsafe extern "C" fn xml_free_prop(cur: XmlAttrPtr) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xmlDeregisterNodeDefaultValue(cur as _);
+        xml_deregister_node_default_value(cur as _);
     }
 
     /* Check for ID removal -> leading to invalid references ! */
@@ -3433,7 +3433,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xmlRegisterNodeDefaultValue(ret as _);
+            xml_register_node_default_value(ret as _);
         }
 
         /*
@@ -3457,7 +3457,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         if parent.is_null() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xmlRegisterNodeDefaultValue(ret as _);
+            xml_register_node_default_value(ret as _);
         }
 
         return ret;
@@ -3576,7 +3576,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     if parent.is_null() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(ret as _);
+        xml_register_node_default_value(ret as _);
     }
 
     ret
@@ -4180,7 +4180,7 @@ pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> Xml
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4225,7 +4225,7 @@ pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar)
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4367,7 +4367,7 @@ pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4418,7 +4418,7 @@ pub unsafe extern "C" fn xml_new_doc_pi(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4490,7 +4490,7 @@ pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: c_int) -
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4543,7 +4543,7 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4581,7 +4581,7 @@ pub unsafe extern "C" fn xml_new_cdata_block(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4626,7 +4626,7 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4686,7 +4686,7 @@ pub unsafe extern "C" fn xml_new_reference(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -4901,7 +4901,7 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xmlRegisterNodeDefaultValue(cur as _);
+        xml_register_node_default_value(cur as _);
     }
     cur
 }
@@ -6334,7 +6334,7 @@ pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
             // && xmlDeregisterNodeDefaultValue.is_some()
             {
-                xmlDeregisterNodeDefaultValue(cur as _);
+                xml_deregister_node_default_value(cur as _);
             }
 
             if (matches!((*cur).typ, XmlElementType::XmlElementNode)
@@ -6419,7 +6419,7 @@ pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xmlDeregisterNodeDefaultValue(cur as _);
+        xml_deregister_node_default_value(cur as _);
     }
 
     if !(*cur).doc.is_null() {

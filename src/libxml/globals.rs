@@ -54,7 +54,7 @@ use super::{
 * DEPRECATED: Alias for xmlInitParser.
 */
 #[deprecated]
-pub unsafe extern "C" fn xmlInitGlobals() {
+pub unsafe extern "C" fn xml_init_globals() {
     xml_init_parser();
 }
 
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn xmlInitGlobals() {
  * have call cleanup functions at all.
  */
 #[deprecated]
-pub unsafe extern "C" fn xmlCleanupGlobals() {}
+pub unsafe extern "C" fn xml_cleanup_globals() {}
 
 /**
  * xmlParserInputBufferCreateFilenameFunc:
@@ -108,7 +108,7 @@ pub type XmlOutputBufferCreateFilenameFunc = unsafe extern "C" fn(
  *
  * Returns the old value of the registration function
  */
-pub unsafe extern "C" fn xmlParserInputBufferCreateFilenameDefault(
+pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_default(
     func: Option<XmlParserInputBufferCreateFilenameFunc>,
 ) -> XmlParserInputBufferCreateFilenameFunc {
     let old: XmlParserInputBufferCreateFilenameFunc =
@@ -127,7 +127,7 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateFilenameDefault(
 *
 * Returns the old value of the registration function
 */
-pub unsafe extern "C" fn xmlOutputBufferCreateFilenameDefault(
+pub unsafe extern "C" fn xml_output_buffer_create_filename_default(
     func: Option<XmlOutputBufferCreateFilenameFunc>,
 ) -> Option<XmlOutputBufferCreateFilenameFunc> {
     let old = _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE;
@@ -157,51 +157,51 @@ pub type XmlDeregisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
 
 pub(crate) type XmlGlobalStatePtr = *mut XmlGlobalState;
 pub(crate) struct XmlGlobalState {
-    pub(crate) xmlParserVersion: *const c_char,
+    pub(crate) xml_parser_version: *const c_char,
 
-    pub(crate) xmlDefaultSAXLocator: XmlSaxlocator,
-    pub(crate) xmlDefaultSAXHandler: XmlSAXHandlerV1,
-    pub(crate) docbDefaultSAXHandler: XmlSAXHandlerV1, /* unused */
-    pub(crate) htmlDefaultSAXHandler: XmlSAXHandlerV1,
+    pub(crate) xml_default_sax_locator: XmlSaxlocator,
+    pub(crate) xml_default_sax_handler: XmlSAXHandlerV1,
+    pub(crate) docb_default_sax_handler: XmlSAXHandlerV1, /* unused */
+    pub(crate) html_default_sax_handler: XmlSAXHandlerV1,
 
-    pub(crate) xmlFree: Option<XmlFreeFunc>,
-    pub(crate) xmlMalloc: Option<XmlMallocFunc>,
-    pub(crate) xmlMemStrdup: Option<XmlStrdupFunc>,
-    pub(crate) xmlRealloc: Option<XmlReallocFunc>,
+    pub(crate) xml_free: Option<XmlFreeFunc>,
+    pub(crate) xml_malloc: Option<XmlMallocFunc>,
+    pub(crate) xml_mem_strdup: Option<XmlStrdupFunc>,
+    pub(crate) xml_realloc: Option<XmlReallocFunc>,
 
-    pub(crate) xmlGenericError: Option<XmlGenericErrorFunc>,
-    pub(crate) xmlStructuredError: Option<XmlStructuredErrorFunc>,
-    pub(crate) xmlGenericErrorContext: AtomicPtr<c_void>,
+    pub(crate) xml_generic_error: Option<XmlGenericErrorFunc>,
+    pub(crate) xml_structured_error: Option<XmlStructuredErrorFunc>,
+    pub(crate) xml_generic_error_context: AtomicPtr<c_void>,
 
-    pub(crate) oldXMLWDcompatibility: c_int,
+    pub(crate) old_xml_wd_compatibility: c_int,
 
-    pub(crate) xmlBufferAllocScheme: XmlBufferAllocationScheme,
-    pub(crate) xmlDefaultBufferSize: c_int,
+    pub(crate) xml_buffer_alloc_scheme: XmlBufferAllocationScheme,
+    pub(crate) xml_default_buffer_size: c_int,
 
-    pub(crate) xmlSubstituteEntitiesDefaultValue: c_int,
-    pub(crate) xmlDoValidityCheckingDefaultValue: c_int,
-    pub(crate) xmlGetWarningsDefaultValue: c_int,
-    pub(crate) xmlKeepBlanksDefaultValue: c_int,
-    pub(crate) xmlLineNumbersDefaultValue: c_int,
-    pub(crate) xmlLoadExtDtdDefaultValue: c_int,
-    pub(crate) xmlParserDebugEntities: c_int,
-    pub(crate) xmlPedanticParserDefaultValue: c_int,
+    pub(crate) xml_substitute_entities_default_value: c_int,
+    pub(crate) xml_do_validity_checking_default_value: c_int,
+    pub(crate) xml_get_warnings_default_value: c_int,
+    pub(crate) xml_keep_blanks_default_value: c_int,
+    pub(crate) xml_line_numbers_default_value: c_int,
+    pub(crate) xml_load_ext_dtd_default_value: c_int,
+    pub(crate) xml_parser_debug_entities: c_int,
+    pub(crate) xml_pedantic_parser_default_value: c_int,
 
-    pub(crate) xmlSaveNoEmptyTags: c_int,
-    pub(crate) xmlIndentTreeOutput: c_int,
-    pub(crate) xmlTreeIndentString: *const c_char,
+    pub(crate) xml_save_no_empty_tags: c_int,
+    pub(crate) xml_indent_tree_output: c_int,
+    pub(crate) xml_tree_indent_string: *const c_char,
 
-    pub(crate) xmlRegisterNodeDefaultValue: Option<XmlRegisterNodeFunc>,
-    pub(crate) xmlDeregisterNodeDefaultValue: Option<XmlDeregisterNodeFunc>,
+    pub(crate) xml_register_node_default_value: Option<XmlRegisterNodeFunc>,
+    pub(crate) xml_deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
 
-    pub(crate) xmlMallocAtomic: Option<XmlMallocFunc>,
-    pub(crate) xmlLastError: XmlError,
+    pub(crate) xml_malloc_atomic: Option<XmlMallocFunc>,
+    pub(crate) xml_last_error: XmlError,
 
-    pub(crate) xmlParserInputBufferCreateFilenameValue:
+    pub(crate) xml_parser_input_buffer_create_filename_value:
         Option<XmlParserInputBufferCreateFilenameFunc>,
-    pub(crate) xmlOutputBufferCreateFilenameValue: Option<XmlOutputBufferCreateFilenameFunc>,
+    pub(crate) xml_output_buffer_create_filename_value: Option<XmlOutputBufferCreateFilenameFunc>,
 
-    pub(crate) xmlStructuredErrorContext: AtomicPtr<c_void>,
+    pub(crate) xml_structured_error_context: AtomicPtr<c_void>,
 }
 
 /*
@@ -442,7 +442,7 @@ pub(crate) static mut XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF: Option<
  * xmlInitializeGlobalState() initialize a global state with all the
  * default values of the library.
  */
-pub unsafe extern "C" fn xmlInitializeGlobalState(gs: XmlGlobalStatePtr) {
+pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     // #ifdef DEBUG_GLOBALS
     //     fprintf(stderr, "Initializing globals at %p for thread %d\n",
     // 	    (void *) gs, xmlGetThreadId());
@@ -452,21 +452,21 @@ pub unsafe extern "C" fn xmlInitializeGlobalState(gs: XmlGlobalStatePtr) {
 
     #[cfg(all(feature = "html", feature = "legacy", feature = "sax1"))]
     {
-        inithtmlDefaultSAXHandler(addr_of_mut!((*gs).htmlDefaultSAXHandler));
+        inithtmlDefaultSAXHandler(addr_of_mut!((*gs).html_default_sax_handler));
     }
 
-    (*gs).oldXMLWDcompatibility = 0;
-    (*gs).xmlBufferAllocScheme = XML_BUFFER_ALLOC_SCHEME_THR_DEF;
-    (*gs).xmlDefaultBufferSize = XML_DEFAULT_BUFFER_SIZE_THR_DEF;
+    (*gs).old_xml_wd_compatibility = 0;
+    (*gs).xml_buffer_alloc_scheme = XML_BUFFER_ALLOC_SCHEME_THR_DEF;
+    (*gs).xml_default_buffer_size = XML_DEFAULT_BUFFER_SIZE_THR_DEF;
     #[cfg(all(feature = "sax1", feature = "legacy"))]
     {
-        initxmlDefaultSAXHandler(addr_of_mut!((*gs).xmlDefaultSAXHandler), 1);
+        initxmlDefaultSAXHandler(addr_of_mut!((*gs).xml_default_sax_handler), 1);
     }
-    (*gs).xmlDefaultSAXLocator.get_public_id = xmlSAX2GetPublicId;
-    (*gs).xmlDefaultSAXLocator.get_system_id = xmlSAX2GetSystemId;
-    (*gs).xmlDefaultSAXLocator.get_line_number = xmlSAX2GetLineNumber;
-    (*gs).xmlDefaultSAXLocator.get_column_number = xmlSAX2GetColumnNumber;
-    (*gs).xmlDoValidityCheckingDefaultValue = XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_default_sax_locator.get_public_id = xmlSAX2GetPublicId;
+    (*gs).xml_default_sax_locator.get_system_id = xmlSAX2GetSystemId;
+    (*gs).xml_default_sax_locator.get_line_number = xmlSAX2GetLineNumber;
+    (*gs).xml_default_sax_locator.get_column_number = xmlSAX2GetColumnNumber;
+    (*gs).xml_do_validity_checking_default_value = XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
     // #if defined(DEBUG_MEMORY_LOCATION) | defined(DEBUG_MEMORY)
     //     {
     //         (*gs).xmlFree = (xmlFreeFunc) xmlMemFree;
@@ -476,42 +476,42 @@ pub unsafe extern "C" fn xmlInitializeGlobalState(gs: XmlGlobalStatePtr) {
     //         (*gs).xmlMemStrdup = (xmlStrdupFunc) xmlMemoryStrdup;
     //     }
     // #else
-    (*gs).xmlFree = Some(free as XmlFreeFunc);
-    (*gs).xmlMalloc = Some(malloc as XmlMallocFunc);
-    (*gs).xmlMallocAtomic = Some(malloc as XmlMallocFunc);
-    (*gs).xmlRealloc = Some(realloc as XmlReallocFunc);
-    (*gs).xmlMemStrdup = Some(xml_strdup as XmlStrdupFunc);
+    (*gs).xml_free = Some(free as XmlFreeFunc);
+    (*gs).xml_malloc = Some(malloc as XmlMallocFunc);
+    (*gs).xml_malloc_atomic = Some(malloc as XmlMallocFunc);
+    (*gs).xml_realloc = Some(realloc as XmlReallocFunc);
+    (*gs).xml_mem_strdup = Some(xml_strdup as XmlStrdupFunc);
     // #endif
-    (*gs).xmlGetWarningsDefaultValue = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
-    (*gs).xmlIndentTreeOutput = XML_INDENT_TREE_OUTPUT_THR_DEF;
-    (*gs).xmlTreeIndentString = XML_TREE_INDENT_STRING_THR_DEF.load(Ordering::Relaxed) as _;
-    (*gs).xmlKeepBlanksDefaultValue = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
-    (*gs).xmlLineNumbersDefaultValue = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
-    (*gs).xmlLoadExtDtdDefaultValue = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
-    (*gs).xmlParserDebugEntities = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
-    (*gs).xmlParserVersion = LIBXML_VERSION_STRING.as_ptr();
-    (*gs).xmlPedanticParserDefaultValue = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
-    (*gs).xmlSaveNoEmptyTags = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
-    (*gs).xmlSubstituteEntitiesDefaultValue = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_get_warnings_default_value = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_indent_tree_output = XML_INDENT_TREE_OUTPUT_THR_DEF;
+    (*gs).xml_tree_indent_string = XML_TREE_INDENT_STRING_THR_DEF.load(Ordering::Relaxed) as _;
+    (*gs).xml_keep_blanks_default_value = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_line_numbers_default_value = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_load_ext_dtd_default_value = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_parser_debug_entities = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
+    (*gs).xml_parser_version = LIBXML_VERSION_STRING.as_ptr();
+    (*gs).xml_pedantic_parser_default_value = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_save_no_empty_tags = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
+    (*gs).xml_substitute_entities_default_value = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
 
-    (*gs).xmlGenericError = XML_GENERIC_ERROR_THR_DEF;
-    (*gs).xmlStructuredError = XML_STRUCTURED_ERROR_THR_DEF;
-    (*gs).xmlGenericErrorContext.store(
+    (*gs).xml_generic_error = XML_GENERIC_ERROR_THR_DEF;
+    (*gs).xml_structured_error = XML_STRUCTURED_ERROR_THR_DEF;
+    (*gs).xml_generic_error_context.store(
         XML_GENERIC_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
         Ordering::Relaxed,
     );
-    (*gs).xmlStructuredErrorContext.store(
+    (*gs).xml_structured_error_context.store(
         XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
         Ordering::Relaxed,
     );
-    (*gs).xmlRegisterNodeDefaultValue = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
-    (*gs).xmlDeregisterNodeDefaultValue = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_register_node_default_value = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
+    (*gs).xml_deregister_node_default_value = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
-    (*gs).xmlParserInputBufferCreateFilenameValue =
+    (*gs).xml_parser_input_buffer_create_filename_value =
         XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
-    (*gs).xmlOutputBufferCreateFilenameValue = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
+    (*gs).xml_output_buffer_create_filename_value = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
     memset(
-        addr_of_mut!((*gs).xmlLastError) as _,
+        addr_of_mut!((*gs).xml_last_error) as _,
         0,
         size_of::<XmlError>(),
     );
@@ -519,7 +519,7 @@ pub unsafe extern "C" fn xmlInitializeGlobalState(gs: XmlGlobalStatePtr) {
     xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
-pub unsafe extern "C" fn xmlThrDefSetGenericErrorFunc(
+pub unsafe extern "C" fn xml_thr_def_set_generic_error_func(
     ctx: *mut c_void,
     handler: Option<XmlGenericErrorFunc>,
 ) {
@@ -533,7 +533,7 @@ pub unsafe extern "C" fn xmlThrDefSetGenericErrorFunc(
     xmlMutexUnlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
-pub unsafe extern "C" fn xmlThrDefSetStructuredErrorFunc(
+pub unsafe extern "C" fn xml_thr_def_set_structured_error_func(
     ctx: *mut c_void,
     handler: XmlStructuredErrorFunc,
 ) {
@@ -551,7 +551,7 @@ pub unsafe extern "C" fn xmlThrDefSetStructuredErrorFunc(
  *
  * Returns the old value of the registration function
  */
-pub unsafe extern "C" fn xmlRegisterNodeDefault(
+pub unsafe extern "C" fn xml_register_node_default(
     func: Option<XmlRegisterNodeFunc>,
 ) -> Option<XmlRegisterNodeFunc> {
     let old = _XML_REGISTER_NODE_DEFAULT_VALUE;
@@ -561,7 +561,7 @@ pub unsafe extern "C" fn xmlRegisterNodeDefault(
     old
 }
 
-pub unsafe extern "C" fn xmlThrDefRegisterNodeDefault(
+pub unsafe extern "C" fn xml_thr_def_register_node_default(
     func: XmlRegisterNodeFunc,
 ) -> Option<XmlRegisterNodeFunc> {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -582,7 +582,7 @@ pub unsafe extern "C" fn xmlThrDefRegisterNodeDefault(
  *
  * Returns the previous value of the deregistration function
  */
-pub unsafe extern "C" fn xmlDeregisterNodeDefault(
+pub unsafe extern "C" fn xml_deregister_node_default(
     func: XmlDeregisterNodeFunc,
 ) -> Option<XmlDeregisterNodeFunc> {
     let old = _XML_DEREGISTER_NODE_DEFAULT_VALUE;
@@ -592,7 +592,7 @@ pub unsafe extern "C" fn xmlDeregisterNodeDefault(
     old
 }
 
-pub unsafe extern "C" fn xmlThrDefDeregisterNodeDefault(
+pub unsafe extern "C" fn xml_thr_def_deregister_node_default(
     func: XmlDeregisterNodeFunc,
 ) -> Option<XmlDeregisterNodeFunc> {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -605,7 +605,7 @@ pub unsafe extern "C" fn xmlThrDefDeregisterNodeDefault(
     old
 }
 
-pub unsafe extern "C" fn xmlThrDefOutputBufferCreateFilenameDefault(
+pub unsafe extern "C" fn xml_thr_def_output_buffer_create_filename_default(
     func: XmlOutputBufferCreateFilenameFunc,
 ) -> Option<XmlOutputBufferCreateFilenameFunc> {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -622,7 +622,7 @@ pub unsafe extern "C" fn xmlThrDefOutputBufferCreateFilenameDefault(
     old
 }
 
-pub unsafe extern "C" fn xmlThrDefParserInputBufferCreateFilenameDefault(
+pub unsafe extern "C" fn xml_thr_def_parser_input_buffer_create_filename_default(
     func: Option<XmlParserInputBufferCreateFilenameFunc>,
 ) -> XmlParserInputBufferCreateFilenameFunc {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -683,7 +683,7 @@ pub unsafe extern "C" fn xml_malloc(size: usize) -> *mut c_void {
 pub fn set_xml_malloc(malloc: Option<XmlMallocFunc>) {
     unsafe {
         _XML_MALLOC = malloc;
-        (*xmlGetGlobalState()).xmlMalloc = malloc;
+        (*xmlGetGlobalState()).xml_malloc = malloc;
     }
 }
 /**
@@ -726,7 +726,7 @@ pub unsafe extern "C" fn xml_realloc(mem: *mut c_void, size: usize) -> *mut c_vo
 pub fn set_xml_realloc(realloc: Option<XmlReallocFunc>) {
     unsafe {
         _XML_REALLOC = realloc;
-        (*xmlGetGlobalState()).xmlRealloc = realloc;
+        (*xmlGetGlobalState()).xml_realloc = realloc;
     }
 }
 /**
@@ -747,7 +747,7 @@ pub unsafe extern "C" fn xml_free(mem: *mut c_void) {
 pub fn set_xml_free(free: Option<XmlFreeFunc>) {
     unsafe {
         _XML_FREE = free;
-        (*xmlGetGlobalState()).xmlFree = free;
+        (*xmlGetGlobalState()).xml_free = free;
     }
 }
 
@@ -782,7 +782,7 @@ pub unsafe extern "C" fn xml_mem_strdup(str: *const XmlChar) -> *mut XmlChar {
 pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
     unsafe {
         _XML_MEM_STRDUP = mem_strdup;
-        (*xmlGetGlobalState()).xmlMemStrdup = mem_strdup;
+        (*xmlGetGlobalState()).xml_mem_strdup = mem_strdup;
     }
 }
 
@@ -796,7 +796,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_MALLOC
         } else {
-            (*xmlGetGlobalState()).xmlMalloc
+            (*xmlGetGlobalState()).xml_malloc
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -809,7 +809,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_MALLOC_ATOMIC
         } else {
-            (*xmlGetGlobalState()).xmlMallocAtomic.unwrap()
+            (*xmlGetGlobalState()).xml_malloc_atomic.unwrap()
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -822,7 +822,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_REALLOC
         } else {
-            (*xmlGetGlobalState()).xmlRealloc
+            (*xmlGetGlobalState()).xml_realloc
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -835,7 +835,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_FREE
         } else {
-            (*xmlGetGlobalState()).xmlFree
+            (*xmlGetGlobalState()).xml_free
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -848,7 +848,7 @@ mod __globals_internal_for_thread_alloc {
         if IS_MAIN_THREAD!() != 0 {
             _XML_MEM_STRDUP
         } else {
-            (*xmlGetGlobalState()).xmlMemStrdup
+            (*xmlGetGlobalState()).xml_mem_strdup
         }
     }
     #[cfg(not(feature = "thread"))]
@@ -904,42 +904,42 @@ mod __globals_internal_for_html {
     use super::*;
 
     #[deprecated]
-    pub unsafe extern "C" fn __htmlDefaultSAXHandler() -> *mut XmlSAXHandlerV1 {
+    pub unsafe extern "C" fn __html_default_sax_handler() -> *mut XmlSAXHandlerV1 {
         if IS_MAIN_THREAD!() != 0 {
             addr_of_mut!(_HTML_DEFAULT_SAXHANDLER)
         } else {
-            addr_of_mut!((*xmlGetGlobalState()).htmlDefaultSAXHandler)
+            addr_of_mut!((*xmlGetGlobalState()).html_default_sax_handler)
         }
     }
     #[cfg(feature = "thread")]
-    pub unsafe extern "C" fn htmlDefaultSAXHandler() -> *mut XmlSAXHandlerV1 {
-        __htmlDefaultSAXHandler()
+    pub unsafe extern "C" fn html_default_sax_handler() -> *mut XmlSAXHandlerV1 {
+        __html_default_sax_handler()
     }
     #[deprecated]
     #[cfg(not(feature = "thread"))]
-    pub unsafe extern "C" fn htmlDefaultSAXHandler() -> *mut XmlSAXHandlerV1 {
+    pub unsafe extern "C" fn html_default_sax_handler() -> *mut XmlSAXHandlerV1 {
         addr_of_mut!(_HTML_DEFAULT_SAXHANDLER)
     }
 }
 #[cfg(feature = "html")]
 pub use __globals_internal_for_html::*;
 
-pub unsafe extern "C" fn __xmlLastError() -> *mut XmlError {
+pub unsafe extern "C" fn __xml_last_error() -> *mut XmlError {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_LAST_ERROR)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlLastError)
+        addr_of_mut!((*xmlGetGlobalState()).xml_last_error)
     }
 }
 
 static mut _XML_LAST_ERROR: XmlError = unsafe { zeroed() };
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlLastError() -> *mut XmlError {
-    __xmlLastError()
+pub unsafe extern "C" fn xml_last_error() -> *mut XmlError {
+    __xml_last_error()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlLastError() -> *mut XmlError {
+pub unsafe extern "C" fn xml_last_error() -> *mut XmlError {
     addr_of_mut!(_XML_LAST_ERROR)
 }
 
@@ -950,11 +950,11 @@ pub unsafe extern "C" fn xmlLastError() -> *mut XmlError {
  */
 
 #[deprecated]
-pub unsafe extern "C" fn __oldXMLWDcompatibility() -> *mut c_int {
+pub unsafe extern "C" fn __old_xml_wd_compatibility() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_OLD_XMLWDCOMPATIBILITY)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).oldXMLWDcompatibility)
+        addr_of_mut!((*xmlGetGlobalState()).old_xml_wd_compatibility)
     }
 }
 
@@ -965,34 +965,34 @@ pub unsafe extern "C" fn __oldXMLWDcompatibility() -> *mut c_int {
  */
 static mut _OLD_XMLWDCOMPATIBILITY: c_int = 0; /* DEPRECATED */
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn oldXMLWDcompatibility() -> *mut c_int {
-    __oldXMLWDcompatibility()
+pub unsafe extern "C" fn old_xml_wd_compatibility() -> *mut c_int {
+    __old_xml_wd_compatibility()
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn oldXMLWDcompatibility() -> *mut c_int {
+pub unsafe extern "C" fn old_xml_wd_compatibility() -> *mut c_int {
     addr_of_mut!(_OLD_XMLWDCOMPATIBILITY)
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xmlBufferAllocScheme() -> *mut XmlBufferAllocationScheme {
+pub unsafe extern "C" fn __xml_buffer_alloc_scheme() -> *mut XmlBufferAllocationScheme {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_BUFFER_ALLOC_SCHEME)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlBufferAllocScheme)
+        addr_of_mut!((*xmlGetGlobalState()).xml_buffer_alloc_scheme)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlBufferAllocScheme() -> *mut XmlBufferAllocationScheme {
-    __xmlBufferAllocScheme()
+pub unsafe extern "C" fn xml_buffer_alloc_scheme() -> *mut XmlBufferAllocationScheme {
+    __xml_buffer_alloc_scheme()
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlBufferAllocScheme() -> *mut XmlBufferAllocationScheme {
+pub unsafe extern "C" fn xml_buffer_alloc_scheme() -> *mut XmlBufferAllocationScheme {
     addr_of_mut!(_XML_BUFFER_ALLOC_SCHEME)
 }
 #[deprecated]
-pub unsafe extern "C" fn xmlThrDefBufferAllocScheme(
+pub unsafe extern "C" fn xml_thr_def_buffer_alloc_scheme(
     v: XmlBufferAllocationScheme,
 ) -> XmlBufferAllocationScheme {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -1003,26 +1003,26 @@ pub unsafe extern "C" fn xmlThrDefBufferAllocScheme(
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xmlDefaultBufferSize() -> *mut c_int {
+pub unsafe extern "C" fn __xml_default_buffer_size() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_DEFAULT_BUFFER_SIZE)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlDefaultBufferSize)
+        addr_of_mut!((*xmlGetGlobalState()).xml_default_buffer_size)
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlDefaultBufferSize() -> *mut c_int {
-    __xmlDefaultBufferSize()
+pub unsafe extern "C" fn xml_default_buffer_size() -> *mut c_int {
+    __xml_default_buffer_size()
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlDefaultBufferSize() -> *mut c_int {
+pub unsafe extern "C" fn xml_default_buffer_size() -> *mut c_int {
     addr_of_mut!(_XML_DEFAULT_BUFFER_SIZE)
 }
 
 #[deprecated]
-pub unsafe extern "C" fn xmlThrDefDefaultBufferSize(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_default_buffer_size(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_DEFAULT_BUFFER_SIZE_THR_DEF;
     XML_DEFAULT_BUFFER_SIZE_THR_DEF = v;
@@ -1031,11 +1031,11 @@ pub unsafe extern "C" fn xmlThrDefDefaultBufferSize(v: c_int) -> c_int {
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xmlDefaultSAXHandler() -> *mut XmlSAXHandlerV1 {
+pub unsafe extern "C" fn __xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_DEFAULT_SAXHANDLER)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlDefaultSAXHandler)
+        addr_of_mut!((*xmlGetGlobalState()).xml_default_sax_handler)
     }
 }
 
@@ -1080,21 +1080,21 @@ static mut _XML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
 };
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlDefaultSAXHandler() -> *mut XmlSAXHandlerV1 {
-    __xmlDefaultSAXHandler()
+pub unsafe extern "C" fn xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
+    __xml_default_sax_handler()
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlDefaultSAXHandler() -> *mut XmlSAXHandlerV1 {
+pub unsafe extern "C" fn xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
     addr_of_mut!(_XML_DEFAULT_SAXHANDLER)
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xmlDefaultSAXLocator() -> *mut XmlSaxlocator {
+pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSaxlocator {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlDefaultSAXLocator)
+        addr_of_mut!((*xmlGetGlobalState()).xml_default_sax_locator)
     }
 }
 
@@ -1114,32 +1114,32 @@ static mut _XML_DEFAULT_SAXLOCATOR: XmlSaxlocator = XmlSaxlocator {
 };
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlDefaultSAXLocator() -> *mut XmlSaxlocator {
-    __xmlDefaultSAXLocator()
+pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSaxlocator {
+    __xml_default_sax_locator()
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlDefaultSAXLocator() -> *mut XmlSaxlocator {
+pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSaxlocator {
     addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
 }
 
-pub unsafe extern "C" fn __xmlDoValidityCheckingDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn __xml_do_validity_checking_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlDoValidityCheckingDefaultValue)
+        addr_of_mut!((*xmlGetGlobalState()).xml_do_validity_checking_default_value)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlDoValidityCheckingDefaultValue() -> *mut c_int {
-    __xmlDoValidityCheckingDefaultValue()
+pub unsafe extern "C" fn xml_do_validity_checking_default_value() -> *mut c_int {
+    __xml_do_validity_checking_default_value()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlDoValidityCheckingDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn xml_do_validity_checking_default_value() -> *mut c_int {
     _XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE.as_ptr()
 }
 
-pub unsafe extern "C" fn xmlThrDefDoValidityCheckingDefaultValue(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_do_validity_checking_default_value(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
     XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF = v;
@@ -1147,93 +1147,93 @@ pub unsafe extern "C" fn xmlThrDefDoValidityCheckingDefaultValue(v: c_int) -> c_
     ret
 }
 
-pub unsafe extern "C" fn __xmlGenericError() -> XmlGenericErrorFunc {
+pub unsafe extern "C" fn __xml_generic_error() -> XmlGenericErrorFunc {
     if IS_MAIN_THREAD!() != 0 {
         _XML_GENERIC_ERROR.unwrap()
     } else {
-        (*xmlGetGlobalState()).xmlGenericError.unwrap()
+        (*xmlGetGlobalState()).xml_generic_error.unwrap()
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlGenericError(ctx: *mut c_void, msg: *const c_char) {
-    __xmlGenericError()(ctx, msg);
+pub unsafe extern "C" fn xml_generic_error(ctx: *mut c_void, msg: *const c_char) {
+    __xml_generic_error()(ctx, msg);
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlGenericError(ctx: *mut c_void, msg: *const c_char) {
+pub unsafe extern "C" fn xml_generic_error(ctx: *mut c_void, msg: *const c_char) {
     _XML_GENERIC_ERROR.unwrap()(ctx, msg)
 }
 
-pub unsafe extern "C" fn __xmlStructuredError() -> Option<XmlStructuredErrorFunc> {
+pub unsafe extern "C" fn __xml_structured_error() -> Option<XmlStructuredErrorFunc> {
     if IS_MAIN_THREAD!() != 0 {
         _XML_STRUCTURED_ERROR
     } else {
-        (*xmlGetGlobalState()).xmlStructuredError
+        (*xmlGetGlobalState()).xml_structured_error
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlStructuredError(user_data: *mut c_void, error: XmlErrorPtr) {
-    if let Some(serror) = __xmlStructuredError() {
+pub unsafe extern "C" fn xml_structured_error(user_data: *mut c_void, error: XmlErrorPtr) {
+    if let Some(serror) = __xml_structured_error() {
         serror(user_data, error)
     }
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlStructuredError(user_data: *mut c_void, error: XmlErrorPtr) {
-    _XML_STRUCTURED_ERROR.unwrap(user_data, error)
+pub unsafe extern "C" fn xml_structured_error(user_data: *mut c_void, error: XmlErrorPtr) {
+    _XML_STRUCTURED_ERROR.unwrap()(user_data, error)
 }
 
-pub unsafe extern "C" fn __xmlGenericErrorContext() -> *mut *mut c_void {
+pub unsafe extern "C" fn __xml_generic_error_context() -> *mut *mut c_void {
     if IS_MAIN_THREAD!() != 0 {
         _XML_GENERIC_ERROR_CONTEXT.as_ptr()
     } else {
-        (*xmlGetGlobalState()).xmlGenericErrorContext.as_ptr()
+        (*xmlGetGlobalState()).xml_generic_error_context.as_ptr()
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlGenericErrorContext() -> *mut c_void {
-    *__xmlGenericErrorContext()
+pub unsafe extern "C" fn xml_generic_error_context() -> *mut c_void {
+    *__xml_generic_error_context()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlGenericErrorContext() -> *mut *mut c_void {
+pub unsafe extern "C" fn xml_generic_error_context() -> *mut c_void {
     *_XML_GENERIC_ERROR_CONTEXT.as_ptr()
 }
 
-pub unsafe extern "C" fn __xmlStructuredErrorContext() -> *mut *mut c_void {
+pub unsafe extern "C" fn __xml_structured_error_context() -> *mut *mut c_void {
     if IS_MAIN_THREAD!() != 0 {
         _XML_STRUCTURED_ERROR_CONTEXT.as_ptr()
     } else {
-        (*xmlGetGlobalState()).xmlStructuredErrorContext.as_ptr()
+        (*xmlGetGlobalState()).xml_structured_error_context.as_ptr()
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlStructuredErrorContext() -> *mut *mut c_void {
-    __xmlStructuredErrorContext()
+pub unsafe extern "C" fn xml_structured_error_context() -> *mut *mut c_void {
+    __xml_structured_error_context()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlStructuredErrorContext() -> *mut *mut c_void {
+pub unsafe extern "C" fn xml_structured_error_context() -> *mut *mut c_void {
     _XML_STRUCTURED_ERROR_CONTEXT.as_ptr()
 }
 
-pub unsafe extern "C" fn __xmlGetWarningsDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn __xml_get_warnings_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_GET_WARNINGS_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlGetWarningsDefaultValue)
+        addr_of_mut!((*xmlGetGlobalState()).xml_get_warnings_default_value)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlGetWarningsDefaultValue() -> *mut c_int {
-    __xmlGetWarningsDefaultValue()
+pub unsafe extern "C" fn xml_get_warnings_default_value() -> *mut c_int {
+    __xml_get_warnings_default_value()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlGetWarningsDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn xml_get_warnings_default_value() -> *mut c_int {
     _XML_GET_WARNINGS_DEFAULT_VALUE.as_ptr()
 }
 
-pub unsafe extern "C" fn xmlThrDefGetWarningsDefaultValue(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_get_warnings_default_value(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
     XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF = v;
@@ -1241,23 +1241,23 @@ pub unsafe extern "C" fn xmlThrDefGetWarningsDefaultValue(v: c_int) -> c_int {
     ret
 }
 
-pub unsafe extern "C" fn __xmlIndentTreeOutput() -> *mut c_int {
+pub unsafe extern "C" fn __xml_indent_tree_output() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_INDENT_TREE_OUTPUT.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlIndentTreeOutput)
+        addr_of_mut!((*xmlGetGlobalState()).xml_indent_tree_output)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlIndentTreeOutput() -> *mut c_int {
-    __xmlIndentTreeOutput()
+pub unsafe extern "C" fn xml_indent_tree_output() -> *mut c_int {
+    __xml_indent_tree_output()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlIndentTreeOutput() -> *mut c_int {
+pub unsafe extern "C" fn xml_indent_tree_output() -> *mut c_int {
     _XML_INDENT_TREE_OUTPUT.as_ptr()
 }
 
-pub unsafe extern "C" fn xmlThrDefIndentTreeOutput(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_indent_tree_output(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_INDENT_TREE_OUTPUT_THR_DEF;
     XML_INDENT_TREE_OUTPUT_THR_DEF = v;
@@ -1265,23 +1265,23 @@ pub unsafe extern "C" fn xmlThrDefIndentTreeOutput(v: c_int) -> c_int {
     ret
 }
 
-pub unsafe extern "C" fn __xmlTreeIndentString() -> *mut *const c_char {
+pub unsafe extern "C" fn __xml_tree_indent_string() -> *mut *const c_char {
     if IS_MAIN_THREAD!() != 0 {
         _XML_TREE_INDENT_STRING.as_ptr() as _
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlTreeIndentString)
+        addr_of_mut!((*xmlGetGlobalState()).xml_tree_indent_string)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlTreeIndentString() -> *mut *const c_char {
-    __xmlTreeIndentString()
+pub unsafe extern "C" fn xml_tree_indent_string() -> *mut *const c_char {
+    __xml_tree_indent_string()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlTreeIndentString() -> *mut *const c_char {
+pub unsafe extern "C" fn xml_tree_indent_string() -> *mut *const c_char {
     _XML_TREE_INDENT_STRING.as_ptr() as _
 }
 
-pub unsafe extern "C" fn xmlThrDefTreeIndentString(v: *const c_char) -> *const c_char {
+pub unsafe extern "C" fn xml_thr_def_tree_indent_string(v: *const c_char) -> *const c_char {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: *const c_char = XML_TREE_INDENT_STRING_THR_DEF.load(Ordering::Relaxed);
     XML_TREE_INDENT_STRING_THR_DEF.store(v as _, Ordering::Relaxed);
@@ -1289,23 +1289,23 @@ pub unsafe extern "C" fn xmlThrDefTreeIndentString(v: *const c_char) -> *const c
     ret
 }
 
-pub unsafe extern "C" fn __xmlKeepBlanksDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn __xml_keep_blanks_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_KEEP_BLANKS_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlKeepBlanksDefaultValue)
+        addr_of_mut!((*xmlGetGlobalState()).xml_keep_blanks_default_value)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlKeepBlanksDefaultValue() -> *mut c_int {
-    __xmlKeepBlanksDefaultValue()
+pub unsafe extern "C" fn xml_keep_blanks_default_value() -> *mut c_int {
+    __xml_keep_blanks_default_value()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlKeepBlanksDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn xml_keep_blanks_default_value() -> *mut c_int {
     _XML_KEEP_BLANKS_DEFAULT_VALUE.as_ptr()
 }
 
-pub unsafe extern "C" fn xmlThrDefKeepBlanksDefaultValue(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_keep_blanks_default_value(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
     XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF = v;
@@ -1314,25 +1314,25 @@ pub unsafe extern "C" fn xmlThrDefKeepBlanksDefaultValue(v: c_int) -> c_int {
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xmlLineNumbersDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn __xml_line_numbers_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_LINE_NUMBERS_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlLineNumbersDefaultValue)
+        addr_of_mut!((*xmlGetGlobalState()).xml_line_numbers_default_value)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlLineNumbersDefaultValue() -> *mut c_int {
-    __xmlLineNumbersDefaultValue()
+pub unsafe extern "C" fn xml_line_numbers_default_value() -> *mut c_int {
+    __xml_line_numbers_default_value()
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlLineNumbersDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn xml_line_numbers_default_value() -> *mut c_int {
     _XML_LINE_NUMBERS_DEFAULT_VALUE.as_ptr()
 }
 
 #[deprecated]
-pub unsafe extern "C" fn xmlThrDefLineNumbersDefaultValue(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_line_numbers_default_value(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
     XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF = v;
@@ -1340,23 +1340,23 @@ pub unsafe extern "C" fn xmlThrDefLineNumbersDefaultValue(v: c_int) -> c_int {
     ret
 }
 
-pub unsafe extern "C" fn __xmlLoadExtDtdDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn __xml_load_ext_dtd_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_LOAD_EXT_DTD_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlLoadExtDtdDefaultValue)
+        addr_of_mut!((*xmlGetGlobalState()).xml_load_ext_dtd_default_value)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlLoadExtDtdDefaultValue() -> *mut c_int {
-    __xmlLoadExtDtdDefaultValue()
+pub unsafe extern "C" fn xml_load_ext_dtd_default_value() -> *mut c_int {
+    __xml_load_ext_dtd_default_value()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlLoadExtDtdDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn xml_load_ext_dtd_default_value() -> *mut c_int {
     _XML_LOAD_EXT_DTD_DEFAULT_VALUE.as_ptr()
 }
 
-pub unsafe extern "C" fn xmlThrDefLoadExtDtdDefaultValue(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_load_ext_dtd_default_value(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
     XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF = v;
@@ -1364,23 +1364,23 @@ pub unsafe extern "C" fn xmlThrDefLoadExtDtdDefaultValue(v: c_int) -> c_int {
     ret
 }
 
-pub unsafe extern "C" fn __xmlParserDebugEntities() -> *mut c_int {
+pub unsafe extern "C" fn __xml_parser_debug_entities() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_PARSER_DEBUG_ENTITIES.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlParserDebugEntities)
+        addr_of_mut!((*xmlGetGlobalState()).xml_parser_debug_entities)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlParserDebugEntities() -> *mut c_int {
-    __xmlParserDebugEntities()
+pub unsafe extern "C" fn xml_parser_debug_entities() -> *mut c_int {
+    __xml_parser_debug_entities()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlParserDebugEntities() -> *mut c_int {
+pub unsafe extern "C" fn xml_parser_debug_entities() -> *mut c_int {
     _XML_PARSER_DEBUG_ENTITIES.as_ptr()
 }
 
-pub unsafe extern "C" fn xmlThrDefParserDebugEntities(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_parser_debug_entities(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
     XML_PARSER_DEBUG_ENTITIES_THR_DEF = v;
@@ -1410,25 +1410,25 @@ pub unsafe extern "C" fn xmlThrDefParserDebugEntities(v: c_int) -> c_int {
 // pub static mut xmlParserVersion: *const c_char;
 
 #[deprecated]
-pub unsafe extern "C" fn __xmlPedanticParserDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn __xml_pedantic_parser_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_PEDANTIC_PARSER_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlPedanticParserDefaultValue)
+        addr_of_mut!((*xmlGetGlobalState()).xml_pedantic_parser_default_value)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlPedanticParserDefaultValue() -> *mut c_int {
-    __xmlPedanticParserDefaultValue()
+pub unsafe extern "C" fn xml_pedantic_parser_default_value() -> *mut c_int {
+    __xml_pedantic_parser_default_value()
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlPedanticParserDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn xml_pedantic_parser_default_value() -> *mut c_int {
     _XML_PEDANTIC_PARSER_DEFAULT_VALUE.as_ptr()
 }
 
 #[deprecated]
-pub unsafe extern "C" fn xmlThrDefPedanticParserDefaultValue(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_pedantic_parser_default_value(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
     XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF = v;
@@ -1436,23 +1436,23 @@ pub unsafe extern "C" fn xmlThrDefPedanticParserDefaultValue(v: c_int) -> c_int 
     ret
 }
 
-pub unsafe extern "C" fn __xmlSaveNoEmptyTags() -> *mut c_int {
+pub unsafe extern "C" fn __xml_save_no_empty_tags() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_SAVE_NO_EMPTY_TAGS.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlSaveNoEmptyTags)
+        addr_of_mut!((*xmlGetGlobalState()).xml_save_no_empty_tags)
     }
 }
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlSaveNoEmptyTags() -> *mut c_int {
-    __xmlSaveNoEmptyTags()
+pub unsafe extern "C" fn xml_save_no_empty_tags() -> *mut c_int {
+    __xml_save_no_empty_tags()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlSaveNoEmptyTags() -> *mut c_int {
+pub unsafe extern "C" fn xml_save_no_empty_tags() -> *mut c_int {
     _XML_SAVE_NO_EMPTY_TAGS.as_ptr()
 }
 
-pub unsafe extern "C" fn xmlThrDefSaveNoEmptyTags(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_save_no_empty_tags(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
     XML_SAVE_NO_EMPTY_TAGS_THR_DEF = v;
@@ -1460,24 +1460,24 @@ pub unsafe extern "C" fn xmlThrDefSaveNoEmptyTags(v: c_int) -> c_int {
     ret
 }
 
-pub unsafe extern "C" fn __xmlSubstituteEntitiesDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn __xml_substitute_entities_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
         _XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE.as_ptr()
     } else {
-        addr_of_mut!((*xmlGetGlobalState()).xmlSubstituteEntitiesDefaultValue)
+        addr_of_mut!((*xmlGetGlobalState()).xml_substitute_entities_default_value)
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlSubstituteEntitiesDefaultValue() -> *mut c_int {
-    __xmlSubstituteEntitiesDefaultValue()
+pub unsafe extern "C" fn xml_substitute_entities_default_value() -> *mut c_int {
+    __xml_substitute_entities_default_value()
 }
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlSubstituteEntitiesDefaultValue() -> *mut c_int {
+pub unsafe extern "C" fn xml_substitute_entities_default_value() -> *mut c_int {
     _XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE.as_ptr()
 }
 
-pub unsafe extern "C" fn xmlThrDefSubstituteEntitiesDefaultValue(v: c_int) -> c_int {
+pub unsafe extern "C" fn xml_thr_def_substitute_entities_default_value(v: c_int) -> c_int {
     xmlMutexLock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
     XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF = v;
@@ -1486,60 +1486,62 @@ pub unsafe extern "C" fn xmlThrDefSubstituteEntitiesDefaultValue(v: c_int) -> c_
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xmlRegisterNodeDefaultValue() -> XmlRegisterNodeFunc {
+pub unsafe extern "C" fn __xml_register_node_default_value() -> XmlRegisterNodeFunc {
     if IS_MAIN_THREAD!() != 0 {
         _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()
     } else {
-        (*xmlGetGlobalState()).xmlRegisterNodeDefaultValue.unwrap()
-    }
-}
-
-#[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlRegisterNodeDefaultValue(node: XmlNodePtr) {
-    __xmlRegisterNodeDefaultValue()(node)
-}
-#[deprecated]
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlRegisterNodeDefaultValue(node: XmlNodePtr) {
-    _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
-}
-
-#[deprecated]
-pub unsafe extern "C" fn __xmlDeregisterNodeDefaultValue() -> XmlDeregisterNodeFunc {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()
-    } else {
         (*xmlGetGlobalState())
-            .xmlDeregisterNodeDefaultValue
+            .xml_register_node_default_value
             .unwrap()
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlDeregisterNodeDefaultValue(node: XmlNodePtr) {
-    __xmlDeregisterNodeDefaultValue()(node)
+pub unsafe extern "C" fn xml_register_node_default_value(node: XmlNodePtr) {
+    __xml_register_node_default_value()(node)
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlDeregisterNodeDefaultValue(node: XmlNodePtr) {
-    _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
+pub unsafe extern "C" fn xml_register_node_default_value(node: XmlNodePtr) {
+    _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
 }
 
-pub(crate) unsafe extern "C" fn __xmlParserInputBufferCreateFilenameValue(
-) -> Option<XmlParserInputBufferCreateFilenameFunc> {
+#[deprecated]
+pub unsafe extern "C" fn __xml_deregister_node_default_value() -> XmlDeregisterNodeFunc {
     if IS_MAIN_THREAD!() != 0 {
-        _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
+        _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()
     } else {
-        (*xmlGetGlobalState()).xmlParserInputBufferCreateFilenameValue
+        (*xmlGetGlobalState())
+            .xml_deregister_node_default_value
+            .unwrap()
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlParserInputBufferCreateFilenameValue(
+pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
+    __xml_deregister_node_default_value()(node)
+}
+#[deprecated]
+#[cfg(not(feature = "thread"))]
+pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
+    _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
+}
+
+pub(crate) unsafe extern "C" fn __xml_parser_input_buffer_create_filename_value(
+) -> Option<XmlParserInputBufferCreateFilenameFunc> {
+    if IS_MAIN_THREAD!() != 0 {
+        _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
+    } else {
+        (*xmlGetGlobalState()).xml_parser_input_buffer_create_filename_value
+    }
+}
+
+#[cfg(feature = "thread")]
+pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_value(
     uri: *const c_char,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
-    if let Some(f) = __xmlParserInputBufferCreateFilenameValue() {
+    if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
         f(uri, enc)
     } else {
         null_mut()
@@ -1547,7 +1549,7 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateFilenameValue(
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlParserInputBufferCreateFilenameValue(
+pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_value(
     uri: *const c_char,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
@@ -1555,22 +1557,22 @@ pub unsafe extern "C" fn xmlParserInputBufferCreateFilenameValue(
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xmlOutputBufferCreateFilenameValue(
+pub unsafe extern "C" fn __xml_output_buffer_create_filename_value(
 ) -> Option<XmlOutputBufferCreateFilenameFunc> {
     if IS_MAIN_THREAD!() != 0 {
         _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE
     } else {
-        (*xmlGetGlobalState()).xmlOutputBufferCreateFilenameValue
+        (*xmlGetGlobalState()).xml_output_buffer_create_filename_value
     }
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xmlOutputBufferCreateFilenameValue(
+pub unsafe extern "C" fn xml_output_buffer_create_filename_value(
     uri: *const c_char,
     encoder: XmlCharEncodingHandlerPtr,
     compression: c_int,
 ) -> XmlOutputBufferPtr {
-    if let Some(fvalue) = __xmlOutputBufferCreateFilenameValue() {
+    if let Some(fvalue) = __xml_output_buffer_create_filename_value() {
         fvalue(uri, encoder, compression)
     } else {
         null_mut()
@@ -1578,7 +1580,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFilenameValue(
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xmlOutputBufferCreateFilenameValue(
+pub unsafe extern "C" fn xml_output_buffer_create_filename_value(
     uri: *const c_char,
     encoder: XmlCharEncodingHandlerPtr,
     compression: c_int,
@@ -1591,7 +1593,7 @@ pub unsafe extern "C" fn xmlOutputBufferCreateFilenameValue(
  *
  * Additional initialisation for multi-threading
  */
-pub(crate) unsafe extern "C" fn xmlInitGlobalsInternal() {
+pub(crate) unsafe extern "C" fn xml_init_globals_internal() {
     xml_init_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
@@ -1600,8 +1602,8 @@ pub(crate) unsafe extern "C" fn xmlInitGlobalsInternal() {
  *
  * Additional cleanup for multi-threading
  */
-pub(crate) unsafe extern "C" fn xmlCleanupGlobalsInternal() {
-    xmlResetError(xmlLastError());
+pub(crate) unsafe extern "C" fn xml_cleanup_globals_internal() {
+    xmlResetError(xml_last_error());
 
     xml_cleanup_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
     __xml_global_init_mutex_destroy();

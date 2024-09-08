@@ -18,7 +18,9 @@ use crate::{
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         encoding::{xmlFindCharEncodingHandler, XmlCharEncoding, XmlCharEncodingHandlerPtr},
-        globals::{xmlDeregisterNodeDefaultValue, xmlGenericErrorContext, xml_free, xml_malloc},
+        globals::{
+            xml_deregister_node_default_value, xml_free, xml_generic_error_context, xml_malloc,
+        },
         parser::{
             xmlCtxtReset, xmlCtxtUseOptions, xml_byte_consumed, xml_create_push_parser_ctxt,
             xml_free_parser_ctxt, xml_parse_chunk, xml_stop_parser, CdataBlockSAXFunc,
@@ -538,7 +540,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
     if ret.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlNewTextReader : malloc failed\n".as_ptr() as _
         );
         return null_mut();
@@ -553,7 +555,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
     if (*ret).buffer.is_null() {
         xml_free(ret as _);
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlNewTextReader : malloc failed\n".as_ptr() as _
         );
         return null_mut();
@@ -568,7 +570,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
         xml_buf_free((*ret).buffer);
         xml_free(ret as _);
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlNewTextReader : malloc failed\n".as_ptr() as _
         );
         return null_mut();
@@ -627,7 +629,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
 
     if (*ret).ctxt.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlNewTextReader : malloc failed\n".as_ptr() as _
         );
         xml_buf_free((*ret).buffer);
@@ -828,7 +830,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
     }
     if (*reader).buffer.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlTextReaderSetup : malloc failed\n".as_ptr() as _
         );
         return -1;
@@ -843,7 +845,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
     }
     if (*reader).sax.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlTextReaderSetup : malloc failed\n".as_ptr() as _
         );
         return -1;
@@ -929,7 +931,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         }
         if (*reader).ctxt.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlTextReaderSetup : malloc failed\n".as_ptr() as _
             );
             return -1;
@@ -1399,7 +1401,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
                 // if let Some(f) = xmlDeregisterNodeDefaultValue {
                 //     f(cur as _);
                 // }
-                xmlDeregisterNodeDefaultValue(cur as _);
+                xml_deregister_node_default_value(cur as _);
             }
 
             if matches!(
@@ -1491,7 +1493,7 @@ unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: Xm
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur as _);
         // }
-        xmlDeregisterNodeDefaultValue(cur as _);
+        xml_deregister_node_default_value(cur as _);
     }
 
     if !(*cur).children.is_null() {
@@ -1550,7 +1552,7 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur);
         // }
-        xmlDeregisterNodeDefaultValue(cur);
+        xml_deregister_node_default_value(cur);
     }
 
     if matches!(
@@ -1636,7 +1638,7 @@ unsafe extern "C" fn xml_text_reader_ent_push(
                 as *mut XmlNodePtr;
         if tmp.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlRealloc failed !\n".as_ptr() as _
             );
             return -1;
@@ -3266,7 +3268,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -
                     (*reader).buffer = xml_buf_create_size(100);
                     if (*reader).buffer.is_null() {
                         xml_generic_error!(
-                            xmlGenericErrorContext(),
+                            xml_generic_error_context(),
                             c"xmlTextReaderSetup : malloc failed\n".as_ptr() as _
                         );
                         return null_mut();
@@ -3588,7 +3590,7 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: XmlTextReaderPtr, cur: Xml
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur as _);
         // }
-        xmlDeregisterNodeDefaultValue(cur as _);
+        xml_deregister_node_default_value(cur as _);
     }
 
     /*
@@ -4656,7 +4658,7 @@ pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
         ) as *mut XmlPatternPtr;
         if (*reader).pattern_tab.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlMalloc failed !\n".as_ptr() as _
             );
             return -1;
@@ -4670,7 +4672,7 @@ pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
         ) as *mut XmlPatternPtr;
         if tmp.is_null() {
             xml_generic_error!(
-                xmlGenericErrorContext(),
+                xml_generic_error_context(),
                 c"xmlRealloc failed !\n".as_ptr() as _
             );
             (*reader).pattern_max /= 2;
@@ -5793,7 +5795,7 @@ pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
     if ret.is_null() {
         xml_generic_error!(
-            xmlGenericErrorContext(),
+            xml_generic_error_context(),
             c"xmlNewTextReader : malloc failed\n".as_ptr() as _
         );
         return null_mut();

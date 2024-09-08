@@ -48,8 +48,8 @@ macro_rules! __xml_raise_error {
 
         use $crate::libxml::{
             globals::{
-                __xmlStructuredError, xmlGenericError, xmlGenericErrorContext, xmlGetWarningsDefaultValue, xmlLastError,
-                xmlStructuredErrorContext,
+                __xml_structured_error, xml_generic_error, xml_generic_error_context, xml_get_warnings_default_value, xml_last_error,
+                xml_structured_error_context,
             },
             parser:: {
                 XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC,
@@ -86,13 +86,13 @@ macro_rules! __xml_raise_error {
                 let mut node: XmlNodePtr = nod as XmlNodePtr;
                 let mut str: *mut c_char;
                 let mut input: XmlParserInputPtr;
-                let mut to: XmlErrorPtr = xmlLastError();
+                let mut to: XmlErrorPtr = xml_last_error();
                 let mut baseptr: XmlNodePtr = null_mut();
 
                 if code == XmlParserErrors::XmlErrOK as i32 {
                     return;
                 }
-                if *xmlGetWarningsDefaultValue() == 0 && matches!(level, XmlErrorLevel::XmlErrWarning) {
+                if *xml_get_warnings_default_value() == 0 && matches!(level, XmlErrorLevel::XmlErrWarning) {
                     return;
                 }
                 if domain == XmlErrorDomain::XmlFromParser as i32
@@ -129,12 +129,12 @@ macro_rules! __xml_raise_error {
                  * Check if structured error handler set
                  */
                 if schannel.is_none() {
-                    schannel = __xmlStructuredError();
+                    schannel = __xml_structured_error();
                     /*
                      * if user has defined handler, change data ptr to user's choice
                      */
                     if schannel.is_some() {
-                        data = *xmlStructuredErrorContext() as _;
+                        data = *xml_structured_error_context() as _;
                     }
                 }
                 /*
@@ -253,8 +253,8 @@ macro_rules! __xml_raise_error {
                 (*to).node = node as _;
                 (*to).ctxt = ctx;
 
-                if to != xmlLastError() {
-                    xmlCopyError(to, xmlLastError());
+                if to != xml_last_error() {
+                    xmlCopyError(to, xml_last_error());
                 }
 
                 if let Some(schannel) = schannel {
@@ -265,7 +265,7 @@ macro_rules! __xml_raise_error {
                 /*
                  * Find the callback channel if channel param is NULL
                  */
-                if !ctxt.is_null() && channel.is_none() && __xmlStructuredError().is_none() && !(*ctxt).sax.is_null() {
+                if !ctxt.is_null() && channel.is_none() && __xml_structured_error().is_none() && !(*ctxt).sax.is_null() {
                     if matches!(level, XmlErrorLevel::XmlErrWarning) {
                         channel = (*(*ctxt).sax).warning;
                     } else {
@@ -273,11 +273,11 @@ macro_rules! __xml_raise_error {
                     }
                     data = (*ctxt).user_data;
                 } else if channel.is_none() {
-                    channel = Some(xmlGenericError);
+                    channel = Some(xml_generic_error);
                     if !ctxt.is_null() {
                         data = ctxt as _;
                     } else {
-                        data = xmlGenericErrorContext();
+                        data = xml_generic_error_context();
                     }
                 }
                 if channel.is_none() {

@@ -6,7 +6,7 @@ use std::{
 
 use exml::libxml::{
     catalog::{xml_catalog_cleanup, xml_load_catalog},
-    globals::{xmlDoValidityCheckingDefaultValue, xmlGenericErrorContext},
+    globals::{xml_do_validity_checking_default_value, xml_generic_error_context},
     parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
     tree::{xml_free_doc, XmlDocPtr},
     xmlerror::xmlSetGenericErrorFunc,
@@ -69,10 +69,10 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         }
 
         if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
-            *xmlDoValidityCheckingDefaultValue() = 0;
+            *xml_do_validity_checking_default_value() = 0;
             xmlSetGenericErrorFunc(stdout as _, None);
         } else {
-            *xmlDoValidityCheckingDefaultValue() = 1;
+            *xml_do_validity_checking_default_value() = 1;
             xmlSetGenericErrorFunc(stderr as _, None);
         }
         #[cfg(feature = "sax1")]
@@ -90,20 +90,20 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             okay = 0;
         }
         if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
-            if *xmlDoValidityCheckingDefaultValue() != 0 {
+            if *xml_do_validity_checking_default_value() != 0 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
-            if xmlGenericErrorContext() != stdout as _ {
+            if xml_generic_error_context() != stdout as _ {
                 println!("xmlGenericErrorContext override failed");
                 okay = 0;
             }
         } else {
-            if *xmlDoValidityCheckingDefaultValue() != 1 {
+            if *xml_do_validity_checking_default_value() != 1 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
-            if xmlGenericErrorContext() != stderr as _ {
+            if xml_generic_error_context() != stderr as _ {
                 println!("xmlGenericErrorContext override failed");
                 okay = 0;
             }
