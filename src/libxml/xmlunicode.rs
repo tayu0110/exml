@@ -3,10 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{
-    ffi::{c_char, c_int, c_uint},
-    ptr::null,
-};
+use std::ffi::{c_char, c_int, c_uint};
 
 use libc::strcmp;
 
@@ -690,7 +687,7 @@ const XML_UNICODE_CATS: *const XmlUnicodeRange = [
 ]
 .as_ptr();
 
-const XML_CS: *const XmlChSRange = [
+const XML_CS: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x0,
         high: 0x1f,
@@ -763,9 +760,9 @@ const XML_CS: *const XmlChSRange = [
         low: 0xfff9,
         high: 0xfffb,
     },
-]
-.as_ptr();
-const XML_CL: *const XmlChLRange = [
+];
+
+const XML_CL: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x1d173,
         high: 0x1d17a,
@@ -794,8 +791,8 @@ const XML_CL: *const XmlChLRange = [
         low: 0x10fffd,
         high: 0x10fffd,
     },
-]
-.as_ptr();
+];
+
 const XML_CG: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 18,
     nb_long_range: 7,
@@ -803,7 +800,7 @@ const XML_CG: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_CL,
 };
 
-const XML_CF_S: *const XmlChSRange = [
+const XML_CF_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0xad,
         high: 0xad,
@@ -848,9 +845,9 @@ const XML_CF_S: *const XmlChSRange = [
         low: 0xfff9,
         high: 0xfffb,
     },
-]
-.as_ptr();
-const XML_CF_L: *const XmlChLRange = [
+];
+
+const XML_CF_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x1d173,
         high: 0x1d17a,
@@ -863,8 +860,8 @@ const XML_CF_L: *const XmlChLRange = [
         low: 0xe0020,
         high: 0xe007f,
     },
-]
-.as_ptr();
+];
+
 const XML_CF_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 11,
     nb_long_range: 3,
@@ -872,7 +869,7 @@ const XML_CF_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_CF_L,
 };
 
-const XML_LS: *const XmlChSRange = [
+const XML_LS: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x41,
         high: 0x5a,
@@ -1989,9 +1986,9 @@ const XML_LS: *const XmlChSRange = [
         low: 0xffda,
         high: 0xffdc,
     },
-]
-.as_ptr();
-const XML_LL: *const XmlChLRange = [
+];
+
+const XML_LL: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10000,
         high: 0x1000b,
@@ -2192,8 +2189,8 @@ const XML_LL: *const XmlChLRange = [
         low: 0x2f800,
         high: 0x2fa1d,
     },
-]
-.as_ptr();
+];
+
 const XML_LG: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 279,
     nb_long_range: 50,
@@ -2201,7 +2198,7 @@ const XML_LG: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_LL,
 };
 
-const XML_LL_S: *const XmlChSRange = [
+const XML_LL_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x61,
         high: 0x7a,
@@ -3786,9 +3783,9 @@ const XML_LL_S: *const XmlChSRange = [
         low: 0xff41,
         high: 0xff5a,
     },
-]
-.as_ptr();
-const XML_LL_L: *const XmlChLRange = [
+];
+
+const XML_LL_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10428,
         high: 0x1044f,
@@ -3901,8 +3898,8 @@ const XML_LL_L: *const XmlChLRange = [
         low: 0x1d7c4,
         high: 0x1d7c9,
     },
-]
-.as_ptr();
+];
+
 const XML_LL_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 396,
     nb_long_range: 28,
@@ -3910,7 +3907,7 @@ const XML_LL_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_LL_L,
 };
 
-const XML_LM_S: *const XmlChSRange = [
+const XML_LM_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x2b0,
         high: 0x2c1,
@@ -3991,16 +3988,16 @@ const XML_LM_S: *const XmlChSRange = [
         low: 0xff9e,
         high: 0xff9f,
     },
-]
-.as_ptr();
+];
+
 const XML_LM_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 20,
     nb_long_range: 0,
     short_range: XML_LM_S,
-    long_range: null(),
+    long_range: &[],
 };
 
-const XML_LO_S: *const XmlChSRange = [
+const XML_LO_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x1bb,
         high: 0x1bb,
@@ -4845,9 +4842,9 @@ const XML_LO_S: *const XmlChSRange = [
         low: 0xffda,
         high: 0xffdc,
     },
-]
-.as_ptr();
-const XML_LO_L: *const XmlChLRange = [
+];
+
+const XML_LO_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10000,
         high: 0x1000b,
@@ -4928,8 +4925,8 @@ const XML_LO_L: *const XmlChLRange = [
         low: 0x2f800,
         high: 0x2fa1d,
     },
-]
-.as_ptr();
+];
+
 const XML_LO_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 211,
     nb_long_range: 20,
@@ -4937,7 +4934,7 @@ const XML_LO_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_LO_L,
 };
 
-const XML_LT_S: *const XmlChSRange = [
+const XML_LT_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x1c5,
         high: 0x1c5,
@@ -4978,16 +4975,16 @@ const XML_LT_S: *const XmlChSRange = [
         low: 0x1ffc,
         high: 0x1ffc,
     },
-]
-.as_ptr();
+];
+
 const XML_LT_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 10,
     nb_long_range: 0,
     short_range: XML_LT_S,
-    long_range: null(),
+    long_range: &[],
 };
 
-const XML_LU_S: *const XmlChSRange = [
+const XML_LU_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x41,
         high: 0x5a,
@@ -6548,9 +6545,9 @@ const XML_LU_S: *const XmlChSRange = [
         low: 0xff21,
         high: 0xff3a,
     },
-]
-.as_ptr();
-const XML_LU_L: *const XmlChLRange = [
+];
+
+const XML_LU_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10400,
         high: 0x10427,
@@ -6675,8 +6672,8 @@ const XML_LU_L: *const XmlChLRange = [
         low: 0x1d790,
         high: 0x1d7a8,
     },
-]
-.as_ptr();
+];
+
 const XML_LU_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 390,
     nb_long_range: 31,
@@ -6684,7 +6681,7 @@ const XML_LU_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_LU_L,
 };
 
-const XML_MS: *const XmlChSRange = [
+const XML_MS: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x300,
         high: 0x357,
@@ -7137,9 +7134,9 @@ const XML_MS: *const XmlChSRange = [
         low: 0xfe20,
         high: 0xfe23,
     },
-]
-.as_ptr();
-const XML_ML: *const XmlChLRange = [
+];
+
+const XML_ML: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x1d165,
         high: 0x1d169,
@@ -7164,8 +7161,8 @@ const XML_ML: *const XmlChLRange = [
         low: 0xe0100,
         high: 0xe01ef,
     },
-]
-.as_ptr();
+];
+
 const XML_MG: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 113,
     nb_long_range: 6,
@@ -7173,7 +7170,7 @@ const XML_MG: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_ML,
 };
 
-const XML_MC_S: *const XmlChSRange = [
+const XML_MC_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x903,
         high: 0x903,
@@ -7394,9 +7391,9 @@ const XML_MC_S: *const XmlChSRange = [
         low: 0x1933,
         high: 0x1938,
     },
-]
-.as_ptr();
-const XML_MC_L: *const XmlChLRange = [
+];
+
+const XML_MC_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x1d165,
         high: 0x1d166,
@@ -7405,8 +7402,8 @@ const XML_MC_L: *const XmlChLRange = [
         low: 0x1d16d,
         high: 0x1d172,
     },
-]
-.as_ptr();
+];
+
 const XML_MC_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 55,
     nb_long_range: 2,
@@ -7414,7 +7411,7 @@ const XML_MC_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_MC_L,
 };
 
-const XML_MN_S: *const XmlChSRange = [
+const XML_MN_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x300,
         high: 0x357,
@@ -7847,9 +7844,9 @@ const XML_MN_S: *const XmlChSRange = [
         low: 0xfe20,
         high: 0xfe23,
     },
-]
-.as_ptr();
-const XML_MN_L: *const XmlChLRange = [
+];
+
+const XML_MN_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x1d167,
         high: 0x1d169,
@@ -7870,8 +7867,8 @@ const XML_MN_L: *const XmlChLRange = [
         low: 0xe0100,
         high: 0xe01ef,
     },
-]
-.as_ptr();
+];
+
 const XML_MN_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 108,
     nb_long_range: 5,
@@ -7879,7 +7876,7 @@ const XML_MN_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_MN_L,
 };
 
-const XML_NS: *const XmlChSRange = [
+const XML_NS: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x30,
         high: 0x39,
@@ -8048,9 +8045,9 @@ const XML_NS: *const XmlChSRange = [
         low: 0xff10,
         high: 0xff19,
     },
-]
-.as_ptr();
-const XML_NL: *const XmlChLRange = [
+];
+
+const XML_NL: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10107,
         high: 0x10133,
@@ -8071,8 +8068,8 @@ const XML_NL: *const XmlChLRange = [
         low: 0x1d7ce,
         high: 0x1d7ff,
     },
-]
-.as_ptr();
+];
+
 const XML_NG: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 42,
     nb_long_range: 5,
@@ -8080,7 +8077,7 @@ const XML_NG: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_NL,
 };
 
-const XML_ND_S: *const XmlChSRange = [
+const XML_ND_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x30,
         high: 0x39,
@@ -8165,9 +8162,9 @@ const XML_ND_S: *const XmlChSRange = [
         low: 0xff10,
         high: 0xff19,
     },
-]
-.as_ptr();
-const XML_ND_L: *const XmlChLRange = [
+];
+
+const XML_ND_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x104a0,
         high: 0x104a9,
@@ -8176,8 +8173,8 @@ const XML_ND_L: *const XmlChLRange = [
         low: 0x1d7ce,
         high: 0x1d7ff,
     },
-]
-.as_ptr();
+];
+
 const XML_ND_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 21,
     nb_long_range: 2,
@@ -8185,7 +8182,7 @@ const XML_ND_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_ND_L,
 };
 
-const XML_NO_S: *const XmlChSRange = [
+const XML_NO_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0xb2,
         high: 0xb3,
@@ -8266,9 +8263,9 @@ const XML_NO_S: *const XmlChSRange = [
         low: 0x32b1,
         high: 0x32bf,
     },
-]
-.as_ptr();
-const XML_NO_L: *const XmlChLRange = [
+];
+
+const XML_NO_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10107,
         high: 0x10133,
@@ -8277,8 +8274,8 @@ const XML_NO_L: *const XmlChLRange = [
         low: 0x10320,
         high: 0x10323,
     },
-]
-.as_ptr();
+];
+
 const XML_NO_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 20,
     nb_long_range: 2,
@@ -8286,7 +8283,7 @@ const XML_NO_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_NO_L,
 };
 
-const XML_PS: *const XmlChSRange = [
+const XML_PS: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x21,
         high: 0x23,
@@ -8623,9 +8620,9 @@ const XML_PS: *const XmlChSRange = [
         low: 0xff5f,
         high: 0xff65,
     },
-]
-.as_ptr();
-const XML_PL: *const XmlChLRange = [
+];
+
+const XML_PL: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10100,
         high: 0x10101,
@@ -8634,8 +8631,8 @@ const XML_PL: *const XmlChLRange = [
         low: 0x1039f,
         high: 0x1039f,
     },
-]
-.as_ptr();
+];
+
 const XML_PG: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 84,
     nb_long_range: 2,
@@ -8643,7 +8640,7 @@ const XML_PG: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_PL,
 };
 
-const XML_PD_S: *const XmlChSRange = [
+const XML_PD_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x2d,
         high: 0x2d,
@@ -8688,16 +8685,16 @@ const XML_PD_S: *const XmlChSRange = [
         low: 0xff0d,
         high: 0xff0d,
     },
-]
-.as_ptr();
+];
+
 const XML_PD_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 11,
     nb_long_range: 0,
     short_range: XML_PD_S,
-    long_range: null(),
+    long_range: &[],
 };
 
-const XML_PE_S: *const XmlChSRange = [
+const XML_PE_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x29,
         high: 0x29,
@@ -8950,16 +8947,16 @@ const XML_PE_S: *const XmlChSRange = [
         low: 0xff63,
         high: 0xff63,
     },
-]
-.as_ptr();
+];
+
 const XML_PE_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 63,
     nb_long_range: 0,
     short_range: XML_PE_S,
-    long_range: null(),
+    long_range: &[],
 };
 
-const XML_PO_S: *const XmlChSRange = [
+const XML_PO_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x21,
         high: 0x23,
@@ -9248,9 +9245,9 @@ const XML_PO_S: *const XmlChSRange = [
         low: 0xff64,
         high: 0xff64,
     },
-]
-.as_ptr();
-const XML_PO_L: *const XmlChLRange = [
+];
+
+const XML_PO_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10100,
         high: 0x10101,
@@ -9259,8 +9256,8 @@ const XML_PO_L: *const XmlChLRange = [
         low: 0x1039f,
         high: 0x1039f,
     },
-]
-.as_ptr();
+];
+
 const XML_PO_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 72,
     nb_long_range: 2,
@@ -9268,7 +9265,7 @@ const XML_PO_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_PO_L,
 };
 
-const XML_PS_S: *const XmlChSRange = [
+const XML_PS_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x28,
         high: 0x28,
@@ -9529,16 +9526,16 @@ const XML_PS_S: *const XmlChSRange = [
         low: 0xff62,
         high: 0xff62,
     },
-]
-.as_ptr();
+];
+
 const XML_PS_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 65,
     nb_long_range: 0,
     short_range: XML_PS_S,
-    long_range: null(),
+    long_range: &[],
 };
 
-const XML_SS: *const XmlChSRange = [
+const XML_SS: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x24,
         high: 0x24,
@@ -10071,9 +10068,9 @@ const XML_SS: *const XmlChSRange = [
         low: 0xfffc,
         high: 0xfffd,
     },
-]
-.as_ptr();
-const XML_SL: *const XmlChLRange = [
+];
+
+const XML_SL: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10102,
         high: 0x10102,
@@ -10154,8 +10151,8 @@ const XML_SL: *const XmlChLRange = [
         low: 0x1d7c3,
         high: 0x1d7c3,
     },
-]
-.as_ptr();
+];
+
 const XML_SG: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 133,
     nb_long_range: 20,
@@ -10163,7 +10160,7 @@ const XML_SG: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_SL,
 };
 
-const XML_SC_S: *const XmlChSRange = [
+const XML_SC_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x24,
         high: 0x24,
@@ -10216,16 +10213,16 @@ const XML_SC_S: *const XmlChSRange = [
         low: 0xffe5,
         high: 0xffe6,
     },
-]
-.as_ptr();
+];
+
 const XML_SC_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 13,
     nb_long_range: 0,
     short_range: XML_SC_S,
-    long_range: null(),
+    long_range: &[],
 };
 
-const XML_SK_S: *const XmlChSRange = [
+const XML_SK_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x5e,
         high: 0x5e,
@@ -10314,16 +10311,16 @@ const XML_SK_S: *const XmlChSRange = [
         low: 0xffe3,
         high: 0xffe3,
     },
-]
-.as_ptr();
+];
+
 const XML_SK_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 22,
     nb_long_range: 0,
     short_range: XML_SK_S,
-    long_range: null(),
+    long_range: &[],
 };
 
-const XML_SM_S: *const XmlChSRange = [
+const XML_SM_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x2b,
         high: 0x2b,
@@ -10516,9 +10513,9 @@ const XML_SM_S: *const XmlChSRange = [
         low: 0xffe9,
         high: 0xffec,
     },
-]
-.as_ptr();
-const XML_SM_L: *const XmlChLRange = [
+];
+
+const XML_SM_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x1d6c1,
         high: 0x1d6c1,
@@ -10559,8 +10556,8 @@ const XML_SM_L: *const XmlChLRange = [
         low: 0x1d7c3,
         high: 0x1d7c3,
     },
-]
-.as_ptr();
+];
+
 const XML_SM_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 48,
     nb_long_range: 10,
@@ -10568,7 +10565,7 @@ const XML_SM_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_SM_L,
 };
 
-const XML_SO_S: *const XmlChSRange = [
+const XML_SO_S: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0xa6,
         high: 0xa7,
@@ -10981,9 +10978,9 @@ const XML_SO_S: *const XmlChSRange = [
         low: 0xfffc,
         high: 0xfffd,
     },
-]
-.as_ptr();
-const XML_SO_L: *const XmlChLRange = [
+];
+
+const XML_SO_L: &[XmlChLRange] = &[
     XmlChLRange {
         low: 0x10102,
         high: 0x10102,
@@ -11024,8 +11021,8 @@ const XML_SO_L: *const XmlChLRange = [
         low: 0x1d300,
         high: 0x1d356,
     },
-]
-.as_ptr();
+];
+
 const XML_SO_G: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 103,
     nb_long_range: 10,
@@ -11033,7 +11030,7 @@ const XML_SO_G: XmlChRangeGroup = XmlChRangeGroup {
     long_range: XML_SO_L,
 };
 
-const XML_ZS: *const XmlChSRange = [
+const XML_ZS: &[XmlChSRange] = &[
     XmlChSRange {
         low: 0x20,
         high: 0x20,
@@ -11070,13 +11067,13 @@ const XML_ZS: *const XmlChSRange = [
         low: 0x3000,
         high: 0x3000,
     },
-]
-.as_ptr();
+];
+
 const XML_ZG: XmlChRangeGroup = XmlChRangeGroup {
     nb_short_range: 9,
     nb_long_range: 0,
     short_range: XML_ZS,
-    long_range: null(),
+    long_range: &[],
 };
 
 const XML_UNICODE_BLOCK_TBL: XmlUnicodeNameTable = XmlUnicodeNameTable {

@@ -10,6 +10,7 @@
 #![warn(unused_labels)]
 #![warn(unused_parens)]
 #![warn(unused_variables)]
+#![warn(unused_unsafe)]
 
 pub mod libxml;
 pub mod private;
