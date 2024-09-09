@@ -36,24 +36,21 @@ pub struct XmlChRangeGroup {
 /// Return `true` if so, otherwise return `false`.
 ///
 /// Please refer to the document of `xmlCharInRange` for original libxml2.
-pub unsafe extern "C" fn xml_char_in_range(val: c_uint, rptr: *const XmlChRangeGroup) -> bool {
+pub unsafe extern "C" fn xml_char_in_range(val: c_uint, rptr: &XmlChRangeGroup) -> bool {
     let mut low: c_int;
     let mut high: c_int;
     let mut mid: c_int;
     let sptr: *const XmlChSRange;
     let lptr: *const XmlChLRange;
 
-    if rptr.is_null() {
-        return false;
-    }
     if val < 0x10000 {
         /* is val in 'short' or 'long'  array? */
-        if (*rptr).nb_short_range == 0 {
+        if rptr.nb_short_range == 0 {
             return false;
         }
         low = 0;
-        high = (*rptr).nb_short_range - 1;
-        sptr = (*rptr).short_range;
+        high = rptr.nb_short_range - 1;
+        sptr = rptr.short_range;
         while low <= high {
             mid = (low + high) / 2;
             if (val as c_ushort) < (*sptr.add(mid as _)).low {
@@ -65,12 +62,12 @@ pub unsafe extern "C" fn xml_char_in_range(val: c_uint, rptr: *const XmlChRangeG
             }
         }
     } else {
-        if (*rptr).nb_long_range == 0 {
+        if rptr.nb_long_range == 0 {
             return false;
         }
         low = 0;
-        high = (*rptr).nb_long_range - 1;
-        lptr = (*rptr).long_range;
+        high = rptr.nb_long_range - 1;
+        lptr = rptr.long_range;
         while low <= high {
             mid = (low + high) / 2;
             if val < (*lptr.add(mid as _)).low {
@@ -123,7 +120,7 @@ macro_rules! xml_is_base_char_q {
         } else {
             $crate::libxml::chvalid::xml_char_in_range(
                 $c,
-                &$crate::libxml::chvalid::XML_IS_BASE_CHAR_GROUP as _,
+                &$crate::libxml::chvalid::XML_IS_BASE_CHAR_GROUP,
             )
         }
     };
@@ -229,7 +226,7 @@ macro_rules! xml_is_combining_q {
         } else {
             $crate::libxml::chvalid::xml_char_in_range(
                 $c,
-                &$crate::libxml::chvalid::XML_IS_COMBINING_GROUP as _,
+                &$crate::libxml::chvalid::XML_IS_COMBINING_GROUP,
             )
         }
     };
@@ -1802,37 +1799,6 @@ mod tests {
     };
 
     use super::*;
-
-    #[test]
-    fn test_xml_char_in_range() {
-        let mut leaks = 0;
-
-        unsafe {
-            for n_val in 0..GEN_NB_UNSIGNED_INT {
-                for n_rptr in 0..GEN_NB_CONST_XML_CH_RANGE_GROUP_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let val = gen_unsigned_int(n_val, 0);
-                    let rptr = gen_const_xml_ch_range_group_ptr(n_rptr, 1);
-
-                    let ret_val = xml_char_in_range(val, rptr) as i32;
-                    desret_int(ret_val);
-                    des_unsigned_int(n_val, val, 0);
-                    des_const_xml_ch_range_group_ptr(n_rptr, rptr, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCharInRange",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_val);
-                        eprintln!(" {}", n_rptr);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCharInRange()");
-        }
-    }
 
     #[test]
     fn test_xml_is_base_char() {
