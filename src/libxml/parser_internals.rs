@@ -245,7 +245,7 @@ macro_rules! IS_CHAR_CH {
 #[macro_export]
 macro_rules! IS_BLANK {
     ( $c:expr ) => {
-        $crate::xml_is_blank_q!($c) != 0
+        $crate::xml_is_blank_q!($c)
     };
 }
 
@@ -273,7 +273,7 @@ macro_rules! IS_BLANK_CH {
 #[macro_export]
 macro_rules! IS_BASECHAR {
     ( $c:expr ) => {
-        $crate::xml_is_base_char_q!($c) != 0
+        $crate::xml_is_base_char_q!($c)
     };
 }
 
@@ -288,7 +288,7 @@ macro_rules! IS_BASECHAR {
 #[macro_export]
 macro_rules! IS_DIGIT {
     ( $c:expr ) => {
-        $crate::xml_is_digit_q!($c) != 0
+        $crate::xml_is_digit_q!($c)
     };
 }
 
@@ -315,7 +315,7 @@ macro_rules! IS_DIGIT {
 #[macro_export]
 macro_rules! IS_COMBINING {
     ( $c:expr ) => {
-        $crate::xml_is_combining_q!($c) != 0
+        $crate::xml_is_combining_q!($c)
     };
 }
 
@@ -345,7 +345,7 @@ macro_rules! IS_COMBINING {
 #[macro_export]
 macro_rules! IS_EXTENDER {
     ( $c:expr ) => {
-        $crate::xml_is_extender_q!($c) != 0
+        $crate::xml_is_extender_q!($c)
     };
 }
 
@@ -373,7 +373,7 @@ macro_rules! IS_EXTENDER {
 #[macro_export]
 macro_rules! IS_IDEOGRAPHIC {
     ( $c:expr ) => {
-        $crate::xml_is_ideographic_q!($c) != 0
+        $crate::xml_is_ideographic_q!($c)
     };
 }
 
@@ -457,7 +457,7 @@ macro_rules! IS_ASCII_DIGIT {
 #[macro_export]
 macro_rules! IS_PUBIDCHAR_CH {
     ( $c:expr ) => {
-        $crate::xml_is_pubid_char_ch!($c) != 0
+        $crate::xml_is_pubid_char_ch!($c)
     };
 }
 

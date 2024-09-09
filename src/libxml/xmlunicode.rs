@@ -12720,7 +12720,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_cs(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_l(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LG)
+    xml_char_in_range(code as c_uint, &XML_LG) as i32
 }
 
 /**
@@ -12732,7 +12732,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_l(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_ll(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LL_G)
+    xml_char_in_range(code as c_uint, &XML_LL_G) as i32
 }
 
 /**
@@ -12744,7 +12744,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_ll(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_lm(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LM_G)
+    xml_char_in_range(code as c_uint, &XML_LM_G) as i32
 }
 
 /**
@@ -12756,7 +12756,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_lm(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_lo(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LO_G)
+    xml_char_in_range(code as c_uint, &XML_LO_G) as i32
 }
 
 /**
@@ -12768,7 +12768,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_lo(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_lt(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LT_G)
+    xml_char_in_range(code as c_uint, &XML_LT_G) as i32
 }
 
 /**
@@ -12780,7 +12780,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_lt(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_lu(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LU_G)
+    xml_char_in_range(code as c_uint, &XML_LU_G) as i32
 }
 
 /**
@@ -12792,7 +12792,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_lu(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_m(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_MG)
+    xml_char_in_range(code as c_uint, &XML_MG) as i32
 }
 
 /**
@@ -12804,7 +12804,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_m(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_mc(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_MC_G)
+    xml_char_in_range(code as c_uint, &XML_MC_G) as i32
 }
 
 /**
@@ -12831,7 +12831,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_me(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_mn(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_MN_G)
+    xml_char_in_range(code as c_uint, &XML_MN_G) as i32
 }
 
 /**
@@ -12843,7 +12843,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_mn(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_n(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_NG)
+    xml_char_in_range(code as c_uint, &XML_NG) as i32
 }
 
 /**
@@ -12855,7 +12855,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_n(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_nd(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_ND_G)
+    xml_char_in_range(code as c_uint, &XML_ND_G) as i32
 }
 
 /**
@@ -12884,7 +12884,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_nl(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_no(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_NO_G)
+    xml_char_in_range(code as c_uint, &XML_NO_G) as i32
 }
 
 /**
@@ -12896,7 +12896,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_no(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_p(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PG)
+    xml_char_in_range(code as c_uint, &XML_PG) as i32
 }
 
 /**
@@ -12927,7 +12927,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pc(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_pd(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PD_G)
+    xml_char_in_range(code as c_uint, &XML_PD_G) as i32
 }
 
 /**
@@ -12939,7 +12939,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pd(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_pe(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PE_G)
+    xml_char_in_range(code as c_uint, &XML_PE_G) as i32
 }
 
 /**
@@ -12979,7 +12979,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pi(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_po(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PO_G)
+    xml_char_in_range(code as c_uint, &XML_PO_G) as i32
 }
 
 /**
@@ -12991,7 +12991,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_po(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_ps(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PS_G)
+    xml_char_in_range(code as c_uint, &XML_PS_G) as i32
 }
 
 /**
@@ -13003,7 +13003,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_ps(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_s(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SG)
+    xml_char_in_range(code as c_uint, &XML_SG) as i32
 }
 
 /**
@@ -13015,7 +13015,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_s(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_sc(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SC_G)
+    xml_char_in_range(code as c_uint, &XML_SC_G) as i32
 }
 
 /**
@@ -13027,7 +13027,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_sc(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_sk(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SK_G)
+    xml_char_in_range(code as c_uint, &XML_SK_G) as i32
 }
 
 /**
@@ -13039,7 +13039,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_sk(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_sm(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SM_G)
+    xml_char_in_range(code as c_uint, &XML_SM_G) as i32
 }
 
 /**
@@ -13051,7 +13051,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_sm(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_so(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SO_G)
+    xml_char_in_range(code as c_uint, &XML_SO_G) as i32
 }
 
 /**
@@ -13063,7 +13063,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_so(code: c_int) -> c_int {
  * Returns 1 if true 0 otherwise
  */
 pub unsafe extern "C" fn xml_ucs_is_cat_z(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_ZG)
+    xml_char_in_range(code as c_uint, &XML_ZG) as i32
 }
 
 /**

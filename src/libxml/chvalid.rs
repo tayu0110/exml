@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_int, c_uchar, c_uint, c_ushort},
+    ffi::{c_int, c_uint, c_ushort},
     ptr::null,
 };
 
@@ -32,20 +32,11 @@ pub struct XmlChRangeGroup {
     pub(crate) long_range: *const XmlChLRange,
 }
 
-/**
- * Range checking routine
- */
-/**
- * xmlCharInRange:
- * @val: character to be validated
- * @rptr: pointer to range to be used to validate
- *
- * Does a binary search of the range table to determine if char
- * is valid
- *
- * Returns: true if character valid, false otherwise
- */
-pub unsafe extern "C" fn xml_char_in_range(val: c_uint, rptr: *const XmlChRangeGroup) -> c_int {
+/// Check if the character ranges that `rptr` points contain `val`.  
+/// Return `true` if so, otherwise return `false`.
+///
+/// Please refer to the document of `xmlCharInRange` for original libxml2.
+pub unsafe extern "C" fn xml_char_in_range(val: c_uint, rptr: *const XmlChRangeGroup) -> bool {
     let mut low: c_int;
     let mut high: c_int;
     let mut mid: c_int;
@@ -53,12 +44,12 @@ pub unsafe extern "C" fn xml_char_in_range(val: c_uint, rptr: *const XmlChRangeG
     let lptr: *const XmlChLRange;
 
     if rptr.is_null() {
-        return 0;
+        return false;
     }
     if val < 0x10000 {
         /* is val in 'short' or 'long'  array? */
         if (*rptr).nb_short_range == 0 {
-            return 0;
+            return false;
         }
         low = 0;
         high = (*rptr).nb_short_range - 1;
@@ -70,12 +61,12 @@ pub unsafe extern "C" fn xml_char_in_range(val: c_uint, rptr: *const XmlChRangeG
             } else if val as c_ushort > (*sptr.add(mid as _)).high {
                 low = mid + 1;
             } else {
-                return 1;
+                return true;
             }
         }
     } else {
         if (*rptr).nb_long_range == 0 {
-            return 0;
+            return false;
         }
         low = 0;
         high = (*rptr).nb_long_range - 1;
@@ -87,11 +78,11 @@ pub unsafe extern "C" fn xml_char_in_range(val: c_uint, rptr: *const XmlChRangeG
             } else if val > (*lptr.add(mid as _)).high {
                 low = mid + 1;
             } else {
-                return 1;
+                return true;
             }
         }
     }
-    0
+    false
 }
 
 /**
@@ -128,7 +119,7 @@ pub(crate) const XML_IS_BASE_CHAR_GROUP: XmlChRangeGroup = XmlChRangeGroup {
 macro_rules! xml_is_base_char_q {
     ( $c:expr ) => {
         if $c < 0x100 {
-            $crate::xml_is_base_char_ch!($c) as i32
+            $crate::xml_is_base_char_ch!($c)
         } else {
             $crate::libxml::chvalid::xml_char_in_range(
                 $c,
@@ -178,9 +169,9 @@ macro_rules! xml_is_blank_ch {
 macro_rules! xml_is_blank_q {
     ( $c:expr ) => {
         if $c < 0x100 {
-            $crate::xml_is_blank_ch!($c) as _
+            $crate::xml_is_blank_ch!($c)
         } else {
-            0
+            false
         }
     };
 }
@@ -234,7 +225,7 @@ pub(crate) const XML_IS_CHAR_GROUP: XmlChRangeGroup = XmlChRangeGroup {
 macro_rules! xml_is_combining_q {
     ( $c:expr ) => {
         if $c < 0x100 {
-            0
+            false
         } else {
             $crate::libxml::chvalid::xml_char_in_range(
                 $c,
@@ -656,13 +647,16 @@ macro_rules! xml_is_digit_ch {
  */
 #[macro_export]
 macro_rules! xml_is_digit_q {
-	($( $c:tt )*) => {
-		if $($c)* < 0x100 {
-            $crate::xml_is_digit_ch!($($c)*) as i32
+    ( $c:expr ) => {
+        if $c < 0x100 {
+            $crate::xml_is_digit_ch!($c)
         } else {
-            $crate::libxml::chvalid::xml_char_in_range($($c)*, &$crate::libxml::chvalid::XML_IS_DIGIT_GROUP as _)
+            $crate::libxml::chvalid::xml_char_in_range(
+                $c,
+                &$crate::libxml::chvalid::XML_IS_DIGIT_GROUP as _,
+            )
         }
-	}
+    };
 }
 
 const XML_IS_DIGIT_SRNG: *const XmlChSRange = [
@@ -739,8 +733,8 @@ pub(crate) const XML_IS_DIGIT_GROUP: XmlChRangeGroup = XmlChRangeGroup {
  */
 #[macro_export]
 macro_rules! xml_is_extender_ch {
-	($( $c:tt )*) => {
-        ($($c)* == 0xb7)
+    ( $c:expr ) => {
+        $c == 0xb7
     };
 }
 
@@ -752,13 +746,16 @@ macro_rules! xml_is_extender_ch {
  */
 #[macro_export]
 macro_rules! xml_is_extender_q {
-	($( $c:tt )*) => {
-		if ($($c)* < 0x100) {
-            $crate::xml_is_extender_ch!($($c)*) as _
+    ( $c:expr ) => {
+        if $c < 0x100 {
+            $crate::xml_is_extender_ch!($c)
         } else {
-            $crate::libxml::chvalid::xml_char_in_range($($c)*, &$crate::libxml::chvalid::XML_IS_EXTENDER_GROUP as _)
+            $crate::libxml::chvalid::xml_char_in_range(
+                $c,
+                &$crate::libxml::chvalid::XML_IS_EXTENDER_GROUP as _,
+            )
         }
-	}
+    };
 }
 
 const XML_IS_EXTENDER_SRNG: *const XmlChSRange = [
@@ -821,10 +818,9 @@ pub(crate) const XML_IS_EXTENDER_GROUP: XmlChRangeGroup = XmlChRangeGroup {
 macro_rules! xml_is_ideographic_q {
     ( $c:expr ) => {
         if $c < 0x100 {
-            0
+            false
         } else {
-            ((0x4e00..=0x9fa5).contains(&$c) || $c == 0x3007 || (0x3021..=0x3029).contains(&$c))
-                as c_int
+            (0x4e00..=0x9fa5).contains(&$c) || $c == 0x3007 || (0x3021..=0x3029).contains(&$c)
         }
     };
 }
@@ -850,31 +846,27 @@ pub(crate) const XML_IS_IDEOGRAPHIC_GROUP: XmlChRangeGroup = XmlChRangeGroup {
     short_range: XML_IS_IDEOGRAPHIC_SRNG,
     long_range: null(),
 };
-/*
- * The initial tables ({func_name}_tab) are used to validate whether a
- * single-byte character is within the specified group.  Each table
- * contains 256 bytes, with each byte representing one of the 256
- * possible characters.  If the table byte is set, the character is
- * allowed.
- *
- */
-pub const XML_IS_PUBID_CHAR_TAB: [c_uchar; 256] = [
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x00, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01,
-    0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+pub const XML_IS_PUBID_CHAR_TAB: [bool; 256] = [
+    false, false, false, false, false, false, false, false, false, false, true, false, false, true,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, true, true, false, true, true, true, false, true, true,
+    true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+    true, true, true, false, true, false, true, true, true, true, true, true, true, true, true,
+    true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+    true, true, true, false, false, false, false, true, false, true, true, true, true, true, true,
+    true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+    true, true, true, true, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false,
 ];
 
 const XML_IS_BASE_CHAR_SRNG: *const XmlChSRange = [
@@ -1678,7 +1670,7 @@ const XML_IS_BASE_CHAR_SRNG: *const XmlChSRange = [
 #[macro_export]
 macro_rules! xml_is_pubid_char_ch {
     ( $c:expr ) => {
-        $crate::libxml::chvalid::XML_IS_PUBID_CHAR_TAB[$c as usize] as i32
+        $crate::libxml::chvalid::XML_IS_PUBID_CHAR_TAB[$c as usize]
     };
 }
 
@@ -1689,13 +1681,13 @@ macro_rules! xml_is_pubid_char_ch {
  * Automatically generated by genChRanges.py
  */
 macro_rules! xml_is_pubid_char_q {
-	($( $c:tt )*) => {
-		if ($($c)* < 0x100) {
-			xml_is_pubid_char_ch!($($c)*)
-		} else {
-			0
-		}
-	}
+    ( $c:expr ) => {
+        if $c < 0x100 {
+            xml_is_pubid_char_ch!($c)
+        } else {
+            false
+        }
+    };
 }
 
 /**
@@ -1707,8 +1699,8 @@ macro_rules! xml_is_pubid_char_q {
  *
  * Returns true if argument valid, false otherwise
  */
-pub unsafe extern "C" fn xml_is_base_char(ch: c_uint) -> c_int {
-    xml_is_base_char_q!(ch) as _
+pub unsafe extern "C" fn xml_is_base_char(ch: c_uint) -> bool {
+    xml_is_base_char_q!(ch)
 }
 
 /**
@@ -1720,8 +1712,8 @@ pub unsafe extern "C" fn xml_is_base_char(ch: c_uint) -> c_int {
  *
  * Returns true if argument valid, false otherwise
  */
-pub unsafe extern "C" fn xml_is_blank(ch: c_uint) -> c_int {
-    xml_is_blank_q!(ch) as _
+pub unsafe extern "C" fn xml_is_blank(ch: c_uint) -> bool {
+    xml_is_blank_q!(ch)
 }
 
 /**
@@ -1733,8 +1725,8 @@ pub unsafe extern "C" fn xml_is_blank(ch: c_uint) -> c_int {
  *
  * Returns true if argument valid, false otherwise
  */
-pub unsafe extern "C" fn xml_is_char(ch: c_uint) -> c_int {
-    xml_is_char_q!(ch) as _
+pub unsafe extern "C" fn xml_is_char(ch: c_uint) -> bool {
+    xml_is_char_q!(ch)
 }
 
 /**
@@ -1746,8 +1738,8 @@ pub unsafe extern "C" fn xml_is_char(ch: c_uint) -> c_int {
  *
  * Returns true if argument valid, false otherwise
  */
-pub unsafe extern "C" fn xml_is_combining(ch: c_uint) -> c_int {
-    xml_is_combining_q!(ch) as _
+pub unsafe extern "C" fn xml_is_combining(ch: c_uint) -> bool {
+    xml_is_combining_q!(ch)
 }
 
 /**
@@ -1759,7 +1751,7 @@ pub unsafe extern "C" fn xml_is_combining(ch: c_uint) -> c_int {
  *
  * Returns true if argument valid, false otherwise
  */
-pub unsafe extern "C" fn xml_is_digit(ch: c_uint) -> c_int {
+pub unsafe extern "C" fn xml_is_digit(ch: c_uint) -> bool {
     xml_is_digit_q!(ch)
 }
 
@@ -1772,7 +1764,7 @@ pub unsafe extern "C" fn xml_is_digit(ch: c_uint) -> c_int {
  *
  * Returns true if argument valid, false otherwise
  */
-pub unsafe extern "C" fn xml_is_extender(ch: c_uint) -> c_int {
+pub unsafe extern "C" fn xml_is_extender(ch: c_uint) -> bool {
     xml_is_extender_q!(ch)
 }
 
@@ -1785,7 +1777,7 @@ pub unsafe extern "C" fn xml_is_extender(ch: c_uint) -> c_int {
  *
  * Returns true if argument valid, false otherwise
  */
-pub unsafe extern "C" fn xml_is_ideographic(ch: c_uint) -> c_int {
+pub unsafe extern "C" fn xml_is_ideographic(ch: c_uint) -> bool {
     xml_is_ideographic_q!(ch)
 }
 
@@ -1798,7 +1790,7 @@ pub unsafe extern "C" fn xml_is_ideographic(ch: c_uint) -> c_int {
  *
  * Returns true if argument valid, false otherwise
  */
-pub unsafe extern "C" fn xml_is_pubid_char(ch: c_uint) -> c_int {
+pub fn xml_is_pubid_char(ch: c_uint) -> bool {
     xml_is_pubid_char_q!(ch)
 }
 
@@ -1822,7 +1814,7 @@ mod tests {
                     let val = gen_unsigned_int(n_val, 0);
                     let rptr = gen_const_xml_ch_range_group_ptr(n_rptr, 1);
 
-                    let ret_val = xml_char_in_range(val, rptr);
+                    let ret_val = xml_char_in_range(val, rptr) as i32;
                     desret_int(ret_val);
                     des_unsigned_int(n_val, val, 0);
                     des_const_xml_ch_range_group_ptr(n_rptr, rptr, 1);
@@ -1851,7 +1843,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ch = gen_unsigned_int(n_ch, 0);
 
-                let ret_val = xml_is_base_char(ch);
+                let ret_val = xml_is_base_char(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
                 xml_reset_last_error();
@@ -1877,7 +1869,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ch = gen_unsigned_int(n_ch, 0);
 
-                let ret_val = xml_is_blank(ch);
+                let ret_val = xml_is_blank(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
                 xml_reset_last_error();
@@ -1903,7 +1895,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ch = gen_unsigned_int(n_ch, 0);
 
-                let ret_val = xml_is_char(ch);
+                let ret_val = xml_is_char(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
                 xml_reset_last_error();
@@ -1929,7 +1921,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ch = gen_unsigned_int(n_ch, 0);
 
-                let ret_val = xml_is_combining(ch);
+                let ret_val = xml_is_combining(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
                 xml_reset_last_error();
@@ -1955,7 +1947,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ch = gen_unsigned_int(n_ch, 0);
 
-                let ret_val = xml_is_digit(ch);
+                let ret_val = xml_is_digit(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
                 xml_reset_last_error();
@@ -1981,7 +1973,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ch = gen_unsigned_int(n_ch, 0);
 
-                let ret_val = xml_is_extender(ch);
+                let ret_val = xml_is_extender(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
                 xml_reset_last_error();
@@ -2007,7 +1999,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ch = gen_unsigned_int(n_ch, 0);
 
-                let ret_val = xml_is_ideographic(ch);
+                let ret_val = xml_is_ideographic(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
                 xml_reset_last_error();
@@ -2033,7 +2025,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ch = gen_unsigned_int(n_ch, 0);
 
-                let ret_val = xml_is_pubid_char(ch);
+                let ret_val = xml_is_pubid_char(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
                 xml_reset_last_error();
