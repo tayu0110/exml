@@ -34,49 +34,44 @@ pub struct XmlChRangeGroup {
 ///
 /// Please refer to the document of `xmlCharInRange` for original libxml2.
 pub fn xml_char_in_range(val: c_uint, rptr: &XmlChRangeGroup) -> bool {
-    let mut low: i32;
-    let mut high: i32;
-    let mut mid: i32;
-
     assert_eq!(rptr.nb_short_range, rptr.short_range.len() as i32);
     assert_eq!(rptr.nb_long_range, rptr.long_range.len() as i32);
+    /* is val in 'short' or 'long'  array? */
     if val < 0x10000 {
-        /* is val in 'short' or 'long'  array? */
-        if rptr.nb_short_range == 0 {
+        if rptr.short_range.is_empty() {
             return false;
         }
-        low = 0;
-        high = rptr.nb_short_range - 1;
         let sptr = rptr.short_range;
-        while low <= high {
-            mid = (low + high) / 2;
-            if (val as c_ushort) < sptr[mid as usize].low {
-                high = mid - 1;
-            } else if val as c_ushort > sptr[mid as usize].high {
-                low = mid + 1;
+        let (mut low, mut high) = (0, sptr.len());
+        while high - low > 1 {
+            let mid = (high + low) / 2;
+            if val < sptr[mid].low as u32 {
+                high = mid;
+            } else if val > sptr[mid].high as u32 {
+                low = mid;
             } else {
                 return true;
             }
         }
+        (sptr[low].low..=sptr[low].high).contains(&(val as u16))
     } else {
-        if rptr.nb_long_range == 0 {
+        if rptr.long_range.is_empty() {
             return false;
         }
-        low = 0;
-        high = rptr.nb_long_range - 1;
         let lptr = rptr.long_range;
-        while low <= high {
-            mid = (low + high) / 2;
-            if val < lptr[mid as usize].low {
-                high = mid - 1;
-            } else if val > lptr[mid as usize].high {
-                low = mid + 1;
+        let (mut low, mut high) = (0, lptr.len());
+        while high - low > 1 {
+            let mid = (high + low) / 2;
+            if val < lptr[mid].low {
+                high = mid;
+            } else if val > lptr[mid].high {
+                low = mid;
             } else {
                 return true;
             }
         }
+        (lptr[low].low..=lptr[low].high).contains(&val)
     }
-    false
 }
 
 /**
