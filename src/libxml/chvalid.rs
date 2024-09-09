@@ -3,7 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::ffi::{c_int, c_uint, c_ushort};
+use std::ffi::{c_uint, c_ushort};
 
 /*
  * Define our typedefs and structures
@@ -23,8 +23,6 @@ pub(crate) struct XmlChLRange {
 
 pub(crate) type XmlChRangeGroupPtr = *mut XmlChRangeGroup;
 pub struct XmlChRangeGroup {
-    pub(crate) nb_short_range: c_int,
-    pub(crate) nb_long_range: c_int,
     pub(crate) short_range: &'static [XmlChSRange], /* points to an array of ranges */
     pub(crate) long_range: &'static [XmlChLRange],
 }
@@ -34,8 +32,6 @@ pub struct XmlChRangeGroup {
 ///
 /// Please refer to the document of `xmlCharInRange` for original libxml2.
 pub fn xml_char_in_range(val: c_uint, rptr: &XmlChRangeGroup) -> bool {
-    assert_eq!(rptr.nb_short_range, rptr.short_range.len() as i32);
-    assert_eq!(rptr.nb_long_range, rptr.long_range.len() as i32);
     /* is val in 'short' or 'long'  array? */
     if val < 0x10000 {
         if rptr.short_range.is_empty() {
@@ -92,8 +88,6 @@ macro_rules! xml_is_base_char_ch {
 }
 
 pub(crate) const XML_IS_BASE_CHAR_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 197,
-    nb_long_range: 0,
     short_range: XML_IS_BASE_CHAR_SRNG,
     long_range: &[],
 };
@@ -196,8 +190,6 @@ macro_rules! xml_is_char_q {
 }
 
 pub(crate) const XML_IS_CHAR_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 2,
-    nb_long_range: 1,
     short_range: XML_IS_CHAR_SRNG,
     long_range: XML_IS_CHAR_LRNG,
 };
@@ -606,8 +598,6 @@ const XML_IS_COMBINING_SRNG: &[XmlChSRange] = &[
 ];
 
 pub(crate) const XML_IS_COMBINING_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 95,
-    nb_long_range: 0,
     short_range: XML_IS_COMBINING_SRNG,
     long_range: &[],
 };
@@ -704,8 +694,6 @@ const XML_IS_DIGIT_SRNG: &[XmlChSRange] = &[
     },
 ];
 pub(crate) const XML_IS_DIGIT_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 14,
-    nb_long_range: 0,
     short_range: XML_IS_DIGIT_SRNG,
     long_range: &[],
 };
@@ -737,7 +725,7 @@ macro_rules! xml_is_extender_q {
         } else {
             $crate::libxml::chvalid::xml_char_in_range(
                 $c,
-                &$crate::libxml::chvalid::XML_IS_EXTENDER_GROUP as _,
+                &$crate::libxml::chvalid::XML_IS_EXTENDER_GROUP,
             )
         }
     };
@@ -786,8 +774,6 @@ const XML_IS_EXTENDER_SRNG: &[XmlChSRange] = &[
     },
 ];
 pub(crate) const XML_IS_EXTENDER_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 10,
-    nb_long_range: 0,
     short_range: XML_IS_EXTENDER_SRNG,
     long_range: &[],
 };
@@ -824,8 +810,6 @@ const XML_IS_IDEOGRAPHIC_SRNG: &[XmlChSRange] = &[
     },
 ];
 pub(crate) const XML_IS_IDEOGRAPHIC_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 3,
-    nb_long_range: 0,
     short_range: XML_IS_IDEOGRAPHIC_SRNG,
     long_range: &[],
 };

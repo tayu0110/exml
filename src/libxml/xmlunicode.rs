@@ -794,8 +794,6 @@ const XML_CL: &[XmlChLRange] = &[
 ];
 
 const XML_CG: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 18,
-    nb_long_range: 7,
     short_range: XML_CS,
     long_range: XML_CL,
 };
@@ -863,8 +861,6 @@ const XML_CF_L: &[XmlChLRange] = &[
 ];
 
 const XML_CF_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 11,
-    nb_long_range: 3,
     short_range: XML_CF_S,
     long_range: XML_CF_L,
 };
@@ -2192,8 +2188,6 @@ const XML_LL: &[XmlChLRange] = &[
 ];
 
 const XML_LG: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 279,
-    nb_long_range: 50,
     short_range: XML_LS,
     long_range: XML_LL,
 };
@@ -3901,8 +3895,6 @@ const XML_LL_L: &[XmlChLRange] = &[
 ];
 
 const XML_LL_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 396,
-    nb_long_range: 28,
     short_range: XML_LL_S,
     long_range: XML_LL_L,
 };
@@ -3991,8 +3983,6 @@ const XML_LM_S: &[XmlChSRange] = &[
 ];
 
 const XML_LM_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 20,
-    nb_long_range: 0,
     short_range: XML_LM_S,
     long_range: &[],
 };
@@ -4928,8 +4918,6 @@ const XML_LO_L: &[XmlChLRange] = &[
 ];
 
 const XML_LO_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 211,
-    nb_long_range: 20,
     short_range: XML_LO_S,
     long_range: XML_LO_L,
 };
@@ -4978,8 +4966,6 @@ const XML_LT_S: &[XmlChSRange] = &[
 ];
 
 const XML_LT_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 10,
-    nb_long_range: 0,
     short_range: XML_LT_S,
     long_range: &[],
 };
@@ -6675,8 +6661,6 @@ const XML_LU_L: &[XmlChLRange] = &[
 ];
 
 const XML_LU_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 390,
-    nb_long_range: 31,
     short_range: XML_LU_S,
     long_range: XML_LU_L,
 };
@@ -7164,8 +7148,6 @@ const XML_ML: &[XmlChLRange] = &[
 ];
 
 const XML_MG: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 113,
-    nb_long_range: 6,
     short_range: XML_MS,
     long_range: XML_ML,
 };
@@ -7405,8 +7387,6 @@ const XML_MC_L: &[XmlChLRange] = &[
 ];
 
 const XML_MC_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 55,
-    nb_long_range: 2,
     short_range: XML_MC_S,
     long_range: XML_MC_L,
 };
@@ -7870,8 +7850,6 @@ const XML_MN_L: &[XmlChLRange] = &[
 ];
 
 const XML_MN_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 108,
-    nb_long_range: 5,
     short_range: XML_MN_S,
     long_range: XML_MN_L,
 };
@@ -8071,8 +8049,6 @@ const XML_NL: &[XmlChLRange] = &[
 ];
 
 const XML_NG: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 42,
-    nb_long_range: 5,
     short_range: XML_NS,
     long_range: XML_NL,
 };
@@ -8176,8 +8152,6 @@ const XML_ND_L: &[XmlChLRange] = &[
 ];
 
 const XML_ND_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 21,
-    nb_long_range: 2,
     short_range: XML_ND_S,
     long_range: XML_ND_L,
 };
@@ -8277,8 +8251,6 @@ const XML_NO_L: &[XmlChLRange] = &[
 ];
 
 const XML_NO_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 20,
-    nb_long_range: 2,
     short_range: XML_NO_S,
     long_range: XML_NO_L,
 };
@@ -8634,8 +8606,6 @@ const XML_PL: &[XmlChLRange] = &[
 ];
 
 const XML_PG: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 84,
-    nb_long_range: 2,
     short_range: XML_PS,
     long_range: XML_PL,
 };
@@ -8688,8 +8658,6 @@ const XML_PD_S: &[XmlChSRange] = &[
 ];
 
 const XML_PD_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 11,
-    nb_long_range: 0,
     short_range: XML_PD_S,
     long_range: &[],
 };
@@ -8950,8 +8918,6 @@ const XML_PE_S: &[XmlChSRange] = &[
 ];
 
 const XML_PE_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 63,
-    nb_long_range: 0,
     short_range: XML_PE_S,
     long_range: &[],
 };
@@ -9259,8 +9225,6 @@ const XML_PO_L: &[XmlChLRange] = &[
 ];
 
 const XML_PO_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 72,
-    nb_long_range: 2,
     short_range: XML_PO_S,
     long_range: XML_PO_L,
 };
@@ -9529,8 +9493,6 @@ const XML_PS_S: &[XmlChSRange] = &[
 ];
 
 const XML_PS_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 65,
-    nb_long_range: 0,
     short_range: XML_PS_S,
     long_range: &[],
 };
@@ -10154,8 +10116,6 @@ const XML_SL: &[XmlChLRange] = &[
 ];
 
 const XML_SG: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 133,
-    nb_long_range: 20,
     short_range: XML_SS,
     long_range: XML_SL,
 };
@@ -10216,8 +10176,6 @@ const XML_SC_S: &[XmlChSRange] = &[
 ];
 
 const XML_SC_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 13,
-    nb_long_range: 0,
     short_range: XML_SC_S,
     long_range: &[],
 };
@@ -10314,8 +10272,6 @@ const XML_SK_S: &[XmlChSRange] = &[
 ];
 
 const XML_SK_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 22,
-    nb_long_range: 0,
     short_range: XML_SK_S,
     long_range: &[],
 };
@@ -10559,8 +10515,6 @@ const XML_SM_L: &[XmlChLRange] = &[
 ];
 
 const XML_SM_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 48,
-    nb_long_range: 10,
     short_range: XML_SM_S,
     long_range: XML_SM_L,
 };
@@ -11024,8 +10978,6 @@ const XML_SO_L: &[XmlChLRange] = &[
 ];
 
 const XML_SO_G: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 103,
-    nb_long_range: 10,
     short_range: XML_SO_S,
     long_range: XML_SO_L,
 };
@@ -11070,8 +11022,6 @@ const XML_ZS: &[XmlChSRange] = &[
 ];
 
 const XML_ZG: XmlChRangeGroup = XmlChRangeGroup {
-    nb_short_range: 9,
-    nb_long_range: 0,
     short_range: XML_ZS,
     long_range: &[],
 };
