@@ -9,6 +9,7 @@ use std::{
     ffi::CStr,
     ops::{Deref, DerefMut},
     ptr::{null, NonNull},
+    slice::from_raw_parts,
     sync::atomic::{AtomicI32, Ordering},
 };
 
@@ -31,24 +32,21 @@ const MAX_DICT_SIZE: usize = 8 * 2048;
  * Calculate a hash key using a fast hash function that works well
  * for low hash table fill.
  */
-pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_fast_key(
-    name: *const XmlChar,
-    mut namelen: i32,
-    seed: i32,
-) -> u64 {
+fn xml_dict_compute_fast_key(name: &[u8], seed: i32) -> u64 {
     let mut value: u64 = seed as _;
 
-    if name.is_null() || namelen <= 0 {
+    if name.is_empty() {
         return value;
     }
-    value += *name as u64;
+    value += name[0] as u64;
     value <<= 5;
-    if namelen > 10 {
-        value += *name.add(namelen as usize - 1) as u64;
+    let mut namelen = name.len();
+    if name.len() > 10 {
+        value += *name.last().unwrap() as u64;
         namelen = 10;
     }
-    for i in 2..=namelen as usize {
-        value += *name.add(i - 1) as u64;
+    for i in 1..namelen {
+        value += name[i] as u64;
     }
     value
 }
@@ -62,19 +60,15 @@ pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_fast_key(
  * Hash function by "One-at-a-Time Hash" see
  * http://burtleburtle.net/bob/hash/doobs.html
  */
-pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_big_key(
-    data: *const XmlChar,
-    namelen: i32,
-    seed: i32,
-) -> u32 {
-    if namelen <= 0 || data.is_null() {
+fn xml_dict_compute_big_key(data: &[u8], seed: i32) -> u32 {
+    if data.is_empty() {
         return 0;
     }
 
     let mut hash = seed as u32;
 
-    for i in 0..namelen {
-        hash = hash.wrapping_add(*data.add(i as usize) as _);
+    for &data in data {
+        hash = hash.wrapping_add(data as _);
         hash = hash.wrapping_add(hash.wrapping_shl(10));
         hash ^= hash.wrapping_shr(6);
     }
@@ -87,13 +81,13 @@ pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_big_key(
 }
 
 macro_rules! xml_dict_compute_key {
-    ($dict:expr, $name:expr, $len:expr) => {
+    ($dict:expr, $name:expr) => {{
         if $dict.dict.len() == MIN_DICT_SIZE {
-            xml_dict_compute_fast_key($name, $len, (*$dict).seed)
+            xml_dict_compute_fast_key($name, $dict.seed)
         } else {
-            xml_dict_compute_big_key($name, $len, (*$dict).seed) as _
+            xml_dict_compute_big_key($name, $dict.seed) as _
         }
-    };
+    }};
 }
 
 /*
@@ -104,43 +98,33 @@ macro_rules! xml_dict_compute_key {
  *
  * Neither of the two strings must be NULL.
  */
-pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_fast_qkey(
-    prefix: *const XmlChar,
-    mut plen: i32,
-    name: *const XmlChar,
-    mut len: i32,
-    seed: i32,
-) -> u64 {
+fn xml_dict_compute_fast_qkey(prefix: &[u8], name: &[u8], seed: i32) -> u64 {
     let mut value: u64 = seed as _;
 
-    if plen == 0 {
+    if prefix.is_empty() {
         value += 30 * b':' as u64;
     } else {
-        value += 30 * (*prefix) as u64;
+        value += 30 * prefix[0] as u64;
     }
 
+    let mut plen = prefix.len();
+    let mut len = name.len();
     if len > 10 {
-        let mut offset: i32 = len - (plen + 1 + 1);
+        let mut offset: i32 = len as i32 - (plen + 1 + 1) as i32;
         if offset < 0 {
-            offset = len - (10 + 1);
+            offset = len as i32 - (10 + 1);
         }
-        value += *name.add(offset as usize) as u64;
+        value += name[offset as usize] as u64;
         len = 10;
-        if plen > 10 {
-            plen = 10;
-        }
+        plen = plen.min(10);
     }
 
-    for i in 1..=plen {
-        value += *prefix.add(i as usize - 1) as u64;
-    }
-    len -= plen;
+    value += prefix[..plen].iter().fold(0u64, |s, &v| s + v as u64);
+    len = len.saturating_sub(plen);
     if len > 0 {
         value += b':' as u64;
         len -= 1;
-    }
-    for i in 1..=len {
-        value += *name.add(i as usize - 1) as u64;
+        value += name[..len].iter().fold(0u64, |s, &v| s + v as u64);
     }
     value
 }
@@ -156,17 +140,12 @@ pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_fast_qkey(
  *
  * Neither of the two strings must be NULL.
  */
-pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_big_qkey(
-    prefix: *const XmlChar,
-    plen: i32,
-    name: *const XmlChar,
-    len: i32,
-    seed: i32,
-) -> u64 {
+fn xml_dict_compute_big_qkey(prefix: &[u8], name: &[u8], seed: i32) -> u64 {
     let mut hash: u32 = seed as _;
 
+    let plen = prefix.len();
     for i in 0..plen {
-        hash = hash.wrapping_add(*prefix.add(i as usize) as u32);
+        hash = hash.wrapping_add(prefix[i] as u32);
         hash = hash.wrapping_add(hash.wrapping_shl(10));
         hash ^= hash.wrapping_shr(6);
     }
@@ -174,8 +153,9 @@ pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_big_qkey(
     hash = hash.wrapping_add(hash.wrapping_shl(10));
     hash ^= hash.wrapping_shr(6);
 
+    let len = name.len();
     for i in 0..len {
-        hash = hash.wrapping_add(*name.add(i as usize) as u32);
+        hash = hash.wrapping_add(name[i] as u32);
         hash = hash.wrapping_add(hash.wrapping_shl(10));
         hash ^= hash.wrapping_shr(6);
     }
@@ -187,13 +167,13 @@ pub(in crate::dict) unsafe extern "C" fn xml_dict_compute_big_qkey(
 }
 
 macro_rules! xml_dict_compute_qkey {
-    ($dict:expr, $prefix:expr, $plen:expr, $name:expr, $len:expr) => {
+    ($dict:expr, $prefix:expr, $name:expr) => {{
         if $dict.dict.len() == MIN_DICT_SIZE {
-            xml_dict_compute_fast_qkey($prefix, $plen, $name, $len, $dict.seed)
+            xml_dict_compute_fast_qkey($prefix, $name, $dict.seed)
         } else {
-            xml_dict_compute_big_qkey($prefix, $plen, $name, $len, $dict.seed)
+            xml_dict_compute_big_qkey($prefix, $name, $dict.seed)
         }
-    };
+    }};
 }
 
 #[repr(C)]
@@ -241,7 +221,7 @@ impl DerefMut for XmlDictEntryRef {
     }
 }
 
-// #[repr(C)]
+#[repr(C)]
 struct XmlDictStrings {
     next: Option<XmlDictStringsRef>,
     array: Vec<XmlChar>,
@@ -385,7 +365,9 @@ impl XmlDict {
             let okey = if keep_keys {
                 entry.okey
             } else {
-                unsafe { xml_dict_compute_key!(self, entry.name, entry.len as i32) as _ }
+                unsafe {
+                    xml_dict_compute_key!(self, from_raw_parts(entry.name, entry.len as usize)) as _
+                }
             };
             let key = (okey % self.dict.len() as u64) as usize;
 
@@ -413,7 +395,9 @@ impl XmlDict {
                 let okey = if keep_keys {
                     now.okey
                 } else {
-                    unsafe { xml_dict_compute_key!(self, now.name, now.len as _) }
+                    unsafe {
+                        xml_dict_compute_key!(self, from_raw_parts(now.name, now.len as usize)) as _
+                    }
                 };
                 let key = (okey % self.dict.len() as u64) as usize;
                 if self.dict[key].valid == 0 {
@@ -486,7 +470,7 @@ impl XmlDict {
             "The length of `name` is too long."
         );
 
-        let okey = unsafe { xml_dict_compute_key!(self, name.as_ptr() as _, len as i32) };
+        let okey = xml_dict_compute_key!(self, name);
         let key = (okey % self.dict.len() as u64) as usize;
         let mut nbi = 0;
         if self.dict[key].valid != 0 {
@@ -516,7 +500,7 @@ impl XmlDict {
             let skey = if (self.dict.len() == MIN_DICT_SIZE && subdict.dict.len() != MIN_DICT_SIZE)
                 || (self.dict.len() != MIN_DICT_SIZE && subdict.dict.len() == MIN_DICT_SIZE)
             {
-                unsafe { xml_dict_compute_key!(subdict, name.as_ptr() as _, len as _) }
+                xml_dict_compute_key!(subdict, name)
             } else {
                 okey
             };
@@ -627,7 +611,7 @@ impl XmlDict {
             return None;
         }
 
-        let okey = unsafe { xml_dict_compute_key!(self, name.as_ptr() as _, len as i32) };
+        let okey = xml_dict_compute_key!(self, name);
         unsafe {
             eprintln!(
                 "line: {}, okey: {okey}, name: {}",
@@ -660,7 +644,7 @@ impl XmlDict {
             let skey = if (self.dict.len() == MIN_DICT_SIZE && subdict.dict.len() != MIN_DICT_SIZE)
                 || (self.dict.len() != MIN_DICT_SIZE && subdict.dict.len() == MIN_DICT_SIZE)
             {
-                unsafe { xml_dict_compute_key!(subdict, name.as_ptr(), len as _) }
+                xml_dict_compute_key!(subdict, name)
             } else {
                 okey
             };
@@ -844,15 +828,7 @@ impl XmlDict {
             "The length of `prefix` and `name` is too long."
         );
 
-        let okey = unsafe {
-            xml_dict_compute_qkey!(
-                self,
-                prefix.as_ptr() as _,
-                plen as i32,
-                name.as_ptr() as _,
-                nlen as i32
-            )
-        };
+        let okey = xml_dict_compute_qkey!(self, prefix, name);
         let key = (okey % self.dict.len() as u64) as usize;
         let mut nbi = 0;
         if self.dict[key].valid != 0 {
@@ -888,15 +864,7 @@ impl XmlDict {
             let skey = if (self.dict.len() == MIN_DICT_SIZE && subdict.dict.len() != MIN_DICT_SIZE)
                 || (self.dict.len() != MIN_DICT_SIZE && subdict.dict.len() == MIN_DICT_SIZE)
             {
-                unsafe {
-                    xml_dict_compute_qkey!(
-                        subdict,
-                        prefix.as_ptr() as _,
-                        plen as i32,
-                        name.as_ptr() as _,
-                        nlen as i32
-                    )
-                }
+                xml_dict_compute_qkey!(subdict, prefix, name)
             } else {
                 okey
             };
