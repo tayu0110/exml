@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = "1.0.86"
 const_format = { version = "0.2.32" }
 libc = "0.2.155"
+rand = "0.8.5"
 
 [features]
 default = [
