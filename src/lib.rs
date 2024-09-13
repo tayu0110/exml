@@ -12,6 +12,7 @@
 #![warn(unused_variables)]
 #![warn(unused_unsafe)]
 
+pub mod dict;
 pub mod libxml;
 pub mod private;
 #[cfg(test)]
