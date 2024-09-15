@@ -723,7 +723,7 @@ impl<T: Ord + 'static> XmlList<T> {
     /// - Both `self` and `other` must be sorted.
     /// - Both `self` and `other` must have same `deallocator` and `comparator`.
     /// - `self` and `other` can be empty.
-    fn merge_sorted_lists(&mut self, other: Self) {
+    fn merge_sorted_lists(&mut self, mut other: Self) {
         if self.is_empty() {
             self.head = other.head;
             self.tail = other.tail;
@@ -765,6 +765,11 @@ impl<T: Ord + 'static> XmlList<T> {
             ohead.prev = Some(prev);
             self.tail = other.tail;
         }
+        // At this point, both `self` and `other` own the head and tail pointers of `other`.
+        // To prevent double-free is done for them,
+        // overwrite the head and tail pointers of `other` with `None`.
+        other.head = None;
+        other.tail = None;
     }
 
     /// Walk from the head and process each data with `walk` until `walk` returns `false`.

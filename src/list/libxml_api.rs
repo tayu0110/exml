@@ -2,10 +2,13 @@ use std::{cmp::Ordering, ffi::c_void, ops::Deref, ptr::null_mut, rc::Rc};
 
 use crate::list::{Comparator, Deallocator};
 
-use super::{XmlLink, XmlLinkRef, XmlList, XmlListRef};
+pub use super::XmlList;
+use super::{XmlLink, XmlLinkRef, XmlListRef};
 
+// In original libxml2, `XmlListDeallocator` is defined as `void (*xmlListDeallocator) (xmlLinkPtr lk)`.
+// However, `XmlLinkPtr` is released at the Rust interface so that only data can be passed.
 pub type XmlListDeallocator = extern "C" fn(*mut c_void);
-pub type XmlListDataCompare = extern "C" fn(*mut c_void, *mut c_void) -> i32;
+pub type XmlListDataCompare = extern "C" fn(*const c_void, *const c_void) -> i32;
 pub type XmlListWalker = extern "C" fn(data: *const c_void, user: *mut c_void) -> i32;
 
 pub type XmlListPtr = *mut XmlList<*mut c_void>;
