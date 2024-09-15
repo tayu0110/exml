@@ -731,7 +731,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_save(
  *
  * Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
  */
-unsafe extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) -> c_int {
+extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) -> c_int {
     let ns1: XmlNsPtr = data1 as _;
     let ns2: XmlNsPtr = data2 as _;
     if ns1 == ns2 {
@@ -744,10 +744,12 @@ unsafe extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_v
         return 1;
     }
 
-    xml_strcmp(
-        (*ns1).prefix.load(Ordering::Relaxed),
-        (*ns2).prefix.load(Ordering::Relaxed),
-    )
+    unsafe {
+        xml_strcmp(
+            (*ns1).prefix.load(Ordering::Relaxed),
+            (*ns2).prefix.load(Ordering::Relaxed),
+        )
+    }
 }
 
 /// Check whether `ns` is a default 'xml:' namespace with href="http://www.w3.org/XML/1998/namespace".  
@@ -947,11 +949,8 @@ unsafe extern "C" fn xml_c14n_print_namespaces(ns: XmlNsPtr, ctx: XmlC14NCtxPtr)
     1
 }
 
-unsafe extern "C" fn xml_c14n_print_namespaces_walker(
-    ns: *const c_void,
-    ctx: *mut c_void,
-) -> c_int {
-    xml_c14n_print_namespaces(ns as _, ctx as _)
+extern "C" fn xml_c14n_print_namespaces_walker(ns: *const c_void, ctx: *mut c_void) -> c_int {
+    unsafe { xml_c14n_print_namespaces(ns as _, ctx as _) }
 }
 
 /**
@@ -1331,7 +1330,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_shift(cur: XmlC14NVisibleNsStackP
  *
  * Returns -1 if attr1 < attr2, 0 if attr1 == attr2 or 1 if attr1 > attr2.
  */
-unsafe extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void) -> c_int {
+extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void) -> c_int {
     let attr1: XmlAttrPtr = data1 as _;
     let attr2: XmlAttrPtr = data2 as _;
 
@@ -1347,36 +1346,39 @@ unsafe extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const 
     if attr2.is_null() {
         return 1;
     }
-    if (*attr1).ns == (*attr2).ns {
-        return xml_strcmp((*attr1).name, (*attr2).name);
-    }
 
-    /*
-     * Attributes in the default namespace are first
-     * because the default namespace is not applied to
-     * unqualified attributes
-     */
-    if (*attr1).ns.is_null() {
-        return -1;
-    }
-    if (*attr2).ns.is_null() {
-        return 1;
-    }
-    if (*(*attr1).ns).prefix.load(Ordering::Relaxed).is_null() {
-        return -1;
-    }
-    if (*(*attr2).ns).prefix.load(Ordering::Relaxed).is_null() {
-        return 1;
-    }
+    unsafe {
+        if (*attr1).ns == (*attr2).ns {
+            return xml_strcmp((*attr1).name, (*attr2).name);
+        }
 
-    let mut ret: i32 = xml_strcmp(
-        (*(*attr1).ns).href.load(Ordering::Relaxed),
-        (*(*attr2).ns).href.load(Ordering::Relaxed),
-    );
-    if ret == 0 {
-        ret = xml_strcmp((*attr1).name, (*attr2).name);
+        /*
+         * Attributes in the default namespace are first
+         * because the default namespace is not applied to
+         * unqualified attributes
+         */
+        if (*attr1).ns.is_null() {
+            return -1;
+        }
+        if (*attr2).ns.is_null() {
+            return 1;
+        }
+        if (*(*attr1).ns).prefix.load(Ordering::Relaxed).is_null() {
+            return -1;
+        }
+        if (*(*attr2).ns).prefix.load(Ordering::Relaxed).is_null() {
+            return 1;
+        }
+
+        let mut ret: i32 = xml_strcmp(
+            (*(*attr1).ns).href.load(Ordering::Relaxed),
+            (*(*attr2).ns).href.load(Ordering::Relaxed),
+        );
+        if ret == 0 {
+            ret = xml_strcmp((*attr1).name, (*attr2).name);
+        }
+        ret
     }
-    ret
 }
 
 /// Checks whether `attr` is a default "xml:" namespace with href="http://www.w3.org/XML/1998/namespace".  
@@ -1705,42 +1707,44 @@ unsafe extern "C" fn xml_c11n_normalize_attr(a: *const u8) -> *mut XmlChar {
  *
  * Returns 1 on success or 0 on fail.
  */
-unsafe extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> c_int {
+extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> c_int {
     let attr: XmlAttrPtr = data as _;
     let ctx: XmlC14NCtxPtr = user as _;
     let buffer: *mut XmlChar;
 
-    if attr.is_null() || ctx.is_null() {
-        xml_c14n_err_param(c"writing attributes".as_ptr() as _);
-        return 0;
-    }
-
-    xml_output_buffer_write_string((*ctx).buf, c" ".as_ptr() as _);
-    if !(*attr).ns.is_null() && xml_strlen((*(*attr).ns).prefix.load(Ordering::Relaxed)) > 0 {
-        xml_output_buffer_write_string(
-            (*ctx).buf,
-            (*(*attr).ns).prefix.load(Ordering::Relaxed) as _,
-        );
-        xml_output_buffer_write_string((*ctx).buf, c":".as_ptr() as _);
-    }
-    xml_output_buffer_write_string((*ctx).buf, (*attr).name as _);
-    xml_output_buffer_write_string((*ctx).buf, c"=\"".as_ptr() as _);
-
-    let value: *mut XmlChar = xml_node_list_get_string((*ctx).doc, (*attr).children, 1);
-    /* todo: should we log an error if value==NULL ? */
-    if !value.is_null() {
-        buffer = xml_c11n_normalize_attr(value);
-        xml_free(value as _);
-        if !buffer.is_null() {
-            xml_output_buffer_write_string((*ctx).buf, buffer as _);
-            xml_free(buffer as _);
-        } else {
-            xml_c14n_err_internal(c"normalizing attributes axis".as_ptr() as _);
+    unsafe {
+        if attr.is_null() || ctx.is_null() {
+            xml_c14n_err_param(c"writing attributes".as_ptr() as _);
             return 0;
         }
+
+        xml_output_buffer_write_string((*ctx).buf, c" ".as_ptr() as _);
+        if !(*attr).ns.is_null() && xml_strlen((*(*attr).ns).prefix.load(Ordering::Relaxed)) > 0 {
+            xml_output_buffer_write_string(
+                (*ctx).buf,
+                (*(*attr).ns).prefix.load(Ordering::Relaxed) as _,
+            );
+            xml_output_buffer_write_string((*ctx).buf, c":".as_ptr() as _);
+        }
+        xml_output_buffer_write_string((*ctx).buf, (*attr).name as _);
+        xml_output_buffer_write_string((*ctx).buf, c"=\"".as_ptr() as _);
+
+        let value: *mut XmlChar = xml_node_list_get_string((*ctx).doc, (*attr).children, 1);
+        /* todo: should we log an error if value==NULL ? */
+        if !value.is_null() {
+            buffer = xml_c11n_normalize_attr(value);
+            xml_free(value as _);
+            if !buffer.is_null() {
+                xml_output_buffer_write_string((*ctx).buf, buffer as _);
+                xml_free(buffer as _);
+            } else {
+                xml_c14n_err_internal(c"normalizing attributes axis".as_ptr() as _);
+                return 0;
+            }
+        }
+        xml_output_buffer_write_string((*ctx).buf, c"\"".as_ptr() as _);
+        1
     }
-    xml_output_buffer_write_string((*ctx).buf, c"\"".as_ptr() as _);
-    1
 }
 
 /**

@@ -41,8 +41,8 @@ use crate::{
             xml_hash_update_entry, XmlHashTable,
         },
         list::{
-            xml_link_get_data, xml_list_append, xml_list_create, xml_list_delete, xml_list_empty,
-            xml_list_remove_first, xml_list_walk, XmlLinkPtr, XmlListPtr,
+            xml_list_append, xml_list_create, xml_list_delete, xml_list_empty,
+            xml_list_remove_first, xml_list_walk, XmlListPtr,
         },
         parser::{XmlParserCtxtPtr, XmlParserMode},
         parser_internals::xml_string_current_char,
@@ -3164,18 +3164,20 @@ pub unsafe extern "C" fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> c_in
  *
  * Deallocate the memory used by a ref definition
  */
-unsafe extern "C" fn xml_free_ref(lk: XmlLinkPtr) {
-    let refe: XmlRefPtr = xml_link_get_data(lk) as XmlRefPtr;
+extern "C" fn xml_free_ref(data: *mut c_void) {
+    let refe: XmlRefPtr = data as XmlRefPtr;
     if refe.is_null() {
         return;
     }
-    if !(*refe).value.is_null() {
-        xml_free((*refe).value as _);
+    unsafe {
+        if !(*refe).value.is_null() {
+            xml_free((*refe).value as _);
+        }
+        if !(*refe).name.is_null() {
+            xml_free((*refe).name as _);
+        }
+        xml_free(refe as _);
     }
-    if !(*refe).name.is_null() {
-        xml_free((*refe).name as _);
-    }
-    xml_free(refe as _);
 }
 
 /**
@@ -3185,7 +3187,7 @@ unsafe extern "C" fn xml_free_ref(lk: XmlLinkPtr) {
  *
  * Do nothing, return 0. Used to create unordered lists.
  */
-unsafe extern "C" fn xml_dummy_compare(_data0: *const c_void, _data1: *const c_void) -> c_int {
+extern "C" fn xml_dummy_compare(_data0: *const c_void, _data1: *const c_void) -> c_int {
     0
 }
 
@@ -3409,17 +3411,19 @@ pub type XmlRemoveMemoPtr = *mut XmlRemoveMemo;
  *
  * Returns 0 to abort the walk or 1 to continue
  */
-unsafe extern "C" fn xml_walk_remove_ref(data: *const c_void, user: *mut c_void) -> c_int {
-    let attr0: XmlAttrPtr = (*(data as XmlRefPtr)).attr;
-    let attr1: XmlAttrPtr = (*(user as XmlRemoveMemoPtr)).ap;
-    let ref_list: XmlListPtr = (*(user as XmlRemoveMemoPtr)).l;
+extern "C" fn xml_walk_remove_ref(data: *const c_void, user: *mut c_void) -> c_int {
+    unsafe {
+        let attr0: XmlAttrPtr = (*(data as XmlRefPtr)).attr;
+        let attr1: XmlAttrPtr = (*(user as XmlRemoveMemoPtr)).ap;
+        let ref_list: XmlListPtr = (*(user as XmlRemoveMemoPtr)).l;
 
-    if attr0 == attr1 {
-        /* Matched: remove and terminate walk */
-        xml_list_remove_first(ref_list, data as *mut c_void);
-        return 0;
+        if attr0 == attr1 {
+            /* Matched: remove and terminate walk */
+            xml_list_remove_first(ref_list, data as *mut c_void);
+            return 0;
+        }
+        1
     }
-    1
 }
 
 /**
@@ -7384,9 +7388,11 @@ unsafe extern "C" fn xml_validate_ref(
  *
  * Returns 0 to abort the walk or 1 to continue
  */
-unsafe extern "C" fn xml_walk_validate_list(data: *const c_void, user: *mut c_void) -> c_int {
-    let memo: XmlValidateMemoPtr = user as XmlValidateMemoPtr;
-    xml_validate_ref(data as XmlRefPtr, (*memo).ctxt, (*memo).name);
+extern "C" fn xml_walk_validate_list(data: *const c_void, user: *mut c_void) -> c_int {
+    unsafe {
+        let memo: XmlValidateMemoPtr = user as XmlValidateMemoPtr;
+        xml_validate_ref(data as XmlRefPtr, (*memo).ctxt, (*memo).name);
+    }
     1
 }
 

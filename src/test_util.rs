@@ -1496,11 +1496,11 @@ pub(crate) fn gen_xml_link_ptr(_no: i32, _nr: i32) -> XmlLinkPtr {
 
 pub(crate) fn des_xml_link_ptr(_no: i32, _val: XmlLinkPtr, _nr: i32) {}
 
-pub(crate) fn gen_const_xml_list_ptr(_no: i32, _nr: i32) -> *const XmlList {
+pub(crate) fn gen_const_xml_list_ptr(_no: i32, _nr: i32) -> *const XmlList<*mut c_void> {
     null_mut()
 }
 
-pub(crate) fn des_const_xml_list_ptr(_no: i32, _val: *const XmlList, _nr: i32) {}
+pub(crate) fn des_const_xml_list_ptr(_no: i32, _val: *const XmlList<*mut c_void>, _nr: i32) {}
 
 unsafe extern "C" fn test_xml_hash_deallocator(_payload: *mut c_void, _namee: *const XmlChar) {}
 

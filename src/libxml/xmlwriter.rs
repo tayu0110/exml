@@ -116,16 +116,18 @@ pub struct XmlTextWriter {
  *
  * Free callback for the xmlList.
  */
-unsafe extern "C" fn xml_free_text_writer_stack_entry(lk: XmlLinkPtr) {
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
+extern "C" fn xml_free_text_writer_stack_entry(data: *mut c_void) {
+    let p: *mut XmlTextWriterStackEntry = data as _;
     if p.is_null() {
         return;
     }
 
-    if !(*p).name.is_null() {
-        xml_free((*p).name as _);
+    unsafe {
+        if !(*p).name.is_null() {
+            xml_free((*p).name as _);
+        }
+        xml_free(p as _);
     }
-    xml_free(p as _);
 }
 
 /**
@@ -137,10 +139,7 @@ unsafe extern "C" fn xml_free_text_writer_stack_entry(lk: XmlLinkPtr) {
  *
  * Returns -1, 0, 1
  */
-unsafe extern "C" fn xml_cmp_text_writer_stack_entry(
-    data0: *const c_void,
-    data1: *const c_void,
-) -> c_int {
+extern "C" fn xml_cmp_text_writer_stack_entry(data0: *const c_void, data1: *const c_void) -> c_int {
     if data0 == data1 {
         return 0;
     }
@@ -156,7 +155,7 @@ unsafe extern "C" fn xml_cmp_text_writer_stack_entry(
     let p0: *mut XmlTextWriterStackEntry = data0 as _;
     let p1: *mut XmlTextWriterStackEntry = data1 as _;
 
-    xml_strcmp((*p0).name, (*p1).name)
+    unsafe { xml_strcmp((*p0).name, (*p1).name) }
 }
 
 /**
@@ -165,20 +164,22 @@ unsafe extern "C" fn xml_cmp_text_writer_stack_entry(
  *
  * Free callback for the xmlList.
  */
-unsafe extern "C" fn xml_free_text_writer_ns_stack_entry(lk: XmlLinkPtr) {
-    let p: *mut XmlTextWriterNsStackEntry = xml_link_get_data(lk) as *mut XmlTextWriterNsStackEntry;
+extern "C" fn xml_free_text_writer_ns_stack_entry(data: *mut c_void) {
+    let p: *mut XmlTextWriterNsStackEntry = data as *mut XmlTextWriterNsStackEntry;
     if p.is_null() {
         return;
     }
 
-    if !(*p).prefix.is_null() {
-        xml_free((*p).prefix as _);
-    }
-    if !(*p).uri.is_null() {
-        xml_free((*p).uri as _);
-    }
+    unsafe {
+        if !(*p).prefix.is_null() {
+            xml_free((*p).prefix as _);
+        }
+        if !(*p).uri.is_null() {
+            xml_free((*p).uri as _);
+        }
 
-    xml_free(p as _);
+        xml_free(p as _);
+    }
 }
 
 /**
@@ -190,7 +191,7 @@ unsafe extern "C" fn xml_free_text_writer_ns_stack_entry(lk: XmlLinkPtr) {
  *
  * Returns -1, 0, 1
  */
-unsafe extern "C" fn xml_cmp_text_writer_ns_stack_entry(
+extern "C" fn xml_cmp_text_writer_ns_stack_entry(
     data0: *const c_void,
     data1: *const c_void,
 ) -> c_int {
@@ -211,10 +212,12 @@ unsafe extern "C" fn xml_cmp_text_writer_ns_stack_entry(
     let p0: *mut XmlTextWriterNsStackEntry = data0 as *mut XmlTextWriterNsStackEntry;
     let p1: *mut XmlTextWriterNsStackEntry = data1 as *mut XmlTextWriterNsStackEntry;
 
-    rc = xml_strcmp((*p0).prefix, (*p1).prefix);
+    unsafe {
+        rc = xml_strcmp((*p0).prefix, (*p1).prefix);
 
-    if rc != 0 || (*p0).elem != (*p1).elem {
-        rc = -1;
+        if rc != 0 || (*p0).elem != (*p1).elem {
+            rc = -1;
+        }
     }
 
     rc
