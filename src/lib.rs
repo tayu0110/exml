@@ -14,6 +14,7 @@
 
 pub mod dict;
 pub mod libxml;
+pub mod list;
 pub mod private;
 #[cfg(test)]
 pub(crate) mod test_util;
