@@ -1,14 +1,5 @@
-/*
- * testrecurse.c: C program to run libxml2 regression tests checking entities
- *            recursions
- *
- * To compile on Unixes:
- * cc -o testrecurse `xml2-config --cflags` testrecurse.c `xml2-config --libs` -lpthread
- *
- * See Copyright for the status of this software.
- *
- * daniel@veillard.com
- */
+//! Rust implementation of original libxml2's `testrecurse.c`.  
+//! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
     env::args,
@@ -66,12 +57,6 @@ struct TestDesc<'a> {
     err: Option<&'a CStr>,    /* suffix for error output files */
     options: c_int,           /* parser options for the test */
 }
-
-/************************************************************************
- *									*
- *		Huge document generator					*
- *									*
- ************************************************************************/
 
 struct XmlHugeDocParts<'a> {
     url: &'a CStr,
@@ -205,12 +190,6 @@ unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut c_char, mut le
     CURRENT.store(current, Ordering::Release);
     len
 }
-
-/************************************************************************
- *									*
- *		Libxml2 specific routines				*
- *									*
- ************************************************************************/
 
 static mut NB_TESTS: c_int = 0;
 static mut NB_ERRORS: c_int = 0;
@@ -586,12 +565,6 @@ unsafe extern "C" fn init_sax(ctxt: XmlParserCtxtPtr) {
     (*(*ctxt).sax).comment = None;
 }
 
-/************************************************************************
- *									*
- *		File name and path utilities				*
- *									*
- ************************************************************************/
-
 unsafe extern "C" fn base_filename(filename: *const c_char) -> *const c_char {
     let mut cur: *const c_char;
     if filename.is_null() {
@@ -653,11 +626,6 @@ unsafe extern "C" fn check_test_file(filename: *const c_char) -> c_int {
     }
 }
 
-/************************************************************************
- *									*
- *		Test to detect or not recursive entities		*
- *									*
- ************************************************************************/
 /**
  * recursiveDetectTest:
  * @filename: the file to parse
@@ -966,12 +934,6 @@ unsafe extern "C" fn huge_dtd_test(
     res
 }
 
-/************************************************************************
- *									*
- *			Tests Descriptions				*
- *									*
- ************************************************************************/
-
 static mut TEST_DESCRIPTIONS: [TestDesc; 11] = [
     TestDesc {
         desc: "Parsing recursive test cases",
@@ -1073,12 +1035,6 @@ static mut TEST_DESCRIPTIONS: [TestDesc; 11] = [
         options: 0,
     },
 ];
-
-/************************************************************************
- *									*
- *		The main code driving the tests				*
- *									*
- ************************************************************************/
 
 unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
     let mut res: c_int;

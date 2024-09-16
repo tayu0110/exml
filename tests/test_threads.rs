@@ -1,3 +1,6 @@
+//! Rust implementation of original libxml2's `testThreads.c`.  
+//! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
+
 use std::{
     ffi::{c_char, c_int, c_void, CStr},
     mem::zeroed,

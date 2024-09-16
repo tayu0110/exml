@@ -1,15 +1,5 @@
-/*
- * runtest.c: C program to run libxml2 regression tests without
- *            requiring make or Python, and reducing platform dependencies
- *            to a strict minimum.
- *
- * To compile on Unixes:
- * cc -o runtest `xml2-config --cflags` runtest.c `xml2-config --libs` -lpthread
- *
- * See Copyright for the status of this software.
- *
- * daniel@veillard.com
- */
+//! Rust implementation of original libxml2's `runtest.c`.  
+//! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
     env::args,
@@ -90,12 +80,7 @@ use libc::{
  */
 const XML_PARSE_HTML: i32 = 1 << 24;
 
-/*
- * O_BINARY is just for Windows compatibility - if it isn't defined
- * on this system, avoid any compilation error
- */
 const RD_FLAGS: i32 = O_RDONLY;
-// const WR_FLAGS: i32 = O_WRONLY | O_CREAT | O_TRUNC;
 
 type Functest = unsafe extern "C" fn(
     filename: *const c_char,
@@ -116,12 +101,6 @@ struct TestDesc<'a> {
 
 static mut UPDATE_RESULTS: c_int = 0;
 static TEMP_DIRECTORY: OnceLock<CString> = OnceLock::new();
-
-/************************************************************************
- *                                    *
- *        Libxml2 specific routines                *
- *                                    *
- ************************************************************************/
 
 static mut NB_TESTS: c_int = 0;
 static mut NB_ERRORS: c_int = 0;
@@ -517,12 +496,6 @@ unsafe extern "C" fn initialize_libxml2() {
     }
 }
 
-/************************************************************************
- *                                    *
- *        File name and path utilities                *
- *                                    *
- ************************************************************************/
-
 unsafe extern "C" fn base_filename(filename: *const c_char) -> *const c_char {
     let mut cur: *const c_char;
     if filename.is_null() {
@@ -562,10 +535,6 @@ unsafe extern "C" fn result_filename(
     }
 
     strncpy(suffixbuff.as_mut_ptr(), suffix, 499);
-    // #ifdef VMS
-    //     if (strstr(base,".") && suffixbuff[0]=='.')
-    //       suffixbuff[0]='_';
-    // #endif
 
     if snprintf(
         res.as_mut_ptr() as _,
@@ -786,18 +755,6 @@ unsafe extern "C" fn unload_mem(mem: *const c_char) -> c_int {
     0
 }
 
-/************************************************************************
- *                                    *
- *        Tests implementations                    *
- *                                    *
- ************************************************************************/
-
-/************************************************************************
- *                                    *
- *        Parse to SAX based tests                *
- *                                    *
- ************************************************************************/
-
 static SAX_DEBUG: Mutex<Option<File>> = Mutex::new(None);
 
 macro_rules! sax_debug {
@@ -863,7 +820,6 @@ static mut EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-// static xmlSAXHandlerPtr emptySAXHandler = &emptySAXHandlerStruct;
 static mut CALLBACKS: c_int = 0;
 static mut QUIET: c_int = 0;
 
@@ -1608,11 +1564,6 @@ static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-// static xmlSAXHandlerPtr debugSAXHandler = &debugSAXHandlerStruct;
-
-/*
- * SAX2 specific callbacks
- */
 /**
  * startElementNsDebug:
  * @ctxt:  An XML parser context
@@ -1782,8 +1733,6 @@ static mut DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-// static xmlSAXHandlerPtr debugSAX2Handler = &debugSAX2HandlerStruct;
-
 /**
  * htmlstartElementDebug:
  * @ctxt:  An XML parser context
@@ -1945,9 +1894,6 @@ static mut DEBUG_HTMLSAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     end_element_ns: None,
     serror: None,
 };
-
-// #[cfg(feature = "html")]
-// static xmlSAXHandlerPtr debugHTMLSAXHandler = &debugHTMLSAXHandlerStruct;
 
 /**
  * saxParseTest:
@@ -2138,11 +2084,6 @@ unsafe extern "C" fn sax_parse_test(
     ret
 }
 
-/************************************************************************
- *                                    *
- *        Parse to tree based tests                *
- *                                    *
- ************************************************************************/
 /**
  * oldParseTest:
  * @filename: the file to parse
@@ -2528,8 +2469,6 @@ unsafe extern "C" fn end_element_ns_bnd(
     prefix: *const XmlChar,
     uri: *const XmlChar,
 ) {
-    /*pushBoundaryCount++;*/
-
     use exml::libxml::sax2::xml_sax2_end_element_ns;
     xml_sax2_end_element_ns(ctx, localname, prefix, uri);
 }
@@ -2634,7 +2573,7 @@ unsafe extern "C" fn push_boundary_test(
     };
     #[cfg(not(feature = "html"))]
     let ctxt =
-        xml_create_push_parser_ctxt(addr_of_mut!(bndSAX) as _, null_mut(), base, 1, filename);
+        xml_create_push_parser_ctxt(addr_of_mut!(bnd_sax) as _, null_mut(), base, 1, filename);
     xml_ctxt_use_options(ctxt, options);
     cur = 1;
     consumed = 0;
@@ -3164,11 +3103,6 @@ unsafe extern "C" fn fd_parse_test(
     0
 }
 
-/************************************************************************
- *                                    *
- *        Reader based tests                    *
- *                                    *
- ************************************************************************/
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
     use exml::libxml::xmlreader::{
@@ -3438,11 +3372,6 @@ unsafe extern "C" fn stream_mem_parse_test(
     ret
 }
 
-/************************************************************************
- *                                    *
- *        XPath and XPointer based tests                *
- *                                    *
- ************************************************************************/
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 static XPATH_OUTPUT: Mutex<Option<File>> = Mutex::new(None);
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -3901,12 +3830,6 @@ unsafe extern "C" fn xmlid_doc_test(
     res
 }
 
-/************************************************************************
- *                                    *
- *            URI based tests                    *
- *                                    *
- ************************************************************************/
-
 unsafe extern "C" fn handle_uri(str: *const c_char, base: *const c_char, o: &mut File) {
     let ret: c_int;
     let mut res: *mut XmlChar = null_mut();
@@ -4302,11 +4225,6 @@ unsafe extern "C" fn uri_path_test(
     failures
 }
 
-/************************************************************************
- *                                    *
- *            Schemas tests                    *
- *                                    *
- ************************************************************************/
 #[cfg(feature = "schema")]
 unsafe extern "C" fn schemas_one_test(
     sch: *const c_char,
@@ -4559,11 +4477,6 @@ unsafe extern "C" fn schemas_test(
     res
 }
 
-/************************************************************************
- *                                    *
- *            Schemas tests                    *
- *                                    *
- ************************************************************************/
 #[cfg(feature = "schema")]
 unsafe extern "C" fn rng_one_test(
     sch: *const c_char,
@@ -4956,11 +4869,6 @@ unsafe extern "C" fn rng_stream_test(
     res
 }
 
-/************************************************************************
- *                                    *
- *            Patterns tests                    *
- *                                    *
- ************************************************************************/
 #[cfg(all(feature = "libxml_pattern", feature = "libxml_reader"))]
 unsafe extern "C" fn pattern_node(
     out: &mut File,
@@ -5250,11 +5158,6 @@ unsafe extern "C" fn pattern_test(
     ret
 }
 
-/************************************************************************
- *                                    *
- *            Canonicalization tests                *
- *                                    *
- ************************************************************************/
 #[cfg(feature = "libxml_c14n")]
 unsafe extern "C" fn load_xpath_expr(
     parent_doc: XmlDocPtr,
@@ -5738,12 +5641,6 @@ unsafe extern "C" fn c14n11_without_comment_test(
     )
 }
 
-/************************************************************************
- *                                    *
- *            Catalog and threads test            *
- *                                    *
- ************************************************************************/
-
 /*
  * mostly a cut and paste from testThreads.c
  */
@@ -5932,11 +5829,6 @@ unsafe extern "C" fn threads_test(
     test_thread()
 }
 
-/************************************************************************
- *                                    *
- *            Regexp tests                    *
- *                                    *
- ************************************************************************/
 #[cfg(feature = "regexp")]
 unsafe extern "C" fn test_regexp(output: &mut File, comp: XmlRegexpPtr, value: *const c_char) {
     use exml::libxml::xmlregexp::xml_regexp_exec;
@@ -6105,11 +5997,6 @@ unsafe extern "C" fn regexp_test(
     res
 }
 
-/************************************************************************
- *                                    *
- *            Automata tests                    *
- *                                    *
- ************************************************************************/
 #[cfg(feature = "libxml_automata")]
 unsafe extern "C" fn scan_number(ptr: *mut *mut c_char) -> c_int {
     let mut ret: c_int = 0;
@@ -6431,12 +6318,6 @@ unsafe extern "C" fn automata_test(
 
     res
 }
-
-/************************************************************************
- *                                    *
- *            Tests Descriptions                *
- *                                    *
- ************************************************************************/
 
 const TEST_DESCRIPTIONS: &[TestDesc] = &[
     TestDesc {
@@ -6975,12 +6856,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         options: 0,
     },
 ];
-
-/************************************************************************
- *                                    *
- *        The main code driving the tests                *
- *                                    *
- ************************************************************************/
 
 unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
     let mut res: c_int;

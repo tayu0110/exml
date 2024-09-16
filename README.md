@@ -12,8 +12,8 @@ All tests under the `tests/` directory are also based on original `libxml2`.\
 These tests passes test under `test/` and `result/` directory in original
 `libxml2`.
 
-If you try to run these codes, please down load test data from original
-`libxml2` repository.
+If you try to run these codes, please download test data from original `libxml2`
+repository.
 
 # License
 

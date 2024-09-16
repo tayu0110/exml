@@ -1,10 +1,5 @@
-/*
- * runsuite.c: C program to run libxml2 against published testsuites
- *
- * See Copyright for the status of this software.
- *
- * daniel@veillard.com
- */
+//! Rust implementation of original libxml2's `runsuite.c`.  
+//! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
     env::args,
@@ -62,12 +57,6 @@ use libc::{snprintf, strcmp, strstr};
 
 static mut VERBOSE: c_int = 0;
 
-/************************************************************************
- *									*
- *		File name and path utilities				*
- *									*
- ************************************************************************/
-
 unsafe extern "C" fn check_test_file(filename: *const c_char) -> c_int {
     match metadata(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
         Ok(meta) => meta.is_file() as i32,
@@ -95,12 +84,6 @@ unsafe extern "C" fn compose_dir(dir: *const XmlChar, path: *const XmlChar) -> *
     xml_strdup(buf.as_ptr() as *const XmlChar)
 }
 
-/************************************************************************
- *									*
- *		Libxml2 specific routines				*
- *									*
- ************************************************************************/
-
 static mut NB_TESTS: c_int = 0;
 static mut NB_ERRORS: c_int = 0;
 static mut NB_INTERNALS: c_int = 0;
@@ -113,9 +96,6 @@ unsafe extern "C" fn fatal_error() -> c_int {
     panic!("Exitting tests on fatal error");
 }
 
-/*
- * that's needed to implement <resource>
- */
 const MAX_ENTITIES: usize = 20;
 static mut TEST_ENTITIES_NAME: [*mut c_char; MAX_ENTITIES] = [null_mut(); MAX_ENTITIES];
 static mut TEST_ENTITIES_VALUE: [*mut c_char; MAX_ENTITIES] = [null_mut(); MAX_ENTITIES];
@@ -171,11 +151,6 @@ unsafe extern "C" fn test_external_entity_loader(
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
         EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
     }
-    // #if 0
-    //     if (ret == NULL) {
-    //         fprintf(stderr, "Failed to find resource %s\n", URL);
-    //     }
-    // #endif
 
     ret
 }
@@ -331,12 +306,6 @@ unsafe extern "C" fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut X
     xml_xpath_free_object(res);
     ret
 }
-
-/************************************************************************
- *									*
- *		Test test/xsdtest/xsdtestsuite.xml			*
- *									*
- ************************************************************************/
 
 unsafe extern "C" fn xsd_incorrect_test_case(
     logfile: &mut Option<File>,
@@ -935,12 +904,6 @@ unsafe extern "C" fn rng_test2(logfile: &mut Option<File>) -> c_int {
     ret
 }
 
-/************************************************************************
- *									*
- *		Schemas test suites from W3C/NIST/MS/Sun		*
- *									*
- ************************************************************************/
-
 unsafe extern "C" fn xstc_test_instance(
     logfile: &mut Option<File>,
     cur: XmlNodePtr,
@@ -1346,11 +1309,6 @@ unsafe extern "C" fn xstc_metadata(
     ret
 }
 
-/************************************************************************
- *									*
- *		The driver for the tests				*
- *									*
- ************************************************************************/
 #[test]
 fn main() {
     let ret: c_int;

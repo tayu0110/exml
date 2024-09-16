@@ -1,14 +1,5 @@
-/*
- * testlimits.c: C program to run libxml2 regression tests checking various
- *       limits in document size. Will consume a lot of RAM and CPU cycles
- *
- * To compile on Unixes:
- * cc -o testlimits `xml2-config --cflags` testlimits.c `xml2-config --libs` -lpthread
- *
- * See Copyright for the status of this software.
- *
- * daniel@veillard.com
- */
+//! Rust implementation of original libxml2's `testlimits.c`.  
+//! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
     env::args,
@@ -52,12 +43,6 @@ use libc::{memcpy, size_t, strcmp, strlen, strncmp};
 static mut VERBOSE: c_int = 0;
 static mut TESTS_QUIET: c_int = 0;
 
-/************************************************************************
- *									*
- *		time handling                                           *
- *									*
- ************************************************************************/
-
 /* maximum time for one parsing before declaring a timeout */
 const MAX_TIME: u64 = 2; /* seconds */
 
@@ -83,12 +68,6 @@ unsafe extern "C" fn check_time() -> c_int {
     }
     1
 }
-
-/************************************************************************
- *									*
- *		Huge document generator					*
- *									*
- ************************************************************************/
 
 /*
  * Huge documents are built using fixed start and end chunks
@@ -1243,12 +1222,6 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     end_element_ns: Some(end_element_ns_callback),
     serror: None,
 };
-
-/************************************************************************
- *									*
- *		The tests front-ends                                     *
- *									*
- ************************************************************************/
 
 /**
  * readerTest:

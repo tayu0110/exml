@@ -1,10 +1,5 @@
-/*
- * runxmlconf.c: C program to run XML W3C conformance testsuites
- *
- * See Copyright for the status of this software.
- *
- * daniel@veillard.com
- */
+//! Rust implementation of original libxml2's `runxmlconf.c`.  
+//! If you want this to work, please download https://www.w3.org/XML/Test/xmlts20130923.tar.gz from [W3C](http://www.w3.org/XML/Test/).
 
 use std::{
     env::args,
