@@ -329,12 +329,12 @@ pub unsafe extern "C" fn xml_hash_qlookup3(
 
     table
         .do_qlookup(
-            CStr::from_ptr(name as *const i8),
             (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
-            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
+            CStr::from_ptr(name as *const i8),
             (!prefix2.is_null()).then(|| CStr::from_ptr(prefix2 as *const i8)),
-            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
+            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
             (!prefix3.is_null()).then(|| CStr::from_ptr(prefix3 as *const i8)),
+            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
         )
         .map(|ptr| ptr.0)
         .unwrap_or(null_mut())

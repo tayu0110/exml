@@ -927,12 +927,12 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
 
     fn do_qlookup(
         &self,
-        name: &CStr,
         prefix: Option<&CStr>,
-        name2: Option<&CStr>,
+        name: &CStr,
         prefix2: Option<&CStr>,
-        name3: Option<&CStr>,
+        name2: Option<&CStr>,
         prefix3: Option<&CStr>,
+        name3: Option<&CStr>,
     ) -> Option<&T> {
         if !self.is_empty() {
             let key = xml_hash_compute_qkey(
@@ -998,16 +998,16 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
     /// table.add_entry(c"hoge:fuga", 1u32);
     ///
     /// // You can search QName by all of the following way.
-    /// assert_eq!(table.qlookup(c"fuga", Some(c"hoge")), Some(&1));
-    /// assert_eq!(table.qlookup(c"hoge:fuga", None), Some(&1));
+    /// assert_eq!(table.qlookup(Some(c"hoge"), c"fuga"), Some(&1));
+    /// assert_eq!(table.qlookup(None, c"hoge:fuga"), Some(&1));
     /// assert_eq!(table.lookup(c"hoge:fuga"), Some(&1));
     ///
     /// table.add_entry(c"hoge", 2);
     ///
-    /// assert_eq!(table.qlookup(c"hoge", None), Some(&2));
+    /// assert_eq!(table.qlookup(None, c"hoge"), Some(&2));
     /// ```
-    pub fn qlookup(&self, name: &CStr, prefix: Option<&CStr>) -> Option<&T> {
-        self.do_qlookup(name, prefix, None, None, None, None)
+    pub fn qlookup(&self, prefix: Option<&CStr>, name: &CStr) -> Option<&T> {
+        self.do_qlookup(prefix, name, None, None, None, None)
     }
 
     /// Search the entry specified by the given QNames.  
@@ -1017,12 +1017,12 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
     /// Please refer to the example for `XmlHashTable::qlookup`.
     pub fn qlookup2(
         &self,
-        name: &CStr,
         prefix: Option<&CStr>,
-        name2: &CStr,
+        name: &CStr,
         prefix2: Option<&CStr>,
+        name2: &CStr,
     ) -> Option<&T> {
-        self.do_qlookup(name, prefix, Some(name2), prefix2, None, None)
+        self.do_qlookup(prefix, name, prefix2, Some(name2), None, None)
     }
 
     /// Search the entry specified by the given QNames.  
@@ -1032,14 +1032,14 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
     /// Please refer to the example for `XmlHashTable::qlookup`.
     pub fn qlookup3(
         &self,
-        name: &CStr,
         prefix: Option<&CStr>,
-        name2: &CStr,
+        name: &CStr,
         prefix2: Option<&CStr>,
-        name3: &CStr,
+        name2: &CStr,
         prefix3: Option<&CStr>,
+        name3: &CStr,
     ) -> Option<&T> {
-        self.do_qlookup(name, prefix, Some(name2), prefix2, Some(name3), prefix3)
+        self.do_qlookup(prefix, name, prefix2, Some(name2), prefix3, Some(name3))
     }
 
     /// Clone the table. `copier` is used for copying each data of entries.
@@ -1481,7 +1481,7 @@ mod tests {
                 table.add_entry(&n1, data);
                 assert_eq!(table.lookup(&n1), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
-                assert_eq!(table.qlookup(&l1, Some(&p1)), Some(&data));
+                assert_eq!(table.qlookup(Some(&p1), &l1), Some(&data));
                 entries.push((n1, None, None, data));
             }
             2 => {
@@ -1492,7 +1492,7 @@ mod tests {
                 assert_eq!(table.lookup2(&n1, &n2), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
                 let (p2, l2) = split_qname(&n2).unwrap();
-                assert_eq!(table.qlookup2(&l1, Some(&p1), &l2, Some(&p2)), Some(&data));
+                assert_eq!(table.qlookup2(Some(&p1), &l1, Some(&p2), &l2), Some(&data));
                 entries.push((n1, Some(n2), None, data));
             }
             3 => {
@@ -1506,7 +1506,7 @@ mod tests {
                 let (p2, l2) = split_qname(&n2).unwrap();
                 let (p3, l3) = split_qname(&n3).unwrap();
                 assert_eq!(
-                    table.qlookup3(&l1, Some(&p1), &l2, Some(&p2), &l3, Some(&p3)),
+                    table.qlookup3(Some(&p1), &l1, Some(&p2), &l2, Some(&p3), &l3),
                     Some(&data)
                 );
                 entries.push((n1, Some(n2), Some(n3), data));
@@ -1568,8 +1568,8 @@ mod tests {
                         assert_eq!(table.len(), entries.len());
                         assert_eq!(table.lookup(n1), Some(data));
                         match split_qname(n1) {
-                            Some((p1, l1)) => assert_eq!(table.qlookup(&l1, Some(&p1)), Some(data)),
-                            _ => assert_eq!(table.qlookup(n1, None), Some(data)),
+                            Some((p1, l1)) => assert_eq!(table.qlookup(Some(&p1), &l1), Some(data)),
+                            _ => assert_eq!(table.qlookup(None, n1), Some(data)),
                         }
                     }
                     Some((n1, Some(n2), None, data)) => {
@@ -1578,11 +1578,11 @@ mod tests {
                         match (split_qname(n1), split_qname(n2)) {
                             (Some((p1, l1)), Some((p2, l2))) => {
                                 assert_eq!(
-                                    table.qlookup2(&l1, Some(&p1), &l2, Some(&p2)),
+                                    table.qlookup2(Some(&p1), &l1, Some(&p2), &l2),
                                     Some(data)
                                 )
                             }
-                            _ => assert_eq!(table.qlookup2(n1, None, n2, None), Some(data)),
+                            _ => assert_eq!(table.qlookup2(None, n1, None, n2), Some(data)),
                         }
                     }
                     Some((n1, Some(n2), Some(n3), data)) => {
@@ -1591,12 +1591,12 @@ mod tests {
                         match (split_qname(n1), split_qname(n2), split_qname(n3)) {
                             (Some((p1, l1)), Some((p2, l2)), Some((p3, l3))) => {
                                 assert_eq!(
-                                    table.qlookup3(&l1, Some(&p1), &l2, Some(&p2), &l3, Some(&p3)),
+                                    table.qlookup3(Some(&p1), &l1, Some(&p2), &l2, Some(&p3), &l3),
                                     Some(data)
                                 );
                             }
                             _ => {
-                                assert_eq!(table.qlookup3(n1, None, n2, None, n3, None), Some(data))
+                                assert_eq!(table.qlookup3(None, n1, None, n2, None, n3), Some(data))
                             }
                         }
                     }
