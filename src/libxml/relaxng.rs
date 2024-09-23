@@ -63,7 +63,7 @@ use crate::{
     xml_generic_error, IS_BLANK_CH,
 };
 
-use super::globals::__xml_generic_error;
+use super::{globals::__xml_generic_error, hash::CVoidWrapper};
 
 /**
  * xmlRelaxNGValidityErrorFunc:
@@ -621,7 +621,8 @@ pub struct XmlRelaxNGTypeLibrary {
 }
 
 static XML_RELAXNG_TYPE_INITIALIZED: AtomicBool = AtomicBool::new(false);
-static XML_RELAXNG_REGISTERED_TYPES: AtomicPtr<XmlHashTable> = AtomicPtr::new(null_mut());
+static XML_RELAXNG_REGISTERED_TYPES: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
+    AtomicPtr::new(null_mut());
 
 macro_rules! VALID_ERR {
     ($ctxt:expr, $a:expr) => {
@@ -1803,18 +1804,17 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> c_int {
  *
  * Free the structure associated to the type library
  */
-unsafe extern "C" fn xml_relaxng_free_type_library(
-    payload: *mut c_void,
-    _namespace: *const XmlChar,
-) {
+extern "C" fn xml_relaxng_free_type_library(payload: *mut c_void, _namespace: *const XmlChar) {
     let lib: XmlRelaxNGTypeLibraryPtr = payload as _;
     if lib.is_null() {
         return;
     }
-    if !(*lib).namespace.is_null() {
-        xml_free((*lib).namespace as _);
+    unsafe {
+        if !(*lib).namespace.is_null() {
+            xml_free((*lib).namespace as _);
+        }
+        xml_free(lib as _);
     }
-    xml_free(lib as _);
 }
 
 /**
@@ -2842,7 +2842,7 @@ unsafe extern "C" fn xml_rng_perr(
  *     flag this in the define and simplify the runtime checking
  *     algorithm
  */
-unsafe extern "C" fn xml_relaxng_compute_interleaves(
+extern "C" fn xml_relaxng_compute_interleaves(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
@@ -2860,197 +2860,200 @@ unsafe extern "C" fn xml_relaxng_compute_interleaves(
     let mut is_mixed: c_int = 0;
     let mut is_determinist: c_int = 1;
 
-    /*
-     * Don't run that check in case of error. Infinite recursion
-     * becomes possible.
-     */
-    if (*ctxt).nb_errors != 0 {
-        return;
-    }
-
-    // #ifdef DEBUG_INTERLEAVE
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"xmlRelaxNGComputeInterleaves(%s)\n".as_ptr() as _, name);
-    // #endif
-    cur = (*def).content;
-    while !cur.is_null() {
-        nbchild += 1;
-        cur = (*cur).next;
-    }
-
-    // #ifdef DEBUG_INTERLEAVE
-    //     xml_generic_error!(xmlGenericErrorContext, c"  %d child\n".as_ptr() as _, nbchild);
-    // #endif
-    let groups: *mut XmlRelaxNGInterleaveGroupPtr =
-        xml_malloc(nbchild as usize * size_of::<XmlRelaxNGInterleaveGroupPtr>()) as _;
-    'goto_error: {
-        if groups.is_null() {
-            break 'goto_error;
+    unsafe {
+        /*
+         * Don't run that check in case of error. Infinite recursion
+         * becomes possible.
+         */
+        if (*ctxt).nb_errors != 0 {
+            return;
         }
+
+        // #ifdef DEBUG_INTERLEAVE
+        //     xml_generic_error!(xmlGenericErrorContext,
+        //                     c"xmlRelaxNGComputeInterleaves(%s)\n".as_ptr() as _, name);
+        // #endif
         cur = (*def).content;
         while !cur.is_null() {
-            *groups.add(nbgroups as usize) =
-                xml_malloc(size_of::<XmlRelaxNGInterleaveGroup>()) as _;
-            if (*groups.add(nbgroups as usize)).is_null() {
-                break 'goto_error;
-            }
-            if (*cur).typ == XmlRelaxNGType::Text {
-                is_mixed += 1;
-            }
-            (*(*groups.add(nbgroups as usize))).rule = cur;
-            (*(*groups.add(nbgroups as usize))).defs = xml_relaxng_get_elements(ctxt, cur, 2);
-            (*(*groups.add(nbgroups as usize))).attrs = xml_relaxng_get_elements(ctxt, cur, 1);
-            nbgroups += 1;
+            nbchild += 1;
             cur = (*cur).next;
         }
+
         // #ifdef DEBUG_INTERLEAVE
-        //     xml_generic_error!(xmlGenericErrorContext, c"  %d groups\n".as_ptr() as _, nbgroups);
+        //     xml_generic_error!(xmlGenericErrorContext, c"  %d child\n".as_ptr() as _, nbchild);
         // #endif
-
-        /*
-         * Let's check that all rules makes a partitions according to 7.4
-         */
-        partitions = xml_malloc(size_of::<XmlRelaxNGPartition>()) as _;
-        if partitions.is_null() {
-            break 'goto_error;
-        }
-        memset(partitions as _, 0, size_of::<XmlRelaxNGPartition>());
-        (*partitions).nbgroups = nbgroups;
-        (*partitions).triage = xml_hash_create(nbgroups);
-        for i in 0..nbgroups {
-            group = *groups.add(i as usize);
-            for j in i + 1..nbgroups {
-                if (*groups.add(j as usize)).is_null() {
-                    continue;
-                }
-
-                ret = xml_relaxng_compare_elem_def_lists(
-                    ctxt,
-                    (*group).defs,
-                    (*(*groups.add(j as usize))).defs,
-                );
-                if ret == 0 {
-                    xml_rng_perr(
-                        ctxt,
-                        (*def).node,
-                        XmlParserErrors::XmlRngpElemTextConflict as i32,
-                        c"Element or text conflicts in interleave\n".as_ptr() as _,
-                        null_mut(),
-                        null_mut(),
-                    );
-                }
-                ret = xml_relaxng_compare_elem_def_lists(
-                    ctxt,
-                    (*group).attrs,
-                    (*(*groups.add(j as usize))).attrs,
-                );
-                if ret == 0 {
-                    xml_rng_perr(
-                        ctxt,
-                        (*def).node,
-                        XmlParserErrors::XmlRngpAttrConflict as i32,
-                        c"Attributes conflicts in interleave\n".as_ptr() as _,
-                        null_mut(),
-                        null_mut(),
-                    );
-                }
+        let groups: *mut XmlRelaxNGInterleaveGroupPtr =
+            xml_malloc(nbchild as usize * size_of::<XmlRelaxNGInterleaveGroupPtr>()) as _;
+        'goto_error: {
+            if groups.is_null() {
+                break 'goto_error;
             }
-            tmp = (*group).defs;
-            if !tmp.is_null() && !(*tmp).is_null() {
-                while !(*tmp).is_null() {
-                    if (*(*tmp)).typ == XmlRelaxNGType::Text {
-                        res = xml_hash_add_entry2(
-                            (*partitions).triage,
-                            c"#text".as_ptr() as _,
-                            null_mut(),
-                            (i + 1) as _,
-                        );
-                        if res != 0 {
-                            is_determinist = -1;
-                        }
-                    } else if (*(*tmp)).typ == XmlRelaxNGType::Element && !(*(*tmp)).name.is_null()
-                    {
-                        if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
-                            res = xml_hash_add_entry2(
-                                (*partitions).triage,
-                                (*(*tmp)).name,
-                                null_mut(),
-                                (i + 1) as _,
-                            );
-                        } else {
-                            res = xml_hash_add_entry2(
-                                (*partitions).triage,
-                                (*(*tmp)).name,
-                                (*(*tmp)).ns,
-                                (i + 1) as _,
-                            );
-                        }
-                        if res != 0 {
-                            is_determinist = -1;
-                        }
-                    } else if (*(*tmp)).typ == XmlRelaxNGType::Element {
-                        if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
-                            res = xml_hash_add_entry2(
-                                (*partitions).triage,
-                                c"#any".as_ptr() as _,
-                                null_mut(),
-                                (i + 1) as _,
-                            );
-                        } else {
-                            res = xml_hash_add_entry2(
-                                (*partitions).triage,
-                                c"#any".as_ptr() as _,
-                                (*(*tmp)).ns,
-                                (i + 1) as _,
-                            );
-                        }
-                        if !(*(*tmp)).name_class.is_null() {
-                            is_determinist = 2;
-                        }
-                        if res != 0 {
-                            is_determinist = -1;
-                        }
-                    } else {
-                        is_determinist = -1;
+            cur = (*def).content;
+            while !cur.is_null() {
+                *groups.add(nbgroups as usize) =
+                    xml_malloc(size_of::<XmlRelaxNGInterleaveGroup>()) as _;
+                if (*groups.add(nbgroups as usize)).is_null() {
+                    break 'goto_error;
+                }
+                if (*cur).typ == XmlRelaxNGType::Text {
+                    is_mixed += 1;
+                }
+                (*(*groups.add(nbgroups as usize))).rule = cur;
+                (*(*groups.add(nbgroups as usize))).defs = xml_relaxng_get_elements(ctxt, cur, 2);
+                (*(*groups.add(nbgroups as usize))).attrs = xml_relaxng_get_elements(ctxt, cur, 1);
+                nbgroups += 1;
+                cur = (*cur).next;
+            }
+            // #ifdef DEBUG_INTERLEAVE
+            //     xml_generic_error!(xmlGenericErrorContext, c"  %d groups\n".as_ptr() as _, nbgroups);
+            // #endif
+
+            /*
+             * Let's check that all rules makes a partitions according to 7.4
+             */
+            partitions = xml_malloc(size_of::<XmlRelaxNGPartition>()) as _;
+            if partitions.is_null() {
+                break 'goto_error;
+            }
+            memset(partitions as _, 0, size_of::<XmlRelaxNGPartition>());
+            (*partitions).nbgroups = nbgroups;
+            (*partitions).triage = xml_hash_create(nbgroups);
+            for i in 0..nbgroups {
+                group = *groups.add(i as usize);
+                for j in i + 1..nbgroups {
+                    if (*groups.add(j as usize)).is_null() {
+                        continue;
                     }
-                    tmp = tmp.add(1);
-                }
-            } else {
-                is_determinist = 0;
-            }
-        }
-        (*partitions).groups = groups;
 
-        /*
-         * and save the partition list back in the def
-         */
-        (*def).data = partitions as _;
-        if is_mixed != 0 {
-            (*def).dflags |= IS_MIXED as i16;
-        }
-        if is_determinist == 1 {
-            (*partitions).flags = IS_DETERMINIST;
-        }
-        if is_determinist == 2 {
-            (*partitions).flags = IS_DETERMINIST | IS_NEEDCHECK;
-        }
-        return;
-    }
-
-    //   error:
-    xml_rng_perr_memory(ctxt, c"in interleave computation\n".as_ptr() as _);
-    if !groups.is_null() {
-        for i in 0..nbgroups {
-            if !(*groups.add(i as usize)).is_null() {
-                if !(*(*groups.add(i as usize))).defs.is_null() {
-                    xml_free((*(*groups.add(i as usize))).defs as _);
+                    ret = xml_relaxng_compare_elem_def_lists(
+                        ctxt,
+                        (*group).defs,
+                        (*(*groups.add(j as usize))).defs,
+                    );
+                    if ret == 0 {
+                        xml_rng_perr(
+                            ctxt,
+                            (*def).node,
+                            XmlParserErrors::XmlRngpElemTextConflict as i32,
+                            c"Element or text conflicts in interleave\n".as_ptr() as _,
+                            null_mut(),
+                            null_mut(),
+                        );
+                    }
+                    ret = xml_relaxng_compare_elem_def_lists(
+                        ctxt,
+                        (*group).attrs,
+                        (*(*groups.add(j as usize))).attrs,
+                    );
+                    if ret == 0 {
+                        xml_rng_perr(
+                            ctxt,
+                            (*def).node,
+                            XmlParserErrors::XmlRngpAttrConflict as i32,
+                            c"Attributes conflicts in interleave\n".as_ptr() as _,
+                            null_mut(),
+                            null_mut(),
+                        );
+                    }
                 }
-                xml_free(*groups.add(i as usize) as _);
+                tmp = (*group).defs;
+                if !tmp.is_null() && !(*tmp).is_null() {
+                    while !(*tmp).is_null() {
+                        if (*(*tmp)).typ == XmlRelaxNGType::Text {
+                            res = xml_hash_add_entry2(
+                                (*partitions).triage,
+                                c"#text".as_ptr() as _,
+                                null_mut(),
+                                (i + 1) as _,
+                            );
+                            if res != 0 {
+                                is_determinist = -1;
+                            }
+                        } else if (*(*tmp)).typ == XmlRelaxNGType::Element
+                            && !(*(*tmp)).name.is_null()
+                        {
+                            if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
+                                res = xml_hash_add_entry2(
+                                    (*partitions).triage,
+                                    (*(*tmp)).name,
+                                    null_mut(),
+                                    (i + 1) as _,
+                                );
+                            } else {
+                                res = xml_hash_add_entry2(
+                                    (*partitions).triage,
+                                    (*(*tmp)).name,
+                                    (*(*tmp)).ns,
+                                    (i + 1) as _,
+                                );
+                            }
+                            if res != 0 {
+                                is_determinist = -1;
+                            }
+                        } else if (*(*tmp)).typ == XmlRelaxNGType::Element {
+                            if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
+                                res = xml_hash_add_entry2(
+                                    (*partitions).triage,
+                                    c"#any".as_ptr() as _,
+                                    null_mut(),
+                                    (i + 1) as _,
+                                );
+                            } else {
+                                res = xml_hash_add_entry2(
+                                    (*partitions).triage,
+                                    c"#any".as_ptr() as _,
+                                    (*(*tmp)).ns,
+                                    (i + 1) as _,
+                                );
+                            }
+                            if !(*(*tmp)).name_class.is_null() {
+                                is_determinist = 2;
+                            }
+                            if res != 0 {
+                                is_determinist = -1;
+                            }
+                        } else {
+                            is_determinist = -1;
+                        }
+                        tmp = tmp.add(1);
+                    }
+                } else {
+                    is_determinist = 0;
+                }
             }
+            (*partitions).groups = groups;
+
+            /*
+             * and save the partition list back in the def
+             */
+            (*def).data = partitions as _;
+            if is_mixed != 0 {
+                (*def).dflags |= IS_MIXED as i16;
+            }
+            if is_determinist == 1 {
+                (*partitions).flags = IS_DETERMINIST;
+            }
+            if is_determinist == 2 {
+                (*partitions).flags = IS_DETERMINIST | IS_NEEDCHECK;
+            }
+            return;
         }
-        xml_free(groups as _);
+
+        //   error:
+        xml_rng_perr_memory(ctxt, c"in interleave computation\n".as_ptr() as _);
+        if !groups.is_null() {
+            for i in 0..nbgroups {
+                if !(*groups.add(i as usize)).is_null() {
+                    if !(*(*groups.add(i as usize))).defs.is_null() {
+                        xml_free((*(*groups.add(i as usize))).defs as _);
+                    }
+                    xml_free(*groups.add(i as usize) as _);
+                }
+            }
+            xml_free(groups as _);
+        }
+        xml_relaxng_free_partition(partitions);
     }
-    xml_relaxng_free_partition(partitions);
 }
 
 macro_rules! IS_BLANK_NODE {
@@ -4457,7 +4460,7 @@ unsafe extern "C" fn xml_relaxng_new_define(
  * Applies the 4.17. combine attribute rule for all the define
  * element of a given grammar using the same name.
  */
-unsafe extern "C" fn xml_relaxng_check_combine(
+extern "C" fn xml_relaxng_check_combine(
     payload: *mut c_void,
     data: *mut c_void,
     name: *const XmlChar,
@@ -4472,142 +4475,144 @@ unsafe extern "C" fn xml_relaxng_check_combine(
     let mut tmp: XmlRelaxNGDefinePtr;
     let mut tmp2: XmlRelaxNGDefinePtr;
 
-    if (*define).next_hash.is_null() {
-        return;
-    }
-    cur = define;
-    while !cur.is_null() {
-        combine = xml_get_prop((*cur).node, c"combine".as_ptr() as _);
-        if !combine.is_null() {
-            if xml_str_equal(combine, c"choice".as_ptr() as _) {
-                if choice_or_interleave == -1 {
-                    choice_or_interleave = 1;
-                } else if choice_or_interleave == 0 {
+    unsafe {
+        if (*define).next_hash.is_null() {
+            return;
+        }
+        cur = define;
+        while !cur.is_null() {
+            combine = xml_get_prop((*cur).node, c"combine".as_ptr() as _);
+            if !combine.is_null() {
+                if xml_str_equal(combine, c"choice".as_ptr() as _) {
+                    if choice_or_interleave == -1 {
+                        choice_or_interleave = 1;
+                    } else if choice_or_interleave == 0 {
+                        xml_rng_perr(
+                            ctxt,
+                            (*define).node,
+                            XmlParserErrors::XmlRngpDefChoiceAndInterleave as i32,
+                            c"Defines for %s use both 'choice' and 'interleave'\n".as_ptr() as _,
+                            name,
+                            null_mut(),
+                        );
+                    }
+                } else if xml_str_equal(combine, c"interleave".as_ptr() as _) {
+                    if choice_or_interleave == -1 {
+                        choice_or_interleave = 0;
+                    } else if choice_or_interleave == 1 {
+                        xml_rng_perr(
+                            ctxt,
+                            (*define).node,
+                            XmlParserErrors::XmlRngpDefChoiceAndInterleave as i32,
+                            c"Defines for %s use both 'choice' and 'interleave'\n".as_ptr() as _,
+                            name,
+                            null_mut(),
+                        );
+                    }
+                } else {
                     xml_rng_perr(
                         ctxt,
                         (*define).node,
-                        XmlParserErrors::XmlRngpDefChoiceAndInterleave as i32,
-                        c"Defines for %s use both 'choice' and 'interleave'\n".as_ptr() as _,
+                        XmlParserErrors::XmlRngpUnknownCombine as i32,
+                        c"Defines for %s use unknown combine value '%s''\n".as_ptr() as _,
                         name,
-                        null_mut(),
+                        combine,
                     );
                 }
-            } else if xml_str_equal(combine, c"interleave".as_ptr() as _) {
-                if choice_or_interleave == -1 {
-                    choice_or_interleave = 0;
-                } else if choice_or_interleave == 1 {
-                    xml_rng_perr(
-                        ctxt,
-                        (*define).node,
-                        XmlParserErrors::XmlRngpDefChoiceAndInterleave as i32,
-                        c"Defines for %s use both 'choice' and 'interleave'\n".as_ptr() as _,
-                        name,
-                        null_mut(),
-                    );
-                }
+                xml_free(combine as _);
+            } else if missing == 0 {
+                missing = 1;
             } else {
                 xml_rng_perr(
                     ctxt,
                     (*define).node,
-                    XmlParserErrors::XmlRngpUnknownCombine as i32,
-                    c"Defines for %s use unknown combine value '%s''\n".as_ptr() as _,
+                    XmlParserErrors::XmlRngpNeedCombine as i32,
+                    c"Some defines for %s needs the combine attribute\n".as_ptr() as _,
                     name,
-                    combine,
+                    null_mut(),
                 );
             }
-            xml_free(combine as _);
-        } else if missing == 0 {
-            missing = 1;
-        } else {
-            xml_rng_perr(
-                ctxt,
-                (*define).node,
-                XmlParserErrors::XmlRngpNeedCombine as i32,
-                c"Some defines for %s needs the combine attribute\n".as_ptr() as _,
-                name,
-                null_mut(),
-            );
-        }
 
-        cur = (*cur).next_hash;
-    }
-    // #ifdef DEBUG
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"xmlRelaxNGCheckCombine(): merging %s defines: %d\n".as_ptr() as _,
-    //                     name, choiceOrInterleave);
-    // #endif
-    if choice_or_interleave == -1 {
-        choice_or_interleave = 0;
-    }
-    cur = xml_relaxng_new_define(ctxt, (*define).node);
-    if cur.is_null() {
-        return;
-    }
-    if choice_or_interleave == 0 {
-        (*cur).typ = XmlRelaxNGType::Interleave;
-    } else {
-        (*cur).typ = XmlRelaxNGType::Choice;
-    }
-    tmp = define;
-    last = null_mut();
-    while !tmp.is_null() {
-        if !(*tmp).content.is_null() {
-            if !(*(*tmp).content).next.is_null() {
-                /*
-                 * we need first to create a wrapper.
-                 */
-                tmp2 = xml_relaxng_new_define(ctxt, (*(*tmp).content).node);
-                if tmp2.is_null() {
-                    break;
+            cur = (*cur).next_hash;
+        }
+        // #ifdef DEBUG
+        //     xml_generic_error!(xmlGenericErrorContext,
+        //                     c"xmlRelaxNGCheckCombine(): merging %s defines: %d\n".as_ptr() as _,
+        //                     name, choiceOrInterleave);
+        // #endif
+        if choice_or_interleave == -1 {
+            choice_or_interleave = 0;
+        }
+        cur = xml_relaxng_new_define(ctxt, (*define).node);
+        if cur.is_null() {
+            return;
+        }
+        if choice_or_interleave == 0 {
+            (*cur).typ = XmlRelaxNGType::Interleave;
+        } else {
+            (*cur).typ = XmlRelaxNGType::Choice;
+        }
+        tmp = define;
+        last = null_mut();
+        while !tmp.is_null() {
+            if !(*tmp).content.is_null() {
+                if !(*(*tmp).content).next.is_null() {
+                    /*
+                     * we need first to create a wrapper.
+                     */
+                    tmp2 = xml_relaxng_new_define(ctxt, (*(*tmp).content).node);
+                    if tmp2.is_null() {
+                        break;
+                    }
+                    (*tmp2).typ = XmlRelaxNGType::Group;
+                    (*tmp2).content = (*tmp).content;
+                } else {
+                    tmp2 = (*tmp).content;
                 }
-                (*tmp2).typ = XmlRelaxNGType::Group;
-                (*tmp2).content = (*tmp).content;
-            } else {
-                tmp2 = (*tmp).content;
+                if last.is_null() {
+                    (*cur).content = tmp2;
+                } else {
+                    (*last).next = tmp2;
+                }
+                last = tmp2;
             }
-            if last.is_null() {
-                (*cur).content = tmp2;
-            } else {
-                (*last).next = tmp2;
+            (*tmp).content = cur;
+            tmp = (*tmp).next_hash;
+        }
+        (*define).content = cur;
+        if choice_or_interleave == 0 {
+            if (*ctxt).interleaves.is_null() {
+                (*ctxt).interleaves = xml_hash_create(10);
             }
-            last = tmp2;
-        }
-        (*tmp).content = cur;
-        tmp = (*tmp).next_hash;
-    }
-    (*define).content = cur;
-    if choice_or_interleave == 0 {
-        if (*ctxt).interleaves.is_null() {
-            (*ctxt).interleaves = xml_hash_create(10);
-        }
-        if (*ctxt).interleaves.is_null() {
-            xml_rng_perr(
-                ctxt,
-                (*define).node,
-                XmlParserErrors::XmlRngpInterleaveCreateFailed as i32,
-                c"Failed to create interleaves hash table\n".as_ptr() as _,
-                null_mut(),
-                null_mut(),
-            );
-        } else {
-            let mut tmpname: [c_char; 32] = [0; 32];
-
-            snprintf(
-                tmpname.as_mut_ptr(),
-                32,
-                c"interleave%d".as_ptr() as _,
-                (*ctxt).nb_interleaves,
-            );
-            (*ctxt).nb_interleaves += 1;
-            if xml_hash_add_entry((*ctxt).interleaves, tmpname.as_ptr() as _, cur as _) < 0 {
+            if (*ctxt).interleaves.is_null() {
                 xml_rng_perr(
                     ctxt,
                     (*define).node,
                     XmlParserErrors::XmlRngpInterleaveCreateFailed as i32,
-                    c"Failed to add %s to hash table\n".as_ptr() as _,
-                    tmpname.as_ptr() as _,
+                    c"Failed to create interleaves hash table\n".as_ptr() as _,
+                    null_mut(),
                     null_mut(),
                 );
+            } else {
+                let mut tmpname: [c_char; 32] = [0; 32];
+
+                snprintf(
+                    tmpname.as_mut_ptr(),
+                    32,
+                    c"interleave%d".as_ptr() as _,
+                    (*ctxt).nb_interleaves,
+                );
+                (*ctxt).nb_interleaves += 1;
+                if xml_hash_add_entry((*ctxt).interleaves, tmpname.as_ptr() as _, cur as _) < 0 {
+                    xml_rng_perr(
+                        ctxt,
+                        (*define).node,
+                        XmlParserErrors::XmlRngpInterleaveCreateFailed as i32,
+                        c"Failed to add %s to hash table\n".as_ptr() as _,
+                        tmpname.as_ptr() as _,
+                        null_mut(),
+                    );
+                }
             }
         }
     }
@@ -4622,7 +4627,7 @@ unsafe extern "C" fn xml_relaxng_check_combine(
  * Applies the 4.17. combine attribute rule for all the define
  * element of a given grammar using the same name.
  */
-unsafe extern "C" fn xml_relaxng_check_reference(
+extern "C" fn xml_relaxng_check_reference(
     payload: *mut c_void,
     data: *mut c_void,
     name: *const XmlChar,
@@ -4635,40 +4640,51 @@ unsafe extern "C" fn xml_relaxng_check_reference(
     /*
      * Those rules don't apply to imported ref from xmlRelaxNGParseImportRef
      */
-    if (*refe).dflags & IS_EXTERNAL_REF as i16 != 0 {
-        return;
-    }
+    unsafe {
+        if (*refe).dflags & IS_EXTERNAL_REF as i16 != 0 {
+            return;
+        }
 
-    let grammar: XmlRelaxNGGrammarPtr = (*ctxt).grammar;
-    if grammar.is_null() {
-        xml_rng_perr(
-            ctxt,
-            (*refe).node,
-            XmlParserErrors::XmlErrInternalError as i32,
-            c"Internal error: no grammar in CheckReference %s\n".as_ptr() as _,
-            name,
-            null_mut(),
-        );
-        return;
-    }
-    if !(*refe).content.is_null() {
-        xml_rng_perr(
-            ctxt,
-            (*refe).node,
-            XmlParserErrors::XmlErrInternalError as i32,
-            c"Internal error: reference has content in CheckReference %s\n".as_ptr() as _,
-            name,
-            null_mut(),
-        );
-        return;
-    }
-    if !(*grammar).defs.is_null() {
-        def = xml_hash_lookup((*grammar).defs, name) as _;
-        if !def.is_null() {
-            cur = refe;
-            while !cur.is_null() {
-                (*cur).content = def;
-                cur = (*cur).next_hash;
+        let grammar: XmlRelaxNGGrammarPtr = (*ctxt).grammar;
+        if grammar.is_null() {
+            xml_rng_perr(
+                ctxt,
+                (*refe).node,
+                XmlParserErrors::XmlErrInternalError as i32,
+                c"Internal error: no grammar in CheckReference %s\n".as_ptr() as _,
+                name,
+                null_mut(),
+            );
+            return;
+        }
+        if !(*refe).content.is_null() {
+            xml_rng_perr(
+                ctxt,
+                (*refe).node,
+                XmlParserErrors::XmlErrInternalError as i32,
+                c"Internal error: reference has content in CheckReference %s\n".as_ptr() as _,
+                name,
+                null_mut(),
+            );
+            return;
+        }
+        if !(*grammar).defs.is_null() {
+            def = xml_hash_lookup((*grammar).defs, name) as _;
+            if !def.is_null() {
+                cur = refe;
+                while !cur.is_null() {
+                    (*cur).content = def;
+                    cur = (*cur).next_hash;
+                }
+            } else {
+                xml_rng_perr(
+                    ctxt,
+                    (*refe).node,
+                    XmlParserErrors::XmlRngpRefNoDef as i32,
+                    c"Reference %s has no matching definition\n".as_ptr() as _,
+                    name,
+                    null_mut(),
+                );
             }
         } else {
             xml_rng_perr(
@@ -4680,15 +4696,6 @@ unsafe extern "C" fn xml_relaxng_check_reference(
                 null_mut(),
             );
         }
-    } else {
-        xml_rng_perr(
-            ctxt,
-            (*refe).node,
-            XmlParserErrors::XmlRngpRefNoDef as i32,
-            c"Reference %s has no matching definition\n".as_ptr() as _,
-            name,
-            null_mut(),
-        );
     }
 }
 
@@ -5600,7 +5607,7 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
  *
  * Import import one references into the current grammar
  */
-unsafe extern "C" fn xml_relaxng_parse_import_ref(
+extern "C" fn xml_relaxng_parse_import_ref(
     payload: *mut c_void,
     data: *mut c_void,
     name: *const XmlChar,
@@ -5608,34 +5615,37 @@ unsafe extern "C" fn xml_relaxng_parse_import_ref(
     let ctxt: XmlRelaxNGParserCtxtPtr = data as _;
     let def: XmlRelaxNGDefinePtr = payload as _;
 
-    (*def).dflags |= IS_EXTERNAL_REF as i16;
+    unsafe {
+        (*def).dflags |= IS_EXTERNAL_REF as i16;
 
-    let tmp: c_int = xml_hash_add_entry((*(*ctxt).grammar).refs, name, def as _);
-    if tmp < 0 {
-        let prev: XmlRelaxNGDefinePtr = xml_hash_lookup((*(*ctxt).grammar).refs, (*def).name) as _;
-        if prev.is_null() {
-            if !(*def).name.is_null() {
-                xml_rng_perr(
-                    ctxt,
-                    null_mut(),
-                    XmlParserErrors::XmlRngpRefCreateFailed as i32,
-                    c"Error refs definitions '%s'\n".as_ptr() as _,
-                    (*def).name,
-                    null_mut(),
-                );
+        let tmp: c_int = xml_hash_add_entry((*(*ctxt).grammar).refs, name, def as _);
+        if tmp < 0 {
+            let prev: XmlRelaxNGDefinePtr =
+                xml_hash_lookup((*(*ctxt).grammar).refs, (*def).name) as _;
+            if prev.is_null() {
+                if !(*def).name.is_null() {
+                    xml_rng_perr(
+                        ctxt,
+                        null_mut(),
+                        XmlParserErrors::XmlRngpRefCreateFailed as i32,
+                        c"Error refs definitions '%s'\n".as_ptr() as _,
+                        (*def).name,
+                        null_mut(),
+                    );
+                } else {
+                    xml_rng_perr(
+                        ctxt,
+                        null_mut(),
+                        XmlParserErrors::XmlRngpRefCreateFailed as i32,
+                        c"Error refs definitions\n".as_ptr() as _,
+                        null_mut(),
+                        null_mut(),
+                    );
+                }
             } else {
-                xml_rng_perr(
-                    ctxt,
-                    null_mut(),
-                    XmlParserErrors::XmlRngpRefCreateFailed as i32,
-                    c"Error refs definitions\n".as_ptr() as _,
-                    null_mut(),
-                    null_mut(),
-                );
+                (*def).next_hash = (*prev).next_hash;
+                (*prev).next_hash = def;
             }
-        } else {
-            (*def).next_hash = (*prev).next_hash;
-            (*prev).next_hash = def;
         }
     }
 }
@@ -5673,7 +5683,11 @@ unsafe extern "C" fn xml_relaxng_parse_import_refs(
         );
         return -1;
     }
-    xml_hash_scan((*grammar).refs, xml_relaxng_parse_import_ref, ctxt as _);
+    xml_hash_scan(
+        (*grammar).refs,
+        Some(xml_relaxng_parse_import_ref),
+        ctxt as _,
+    );
     0
 }
 
@@ -6953,14 +6967,14 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
      */
     xml_relaxng_combine_start(ctxt, ret);
     if !(*ret).defs.is_null() {
-        xml_hash_scan((*ret).defs, xml_relaxng_check_combine, ctxt as _);
+        xml_hash_scan((*ret).defs, Some(xml_relaxng_check_combine), ctxt as _);
     }
 
     /*
      * link together defines and refs in this grammar
      */
     if !(*ret).refs.is_null() {
-        xml_hash_scan((*ret).refs, xml_relaxng_check_reference, ctxt as _);
+        xml_hash_scan((*ret).refs, Some(xml_relaxng_check_reference), ctxt as _);
     }
 
     /* @@@@ */
@@ -8894,7 +8908,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
     if !(*ctxt).interleaves.is_null() {
         xml_hash_scan(
             (*ctxt).interleaves,
-            xml_relaxng_compute_interleaves,
+            Some(xml_relaxng_compute_interleaves),
             ctxt as _,
         );
     }

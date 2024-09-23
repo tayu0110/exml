@@ -4679,8 +4679,10 @@ unsafe extern "C" fn xml_schema_subst_group_free(group: XmlSchemaSubstGroupPtr) 
     xml_free(group as _);
 }
 
-unsafe extern "C" fn xml_schema_subst_group_free_entry(group: *mut c_void, _name: *const XmlChar) {
-    xml_schema_subst_group_free(group as XmlSchemaSubstGroupPtr);
+extern "C" fn xml_schema_subst_group_free_entry(group: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_schema_subst_group_free(group as XmlSchemaSubstGroupPtr);
+    }
 }
 
 unsafe extern "C" fn xml_schema_redef_list_free(mut redef: XmlSchemaRedefPtr) {
@@ -23864,8 +23866,10 @@ pub unsafe extern "C" fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSc
     null_mut()
 }
 
-unsafe extern "C" fn xml_schema_bucket_free_entry(bucket: *mut c_void, _name: *const XmlChar) {
-    xml_schema_bucket_free(bucket as XmlSchemaBucketPtr);
+extern "C" fn xml_schema_bucket_free_entry(bucket: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_schema_bucket_free(bucket as XmlSchemaBucketPtr);
+    }
 }
 
 /**
@@ -24194,12 +24198,14 @@ unsafe extern "C" fn xml_schema_type_dump(typ: XmlSchemaTypePtr, output: *mut FI
 }
 
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_schema_type_dump_entry(
+extern "C" fn xml_schema_type_dump_entry(
     typ: *mut c_void,
     output: *mut c_void,
     _name: *const XmlChar,
 ) {
-    xml_schema_type_dump(typ as XmlSchemaTypePtr, output as *mut FILE);
+    unsafe {
+        xml_schema_type_dump(typ as XmlSchemaTypePtr, output as *mut FILE);
+    }
 }
 
 /**
@@ -24210,7 +24216,7 @@ unsafe extern "C" fn xml_schema_type_dump_entry(
  * Dump the element
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_schema_element_dump(
+extern "C" fn xml_schema_element_dump(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
@@ -24223,85 +24229,75 @@ unsafe extern "C" fn xml_schema_element_dump(
         return;
     }
 
-    fprintf(output, c"Element".as_ptr() as _);
-    if (*elem).flags & XML_SCHEMAS_ELEM_GLOBAL != 0 {
-        fprintf(output, c" (global)".as_ptr() as _);
-    }
-    fprintf(output, c": '%s' ".as_ptr() as _, (*elem).name);
-    if !namespace.is_null() {
-        fprintf(output, c"ns '%s'".as_ptr() as _, namespace);
-    }
-    fprintf(output, c"\n".as_ptr() as _);
-    // #if 0
-    //     if (((*elem).min_occurs != 1) || ((*elem).max_occurs != 1)) {
-    //     fprintf(output, c"  min %d ", (*elem).min_occurs);
-    //         if ((*elem).max_occurs >= UNBOUNDED) {
-    //             fprintf(output, c"max: unbounded\n".as_ptr() as _);}
-    //         else if ((*elem).max_occurs != 1) {
-    //             fprintf(output, c"max: %d\n".as_ptr() as _, (*elem).max_occurs);}
-    //         else {
-    //     }
-
-    //             fprintf(output, c"\n".as_ptr() as _);
-    // #endif
-    /*
-     * Misc other properties.
-     */
-    if (*elem).flags & XML_SCHEMAS_ELEM_NILLABLE != 0
-        || (*elem).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0
-        || (*elem).flags & XML_SCHEMAS_ELEM_FIXED != 0
-        || (*elem).flags & XML_SCHEMAS_ELEM_DEFAULT != 0
-    {
-        fprintf(output, c"  props: ".as_ptr() as _);
-        if (*elem).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
-            fprintf(output, c"[fixed] ".as_ptr() as _);
+    unsafe {
+        fprintf(output, c"Element".as_ptr() as _);
+        if (*elem).flags & XML_SCHEMAS_ELEM_GLOBAL != 0 {
+            fprintf(output, c" (global)".as_ptr() as _);
         }
-        if (*elem).flags & XML_SCHEMAS_ELEM_DEFAULT != 0 {
-            fprintf(output, c"[default] ".as_ptr() as _);
-        }
-        if (*elem).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0 {
-            fprintf(output, c"[abstract] ".as_ptr() as _);
-        }
-        if (*elem).flags & XML_SCHEMAS_ELEM_NILLABLE != 0 {
-            fprintf(output, c"[nillable] ".as_ptr() as _);
+        fprintf(output, c": '%s' ".as_ptr() as _, (*elem).name);
+        if !namespace.is_null() {
+            fprintf(output, c"ns '%s'".as_ptr() as _, namespace);
         }
         fprintf(output, c"\n".as_ptr() as _);
-    }
-    /*
-     * Default/fixed value.
-     */
-    if !(*elem).value.is_null() {
-        fprintf(output, c"  value: '%s'\n".as_ptr() as _, (*elem).value);
-    }
-    /*
-     * Type.
-     */
-    if !(*elem).named_type.is_null() {
-        fprintf(output, c"  type: '%s' ".as_ptr() as _, (*elem).named_type);
-        if !(*elem).named_type_ns.is_null() {
-            fprintf(output, c"ns '%s'\n".as_ptr() as _, (*elem).named_type_ns);
-        } else {
+        /*
+         * Misc other properties.
+         */
+        if (*elem).flags & XML_SCHEMAS_ELEM_NILLABLE != 0
+            || (*elem).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0
+            || (*elem).flags & XML_SCHEMAS_ELEM_FIXED != 0
+            || (*elem).flags & XML_SCHEMAS_ELEM_DEFAULT != 0
+        {
+            fprintf(output, c"  props: ".as_ptr() as _);
+            if (*elem).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
+                fprintf(output, c"[fixed] ".as_ptr() as _);
+            }
+            if (*elem).flags & XML_SCHEMAS_ELEM_DEFAULT != 0 {
+                fprintf(output, c"[default] ".as_ptr() as _);
+            }
+            if (*elem).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0 {
+                fprintf(output, c"[abstract] ".as_ptr() as _);
+            }
+            if (*elem).flags & XML_SCHEMAS_ELEM_NILLABLE != 0 {
+                fprintf(output, c"[nillable] ".as_ptr() as _);
+            }
             fprintf(output, c"\n".as_ptr() as _);
         }
-    } else if !(*elem).subtypes.is_null() {
         /*
-         * Dump local types.
+         * Default/fixed value.
          */
-        xml_schema_type_dump((*elem).subtypes, output);
-    }
-    /*
-     * Substitution group.
-     */
-    if !(*elem).subst_group.is_null() {
-        fprintf(
-            output,
-            c"  substitutionGroup: '%s' ".as_ptr() as _,
-            (*elem).subst_group,
-        );
-        if !(*elem).subst_group_ns.is_null() {
-            fprintf(output, c"ns '%s'\n".as_ptr() as _, (*elem).subst_group_ns);
-        } else {
-            fprintf(output, c"\n".as_ptr() as _);
+        if !(*elem).value.is_null() {
+            fprintf(output, c"  value: '%s'\n".as_ptr() as _, (*elem).value);
+        }
+        /*
+         * Type.
+         */
+        if !(*elem).named_type.is_null() {
+            fprintf(output, c"  type: '%s' ".as_ptr() as _, (*elem).named_type);
+            if !(*elem).named_type_ns.is_null() {
+                fprintf(output, c"ns '%s'\n".as_ptr() as _, (*elem).named_type_ns);
+            } else {
+                fprintf(output, c"\n".as_ptr() as _);
+            }
+        } else if !(*elem).subtypes.is_null() {
+            /*
+             * Dump local types.
+             */
+            xml_schema_type_dump((*elem).subtypes, output);
+        }
+        /*
+         * Substitution group.
+         */
+        if !(*elem).subst_group.is_null() {
+            fprintf(
+                output,
+                c"  substitutionGroup: '%s' ".as_ptr() as _,
+                (*elem).subst_group,
+            );
+            if !(*elem).subst_group_ns.is_null() {
+                fprintf(output, c"ns '%s'\n".as_ptr() as _, (*elem).subst_group_ns);
+            } else {
+                fprintf(output, c"\n".as_ptr() as _);
+            }
         }
     }
 }
@@ -24341,7 +24337,11 @@ pub unsafe extern "C" fn xml_schema_dump(output: *mut FILE, schema: XmlSchemaPtr
     if !(*schema).annot.is_null() {
         xml_schema_annot_dump(output, (*schema).annot);
     }
-    xml_hash_scan((*schema).type_decl, xml_schema_type_dump_entry, output as _);
+    xml_hash_scan(
+        (*schema).type_decl,
+        Some(xml_schema_type_dump_entry),
+        output as _,
+    );
     xml_hash_scan_full(
         (*schema).elem_decl,
         Some(xml_schema_element_dump),
@@ -24619,13 +24619,15 @@ unsafe extern "C" fn xml_schema_clear_attr_infos(vctxt: XmlSchemaValidCtxtPtr) {
     (*vctxt).nb_attr_infos = 0;
 }
 
-unsafe extern "C" fn xml_free_idc_hash_entry(payload: *mut c_void, _name: *const XmlChar) {
+extern "C" fn xml_free_idc_hash_entry(payload: *mut c_void, _name: *const XmlChar) {
     let mut e: XmlIDCHashEntryPtr = payload as _;
     let mut n: XmlIDCHashEntryPtr;
     while !e.is_null() {
-        n = (*e).next;
-        xml_free(e as _);
-        e = n;
+        unsafe {
+            n = (*e).next;
+            xml_free(e as _);
+            e = n;
+        }
     }
 }
 
@@ -24884,7 +24886,7 @@ pub unsafe extern "C" fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr)
  *
  * Returns the item, or NULL on internal errors.
  */
-unsafe extern "C" fn xml_schema_augment_idc(
+extern "C" fn xml_schema_augment_idc(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
@@ -24892,29 +24894,33 @@ unsafe extern "C" fn xml_schema_augment_idc(
     let idc_def: XmlSchemaIDCPtr = payload as XmlSchemaIDCPtr;
     let vctxt: XmlSchemaValidCtxtPtr = data as XmlSchemaValidCtxtPtr;
 
-    let aidc: XmlSchemaIDCAugPtr = xml_malloc(size_of::<XmlSchemaIDCAug>()) as XmlSchemaIDCAugPtr;
-    if aidc.is_null() {
-        xml_schema_verr_memory(
-            vctxt,
-            c"xmlSchemaAugmentIDC: allocating an augmented IDC definition".as_ptr() as _,
-            null_mut(),
-        );
-        return;
-    }
-    (*aidc).keyref_depth = -1;
-    (*aidc).def = idc_def;
-    (*aidc).next = null_mut();
-    if (*vctxt).aidcs.is_null() {
-        (*vctxt).aidcs = aidc;
-    } else {
-        (*aidc).next = (*vctxt).aidcs;
-        (*vctxt).aidcs = aidc;
-    }
-    /*
-     * Save if we have keyrefs at all.
-     */
-    if (*vctxt).has_keyrefs == 0 && (*idc_def).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
-        (*vctxt).has_keyrefs = 1;
+    unsafe {
+        let aidc: XmlSchemaIDCAugPtr =
+            xml_malloc(size_of::<XmlSchemaIDCAug>()) as XmlSchemaIDCAugPtr;
+        if aidc.is_null() {
+            xml_schema_verr_memory(
+                vctxt,
+                c"xmlSchemaAugmentIDC: allocating an augmented IDC definition".as_ptr() as _,
+                null_mut(),
+            );
+            return;
+        }
+        (*aidc).keyref_depth = -1;
+        (*aidc).def = idc_def;
+        (*aidc).next = null_mut();
+        if (*vctxt).aidcs.is_null() {
+            (*vctxt).aidcs = aidc;
+        } else {
+            (*aidc).next = (*vctxt).aidcs;
+            (*vctxt).aidcs = aidc;
+        }
+        /*
+         * Save if we have keyrefs at all.
+         */
+        if (*vctxt).has_keyrefs == 0 && (*idc_def).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref
+        {
+            (*vctxt).has_keyrefs = 1;
+        }
     }
 }
 
@@ -24924,19 +24930,21 @@ unsafe extern "C" fn xml_schema_augment_idc(
  *
  * Creates an augmented IDC definition for the imported schema.
  */
-unsafe extern "C" fn xml_schema_augment_imported_idc(
+extern "C" fn xml_schema_augment_imported_idc(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
 ) {
     let imported: XmlSchemaImportPtr = payload as XmlSchemaImportPtr;
     let vctxt: XmlSchemaValidCtxtPtr = data as XmlSchemaValidCtxtPtr;
-    if !(*(*imported).schema).idc_def.is_null() {
-        xml_hash_scan(
-            (*(*imported).schema).idc_def,
-            xml_schema_augment_idc,
-            vctxt as _,
-        );
+    unsafe {
+        if !(*(*imported).schema).idc_def.is_null() {
+            xml_hash_scan(
+                (*(*imported).schema).idc_def,
+                Some(xml_schema_augment_idc),
+                vctxt as _,
+            );
+        }
     }
 }
 
@@ -25024,7 +25032,7 @@ unsafe extern "C" fn xml_schema_pre_run(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
      */
     xml_hash_scan(
         (*(*vctxt).schema).schemas_imports,
-        xml_schema_augment_imported_idc,
+        Some(xml_schema_augment_imported_idc),
         vctxt as _,
     );
 
@@ -28459,7 +28467,7 @@ unsafe extern "C" fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> c
          */
         xml_hash_scan(
             (*(*vctxt).schema).schemas_imports,
-            xml_schema_augment_imported_idc,
+            Some(xml_schema_augment_imported_idc),
             vctxt as _,
         );
     }

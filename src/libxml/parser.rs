@@ -17,6 +17,7 @@ use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen,
 
 use crate::{
     __xml_raise_error,
+    hash::XmlHashTableRef,
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
         dict::{
@@ -40,7 +41,7 @@ use crate::{
         },
         hash::{
             xml_hash_default_deallocator, xml_hash_free, xml_hash_lookup2, xml_hash_qlookup2,
-            xml_hash_remove_entry2, xml_hash_scan_full, xml_hash_size, XmlHashTablePtr,
+            XmlHashTablePtr,
         },
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
@@ -2407,19 +2408,21 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
  *
  * Removes CDATA attributes from the special attribute table
  */
-unsafe extern "C" fn xml_clean_special_attr_callback(
-    payload: *mut c_void,
-    data: *mut c_void,
-    fullname: *const XmlChar,
-    fullattr: *const XmlChar,
-    _unused: *const XmlChar,
-) {
-    let ctxt: XmlParserCtxtPtr = data as XmlParserCtxtPtr;
+// This is used the callback for xml_hash_scan_full on xml_clean_special_attr,
+// but no longer needed.
+// unsafe extern "C" fn xml_clean_special_attr_callback(
+//     payload: *mut c_void,
+//     data: *mut c_void,
+//     fullname: *const XmlChar,
+//     fullattr: *const XmlChar,
+//     _unused: *const XmlChar,
+// ) {
+//     let ctxt: XmlParserCtxtPtr = data as XmlParserCtxtPtr;
 
-    if payload as isize == XmlAttributeType::XmlAttributeCdata as isize {
-        xml_hash_remove_entry2((*ctxt).atts_special, fullname, fullattr, None);
-    }
-}
+//     if payload as isize == XmlAttributeType::XmlAttributeCdata as isize {
+//         xml_hash_remove_entry2((*ctxt).atts_special, fullname, fullattr, None);
+//     }
+// }
 
 /**
  * xmlCleanSpecialAttr:
@@ -2430,20 +2433,33 @@ unsafe extern "C" fn xml_clean_special_attr_callback(
  * to parse the DTD and before starting to parse the document root.
  */
 unsafe extern "C" fn xml_clean_special_attr(ctxt: XmlParserCtxtPtr) {
-    if (*ctxt).atts_special.is_null() {
+    let Some(mut atts) = XmlHashTableRef::from_raw((*ctxt).atts_special) else {
         return;
-    }
+    };
 
-    xml_hash_scan_full(
-        (*ctxt).atts_special,
-        Some(xml_clean_special_attr_callback),
-        ctxt as _,
+    atts.remove_if(
+        |data, _, _, _| data.0 as isize == XmlAttributeType::XmlAttributeCdata as isize,
+        |_, _| {},
     );
-
-    if xml_hash_size((*ctxt).atts_special) == 0 {
-        xml_hash_free((*ctxt).atts_special, None);
+    if atts.is_empty() {
+        atts.free();
         (*ctxt).atts_special = null_mut();
     }
+
+    // if (*ctxt).atts_special.is_null() {
+    //     return;
+    // }
+
+    // xml_hash_scan_full(
+    //     (*ctxt).atts_special,
+    //     Some(xml_clean_special_attr_callback),
+    //     ctxt as _,
+    // );
+
+    // if xml_hash_size((*ctxt).atts_special) == 0 {
+    //     xml_hash_free((*ctxt).atts_special, None);
+    //     (*ctxt).atts_special = null_mut();
+    // }
 }
 
 pub(crate) const SAX_COMPAT_MODE: &CStr = c"SAX compatibility mode document";

@@ -40,6 +40,8 @@ use crate::{
 #[cfg(feature = "legacy")]
 use crate::{libxml::globals::xml_generic_error_context, xml_generic_error};
 
+use super::hash::CVoidWrapper;
+
 /*
  * The different valid entity types.
  */
@@ -114,7 +116,7 @@ pub struct XmlEntity {
  * There is 2 separate hash tables for global and parameter entities.
  */
 
-pub type XmlEntitiesTable = XmlHashTable;
+pub type XmlEntitiesTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlEntitiesTablePtr = *mut XmlEntitiesTable;
 
 /*
@@ -1347,39 +1349,42 @@ pub unsafe extern "C" fn xml_create_entities_table() -> XmlEntitiesTablePtr {
  * Returns the new xmlEntitiesPtr or NULL in case of error.
  */
 #[cfg(feature = "tree")]
-unsafe extern "C" fn xml_copy_entity(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
+extern "C" fn xml_copy_entity(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let ent: XmlEntityPtr = payload as XmlEntityPtr;
 
-    let cur: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
-    if cur.is_null() {
-        xml_entities_err_memory(c"xmlCopyEntity:: malloc failed".as_ptr() as _);
-        return null_mut();
-    }
-    memset(cur as _, 0, size_of::<XmlEntity>());
-    (*cur).typ = XmlElementType::XmlEntityDecl;
+    unsafe {
+        let cur: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
+        if cur.is_null() {
+            xml_entities_err_memory(c"xmlCopyEntity:: malloc failed".as_ptr() as _);
+            return null_mut();
+        }
+        memset(cur as _, 0, size_of::<XmlEntity>());
+        (*cur).typ = XmlElementType::XmlEntityDecl;
 
-    (*cur).etype = (*ent).etype;
-    if !(*ent).name.load(Ordering::Relaxed).is_null() {
-        (*cur).name = AtomicPtr::new(xml_strdup((*ent).name.load(Ordering::Relaxed)) as _);
+        (*cur).etype = (*ent).etype;
+        if !(*ent).name.load(Ordering::Relaxed).is_null() {
+            (*cur).name = AtomicPtr::new(xml_strdup((*ent).name.load(Ordering::Relaxed)) as _);
+        }
+        if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
+            (*cur).external_id =
+                AtomicPtr::new(xml_strdup((*ent).external_id.load(Ordering::Relaxed)) as _);
+        }
+        if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
+            (*cur).system_id =
+                AtomicPtr::new(xml_strdup((*ent).system_id.load(Ordering::Relaxed)) as _);
+        }
+        if !(*ent).content.load(Ordering::Relaxed).is_null() {
+            (*cur).content =
+                AtomicPtr::new(xml_strdup((*ent).content.load(Ordering::Relaxed)) as _);
+        }
+        if !(*ent).orig.load(Ordering::Relaxed).is_null() {
+            (*cur).orig = AtomicPtr::new(xml_strdup((*ent).orig.load(Ordering::Relaxed)) as _);
+        }
+        if !(*ent).uri.load(Ordering::Relaxed).is_null() {
+            (*cur).uri = AtomicPtr::new(xml_strdup((*ent).uri.load(Ordering::Relaxed)) as _);
+        }
+        cur as _
     }
-    if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-        (*cur).external_id =
-            AtomicPtr::new(xml_strdup((*ent).external_id.load(Ordering::Relaxed)) as _);
-    }
-    if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
-        (*cur).system_id =
-            AtomicPtr::new(xml_strdup((*ent).system_id.load(Ordering::Relaxed)) as _);
-    }
-    if !(*ent).content.load(Ordering::Relaxed).is_null() {
-        (*cur).content = AtomicPtr::new(xml_strdup((*ent).content.load(Ordering::Relaxed)) as _);
-    }
-    if !(*ent).orig.load(Ordering::Relaxed).is_null() {
-        (*cur).orig = AtomicPtr::new(xml_strdup((*ent).orig.load(Ordering::Relaxed)) as _);
-    }
-    if !(*ent).uri.load(Ordering::Relaxed).is_null() {
-        (*cur).uri = AtomicPtr::new(xml_strdup((*ent).uri.load(Ordering::Relaxed)) as _);
-    }
-    cur as _
 }
 
 /**
@@ -1404,9 +1409,11 @@ pub unsafe extern "C" fn xml_copy_entities_table(
  *
  * Deallocate the memory used by an entities in the hash table.
  */
-unsafe extern "C" fn xml_free_entity_wrapper(entity: *mut c_void, _name: *const XmlChar) {
-    if !entity.is_null() {
-        xml_free_entity(entity as XmlEntityPtr);
+extern "C" fn xml_free_entity_wrapper(entity: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        if !entity.is_null() {
+            xml_free_entity(entity as XmlEntityPtr);
+        }
     }
 }
 
@@ -1428,12 +1435,10 @@ pub unsafe extern "C" fn xml_free_entities_table(table: XmlEntitiesTablePtr) {
  * When using the hash table scan function, arguments need to be reversed
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_dump_entity_decl_scan(
-    ent: *mut c_void,
-    buf: *mut c_void,
-    _name: *const XmlChar,
-) {
-    xml_dump_entity_decl(buf as XmlBufferPtr, ent as XmlEntityPtr);
+extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_dump_entity_decl(buf as XmlBufferPtr, ent as XmlEntityPtr);
+    }
 }
 
 /**
@@ -1445,7 +1450,7 @@ unsafe extern "C" fn xml_dump_entity_decl_scan(
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufferPtr, table: XmlEntitiesTablePtr) {
-    xml_hash_scan(table, xml_dump_entity_decl_scan, buf as _);
+    xml_hash_scan(table, Some(xml_dump_entity_decl_scan), buf as _);
 }
 
 /**

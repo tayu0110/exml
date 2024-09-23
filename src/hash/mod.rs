@@ -1,4 +1,4 @@
-mod libxml_api;
+pub mod libxml_api;
 
 use std::{
     borrow::Cow,
@@ -30,7 +30,7 @@ fn xml_hash_compute_key<T>(
         .filter(|name| !name.is_empty())
         .map(|name| name.as_ref().to_bytes())
     {
-        value += 30 * name[0] as u64;
+        value = value.wrapping_add(30 * name[0] as u64);
         for &ch in name {
             value ^= value
                 .wrapping_shl(5)
@@ -256,6 +256,7 @@ impl<'a, T> XmlHashTable<'a, T> {
                 deallocator(payload, name);
             }
         }
+        self.num_elems = 0;
     }
 }
 
@@ -396,27 +397,25 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             )
         };
 
+        if self.is_empty() {
+            self.grow(1);
+        }
+
         let key =
             xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
         let entry = if self.table[key].valid != 0 {
-            if self.table[key].name == name
-                && self.table[key].name2 == name2
-                && self.table[key].name3 == name3
-            {
-                let old = replace(&mut self.table[key].payload, data);
-                deallocator(old, name);
-                return Ok(());
-            }
-
-            let mut next = self.table[key].next;
-            while let Some(now) = next {
-                if now.name == name && now.name2 == name2 && now.name3 == name3 {
-                    let old = replace(&mut self.table[key].payload, data);
+            let mut entry = &mut self.table[key];
+            loop {
+                if entry.name == name && entry.name2 == name2 && entry.name3 == name3 {
+                    let old = replace(&mut entry.payload, data);
                     deallocator(old, name);
                     return Ok(());
                 }
-                next = now.next;
+                let Some(next) = entry.next.as_mut() else {
+                    break;
+                };
+                entry = next.deref_mut();
             }
 
             let mut new =
@@ -425,6 +424,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             self.table[key].next = Some(new);
             self.table[key].next.as_mut().unwrap().deref_mut()
         } else {
+            self.table[key].next = None;
             &mut self.table[key]
         };
 
@@ -574,6 +574,10 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             )
         };
 
+        if self.is_empty() {
+            self.grow(1);
+        }
+
         let key =
             xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
@@ -707,52 +711,54 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             name3.map(Cow::Borrowed),
         );
 
-        let key =
-            xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
+        if !self.is_empty() {
+            let key =
+                xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
-        ensure!(self.table[key].valid != 0, "Entry is not found");
+            ensure!(self.table[key].valid != 0, "Entry is not found");
 
-        if self.table[key].name == name
-            && self.table[key].name2 == name2
-            && self.table[key].name3 == name3
-        {
-            let (payload, name) = if let Some(next) = self.table[key].next.take() {
-                let next = next.into_inner();
-                let XmlHashEntry { name, payload, .. } = replace(&mut self.table[key], next);
-                (payload, name)
-            } else {
-                self.table[key].valid = 0;
-                (
-                    take(&mut self.table[key].payload),
-                    self.table[key].name.take(),
-                )
-            };
-            deallocator(payload, name);
-
-            self.num_elems -= 1;
-            return Ok(());
-        }
-
-        let mut prev = None::<XmlHashEntryRef<'_, T>>;
-        let mut next = self.table[key].next;
-        while let Some(now) = next {
-            next = now.next;
-
-            if now.name == name && now.name2 == name2 && now.name3 == name3 {
-                let XmlHashEntry { name, payload, .. } = now.into_inner();
-                if let Some(mut prev) = prev {
-                    prev.next = next;
+            if self.table[key].name == name
+                && self.table[key].name2 == name2
+                && self.table[key].name3 == name3
+            {
+                let (payload, name) = if let Some(next) = self.table[key].next.take() {
+                    let next = next.into_inner();
+                    let XmlHashEntry { name, payload, .. } = replace(&mut self.table[key], next);
+                    (payload, name)
                 } else {
-                    self.table[key].next = next;
-                }
-
+                    self.table[key].valid = 0;
+                    (
+                        take(&mut self.table[key].payload),
+                        self.table[key].name.take(),
+                    )
+                };
                 deallocator(payload, name);
 
                 self.num_elems -= 1;
                 return Ok(());
             }
 
-            prev = Some(now);
+            let mut prev = None::<XmlHashEntryRef<'_, T>>;
+            let mut next = self.table[key].next;
+            while let Some(now) = next {
+                next = now.next;
+
+                if now.name == name && now.name2 == name2 && now.name3 == name3 {
+                    let XmlHashEntry { name, payload, .. } = now.into_inner();
+                    if let Some(mut prev) = prev {
+                        prev.next = next;
+                    } else {
+                        self.table[key].next = next;
+                    }
+
+                    deallocator(payload, name);
+
+                    self.num_elems -= 1;
+                    return Ok(());
+                }
+
+                prev = Some(now);
+            }
         }
 
         Err(anyhow!("Entry is not found"))
@@ -842,29 +848,21 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             name2.map(Cow::Borrowed),
             name3.map(Cow::Borrowed),
         );
-        let key =
-            xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
-        if self.table[key].valid == 0 {
-            return None;
-        }
+        if !self.is_empty() {
+            let key =
+                xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
-        if self.table[key].name == name
-            && self.table[key].name2 == name2
-            && self.table[key].name3 == name3
-        {
-            return Some(&self.table[key].payload);
-        }
+            if self.table[key].valid == 0 {
+                return None;
+            }
 
-        let mut next = self.table[key].next;
-        while let Some(now) = next {
-            next = now.next;
-
-            if now.name == name && now.name2 == name2 && now.name3 == name3 {
-                unsafe {
-                    // Lifetime is not enough for `&now.payload`.
-                    return Some(&now.0.as_ref().payload);
+            let mut now = &self.table[key];
+            loop {
+                if now.name == name && now.name2 == name2 && now.name3 == name3 {
+                    return Some(&now.payload);
                 }
+                now = now.next.as_ref()?.deref();
             }
         }
         None
@@ -936,73 +934,51 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
         name3: Option<&CStr>,
         prefix3: Option<&CStr>,
     ) -> Option<&T> {
-        let key = xml_hash_compute_qkey(
-            self,
-            prefix.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
-            name,
-            prefix2.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
-            name2.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
-            prefix3.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
-            name3.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
-        ) as usize;
-
-        if self.table[key].valid == 0 {
-            return None;
-        }
-
-        unsafe {
-            let (prefix, prefix2, prefix3) = (
-                prefix.map_or(null(), |p| p.as_ptr()) as *const u8,
-                prefix2.map_or(null(), |p| p.as_ptr()) as *const u8,
-                prefix3.map_or(null(), |p| p.as_ptr()) as *const u8,
-            );
-            let (name, name2, name3) = (
-                name.as_ptr() as *const u8,
-                name2.map_or(null(), |n| n.as_ptr()) as *const u8,
-                name3.map_or(null(), |n| n.as_ptr()) as *const u8,
-            );
-
-            if xml_str_qequal(
-                prefix,
+        if !self.is_empty() {
+            let key = xml_hash_compute_qkey(
+                self,
+                prefix.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
                 name,
-                self.table[key].name.as_ref().map_or(null(), |n| n.as_ptr()) as _,
-            ) && xml_str_qequal(
-                prefix2,
-                name2,
-                self.table[key]
-                    .name2
-                    .as_ref()
-                    .map_or(null(), |n| n.as_ptr()) as _,
-            ) && xml_str_qequal(
-                prefix3,
-                name3,
-                self.table[key]
-                    .name3
-                    .as_ref()
-                    .map_or(null(), |n| n.as_ptr()) as _,
-            ) {
-                return Some(&self.table[key].payload);
+                prefix2.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
+                name2.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
+                prefix3.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
+                name3.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
+            ) as usize;
+
+            if self.table[key].valid == 0 {
+                return None;
             }
 
-            let mut next = self.table[key].next;
-            while let Some(now) = next {
-                next = now.next;
+            unsafe {
+                let (prefix, prefix2, prefix3) = (
+                    prefix.map_or(null(), |p| p.as_ptr()) as *const u8,
+                    prefix2.map_or(null(), |p| p.as_ptr()) as *const u8,
+                    prefix3.map_or(null(), |p| p.as_ptr()) as *const u8,
+                );
+                let (name, name2, name3) = (
+                    name.as_ptr() as *const u8,
+                    name2.map_or(null(), |n| n.as_ptr()) as *const u8,
+                    name3.map_or(null(), |n| n.as_ptr()) as *const u8,
+                );
 
-                if xml_str_qequal(
-                    prefix,
-                    name,
-                    now.name.as_ref().map_or(null(), |n| n.as_ptr()) as _,
-                ) && xml_str_qequal(
-                    prefix2,
-                    name2,
-                    now.name2.as_ref().map_or(null(), |n| n.as_ptr()) as _,
-                ) && xml_str_qequal(
-                    prefix3,
-                    name3,
-                    now.name3.as_ref().map_or(null(), |n| n.as_ptr()) as _,
-                ) {
-                    // Lifetime is not enough for `&now.payload`.
-                    return Some(&now.0.as_ref().payload);
+                let mut now = &self.table[key];
+                loop {
+                    if xml_str_qequal(
+                        prefix,
+                        name,
+                        now.name.as_ref().map_or(null(), |n| n.as_ptr()) as _,
+                    ) && xml_str_qequal(
+                        prefix2,
+                        name2,
+                        now.name2.as_ref().map_or(null(), |n| n.as_ptr()) as _,
+                    ) && xml_str_qequal(
+                        prefix3,
+                        name3,
+                        now.name3.as_ref().map_or(null(), |n| n.as_ptr()) as _,
+                    ) {
+                        return Some(&now.payload);
+                    }
+                    now = now.next.as_ref()?.deref();
                 }
             }
         }
@@ -1093,20 +1069,27 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
     /// ```
     pub fn clone_with(&self, mut copier: impl FnMut(&T, Option<&Cow<'a, CStr>>) -> T) -> Self {
         let mut res = Self::with_capacity(self.table.len());
-        for entry in &self.table {
+        for mut entry in &self.table {
             if entry.valid == 0 {
                 continue;
             }
 
-            res.do_add_entry(
-                entry.name.as_ref().map(|n| n.as_ref()),
-                entry.name2.as_ref().map(|n| n.as_ref()),
-                entry.name3.as_ref().map(|n| n.as_ref()),
-                copier(&entry.payload, entry.name.as_ref()),
-            );
+            loop {
+                res.do_add_entry(
+                    entry.name.as_ref().map(|n| n.as_ref()),
+                    entry.name2.as_ref().map(|n| n.as_ref()),
+                    entry.name3.as_ref().map(|n| n.as_ref()),
+                    copier(&entry.payload, entry.name.as_ref()),
+                );
+
+                let Some(next) = entry.next.as_ref() else {
+                    break;
+                };
+                entry = next.deref();
+            }
         }
 
-        res.num_elems = self.num_elems;
+        assert_eq!(res.num_elems, self.num_elems);
         res
     }
 
@@ -1133,8 +1116,10 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
     /// table.add_entry(c"fuga", 2);
     /// table.add_entry(c"piyo", 3);
     /// table.add_entry(c"foo", 4);
+    /// assert_eq!(table.len(), 4);
     ///
     /// table.remove_if(|data, _, _, _| data % 2 == 0, |_, _| {});
+    /// assert_eq!(table.len(), 2);
     ///
     /// assert!(table.lookup(c"hoge").is_some());
     /// assert!(table.lookup(c"fuga").is_none());
@@ -1166,7 +1151,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                     entry.name3.as_ref(),
                 )
             {
-                let (payload, name) = if let Some(next) = entry.next {
+                let (payload, name) = if let Some(next) = entry.next.take() {
                     let old = replace(entry, next.into_inner());
                     (old.payload, old.name)
                 } else {
@@ -1174,6 +1159,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                     (take(&mut entry.payload), entry.name.take())
                 };
                 deallocator(payload, name);
+                self.num_elems -= 1;
             }
 
             if entry.valid != 0 {
@@ -1200,6 +1186,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                             entry.next = next;
                         }
                         deallocator(payload, name);
+                        self.num_elems -= 1;
                     } else {
                         prev = Some(now);
                     }
@@ -1214,33 +1201,67 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
     /// In original libxml2, xmlHashScan/ScanFull allows to modify the table inner callback,
     /// but it is obviously not safe.  
     /// Therefore, this method allow callback to modify the table.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use exml::hash::XmlHashTable;
+    ///
+    /// let mut table = XmlHashTable::new();
+    /// table.add_entry(c"foo", 1u32);
+    /// table.add_entry2(c"hoge", c"fuga", 2);
+    /// table.add_entry3(c"foo", c"bar", c"piyo", 3);
+    ///
+    /// let mut entries = vec![];
+    /// table.scan(|data, s1, s2, s3| entries.push(
+    ///     (
+    ///         *data,
+    ///         s1.map_or(c"".to_owned(), |s| s.clone().into()),
+    ///         s2.map_or(c"".to_owned(), |s| s.clone().into()),
+    ///         s3.map_or(c"".to_owned(), |s| s.clone().into()),
+    ///     )
+    /// ));
+    /// entries.sort();
+    /// assert_eq!(
+    ///     entries,
+    ///     vec![
+    ///         (1u32, c"foo".to_owned(), c"".to_owned(), c"".to_owned()),
+    ///         (2u32, c"hoge".to_owned(), c"fuga".to_owned(), c"".to_owned()),
+    ///         (3u32, c"foo".to_owned(), c"bar".to_owned(), c"piyo".to_owned()),
+    ///     ],
+    /// )
+    /// ```
     pub fn scan(
         &self,
         mut f: impl FnMut(&T, Option<&Cow<'_, CStr>>, Option<&Cow<'_, CStr>>, Option<&Cow<'_, CStr>>),
     ) {
-        for entry in &self.table {
+        let num_elems = self.num_elems;
+        for mut entry in &self.table {
             if entry.valid == 0 {
                 continue;
             }
 
-            f(
-                &entry.payload,
-                entry.name.as_ref(),
-                entry.name2.as_ref(),
-                entry.name3.as_ref(),
-            );
-
-            let mut next = entry.next;
-            while let Some(now) = next {
-                next = now.next;
+            loop {
                 f(
-                    &now.payload,
-                    now.name.as_ref(),
-                    now.name2.as_ref(),
-                    now.name3.as_ref(),
+                    &entry.payload,
+                    entry.name.as_ref(),
+                    entry.name2.as_ref(),
+                    entry.name3.as_ref(),
                 );
+
+                let Some(next) = entry.next.as_ref() else {
+                    break;
+                };
+                entry = next.deref();
             }
         }
+        // In original libxml2, some entries may be removed by callback,
+        // but this method does not allowed such operations.
+        // Therefore, we should check that such operations have not been applied.
+        assert_eq!(self.num_elems, num_elems);
+    }
+
+    pub fn drain(&'a mut self) -> Drain<'a, T> {
+        Drain::new(self)
     }
 }
 
@@ -1311,5 +1332,338 @@ impl<'a, T: Default> Deref for XmlHashTableRef<'a, T> {
 impl<'a, T: Default> DerefMut for XmlHashTableRef<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut() }
+    }
+}
+
+pub struct Drain<'a, T> {
+    table: &'a mut XmlHashTable<'a, T>,
+    list: Option<XmlHashEntryRef<'a, T>>,
+    next_index: usize,
+}
+
+impl<'a, T> Drain<'a, T> {
+    fn new(table: &'a mut XmlHashTable<'a, T>) -> Self {
+        Self {
+            table,
+            list: None,
+            next_index: 0,
+        }
+    }
+}
+
+impl<'a, T: Default> Iterator for Drain<'a, T> {
+    type Item = (
+        T,
+        Option<Cow<'a, CStr>>,
+        Option<Cow<'a, CStr>>,
+        Option<Cow<'a, CStr>>,
+    );
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(list) = self.list {
+            self.list = list.next;
+
+            let XmlHashEntry {
+                name,
+                name2,
+                name3,
+                payload,
+                ..
+            } = list.into_inner();
+            return Some((payload, name, name2, name3));
+        }
+
+        while self.next_index < self.table.table.len() {
+            if self.table.table[self.next_index].valid != 0 {
+                let XmlHashEntry {
+                    next,
+                    name,
+                    name2,
+                    name3,
+                    payload,
+                    ..
+                } = take(&mut self.table.table[self.next_index]);
+
+                self.list = next;
+                self.next_index += 1;
+
+                return Some((payload, name, name2, name3));
+            }
+            self.next_index += 1;
+        }
+
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{ffi::CString, num::NonZeroU8};
+
+    use rand::{
+        distributions::Alphanumeric, prelude::Distribution, seq::SliceRandom, thread_rng, Rng,
+    };
+
+    use super::*;
+
+    const LEN: usize = 30;
+
+    fn gen_chars(rng: &mut impl Rng) -> Vec<NonZeroU8> {
+        Alphanumeric
+            .sample_iter(rng)
+            .map(|c| NonZeroU8::new(c).unwrap())
+            .take(LEN)
+            .collect::<Vec<_>>()
+    }
+
+    fn gen_ncname(rng: &mut impl Rng) -> CString {
+        CString::from(gen_chars(rng))
+    }
+
+    fn gen_qname(rng: &mut impl Rng) -> CString {
+        let mut chars = gen_chars(rng);
+        chars[rng.gen_range(1..29)] = NonZeroU8::new(b':').unwrap();
+        CString::from(chars)
+    }
+
+    fn ncname_insertion_test(
+        table: &mut XmlHashTable<u64>,
+        entries: &mut Vec<(CString, Option<CString>, Option<CString>, u64)>,
+        rng: &mut impl Rng,
+    ) {
+        match rng.gen_range(1..=3) {
+            1 => {
+                let n1 = gen_ncname(rng);
+                let data = rng.gen::<u64>();
+                table.add_entry(&n1, data);
+                assert_eq!(table.lookup(&n1), Some(&data));
+                entries.push((n1, None, None, data));
+            }
+            2 => {
+                let n1 = gen_ncname(rng);
+                let n2 = gen_ncname(rng);
+                let data = rng.gen::<u64>();
+                table.add_entry2(&n1, &n2, data);
+                assert_eq!(table.lookup2(&n1, &n2), Some(&data));
+                entries.push((n1, Some(n2), None, data));
+            }
+            3 => {
+                let n1 = gen_ncname(rng);
+                let n2 = gen_ncname(rng);
+                let n3 = gen_ncname(rng);
+                let data = rng.gen::<u64>();
+                table.add_entry3(&n1, &n2, &n3, data);
+                assert_eq!(table.lookup3(&n1, &n2, &n3), Some(&data));
+                entries.push((n1, Some(n2), Some(n3), data));
+            }
+            _ => {}
+        }
+    }
+
+    fn split_qname(qname: &CStr) -> Option<(CString, CString)> {
+        let qname = qname.to_string_lossy();
+        let (prefix, local_name) = qname.split_once(':')?;
+        Some((
+            CString::new(prefix).unwrap(),
+            CString::new(local_name).unwrap(),
+        ))
+    }
+
+    fn qname_insertion_test(
+        table: &mut XmlHashTable<u64>,
+        entries: &mut Vec<(CString, Option<CString>, Option<CString>, u64)>,
+        rng: &mut impl Rng,
+    ) {
+        match rng.gen_range(1..=3) {
+            1 => {
+                let n1 = gen_qname(rng);
+                let data = rng.gen::<u64>();
+                table.add_entry(&n1, data);
+                assert_eq!(table.lookup(&n1), Some(&data));
+                let (p1, l1) = split_qname(&n1).unwrap();
+                assert_eq!(table.qlookup(&l1, Some(&p1)), Some(&data));
+                entries.push((n1, None, None, data));
+            }
+            2 => {
+                let n1 = gen_qname(rng);
+                let n2 = gen_qname(rng);
+                let data = rng.gen::<u64>();
+                table.add_entry2(&n1, &n2, data);
+                assert_eq!(table.lookup2(&n1, &n2), Some(&data));
+                let (p1, l1) = split_qname(&n1).unwrap();
+                let (p2, l2) = split_qname(&n2).unwrap();
+                assert_eq!(table.qlookup2(&l1, Some(&p1), &l2, Some(&p2)), Some(&data));
+                entries.push((n1, Some(n2), None, data));
+            }
+            3 => {
+                let n1 = gen_qname(rng);
+                let n2 = gen_qname(rng);
+                let n3 = gen_qname(rng);
+                let data = rng.gen::<u64>();
+                table.add_entry3(&n1, &n2, &n3, data);
+                assert_eq!(table.lookup3(&n1, &n2, &n3), Some(&data));
+                let (p1, l1) = split_qname(&n1).unwrap();
+                let (p2, l2) = split_qname(&n2).unwrap();
+                let (p3, l3) = split_qname(&n3).unwrap();
+                assert_eq!(
+                    table.qlookup3(&l1, Some(&p1), &l2, Some(&p2), &l3, Some(&p3)),
+                    Some(&data)
+                );
+                entries.push((n1, Some(n2), Some(n3), data));
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn random_test() {
+        let mut table = XmlHashTable::new();
+        let mut rng = thread_rng();
+        let mut entries = vec![];
+
+        for _ in 0..100_000 {
+            if entries.is_empty() {
+                assert!(table.is_empty());
+                [ncname_insertion_test, qname_insertion_test]
+                    .choose(&mut rng)
+                    .unwrap()(&mut table, &mut entries, &mut rng);
+            }
+            // 0: insert (ncname)
+            // 1: insert (qname)
+            // 2: remove
+            // 3: lookup
+            // 4: update
+            // 5: clone
+            // 6: remove_if
+            // 7: clear
+            let query = rng.gen_range(0..=6 + (table.len() > 200) as i32);
+            match query {
+                0 => ncname_insertion_test(&mut table, &mut entries, &mut rng),
+                1 => qname_insertion_test(&mut table, &mut entries, &mut rng),
+                2 => match entries.swap_remove(rng.gen_range(0..entries.len())) {
+                    (n1, None, None, data) => {
+                        assert_eq!(table.lookup(&n1), Some(&data));
+                        assert!(table.remove_entry(&n1, |_, _| {}).is_ok());
+                        assert!(table.lookup(&n1).is_none());
+                        assert_eq!(table.len(), entries.len());
+                    }
+                    (n1, Some(n2), None, data) => {
+                        assert_eq!(table.lookup2(&n1, &n2), Some(&data));
+                        assert!(table.remove_entry2(&n1, &n2, |_, _| {}).is_ok());
+                        assert!(table.lookup2(&n1, &n2).is_none());
+                        assert_eq!(table.len(), entries.len());
+                    }
+                    (n1, Some(n2), Some(n3), data) => {
+                        assert_eq!(table.lookup3(&n1, &n2, &n3), Some(&data));
+                        assert!(table.remove_entry3(&n1, &n2, &n3, |_, _| {}).is_ok());
+                        assert!(table.lookup3(&n1, &n2, &n3).is_none());
+                        assert_eq!(table.len(), entries.len());
+                    }
+                    _ => [ncname_insertion_test, qname_insertion_test]
+                        .choose(&mut rng)
+                        .unwrap()(&mut table, &mut entries, &mut rng),
+                },
+                3 => match entries.choose(&mut rng) {
+                    Some((n1, None, None, data)) => {
+                        assert_eq!(table.len(), entries.len());
+                        assert_eq!(table.lookup(n1), Some(data));
+                        match split_qname(n1) {
+                            Some((p1, l1)) => assert_eq!(table.qlookup(&l1, Some(&p1)), Some(data)),
+                            _ => assert_eq!(table.qlookup(n1, None), Some(data)),
+                        }
+                    }
+                    Some((n1, Some(n2), None, data)) => {
+                        assert_eq!(table.len(), entries.len());
+                        assert_eq!(table.lookup2(n1, n2), Some(data));
+                        match (split_qname(n1), split_qname(n2)) {
+                            (Some((p1, l1)), Some((p2, l2))) => {
+                                assert_eq!(
+                                    table.qlookup2(&l1, Some(&p1), &l2, Some(&p2)),
+                                    Some(data)
+                                )
+                            }
+                            _ => assert_eq!(table.qlookup2(n1, None, n2, None), Some(data)),
+                        }
+                    }
+                    Some((n1, Some(n2), Some(n3), data)) => {
+                        assert_eq!(table.len(), entries.len());
+                        assert_eq!(table.lookup3(n1, n2, n3), Some(data));
+                        match (split_qname(n1), split_qname(n2), split_qname(n3)) {
+                            (Some((p1, l1)), Some((p2, l2)), Some((p3, l3))) => {
+                                assert_eq!(
+                                    table.qlookup3(&l1, Some(&p1), &l2, Some(&p2), &l3, Some(&p3)),
+                                    Some(data)
+                                );
+                            }
+                            _ => {
+                                assert_eq!(table.qlookup3(n1, None, n2, None, n3, None), Some(data))
+                            }
+                        }
+                    }
+                    _ => [ncname_insertion_test, qname_insertion_test]
+                        .choose(&mut rng)
+                        .unwrap()(&mut table, &mut entries, &mut rng),
+                },
+                4 => {
+                    let index = rng.gen_range(0..entries.len());
+                    let data = rng.gen();
+                    match &entries[index] {
+                        (n1, None, None, old) => {
+                            assert_eq!(table.lookup(n1), Some(old));
+                            assert!(table.update_entry(n1, data, |_, _| {}).is_ok());
+                            assert_eq!(table.lookup(n1), Some(&data));
+                        }
+                        (n1, Some(n2), None, old) => {
+                            assert_eq!(table.lookup2(n1, n2), Some(old));
+                            assert!(table.update_entry2(n1, n2, data, |_, _| {}).is_ok());
+                            assert_eq!(table.lookup2(n1, n2), Some(&data));
+                        }
+                        (n1, Some(n2), Some(n3), old) => {
+                            assert_eq!(table.lookup3(n1, n2, n3), Some(old));
+                            assert!(table.update_entry3(n1, n2, n3, data, |_, _| {}).is_ok());
+                            assert_eq!(table.lookup3(n1, n2, n3), Some(&data));
+                        }
+                        _ => {}
+                    }
+                    entries[index].3 = data;
+                }
+                5 => {
+                    let cloned = table.clone_with(|data, _| *data);
+                    assert_eq!(cloned.len(), table.len());
+                    let mut buf = vec![];
+                    cloned.scan(|data, name, name2, name3| {
+                        buf.push((
+                            name.map(|n| n.as_ref().to_owned()).unwrap(),
+                            name2.map(|n| n.as_ref().to_owned()),
+                            name3.map(|n| n.as_ref().to_owned()),
+                            *data,
+                        ));
+                    });
+                    buf.sort_unstable();
+                    entries.sort_unstable();
+                    assert_eq!(buf, entries);
+                }
+                6 => {
+                    let parity = rng.gen_range(0..2);
+                    entries.retain(|e| e.3 % 2 == parity);
+                    table.remove_if(|data, _, _, _| data % 2 != parity, |_, _| {});
+                    assert!(entries.iter().all(|(name, name2, name3, _)| {
+                        table
+                            .do_lookup(name, name2.as_deref(), name3.as_deref())
+                            .is_some()
+                    }));
+                }
+                7 => {
+                    table.clear();
+                    assert!(table.is_empty());
+                    let mut found = false;
+                    table.scan(|_, _, _, _| found = true);
+                    assert!(!found);
+                    entries.clear();
+                }
+                _ => {}
+            }
+            assert_eq!(table.len(), entries.len());
+        }
     }
 }

@@ -6322,10 +6322,10 @@ unsafe extern "C" fn automata_test(
 const TEST_DESCRIPTIONS: &[TestDesc] = &[
     TestDesc {
         desc: "for debug",
-        func: sax_parse_test,
-        input: Some(c"./test/defattr2.xml"),
+        func: old_parse_test,
+        input: Some(c"./test/att10"),
         out: Some(c"./result/"),
-        suffix: Some(c".sax2"),
+        suffix: Some(c""),
         err: None,
         options: 0,
     },

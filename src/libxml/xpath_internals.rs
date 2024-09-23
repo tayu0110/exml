@@ -2426,8 +2426,10 @@ pub unsafe extern "C" fn xml_xpath_register_variable(
     xml_xpath_register_variable_ns(ctxt, name, null(), value)
 }
 
-unsafe extern "C" fn xml_xpath_free_object_entry(obj: *mut c_void, _name: *const XmlChar) {
-    xml_xpath_free_object(obj as XmlXPathObjectPtr);
+extern "C" fn xml_xpath_free_object_entry(obj: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_xpath_free_object(obj as XmlXPathObjectPtr);
+    }
 }
 
 /**

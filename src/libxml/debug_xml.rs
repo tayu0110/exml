@@ -1787,82 +1787,84 @@ pub unsafe extern "C" fn xml_debug_dump_dtd(mut output: *mut FILE, dtd: XmlDtdPt
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-unsafe extern "C" fn xml_ctxt_dump_entity_callback(
+extern "C" fn xml_ctxt_dump_entity_callback(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
 ) {
     let cur: XmlEntityPtr = payload as XmlEntityPtr;
     let ctxt: XmlDebugCtxtPtr = data as XmlDebugCtxtPtr;
-    if cur.is_null() {
-        if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"Entity is NULL".as_ptr());
+    unsafe {
+        if cur.is_null() {
+            if (*ctxt).check == 0 {
+                fprintf((*ctxt).output, c"Entity is NULL".as_ptr());
+            }
+            return;
         }
-        return;
-    }
-    if (*ctxt).check == 0 {
-        fprintf(
-            (*ctxt).output,
-            c"%s : ".as_ptr(),
-            (*cur).name.load(Ordering::Relaxed) as *mut c_char,
-        );
-        match (*cur).etype {
-            Some(XmlEntityType::XmlInternalGeneralEntity) => {
-                fprintf((*ctxt).output, c"INTERNAL GENERAL, ".as_ptr());
+        if (*ctxt).check == 0 {
+            fprintf(
+                (*ctxt).output,
+                c"%s : ".as_ptr(),
+                (*cur).name.load(Ordering::Relaxed) as *mut c_char,
+            );
+            match (*cur).etype {
+                Some(XmlEntityType::XmlInternalGeneralEntity) => {
+                    fprintf((*ctxt).output, c"INTERNAL GENERAL, ".as_ptr());
+                }
+                Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+                    fprintf((*ctxt).output, c"EXTERNAL PARSED, ".as_ptr());
+                }
+                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                    fprintf((*ctxt).output, c"EXTERNAL UNPARSED, ".as_ptr());
+                }
+                Some(XmlEntityType::XmlInternalParameterEntity) => {
+                    fprintf((*ctxt).output, c"INTERNAL PARAMETER, ".as_ptr());
+                }
+                Some(XmlEntityType::XmlExternalParameterEntity) => {
+                    fprintf((*ctxt).output, c"EXTERNAL PARAMETER, ".as_ptr());
+                }
+                Some(e) => {
+                    xml_debug_err2(
+                        ctxt,
+                        XmlParserErrors::XmlCheckEntityType as i32,
+                        c"Unknown entity type %d\n".as_ptr(),
+                        e as i32,
+                    );
+                }
+                _ => unreachable!(),
             }
-            Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
-                fprintf((*ctxt).output, c"EXTERNAL PARSED, ".as_ptr());
-            }
-            Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                fprintf((*ctxt).output, c"EXTERNAL UNPARSED, ".as_ptr());
-            }
-            Some(XmlEntityType::XmlInternalParameterEntity) => {
-                fprintf((*ctxt).output, c"INTERNAL PARAMETER, ".as_ptr());
-            }
-            Some(XmlEntityType::XmlExternalParameterEntity) => {
-                fprintf((*ctxt).output, c"EXTERNAL PARAMETER, ".as_ptr());
-            }
-            Some(e) => {
-                xml_debug_err2(
-                    ctxt,
-                    XmlParserErrors::XmlCheckEntityType as i32,
-                    c"Unknown entity type %d\n".as_ptr(),
-                    e as i32,
+            if !(*cur).external_id.load(Ordering::Relaxed).is_null() {
+                fprintf(
+                    (*ctxt).output,
+                    c"ID \"%s\"".as_ptr(),
+                    (*cur).external_id.load(Ordering::Relaxed) as *mut c_char,
                 );
             }
-            _ => unreachable!(),
+            if !(*cur).system_id.load(Ordering::Relaxed).is_null() {
+                fprintf(
+                    (*ctxt).output,
+                    c"SYSTEM \"%s\"".as_ptr(),
+                    (*cur).system_id.load(Ordering::Relaxed) as *mut c_char,
+                );
+            }
+            if !(*cur).orig.load(Ordering::Relaxed).is_null() {
+                fprintf(
+                    (*ctxt).output,
+                    c"\n orig \"%s\"".as_ptr(),
+                    (*cur).orig.load(Ordering::Relaxed) as *mut c_char,
+                );
+            }
+            if (*cur).typ != XmlElementType::XmlElementNode
+                && !(*cur).content.load(Ordering::Relaxed).is_null()
+            {
+                fprintf(
+                    (*ctxt).output,
+                    c"\n content \"%s\"".as_ptr(),
+                    (*cur).content.load(Ordering::Relaxed) as *mut c_char,
+                );
+            }
+            fprintf((*ctxt).output, c"\n".as_ptr());
         }
-        if !(*cur).external_id.load(Ordering::Relaxed).is_null() {
-            fprintf(
-                (*ctxt).output,
-                c"ID \"%s\"".as_ptr(),
-                (*cur).external_id.load(Ordering::Relaxed) as *mut c_char,
-            );
-        }
-        if !(*cur).system_id.load(Ordering::Relaxed).is_null() {
-            fprintf(
-                (*ctxt).output,
-                c"SYSTEM \"%s\"".as_ptr(),
-                (*cur).system_id.load(Ordering::Relaxed) as *mut c_char,
-            );
-        }
-        if !(*cur).orig.load(Ordering::Relaxed).is_null() {
-            fprintf(
-                (*ctxt).output,
-                c"\n orig \"%s\"".as_ptr(),
-                (*cur).orig.load(Ordering::Relaxed) as *mut c_char,
-            );
-        }
-        if (*cur).typ != XmlElementType::XmlElementNode
-            && !(*cur).content.load(Ordering::Relaxed).is_null()
-        {
-            fprintf(
-                (*ctxt).output,
-                c"\n content \"%s\"".as_ptr(),
-                (*cur).content.load(Ordering::Relaxed) as *mut c_char,
-            );
-        }
-        fprintf((*ctxt).output, c"\n".as_ptr());
     }
 }
 
@@ -1884,7 +1886,7 @@ unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"Entities in internal subset\n".as_ptr());
         }
-        xml_hash_scan(table, xml_ctxt_dump_entity_callback, ctxt as _);
+        xml_hash_scan(table, Some(xml_ctxt_dump_entity_callback), ctxt as _);
     } else {
         fprintf((*ctxt).output, c"No entities in internal subset\n".as_ptr());
     }
@@ -1894,7 +1896,7 @@ unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         if (*ctxt).check == 0 {
             fprintf((*ctxt).output, c"Entities in external subset\n".as_ptr());
         }
-        xml_hash_scan(table, xml_ctxt_dump_entity_callback, ctxt as _);
+        xml_hash_scan(table, Some(xml_ctxt_dump_entity_callback), ctxt as _);
     } else if (*ctxt).check == 0 {
         fprintf((*ctxt).output, c"No entities in external subset\n".as_ptr());
     }

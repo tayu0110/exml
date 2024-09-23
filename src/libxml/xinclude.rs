@@ -833,7 +833,7 @@ pub struct XmlXIncludeMergeData {
  *
  * Implements the merge of one entity
  */
-unsafe extern "C" fn xml_xinclude_merge_entity(
+extern "C" fn xml_xinclude_merge_entity(
     payload: *mut c_void,
     vdata: *mut c_void,
     _name: *const XmlChar,
@@ -845,95 +845,97 @@ unsafe extern "C" fn xml_xinclude_merge_entity(
     if ent.is_null() || data.is_null() {
         return;
     }
-    let ctxt: XmlXincludeCtxtPtr = (*data).ctxt;
-    let doc: XmlDocPtr = (*data).doc;
-    if ctxt.is_null() || doc.is_null() {
-        return;
-    }
-    match (*ent).etype {
-        Some(XmlEntityType::XmlInternalParameterEntity)
-        | Some(XmlEntityType::XmlExternalParameterEntity)
-        | Some(XmlEntityType::XmlInternalPredefinedEntity) => return,
-        Some(XmlEntityType::XmlInternalGeneralEntity)
-        | Some(XmlEntityType::XmlExternalGeneralParsedEntity)
-        | Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
-        _ => unreachable!(),
-    }
-    let ret: XmlEntityPtr = xml_add_doc_entity(
-        doc,
-        (*ent).name.load(Ordering::Relaxed),
-        (*ent).etype.map_or(0, |e| e as i32),
-        (*ent).external_id.load(Ordering::Relaxed),
-        (*ent).system_id.load(Ordering::Relaxed),
-        (*ent).content.load(Ordering::Relaxed),
-    );
-    if !ret.is_null() {
-        if !(*ent).uri.load(Ordering::Relaxed).is_null() {
-            (*ret).uri.store(
-                xml_strdup((*ent).uri.load(Ordering::Relaxed)),
-                Ordering::Relaxed,
-            );
+    unsafe {
+        let ctxt: XmlXincludeCtxtPtr = (*data).ctxt;
+        let doc: XmlDocPtr = (*data).doc;
+        if ctxt.is_null() || doc.is_null() {
+            return;
         }
-    } else {
-        prev = xml_get_doc_entity(doc, (*ent).name.load(Ordering::Relaxed));
-        if !prev.is_null() {
-            let error = || {
-                match (*ent).etype {
-                    Some(XmlEntityType::XmlInternalParameterEntity)
-                    | Some(XmlEntityType::XmlExternalParameterEntity)
-                    | Some(XmlEntityType::XmlInternalPredefinedEntity)
-                    | Some(XmlEntityType::XmlInternalGeneralEntity)
-                    | Some(XmlEntityType::XmlExternalGeneralParsedEntity) => return,
-                    Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
-                    _ => unreachable!(),
-                }
-                xml_xinclude_err(
-                    ctxt,
-                    ent as XmlNodePtr,
-                    XmlParserErrors::XmlXincludeEntityDefMismatch as i32,
-                    c"mismatch in redefinition of entity %s\n".as_ptr() as _,
-                    (*ent).name.load(Ordering::Relaxed) as _,
+        match (*ent).etype {
+            Some(XmlEntityType::XmlInternalParameterEntity)
+            | Some(XmlEntityType::XmlExternalParameterEntity)
+            | Some(XmlEntityType::XmlInternalPredefinedEntity) => return,
+            Some(XmlEntityType::XmlInternalGeneralEntity)
+            | Some(XmlEntityType::XmlExternalGeneralParsedEntity)
+            | Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
+            _ => unreachable!(),
+        }
+        let ret: XmlEntityPtr = xml_add_doc_entity(
+            doc,
+            (*ent).name.load(Ordering::Relaxed),
+            (*ent).etype.map_or(0, |e| e as i32),
+            (*ent).external_id.load(Ordering::Relaxed),
+            (*ent).system_id.load(Ordering::Relaxed),
+            (*ent).content.load(Ordering::Relaxed),
+        );
+        if !ret.is_null() {
+            if !(*ent).uri.load(Ordering::Relaxed).is_null() {
+                (*ret).uri.store(
+                    xml_strdup((*ent).uri.load(Ordering::Relaxed)),
+                    Ordering::Relaxed,
                 );
-            };
-
-            if (*ent).etype != (*prev).etype {
-                // goto error;
-                return error();
             }
+        } else {
+            prev = xml_get_doc_entity(doc, (*ent).name.load(Ordering::Relaxed));
+            if !prev.is_null() {
+                let error = || {
+                    match (*ent).etype {
+                        Some(XmlEntityType::XmlInternalParameterEntity)
+                        | Some(XmlEntityType::XmlExternalParameterEntity)
+                        | Some(XmlEntityType::XmlInternalPredefinedEntity)
+                        | Some(XmlEntityType::XmlInternalGeneralEntity)
+                        | Some(XmlEntityType::XmlExternalGeneralParsedEntity) => return,
+                        Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
+                        _ => unreachable!(),
+                    }
+                    xml_xinclude_err(
+                        ctxt,
+                        ent as XmlNodePtr,
+                        XmlParserErrors::XmlXincludeEntityDefMismatch as i32,
+                        c"mismatch in redefinition of entity %s\n".as_ptr() as _,
+                        (*ent).name.load(Ordering::Relaxed) as _,
+                    );
+                };
 
-            if !(*ent).system_id.load(Ordering::Relaxed).is_null()
-                && !(*prev).system_id.load(Ordering::Relaxed).is_null()
-            {
-                if !xml_str_equal(
-                    (*ent).system_id.load(Ordering::Relaxed),
-                    (*prev).system_id.load(Ordering::Relaxed),
-                ) {
-                    // goto error;
-                    error()
-                }
-            } else if !(*ent).external_id.load(Ordering::Relaxed).is_null()
-                && !(*prev).external_id.load(Ordering::Relaxed).is_null()
-            {
-                if !xml_str_equal(
-                    (*ent).external_id.load(Ordering::Relaxed),
-                    (*prev).external_id.load(Ordering::Relaxed),
-                ) {
+                if (*ent).etype != (*prev).etype {
                     // goto error;
                     return error();
                 }
-            } else if !(*ent).content.load(Ordering::Relaxed).is_null()
-                && !(*prev).content.load(Ordering::Relaxed).is_null()
-            {
-                if !xml_str_equal(
-                    (*ent).content.load(Ordering::Relaxed),
-                    (*prev).content.load(Ordering::Relaxed),
-                ) {
+
+                if !(*ent).system_id.load(Ordering::Relaxed).is_null()
+                    && !(*prev).system_id.load(Ordering::Relaxed).is_null()
+                {
+                    if !xml_str_equal(
+                        (*ent).system_id.load(Ordering::Relaxed),
+                        (*prev).system_id.load(Ordering::Relaxed),
+                    ) {
+                        // goto error;
+                        error()
+                    }
+                } else if !(*ent).external_id.load(Ordering::Relaxed).is_null()
+                    && !(*prev).external_id.load(Ordering::Relaxed).is_null()
+                {
+                    if !xml_str_equal(
+                        (*ent).external_id.load(Ordering::Relaxed),
+                        (*prev).external_id.load(Ordering::Relaxed),
+                    ) {
+                        // goto error;
+                        return error();
+                    }
+                } else if !(*ent).content.load(Ordering::Relaxed).is_null()
+                    && !(*prev).content.load(Ordering::Relaxed).is_null()
+                {
+                    if !xml_str_equal(
+                        (*ent).content.load(Ordering::Relaxed),
+                        (*prev).content.load(Ordering::Relaxed),
+                    ) {
+                        // goto error;
+                        return error();
+                    }
+                } else {
                     // goto error;
                     return error();
                 }
-            } else {
-                // goto error;
-                return error();
             }
         }
     }
@@ -998,7 +1000,7 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
 
         xml_hash_scan(
             (*source).entities as XmlHashTablePtr,
-            xml_xinclude_merge_entity,
+            Some(xml_xinclude_merge_entity),
             addr_of_mut!(data) as _,
         );
     }
@@ -1017,7 +1019,7 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
         {
             xml_hash_scan(
                 (*source).entities as XmlHashTablePtr,
-                xml_xinclude_merge_entity,
+                Some(xml_xinclude_merge_entity),
                 addr_of_mut!(data) as _,
             );
         }

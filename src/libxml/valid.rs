@@ -68,6 +68,8 @@ use crate::{
     IS_BLANK, IS_BLANK_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
 };
 
+use super::hash::CVoidWrapper;
+
 /*
  * Validation state added for non-determinist content model.
  */
@@ -164,7 +166,7 @@ pub struct XmlValidCtxt {
  * There is one table per DTD.
  */
 
-pub type XmlNotationTable = XmlHashTable;
+pub type XmlNotationTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlNotationTablePtr = *mut XmlNotationTable;
 
 /*
@@ -172,7 +174,7 @@ pub type XmlNotationTablePtr = *mut XmlNotationTable;
  * There is one table per DTD.
  */
 
-pub type XmlElementTable = XmlHashTable;
+pub type XmlElementTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlElementTablePtr = *mut XmlElementTable;
 
 /*
@@ -180,7 +182,7 @@ pub type XmlElementTablePtr = *mut XmlElementTable;
  * There is one table per DTD.
  */
 
-pub type XmlAttributeTable = XmlHashTable;
+pub type XmlAttributeTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlAttributeTablePtr = *mut XmlAttributeTable;
 
 /*
@@ -188,7 +190,7 @@ pub type XmlAttributeTablePtr = *mut XmlAttributeTable;
  * There is one table per document.
  */
 
-pub type XmlIDTable = XmlHashTable;
+pub type XmlIDTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlIDTablePtr = *mut XmlIDTable;
 
 /*
@@ -196,7 +198,7 @@ pub type XmlIDTablePtr = *mut XmlIDTable;
  * There is one table per document.
  */
 
-pub type XmlRefTable = XmlHashTable;
+pub type XmlRefTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlRefTablePtr = *mut XmlRefTable;
 
 /**
@@ -454,30 +456,32 @@ pub unsafe extern "C" fn xml_add_notation_decl(
  * Returns the new xmlNotationPtr or null_mut() in case of error.
  */
 #[cfg(feature = "tree")]
-unsafe extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
+extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let nota: XmlNotationPtr = payload as XmlNotationPtr;
 
-    let cur: XmlNotationPtr = xml_malloc(size_of::<XmlNotation>()) as XmlNotationPtr;
-    if cur.is_null() {
-        xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
-        return null_mut();
+    unsafe {
+        let cur: XmlNotationPtr = xml_malloc(size_of::<XmlNotation>()) as XmlNotationPtr;
+        if cur.is_null() {
+            xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+            return null_mut();
+        }
+        if !(*nota).name.is_null() {
+            (*cur).name = xml_strdup((*nota).name);
+        } else {
+            (*cur).name = null_mut();
+        }
+        if !(*nota).public_id.is_null() {
+            (*cur).public_id = xml_strdup((*nota).public_id);
+        } else {
+            (*cur).public_id = null_mut();
+        }
+        if !(*nota).system_id.is_null() {
+            (*cur).system_id = xml_strdup((*nota).system_id);
+        } else {
+            (*cur).system_id = null_mut();
+        }
+        cur as _
     }
-    if !(*nota).name.is_null() {
-        (*cur).name = xml_strdup((*nota).name);
-    } else {
-        (*cur).name = null_mut();
-    }
-    if !(*nota).public_id.is_null() {
-        (*cur).public_id = xml_strdup((*nota).public_id);
-    } else {
-        (*cur).public_id = null_mut();
-    }
-    if !(*nota).system_id.is_null() {
-        (*cur).system_id = xml_strdup((*nota).system_id);
-    } else {
-        (*cur).system_id = null_mut();
-    }
-    cur as _
 }
 
 /**
@@ -495,8 +499,10 @@ pub unsafe extern "C" fn xml_copy_notation_table(
     xml_hash_copy(table, Some(xml_copy_notation)) as XmlNotationTablePtr
 }
 
-unsafe extern "C" fn xml_free_notation_table_entry(nota: *mut c_void, _name: *const XmlChar) {
-    xml_free_notation(nota as XmlNotationPtr);
+extern "C" fn xml_free_notation_table_entry(nota: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_free_notation(nota as XmlNotationPtr);
+    }
 }
 
 /**
@@ -545,12 +551,14 @@ pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufferPtr, nota: XmlNota
  * This is called with the hash scan function, and just reverses args
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_dump_notation_decl_scan(
+extern "C" fn xml_dump_notation_decl_scan(
     nota: *mut c_void,
     buf: *mut c_void,
     _name: *const XmlChar,
 ) {
-    xml_dump_notation_decl(buf as XmlBufferPtr, nota as XmlNotationPtr);
+    unsafe {
+        xml_dump_notation_decl(buf as XmlBufferPtr, nota as XmlNotationPtr);
+    }
 }
 
 /**
@@ -565,7 +573,7 @@ pub unsafe extern "C" fn xml_dump_notation_table(buf: XmlBufferPtr, table: XmlNo
     if buf.is_null() || table.is_null() {
         return;
     }
-    xml_hash_scan(table, xml_dump_notation_decl_scan, buf as _);
+    xml_hash_scan(table, Some(xml_dump_notation_decl_scan), buf as _);
 }
 
 /* Element Content */
@@ -1399,31 +1407,33 @@ pub unsafe extern "C" fn xml_add_element_decl(
  * Returns the new xmlElementPtr or null_mut() in case of error.
  */
 #[cfg(feature = "tree")]
-unsafe extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
+extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let elem: XmlElementPtr = payload as XmlElementPtr;
 
-    let cur: XmlElementPtr = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
-    if cur.is_null() {
-        xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
-        return null_mut();
+    unsafe {
+        let cur: XmlElementPtr = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
+        if cur.is_null() {
+            xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+            return null_mut();
+        }
+        memset(cur as _, 0, size_of::<XmlElement>());
+        (*cur).typ = XmlElementType::XmlElementDecl;
+        (*cur).etype = (*elem).etype;
+        if !(*elem).name.is_null() {
+            (*cur).name = xml_strdup((*elem).name);
+        } else {
+            (*cur).name = null_mut();
+        }
+        if !(*elem).prefix.is_null() {
+            (*cur).prefix = xml_strdup((*elem).prefix);
+        } else {
+            (*cur).prefix = null_mut();
+        }
+        (*cur).content = xml_copy_element_content((*elem).content);
+        /* TODO : rebuild the attribute list on the copy */
+        (*cur).attributes = null_mut();
+        cur as _
     }
-    memset(cur as _, 0, size_of::<XmlElement>());
-    (*cur).typ = XmlElementType::XmlElementDecl;
-    (*cur).etype = (*elem).etype;
-    if !(*elem).name.is_null() {
-        (*cur).name = xml_strdup((*elem).name);
-    } else {
-        (*cur).name = null_mut();
-    }
-    if !(*elem).prefix.is_null() {
-        (*cur).prefix = xml_strdup((*elem).prefix);
-    } else {
-        (*cur).prefix = null_mut();
-    }
-    (*cur).content = xml_copy_element_content((*elem).content);
-    /* TODO : rebuild the attribute list on the copy */
-    (*cur).attributes = null_mut();
-    cur as _
 }
 
 /**
@@ -1439,8 +1449,10 @@ pub unsafe extern "C" fn xml_copy_element_table(table: XmlElementTablePtr) -> Xm
     xml_hash_copy(table, Some(xml_copy_element)) as XmlElementTablePtr
 }
 
-unsafe extern "C" fn xml_free_element_table_entry(elem: *mut c_void, _name: *const XmlChar) {
-    xml_free_element(elem as XmlElementPtr);
+extern "C" fn xml_free_element_table_entry(elem: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_free_element(elem as XmlElementPtr);
+    }
 }
 
 /**
@@ -1462,12 +1474,14 @@ pub unsafe extern "C" fn xml_free_element_table(table: XmlElementTablePtr) {
  * the arguments.
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_dump_element_decl_scan(
+extern "C" fn xml_dump_element_decl_scan(
     elem: *mut c_void,
     buf: *mut c_void,
     _name: *const XmlChar,
 ) {
-    xml_dump_element_decl(buf as XmlBufferPtr, elem as XmlElementPtr);
+    unsafe {
+        xml_dump_element_decl(buf as XmlBufferPtr, elem as XmlElementPtr);
+    }
 }
 
 /**
@@ -1482,7 +1496,7 @@ pub unsafe extern "C" fn xml_dump_element_table(buf: XmlBufferPtr, table: XmlEle
     if buf.is_null() || table.is_null() {
         return;
     }
-    xml_hash_scan(table, xml_dump_element_decl_scan, buf as _);
+    xml_hash_scan(table, Some(xml_dump_element_decl_scan), buf as _);
 }
 
 /**
@@ -2585,35 +2599,34 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
  * Returns the new xmlAttributePtr or null_mut() in case of error.
  */
 #[cfg(feature = "tree")]
-unsafe extern "C" fn xml_copy_attribute(
-    payload: *mut c_void,
-    _name: *const XmlChar,
-) -> *mut c_void {
+extern "C" fn xml_copy_attribute(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let attr: XmlAttributePtr = payload as XmlAttributePtr;
 
-    let cur: XmlAttributePtr = xml_malloc(size_of::<XmlAttribute>()) as XmlAttributePtr;
-    if cur.is_null() {
-        xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
-        return null_mut();
+    unsafe {
+        let cur: XmlAttributePtr = xml_malloc(size_of::<XmlAttribute>()) as XmlAttributePtr;
+        if cur.is_null() {
+            xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+            return null_mut();
+        }
+        memset(cur as _, 0, size_of::<XmlAttribute>());
+        (*cur).typ = XmlElementType::XmlAttributeDecl;
+        (*cur).atype = (*attr).atype;
+        (*cur).def = (*attr).def;
+        (*cur).tree = xml_copy_enumeration((*attr).tree);
+        if !(*attr).elem.is_null() {
+            (*cur).elem = xml_strdup((*attr).elem);
+        }
+        if !(*attr).name.is_null() {
+            (*cur).name = xml_strdup((*attr).name);
+        }
+        if !(*attr).prefix.is_null() {
+            (*cur).prefix = xml_strdup((*attr).prefix);
+        }
+        if !(*attr).default_value.is_null() {
+            (*cur).default_value = xml_strdup((*attr).default_value);
+        }
+        cur as _
     }
-    memset(cur as _, 0, size_of::<XmlAttribute>());
-    (*cur).typ = XmlElementType::XmlAttributeDecl;
-    (*cur).atype = (*attr).atype;
-    (*cur).def = (*attr).def;
-    (*cur).tree = xml_copy_enumeration((*attr).tree);
-    if !(*attr).elem.is_null() {
-        (*cur).elem = xml_strdup((*attr).elem);
-    }
-    if !(*attr).name.is_null() {
-        (*cur).name = xml_strdup((*attr).name);
-    }
-    if !(*attr).prefix.is_null() {
-        (*cur).prefix = xml_strdup((*attr).prefix);
-    }
-    if !(*attr).default_value.is_null() {
-        (*cur).default_value = xml_strdup((*attr).default_value);
-    }
-    cur as _
 }
 
 /**
@@ -2631,8 +2644,10 @@ pub unsafe extern "C" fn xml_copy_attribute_table(
     xml_hash_copy(table, Some(xml_copy_attribute)) as XmlAttributeTablePtr
 }
 
-unsafe extern "C" fn xml_free_attribute_table_entry(attr: *mut c_void, _name: *const XmlChar) {
-    xml_free_attribute(attr as XmlAttributePtr);
+extern "C" fn xml_free_attribute_table_entry(attr: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_free_attribute(attr as XmlAttributePtr);
+    }
 }
 
 /**
@@ -2653,12 +2668,14 @@ pub unsafe extern "C" fn xml_free_attribute_table(table: XmlAttributeTablePtr) {
  * This is used with the hash scan function - just reverses arguments
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_dump_attribute_decl_scan(
+extern "C" fn xml_dump_attribute_decl_scan(
     attr: *mut c_void,
     buf: *mut c_void,
     _name: *const XmlChar,
 ) {
-    xml_dump_attribute_decl(buf as XmlBufferPtr, attr as XmlAttributePtr);
+    unsafe {
+        xml_dump_attribute_decl(buf as XmlBufferPtr, attr as XmlAttributePtr);
+    }
 }
 
 /**
@@ -2673,7 +2690,7 @@ pub unsafe extern "C" fn xml_dump_attribute_table(buf: XmlBufferPtr, table: XmlA
     if buf.is_null() || table.is_null() {
         return;
     }
-    xml_hash_scan(table, xml_dump_attribute_decl_scan, buf as _);
+    xml_hash_scan(table, Some(xml_dump_attribute_decl_scan), buf as _);
 }
 
 /**
@@ -2934,8 +2951,10 @@ pub unsafe extern "C" fn xml_add_id(
     ret
 }
 
-unsafe extern "C" fn xml_free_id_table_entry(id: *mut c_void, _name: *const XmlChar) {
-    xml_free_id(id as XmlIDPtr);
+extern "C" fn xml_free_id_table_entry(id: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_free_id(id as XmlIDPtr);
+    }
 }
 
 /**
@@ -3320,7 +3339,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
  *
  * Deallocate the memory used by a list of references
  */
-unsafe extern "C" fn xml_free_ref_table_entry(payload: *mut c_void, _name: *const XmlChar) {
+extern "C" fn xml_free_ref_table_entry(payload: *mut c_void, _name: *const XmlChar) {
     let list_ref: XmlListPtr = payload as XmlListPtr;
     if list_ref.is_null() {
         return;
@@ -4011,15 +4030,17 @@ c"standalone: %s on %s value had to be normalized based on external subset decla
     ret
 }
 
-unsafe extern "C" fn xml_validate_attribute_id_callback(
+extern "C" fn xml_validate_attribute_id_callback(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
 ) {
     let attr: XmlAttributePtr = payload as XmlAttributePtr;
     let count: *mut c_int = data as *mut c_int;
-    if matches!((*attr).atype, XmlAttributeType::XmlAttributeId) {
-        (*count) += 1;
+    unsafe {
+        if matches!((*attr).atype, XmlAttributeType::XmlAttributeId) {
+            (*count) += 1;
+        }
     }
 }
 
@@ -4172,7 +4193,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                     null_mut(),
                     null_mut(),
                     (*attr).elem,
-                    xml_validate_attribute_id_callback,
+                    Some(xml_validate_attribute_id_callback),
                     addr_of_mut!(nb_id) as _,
                 );
             }
@@ -4512,7 +4533,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
     ret
 }
 
-unsafe extern "C" fn xml_validate_attribute_callback(
+extern "C" fn xml_validate_attribute_callback(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
@@ -4526,99 +4547,101 @@ unsafe extern "C" fn xml_validate_attribute_callback(
     if cur.is_null() {
         return;
     }
-    match (*cur).atype {
-        XmlAttributeType::XmlAttributeCdata
-        | XmlAttributeType::XmlAttributeId
-        | XmlAttributeType::XmlAttributeIdref
-        | XmlAttributeType::XmlAttributeIdrefs
-        | XmlAttributeType::XmlAttributeNmtoken
-        | XmlAttributeType::XmlAttributeNmtokens
-        | XmlAttributeType::XmlAttributeEnumeration => {}
-        XmlAttributeType::XmlAttributeEntity
-        | XmlAttributeType::XmlAttributeEntities
-        | XmlAttributeType::XmlAttributeNotation => {
-            if !(*cur).default_value.is_null() {
-                ret = xml_validate_attribute_value2(
-                    ctxt,
-                    (*ctxt).doc,
-                    (*cur).name,
-                    (*cur).atype,
-                    (*cur).default_value,
-                );
-                if ret == 0 && (*ctxt).valid == 1 {
-                    (*ctxt).valid = 0;
-                }
-            }
-            if !(*cur).tree.is_null() {
-                let mut tree: XmlEnumerationPtr = (*cur).tree;
-                while !tree.is_null() {
+    unsafe {
+        match (*cur).atype {
+            XmlAttributeType::XmlAttributeCdata
+            | XmlAttributeType::XmlAttributeId
+            | XmlAttributeType::XmlAttributeIdref
+            | XmlAttributeType::XmlAttributeIdrefs
+            | XmlAttributeType::XmlAttributeNmtoken
+            | XmlAttributeType::XmlAttributeNmtokens
+            | XmlAttributeType::XmlAttributeEnumeration => {}
+            XmlAttributeType::XmlAttributeEntity
+            | XmlAttributeType::XmlAttributeEntities
+            | XmlAttributeType::XmlAttributeNotation => {
+                if !(*cur).default_value.is_null() {
                     ret = xml_validate_attribute_value2(
                         ctxt,
                         (*ctxt).doc,
                         (*cur).name,
                         (*cur).atype,
-                        (*tree).name,
+                        (*cur).default_value,
                     );
                     if ret == 0 && (*ctxt).valid == 1 {
                         (*ctxt).valid = 0;
                     }
-                    tree = (*tree).next;
+                }
+                if !(*cur).tree.is_null() {
+                    let mut tree: XmlEnumerationPtr = (*cur).tree;
+                    while !tree.is_null() {
+                        ret = xml_validate_attribute_value2(
+                            ctxt,
+                            (*ctxt).doc,
+                            (*cur).name,
+                            (*cur).atype,
+                            (*tree).name,
+                        );
+                        if ret == 0 && (*ctxt).valid == 1 {
+                            (*ctxt).valid = 0;
+                        }
+                        tree = (*tree).next;
+                    }
                 }
             }
         }
-    }
-    if matches!((*cur).atype, XmlAttributeType::XmlAttributeNotation) {
-        doc = (*cur).doc;
-        if (*cur).elem.is_null() {
-            xml_err_valid(
-                ctxt,
-                XmlParserErrors::XmlErrInternalError,
-                c"xmlValidateAttributeCallback(%s): internal error\n".as_ptr() as _,
-                (*cur).name as *const c_char,
-            );
-            return;
-        }
+        if matches!((*cur).atype, XmlAttributeType::XmlAttributeNotation) {
+            doc = (*cur).doc;
+            if (*cur).elem.is_null() {
+                xml_err_valid(
+                    ctxt,
+                    XmlParserErrors::XmlErrInternalError,
+                    c"xmlValidateAttributeCallback(%s): internal error\n".as_ptr() as _,
+                    (*cur).name as *const c_char,
+                );
+                return;
+            }
 
-        if !doc.is_null() {
-            elem = xml_get_dtd_element_desc((*doc).int_subset, (*cur).elem);
-        }
-        if elem.is_null() && !doc.is_null() {
-            elem = xml_get_dtd_element_desc((*doc).ext_subset, (*cur).elem);
-        }
-        if elem.is_null()
-            && !(*cur).parent.is_null()
-            && matches!((*(*cur).parent).typ, XmlElementType::XmlDtdNode)
-        {
-            elem = xml_get_dtd_element_desc((*cur).parent as XmlDtdPtr, (*cur).elem);
-        }
-        if elem.is_null() {
-            xml_err_valid_node(
-                ctxt,
-                null_mut(),
-                XmlParserErrors::XmlDtdUnknownElem,
-                c"attribute %s: could not find decl for element %s\n".as_ptr() as _,
-                (*cur).name,
-                (*cur).elem,
-                null_mut(),
-            );
-            return;
-        }
-        if matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeEmpty) {
-            xml_err_valid_node(
-                ctxt,
-                null_mut(),
-                XmlParserErrors::XmlDtdEmptyNotation,
-                c"NOTATION attribute %s declared for EMPTY element %s\n".as_ptr() as _,
-                (*cur).name,
-                (*cur).elem,
-                null_mut(),
-            );
-            (*ctxt).valid = 0;
+            if !doc.is_null() {
+                elem = xml_get_dtd_element_desc((*doc).int_subset, (*cur).elem);
+            }
+            if elem.is_null() && !doc.is_null() {
+                elem = xml_get_dtd_element_desc((*doc).ext_subset, (*cur).elem);
+            }
+            if elem.is_null()
+                && !(*cur).parent.is_null()
+                && matches!((*(*cur).parent).typ, XmlElementType::XmlDtdNode)
+            {
+                elem = xml_get_dtd_element_desc((*cur).parent as XmlDtdPtr, (*cur).elem);
+            }
+            if elem.is_null() {
+                xml_err_valid_node(
+                    ctxt,
+                    null_mut(),
+                    XmlParserErrors::XmlDtdUnknownElem,
+                    c"attribute %s: could not find decl for element %s\n".as_ptr() as _,
+                    (*cur).name,
+                    (*cur).elem,
+                    null_mut(),
+                );
+                return;
+            }
+            if matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeEmpty) {
+                xml_err_valid_node(
+                    ctxt,
+                    null_mut(),
+                    XmlParserErrors::XmlDtdEmptyNotation,
+                    c"NOTATION attribute %s declared for EMPTY element %s\n".as_ptr() as _,
+                    (*cur).name,
+                    (*cur).elem,
+                    null_mut(),
+                );
+                (*ctxt).valid = 0;
+            }
         }
     }
 }
 
-unsafe extern "C" fn xml_validate_notation_callback(
+extern "C" fn xml_validate_notation_callback(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
@@ -4628,17 +4651,22 @@ unsafe extern "C" fn xml_validate_notation_callback(
     if cur.is_null() {
         return;
     }
-    if matches!(
-        (*cur).etype,
-        Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
-    ) {
-        let notation: *mut XmlChar = (*cur).content.load(Ordering::Relaxed) as _;
+    unsafe {
+        if matches!(
+            (*cur).etype,
+            Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
+        ) {
+            let notation: *mut XmlChar = (*cur).content.load(Ordering::Relaxed) as _;
 
-        if !notation.is_null() {
-            let ret: c_int =
-                xml_validate_notation_use(ctxt, (*cur).doc.load(Ordering::Relaxed) as _, notation);
-            if ret != 1 {
-                (*ctxt).valid = 0;
+            if !notation.is_null() {
+                let ret: c_int = xml_validate_notation_use(
+                    ctxt,
+                    (*cur).doc.load(Ordering::Relaxed) as _,
+                    notation,
+                );
+                if ret != 1 {
+                    (*ctxt).valid = 0;
+                }
             }
         }
     }
@@ -4677,20 +4705,20 @@ pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlD
     dtd = (*doc).int_subset;
     if !dtd.is_null() && !(*dtd).attributes.is_null() {
         table = (*dtd).attributes as XmlAttributeTablePtr;
-        xml_hash_scan(table, xml_validate_attribute_callback, ctxt as _);
+        xml_hash_scan(table, Some(xml_validate_attribute_callback), ctxt as _);
     }
     if !dtd.is_null() && !(*dtd).entities.is_null() {
         entities = (*dtd).entities as XmlEntitiesTablePtr;
-        xml_hash_scan(entities, xml_validate_notation_callback, ctxt as _);
+        xml_hash_scan(entities, Some(xml_validate_notation_callback), ctxt as _);
     }
     dtd = (*doc).ext_subset;
     if !dtd.is_null() && !(*dtd).attributes.is_null() {
         table = (*dtd).attributes as XmlAttributeTablePtr;
-        xml_hash_scan(table, xml_validate_attribute_callback, ctxt as _);
+        xml_hash_scan(table, Some(xml_validate_attribute_callback), ctxt as _);
     }
     if !dtd.is_null() && !(*dtd).entities.is_null() {
         entities = (*dtd).entities as XmlEntitiesTablePtr;
-        xml_hash_scan(entities, xml_validate_notation_callback, ctxt as _);
+        xml_hash_scan(entities, Some(xml_validate_notation_callback), ctxt as _);
     }
     (*ctxt).valid
 }
@@ -7403,7 +7431,7 @@ extern "C" fn xml_walk_validate_list(data: *const c_void, user: *mut c_void) -> 
  * @name:  Name of ID we are searching for
  *
  */
-unsafe extern "C" fn xml_validate_check_ref_callback(
+extern "C" fn xml_validate_check_ref_callback(
     payload: *mut c_void,
     data: *mut c_void,
     name: *const XmlChar,
@@ -7473,7 +7501,7 @@ pub unsafe extern "C" fn xml_validate_document_final(
     let table: XmlRefTablePtr = (*doc).refs as XmlRefTablePtr;
     (*ctxt).doc = doc;
     (*ctxt).valid = 1;
-    xml_hash_scan(table, xml_validate_check_ref_callback, ctxt as _);
+    xml_hash_scan(table, Some(xml_validate_check_ref_callback), ctxt as _);
 
     (*ctxt).flags = save;
     (*ctxt).valid

@@ -1502,7 +1502,7 @@ pub(crate) fn gen_const_xml_list_ptr(_no: i32, _nr: i32) -> *const XmlList<*mut 
 
 pub(crate) fn des_const_xml_list_ptr(_no: i32, _val: *const XmlList<*mut c_void>, _nr: i32) {}
 
-unsafe extern "C" fn test_xml_hash_deallocator(_payload: *mut c_void, _namee: *const XmlChar) {}
+extern "C" fn test_xml_hash_deallocator(_payload: *mut c_void, _namee: *const XmlChar) {}
 
 pub(crate) fn gen_xml_hash_deallocator(no: c_int, _nr: c_int) -> Option<XmlHashDeallocator> {
     if no == 0 {

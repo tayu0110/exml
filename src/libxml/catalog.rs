@@ -16,46 +16,47 @@ use libc::{close, fprintf, getenv, memset, open, read, snprintf, stat, FILE, O_R
 
 use crate::{
     __xml_raise_error,
+    hash::XmlHashTableRef,
     libxml::{
-        globals::{xml_generic_error_context, xml_realloc},
-        hash::xml_hash_add_entry,
-        threads::xml_get_thread_id,
-        uri::xml_build_uri,
-        xml_io::XmlParserInputBufferPtr,
+        encoding::XmlCharEncoding,
+        globals::{
+            xml_free, xml_generic_error_context, xml_malloc, xml_malloc_atomic, xml_realloc,
+        },
+        hash::{
+            xml_hash_add_entry, xml_hash_create, xml_hash_free, xml_hash_lookup,
+            xml_hash_remove_entry, xml_hash_scan, xml_hash_size, XmlHashTable, XmlHashTablePtr,
+        },
+        parser::{
+            xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr,
+            XmlParserInputPtr,
+        },
+        parser_internals::{input_push, xml_new_input_stream, XML_MAX_NAMELEN},
+        threads::{
+            xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
+            XmlRMutex,
+        },
+        tree::{
+            xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_ns, xml_get_ns_prop,
+            xml_get_prop, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
+            xml_node_get_base, xml_save_format_file_to, xml_search_ns_by_href, xml_set_ns_prop,
+            xml_set_prop, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        },
+        uri::{xml_build_uri, xml_canonic_path},
+        xml_io::{
+            xml_free_parser_input_buffer, xml_output_buffer_create_file, xml_parser_get_directory,
+            xml_parser_input_buffer_create_filename, XmlOutputBufferPtr, XmlParserInputBufferPtr,
+        },
         xmlerror::XmlParserErrors,
-        xmlstring::xml_str_equal,
+        xmlstring::{
+            xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
+        },
     },
     private::buf::xml_buf_reset_input,
     xml_generic_error, xml_is_blank_ch, IS_BLANK_CH, IS_DIGIT, IS_LETTER, IS_PUBIDCHAR_CH,
     SYSCONFDIR,
 };
 
-use super::{
-    encoding::XmlCharEncoding,
-    globals::{xml_free, xml_malloc, xml_malloc_atomic},
-    hash::{
-        xml_hash_create, xml_hash_free, xml_hash_lookup, xml_hash_remove_entry, xml_hash_scan,
-        xml_hash_size, XmlHashTable, XmlHashTablePtr,
-    },
-    parser::{
-        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr,
-        XmlParserInputPtr,
-    },
-    parser_internals::{input_push, xml_new_input_stream, XML_MAX_NAMELEN},
-    threads::{xml_free_rmutex, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock, XmlRMutex},
-    tree::{
-        xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_ns, xml_get_ns_prop,
-        xml_get_prop, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns, xml_node_get_base,
-        xml_save_format_file_to, xml_search_ns_by_href, xml_set_ns_prop, xml_set_prop, XmlDocPtr,
-        XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
-    },
-    uri::xml_canonic_path,
-    xml_io::{
-        xml_free_parser_input_buffer, xml_output_buffer_create_file, xml_parser_get_directory,
-        xml_parser_input_buffer_create_filename, XmlOutputBufferPtr,
-    },
-    xmlstring::{xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar},
-};
+use super::hash::CVoidWrapper;
 
 /**
  * XML_CATALOGS_NAMESPACE:
@@ -606,7 +607,7 @@ unsafe extern "C" fn xml_new_catalog_entry(
  *
  * Free the memory allocated to a Catalog entry
  */
-unsafe extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar) {
+extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar) {
     let ret: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
     if ret.is_null() {
         return;
@@ -615,41 +616,43 @@ unsafe extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const 
      * Entries stored in the file hash must be deallocated
      * only by the file hash cleaner !
      */
-    if (*ret).dealloc == 1 {
-        return;
-    }
-
-    if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-        if !(*ret).name.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Free catalog entry %s\n".as_ptr() as _,
-                (*ret).name
-            );
-        } else if !(*ret).value.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Free catalog entry %s\n".as_ptr() as _,
-                (*ret).value
-            );
-        } else {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Free catalog entry\n".as_ptr() as _
-            );
+    unsafe {
+        if (*ret).dealloc == 1 {
+            return;
         }
-    }
 
-    if !(*ret).name.is_null() {
-        xml_free((*ret).name as _);
+        if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
+            if !(*ret).name.is_null() {
+                xml_generic_error!(
+                    xml_generic_error_context(),
+                    c"Free catalog entry %s\n".as_ptr() as _,
+                    (*ret).name
+                );
+            } else if !(*ret).value.is_null() {
+                xml_generic_error!(
+                    xml_generic_error_context(),
+                    c"Free catalog entry %s\n".as_ptr() as _,
+                    (*ret).value
+                );
+            } else {
+                xml_generic_error!(
+                    xml_generic_error_context(),
+                    c"Free catalog entry\n".as_ptr() as _
+                );
+            }
+        }
+
+        if !(*ret).name.is_null() {
+            xml_free((*ret).name as _);
+        }
+        if !(*ret).value.is_null() {
+            xml_free((*ret).value as _);
+        }
+        if !(*ret).url.is_null() {
+            xml_free((*ret).url as _);
+        }
+        xml_free(ret as _);
     }
-    if !(*ret).value.is_null() {
-        xml_free((*ret).value as _);
-    }
-    if !(*ret).url.is_null() {
-        xml_free((*ret).url as _);
-    }
-    xml_free(ret as _);
 }
 
 /**
@@ -1042,75 +1045,75 @@ pub unsafe extern "C" fn xml_load_sgml_super_catalog(filename: *const c_char) ->
     catal
 }
 
-/**
- * xmlCatalogConvertEntry:
- * @entry:  the entry
- * @catal:  pointer to the catalog being converted
- *
- * Convert one entry from the catalog
- */
-unsafe extern "C" fn xml_catalog_convert_entry(
-    payload: *mut c_void,
-    data: *mut c_void,
-    _name: *const XmlChar,
-) {
-    let entry: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
-    let catal: XmlCatalogPtr = data as XmlCatalogPtr;
-    if entry.is_null() || catal.is_null() || (*catal).sgml.is_null() || (*catal).xml.is_null() {
-        return;
-    }
-    match (*entry).typ {
-        XmlCatalogEntryType::SgmlCataEntity => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-        }
-        XmlCatalogEntryType::SgmlCataPentity => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-        }
-        XmlCatalogEntryType::SgmlCataDoctype => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-        }
-        XmlCatalogEntryType::SgmlCataLinktype => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-        }
-        XmlCatalogEntryType::SgmlCataNotation => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-        }
-        XmlCatalogEntryType::SgmlCataPublic => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-        }
-        XmlCatalogEntryType::SgmlCataSystem => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataSystem;
-        }
-        XmlCatalogEntryType::SgmlCataDelegate => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataDelegatePublic;
-        }
-        XmlCatalogEntryType::SgmlCataCatalog => {
-            (*entry).typ = XmlCatalogEntryType::XmlCataCatalog;
-        }
-        _ => {
-            xml_hash_remove_entry((*catal).sgml, (*entry).name, Some(xml_free_catalog_entry));
-            return;
-        }
-    }
-    /*
-     * Conversion successful, remove from the SGML catalog
-     * and add it to the default XML one
-     */
-    xml_hash_remove_entry((*catal).sgml, (*entry).name, None);
-    (*entry).parent = (*catal).xml;
-    (*entry).next = null_mut();
-    if (*(*catal).xml).children.is_null() {
-        (*(*catal).xml).children = entry;
-    } else {
-        let mut prev: XmlCatalogEntryPtr;
+// /**
+//  * xmlCatalogConvertEntry:
+//  * @entry:  the entry
+//  * @catal:  pointer to the catalog being converted
+//  *
+//  * Convert one entry from the catalog
+//  */
+// unsafe extern "C" fn xml_catalog_convert_entry(
+//     payload: *mut c_void,
+//     data: *mut c_void,
+//     _name: *const XmlChar,
+// ) {
+//     let entry: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
+//     let catal: XmlCatalogPtr = data as XmlCatalogPtr;
+//     if entry.is_null() || catal.is_null() || (*catal).sgml.is_null() || (*catal).xml.is_null() {
+//         return;
+//     }
+//     match (*entry).typ {
+//         XmlCatalogEntryType::SgmlCataEntity => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+//         }
+//         XmlCatalogEntryType::SgmlCataPentity => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+//         }
+//         XmlCatalogEntryType::SgmlCataDoctype => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+//         }
+//         XmlCatalogEntryType::SgmlCataLinktype => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+//         }
+//         XmlCatalogEntryType::SgmlCataNotation => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+//         }
+//         XmlCatalogEntryType::SgmlCataPublic => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+//         }
+//         XmlCatalogEntryType::SgmlCataSystem => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataSystem;
+//         }
+//         XmlCatalogEntryType::SgmlCataDelegate => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataDelegatePublic;
+//         }
+//         XmlCatalogEntryType::SgmlCataCatalog => {
+//             (*entry).typ = XmlCatalogEntryType::XmlCataCatalog;
+//         }
+//         _ => {
+//             xml_hash_remove_entry((*catal).sgml, (*entry).name, Some(xml_free_catalog_entry));
+//             return;
+//         }
+//     }
+//     /*
+//      * Conversion successful, remove from the SGML catalog
+//      * and add it to the default XML one
+//      */
+//     xml_hash_remove_entry((*catal).sgml, (*entry).name, None);
+//     (*entry).parent = (*catal).xml;
+//     (*entry).next = null_mut();
+//     if (*(*catal).xml).children.is_null() {
+//         (*(*catal).xml).children = entry;
+//     } else {
+//         let mut prev: XmlCatalogEntryPtr;
 
-        prev = (*(*catal).xml).children;
-        while !(*prev).next.is_null() {
-            prev = (*prev).next;
-        }
-        (*prev).next = entry;
-    }
-}
+//         prev = (*(*catal).xml).children;
+//         while !(*prev).next.is_null() {
+//             prev = (*prev).next;
+//         }
+//         (*prev).next = entry;
+//     }
+// }
 
 /**
  * xmlConvertSGMLCatalog:
@@ -1120,7 +1123,7 @@ unsafe extern "C" fn xml_catalog_convert_entry(
  *
  * Returns the number of entries converted if successful, -1 otherwise
  */
-pub unsafe extern "C" fn xml_convert_sgmlcatalog(mut catal: XmlCatalogPtr) -> c_int {
+pub unsafe extern "C" fn xml_convert_sgml_catalog(catal: XmlCatalogPtr) -> c_int {
     if catal.is_null() || !matches!((*catal).typ, XmlCatalogType::XmlSgmlCatalogType) {
         return -1;
     }
@@ -1131,11 +1134,79 @@ pub unsafe extern "C" fn xml_convert_sgmlcatalog(mut catal: XmlCatalogPtr) -> c_
             c"Converting SGML catalog to XML\n".as_ptr() as _
         );
     }
-    xml_hash_scan(
-        (*catal).sgml,
-        xml_catalog_convert_entry,
-        addr_of_mut!(catal) as _,
-    );
+
+    let Some(mut sgml) = XmlHashTableRef::from_raw((*catal).sgml) else {
+        return 0;
+    };
+
+    if (*catal).xml.is_null() {
+        return 0;
+    }
+
+    for (payload, name, _, _) in sgml.drain() {
+        let entry: XmlCatalogEntryPtr = payload.0 as XmlCatalogEntryPtr;
+        if entry.is_null() {
+            continue;
+        }
+        match (*entry).typ {
+            XmlCatalogEntryType::SgmlCataEntity => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+            }
+            XmlCatalogEntryType::SgmlCataPentity => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+            }
+            XmlCatalogEntryType::SgmlCataDoctype => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+            }
+            XmlCatalogEntryType::SgmlCataLinktype => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+            }
+            XmlCatalogEntryType::SgmlCataNotation => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+            }
+            XmlCatalogEntryType::SgmlCataPublic => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
+            }
+            XmlCatalogEntryType::SgmlCataSystem => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataSystem;
+            }
+            XmlCatalogEntryType::SgmlCataDelegate => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataDelegatePublic;
+            }
+            XmlCatalogEntryType::SgmlCataCatalog => {
+                (*entry).typ = XmlCatalogEntryType::XmlCataCatalog;
+            }
+            _ => {
+                xml_free_catalog_entry(
+                    payload.0,
+                    name.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                );
+                continue;
+            }
+        }
+        /*
+         * Conversion successful, remove from the SGML catalog
+         * and add it to the default XML one
+         */
+        (*entry).parent = (*catal).xml;
+        (*entry).next = null_mut();
+        if (*(*catal).xml).children.is_null() {
+            (*(*catal).xml).children = entry;
+        } else {
+            let mut prev: XmlCatalogEntryPtr;
+
+            prev = (*(*catal).xml).children;
+            while !(*prev).next.is_null() {
+                prev = (*prev).next;
+            }
+            (*prev).next = entry;
+        }
+    }
+    // xml_hash_scan(
+    //     (*catal).sgml,
+    //     xml_catalog_convert_entry,
+    //     addr_of_mut!(catal) as _,
+    // );
     0
 }
 
@@ -1143,7 +1214,8 @@ pub unsafe extern "C" fn xml_convert_sgmlcatalog(mut catal: XmlCatalogPtr) -> c_
  * Hash table containing all the trees of XML catalogs parsed by
  * the application.
  */
-static XML_CATALOG_XMLFILES: AtomicPtr<XmlHashTable> = AtomicPtr::new(null_mut());
+static XML_CATALOG_XMLFILES: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
+    AtomicPtr::new(null_mut());
 
 /*
  * A mutex for modifying the shared global catalog(s)
@@ -3054,7 +3126,7 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_uri(
  * Serialize an SGML Catalog entry
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_catalog_dump_entry(
+extern "C" fn xml_catalog_dump_entry(
     payload: *mut c_void,
     data: *mut c_void,
     _name: *const XmlChar,
@@ -3064,80 +3136,82 @@ unsafe extern "C" fn xml_catalog_dump_entry(
     if entry.is_null() || out.is_null() {
         return;
     }
-    match (*entry).typ {
-        XmlCatalogEntryType::SgmlCataEntity => {
-            fprintf(out, c"ENTITY ".as_ptr() as _);
+    unsafe {
+        match (*entry).typ {
+            XmlCatalogEntryType::SgmlCataEntity => {
+                fprintf(out, c"ENTITY ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataPentity => {
+                fprintf(out, c"ENTITY %%".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataDoctype => {
+                fprintf(out, c"DOCTYPE ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataLinktype => {
+                fprintf(out, c"LINKTYPE ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataNotation => {
+                fprintf(out, c"NOTATION ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataPublic => {
+                fprintf(out, c"PUBLIC ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataSystem => {
+                fprintf(out, c"SYSTEM ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataDelegate => {
+                fprintf(out, c"DELEGATE ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataBase => {
+                fprintf(out, c"BASE ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataCatalog => {
+                fprintf(out, c"CATALOG ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataDocument => {
+                fprintf(out, c"DOCUMENT ".as_ptr() as _);
+            }
+            XmlCatalogEntryType::SgmlCataSgmldecl => {
+                fprintf(out, c"SGMLDECL ".as_ptr() as _);
+            }
+            _ => {
+                return;
+            }
         }
-        XmlCatalogEntryType::SgmlCataPentity => {
-            fprintf(out, c"ENTITY %%".as_ptr() as _);
+        match (*entry).typ {
+            XmlCatalogEntryType::SgmlCataEntity
+            | XmlCatalogEntryType::SgmlCataPentity
+            | XmlCatalogEntryType::SgmlCataDoctype
+            | XmlCatalogEntryType::SgmlCataLinktype
+            | XmlCatalogEntryType::SgmlCataNotation => {
+                fprintf(out, c"%s".as_ptr() as _, (*entry).name);
+            }
+            XmlCatalogEntryType::SgmlCataPublic
+            | XmlCatalogEntryType::SgmlCataSystem
+            | XmlCatalogEntryType::SgmlCataSgmldecl
+            | XmlCatalogEntryType::SgmlCataDocument
+            | XmlCatalogEntryType::SgmlCataCatalog
+            | XmlCatalogEntryType::SgmlCataBase
+            | XmlCatalogEntryType::SgmlCataDelegate => {
+                fprintf(out, c"\"%s\"".as_ptr() as _, (*entry).name);
+            }
+            _ => {}
         }
-        XmlCatalogEntryType::SgmlCataDoctype => {
-            fprintf(out, c"DOCTYPE ".as_ptr() as _);
+        match (*entry).typ {
+            XmlCatalogEntryType::SgmlCataEntity
+            | XmlCatalogEntryType::SgmlCataPentity
+            | XmlCatalogEntryType::SgmlCataDoctype
+            | XmlCatalogEntryType::SgmlCataLinktype
+            | XmlCatalogEntryType::SgmlCataNotation
+            | XmlCatalogEntryType::SgmlCataPublic
+            | XmlCatalogEntryType::SgmlCataSystem
+            | XmlCatalogEntryType::SgmlCataDelegate => {
+                fprintf(out, c" \"%s\"".as_ptr() as _, (*entry).value);
+            }
+            _ => {}
         }
-        XmlCatalogEntryType::SgmlCataLinktype => {
-            fprintf(out, c"LINKTYPE ".as_ptr() as _);
-        }
-        XmlCatalogEntryType::SgmlCataNotation => {
-            fprintf(out, c"NOTATION ".as_ptr() as _);
-        }
-        XmlCatalogEntryType::SgmlCataPublic => {
-            fprintf(out, c"PUBLIC ".as_ptr() as _);
-        }
-        XmlCatalogEntryType::SgmlCataSystem => {
-            fprintf(out, c"SYSTEM ".as_ptr() as _);
-        }
-        XmlCatalogEntryType::SgmlCataDelegate => {
-            fprintf(out, c"DELEGATE ".as_ptr() as _);
-        }
-        XmlCatalogEntryType::SgmlCataBase => {
-            fprintf(out, c"BASE ".as_ptr() as _);
-        }
-        XmlCatalogEntryType::SgmlCataCatalog => {
-            fprintf(out, c"CATALOG ".as_ptr() as _);
-        }
-        XmlCatalogEntryType::SgmlCataDocument => {
-            fprintf(out, c"DOCUMENT ".as_ptr() as _);
-        }
-        XmlCatalogEntryType::SgmlCataSgmldecl => {
-            fprintf(out, c"SGMLDECL ".as_ptr() as _);
-        }
-        _ => {
-            return;
-        }
+        fprintf(out, c"\n".as_ptr() as _);
     }
-    match (*entry).typ {
-        XmlCatalogEntryType::SgmlCataEntity
-        | XmlCatalogEntryType::SgmlCataPentity
-        | XmlCatalogEntryType::SgmlCataDoctype
-        | XmlCatalogEntryType::SgmlCataLinktype
-        | XmlCatalogEntryType::SgmlCataNotation => {
-            fprintf(out, c"%s".as_ptr() as _, (*entry).name);
-        }
-        XmlCatalogEntryType::SgmlCataPublic
-        | XmlCatalogEntryType::SgmlCataSystem
-        | XmlCatalogEntryType::SgmlCataSgmldecl
-        | XmlCatalogEntryType::SgmlCataDocument
-        | XmlCatalogEntryType::SgmlCataCatalog
-        | XmlCatalogEntryType::SgmlCataBase
-        | XmlCatalogEntryType::SgmlCataDelegate => {
-            fprintf(out, c"\"%s\"".as_ptr() as _, (*entry).name);
-        }
-        _ => {}
-    }
-    match (*entry).typ {
-        XmlCatalogEntryType::SgmlCataEntity
-        | XmlCatalogEntryType::SgmlCataPentity
-        | XmlCatalogEntryType::SgmlCataDoctype
-        | XmlCatalogEntryType::SgmlCataLinktype
-        | XmlCatalogEntryType::SgmlCataNotation
-        | XmlCatalogEntryType::SgmlCataPublic
-        | XmlCatalogEntryType::SgmlCataSystem
-        | XmlCatalogEntryType::SgmlCataDelegate => {
-            fprintf(out, c" \"%s\"".as_ptr() as _, (*entry).value);
-        }
-        _ => {}
-    }
-    fprintf(out, c"\n".as_ptr() as _);
 }
 
 /**
@@ -3337,7 +3411,7 @@ pub unsafe extern "C" fn xml_a_catalog_dump(catal: XmlCatalogPtr, out: *mut FILE
     if matches!((*catal).typ, XmlCatalogType::XmlXmlCatalogType) {
         xml_dump_xml_catalog(out, (*catal).xml);
     } else {
-        xml_hash_scan((*catal).sgml, xml_catalog_dump_entry, out as _);
+        xml_hash_scan((*catal).sgml, Some(xml_catalog_dump_entry), out as _);
     }
 }
 
@@ -3666,7 +3740,7 @@ pub unsafe extern "C" fn xml_load_catalogs(pathss: *const c_char) {
  * Free the memory allocated to list of Catalog entries from the
  * catalog file hash.
  */
-unsafe extern "C" fn xml_free_catalog_hash_entry_list(payload: *mut c_void, _name: *const XmlChar) {
+extern "C" fn xml_free_catalog_hash_entry_list(payload: *mut c_void, _name: *const XmlChar) {
     let catal: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
     let mut children: XmlCatalogEntryPtr;
     let mut next: XmlCatalogEntryPtr;
@@ -3675,16 +3749,18 @@ unsafe extern "C" fn xml_free_catalog_hash_entry_list(payload: *mut c_void, _nam
         return;
     }
 
-    children = (*catal).children;
-    while !children.is_null() {
-        next = (*children).next;
-        (*children).dealloc = 0;
-        (*children).children = null_mut();
-        xml_free_catalog_entry(children as _, null_mut());
-        children = next;
+    unsafe {
+        children = (*catal).children;
+        while !children.is_null() {
+            next = (*children).next;
+            (*children).dealloc = 0;
+            (*children).children = null_mut();
+            xml_free_catalog_entry(children as _, null_mut());
+            children = next;
+        }
+        (*catal).dealloc = 0;
+        xml_free_catalog_entry(catal as _, null_mut());
     }
-    (*catal).dealloc = 0;
-    xml_free_catalog_entry(catal as _, null_mut());
 }
 
 /**
@@ -3974,7 +4050,7 @@ pub unsafe extern "C" fn xml_catalog_convert() -> c_int {
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
     xml_rmutex_lock(mutex);
-    let res: c_int = xml_convert_sgmlcatalog(XML_DEFAULT_CATALOG.load(Ordering::Relaxed));
+    let res: c_int = xml_convert_sgml_catalog(XML_DEFAULT_CATALOG.load(Ordering::Relaxed));
     xml_rmutex_unlock(mutex);
     res
 }
@@ -5043,7 +5119,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let catal = gen_xml_catalog_ptr(n_catal, 0);
 
-                let ret_val = xml_convert_sgmlcatalog(catal);
+                let ret_val = xml_convert_sgml_catalog(catal);
                 desret_int(ret_val);
                 des_xml_catalog_ptr(n_catal, catal, 0);
                 xml_reset_last_error();

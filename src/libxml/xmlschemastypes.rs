@@ -55,6 +55,8 @@ use crate::{
     xml_is_digit_ch, IS_BLANK_CH,
 };
 
+use super::hash::CVoidWrapper;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlSchemaWhitespaceValueType {
@@ -180,7 +182,8 @@ pub struct XmlSchemaVal {
 }
 
 static XML_SCHEMA_TYPES_INITIALIZED: AtomicBool = AtomicBool::new(false);
-static XML_SCHEMA_TYPES_BANK: AtomicPtr<XmlHashTable> = AtomicPtr::new(null_mut());
+static XML_SCHEMA_TYPES_BANK: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
+    AtomicPtr::new(null_mut());
 
 /*
  * Basic types
@@ -364,8 +367,10 @@ macro_rules! DAY_IN_YEAR {
 */
 const UNBOUNDED: i32 = 1 << 30;
 
-unsafe extern "C" fn xml_schema_free_type_entry(typ: *mut c_void, _name: *const XmlChar) {
-    xml_schema_free_type(typ as XmlSchemaTypePtr);
+extern "C" fn xml_schema_free_type_entry(typ: *mut c_void, _name: *const XmlChar) {
+    unsafe {
+        xml_schema_free_type(typ as XmlSchemaTypePtr);
+    }
 }
 
 /**
