@@ -962,6 +962,7 @@ pub struct XmlSAXHandler {
 // typedef xmlSAXHandlerV1 *xmlSAXHandlerV1Ptr;
 pub type XmlSAXHandlerV1Ptr = *mut XmlSAXHandlerV1;
 #[repr(C)]
+#[derive(Debug, Default)]
 pub struct XmlSAXHandlerV1 {
     pub(crate) internal_subset: Option<InternalSubsetSAXFunc>,
     pub(crate) is_standalone: Option<IsStandaloneSAXFunc>,
