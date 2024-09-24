@@ -3,13 +3,16 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::ffi::{c_char, c_int, c_uint, c_void};
+use std::ffi::{c_char, c_int, c_uint, c_void, CStr};
+use std::io::Write;
 use std::mem::{size_of, size_of_val};
+use std::os::fd::FromRawFd;
 use std::ptr::{addr_of_mut, null_mut};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use libc::{fprintf, memcpy, memset, perror, FILE};
+use libc::{memcpy, memset, FILE};
 
+use crate::error::generic_error_default;
 use crate::libxml::globals::_XML_GENERIC_ERROR;
 use crate::libxml::parser::{XmlParserCtxtPtr, XmlParserInputPtr};
 
@@ -973,18 +976,19 @@ pub(crate) unsafe extern "C" fn xml_generic_error_default_func(
     _ctx: *mut c_void,
     msg: *const c_char,
 ) {
-    // va_list args;
-
-    // if (xmlGenericErrorContext == null_mut())
-    // xmlGenericErrorContext = (void *) stderr;
-
-    // va_start(args, msg);
-    // vfprintf((FILE *)xmlGenericErrorContext, msg, args);
-    // va_end(args);
+    let msg = CStr::from_ptr(msg).to_string_lossy();
     if xml_generic_error_context().is_null() {
-        perror(msg);
+        generic_error_default(None::<&mut std::io::Stderr>, &msg);
     } else {
-        fprintf(xml_generic_error_context() as *mut FILE, msg);
+        let fp = xml_generic_error_context() as *mut FILE;
+        // The buffers of C/Rust stdio are separated,
+        // so unless do `fflush`, the order of outputs may be strange.
+        libc::fflush(fp);
+        let fd = libc::fileno(fp);
+        let mut file = std::fs::File::from_raw_fd(fd);
+        generic_error_default(Some(&mut file), &msg);
+        // For the same reason, do `std::io::Write::flush`.
+        file.flush().ok();
     }
 }
 

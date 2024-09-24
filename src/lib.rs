@@ -13,6 +13,7 @@
 #![warn(unused_unsafe)]
 
 pub mod dict;
+pub mod error;
 pub mod hash;
 pub mod libxml;
 pub mod list;
