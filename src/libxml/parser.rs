@@ -16,7 +16,7 @@ use libc::strcmp;
 use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen, strncmp, strstr};
 
 use crate::{
-    __xml_raise_error,
+    __xml_raise_error, generic_error,
     hash::XmlHashTableRef,
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
@@ -32,12 +32,11 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_handler, xml_default_sax_locator,
-            xml_do_validity_checking_default_value, xml_free, xml_generic_error_context,
-            xml_get_warnings_default_value, xml_indent_tree_output, xml_init_globals_internal,
-            xml_keep_blanks_default_value, xml_line_numbers_default_value,
-            xml_load_ext_dtd_default_value, xml_malloc, xml_malloc_atomic,
-            xml_parser_debug_entities, xml_pedantic_parser_default_value, xml_realloc,
-            xml_substitute_entities_default_value,
+            xml_do_validity_checking_default_value, xml_free, xml_get_warnings_default_value,
+            xml_indent_tree_output, xml_init_globals_internal, xml_keep_blanks_default_value,
+            xml_line_numbers_default_value, xml_load_ext_dtd_default_value, xml_malloc,
+            xml_malloc_atomic, xml_parser_debug_entities, xml_pedantic_parser_default_value,
+            xml_realloc, xml_substitute_entities_default_value,
         },
         hash::{
             xml_hash_default_deallocator, xml_hash_free, xml_hash_lookup2, xml_hash_qlookup2,
@@ -124,8 +123,8 @@ use crate::{
             xml_cleanup_threads_internal, xml_init_threads_internal,
         },
     },
-    xml_generic_error, IS_BLANK_CH, IS_BYTE_CHAR, IS_CHAR, IS_COMBINING, IS_DIGIT, IS_EXTENDER,
-    IS_LETTER, IS_PUBIDCHAR_CH,
+    IS_BLANK_CH, IS_BYTE_CHAR, IS_CHAR, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    IS_PUBIDCHAR_CH,
 };
 
 /**
@@ -3648,11 +3647,7 @@ pub(crate) unsafe extern "C" fn ns_pop(ctxt: XmlParserCtxtPtr, mut nr: c_int) ->
         return 0;
     }
     if (*ctxt).ns_nr < nr {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Pbm popping %d NS\n".as_ptr() as _,
-            nr
-        );
+        generic_error!("Pbm popping {} NS\n", nr);
         nr = (*ctxt).ns_nr;
     }
     if (*ctxt).ns_nr <= 0 {
@@ -6440,11 +6435,7 @@ pub unsafe extern "C" fn xml_pop_input(ctxt: XmlParserCtxtPtr) -> XmlChar {
         return 0;
     }
     if *xml_parser_debug_entities() != 0 {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Popping input %d\n".as_ptr() as _,
-            (*ctxt).input_nr
-        );
+        generic_error!("Popping input {}\n", (*ctxt).input_nr);
     }
     if (*ctxt).input_nr > 1
         && (*ctxt).in_subset == 0
@@ -6503,10 +6494,9 @@ unsafe extern "C" fn xml_load_entity_content(
     }
 
     if *xml_parser_debug_entities() != 0 {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Reading %s entity content input\n".as_ptr() as _,
-            (*entity).name.load(Ordering::Relaxed)
+        generic_error!(
+            "Reading {} entity content input\n",
+            CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
         );
     }
 
@@ -6685,10 +6675,13 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                     }
                 } else if c == b'&' as i32 && what & XML_SUBSTITUTE_REF as i32 != 0 {
                     if *xml_parser_debug_entities() != 0 {
-                        xml_generic_error!(
-                            xml_generic_error_context(),
-                            c"String decoding Entity Reference: %.30s\n".as_ptr() as _,
-                            str
+                        generic_error!(
+                            "String decoding Entity Reference: {}\n",
+                            CStr::from_ptr(str as *const i8)
+                                .to_string_lossy()
+                                .chars()
+                                .take(30)
+                                .collect::<String>()
                         );
                     }
                     ent = xml_parse_string_entity_ref(ctxt, addr_of_mut!(str));
@@ -6798,10 +6791,13 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                     }
                 } else if c == b'%' as i32 && what & XML_SUBSTITUTE_PEREF as i32 != 0 {
                     if *xml_parser_debug_entities() != 0 {
-                        xml_generic_error!(
-                            xml_generic_error_context(),
-                            c"String decoding PE Reference: %.30s\n".as_ptr() as _,
-                            str
+                        generic_error!(
+                            "String decoding PE Reference: {}\n",
+                            CStr::from_ptr(str as *const i8)
+                                .to_string_lossy()
+                                .chars()
+                                .take(30)
+                                .collect::<String>()
                         );
                     }
                     ent = xml_parse_string_pereference(ctxt, addr_of_mut!(str));
@@ -10379,99 +10375,40 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     // break;
                 }
                 XmlParserInputState::XmlParserComment => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"PP: internal error, state == COMMENT\n".as_ptr() as _,
-                    );
+                    generic_error!("PP: internal error, state == COMMENT\n",);
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
-                    // #ifdef DEBUG_PUSH
-                    // 		xml_generic_error!(xmlGenericErrorContext(),
-                    // 			c"PP: entering CONTENT\n".as_ptr() as _);
-                    // #endif
                 }
                 XmlParserInputState::XmlParserIgnore => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"PP: internal error, state == IGNORE".as_ptr() as _,
-                    );
+                    generic_error!("PP: internal error, state == IGNORE",);
                     (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-                    // #ifdef DEBUG_PUSH
-                    // 		xml_generic_error!(xmlGenericErrorContext(),
-                    // 			c"PP: entering DTD\n".as_ptr() as _);
-                    // #endif
                 }
                 XmlParserInputState::XmlParserPI => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"PP: internal error, state == PI\n".as_ptr() as _,
-                    );
+                    generic_error!("PP: internal error, state == PI\n",);
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
-                    // #ifdef DEBUG_PUSH
-                    // 		xml_generic_error!(xmlGenericErrorContext(),
-                    // 			c"PP: entering CONTENT\n".as_ptr() as _);
-                    // #endif
                 }
                 XmlParserInputState::XmlParserEntityDecl => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"PP: internal error, state == ENTITY_DECL\n".as_ptr() as _,
-                    );
+                    generic_error!("PP: internal error, state == ENTITY_DECL\n",);
                     (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-                    // #ifdef DEBUG_PUSH
-                    // 		xml_generic_error!(xmlGenericErrorContext(),
-                    // 			c"PP: entering DTD\n".as_ptr() as _);
-                    // #endif
                 }
                 XmlParserInputState::XmlParserEntityValue => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"PP: internal error, state == ENTITY_VALUE\n".as_ptr() as _,
-                    );
+                    generic_error!("PP: internal error, state == ENTITY_VALUE\n",);
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
-                    // #ifdef DEBUG_PUSH
-                    // 		xml_generic_error!(xmlGenericErrorContext(),
-                    // 			c"PP: entering DTD\n".as_ptr() as _);
-                    // #endif
                 }
                 XmlParserInputState::XmlParserAttributeValue => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"PP: internal error, state == ATTRIBUTE_VALUE\n".as_ptr() as _,
-                    );
+                    generic_error!("PP: internal error, state == ATTRIBUTE_VALUE\n",);
                     (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
-                    // #ifdef DEBUG_PUSH
-                    // 		xml_generic_error!(xmlGenericErrorContext(),
-                    // 			c"PP: entering START_TAG\n".as_ptr() as _);
-                    // #endif
                 }
                 XmlParserInputState::XmlParserSystemLiteral => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"PP: internal error, state == SYSTEM_LITERAL\n".as_ptr() as _,
-                    );
+                    generic_error!("PP: internal error, state == SYSTEM_LITERAL\n",);
                     (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
-                    // #ifdef DEBUG_PUSH
-                    // 		xml_generic_error!(xmlGenericErrorContext(),
-                    // 			c"PP: entering START_TAG\n".as_ptr() as _);
-                    // #endif
                 }
                 XmlParserInputState::XmlParserPublicLiteral => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"PP: internal error, state == PUBLIC_LITERAL\n".as_ptr() as _,
-                    );
+                    generic_error!("PP: internal error, state == PUBLIC_LITERAL\n",);
                     (*ctxt).instate = XmlParserInputState::XmlParserStartTag;
-                    // #ifdef DEBUG_PUSH
-                    // 		xml_generic_error!(xmlGenericErrorContext,
-                    // 			c"PP: entering START_TAG\n".as_ptr() as _);
-                    // #endif
                 }
             }
         }
         // done:
-        // #ifdef DEBUG_PUSH
-        //     xml_generic_error!(xmlGenericErrorContext, c"PP: done %d\n".as_ptr() as _, ret);
-        // #endif
         return ret;
     }
     // encoding_error:
@@ -10585,10 +10522,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
             xml_buf_set_input_base_cur((*input).buffer, (*ctxt).input, base, current);
             if nbchars < 0 {
                 /* TODO 2.6.0 */
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"xmlParseChunk: encoder error\n".as_ptr() as _
-                );
+                generic_error!("xmlParseChunk: encoder error\n");
                 xml_halt_parser(ctxt);
                 return XmlParserErrors::XmlErrInvalidEncoding as i32;
             }
@@ -10729,10 +10663,7 @@ pub unsafe extern "C" fn xml_new_io_input_stream(
         return null_mut();
     }
     if *xml_parser_debug_entities() != 0 {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"new input from I/O\n".as_ptr() as _
-        )
+        generic_error!("new input from I/O\n");
     }
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input_stream.is_null() {

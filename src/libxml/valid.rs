@@ -5106,11 +5106,7 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
 #[cfg(not(feature = "regexp"))]
 macro_rules! DEBUG_VALID_MSG {
     ($m:expr) => {
-        $crate::xml_generic_error!(
-            $crate::libxml::globals::xmlGenericErrorContext,
-            c"%s\n".as_ptr() as _,
-            $m
-        );
+        $crate::generic_error!("{}\n", $m);
     };
 }
 

@@ -14,14 +14,12 @@ use std::{
 use libc::{fprintf, memcpy, memset, size_t, snprintf, strchr, FILE};
 
 use crate::{
-    __xml_raise_error,
+    __xml_raise_error, generic_error,
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         encoding::XmlCharEncoding,
         entities::XmlEntityPtr,
-        globals::{
-            xml_free, xml_generic_error_context, xml_malloc, xml_malloc_atomic, xml_realloc,
-        },
+        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_create_dict,
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTablePtr,
@@ -131,7 +129,7 @@ use crate::{
         },
     },
     private::error::__xml_simple_error,
-    xml_generic_error, IS_BLANK_CH,
+    IS_BLANK_CH,
 };
 
 /**
@@ -23191,16 +23189,12 @@ unsafe extern "C" fn xml_schema_build_content_model(
         return;
     }
 
-    // #ifdef DEBUG_CONTENT
-    //     xml_generic_error!(xmlGenericErrorContext,      "Building content model for %s\n".as_ptr() as _, name);
-    // #endif
     (*ctxt).am = null_mut();
     (*ctxt).am = xml_new_automata();
     if (*ctxt).am.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Cannot create automata for complex type %s\n".as_ptr() as _,
-            (*typ).name
+        generic_error!(
+            "Cannot create automata for complex type {}\n",
+            CStr::from_ptr((*typ).name as *const i8).to_string_lossy()
         );
         return;
     }
@@ -23231,10 +23225,7 @@ unsafe extern "C" fn xml_schema_build_content_model(
             null_mut(),
         );
     } else {
-        // #ifdef DEBUG_CONTENT_REGEXP
-        //         xml_generic_error!(xmlGenericErrorContext,          "Content model of %s:\n".as_ptr() as _, (*typ).name);
-        //         xmlRegexpPrint(stderr, (*typ).contModel);
-        // #endif
+        // no-op
     }
     (*ctxt).state = null_mut();
     xml_free_automata((*ctxt).am);
@@ -25761,19 +25752,6 @@ unsafe extern "C" fn xml_schema_vcontent_model_callback(
     let item: XmlSchemaElementPtr = transdata as XmlSchemaElementPtr;
     let inode: XmlSchemaNodeInfoPtr = inputdata as XmlSchemaNodeInfoPtr;
     (*inode).decl = item;
-    // #ifdef DEBUG_CONTENT
-    //     {
-    //     let str: *mut xmlChar = null_mut();
-
-    //     if ((*item).typ == XmlSchemaTypeType::XML_SCHEMA_TYPE_ELEMENT) {
-    //         xml_generic_error!(xmlGenericErrorContext,  c"AUTOMATON callback for '%s' [declaration]\n".as_ptr() as _, xmlSchemaFormatQName(addr_of_mut!(str), (*inode).localName, (*inode).nsName));
-    //     } else {
-    //         xml_generic_error!(xmlGenericErrorContext,   c"AUTOMATON callback for '%s' [wildcard]\n".as_ptr() as _,     xmlSchemaFormatQName(addr_of_mut!(str),     (*inode).localName, (*inode).nsName));
-
-    //     }
-    //     FREE_AND_NULL!(str)
-    //     }
-    // #endif
 }
 
 unsafe extern "C" fn xml_schema_complex_type_err(
@@ -26055,9 +26033,6 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
                         return -1;
                     }
                     (*pielem).regex_ctxt = regex_ctxt;
-                    // #ifdef DEBUG_AUTOMATA
-                    //         xml_generic_error!(xmlGenericErrorContext, "AUTOMATA create on '%s'\n".as_ptr() as _,     (*pielem).localName);
-                    // #endif
                 }
 
                 /*
@@ -26074,12 +26049,6 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
                     (*(*vctxt).inode).ns_name,
                     (*vctxt).inode as _,
                 );
-                // #ifdef DEBUG_AUTOMATA
-                //         if ret < 0 {
-                //         xml_generic_error!(xmlGenericErrorContext,  c"AUTOMATON push ERROR for '%s' on '%s'\n".as_ptr() as _, (*(*vctxt).inode).localName, (*pielem).localName);}
-                //         xml_generic_error!(xmlGenericErrorContext,  c"AUTOMATON push OK for '%s' on '%s'\n".as_ptr() as _, (*(*vctxt).inode).localName, (*pielem).localName);
-                //        else {
-                // #endif
                 if (*vctxt).err == XmlParserErrors::XmlSchemavInternal as i32 {
                     VERROR_INT!(
                         vctxt,
@@ -26325,9 +26294,6 @@ unsafe extern "C" fn xml_schema_idc_add_state_object(
     (*sto).sel = sel;
     (*sto).nb_history = 0;
 
-    // #ifdef DEBUG_IDC
-    //     xml_generic_error!(xmlGenericErrorContext, "IDC:   STO push '%s'\n".as_ptr() as _,     (*sto).(*sel).xpath);
-    // #endif
     0
 }
 
@@ -26356,13 +26322,6 @@ unsafe extern "C" fn xml_schema_idc_register_matchers(
         return 0;
     }
 
-    // #ifdef DEBUG_IDC
-    //     {
-    //     let str: *mut xmlChar = null_mut();
-    //     xml_generic_error!(xmlGenericErrorContext,       c"IDC: REGISTER on %s, depth %d\n".as_ptr() as _, (c_char *) xmlSchemaFormatQName(addr_of_mut!(str), (*(*vctxt).inode).nsName, (*(*vctxt).inode).localName), (*vctxt).depth);
-    //     FREE_AND_NULL!(str)
-    //     }
-    // #endif
     if !(*(*vctxt).inode).idc_matchers.is_null() {
         VERROR_INT!(
             vctxt,
@@ -26460,9 +26419,6 @@ unsafe extern "C" fn xml_schema_idc_register_matchers(
         (*matcher).depth = (*vctxt).depth;
         (*matcher).aidc = aidc;
         (*matcher).idc_type = (*(*aidc).def).typ as _;
-        // #ifdef DEBUG_IDC
-        //     xml_generic_error!(xmlGenericErrorContext, "IDC:   register matcher\n".as_ptr() as _);
-        // #endif
         /*
          * Init the automaton state object.
          */
@@ -26658,25 +26614,12 @@ unsafe extern "C" fn xml_schema_xpath_evaluate(
     if node_type == XmlElementType::XmlAttributeNode {
         depth += 1;
     }
-    // #ifdef DEBUG_IDC
-    //     {
-    //     let str: *mut xmlChar = null_mut();
-    //     xml_generic_error!(xmlGenericErrorContext,       c"IDC: EVAL on %s, depth %d, type %d\n".as_ptr() as _, xmlSchemaFormatQName(addr_of_mut!(str), (*(*vctxt).inode).nsName, (*(*vctxt).inode).localName), depth, nodeType);
-    //     FREE_AND_NULL!(str)
-    //     }
-    // #endif
     /*
      * Process all active XPath state objects.
      */
     let first: XmlSchemaIDCStateObjPtr = (*vctxt).xpath_states;
     sto = first;
     while sto != head {
-        // #ifdef DEBUG_IDC
-        //     if ((*sto).typ == XPATH_STATE_OBJ_TYPE_IDC_SELECTOR) {
-        //         xml_generic_error!(xmlGenericErrorContext, "IDC:   ['%s'] selector '%s'\n".as_ptr() as _, (*(*(*(*sto).matcher).aidc).def).name, (*sto).(*sel).xpath);}
-        //         xml_generic_error!(xmlGenericErrorContext, "IDC:   ['%s'] field '%s'\n".as_ptr() as _, (*(*(*(*sto).matcher).aidc).def).name, (*sto).(*sel).xpath);
-        //     ele {
-        // #endif
         if node_type == XmlElementType::XmlElementNode {
             res = xml_stream_push(
                 (*sto).xpath_ctxt as XmlStreamCtxtPtr,
@@ -26705,10 +26648,6 @@ unsafe extern "C" fn xml_schema_xpath_evaluate(
             /*
              * Full match.
              */
-            // #ifdef DEBUG_IDC
-            //     xml_generic_error!(xmlGenericErrorContext, "IDC:     "
-            //       c"MATCH\n".as_ptr() as _);
-            // #endif
             /*
              * Register a match in the state object history.
              */
@@ -26741,20 +26680,12 @@ unsafe extern "C" fn xml_schema_xpath_evaluate(
             *(*sto).history.add((*sto).nb_history as usize) = depth;
             (*sto).nb_history += 1;
 
-            // #ifdef DEBUG_IDC
-            //     xml_generic_error!(xmlGenericErrorContext, "IDC:       push match '%d'\n".as_ptr() as _, (*vctxt).depth);
-            // #endif
-
             if (*sto).typ == XPATH_STATE_OBJ_TYPE_IDC_SELECTOR {
                 let mut sel: XmlSchemaIdcselectPtr;
                 /*
                  * Activate state objects for the IDC fields of
                  * the IDC selector.
                  */
-                // #ifdef DEBUG_IDC
-                //         xml_generic_error!(xmlGenericErrorContext, "IDC:     "
-                //  c"activating field states\n".as_ptr() as _);
-                // #endif
                 sel = (*(*(*(*sto).matcher).aidc).def).fields;
                 while !sel.is_null() {
                     if xml_schema_idc_add_state_object(
@@ -26772,9 +26703,6 @@ unsafe extern "C" fn xml_schema_xpath_evaluate(
                 /*
                  * An IDC key node was found by the IDC field.
                  */
-                // #ifdef DEBUG_IDC
-                //         xml_generic_error!(xmlGenericErrorContext,  c"IDC:     key found\n".as_ptr() as _);
-                // #endif
                 /*
                  * Notify that the character value of this node is
                  * needed.
@@ -27053,13 +26981,6 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
     }
     sto = (*vctxt).xpath_states;
 
-    // #ifdef DEBUG_IDC
-    //     {
-    //     let str: *mut xmlChar = null_mut();
-    //     xml_generic_error!(xmlGenericErrorContext,       c"IDC: BACK on %s, depth %d\n".as_ptr() as _, xmlSchemaFormatQName(addr_of_mut!(str), (*(*vctxt).inode).nsName, (*(*vctxt).inode).localName), (*vctxt).depth);
-    //     FREE_AND_NULL!(str)
-    //     }
-    // #endif
     /*
      * Evaluate the state objects.
      */
@@ -27073,9 +26994,6 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
             );
             return -1;
         }
-        // #ifdef DEBUG_IDC
-        //     xml_generic_error!(xmlGenericErrorContext, "IDC:   stream pop '%s'\n".as_ptr() as _, (*sto).(*sel).xpath);
-        // #endif
         'deregister_check: {
             if (*sto).nb_history == 0 {
                 break 'deregister_check;
@@ -27586,9 +27504,6 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
          * Deregister state objects if they reach the depth of creation.
          */
         if (*sto).nb_history == 0 && (*sto).depth == depth {
-            // #ifdef DEBUG_IDC
-            //         xml_generic_error!(xmlGenericErrorContext, "IDC:   STO pop '%s'\n".as_ptr() as _, (*sto).(*sel).xpath);
-            // #endif
             if (*vctxt).xpath_states != sto {
                 VERROR_INT!(
                     vctxt,
@@ -29913,9 +29828,6 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                                     );
                                     break 'internal_error;
                                 }
-                                // #ifdef DEBUG_AUTOMATA
-                                //         xml_generic_error!(xmlGenericErrorContext,   c"AUTOMATON create on '%s'\n".as_ptr() as _, (*inode).localName);
-                                // #endif
                             }
 
                             /*
@@ -29923,9 +29835,6 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                              */
                             if INODE_NILLED!(inode) {
                                 ret = 0;
-                                // #ifdef DEBUG_AUTOMATA
-                                //         xml_generic_error!(xmlGenericErrorContext,   c"AUTOMATON succeeded on nilled '%s'\n".as_ptr() as _,     (*inode).localName);
-                                // #endif
                                 break 'skip_nilled;
                             }
                             /*
@@ -29960,17 +29869,11 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                                     nbneg,
                                     values.as_mut_ptr() as _,
                                 );
-                            // #ifdef DEBUG_AUTOMATA
-                            //         xml_generic_error!(xmlGenericErrorContext,   c"AUTOMATON missing ERROR on '%s'\n".as_ptr() as _,     (*inode).localName);
-                            // #endif
                             } else {
                                 /*
                                  * Content model is satisfied.
                                  */
                                 ret = 0;
-                                // #ifdef DEBUG_AUTOMATA
-                                //         xml_generic_error!(xmlGenericErrorContext,   c"AUTOMATON succeeded on '%s'\n".as_ptr() as _,     (*inode).localName);
-                                // #endif
                             }
                         }
                     }

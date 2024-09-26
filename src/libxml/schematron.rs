@@ -14,13 +14,12 @@ use std::{
 use libc::{malloc, memset, snprintf, sprintf, FILE};
 
 use crate::{
-    __xml_raise_error,
+    __xml_raise_error, generic_error,
     libxml::{
-        globals::xml_generic_error_context, tree::XmlElementType, xmlerror::XmlGenericErrorFunc,
-        xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile,
+        tree::XmlElementType, xmlerror::XmlGenericErrorFunc, xmlstring::xml_str_equal,
+        xpath::xml_xpath_ctxt_compile,
     },
     private::error::__xml_simple_error,
-    xml_generic_error,
 };
 
 use super::{
@@ -1670,17 +1669,11 @@ unsafe extern "C" fn xml_schematron_register_variables(
     while !letr.is_null() {
         let_eval = xml_xpath_compiled_eval((*letr).comp, ctxt);
         if let_eval.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Evaluation of compiled expression failed\n".as_ptr() as _
-            );
+            generic_error!("Evaluation of compiled expression failed\n");
             return -1;
         }
         if xml_xpath_register_variable_ns(ctxt, (*letr).name, null_mut(), let_eval) != 0 {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Registering a let variable failed\n".as_ptr() as _
-            );
+            generic_error!("Registering a let variable failed\n");
             return -1;
         }
         letr = (*letr).next;
@@ -1787,10 +1780,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                             );
                         }
                     } else {
-                        xml_generic_error!(
-                            xml_generic_error_context(),
-                            c"Empty node set\n".as_ptr() as _
-                        );
+                        generic_error!("Empty node set\n");
                     }
                 }
                 XmlXPathObjectType::XpathBoolean => {
@@ -1814,11 +1804,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                     ret = xml_strcat(ret, (*eval).stringval);
                 }
                 _ => {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Unsupported XPATH Type: %d\n".as_ptr() as _,
-                        (*eval).typ
-                    );
+                    generic_error!("Unsupported XPATH Type: {:?}\n", (*eval).typ);
                 }
             }
             xml_xpath_free_object(eval);
@@ -2079,10 +2065,7 @@ unsafe extern "C" fn xml_schematron_unregister_variables(
 ) -> c_int {
     while !letr.is_null() {
         if xml_xpath_register_variable_ns(ctxt, (*letr).name, null_mut(), null_mut()) != 0 {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Unregistering a let variable failed\n".as_ptr() as _
-            );
+            generic_error!("Unregistering a let variable failed\n");
             return -1;
         }
         letr = (*letr).next;

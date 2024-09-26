@@ -12,12 +12,12 @@ use libc::{
     FILE,
 };
 
+use crate::generic_error;
 use crate::libxml::globals::{
-    xml_free, xml_generic_error_context, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc,
+    xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc,
 };
 use crate::libxml::parser::xml_init_parser;
 use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
-use crate::xml_generic_error;
 
 use super::globals::{_XML_FREE, _XML_MALLOC, _XML_MALLOC_ATOMIC, _XML_MEM_STRDUP, _XML_REALLOC};
 use super::threads::{xml_mutex_lock, xml_mutex_unlock, XmlMutex};
@@ -84,11 +84,7 @@ static mut XML_MEM_TRACE_BLOCK_AT: *mut c_void = null_mut();
  * internal error function.
  */
 unsafe extern "C" fn debugmem_tag_error(addr: *mut c_void) {
-    xml_generic_error!(
-        xml_generic_error_context(),
-        c"Memory tag error occurs :%p \n\t bye\n".as_ptr() as _,
-        addr
-    );
+    generic_error!("Memory tag error occurs :{:?} \n\t bye\n", addr);
     // #ifdef MEM_LIST
     // if cfg!(feature = "debug_memory_location") && (stderr) {
     //     xmlMemDisplay(stderr);
@@ -184,9 +180,8 @@ pub type XmlStrdupFunc = unsafe extern "C" fn(str: *const XmlChar) -> *mut XmlCh
  * to it to get the context in which the given block is allocated.
  */
 pub unsafe extern "C" fn xml_malloc_breakpoint() {
-    xml_generic_error!(
-        xml_generic_error_context(),
-        c"xmlMallocBreakpoint reached on block %d\n".as_ptr() as _,
+    generic_error!(
+        "xmlMallocBreakpoint reached on block {}\n",
         XML_MEM_STOP_AT_BLOCK
     );
 }
@@ -222,9 +217,6 @@ pub unsafe extern "C" fn xml_mem_setup(
     realloc_func: Option<XmlReallocFunc>,
     strdup_func: Option<XmlStrdupFunc>,
 ) -> c_int {
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(xmlGenericErrorContext, c"xmlMemSetup()\n".as_ptr() as _);
-    // }
     if free_func.is_none() {
         return -1;
     }
@@ -242,9 +234,6 @@ pub unsafe extern "C" fn xml_mem_setup(
     _XML_MALLOC_ATOMIC = malloc_func.unwrap();
     _XML_REALLOC = realloc_func;
     _XML_MEM_STRDUP = strdup_func;
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(xmlGenericErrorContext, c"xmlMemSetup() Ok\n".as_ptr() as _);
-    // }
     0
 }
 
@@ -305,9 +294,6 @@ pub unsafe extern "C" fn xml_gc_mem_setup(
     realloc_func: Option<XmlReallocFunc>,
     strdup_func: Option<XmlStrdupFunc>,
 ) -> c_int {
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(xmlGenericErrorContext, c"xmlGcMemSetup()\n".as_ptr() as _);
-    // }
     if free_func.is_none() {
         return -1;
     }
@@ -328,12 +314,6 @@ pub unsafe extern "C" fn xml_gc_mem_setup(
     _XML_MALLOC_ATOMIC = malloc_atomic_func.unwrap();
     _XML_REALLOC = realloc_func;
     _XML_MEM_STRDUP = strdup_func;
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(
-    //         xmlGenericErrorContext,
-    //         c"xmlGcMemSetup() Ok\n".as_ptr() as _,
-    //     );
-    // }
     0
 }
 
@@ -792,19 +772,12 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
 
     'error: {
         if ptr == -1 as _ {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"trying to free pointer from freed area\n".as_ptr() as _
-            );
+            generic_error!("trying to free pointer from freed area\n");
             break 'error;
         }
 
         if XML_MEM_TRACE_BLOCK_AT == ptr {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%p : Freed()\n".as_ptr() as _,
-                XML_MEM_TRACE_BLOCK_AT
-            );
+            generic_error!("{:?} : Freed()\n", XML_MEM_TRACE_BLOCK_AT);
             xml_malloc_breakpoint();
         }
 
@@ -837,22 +810,11 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
 
         // TEST_POINT
 
-        // if cfg!(feature = "debug_memory") {
-        //     xml_generic_error!(
-        //         xmlGenericErrorContext,
-        //         c"Freed(%d) Ok\n".as_ptr() as _,
-        //         size
-        //     );
-        // }
         return;
     }
 
     // error:
-    xml_generic_error!(
-        xml_generic_error_context(),
-        c"xmlMemFree(%p) error\n".as_ptr() as _,
-        ptr
-    );
+    generic_error!("xmlMemFree({:?}) error\n", ptr);
     xml_malloc_breakpoint();
 }
 
@@ -884,17 +846,11 @@ pub unsafe extern "C" fn xml_malloc_loc(
     line: c_int,
 ) -> *mut c_void {
     xml_init_parser();
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(xmlGenericErrorContext, c"Malloc(%d)\n".as_ptr() as _, size);
-    // }
 
     // TEST_POINT
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlMallocLoc : Unsigned overflow\n".as_ptr() as _,
-        );
+        generic_error!("xmlMallocLoc : Unsigned overflow\n");
         xml_memory_dump();
         return null_mut();
     }
@@ -902,10 +858,7 @@ pub unsafe extern "C" fn xml_malloc_loc(
     let p: *mut Memhdr = malloc(RESERVE_SIZE + size) as *mut Memhdr;
 
     if p.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlMallocLoc : Out of free space\n".as_ptr() as _
-        );
+        generic_error!("xmlMallocLoc : Out of free space\n");
         xml_memory_dump();
         return null_mut();
     }
@@ -927,14 +880,6 @@ pub unsafe extern "C" fn xml_malloc_loc(
     // }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(
-    //         xmlGenericErrorContext,
-    //         c"Malloc(%d) Ok\n".as_ptr() as _,
-    //         size,
-    //     );
-    // }
-
     if XML_MEM_STOP_AT_BLOCK == (*p).mh_number as _ {
         xml_malloc_breakpoint();
     }
@@ -942,9 +887,8 @@ pub unsafe extern "C" fn xml_malloc_loc(
     let ret: *mut c_void = HDR_2_CLIENT!(p) as _;
 
     if XML_MEM_TRACE_BLOCK_AT == ret {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"%p : Malloc(%lu) Ok\n".as_ptr() as _,
+        generic_error!(
+            "{:?} : Malloc({}) Ok\n",
             XML_MEM_TRACE_BLOCK_AT,
             size as c_ulong
         );
@@ -1009,10 +953,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlReallocLoc : Unsigned overflow\n".as_ptr() as _
-        );
+        generic_error!("xmlReallocLoc : Unsigned overflow\n");
         xml_memory_dump();
         return null_mut();
     }
@@ -1025,9 +966,8 @@ pub unsafe extern "C" fn xml_realloc_loc(
     }
     p = tmp;
     if XML_MEM_TRACE_BLOCK_AT == ptr {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"%p : Realloced(%lu -> %lu) Ok\n".as_ptr() as _,
+        generic_error!(
+            "{:?} : Realloced({} -> {}) Ok\n",
             XML_MEM_TRACE_BLOCK_AT,
             (*p).mh_size as c_ulong,
             size as c_ulong
@@ -1053,14 +993,6 @@ pub unsafe extern "C" fn xml_realloc_loc(
 
     //  TEST_POINT
 
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(
-    //         xmlGenericErrorContext,
-    //         c"Realloced(%d to %d) Ok\n".as_ptr() as _,
-    //         oldsize,
-    //         size
-    //     );
-    // }
     HDR_2_CLIENT!(p) as _
 
     //  error:
@@ -1083,17 +1015,11 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     line: c_int,
 ) -> *mut c_void {
     xml_init_parser();
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(xmlGenericErrorContext, c"Malloc(%d)\n".as_ptr() as _, size);
-    // }
 
     //  TEST_POINT
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlMallocAtomicLoc : Unsigned overflow\n".as_ptr() as _
-        );
+        generic_error!("xmlMallocAtomicLoc : Unsigned overflow\n");
         xml_memory_dump();
         return null_mut();
     }
@@ -1101,10 +1027,7 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     let p: *mut Memhdr = malloc(RESERVE_SIZE + size) as *mut Memhdr;
 
     if p.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlMallocAtomicLoc : Out of free space\n".as_ptr() as _
-        );
+        generic_error!("xmlMallocAtomicLoc : Out of free space\n");
         xml_memory_dump();
         return null_mut();
     }
@@ -1126,14 +1049,6 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     // }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
-    // if cfg!(feature = "debug_memory") {
-    //     xml_generic_error!(
-    //         xmlGenericErrorContext,
-    //         c"Malloc(%d) Ok\n".as_ptr() as _,
-    //         size
-    //     );
-    // }
-
     if XML_MEM_STOP_AT_BLOCK == (*p).mh_number as _ {
         xml_malloc_breakpoint();
     }
@@ -1141,9 +1056,8 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     let ret: *mut c_void = HDR_2_CLIENT!(p) as _;
 
     if XML_MEM_TRACE_BLOCK_AT == ret {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"%p : Malloc(%lu) Ok\n".as_ptr() as _,
+        generic_error!(
+            "{:?} : Malloc({}) Ok\n",
             XML_MEM_TRACE_BLOCK_AT,
             size as c_ulong
         );
@@ -1176,10 +1090,7 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
     //  TEST_POINT
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlMemStrdupLoc : Unsigned overflow\n".as_ptr() as _
-        );
+        generic_error!("xmlMemStrdupLoc : Unsigned overflow\n");
         xml_memory_dump();
         return null_mut();
     }
@@ -1217,11 +1128,7 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
     //  TEST_POINT
 
     if XML_MEM_TRACE_BLOCK_AT == s as _ {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"%p : Strdup() Ok\n".as_ptr() as _,
-            XML_MEM_TRACE_BLOCK_AT
-        );
+        generic_error!("{:?} : Strdup() Ok\n", XML_MEM_TRACE_BLOCK_AT);
         xml_malloc_breakpoint();
     }
 

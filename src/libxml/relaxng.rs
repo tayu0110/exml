@@ -15,7 +15,7 @@ use std::{
 use libc::{fprintf, memcpy, memset, ptrdiff_t, snprintf, FILE};
 
 use crate::{
-    __xml_raise_error,
+    __xml_raise_error, generic_error,
     libxml::{
         globals::{
             xml_free, xml_generic_error_context, xml_malloc, xml_malloc_atomic, xml_realloc,
@@ -60,7 +60,7 @@ use crate::{
             xml_strlen, XmlChar,
         },
     },
-    xml_generic_error, IS_BLANK_CH,
+    IS_BLANK_CH,
 };
 
 use super::{globals::__xml_generic_error, hash::CVoidWrapper};
@@ -1002,9 +1002,6 @@ unsafe extern "C" fn xml_relaxng_show_valid_error(
         return;
     }
 
-    // #ifdef DEBUG_ERROR
-    //     xml_generic_error!(xmlGenericErrorContext, c"Show error %d\n".as_ptr() as _, err);
-    // #endif
     let msg: *mut XmlChar = xml_relaxng_get_error_string(err, arg1, arg2);
     if msg.is_null() {
         return;
@@ -1037,10 +1034,6 @@ unsafe extern "C" fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) 
     let mut err: XmlRelaxNGValidErrorPtr;
     let mut dup: XmlRelaxNGValidErrorPtr;
 
-    // #ifdef DEBUG_ERROR
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"Dumping error stack %d errors\n".as_ptr() as _, (*ctxt).errNr);
-    // #endif
     k = 0;
     'main: for i in 0..(*ctxt).err_nr {
         err = (*ctxt).err_tab.add(i as usize);
@@ -1099,10 +1092,6 @@ unsafe extern "C" fn xml_relaxng_valid_error_push(
     arg2: *const XmlChar,
     dup: c_int,
 ) -> c_int {
-    // #ifdef DEBUG_ERROR
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"Pushing error %d at %d on stack\n".as_ptr() as _, err, (*ctxt).errNr);
-    // #endif
     if (*ctxt).err_tab.is_null() {
         (*ctxt).err_max = 8;
         (*ctxt).err_nr = 0;
@@ -1181,9 +1170,6 @@ unsafe extern "C" fn xml_relaxng_add_valid_error(
         return;
     }
 
-    // #ifdef DEBUG_ERROR
-    //     xml_generic_error!(xmlGenericErrorContext, c"Adding error %d\n".as_ptr() as _, err);
-    // #endif
     /*
      * generate the error directly
      */
@@ -1306,10 +1292,9 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
         return -1;
     }
     if !xml_hash_lookup(registered_types, namespace).is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Relax-NG types library '%s' already registered\n".as_ptr() as _,
-            namespace
+        generic_error!(
+            "Relax-NG types library '{}' already registered\n",
+            CStr::from_ptr(namespace as *const i8).to_string_lossy()
         );
         return -1;
     }
@@ -1328,10 +1313,9 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     (*lib).freef = freef;
     let ret: c_int = xml_hash_add_entry(registered_types, namespace, lib as _);
     if ret < 0 {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Relax-NG types library failed to register '%s'\n".as_ptr() as _,
-            namespace
+        generic_error!(
+            "Relax-NG types library failed to register '{}'\n",
+            CStr::from_ptr(namespace as *const i8).to_string_lossy()
         );
         xml_relaxng_free_type_library(lib as _, namespace);
         return -1;
@@ -1767,10 +1751,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> c_int {
 
     let registered_types = xml_hash_create(10);
     if registered_types.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Failed to allocate sh table for Relax-NG types\n".as_ptr() as _,
-        );
+        generic_error!("Failed to allocate sh table for Relax-NG types\n");
         return -1;
     }
 
@@ -2458,10 +2439,6 @@ unsafe extern "C" fn xml_relaxng_get_elements(
 unsafe extern "C" fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level: c_int) {
     let mut err: XmlRelaxNGValidErrorPtr;
 
-    // #ifdef DEBUG_ERROR
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"Pop errors till level %d\n".as_ptr() as _, level);
-    // #endif
     for i in level..(*ctxt).err_nr {
         err = (*ctxt).err_tab.add(i as usize);
         if (*err).flags & ERROR_IS_DUP != 0 {
@@ -2869,19 +2846,12 @@ extern "C" fn xml_relaxng_compute_interleaves(
             return;
         }
 
-        // #ifdef DEBUG_INTERLEAVE
-        //     xml_generic_error!(xmlGenericErrorContext,
-        //                     c"xmlRelaxNGComputeInterleaves(%s)\n".as_ptr() as _, name);
-        // #endif
         cur = (*def).content;
         while !cur.is_null() {
             nbchild += 1;
             cur = (*cur).next;
         }
 
-        // #ifdef DEBUG_INTERLEAVE
-        //     xml_generic_error!(xmlGenericErrorContext, c"  %d child\n".as_ptr() as _, nbchild);
-        // #endif
         let groups: *mut XmlRelaxNGInterleaveGroupPtr =
             xml_malloc(nbchild as usize * size_of::<XmlRelaxNGInterleaveGroupPtr>()) as _;
         'goto_error: {
@@ -2904,9 +2874,6 @@ extern "C" fn xml_relaxng_compute_interleaves(
                 nbgroups += 1;
                 cur = (*cur).next;
             }
-            // #ifdef DEBUG_INTERLEAVE
-            //     xml_generic_error!(xmlGenericErrorContext, c"  %d groups\n".as_ptr() as _, nbgroups);
-            // #endif
 
             /*
              * Let's check that all rules makes a partitions according to 7.4
@@ -3537,15 +3504,6 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
     let mut tmp2: XmlNodePtr;
     let mut name2: *mut XmlChar;
 
-    // #ifdef DEBUG_INCLUDE
-    //     if name.is_null()
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //                         c"Elimination of <include> start from %s\n".as_ptr() as _, URL);
-    //     else
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //                         c"Elimination of <include> define %s from %s\n".as_ptr() as _,
-    //                         name, URL);
-    // #endif
     tmp = target;
     while !tmp.is_null() {
         tmp2 = (*tmp).next;
@@ -3620,11 +3578,6 @@ unsafe extern "C" fn xml_relaxng_load_include(
     let mut root: XmlNodePtr;
     let mut cur: XmlNodePtr;
 
-    // #ifdef DEBUG_INCLUDE
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"xmlRelaxNGLoadInclude(%s)\n".as_ptr() as _, URL);
-    // #endif
-
     /*
      * check against recursion in the stack
      */
@@ -3657,9 +3610,6 @@ unsafe extern "C" fn xml_relaxng_load_include(
         );
         return null_mut();
     }
-    // #ifdef DEBUG_INCLUDE
-    //     xml_generic_error!(xmlGenericErrorContext, c"Parsed %s Okay\n".as_ptr() as _, URL);
-    // #endif
 
     /*
      * Allocate the document structures and register it first.
@@ -3695,9 +3645,6 @@ unsafe extern "C" fn xml_relaxng_load_include(
      * Some preprocessing of the document content, this include recursing
      * in the include stack.
      */
-    // #ifdef DEBUG_INCLUDE
-    //     xml_generic_error!(xmlGenericErrorContext, c"cleanup of %s\n".as_ptr() as _, URL);
-    // #endif
 
     doc = xml_relaxng_cleanup_doc(ctxt, doc);
     if doc.is_null() {
@@ -3710,9 +3657,6 @@ unsafe extern "C" fn xml_relaxng_load_include(
      */
     xml_relaxng_include_pop(ctxt);
 
-    // #ifdef DEBUG_INCLUDE
-    //     xml_generic_error!(xmlGenericErrorContext, c"Checking of %s\n".as_ptr() as _, URL);
-    // #endif
     /*
      * Check that the top element is a grammar
      */
@@ -4535,11 +4479,6 @@ extern "C" fn xml_relaxng_check_combine(
 
             cur = (*cur).next_hash;
         }
-        // #ifdef DEBUG
-        //     xml_generic_error!(xmlGenericErrorContext,
-        //                     c"xmlRelaxNGCheckCombine(): merging %s defines: %d\n".as_ptr() as _,
-        //                     name, choiceOrInterleave);
-        // #endif
         if choice_or_interleave == -1 {
             choice_or_interleave = 0;
         }
@@ -6057,11 +5996,6 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
             );
         }
     } else if IS_RELAXNG!(node, c"grammar".as_ptr() as _) {
-        // #ifdef DEBUG_GRAMMAR
-        //         xml_generic_error!(xmlGenericErrorContext,
-        //                         c"Found <grammar> pattern\n".as_ptr() as _);
-        // #endif
-
         let oldparent: XmlRelaxNGGrammarPtr = (*ctxt).parentgrammar;
         let old: XmlRelaxNGGrammarPtr = (*ctxt).grammar;
         (*ctxt).parentgrammar = old;
@@ -6841,11 +6775,6 @@ unsafe extern "C" fn xml_relaxng_combine_start(
 
         cur = (*cur).next;
     }
-    // #ifdef DEBUG
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"xmlRelaxNGCombineStart(): merging <start>: %d\n".as_ptr() as _,
-    //                     choiceOrInterleave);
-    // #endif
     if choice_or_interleave == -1 {
         choice_or_interleave = 0;
     }
@@ -6912,10 +6841,6 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
     nodes: XmlNodePtr,
 ) -> XmlRelaxNGGrammarPtr {
     let mut tmp: XmlRelaxNGGrammarPtr;
-
-    // #ifdef DEBUG_GRAMMAR
-    //     xml_generic_error!(xmlGenericErrorContext, c"Parsing a new grammar\n".as_ptr() as _);
-    // #endif
 
     let ret: XmlRelaxNGGrammarPtr = xml_relaxng_new_grammar(ctxt);
     if ret.is_null() {
@@ -8299,11 +8224,6 @@ unsafe extern "C" fn xml_relaxng_parse_document(
             );
         }
     }
-    // #ifdef DEBUG
-    //     if schema.is_null()
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //                         c"xmlRelaxNGParseDocument() failed\n".as_ptr() as _);
-    // #endif
 
     schema
 }
@@ -8362,21 +8282,6 @@ unsafe extern "C" fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> c_in
                 } {
                     (*def).dflags |= IS_COMPILABLE as i16;
                 }
-                // #ifdef DEBUG_COMPILE
-                //                 if ret == 1 {
-                //                     xml_generic_error!(xmlGenericErrorContext,
-                //                                     c"element content for %s is compilable\n".as_ptr() as _,
-                //                                     (*def).name);
-                //                 } else if ret == 0 {
-                //                     xml_generic_error!(xmlGenericErrorContext,
-                //                                     c"element content for %s is not compilable\n".as_ptr() as _,
-                //                                     (*def).name);
-                //                 } else {
-                //                     xml_generic_error!(xmlGenericErrorContext,
-                //                                     c"Problem in RelaxNGIsCompilable for element %s\n".as_ptr() as _,
-                //                                     (*def).name);
-                //                 }
-                // #endif
             }
             /*
              * All elements return a compilable status unless they
@@ -8439,21 +8344,6 @@ unsafe extern "C" fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> c_in
     if ret == 1 {
         (*def).dflags |= IS_COMPILABLE as i16;
     }
-    // #ifdef DEBUG_COMPILE
-    //     if ret == 1 {
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //                         c"RelaxNGIsCompilable %s : true\n".as_ptr() as _,
-    //                         xmlRelaxNGDefName(def));
-    //     } else if ret == 0 {
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //                         c"RelaxNGIsCompilable %s : false\n".as_ptr() as _,
-    //                         xmlRelaxNGDefName(def));
-    //     } else {
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //                         c"Problem in RelaxNGIsCompilable %s\n".as_ptr() as _,
-    //                         xmlRelaxNGDefName(def));
-    //     }
-    // #endif
     ret
 }
 
@@ -8579,11 +8469,6 @@ unsafe extern "C" fn xml_relaxng_compile(
                 xml_automata_set_final_state((*ctxt).am, (*ctxt).state);
                 (*def).cont_model = xml_automata_compile((*ctxt).am);
                 if xml_regexp_is_determinist((*def).cont_model) == 0 {
-                    // #ifdef DEBUG_COMPILE
-                    //                     xml_generic_error!(xmlGenericErrorContext,
-                    //                         c"Content model not determinist %s\n".as_ptr() as _,
-                    //                                     (*def).name);
-                    // #endif
                     /*
                      * we can only use the automata if it is determinist
                      */
@@ -8738,24 +8623,6 @@ unsafe extern "C" fn xml_relaxng_try_compile(
         if (*def).dflags & IS_COMPILABLE as i16 != 0 && (*def).depth != -25 {
             (*ctxt).am = null_mut();
             ret = xml_relaxng_compile(ctxt, def);
-            // #ifdef DEBUG_PROGRESSIVE
-            //             if ret == 0 {
-            //                 if ((*def).typ == xmlRelaxNGType::XML_RELAXNG_START)
-            //                     xml_generic_error!(xmlGenericErrorContext,
-            //                                     c"compiled the start\n".as_ptr() as _);
-            //                 else
-            //                     xml_generic_error!(xmlGenericErrorContext,
-            //                                     c"compiled element %s\n".as_ptr() as _, (*def).name);
-            //             } else {
-            //                 if ((*def).typ == xmlRelaxNGType::XML_RELAXNG_START)
-            //                     xml_generic_error!(xmlGenericErrorContext,
-            //                                     c"failed to compile the start\n".as_ptr() as _);
-            //                 else
-            //                     xml_generic_error!(xmlGenericErrorContext,
-            //                                     c"failed to compile element %s\n".as_ptr() as _,
-            //                                     (*def).name);
-            //             }
-            // #endif
             return ret;
         }
     }
@@ -10059,12 +9926,6 @@ unsafe extern "C" fn xml_relaxng_validate_value(
                     cur = cur.add(1);
                 }
             }
-            // #ifdef DEBUG_LIST
-            //                 xml_generic_error!(xmlGenericErrorContext,
-            //                                 c"list value: '%s' found %d items\n".as_ptr() as _,
-            //                                 oldvalue, nb_values);
-            //                 nb_values = 0;
-            // #endif
             (*(*ctxt).state).endvalue = cur;
             cur = val;
             while *cur == 0 && cur != (*(*ctxt).state).endvalue {
@@ -10079,11 +9940,6 @@ unsafe extern "C" fn xml_relaxng_validate_value(
                 }
                 ret = xml_relaxng_validate_value(ctxt, list);
                 if ret != 0 {
-                    // #ifdef DEBUG_LIST
-                    //                         xml_generic_error!(xmlGenericErrorContext,
-                    //                                         c"Failed to validate value: '%s' with %d rule\n".as_ptr() as _,
-                    //                                         (*(*ctxt).state).value, nb_values);
-                    // #endif
                     break;
                 }
                 // #ifdef DEBUG_LIST
@@ -10368,11 +10224,6 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
         } else {
             ret = -1;
         }
-    // #ifdef DEBUG
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //                         c"xmlRelaxNGValidateAttribute(%s): %d\n".as_ptr() as _,
-    //                         (*define).name, ret);
-    // #endif
     } else {
         let mut j = (*(*ctxt).state).nb_attrs;
         for i in 0..(*(*ctxt).state).nb_attrs {
@@ -10408,17 +10259,6 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
         } else {
             ret = -1;
         }
-        // #ifdef DEBUG
-        //         if !(*define).ns.is_null() {
-        //             xml_generic_error!(xmlGenericErrorContext,
-        //                             c"xmlRelaxNGValidateAttribute(nsName ns = %s): %d\n".as_ptr() as _,
-        //                             (*define).ns, ret);
-        //         } else {
-        //             xml_generic_error!(xmlGenericErrorContext,
-        //                             c"xmlRelaxNGValidateAttribute(anyName): %d\n".as_ptr() as _,
-        //                             ret);
-        //         }
-        // #endif
     }
 
     ret
@@ -10502,10 +10342,6 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_callback(
         static stderr: *mut FILE;
     }
 
-    // #ifdef DEBUG_COMPILE
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"Compiled callback for: '%s'\n".as_ptr() as _, token);
-    // #endif
     if ctxt.is_null() {
         fprintf(
             stderr,
@@ -11381,18 +11217,6 @@ unsafe extern "C" fn xml_relaxng_validate_state(
     } else {
         node = null_mut();
     }
-    // #ifdef DEBUG
-    //     for (i = 0; i < (*ctxt).depth; i++)
-    //         xml_generic_error!(xmlGenericErrorContext, c" ".as_ptr() as _);
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"Start validating %s ".as_ptr() as _, xmlRelaxNGDefName(define));
-    //     if !(*define).name.is_null()
-    //         xml_generic_error!(xmlGenericErrorContext, c"%s ".as_ptr() as _, (*define).name);
-    //     if (!node.is_null() && ((*node).name != null_mut()))
-    //         xml_generic_error!(xmlGenericErrorContext, c"on %s\n".as_ptr() as _, (*node).name);
-    //     else
-    //         xml_generic_error!(xmlGenericErrorContext, c"\n".as_ptr() as _);
-    // #endif
     (*ctxt).depth += 1;
     match (*define).typ {
         XmlRelaxNGType::Empty => {
@@ -11530,11 +11354,6 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 (*ctxt).states = tmpstates;
                 xml_relaxng_free_valid_state(ctxt, nstate);
 
-                // #ifdef DEBUG_COMPILE
-                //                 xml_generic_error!(xmlGenericErrorContext,
-                //                                 c"Validating content of '%s' : %d\n".as_ptr() as _,
-                //                                 (*define).name, tmp);
-                // #endif
                 if tmp != 0 {
                     ret = -1;
                 }
@@ -11663,22 +11482,6 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             } else if (*ctxt).err_nr > err_nr {
                 xml_relaxng_pop_errors(ctxt, err_nr);
             }
-
-            // #ifdef DEBUG
-            //             xml_generic_error!(xmlGenericErrorContext,
-            //                             c"xmlRelaxNGValidateDefinition(): validated %s : %d".as_ptr() as _,
-            //                             (*node).name, ret);
-            //             if (oldstate.is_null())
-            //                 xml_generic_error!(xmlGenericErrorContext, c": no state\n".as_ptr() as _);
-            //             else if ((*oldstate).seq.is_null())
-            //                 xml_generic_error!(xmlGenericErrorContext, c": done\n".as_ptr() as _);
-            //             else if ((*oldstate).seq->type == XmlElementType::XmlElementNode)
-            //                 xml_generic_error!(xmlGenericErrorContext, c": next elem %s\n".as_ptr() as _,
-            //                                 (*oldstate).seq->name);
-            //             else
-            //                 xml_generic_error!(xmlGenericErrorContext, c": next %s %d\n".as_ptr() as _,
-            //                                 (*oldstate).seq->name, (*oldstate).seq->type);
-            // #endif
         }
         XmlRelaxNGType::Optional => 'to_break: {
             err_nr = (*ctxt).err_nr;
@@ -12176,18 +11979,6 @@ unsafe extern "C" fn xml_relaxng_validate_state(
         }
     }
     (*ctxt).depth -= 1;
-    // #ifdef DEBUG
-    //     for (i = 0; i < (*ctxt).depth; i++)
-    //         xml_generic_error!(xmlGenericErrorContext, c" ".as_ptr() as _);
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"Validating %s ".as_ptr() as _, xmlRelaxNGDefName(define));
-    //     if !(*define).name.is_null()
-    //         xml_generic_error!(xmlGenericErrorContext, c"%s ".as_ptr() as _, (*define).name);
-    //     if ret == 0
-    //         xml_generic_error!(xmlGenericErrorContext, c"succeeded\n".as_ptr() as _);
-    //     else
-    //         xml_generic_error!(xmlGenericErrorContext, c"failed\n".as_ptr() as _);
-    // #endif
     ret
 }
 
@@ -12542,10 +12333,6 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
         static stderr: *mut FILE;
     }
 
-    // #ifdef DEBUG_PROGRESSIVE
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     c"Progressive callback for: '%s'\n".as_ptr() as _, token);
-    // #endif
     if ctxt.is_null() {
         fprintf(
             stderr,
@@ -12606,11 +12393,6 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
         /*
          * this node cannot be validated in a streamable fashion
          */
-        // #ifdef DEBUG_PROGRESSIVE
-        //         xml_generic_error!(xmlGenericErrorContext,
-        //                         c"Element '%s' validation is not streamable\n".as_ptr() as _,
-        //                         token);
-        // #endif
         (*ctxt).pstate = 0;
         (*ctxt).pdef = define;
         return;
@@ -12756,9 +12538,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_element(
         return -1;
     }
 
-    // #ifdef DEBUG_PROGRESSIVE
-    //     xml_generic_error!(xmlGenericErrorContext, c"PushElem %s\n".as_ptr() as _, (*elem).name);
-    // #endif
     if (*ctxt).elem.is_null() {
         let schema: XmlRelaxNGPtr = (*ctxt).schema;
         if schema.is_null() {
@@ -12810,11 +12589,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_element(
     } else {
         ret = 1;
     }
-    // #ifdef DEBUG_PROGRESSIVE
-    //     if ret < 0
-    //         xml_generic_error!(xmlGenericErrorContext, c"PushElem %s failed\n".as_ptr() as _,
-    //                         (*elem).name);
-    // #endif
     ret
 }
 
@@ -12837,10 +12611,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_cdata(
         return -1;
     }
 
-    // #ifdef DEBUG_PROGRESSIVE
-    //     xml_generic_error!(xmlGenericErrorContext, c"CDATA %s %d\n".as_ptr() as _, data, len);
-    // #endif
-
     while *data != 0 {
         if !IS_BLANK_CH!(*data) {
             break;
@@ -12858,9 +12628,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_cdata(
             XmlRelaxNGValidErr::XmlRelaxngErrTextwrong,
             c" TODO ".as_ptr() as _
         );
-        // #ifdef DEBUG_PROGRESSIVE
-        //         xml_generic_error!(xmlGenericErrorContext, c"CDATA failed\n".as_ptr() as _);
-        // #endif
 
         return -1;
     }
@@ -12887,9 +12654,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_pop_element(
     if ctxt.is_null() || (*ctxt).elem.is_null() || elem.is_null() {
         return -1;
     }
-    // #ifdef DEBUG_PROGRESSIVE
-    //     xml_generic_error!(xmlGenericErrorContext, c"PopElem %s\n".as_ptr() as _, (*elem).name);
-    // #endif
     /*
      * verify that we reached a terminal state of the content model.
      */
@@ -12915,11 +12679,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_pop_element(
         }
     }
     xml_reg_free_exec_ctxt(exec);
-    // #ifdef DEBUG_PROGRESSIVE
-    //     if ret < 0
-    //         xml_generic_error!(xmlGenericErrorContext, c"PopElem %s failed\n".as_ptr() as _,
-    //                         (*elem).name);
-    // #endif
     ret
 }
 
@@ -12944,9 +12703,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_full_element(
     if ctxt.is_null() || (*ctxt).pdef.is_null() || elem.is_null() {
         return -1;
     }
-    // #ifdef DEBUG_PROGRESSIVE
-    //     xml_generic_error!(xmlGenericErrorContext, c"FullElem %s\n".as_ptr() as _, (*elem).name);
-    // #endif
     let state: XmlRelaxNGValidStatePtr = xml_relaxng_new_valid_state(ctxt, (*elem).parent);
     if state.is_null() {
         return -1;
@@ -12962,11 +12718,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_full_element(
     }
     xml_relaxng_free_valid_state(ctxt, (*ctxt).state);
     (*ctxt).state = null_mut();
-    // #ifdef DEBUG_PROGRESSIVE
-    //     if ret < 0
-    //         xml_generic_error!(xmlGenericErrorContext, c"FullElem %s failed\n".as_ptr() as _,
-    //                         (*elem).name);
-    // #endif
     ret
 }
 

@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int},
+    ffi::{c_char, c_int, CStr},
     mem::zeroed,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null_mut},
@@ -13,11 +13,7 @@ use std::{
 
 use libc::{fprintf, fputc, strlen, FILE};
 
-use crate::{
-    __xml_raise_error,
-    libxml::{entities::XmlEntityPtr, globals::xml_generic_error_context},
-    xml_generic_error, IS_BLANK_CH,
-};
+use crate::{__xml_raise_error, generic_error, libxml::entities::XmlEntityPtr, IS_BLANK_CH};
 
 #[cfg(feature = "xpath")]
 use super::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr};
@@ -2246,6 +2242,10 @@ pub type XmlShellCmd = unsafe extern "C" fn(
  */
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: c_int, mut arg: *const c_char) {
+    use std::ffi::CStr;
+
+    use crate::generic_error;
+
     let default_arg: *const c_char = c"Result".as_ptr();
 
     if arg.is_null() {
@@ -2254,78 +2254,43 @@ pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: c_int, mut arg:
 
     match XmlXPathObjectType::try_from(error_type) {
         Ok(XmlXPathObjectType::XpathUndefined) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s: no such node\n".as_ptr(),
-                arg
-            );
+            generic_error!("{}: no such node\n", CStr::from_ptr(arg).to_string_lossy());
         }
         Ok(XmlXPathObjectType::XpathBoolean) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s is a Boolean\n".as_ptr(),
-                arg
-            );
+            generic_error!("{} is a Boolean\n", CStr::from_ptr(arg).to_string_lossy());
         }
         Ok(XmlXPathObjectType::XpathNumber) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s is a number\n".as_ptr(),
-                arg
-            );
+            generic_error!("{} is a number\n", CStr::from_ptr(arg).to_string_lossy());
         }
         Ok(XmlXPathObjectType::XpathString) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s is a string\n".as_ptr(),
-                arg
-            );
+            generic_error!("{} is a string\n", CStr::from_ptr(arg).to_string_lossy());
         }
         #[cfg(feature = "libxml_xptr_locs")]
         Ok(XmlXPathObjectType::XpathPoint) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s is a point\n".as_ptr(),
-                arg
-            );
+            generic_error!("{} is a point\n", CStr::from_ptr(arg).to_string_lossy());
         }
         #[cfg(feature = "libxml_xptr_locs")]
         Ok(XmlXPathObjectType::XpathRange) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s is a range\n".as_ptr(),
-                arg
-            );
+            generic_error!("{} is a range\n", CStr::from_ptr(arg).to_string_lossy());
         }
         #[cfg(feature = "libxml_xptr_locs")]
         Ok(XmlXPathObjectType::XpathLocationset) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s is a range\n".as_ptr(),
-                arg
-            );
+            generic_error!("{} is a range\n", CStr::from_ptr(arg).to_string_lossy());
         }
         Ok(XmlXPathObjectType::XpathUsers) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s is user-defined\n".as_ptr(),
-                arg
+            generic_error!(
+                "{} is user-defined\n",
+                CStr::from_ptr(arg).to_string_lossy()
             );
         }
         Ok(XmlXPathObjectType::XpathXsltTree) => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"%s is an XSLT value tree\n".as_ptr(),
-                arg
+            generic_error!(
+                "{} is an XSLT value tree\n",
+                CStr::from_ptr(arg).to_string_lossy()
             );
         }
         _ => unreachable!(),
     }
-    // #if 0
-    //     xml_generic_error!(xmlGenericErrorContext(),
-    //                c"Try casting the result string function (xpath builtin)\n",
-    //                     arg);
-    // #endif
 }
 
 /**
@@ -2391,32 +2356,26 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
                         );
                     }
                 } else {
-                    xml_generic_error!(xml_generic_error_context(), c"Empty node set\n".as_ptr());
+                    generic_error!("Empty node set\n");
                 }
                 #[cfg(not(feature = "output"))]
                 {
-                    xml_generic_error!(xml_generic_error_context(), c"Node set\n".as_ptr());
+                    generic_error!("Node set\n");
                 }
             }
             XmlXPathObjectType::XpathBoolean => {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Is a Boolean:%s\n".as_ptr(),
-                    xml_bool_to_text((*list).boolval)
+                generic_error!(
+                    "Is a Boolean:{}\n",
+                    CStr::from_ptr(xml_bool_to_text((*list).boolval)).to_string_lossy()
                 );
             }
             XmlXPathObjectType::XpathNumber => {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Is a number:%0g\n".as_ptr(),
-                    (*list).floatval
-                );
+                generic_error!("Is a number:{}\n", (*list).floatval);
             }
             XmlXPathObjectType::XpathString => {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Is a string:%s\n".as_ptr(),
-                    (*list).stringval
+                generic_error!(
+                    "Is a string:{}\n",
+                    CStr::from_ptr((*list).stringval as *const i8).to_string_lossy()
                 );
             }
             _ => {
@@ -2737,19 +2696,12 @@ pub unsafe extern "C" fn xml_shell_write(
     if filename.is_null() || *filename.add(0) == 0 {
         return -1;
     }
-    // #ifdef W_OK
-    //     if (access(filename as *mut c_char, W_OK)) {
-    //         xml_generic_error!(xmlGenericErrorContext(), c"Cannot write to %s\n".as_ptr(), filename);
-    //         return -1;
-    //     }
-    // #endif
     match (*node).typ {
         XmlElementType::XmlDocumentNode => {
             if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Failed to write to %s\n".as_ptr(),
-                    filename
+                generic_error!(
+                    "Failed to write to {}\n",
+                    CStr::from_ptr(filename as *const i8).to_string_lossy()
                 );
                 return -1;
             }
@@ -2757,19 +2709,17 @@ pub unsafe extern "C" fn xml_shell_write(
         XmlElementType::XmlHtmlDocumentNode => {
             #[cfg(feature = "html")]
             if html_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Failed to write to %s\n".as_ptr(),
-                    filename
+                generic_error!(
+                    "Failed to write to {}\n",
+                    CStr::from_ptr(filename as *const i8).to_string_lossy()
                 );
                 return -1;
             }
             #[cfg(not(feature = "html"))]
             if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Failed to write to %s\n".as_ptr(),
-                    filename
+                generic_error!(
+                    "Failed to write to {}\n",
+                    CStr::from_ptr(filename as *const i8).to_string_lossy()
                 );
                 return -1;
             }
@@ -2777,10 +2727,9 @@ pub unsafe extern "C" fn xml_shell_write(
         _ => {
             let f: *mut FILE = fopen(filename as *mut c_char, c"w".as_ptr());
             if f.is_null() {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Failed to write to %s\n".as_ptr(),
-                    filename
+                generic_error!(
+                    "Failed to write to {}\n",
+                    CStr::from_ptr(filename as *const i8).to_string_lossy()
                 );
                 return -1;
             }
@@ -2823,45 +2772,33 @@ pub unsafe extern "C" fn xml_shell_save(
     if filename.is_null() {
         return -1;
     }
-    // #ifdef W_OK
-    //     if (access(filename as *mut c_char, W_OK)) {
-    //         xml_generic_error!(xmlGenericErrorContext(), c"Cannot save to %s\n".as_ptr(), filename);
-    //         return -1;
-    //     }
-    // #endif
     match (*(*ctxt).doc).typ {
         XmlElementType::XmlDocumentNode => {
             if xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Failed to save to %s\n".as_ptr(),
-                    filename
+                generic_error!(
+                    "Failed to save to {}\n",
+                    CStr::from_ptr(filename as *const i8).to_string_lossy()
                 );
             }
         }
         XmlElementType::XmlHtmlDocumentNode => {
             #[cfg(feature = "html")]
             if html_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Failed to save to %s\n".as_ptr(),
-                    filename
+                generic_error!(
+                    "Failed to save to {}\n",
+                    CStr::from_ptr(filename as *const i8).to_string_lossy()
                 );
             }
             #[cfg(not(feature = "html"))]
             if (xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0) {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Failed to save to %s\n".as_ptr(),
-                    filename
+                generic_error!(
+                    "Failed to save to {}\n",
+                    CStr::from_ptr(filename as *const i8).to_string_lossy()
                 );
             }
         }
         _ => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"To save to subparts of a document use the 'write' command\n".as_ptr()
-            );
+            generic_error!("To save to subparts of a document use the 'write' command\n");
             return -1;
         }
     }
@@ -3110,10 +3047,9 @@ unsafe extern "C" fn xml_shell_rng_validate(
     let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
     xml_relaxng_free_parser_ctxt(ctxt);
     if relaxngschemas.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Relax-NG schema %s failed to compile\n".as_ptr(),
-            schemas
+        generic_error!(
+            "Relax-NG schema {} failed to compile\n",
+            CStr::from_ptr(schemas as *const i8).to_string_lossy()
         );
         return -1;
     }
@@ -3768,10 +3704,7 @@ pub unsafe extern "C" fn xml_shell(
         } {
             #[cfg(feature = "output")]
             if arg[0] == 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Write command requires a filename argument\n".as_ptr()
-                );
+                generic_error!("Write command requires a filename argument\n");
             } else {
                 xml_shell_write(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
             }
@@ -3809,10 +3742,9 @@ pub unsafe extern "C" fn xml_shell(
                 if !list.is_null() {
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s: no such node\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{}: no such node\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNodeset => {
@@ -3830,62 +3762,54 @@ pub unsafe extern "C" fn xml_shell(
                             }
                         }
                         XmlXPathObjectType::XpathBoolean => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a Boolean\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a Boolean\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a number\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a number\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathString => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a string\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a string\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a point\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a point\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is user-defined\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is user-defined\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is an XSLT value tree\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is an XSLT value tree\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                     }
@@ -3894,10 +3818,9 @@ pub unsafe extern "C" fn xml_shell(
                         xml_xpath_free_object(list);
                     }
                 } else {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"%s: no such node\n".as_ptr(),
-                        arg
+                    generic_error!(
+                        "{}: no such node\n",
+                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
                 (*(*ctxt).pctxt).node = null_mut();
@@ -3918,10 +3841,7 @@ pub unsafe extern "C" fn xml_shell(
         } {
             #[cfg(feature = "xpath")]
             if arg[0] == 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"setns: prefix=[nsuri] required\n".as_ptr()
-                );
+                generic_error!("setns: prefix=[nsuri] required\n");
             } else {
                 xml_shell_register_namespace(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
@@ -3952,10 +3872,7 @@ pub unsafe extern "C" fn xml_shell(
         } {
             #[cfg(feature = "xpath")]
             if arg[0] == 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"xpath: expression required\n".as_ptr()
-                );
+                generic_error!("xpath: expression required\n");
             } else {
                 (*(*ctxt).pctxt).node = (*ctxt).node;
                 list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
@@ -4001,10 +3918,9 @@ pub unsafe extern "C" fn xml_shell(
                 if !list.is_null() {
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s: no such node\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{}: no such node\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNodeset => {
@@ -4031,62 +3947,54 @@ pub unsafe extern "C" fn xml_shell(
                             }
                         }
                         XmlXPathObjectType::XpathBoolean => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a Boolean\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a Boolean\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a number\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a number\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathString => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a string\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a string\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a point\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a point\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is user-defined\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is user-defined\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is an XSLT value tree\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is an XSLT value tree\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                     }
@@ -4095,10 +4003,9 @@ pub unsafe extern "C" fn xml_shell(
                         xml_xpath_free_object(list);
                     }
                 } else {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"%s: no such node\n".as_ptr(),
-                        arg
+                    generic_error!(
+                        "{}: no such node\n",
+                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
                 (*(*ctxt).pctxt).node = null_mut();
@@ -4123,10 +4030,9 @@ pub unsafe extern "C" fn xml_shell(
                 if !list.is_null() {
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s: no such node\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{}: no such node\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNodeset => {
@@ -4147,62 +4053,54 @@ pub unsafe extern "C" fn xml_shell(
                             }
                         }
                         XmlXPathObjectType::XpathBoolean => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a Boolean\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a Boolean\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a number\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a number\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathString => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a string\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a string\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a point\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a point\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is user-defined\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is user-defined\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is an XSLT value tree\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is an XSLT value tree\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                     }
@@ -4211,10 +4109,9 @@ pub unsafe extern "C" fn xml_shell(
                         xml_xpath_free_object(list);
                     }
                 } else {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"%s: no such node\n".as_ptr(),
-                        arg
+                    generic_error!(
+                        "{}: no such node\n",
+                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
                 (*(*ctxt).pctxt).node = null_mut();
@@ -4239,10 +4136,9 @@ pub unsafe extern "C" fn xml_shell(
                 if !list.is_null() {
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s: no such node\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{}: no such node\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNodeset => {
@@ -4252,85 +4148,72 @@ pub unsafe extern "C" fn xml_shell(
                                     if !(*ctxt).node.is_null()
                                         && ((*(*ctxt).node).typ == XmlElementType::XmlNamespaceDecl)
                                     {
-                                        xml_generic_error!(
-                                            xml_generic_error_context(),
-                                            c"cannot cd to namespace\n".as_ptr()
-                                        );
+                                        generic_error!("cannot cd to namespace\n");
                                         (*ctxt).node = null_mut();
                                     }
                                 } else {
-                                    xml_generic_error!(
-                                        xml_generic_error_context(),
-                                        c"%s is a %d Node Set\n".as_ptr(),
-                                        arg,
+                                    generic_error!(
+                                        "{} is a {} Node Set\n",
+                                        CStr::from_ptr(arg.as_ptr()).to_string_lossy(),
                                         (*(*list).nodesetval).node_nr
                                     );
                                 }
                             } else {
-                                xml_generic_error!(
-                                    xml_generic_error_context(),
-                                    c"%s is an empty Node Set\n".as_ptr(),
-                                    arg
+                                generic_error!(
+                                    "{} is an empty Node Set\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                                 );
                             }
                         }
                         XmlXPathObjectType::XpathBoolean => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a Boolean\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a Boolean\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a number\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a number\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathString => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a string\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a string\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a point\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a point\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is user-defined\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is user-defined\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is an XSLT value tree\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is an XSLT value tree\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                     }
@@ -4339,10 +4222,9 @@ pub unsafe extern "C" fn xml_shell(
                         xml_xpath_free_object(list);
                     }
                 } else {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"%s: no such node\n".as_ptr(),
-                        arg
+                    generic_error!(
+                        "{}: no such node\n",
+                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
 
@@ -4375,10 +4257,9 @@ pub unsafe extern "C" fn xml_shell(
                 if !list.is_null() {
                     match (*list).typ {
                         XmlXPathObjectType::XpathUndefined => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s: no such node\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{}: no such node\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNodeset => {
@@ -4399,62 +4280,54 @@ pub unsafe extern "C" fn xml_shell(
                             }
                         }
                         XmlXPathObjectType::XpathBoolean => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a Boolean\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a Boolean\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathNumber => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a number\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a number\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathString => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a string\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a string\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathPoint => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a point\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a point\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathRange => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
                         XmlXPathObjectType::XpathLocationset => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is a range\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is a range\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathUsers => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is user-defined\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is user-defined\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         XmlXPathObjectType::XpathXsltTree => {
-                            xml_generic_error!(
-                                xml_generic_error_context(),
-                                c"%s is an XSLT value tree\n".as_ptr(),
-                                arg
+                            generic_error!(
+                                "{} is an XSLT value tree\n",
+                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                     }
@@ -4463,19 +4336,17 @@ pub unsafe extern "C" fn xml_shell(
                         xml_xpath_free_object(list);
                     }
                 } else {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"%s: no such node\n".as_ptr(),
-                        arg
+                    generic_error!(
+                        "{}: no such node\n",
+                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
                 (*(*ctxt).pctxt).node = null_mut();
             }
         } else {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Unknown command %s\n".as_ptr(),
-                command
+            generic_error!(
+                "Unknown command {}\n",
+                CStr::from_ptr(command.as_ptr()).to_string_lossy()
             );
         }
         free(cmdline as _); /* not xmlFree here ! */

@@ -336,16 +336,13 @@ pub unsafe extern "C" fn xml_cleanup_threads() {}
  */
 #[cfg(feature = "thread")]
 unsafe extern "C" fn xml_new_global_state() -> XmlGlobalStatePtr {
-    use crate::{libxml::globals::xml_generic_error_context, xml_generic_error};
+    use crate::generic_error;
 
     use super::globals::xml_initialize_global_state;
 
     let gs: *mut XmlGlobalState = malloc(size_of::<XmlGlobalState>()) as _;
     if gs.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlGetGlobalState: out of memory\n".as_ptr() as _
-        );
+        generic_error!("xmlGetGlobalState: out of memory\n");
         return null_mut();
     }
 

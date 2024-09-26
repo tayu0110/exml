@@ -18,9 +18,7 @@ use crate::{
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         encoding::{xml_find_char_encoding_handler, XmlCharEncoding, XmlCharEncodingHandlerPtr},
-        globals::{
-            xml_deregister_node_default_value, xml_free, xml_generic_error_context, xml_malloc,
-        },
+        globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
         parser::{
             xml_byte_consumed, xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options,
             xml_free_parser_ctxt, xml_parse_chunk, xml_stop_parser, CdataBlockSAXFunc,
@@ -86,7 +84,6 @@ use crate::{
         xml_buf_create_size, xml_buf_empty, xml_buf_free, xml_buf_reset_input,
         xml_buf_set_allocation_scheme,
     },
-    xml_generic_error,
 };
 
 /**
@@ -535,15 +532,14 @@ pub unsafe extern "C" fn xml_new_text_reader(
     input: XmlParserInputBufferPtr,
     uri: *const c_char,
 ) -> XmlTextReaderPtr {
+    use crate::generic_error;
+
     if input.is_null() {
         return null_mut();
     }
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
     if ret.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlNewTextReader : malloc failed\n".as_ptr() as _
-        );
+        generic_error!("xmlNewTextReader : malloc failed\n");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlTextReader>());
@@ -555,10 +551,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
     (*ret).buffer = xml_buf_create_size(100);
     if (*ret).buffer.is_null() {
         xml_free(ret as _);
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlNewTextReader : malloc failed\n".as_ptr() as _
-        );
+        generic_error!("xmlNewTextReader : malloc failed\n");
         return null_mut();
     }
     /* no operation on a reader should require a huge buffer */
@@ -570,10 +563,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
     if (*ret).sax.is_null() {
         xml_buf_free((*ret).buffer);
         xml_free(ret as _);
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlNewTextReader : malloc failed\n".as_ptr() as _
-        );
+        generic_error!("xmlNewTextReader : malloc failed\n");
         return null_mut();
     }
     xml_sax_version((*ret).sax, 2);
@@ -629,10 +619,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
     }
 
     if (*ret).ctxt.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlNewTextReader : malloc failed\n".as_ptr() as _
-        );
+        generic_error!("xmlNewTextReader : malloc failed\n");
         xml_buf_free((*ret).buffer);
         xml_free((*ret).sax as _);
         xml_free(ret as _);
@@ -795,7 +782,10 @@ pub unsafe extern "C" fn xml_text_reader_setup(
     encoding: *const c_char,
     mut options: c_int,
 ) -> c_int {
-    use crate::libxml::xinclude::{xml_xinclude_free_context, XINCLUDE_NODE};
+    use crate::{
+        generic_error,
+        libxml::xinclude::{xml_xinclude_free_context, XINCLUDE_NODE},
+    };
 
     if reader.is_null() {
         if !input.is_null() {
@@ -830,10 +820,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         (*reader).buffer = xml_buf_create_size(100);
     }
     if (*reader).buffer.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlTextReaderSetup : malloc failed\n".as_ptr() as _
-        );
+        generic_error!("xmlTextReaderSetup : malloc failed\n");
         return -1;
     }
     /* no operation on a reader should require a huge buffer */
@@ -845,10 +832,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
         (*reader).sax = xml_malloc(size_of::<XmlSAXHandler>()) as *mut XmlSAXHandler;
     }
     if (*reader).sax.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlTextReaderSetup : malloc failed\n".as_ptr() as _
-        );
+        generic_error!("xmlTextReaderSetup : malloc failed\n");
         return -1;
     }
     xml_sax_version((*reader).sax, 2);
@@ -931,10 +915,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
             (*reader).cur = 0;
         }
         if (*reader).ctxt.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlTextReaderSetup : malloc failed\n".as_ptr() as _
-            );
+            generic_error!("xmlTextReaderSetup : malloc failed\n");
             return -1;
         }
     }
@@ -1625,6 +1606,8 @@ unsafe extern "C" fn xml_text_reader_ent_push(
     reader: XmlTextReaderPtr,
     value: XmlNodePtr,
 ) -> c_int {
+    use crate::generic_error;
+
     use super::globals::xml_realloc;
 
     if (*reader).ent_nr >= (*reader).ent_max {
@@ -1638,10 +1621,7 @@ unsafe extern "C" fn xml_text_reader_ent_push(
             xml_realloc((*reader).ent_tab as _, new_size * size_of::<XmlNodePtr>())
                 as *mut XmlNodePtr;
         if tmp.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlRealloc failed !\n".as_ptr() as _
-            );
+            generic_error!("xmlRealloc failed !\n");
             return -1;
         }
         (*reader).ent_tab = tmp;
@@ -3238,6 +3218,8 @@ pub unsafe extern "C" fn xml_text_reader_const_string(
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -> *const XmlChar {
+    use crate::generic_error;
+
     if reader.is_null() {
         return null_mut();
     }
@@ -3267,10 +3249,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -
                 if (*reader).buffer.is_null() {
                     (*reader).buffer = xml_buf_create_size(100);
                     if (*reader).buffer.is_null() {
-                        xml_generic_error!(
-                            xml_generic_error_context(),
-                            c"xmlTextReaderSetup : malloc failed\n".as_ptr() as _
-                        );
+                        generic_error!("xmlTextReaderSetup : malloc failed\n");
                         return null_mut();
                     }
                     xml_buf_set_allocation_scheme(
@@ -4638,6 +4617,8 @@ pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
     pattern: *const XmlChar,
     namespaces: *mut *const XmlChar,
 ) -> c_int {
+    use crate::generic_error;
+
     use super::globals::xml_realloc;
 
     if reader.is_null() || pattern.is_null() {
@@ -4655,10 +4636,7 @@ pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
             (*reader).pattern_max as usize * size_of_val(&*(*reader).pattern_tab.add(0)),
         ) as *mut XmlPatternPtr;
         if (*reader).pattern_tab.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlMalloc failed !\n".as_ptr() as _
-            );
+            generic_error!("xmlMalloc failed !\n");
             return -1;
         }
     }
@@ -4669,10 +4647,7 @@ pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
             (*reader).pattern_max as usize * size_of_val(&*(*reader).pattern_tab.add(0)),
         ) as *mut XmlPatternPtr;
         if tmp.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlRealloc failed !\n".as_ptr() as _
-            );
+            generic_error!("xmlRealloc failed !\n");
             (*reader).pattern_max /= 2;
             return -1;
         }
@@ -5786,16 +5761,15 @@ pub unsafe extern "C" fn xml_text_reader_byte_consumed(reader: XmlTextReaderPtr)
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
+    use crate::generic_error;
+
     if doc.is_null() {
         return null_mut();
     }
 
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
     if ret.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlNewTextReader : malloc failed\n".as_ptr() as _
-        );
+        generic_error!("xmlNewTextReader : malloc failed\n");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlTextReader>());

@@ -170,15 +170,6 @@ pub unsafe extern "C" fn xml_nanohttp_scan_proxy(url: *const c_char) {
     }
     PROXY_PORT.store(0, Ordering::Relaxed);
 
-    // #ifdef DEBUG_HTTP
-    //     if URL.is_null() {
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //             "Removing HTTP proxy info\n");
-    //     }
-    //     else
-    // 	xml_generic_error!(xmlGenericErrorContext,
-    // 		"Using HTTP proxy %s\n".as_ptr() as _, URL);
-    // #endif
     if url.is_null() {
         return;
     }
@@ -970,11 +961,6 @@ unsafe extern "C" fn xml_nanohttp_connect_host(host: *const c_char, port: c_int)
         }
     }
 
-    // #ifdef DEBUG_HTTP
-    //     xml_generic_error!(xmlGenericErrorContext,
-    //                     "xmlNanoHTTPConnectHost:  unable to connect to '%s'.\n",
-    //                     host);
-    // #endif
     INVALID_SOCKET
 }
 
@@ -1501,42 +1487,14 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             snprintf(p, blen - p.offset_from(bp) as usize, c"\r\n".as_ptr() as _);
         }
 
-        // #ifdef DEBUG_HTTP
-        //     xml_generic_error!(xmlGenericErrorContext,
-        // 	    "-> %s%s".as_ptr() as _, use_proxy ? "(Proxy) " : "".as_ptr() as _, bp);
-        //     if ((blen -= strlen(bp)+1) < 0)
-        // 	xml_generic_error!(xmlGenericErrorContext,
-        // 		"ERROR: overflowed buffer by %d bytes\n".as_ptr() as _, -blen);
-        // #endif
         (*ctxt).outptr = bp;
         (*ctxt).out = bp;
         (*ctxt).state = XML_NANO_HTTP_WRITE as _;
         blen = strlen((*ctxt).out);
-        // #ifdef DEBUG_HTTP
-        //     xmt_bytes = xmlNanoHTTPSend(ctxt, (*ctxt).out, blen );
-        //     if ( xmt_bytes != blen )
-        //         xml_generic_error!( xmlGenericErrorContext,
-        // 			"xmlNanoHTTPMethodRedir:  Only %d of %d %s %s\n".as_ptr() as _,
-        // 			xmt_bytes, blen,
-        // 			"bytes of HTTP headers sent to host".as_ptr() as _,
-        // 			(*ctxt).hostname );
-        // #else
         xml_nanohttp_send(ctxt, (*ctxt).out, blen as _);
-        // #endif
 
         if !input.is_null() {
-            // #ifdef DEBUG_HTTP
-            //         xmt_bytes = xmlNanoHTTPSend( ctxt, input, ilen );
-
-            // 	if ( xmt_bytes != ilen )
-            // 	    xml_generic_error!( xmlGenericErrorContext,
-            // 			"xmlNanoHTTPMethodRedir:  Only %d of %d %s %s\n".as_ptr() as _,
-            // 			xmt_bytes, ilen,
-            // 			"bytes of HTTP content sent to host".as_ptr() as _,
-            // 			(*ctxt).hostname );
-            // #else
             xml_nanohttp_send(ctxt, input, ilen);
-            // #endif
         }
 
         (*ctxt).state = XML_NANO_HTTP_READ as _;
@@ -1552,9 +1510,6 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             }
             xml_nanohttp_scan_answer(ctxt, p);
 
-            // #ifdef DEBUG_HTTP
-            // 	xml_generic_error!(xmlGenericErrorContext, c"<- %s\n".as_ptr() as _, p);
-            // #endif
             xml_free(p as _);
         }
 
@@ -1562,10 +1517,6 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             && ((*ctxt).return_value >= 300)
             && ((*ctxt).return_value < 400)
         {
-            // #ifdef DEBUG_HTTP
-            // 	xml_generic_error!(xmlGenericErrorContext,
-            // 		"\nRedirect to: %s\n".as_ptr() as _, (*ctxt).location);
-            // #endif
             while xml_nanohttp_recv(ctxt) > 0 {}
             if nb_redirects < XML_NANO_HTTP_MAX_REDIR as i32 {
                 nb_redirects += 1;
@@ -1583,10 +1534,6 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
         if !redir_url.is_null() {
             xml_free(redir_url as _);
         }
-        // #ifdef DEBUG_HTTP
-        // 	xml_generic_error!(xmlGenericErrorContext,
-        // 		"xmlNanoHTTPMethodRedir: Too many redirects, aborting ...\n");
-        // #endif
         return null_mut();
     }
 
@@ -1608,17 +1555,6 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             *redir = null_mut();
         }
     }
-
-    // #ifdef DEBUG_HTTP
-    //     if !(*ctxt).contentType.is_null()
-    // 	xml_generic_error!(xmlGenericErrorContext,
-    // 		"\nCode %d, content-type '%s'\n\n".as_ptr() as _,
-    // 	       (*ctxt).returnValue, (*ctxt).contentType);
-    //     else
-    // 	xml_generic_error!(xmlGenericErrorContext,
-    // 		"\nCode %d, no content-type\n\n".as_ptr() as _,
-    // 	       (*ctxt).returnValue);
-    // #endif
 
     ctxt as _
 }

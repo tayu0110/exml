@@ -7,15 +7,17 @@ use std::{
     ptr::{addr_of_mut, null_mut},
 };
 
-use exml::libxml::{
-    catalog::{xml_catalog_cleanup, xml_load_catalog},
-    globals::{xml_do_validity_checking_default_value, xml_generic_error_context},
-    parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
-    tree::{xml_free_doc, XmlDocPtr},
-    xmlerror::xml_set_generic_error_func,
-    xmlmemory::xml_memory_dump,
+use exml::{
+    globals::set_generic_error,
+    libxml::{
+        catalog::{xml_catalog_cleanup, xml_load_catalog},
+        globals::xml_do_validity_checking_default_value,
+        parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
+        tree::{xml_free_doc, XmlDocPtr},
+        xmlmemory::xml_memory_dump,
+    },
 };
-use libc::{memset, pthread_create, pthread_join, pthread_t, strcmp, FILE};
+use libc::{memset, pthread_create, pthread_join, pthread_t, strcmp};
 
 const MAX_ARGC: usize = 20;
 const TEST_REPEAT_COUNT: usize = 500;
@@ -66,17 +68,12 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         let filename: *const c_char = (*params).filename.as_ptr();
         let mut okay: c_int = 1;
 
-        extern "C" {
-            static stdout: *mut FILE;
-            static stderr: *mut FILE;
-        }
-
         if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
             *xml_do_validity_checking_default_value() = 0;
-            xml_set_generic_error_func(stdout as _, None);
+            set_generic_error(None, Some(std::io::stdout()));
         } else {
             *xml_do_validity_checking_default_value() = 1;
-            xml_set_generic_error_func(stderr as _, None);
+            set_generic_error(None, Some(std::io::stderr()));
         }
         #[cfg(feature = "sax1")]
         {
@@ -97,19 +94,9 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
-            if xml_generic_error_context() != stdout as _ {
-                println!("xmlGenericErrorContext override failed");
-                okay = 0;
-            }
-        } else {
-            if *xml_do_validity_checking_default_value() != 1 {
-                println!("ValidityCheckingDefaultValue override failed");
-                okay = 0;
-            }
-            if xml_generic_error_context() != stderr as _ {
-                println!("xmlGenericErrorContext override failed");
-                okay = 0;
-            }
+        } else if *xml_do_validity_checking_default_value() != 1 {
+            println!("ValidityCheckingDefaultValue override failed");
+            okay = 0;
         }
         (*params).okay = okay;
         null_mut()

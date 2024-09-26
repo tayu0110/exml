@@ -14,6 +14,7 @@ use std::{
 use libc::{memcpy, memset};
 
 use crate::{
+    generic_error,
     libxml::{
         encoding::{
             xml_char_enc_close_func, xml_find_char_encoding_handler, xml_parse_char_encoding,
@@ -21,8 +22,8 @@ use crate::{
         },
         entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{
-            xml_free, xml_generic_error_context, xml_indent_tree_output, xml_malloc,
-            xml_save_no_empty_tags, xml_tree_indent_string,
+            xml_free, xml_indent_tree_output, xml_malloc, xml_save_no_empty_tags,
+            xml_tree_indent_string,
         },
         htmltree::{
             html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
@@ -58,7 +59,7 @@ use crate::{
         error::__xml_simple_error,
         save::xml_buf_attr_serialize_txt_content,
     },
-    xml_generic_error, IS_BYTE_CHAR, IS_CHAR,
+    IS_BYTE_CHAR, IS_CHAR,
 };
 
 const MAX_INDENT: usize = 60;
@@ -408,10 +409,7 @@ unsafe extern "C" fn xml_escape_entities(
             out = xml_serialize_hex_char_ref(out, *input as _);
             input = input.add(1);
         } else {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlEscapeEntities : char out of range\n".as_ptr() as _
-            );
+            generic_error!("xmlEscapeEntities : char out of range\n");
             input = input.add(1);
             // goto error;
             *outlen = out.offset_from(outstart) as _;

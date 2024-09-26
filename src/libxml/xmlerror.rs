@@ -4,15 +4,17 @@
 //! Please refer to original libxml2 documents also.
 
 use std::ffi::{c_char, c_int, c_uint, c_void, CStr};
+use std::fs::File;
 use std::io::Write;
 use std::mem::{size_of, size_of_val};
 use std::os::fd::FromRawFd;
 use std::ptr::{addr_of_mut, null_mut};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use libc::{memcpy, memset, FILE};
+use libc::{fflush, fileno, memcpy, memset, FILE};
 
 use crate::error::generic_error_default;
+use crate::globals::set_generic_error;
 use crate::libxml::globals::_XML_GENERIC_ERROR;
 use crate::libxml::parser::{XmlParserCtxtPtr, XmlParserInputPtr};
 
@@ -1024,6 +1026,20 @@ pub unsafe extern "C" fn xml_set_generic_error_func(
         (*xml_get_global_state()).xml_generic_error =
             handler.or(Some(xml_generic_error_default_func));
     }
+    set_generic_error(
+        Some({
+            let mut handler = handler.unwrap_or(xml_generic_error_default_func);
+            let ptr_value = addr_of_mut!(handler) as usize;
+            let ptr = ptr_value as *const fn(Option<&mut (dyn Write + 'static)>, &str);
+            *ptr
+        }),
+        (!ctx.is_null()).then(|| {
+            let file = ctx as *mut FILE;
+            fflush(file);
+            let fd = fileno(file);
+            File::from_raw_fd(fd)
+        }),
+    );
 }
 
 /**

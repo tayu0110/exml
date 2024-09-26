@@ -22,7 +22,7 @@ use crate::{
     },
 };
 
-type GenericError = for<'a> fn(Option<&mut (dyn Write + 'a)>, &str);
+type GenericError = for<'a> fn(Option<&mut (dyn Write + 'static)>, &str);
 
 pub struct XmlGlobalState {
     parser_version: Cow<'static, str>,
@@ -34,8 +34,8 @@ pub struct XmlGlobalState {
     malloc_atomic: Option<XmlMallocFunc>,
     realloc: Option<XmlReallocFunc>,
     mem_strdup: Option<XmlStrdupFunc>,
-    pub generic_error: GenericError,
-    pub generic_error_context: Option<Box<dyn Write>>,
+    pub(crate) generic_error: GenericError,
+    pub(crate) generic_error_context: Option<Box<dyn Write>>,
     structured_error: Option<XmlStructuredErrorFunc>,
     structured_error_context: *mut c_void,
     old_xml_wd_compatibility: bool,
@@ -125,4 +125,18 @@ impl XmlGlobalState {
 
 thread_local! {
     pub static GLOBAL_STATE: RefCell<XmlGlobalState> = RefCell::new(XmlGlobalState::new());
+}
+
+/// Set new generic error function and generic error context.
+///
+/// If `func` is `None`, set `generic_error_default`.  
+/// If `context` is `None`, current context is clear and no context is set.  
+pub fn set_generic_error(func: Option<GenericError>, context: Option<impl Write + 'static>) {
+    GLOBAL_STATE.with_borrow_mut(|state| {
+        state.generic_error = func.unwrap_or(generic_error_default);
+        state.generic_error_context = context.map(|context| {
+            let boxed: Box<dyn Write + 'static> = Box::new(context);
+            boxed
+        });
+    });
 }

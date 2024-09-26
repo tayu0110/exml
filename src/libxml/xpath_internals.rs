@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, CString},
+    ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, CStr},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null, null_mut},
@@ -22,13 +22,10 @@ use crate::libxml::xpointer::{
     XmlLocationSetPtr,
 };
 use crate::{
-    __xml_raise_error,
+    __xml_raise_error, generic_error,
     libxml::{
         dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
-        globals::{
-            xml_free, xml_generic_error, xml_generic_error_context, xml_malloc, xml_malloc_atomic,
-            xml_realloc,
-        },
+        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_default_deallocator,
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_remove_entry,
@@ -70,9 +67,9 @@ use crate::{
         },
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
-    xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_generic_error,
-    xml_str_printf, IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH,
-    IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH, IS_COMBINING, IS_DIGIT,
+    IS_EXTENDER, IS_LETTER,
 };
 
 /************************************************************************
@@ -4821,12 +4818,7 @@ unsafe extern "C" fn xml_xpath_comp_node_test(
     mut name: *mut XmlChar,
 ) -> *mut XmlChar {
     if test.is_null() || typ.is_null() || prefix.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Internal error at %s:%d\n".as_ptr(),
-            file!(),
-            line!()
-        );
+        generic_error!("Internal error at {}:{}\n", file!(), line!());
         return null_mut();
     }
     *typ = XmlXPathTypeVal::NodeTypeNode;
@@ -6441,10 +6433,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                 if !goto_scan_children {
                     if (*ctxt).op_limit != 0 {
                         if (*ctxt).op_count >= (*ctxt).op_limit {
-                            xml_generic_error(
-                                xml_generic_error_context(),
-                                c"XPath operation limit exceeded\n".as_ptr() as _,
-                            );
+                            generic_error!("XPath operation limit exceeded\n");
                             xml_free_stream_ctxt(patstream);
                             return -1;
                         }
@@ -7244,10 +7233,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_predicate(
             (*(*comp).steps.add((*op).ch1 as usize)).op,
             XmlXPathOp::XpathOpPredicate
         ) {
-            xml_generic_error(
-                xml_generic_error_context(),
-                c"xmlXPathCompOpEvalPredicate: Expected a predicate\n".as_ptr() as _,
-            );
+            generic_error!("xmlXPathCompOpEvalPredicate: Expected a predicate\n");
             XP_ERROR!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
         }
         if (*(*ctxt).context).depth >= XPATH_MAX_RECURSION_DEPTH as i32 {
@@ -7665,13 +7651,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
             match test {
                 XmlXPathTestVal::NodeTestNone => {
                     total = 0;
-                    let file = CString::new(file!()).unwrap();
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Internal error at %s:%d\n".as_ptr() as _,
-                        file.as_ptr(),
-                        line!()
-                    );
+                    generic_error!("Internal error at {}:{}\n", file!(), line!());
                     // goto error;
                     break 'main;
                 }
@@ -8746,12 +8726,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
             } else {
                 let uri: *const XmlChar = xml_xpath_ns_lookup((*ctxt).context, (*op).value5 as _);
                 if uri.is_null() {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"xmlXPathCompOpEval: variable %s bound to undefined prefix %s\n".as_ptr()
-                            as _,
-                        (*op).value4 as *mut c_char,
-                        (*op).value5 as *mut c_char
+                    generic_error!(
+                        "xmlXPathCompOpEval: variable {} bound to undefined prefix {}\n",
+                        CStr::from_ptr((*op).value4 as *const i8).to_string_lossy(),
+                        CStr::from_ptr((*op).value5 as *const i8).to_string_lossy()
                     );
                     (*ctxt).error = XmlXPathError::XpathUndefPrefixError as _;
                     break 'to_break;
@@ -8774,10 +8752,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                 }
             }
             if (*ctxt).value_nr < frame + (*op).value {
-                xml_generic_error(
-                    xml_generic_error_context(),
-                    c"xmlXPathCompOpEval: parameter error\n".as_ptr(),
-                );
+                generic_error!("xmlXPathCompOpEval: parameter error\n");
                 (*ctxt).error = XmlXPathError::XpathInvalidOperand as i32;
                 break 'to_break;
             }
@@ -8787,10 +8762,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                     .add(((*ctxt).value_nr as usize - 1) - i as usize))
                 .is_null()
                 {
-                    xml_generic_error(
-                        xml_generic_error_context(),
-                        c"xmlXPathCompOpEval: parameter error\n".as_ptr(),
-                    );
+                    generic_error!("xmlXPathCompOpEval: parameter error\n");
                     (*ctxt).error = XmlXPathError::XpathInvalidOperand as i32;
                     break;
                 }
@@ -8805,12 +8777,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                 } else {
                     uri = xml_xpath_ns_lookup((*ctxt).context, (*op).value5 as _);
                     if uri.is_null() {
-                        xml_generic_error!(
-                            xml_generic_error_context(),
-                            c"xmlXPathCompOpEval: function %s bound to undefined prefix %s\n"
-                                .as_ptr(),
-                            (*op).value4 as *mut c_char,
-                            (*op).value5 as *mut c_char
+                        generic_error!(
+                            "xmlXPathCompOpEval: function {} bound to undefined prefix {}\n",
+                            CStr::from_ptr((*op).value4 as *const i8).to_string_lossy(),
+                            CStr::from_ptr((*op).value5 as *const i8).to_string_lossy()
                         );
                         (*ctxt).error = XmlXPathError::XpathUndefPrefixError as i32;
                         break 'to_break;
@@ -8820,10 +8790,9 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                 if let Some(f) = f {
                     func = f;
                 } else {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"xmlXPathCompOpEval: function %s not found\n".as_ptr(),
-                        (*op).value4 as *mut c_char
+                    generic_error!(
+                        "xmlXPathCompOpEval: function {} not found\n",
+                        CStr::from_ptr((*op).value4 as *mut i8).to_string_lossy()
                     );
                     XP_ERROR0!(ctxt, XmlXPathError::XpathUnknownFuncError as i32);
                 }
@@ -9183,9 +9152,8 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
             (*(*ctxt).context).context_size = oldcs;
             (*(*ctxt).context).proximity_position = oldpp;
         } // _ => {
-          //     xml_generic_error!(
-          //         xml_generic_error_context(),
-          //         c"XPath: unknown precompiled operation %d\n".as_ptr(),
+          //     generic_error!(
+          //         "XPath: unknown precompiled operation {}\n",
           //         (*op).op
           //     );
           //     (*ctxt).error = XmlXPathError::XpathInvalidOperand as i32;
@@ -9369,10 +9337,7 @@ pub(crate) unsafe extern "C" fn xml_xpath_run_eval(
     }
     let comp: XmlXPathCompExprPtr = (*ctxt).comp;
     if (*comp).last < 0 {
-        xml_generic_error(
-            xml_generic_error_context(),
-            c"xmlXPathRunEval: last is less than zero\n".as_ptr(),
-        );
+        generic_error!("xmlXPathRunEval: last is less than zero\n");
         return -1;
     }
     let old_depth: c_int = (*(*ctxt).context).depth;
@@ -9820,13 +9785,7 @@ pub unsafe extern "C" fn xml_xpath_evaluate_predicate_result(
             return ((*ptr).loc_nr != 0) as i32;
         }
         _ => {
-            let file = CString::new(file!()).unwrap();
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Internal error at %s:%d\n".as_ptr(),
-                file.as_ptr(),
-                line!()
-            );
+            generic_error!("Internal error at {}:{}\n", file!(), line!());
         }
     }
     0
@@ -11644,10 +11603,8 @@ unsafe extern "C" fn xml_xpath_compare_node_set_value(
             xml_xpath_compare_values(ctxt, inf, strict)
         }
         _ => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlXPathCompareNodeSetValue: Can't compare node set and object of type %d\n"
-                    .as_ptr() as _,
+            generic_error!(
+                "xmlXPathCompareNodeSetValue: Can't compare node set and object of type {:?}\n",
                 (*val).typ
             );
             xml_xpath_release_object((*ctxt).context, arg);
@@ -13796,10 +13753,7 @@ pub unsafe extern "C" fn xml_xpath_translate_function(
             if ch & 0x80 != 0 {
                 /* if not simple ascii, verify proper format */
                 if ch & 0xc0 != 0xc0 {
-                    xml_generic_error(
-                        xml_generic_error_context(),
-                        c"xmlXPathTranslateFunction: Invalid UTF8 string\n".as_ptr(),
-                    );
+                    generic_error!("xmlXPathTranslateFunction: Invalid UTF8 string\n");
                     /* not asserting an XPath error is probably better */
                     break;
                 }
@@ -13811,10 +13765,7 @@ pub unsafe extern "C" fn xml_xpath_translate_function(
                     let f = *cptr & 0xc0 != 0x80;
                     cptr = cptr.add(1);
                     if f {
-                        xml_generic_error(
-                            xml_generic_error_context(),
-                            c"xmlXPathTranslateFunction: Invalid UTF8 string\n".as_ptr(),
-                        );
+                        generic_error!("xmlXPathTranslateFunction: Invalid UTF8 string\n");
                         /* not asserting an XPath error is probably better */
                         break;
                     }

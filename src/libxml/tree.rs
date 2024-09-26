@@ -2653,15 +2653,10 @@ pub unsafe extern "C" fn xmlNewGlobalNs(
 ) -> XmlNsPtr {
     use std::sync::atomic::AtomicBool;
 
-    use crate::{libxml::globals::xml_generic_error_context, xml_generic_error};
-
     static DEPRECATED: AtomicBool = AtomicBool::new(false);
 
     if !DEPRECATED.load(Ordering::Acquire) {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"xmlNewGlobalNs() deprecated function reached\n".as_ptr() as _
-        );
+        generic_error!("xmlNewGlobalNs() deprecated function reached\n");
         DEPRECATED.store(true, Ordering::Release);
     }
     null_mut()
@@ -9799,10 +9794,6 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
     let mut handler: XmlCharEncodingHandlerPtr = null_mut();
 
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xml_generic_error!(xmlGenericErrorContext,
-        // 		c"xmlDocDump : document.is_null()\n".as_ptr() as _);
-        // #endif
         return -1;
     }
     encoding = (*cur).encoding as _;
@@ -9865,18 +9856,8 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
     xml_init_parser();
 
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xml_generic_error!(xmlGenericErrorContext,
-        //                         c"xmlElemDump : cur.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
-    // #ifdef DEBUG_TREE
-    //     if doc.is_null() {
-    //         xml_generic_error!(xmlGenericErrorContext,
-    //                         c"xmlElemDump : doc.is_null()\n".as_ptr() as _);
-    //     }
-    // #endif
 
     let outbuf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, null_mut());
     if outbuf.is_null() {
@@ -9972,17 +9953,9 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     xml_init_parser();
 
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xml_generic_error!(xmlGenericErrorContext,
-        //                         c"xmlNodeDump : node.is_null()\n".as_ptr() as _);
-        // #endif
         return usize::MAX;
     }
     if buf.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xml_generic_error!(xmlGenericErrorContext,
-        //                         c"xmlNodeDump : buf.is_null()\n".as_ptr() as _);
-        // #endif
         return usize::MAX;
     }
     let outbuf: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as _;

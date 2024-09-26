@@ -14,6 +14,8 @@ use std::{
 
 use libc::{memset, size_t, snprintf, strchr};
 
+#[cfg(feature = "legacy")]
+use crate::generic_error;
 use crate::{
     __xml_raise_error,
     libxml::{
@@ -37,8 +39,6 @@ use crate::{
     private::error::__xml_simple_error,
     IS_BYTE_CHAR, IS_CHAR,
 };
-#[cfg(feature = "legacy")]
-use crate::{libxml::globals::xml_generic_error_context, xml_generic_error};
 
 use super::hash::CVoidWrapper;
 
@@ -853,14 +853,8 @@ pub unsafe extern "C" fn xmlEncodeEntities(
     static WARNING: AtomicI32 = AtomicI32::new(1);
 
     if WARNING.load(Ordering::Acquire) != 0 {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Deprecated API xmlEncodeEntities() used\n".as_ptr() as _
-        );
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"   change code to use xmlEncodeEntitiesReentrant()\n".as_ptr() as _
-        );
+        generic_error!("Deprecated API xmlEncodeEntities() used\n");
+        generic_error!("   change code to use xmlEncodeEntitiesReentrant()\n");
         WARNING.store(0, Ordering::Release);
     }
     null()
