@@ -978,7 +978,7 @@ pub(crate) unsafe extern "C" fn xml_generic_error_default_func(
 ) {
     let msg = CStr::from_ptr(msg).to_string_lossy();
     if xml_generic_error_context().is_null() {
-        generic_error_default(None::<&mut std::io::Stderr>, &msg);
+        generic_error_default(None::<&mut dyn Write>, &msg);
     } else {
         let fp = xml_generic_error_context() as *mut FILE;
         // The buffers of C/Rust stdio are separated,
