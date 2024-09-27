@@ -172,10 +172,6 @@ pub(crate) unsafe extern "C" fn xml_buf_set_allocation_scheme(
     scheme: XmlBufferAllocationScheme,
 ) -> c_int {
     if buf.is_null() || (*buf).error != 0 {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		"xmlBufSetAllocationScheme: buf.is_null() or in error\n");
-        // #endif
         return -1;
     }
     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo) {
@@ -215,10 +211,6 @@ pub(crate) unsafe extern "C" fn xml_buf_set_allocation_scheme(
  */
 pub(crate) unsafe extern "C" fn xml_buf_get_allocation_scheme(buf: XmlBufPtr) -> c_int {
     if buf.is_null() {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		"xmlBufGetAllocationScheme: buf.is_null()\n");
-        // #endif
         return -1;
     }
     (*buf).alloc as _
@@ -233,10 +225,6 @@ pub(crate) unsafe extern "C" fn xml_buf_get_allocation_scheme(buf: XmlBufPtr) ->
  */
 pub(crate) unsafe extern "C" fn xml_buf_free(buf: XmlBufPtr) {
     if buf.is_null() {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		"xmlBufFree: buf.is_null()\n");
-        // #endif
         return;
     }
 
@@ -560,10 +548,6 @@ pub(crate) unsafe extern "C" fn xml_buf_add(
     CHECK_COMPAT!(buf);
 
     if len < -1 {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		"xmlBufAdd: len < 0\n");
-        // #endif
         return -1;
     }
     if len == 0 {
@@ -672,10 +656,6 @@ pub(crate) unsafe extern "C" fn xml_buf_write_quoted_string(
     CHECK_COMPAT!(buf);
     if !xml_strchr(string, b'\"').is_null() {
         if !xml_strchr(string, b'\'').is_null() {
-            // #ifdef DEBUG_BUFFER
-            // 	    xmlGenericError(xmlGenericErrorContext,
-            //  "xmlBufWriteQuotedString: string contains quote and double-quotes !\n");
-            // #endif
             xml_buf_ccat(buf, c"\"".as_ptr() as _);
             base = string;
             cur = string;
@@ -836,17 +816,9 @@ pub(crate) unsafe extern "C" fn xml_buf_detach(buf: XmlBufPtr) -> *mut XmlChar {
  */
 pub(crate) unsafe extern "C" fn xml_buf_dump(mut file: *mut FILE, buf: XmlBufPtr) -> size_t {
     if buf.is_null() || (*buf).error != 0 {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		"xmlBufDump: buf.is_null() or in error\n");
-        // #endif
         return 0;
     }
     if (*buf).content.is_null() {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		"xmlBufDump: (*buf).content.is_null()\n");
-        // #endif
         return 0;
     }
     CHECK_COMPAT!(buf);
