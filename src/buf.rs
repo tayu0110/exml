@@ -423,6 +423,20 @@ impl XmlBuf {
     pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
         self.content.as_mut_ptr()
     }
+
+    pub(crate) fn add_len(&mut self, additional: usize) -> Result<(), anyhow::Error> {
+        ensure!(
+            self.error.is_ok(),
+            "Failed to add len: some errors have already occured."
+        );
+        ensure!(
+            self.len() + additional < self.capacity(),
+            "requested length is too large."
+        );
+        self.next_use += additional;
+        self.content[self.next_use] = 0;
+        Ok(())
+    }
 }
 
 pub(crate) struct XmlBufRef(NonNull<XmlBuf>);
@@ -440,6 +454,14 @@ impl XmlBufRef {
         let boxed = Box::new(new);
         let leaked = Box::leak(boxed);
         NonNull::new(leaked).map(Self)
+    }
+
+    pub(crate) fn from_raw(ptr: *mut XmlBuf) -> Option<Self> {
+        NonNull::new(ptr).map(Self)
+    }
+
+    pub(crate) fn into_inner(self) -> XmlBuf {
+        unsafe { *Box::from_raw(self.0.as_ptr()) }
     }
 }
 
@@ -462,5 +484,194 @@ impl Deref for XmlBufRef {
 impl DerefMut for XmlBufRef {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut() }
+    }
+}
+
+pub mod libxml_api {
+    use std::{fs::File, mem::forget, os::fd::FromRawFd};
+
+    use libc::{fileno, FILE};
+
+    use super::*;
+
+    pub(crate) type XmlBufPtr = *mut XmlBuf;
+
+    pub(crate) extern "C" fn xml_buf_create() -> XmlBufPtr {
+        XmlBufRef::new().map_or(null_mut(), |ptr| ptr.0.as_ptr())
+    }
+
+    pub(crate) extern "C" fn xml_buf_create_size(size: usize) -> XmlBufPtr {
+        XmlBufRef::with_capacity(size).map_or(null_mut(), |ptr| ptr.0.as_ptr())
+    }
+
+    pub(crate) extern "C" fn xml_buf_set_allocation_scheme(
+        buf: XmlBufPtr,
+        scheme: XmlBufferAllocationScheme,
+    ) -> i32 {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return -1;
+        };
+
+        match buf.set_allocation_scheme(scheme) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
+    }
+
+    pub(crate) extern "C" fn xml_buf_get_allocation_scheme(buf: XmlBufPtr) -> i32 {
+        let Some(buf) = XmlBufRef::from_raw(buf) else {
+            return -1;
+        };
+        buf.scheme as i32
+    }
+
+    pub(crate) extern "C" fn xml_buf_free(buf: XmlBufPtr) {
+        let Some(buf) = XmlBufRef::from_raw(buf) else {
+            return;
+        };
+        let _ = buf.into_inner();
+    }
+
+    pub(crate) extern "C" fn xml_buf_empty(buf: XmlBufPtr) {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return;
+        };
+        buf.clear();
+    }
+
+    pub(crate) extern "C" fn xml_buf_grow(buf: XmlBufPtr, len: i32) -> i32 {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return -1;
+        };
+
+        if len < 0 {
+            return -1;
+        }
+
+        buf.grow(len as usize)
+            .map_or(-1, |res| res.min(i32::MAX as usize) as i32)
+    }
+
+    pub(crate) extern "C" fn xml_buf_resize(buf: XmlBufPtr, size: usize) -> i32 {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return 0;
+        };
+        buf.resize(size).is_ok() as i32
+    }
+
+    /// # Safety
+    /// - `str` must be a valid NULL-terminated string.
+    pub(crate) unsafe extern "C" fn xml_buf_add(buf: XmlBufPtr, str: *const u8, len: i32) -> i32 {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return -1;
+        };
+        if str.is_null() || len < -1 {
+            return -1;
+        }
+
+        let bytes = CStr::from_ptr(str as *const i8).to_bytes();
+        if len == 0 || bytes.is_empty() {
+            return 0;
+        }
+
+        let res = if len == -1 {
+            buf.push_bytes(bytes)
+        } else {
+            buf.push_bytes(&bytes[..len as usize])
+        };
+
+        match res {
+            Ok(_) => 0,
+            Err(None) => -1,
+            Err(Some(code)) => code as i32,
+        }
+    }
+
+    /// # Safety
+    /// - `str` must be a valid NULL-terminated string.
+    pub(crate) unsafe extern "C" fn xml_buf_cat(buf: XmlBufPtr, str: *const u8) -> i32 {
+        let Some(buf) = XmlBufRef::from_raw(buf) else {
+            return -1;
+        };
+        if str.is_null() {
+            return -1;
+        }
+        xml_buf_add(buf.0.as_ptr(), str, -1)
+    }
+
+    /// # Safety
+    /// - `str` must be a valid NULL-terminated string.
+    pub(crate) unsafe extern "C" fn xml_buf_ccat(buf: XmlBufPtr, str: *const i8) -> i32 {
+        xml_buf_cat(buf, str as _)
+    }
+
+    /// # Safety
+    /// - `string` must be a valid NULL-terminated string.
+    pub(crate) unsafe extern "C" fn xml_buf_write_quoted_string(
+        buf: XmlBufPtr,
+        string: *const u8,
+    ) -> i32 {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return -1;
+        };
+        let s = CStr::from_ptr(string as *const i8);
+        match buf.push_quoted_str(s) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
+    }
+
+    pub(crate) extern "C" fn xml_buf_avail(buf: XmlBufPtr) -> usize {
+        XmlBufRef::from_raw(buf).map_or(0, |buf| buf.avail())
+    }
+
+    pub(crate) extern "C" fn xml_buf_length(buf: XmlBufPtr) -> usize {
+        XmlBufRef::from_raw(buf).map_or(0, |buf| buf.len())
+    }
+
+    pub(crate) extern "C" fn xml_buf_is_empty(buf: XmlBufPtr) -> i32 {
+        XmlBufRef::from_raw(buf).map_or(-1, |buf| buf.is_empty() as i32)
+    }
+
+    pub(crate) extern "C" fn xml_buf_add_len(buf: XmlBufPtr, len: usize) -> i32 {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return -1;
+        };
+        match buf.add_len(len) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
+    }
+
+    /// # Safety
+    /// - Returned memory should be managed at Rust API side.   
+    ///   <strong>DO NOT return in any other way than `Box::from_raw`</strong>.
+    pub(crate) unsafe extern "C" fn xml_buf_detach(buf: XmlBufPtr) -> *mut u8 {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return null_mut();
+        };
+        buf.detach()
+            .map_or(null_mut(), |buf| Box::leak(buf).as_mut_ptr())
+    }
+
+    /// # Safety
+    /// - `file` is transformed to Rust `File` in this method,
+    ///   so the order of the output may change due to buffering.
+    pub(crate) unsafe extern "C" fn xml_buf_dump(file: *mut FILE, buf: XmlBufPtr) -> usize {
+        let Some(buf) = XmlBufRef::from_raw(buf) else {
+            return 0;
+        };
+        if file.is_null() {
+            buf.dump(None::<&mut File>).unwrap_or(0)
+        } else {
+            let mut file = File::from_raw_fd(fileno(file));
+            let res = buf.dump(Some(&mut file));
+            file.flush().ok();
+            // `File` owns the file stream and try to free it when `file` is dropped.
+            // However, the file stream may be used at C side after this point,
+            // so we should prevent to drop `file`.
+            forget(file);
+            res.unwrap_or(0)
+        }
     }
 }
