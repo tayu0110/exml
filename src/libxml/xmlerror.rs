@@ -946,6 +946,12 @@ impl_xml_parser_errors!(
     XmlBufOverflow = 7000
 );
 
+impl XmlParserErrors {
+    pub fn is_ok(&self) -> bool {
+        *self == Self::XmlErrOK
+    }
+}
+
 /**
  * xmlGenericErrorFunc:
  * @ctx:  a parsing context

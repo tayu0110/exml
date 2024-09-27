@@ -12,6 +12,7 @@
 #![warn(unused_variables)]
 #![warn(unused_unsafe)]
 
+mod buf;
 pub mod dict;
 pub mod error;
 pub mod globals;
