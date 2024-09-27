@@ -419,9 +419,29 @@ impl XmlBuf {
         }
         .map(|_| self.len())
     }
+
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.content.as_mut_ptr()
+    }
 }
 
 pub(crate) struct XmlBufRef(NonNull<XmlBuf>);
+
+impl XmlBufRef {
+    pub(crate) fn new() -> Option<Self> {
+        let new = XmlBuf::new();
+        let boxed = Box::new(new);
+        let leaked = Box::leak(boxed);
+        NonNull::new(leaked).map(Self)
+    }
+
+    pub(crate) fn with_capacity(size: usize) -> Option<Self> {
+        let new = XmlBuf::with_capacity(size);
+        let boxed = Box::new(new);
+        let leaked = Box::leak(boxed);
+        NonNull::new(leaked).map(Self)
+    }
+}
 
 impl Clone for XmlBufRef {
     fn clone(&self) -> Self {
