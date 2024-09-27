@@ -2,7 +2,8 @@ use std::{
     ffi::{CStr, CString},
     io::{ErrorKind, Write},
     mem::take,
-    ptr::null_mut,
+    ops::{Deref, DerefMut},
+    ptr::{null_mut, NonNull},
 };
 
 use anyhow::{bail, ensure};
@@ -417,5 +418,29 @@ impl XmlBuf {
             std::io::stdout().write_all(&self.content[..self.next_use])
         }
         .map(|_| self.len())
+    }
+}
+
+pub(crate) struct XmlBufRef(NonNull<XmlBuf>);
+
+impl Clone for XmlBufRef {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl Copy for XmlBufRef {}
+
+impl Deref for XmlBufRef {
+    type Target = XmlBuf;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl DerefMut for XmlBufRef {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.0.as_mut() }
     }
 }
