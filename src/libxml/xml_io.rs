@@ -12,6 +12,7 @@ use std::{
     ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void},
     mem::{size_of, zeroed},
     ptr::{addr_of_mut, null, null_mut},
+    slice::from_raw_parts,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
@@ -27,6 +28,8 @@ use libc::{
 
 use crate::{
     __xml_raise_error,
+    buf::XmlBufRef,
+    globals::GLOBAL_STATE,
     libxml::{
         encoding::xml_find_char_encoding_handler,
         globals::xml_mem_strdup,
@@ -177,9 +180,9 @@ pub struct XmlParserInputBuffer {
 
     pub(crate) encoder: XmlCharEncodingHandlerPtr, /* I18N conversions to UTF-8 */
 
-    pub buffer: XmlBufPtr,        /* Local buffer encoded in UTF-8 */
-    pub(crate) raw: XmlBufPtr,    /* if encoder != NULL buffer for raw input */
-    pub(crate) compressed: c_int, /* -1=unknown, 0=not compressed, 1=compressed */
+    pub buffer: Option<XmlBufRef>, /* Local buffer encoded in UTF-8 */
+    pub(crate) raw: XmlBufPtr,     /* if encoder != NULL buffer for raw input */
+    pub(crate) compressed: c_int,  /* -1=unknown, 0=not compressed, 1=compressed */
     pub(crate) error: c_int,
     pub(crate) rawconsumed: c_ulong, /* amount consumed from raw */
 }
@@ -360,15 +363,13 @@ pub unsafe extern "C" fn xml_alloc_parser_input_buffer(
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlParserInputBuffer>());
-    (*ret).buffer = xml_buf_create_size(2 * *xml_default_buffer_size() as usize);
-    if (*ret).buffer.is_null() {
+    let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
+    let Some(mut new_buf) = XmlBufRef::with_capacity(2 * default_buffer_size) else {
         xml_free(ret as _);
         return null_mut();
-    }
-    xml_buf_set_allocation_scheme(
-        (*ret).buffer,
-        XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
-    );
+    };
+    (*ret).buffer = Some(new_buf);
+    new_buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     (*ret).encoder = xml_get_char_encoding_handler(enc);
     if !(*ret).encoder.is_null() {
         (*ret).raw = xml_buf_create_size(2 * *xml_default_buffer_size() as usize);
@@ -735,8 +736,6 @@ pub unsafe extern "C" fn xml_parser_input_buffer_create_mem(
     size: c_int,
     enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
-    let errcode: c_int;
-
     if size < 0 {
         return null_mut();
     }
@@ -749,8 +748,12 @@ pub unsafe extern "C" fn xml_parser_input_buffer_create_mem(
         (*ret).context = mem as _;
         (*ret).readcallback = None;
         (*ret).closecallback = None;
-        errcode = xml_buf_add((*ret).buffer as _, mem as _, size);
-        if errcode != 0 {
+        if (*ret)
+            .buffer
+            .expect("Internal Error")
+            .push_bytes(from_raw_parts(mem as *const u8, size as usize))
+            .is_err()
+        {
             xml_free_parser_input_buffer(ret);
             return null_mut();
         }
@@ -864,7 +867,6 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
     input: XmlParserInputBufferPtr,
     mut len: c_int,
 ) -> c_int {
-    let buf: XmlBufPtr;
     let mut res: c_int = 0;
 
     if input.is_null() || (*input).error != 0 {
@@ -874,17 +876,17 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
         len = MINLEN as i32;
     }
 
-    if (*input).encoder.is_null() {
+    let buf = if (*input).encoder.is_null() {
         if (*input).readcallback.is_none() {
             return 0;
         }
-        buf = (*input).buffer;
+        (*input).buffer.map_or(null_mut(), |ptr| ptr.as_ptr())
     } else {
         if (*input).raw.is_null() {
             (*input).raw = xml_buf_create();
         }
-        buf = (*input).raw;
-    }
+        (*input).raw
+    };
 
     /*
      * Call the read method for this I/O type.
@@ -1002,16 +1004,16 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
         }
     } else {
         nbchars = len;
-        ret = xml_buf_add((*input).buffer, buf as _, nbchars);
-        if ret != 0 {
+        if buf.is_null()
+            || (*input)
+                .buffer
+                .expect("Internal Error")
+                .push_bytes(from_raw_parts(buf as *const u8, nbchars as usize))
+                .is_err()
+        {
             return -1;
         }
     }
-    // #ifdef DEBUG_INPUT
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "I/O: pushed %d chars, buffer %d/%d\n",
-    //             nbchars, xmlBufUse((*input).buffer), xmlBufLength((*input).buffer));
-    // #endif
     nbchars
 }
 
@@ -1036,9 +1038,8 @@ pub unsafe extern "C" fn xml_free_parser_input_buffer(input: XmlParserInputBuffe
     if let Some(callback) = (*input).closecallback {
         callback((*input).context);
     }
-    if !(*input).buffer.is_null() {
-        xml_buf_free((*input).buffer);
-        (*input).buffer = null_mut();
+    if let Some(buffer) = (*input).buffer.take() {
+        buffer.free();
     }
 
     xml_free(input as _);

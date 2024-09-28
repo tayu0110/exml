@@ -597,14 +597,18 @@ pub unsafe extern "C" fn xml_new_text_reader(
     (*ret).mode = XmlTextReaderMode::XmlTextreaderModeInitial as _;
     (*ret).node = null_mut();
     (*ret).curnode = null_mut();
-    if xml_buf_use((*(*ret).input).buffer) < 4 {
+    if (*(*ret).input).buffer.map_or(0, |buf| buf.len()) < 4 {
         xml_parser_input_buffer_read(input, 4);
     }
-    if xml_buf_use((*(*ret).input).buffer) >= 4 {
+    if (*(*ret).input).buffer.map_or(0, |buf| buf.len()) >= 4 {
         (*ret).ctxt = xml_create_push_parser_ctxt(
             (*ret).sax,
             null_mut(),
-            xml_buf_content((*(*ret).input).buffer) as _,
+            (*(*ret).input)
+                .buffer
+                .expect("Internal Error")
+                .as_ref()
+                .as_ptr() as _,
             4,
             uri,
         );
@@ -867,15 +871,19 @@ pub unsafe extern "C" fn xml_text_reader_setup(
     (*reader).node = null_mut();
     (*reader).curnode = null_mut();
     if !input.is_null() {
-        if xml_buf_use((*(*reader).input).buffer) < 4 {
+        if (*(*reader).input).buffer.map_or(0, |buf| buf.len()) < 4 {
             xml_parser_input_buffer_read(input, 4);
         }
         if (*reader).ctxt.is_null() {
-            if xml_buf_use((*(*reader).input).buffer) >= 4 {
+            if (*(*reader).input).buffer.map_or(0, |buf| buf.len()) >= 4 {
                 (*reader).ctxt = xml_create_push_parser_ctxt(
                     (*reader).sax,
                     null_mut(),
-                    xml_buf_content((*(*reader).input).buffer) as _,
+                    (*(*reader).input)
+                        .buffer
+                        .expect("Internal Error")
+                        .as_ref()
+                        .as_ptr() as _,
                     4,
                     url,
                 );
@@ -907,7 +915,10 @@ pub unsafe extern "C" fn xml_text_reader_setup(
                 (*input_stream).filename = xml_canonic_path(url as _) as _;
             }
             (*input_stream).buf = buf;
-            xml_buf_reset_input((*buf).buffer, input_stream);
+            xml_buf_reset_input(
+                (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+                input_stream,
+            );
 
             input_push((*reader).ctxt, input_stream);
             (*reader).cur = 0;
@@ -1112,13 +1123,13 @@ unsafe extern "C" fn xml_text_reader_push_data(reader: XmlTextReaderPtr) -> c_in
     let mut val: c_int;
     let mut s: c_int;
 
-    if (*reader).input.is_null() || (*(*reader).input).buffer.is_null() {
+    if (*reader).input.is_null() || (*(*reader).input).buffer.is_none() {
         return -1;
     }
 
     let oldstate: XmlTextReaderState = (*reader).state;
     (*reader).state = XmlTextReaderState::None;
-    let inbuf: XmlBufPtr = (*(*reader).input).buffer;
+    let inbuf: XmlBufPtr = (*(*reader).input).buffer.unwrap().as_ptr();
 
     while (*reader).state == XmlTextReaderState::None {
         if xml_buf_use(inbuf) < (*reader).cur as usize + CHUNK_SIZE {

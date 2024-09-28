@@ -42,8 +42,8 @@ use crate::{
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         tree::{
-            xml_buf_shrink, xml_create_int_subset, xml_free_doc, xml_get_int_subset,
-            xml_get_last_child, xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
+            xml_create_int_subset, xml_free_doc, xml_get_int_subset, xml_get_last_child,
+            xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
         },
         uri::xml_canonic_path,
         xml_io::{
@@ -7172,15 +7172,18 @@ unsafe extern "C" fn html_check_encoding_direct(
         if !(*(*ctxt).input).buf.is_null()
             && !(*(*(*ctxt).input).buf).encoder.is_null()
             && !(*(*(*ctxt).input).buf).raw.is_null()
-            && !(*(*(*ctxt).input).buf).buffer.is_null()
+            && (*(*(*ctxt).input).buf).buffer.is_some()
         {
             /*
              * convert as much as possible to the parser reading buffer.
              */
             let processed: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
-            xml_buf_shrink((*(*(*ctxt).input).buf).buffer, processed);
+            (*(*(*ctxt).input).buf).buffer.unwrap().trim_head(processed);
             let nbchars: c_int = xml_char_enc_input((*(*ctxt).input).buf, 1);
-            xml_buf_reset_input((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
+            xml_buf_reset_input(
+                (*(*(*ctxt).input).buf).buffer.unwrap().as_ptr(),
+                (*ctxt).input,
+            );
             if nbchars < 0 {
                 html_parse_err(
                     ctxt,
@@ -9555,7 +9558,7 @@ pub unsafe extern "C" fn html_create_memory_parser_ctxt(
 
     (*input).filename = null_mut();
     (*input).buf = buf;
-    xml_buf_reset_input((*buf).buffer, input);
+    xml_buf_reset_input((*buf).buffer.map_or(null_mut(), |ptr| ptr.as_ptr()), input);
 
     input_push(ctxt, input);
     ctxt
@@ -10768,20 +10771,32 @@ pub unsafe extern "C" fn html_create_push_parser_ctxt(
         (*input_stream).filename = xml_canonic_path(filename as _) as _;
     }
     (*input_stream).buf = buf;
-    xml_buf_reset_input((*buf).buffer, input_stream);
+    xml_buf_reset_input(
+        (*buf).buffer.map_or(null_mut(), |ptr| ptr.as_ptr()),
+        input_stream,
+    );
 
     input_push(ctxt, input_stream);
 
     if size > 0 && !chunk.is_null() && !(*ctxt).input.is_null() && !(*(*ctxt).input).buf.is_null() {
-        let base: size_t = xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
+        let base: size_t = xml_buf_get_input_base(
+            (*(*(*ctxt).input).buf)
+                .buffer
+                .map_or(null_mut(), |ptr| ptr.as_ptr()),
+            (*ctxt).input,
+        );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         xml_parser_input_buffer_push((*(*ctxt).input).buf, size, chunk);
 
-        xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
-        // #ifdef DEBUG_PUSH
-        // 	xmlGenericError(xmlGenericErrorContext, c"HPP: pushed %d\n".as_ptr() as _, size);
-        // #endif
+        xml_buf_set_input_base_cur(
+            (*(*(*ctxt).input).buf)
+                .buffer
+                .map_or(null_mut(), |ptr| ptr.as_ptr()),
+            (*ctxt).input,
+            base,
+            cur,
+        );
     }
     (*ctxt).progressive = 1;
 
@@ -11875,33 +11890,43 @@ pub unsafe extern "C" fn html_parse_chunk(
         && !(*(*ctxt).input).buf.is_null()
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
-        let base: size_t = xml_buf_get_input_base((*(*(*ctxt).input).buf).buffer, (*ctxt).input);
+        let base: size_t = xml_buf_get_input_base(
+            (*(*(*ctxt).input).buf)
+                .buffer
+                .map_or(null_mut(), |ptr| ptr.as_ptr()),
+            (*ctxt).input,
+        );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         let res: c_int = xml_parser_input_buffer_push((*(*ctxt).input).buf, size, chunk);
-        xml_buf_set_input_base_cur((*(*(*ctxt).input).buf).buffer, (*ctxt).input, base, cur);
+        xml_buf_set_input_base_cur(
+            (*(*(*ctxt).input).buf)
+                .buffer
+                .map_or(null_mut(), |ptr| ptr.as_ptr()),
+            (*ctxt).input,
+            base,
+            cur,
+        );
         if res < 0 {
             html_err_memory(ctxt, null());
             return (*ctxt).err_no;
         }
-    // #ifdef DEBUG_PUSH
-    // 	xmlGenericError(xmlGenericErrorContext, c"HPP: pushed %d\n".as_ptr() as _, size);
-    // #endif
-
-    // #if 0
-    // 	if ((terminate) || ((*(*(*(*ctxt).input).buf).buffer).use > 80))
-    // 	    htmlParseTryOrFinish(ctxt, terminate);
-    // #endif
     } else if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         && (!(*ctxt).input.is_null() && !(*(*ctxt).input).buf.is_null())
     {
         let input: XmlParserInputBufferPtr = (*(*ctxt).input).buf;
-        if !(*input).encoder.is_null() && !(*input).buffer.is_null() && !(*input).raw.is_null() {
-            let base: size_t = xml_buf_get_input_base((*input).buffer, (*ctxt).input);
+        if !(*input).encoder.is_null() && (*input).buffer.is_some() && !(*input).raw.is_null() {
+            let base: size_t =
+                xml_buf_get_input_base((*input).buffer.unwrap().as_ptr(), (*ctxt).input);
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
             let nbchars: c_int = xml_char_enc_input(input, terminate);
-            xml_buf_set_input_base_cur((*input).buffer, (*ctxt).input, base, current);
+            xml_buf_set_input_base_cur(
+                (*input).buffer.map_or(null_mut(), |ptr| ptr.as_ptr()),
+                (*ctxt).input,
+                base,
+                current,
+            );
             if nbchars < 0 {
                 html_parse_err(
                     ctxt,

@@ -121,12 +121,12 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
 
     if input.is_null()
         || (*input).encoder.is_null()
-        || (*input).buffer.is_null()
+        || (*input).buffer.is_none()
         || (*input).raw.is_null()
     {
         return -1;
     }
-    let out: XmlBufPtr = (*input).buffer;
+    let out: XmlBufPtr = (*input).buffer.unwrap().as_ptr();
     let bufin: XmlBufPtr = (*input).raw;
 
     toconv = xml_buf_use(bufin);
@@ -165,25 +165,13 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
 
     match ret {
         0 => {
-            // #ifdef DEBUG_ENCODING
-            //             xmlGenericError(xmlGenericErrorContext,
-            //                             "converted %d bytes to %d bytes of input\n",
-            //                             c_in, c_out);
-            // #endif
+            // no-op
         }
         -1 => {
-            // #ifdef DEBUG_ENCODING
-            //             xmlGenericError(xmlGenericErrorContext,
-            //                          "converted %d bytes to %d bytes of input, %d left\n",
-            //                             c_in, c_out, (c_int)xmlBufUse(bufin));
-            // #endif
+            // no-op
         }
         -3 => {
-            // #ifdef DEBUG_ENCODING
-            //             xmlGenericError(xmlGenericErrorContext,
-            //                         "converted %d bytes to %d bytes of input, %d left\n",
-            //                             c_in, c_out, (c_int)xmlBufUse(bufin));
-            // #endif
+            // no-op
         }
         -2 => {
             let mut buf: [c_char; 50] = [0; 50];
@@ -278,10 +266,6 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
                 addr_of_mut!(c_in) as _,
             );
             xml_buf_add_len(out, c_out as _);
-            // #ifdef DEBUG_ENCODING
-            // 	xmlGenericError(xmlGenericErrorContext,
-            // 		"initialized encoder\n");
-            // #endif
             return c_out;
         }
 
@@ -329,25 +313,15 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
          */
         match ret {
             0 => {
-                // #ifdef DEBUG_ENCODING
-                // 	    xmlGenericError(xmlGenericErrorContext,
-                // 		    "converted %d bytes to %d bytes of output\n",
-                // 	            c_in, c_out);
-                // #endif
+                // no-op
                 break;
             }
             -1 => {
-                // #ifdef DEBUG_ENCODING
-                // 	    xmlGenericError(xmlGenericErrorContext,
-                // 		    "output conversion failed by lack of space\n");
-                // #endif
+                // no-op
                 break;
             }
             -3 => {
-                // #ifdef DEBUG_ENCODING
-                // 	    xmlGenericError(xmlGenericErrorContext,"converted %d bytes to %d bytes of output %d left\n",
-                // 	            c_in, c_out, (c_int) xmlBufUse(bufin));
-                // #endif
+                // no-op
                 break;
             }
             -4 => {
@@ -369,19 +343,6 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
                 if cur <= 0 {
                     break;
                 } else {
-                    // #ifdef DEBUG_ENCODING
-                    //             xmlGenericError(xmlGenericErrorContext,
-                    //                     "handling output conversion error\n");
-                    //             xmlGenericError(xmlGenericErrorContext,
-                    //                     "Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n",
-                    //                     content[0], content[1],
-                    //                     content[2], content[3]);
-                    // #endif
-                    /*
-                     * Removes the UTF8 sequence, and replace it by a charref
-                     * and continue the transcoding phase, hoping the error
-                     * did not mangle the encoder state.
-                     */
                     charref_len = snprintf(
                         charref.as_mut_ptr().add(0) as _,
                         charref.len(),

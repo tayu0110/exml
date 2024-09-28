@@ -18,7 +18,6 @@ use crate::{
             input_pop, xml_err_internal, xml_free_input_stream, INPUT_CHUNK, LINE_LEN,
             XML_MAX_LOOKUP_LIMIT,
         },
-        tree::xml_buf_shrink,
         xml_io::{
             xml_free_parser_input_buffer, xml_parser_input_buffer_grow, XmlParserInputBufferPtr,
         },
@@ -233,7 +232,12 @@ pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
     }
 
     let ret: c_int = xml_parser_input_buffer_grow(buf, INPUT_CHUNK as _);
-    xml_buf_set_input_base_cur((*buf).buffer, input, 0, cur_base as _);
+    xml_buf_set_input_base_cur(
+        (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+        input,
+        0,
+        cur_base as _,
+    );
 
     /* TODO: Get error code from xmlParserInputBufferGrow */
     if ret < 0 {
@@ -267,7 +271,9 @@ pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
      * was consumed
      */
     if used > INPUT_CHUNK {
-        let res: size_t = xml_buf_shrink((*buf).buffer, used - LINE_LEN);
+        let res: size_t = (*buf)
+            .buffer
+            .map_or(0, |mut buf| buf.trim_head(used - LINE_LEN));
 
         if res > 0 {
             used -= res;
@@ -279,5 +285,10 @@ pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
         }
     }
 
-    xml_buf_set_input_base_cur((*buf).buffer, input, 0, used);
+    xml_buf_set_input_base_cur(
+        (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+        input,
+        0,
+        used,
+    );
 }

@@ -3961,7 +3961,10 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
 
     (*input_stream).filename = xml_canonic_path(filename as _) as _;
     (*input_stream).buf = buf;
-    xml_buf_reset_input((*buf).buffer, input_stream);
+    xml_buf_reset_input(
+        (*buf).buffer.map_or(null_mut(), |ptr| ptr.as_ptr()),
+        input_stream,
+    );
 
     input_push(ctxt, input_stream);
     if (*ctxt).directory.is_null() {

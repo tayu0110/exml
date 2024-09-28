@@ -33,9 +33,9 @@ use crate::{
         },
         parser_internals::{input_push, xml_free_input_stream, xml_string_current_char},
         tree::{
-            xml_add_next_sibling, xml_add_prev_sibling, xml_buf_content, xml_create_int_subset,
-            xml_doc_copy_node, xml_doc_get_root_element, xml_free_doc, xml_free_node,
-            xml_free_node_list, xml_get_ns_prop, xml_get_prop, xml_new_doc_node, xml_new_doc_text,
+            xml_add_next_sibling, xml_add_prev_sibling, xml_create_int_subset, xml_doc_copy_node,
+            xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_free_node_list,
+            xml_get_ns_prop, xml_get_prop, xml_new_doc_node, xml_new_doc_text,
             xml_node_add_content_len, xml_node_get_base, xml_node_set_base, xml_static_copy_node,
             xml_static_copy_node_list, xml_unlink_node, xml_unset_prop, XmlDocPtr, XmlDtdPtr,
             XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
@@ -53,7 +53,6 @@ use crate::{
         },
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
-    private::buf::xml_buf_length,
     IS_CHAR,
 };
 
@@ -2259,8 +2258,14 @@ unsafe extern "C" fn xml_xinclude_load_txt(
      */
     while xml_parser_input_buffer_read(buf, 4096) > 0 {}
 
-    let content: *const XmlChar = xml_buf_content((*buf).buffer);
-    let len: c_int = xml_buf_length((*buf).buffer) as _;
+    let content: *const XmlChar = (*buf).buffer.map_or(null_mut(), |buf| {
+        if buf.is_ok() {
+            buf.as_ref().as_ptr()
+        } else {
+            null_mut()
+        }
+    });
+    let len: c_int = (*buf).buffer.map_or(0, |buf| buf.len()) as i32;
     i = 0;
     while i < len {
         let mut l: c_int = 0;

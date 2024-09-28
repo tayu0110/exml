@@ -13,6 +13,7 @@ use std::sync::atomic::Ordering;
 pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, size_t, snprintf, strcmp, INT_MAX};
 
+use crate::buf::XmlBufRef;
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::libxml::dict::xml_dict_owns;
@@ -38,7 +39,7 @@ use crate::libxml::xml_io::XmlParserInputBufferPtr;
 use crate::libxml::xmlerror::XmlParserErrors;
 use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
 
-use crate::private::buf::{xml_buf_create, xml_buf_is_empty, xml_buf_reset_input};
+use crate::private::buf::xml_buf_reset_input;
 use crate::private::enc::{xml_char_enc_input, xml_enc_input_chunk};
 use crate::private::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
@@ -75,10 +76,9 @@ use super::parser::{
 };
 use super::sax2::xml_sax2_ignorable_whitespace;
 use super::tree::{
-    xml_add_child, xml_add_child_list, xml_buf_content, xml_buf_end, xml_buf_shrink, xml_buf_use,
-    xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc_node,
-    xml_set_tree_doc, xml_split_qname3, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-    XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
+    xml_add_child, xml_add_child_list, xml_buf_use, xml_doc_copy_node, xml_free_doc, xml_free_node,
+    xml_free_node_list, xml_new_doc_node, xml_set_tree_doc, xml_split_qname3, XmlDocPtr,
+    XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
 };
 use super::uri::{xml_build_uri, xml_canonic_path};
 use super::xml_io::{
@@ -825,7 +825,12 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
 
     (*input).filename = null_mut();
     (*input).buf = buf;
-    xml_buf_reset_input((*(*input).buf).buffer, input);
+    xml_buf_reset_input(
+        (*(*input).buf)
+            .buffer
+            .map_or(null_mut(), |ptr| ptr.as_ptr()),
+        input,
+    );
 
     input_push(ctxt, input);
     ctxt
@@ -1219,7 +1224,8 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
     /*
      * Is there already some content down the pipe to convert ?
      */
-    if xml_buf_is_empty((*input_buf).buffer) == 0 {
+    // if xml_buf_is_empty((*input_buf).buffer) == 0 {
+    if let Some(mut buf) = (*input_buf).buffer.filter(|buf| !buf.is_empty()) {
         /*
          * FIXME: The BOM shouldn't be skipped here, but in the parsing code.
          */
@@ -1274,11 +1280,11 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
          * Move it as the raw buffer and create a new input buffer
          */
         let processed: size_t = (*input).cur.offset_from((*input).base) as usize;
-        xml_buf_shrink((*input_buf).buffer, processed);
+        buf.trim_head(processed as usize);
         (*input).consumed += processed as u64;
-        (*input_buf).raw = (*input_buf).buffer;
-        (*input_buf).buffer = xml_buf_create();
-        assert!(!(*input_buf).buffer.is_null());
+        (*input_buf).raw = buf.as_ptr();
+        (*input_buf).buffer = XmlBufRef::new();
+        assert!((*input_buf).buffer.is_some());
         (*input_buf).rawconsumed = processed as u64;
         let using: size_t = xml_buf_use((*input_buf).raw);
 
@@ -1293,7 +1299,10 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
          * completely.
          */
         nbchars = xml_char_enc_input(input_buf, 1);
-        xml_buf_reset_input((*input_buf).buffer, input);
+        xml_buf_reset_input(
+            (*input_buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+            input,
+        );
         if nbchars < 0 {
             /* TODO: This could be an out of memory or an encoding error. */
             xml_err_internal(
@@ -1366,7 +1375,12 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
         return null_mut();
     }
     (*input).buf = buf;
-    xml_buf_reset_input((*(*input).buf).buffer, input);
+    xml_buf_reset_input(
+        (*(*input).buf)
+            .buffer
+            .map_or(null_mut(), |buf| buf.as_ptr()),
+        input,
+    );
     input
 }
 
@@ -1822,7 +1836,12 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     }
     (*input_stream).directory = directory;
 
-    xml_buf_reset_input((*(*input_stream).buf).buffer, input_stream);
+    xml_buf_reset_input(
+        (*(*input_stream).buf)
+            .buffer
+            .map_or(null_mut(), |buf| buf.as_ptr()),
+        input_stream,
+    );
     if (*ctxt).directory.is_null() && !directory.is_null() {
         (*ctxt).directory = xml_strdup(directory as *const XmlChar) as *mut c_char;
     }
@@ -7992,11 +8011,7 @@ pub(crate) const LINE_LEN: usize = 80;
  */
 pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr) {
     let mut used: size_t;
-    let ret: size_t;
 
-    // #ifdef DEBUG_INPUT
-    //     xmlGenericError(xmlGenericErrorContext(), "Shrink\n");
-    // #endif
     if input.is_null() {
         return;
     }
@@ -8009,11 +8024,9 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     if (*input).cur.is_null() {
         return;
     }
-    if (*(*input).buf).buffer.is_null() {
+    let Some(mut buf) = (*(*input).buf).buffer else {
         return;
-    }
-
-    // CHECK_BUFFER(input);
+    };
 
     used = (*input).cur.offset_from((*input).base) as _;
     /*
@@ -8021,7 +8034,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
      * was consumed
      */
     if used > INPUT_CHUNK {
-        ret = xml_buf_shrink((*(*input).buf).buffer, used - LINE_LEN);
+        let ret = buf.trim_head(used - LINE_LEN);
         if ret > 0 {
             used -= ret;
             if ret as u64 > u64::MAX || (*input).consumed > u64::MAX - ret as c_ulong {
@@ -8032,11 +8045,11 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
         }
     }
 
-    if xml_buf_use((*(*input).buf).buffer) <= INPUT_CHUNK {
+    if buf.len() <= INPUT_CHUNK {
         xml_parser_input_buffer_read((*input).buf, 2 * INPUT_CHUNK as i32);
     }
 
-    (*input).base = xml_buf_content((*(*input).buf).buffer);
+    (*input).base = buf.as_ref().as_ptr();
     if (*input).base.is_null() {
         /* TODO: raise error */
         (*input).base = c"".as_ptr() as _;
@@ -8045,9 +8058,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
         return;
     }
     (*input).cur = (*input).base.add(used);
-    (*input).end = xml_buf_end((*(*input).buf).buffer);
-
-    // CHECK_BUFFER(input);
+    (*input).end = buf.as_ref().as_ptr().add(buf.len());
 }
 
 /*

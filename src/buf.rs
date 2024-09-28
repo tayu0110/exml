@@ -505,6 +505,14 @@ impl XmlBufRef {
     pub(crate) fn into_inner(self) -> XmlBuf {
         unsafe { *Box::from_raw(self.0.as_ptr()) }
     }
+
+    pub(crate) fn as_ptr(self) -> *mut XmlBuf {
+        self.0.as_ptr()
+    }
+
+    pub(crate) fn free(self) {
+        let _ = self.into_inner();
+    }
 }
 
 impl Clone for XmlBufRef {

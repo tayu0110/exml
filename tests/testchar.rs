@@ -7,7 +7,6 @@ use std::{
     ptr::{addr_of_mut, null_mut},
 };
 
-use exml::buf::libxml_api::xml_buf_content;
 use exml::libxml::{
     encoding::XmlCharEncoding,
     globals::{xml_free, xml_malloc},
@@ -760,7 +759,9 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
     }
     (*input).filename = null_mut();
     (*input).buf = buf;
-    (*input).cur = xml_buf_content((*(*input).buf).buffer);
+    (*input).cur = (*(*input).buf)
+        .buffer
+        .map_or(null_mut(), |buf| buf.as_ref().as_ptr());
     (*input).base = (*input).cur;
     (*input).end = (*input).base.add(4);
     input_push(ctxt, input);
