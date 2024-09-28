@@ -57,6 +57,9 @@ unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
 pub struct XmlBuf {
     content: Box<[u8]>,
     next_use: usize,
+    // When the `scheme` is `XmlBufferAllocIO`,
+    // `next_rw` is also required to indicate how far the buffer has been read or written.
+    next_rw: usize,
     scheme: XmlBufferAllocationScheme,
     error: XmlParserErrors,
 }
@@ -68,6 +71,7 @@ impl XmlBuf {
         Self {
             content: vec![0; default_buffer_size].into_boxed_slice(),
             next_use: 0,
+            next_rw: 0,
             scheme,
             error: XmlParserErrors::XmlErrOK,
         }
@@ -78,6 +82,7 @@ impl XmlBuf {
         Self {
             content: vec![0; if size != 0 { size + 1 } else { 0 }].into_boxed_slice(), // For NULL-terminator, +1
             next_use: 0,
+            next_rw: 0,
             scheme,
             error: XmlParserErrors::XmlErrOK,
         }
@@ -102,18 +107,10 @@ impl XmlBuf {
                 | XmlBufferAllocationScheme::XmlBufferAllocExact
                 | XmlBufferAllocationScheme::XmlBufferAllocHybrid
                 | XmlBufferAllocationScheme::XmlBufferAllocBounded
+                | XmlBufferAllocationScheme::XmlBufferAllocIo
         ) {
             self.scheme = scheme;
-            // TODO: is it necessary ???
-            // if !(*buf).buffer.is_null() {
-            //     (*(*buf).buffer).alloc = scheme;
-            // }
             return Ok(());
-        }
-
-        if scheme == XmlBufferAllocationScheme::XmlBufferAllocIo {
-            self.scheme = scheme;
-            // TODO: why is `content_io` necessary ???
         }
 
         Err(anyhow::anyhow!("Unsupported allocation scheme."))
@@ -131,6 +128,7 @@ impl XmlBuf {
         }
 
         self.next_use = 0;
+        self.next_rw = 0;
         if !self.content.is_empty() {
             self.content[0] = 0;
         }
@@ -160,8 +158,8 @@ impl XmlBuf {
             "Failed to grow: Some errors have been already occured."
         );
 
-        if additional < self.capacity() - self.len() {
-            return Ok(self.capacity() - self.len());
+        if self.next_use + additional < self.content.len() {
+            return Ok(self.content.len() - self.next_use);
         }
         if additional >= usize::MAX - self.next_use {
             const MSG: &str = "growing buffer past SIZE_MAX";
@@ -171,19 +169,11 @@ impl XmlBuf {
             bail!(MSG);
         }
 
-        let mut size = if self.capacity() > additional {
-            if self.capacity() > usize::MAX / 2 {
-                usize::MAX
-            } else {
-                self.capacity() * 2
-            }
+        let mut size = if self.content.len() > additional {
+            self.content.len().saturating_mul(2)
         } else {
             let size = self.next_use + additional;
-            if size > usize::MAX - 100 {
-                usize::MAX
-            } else {
-                size + 100
-            }
+            size.saturating_add(100)
         };
 
         if matches!(
@@ -194,7 +184,7 @@ impl XmlBuf {
              * Used to provide parsing limits
              */
             if self.next_use + additional + 1 >= XML_MAX_TEXT_LENGTH
-                || self.capacity() >= XML_MAX_TEXT_LENGTH
+                || self.content.len() >= XML_MAX_TEXT_LENGTH
             {
                 const MSG: &str = "buffer error: text too long\n";
                 unsafe {
@@ -204,32 +194,18 @@ impl XmlBuf {
             }
             size = size.max(XML_MAX_TEXT_LENGTH);
         }
-        // if matches!(self.scheme, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        //     && !self.content_io.is_null()
-        // {
-        //     let start_buf: size_t = self.content.offset_from(self.content_io) as _;
-
-        //     newbuf = xml_realloc(self.content_io as _, start_buf + size) as *mut XmlChar;
-        //     if newbuf.is_null() {
-        //         xml_buf_memory_error(buf, c"growing buffer".as_ptr() as _);
-        //         return 0;
-        //     }
-        //     self.content_io = newbuf;
-        //     self.content = newbuf.add(start_buf);
-        // } else {
         let mut new = vec![0; size].into_boxed_slice();
         if !self.is_empty() {
-            new[..self.len()].copy_from_slice(&self.content[..self.len()]);
+            new[..self.next_use].copy_from_slice(&self.content[..self.next_use]);
         }
         self.content = new;
-        // }
         // for NULL-terminator, -1
-        Ok(self.capacity() - self.len() - 1)
+        Ok(self.content.len() - self.next_use - 1)
     }
 
     pub(crate) fn grow(&mut self, additional: usize) -> Result<usize, anyhow::Error> {
         if additional == 0 {
-            return Ok(self.capacity() - self.len() - 1);
+            return Ok(0);
         }
         self.grow_inner(additional)
     }
@@ -257,7 +233,7 @@ impl XmlBuf {
         }
 
         /* Don't resize if we don't have to */
-        if new_size < self.capacity() {
+        if new_size < self.content.len() {
             return Ok(());
         }
 
@@ -266,10 +242,10 @@ impl XmlBuf {
             XmlBufferAllocationScheme::XmlBufferAllocIo
             | XmlBufferAllocationScheme::XmlBufferAllocDoubleit => {
                 /*take care of empty case*/
-                let mut now = if self.capacity() == 0 {
+                let mut now = if self.content.len() == 0 {
                     new_size.saturating_add(10)
                 } else {
-                    self.capacity()
+                    self.content.len()
                 };
                 while new_size > now {
                     let (new, f) = now.overflowing_mul(2);
@@ -289,7 +265,7 @@ impl XmlBuf {
                 if self.next_use < BASE_BUFFER_SIZE {
                     new_size
                 } else {
-                    let mut now = self.capacity();
+                    let mut now = self.content.len();
                     while new_size > now {
                         let (new, f) = now.overflowing_mul(2);
                         if f {
@@ -330,10 +306,9 @@ impl XmlBuf {
         // } else {
         let mut new = vec![0; new_size].into_boxed_slice();
         if !self.is_empty() {
-            new[..self.len()].copy_from_slice(&self.content[..]);
+            new[..self.next_use].copy_from_slice(&self.content[..self.next_use]);
         }
         self.content = new;
-        // }
 
         Ok(())
     }
@@ -348,7 +323,7 @@ impl XmlBuf {
             return Ok(());
         }
 
-        if len >= self.capacity() - self.len() {
+        if self.next_use + len >= self.content.len() {
             if len >= usize::MAX - self.len() {
                 unsafe {
                     xml_buf_memory_error(self, "growing buffer past SIZE_MAX");
@@ -375,6 +350,7 @@ impl XmlBuf {
 
         self.content[self.next_use..self.next_use + len].copy_from_slice(bytes);
         self.next_use += len;
+        self.content[self.next_use] = 0;
         Ok(())
     }
 
@@ -412,7 +388,7 @@ impl XmlBuf {
 
     pub(crate) fn avail(&self) -> usize {
         if self.error.is_ok() {
-            (self.capacity() - self.len()).saturating_sub(1)
+            (self.content.len() - self.next_use).saturating_sub(1)
         } else {
             0
         }
@@ -420,6 +396,10 @@ impl XmlBuf {
 
     pub(crate) fn detach(&mut self) -> Option<Box<[u8]>> {
         self.error.is_ok().then(|| {
+            if self.next_rw != 0 {
+                self.trim_head(self.next_rw);
+            }
+            self.next_rw = 0;
             self.next_use = 0;
             take(&mut self.content)
         })
@@ -434,15 +414,15 @@ impl XmlBuf {
         }
 
         if let Some(file) = file {
-            file.write_all(&self.content[..self.next_use])
+            file.write_all(&self.content[self.next_rw..self.next_use])
         } else {
-            std::io::stdout().write_all(&self.content[..self.next_use])
+            std::io::stdout().write_all(&self.content[self.next_rw..self.next_use])
         }
         .map(|_| self.len())
     }
 
     pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.content.as_mut_ptr()
+        self.content[self.next_rw..].as_mut_ptr()
     }
 
     pub(crate) fn add_len(&mut self, additional: usize) -> Result<(), anyhow::Error> {
@@ -473,45 +453,20 @@ impl XmlBuf {
     /// so it is renamed.
     #[doc(alias = "xmlBufShrink")]
     pub(crate) fn trim_head(&mut self, len: usize) -> usize {
-        if !self.error.is_ok() || len == 0 || len > self.len() {
+        if !self.error.is_ok() || len == 0 || len > self.next_use {
             return 0;
         }
 
+        if self.scheme == XmlBufferAllocationScheme::XmlBufferAllocIo {
+            self.content
+                .copy_within(len + self.next_rw..self.next_use, 0);
+            self.next_use -= self.next_rw;
+            self.next_rw = 0;
+        } else {
+            self.content.copy_within(len..self.next_use, 0);
+        }
         self.next_use -= len;
-        // if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        //     && !(*buf).content_io.is_null()
-        // {
-        //     /*
-        //      * we just move the content pointer, but also make sure
-        //      * the perceived buffer size has shrunk accordingly
-        //      */
-        //     (*buf).content = (*buf).content.add(len);
-        //     (*buf).size -= len;
-
-        //     /*
-        //      * sometimes though it maybe be better to really shrink
-        //      * on IO buffers
-        //      */
-        //     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        //         && !(*buf).content_io.is_null()
-        //     {
-        //         let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
-        //         if start_buf >= (*buf).size {
-        //             memmove(
-        //                 (*buf).content_io as _,
-        //                 (*buf).content.add(0) as _,
-        //                 (*buf).using,
-        //             );
-        //             (*buf).content = (*buf).content_io;
-        //             *(*buf).content.add((*buf).using) = 0;
-        //             (*buf).size += start_buf;
-        //         }
-        //     }
-        // } else {
-        self.content.copy_within(len..self.next_use + len, 0);
         self.content[self.next_use] = 0;
-        // }
-        // UPDATE_COMPAT!(buf);
         len
     }
 
@@ -522,7 +477,7 @@ impl XmlBuf {
 
 impl AsRef<[u8]> for XmlBuf {
     fn as_ref(&self) -> &[u8] {
-        &self.content[..]
+        &self.content[self.next_rw..self.next_use]
     }
 }
 
@@ -575,7 +530,12 @@ impl DerefMut for XmlBufRef {
 }
 
 pub mod libxml_api {
-    use std::{fs::File, mem::forget, os::fd::FromRawFd, slice::from_raw_parts_mut};
+    use std::{
+        fs::File,
+        mem::forget,
+        os::fd::FromRawFd,
+        slice::{from_raw_parts, from_raw_parts_mut},
+    };
 
     use libc::{fileno, FILE};
 
@@ -658,15 +618,19 @@ pub mod libxml_api {
             return -1;
         }
 
-        let bytes = CStr::from_ptr(str as *const i8).to_bytes();
-        if len == 0 || bytes.is_empty() {
+        if len == 0 {
             return 0;
         }
 
         let res = if len == -1 {
+            let bytes = CStr::from_ptr(str as *const i8).to_bytes();
+            if bytes.is_empty() {
+                return 0;
+            }
             buf.push_bytes(bytes)
         } else {
-            buf.push_bytes(&bytes[..len as usize])
+            let bytes = from_raw_parts(str, len as usize);
+            buf.push_bytes(bytes)
         };
 
         match res {
@@ -873,5 +837,54 @@ pub mod libxml_api {
         (*input).cur = (*input).base.add(cur);
         (*input).end = buf.as_mut_ptr().add(buf.len());
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn buffer_resize_test() {
+        let mut buf = XmlBuf::with_capacity(8);
+        assert_eq!(buf.len(), 0);
+        assert!(buf.capacity() >= 8);
+        assert!(buf.resize(16).is_ok());
+        assert_eq!(buf.len(), 0);
+        assert!(buf.capacity() >= 16);
+        assert!(buf.resize(8).is_ok());
+        assert_eq!(buf.len(), 0);
+        assert!(buf.capacity() >= 16);
+    }
+
+    #[test]
+    fn buffer_modify_test() {
+        let mut buf = XmlBuf::with_capacity(8);
+        const TREE1: &[u8] = b"<abc><def/></abc>";
+        buf.push_bytes(TREE1);
+        assert_eq!(buf.len(), TREE1.len());
+        assert_eq!(buf.as_ref(), TREE1);
+        const TREE2: &[u8] = b"<ghi/>";
+        buf.push_bytes(TREE2);
+        assert_eq!(buf.len(), TREE1.len() + TREE2.len());
+        assert_eq!(buf.as_ref(), b"<abc><def/></abc><ghi/>");
+
+        buf.trim_head(TREE1.len());
+        assert_eq!(buf.len(), TREE2.len());
+        assert_eq!(buf.as_ref(), TREE2);
+
+        buf.push_bytes(TREE1);
+        assert_eq!(buf.len(), TREE1.len() + TREE2.len());
+        assert_eq!(buf.as_ref(), b"<ghi/><abc><def/></abc>");
+
+        buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocIo);
+        assert_eq!(
+            buf.current_allocation_scheme(),
+            XmlBufferAllocationScheme::XmlBufferAllocIo
+        );
+
+        buf.trim_head(TREE2.len());
+        assert_eq!(buf.len(), TREE1.len());
+        assert_eq!(buf.as_ref(), TREE1);
     }
 }

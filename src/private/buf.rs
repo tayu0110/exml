@@ -882,38 +882,38 @@ mod legacy {
         ret
     }
 
-    /**
-     * xmlBufFromBuffer:
-     * @buffer: incoming old buffer to convert to a new one
-     *
-     * Helper routine to switch from the old buffer structures in use
-     * in various APIs. It creates a wrapper xmlBufPtr which will be
-     * used for internal processing until the xmlBufBackToBuffer() is
-     * issued.
-     *
-     * Returns a new xmlBufPtr unless the call failed and NULL is returned
-     */
-    pub(crate) unsafe extern "C" fn xml_buf_from_buffer(buffer: XmlBufferPtr) -> XmlBufPtr {
-        if buffer.is_null() {
-            return null_mut();
-        }
+    // /**
+    //  * xmlBufFromBuffer:
+    //  * @buffer: incoming old buffer to convert to a new one
+    //  *
+    //  * Helper routine to switch from the old buffer structures in use
+    //  * in various APIs. It creates a wrapper xmlBufPtr which will be
+    //  * used for internal processing until the xmlBufBackToBuffer() is
+    //  * issued.
+    //  *
+    //  * Returns a new xmlBufPtr unless the call failed and NULL is returned
+    //  */
+    // pub(crate) unsafe extern "C" fn xml_buf_from_buffer(buffer: XmlBufferPtr) -> XmlBufPtr {
+    //     if buffer.is_null() {
+    //         return null_mut();
+    //     }
 
-        let ret: XmlBufPtr = xml_malloc(size_of::<XmlBuf>()) as XmlBufPtr;
-        if ret.is_null() {
-            xml_buf_memory_error(null_mut(), c"creating buffer".as_ptr() as _);
-            return null_mut();
-        }
-        (*ret).using = (*buffer).using as _;
-        (*ret).size = (*buffer).size as _;
-        UPDATE_COMPAT!(ret);
-        (*ret).error = 0;
-        (*ret).buffer = buffer;
-        (*ret).alloc = (*buffer).alloc;
-        (*ret).content = (*buffer).content;
-        (*ret).content_io = (*buffer).content_io;
+    //     let ret: XmlBufPtr = xml_malloc(size_of::<XmlBuf>()) as XmlBufPtr;
+    //     if ret.is_null() {
+    //         xml_buf_memory_error(null_mut(), c"creating buffer".as_ptr() as _);
+    //         return null_mut();
+    //     }
+    //     (*ret).using = (*buffer).using as _;
+    //     (*ret).size = (*buffer).size as _;
+    //     UPDATE_COMPAT!(ret);
+    //     (*ret).error = 0;
+    //     (*ret).buffer = buffer;
+    //     (*ret).alloc = (*buffer).alloc;
+    //     (*ret).content = (*buffer).content;
+    //     (*ret).content_io = (*buffer).content_io;
 
-        ret
-    }
+    //     ret
+    // }
 
     // /**
     //  * xmlBufBackToBuffer:
