@@ -14,11 +14,11 @@ use libc::{fprintf, memcpy, memset, printf, size_t, snprintf, strlen, FILE, INT_
 
 use crate::{
     __xml_raise_error,
+    buf::libxml_api::{xml_buf_cat, xml_buf_ccat, XmlBufPtr},
     libxml::{
         dict::{xml_dict_lookup, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser_internals::xml_string_current_char,
-        tree::{xml_buffer_write_char, xml_buffer_write_xml_char, XmlBufferPtr},
         xmlautomata::{
             xml_free_automata, xml_new_automata, XmlAutomata, XmlAutomataPtr, XmlAutomataState,
         },
@@ -8291,21 +8291,21 @@ pub unsafe extern "C" fn xml_exp_subsume(
     0
 }
 
-unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, glob: c_int) {
+unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob: c_int) {
     let mut c: XmlExpNodePtr;
 
     if expr.is_null() {
         return;
     }
     if glob != 0 {
-        xml_buffer_write_char(buf, c"(".as_ptr());
+        xml_buf_ccat(buf, c"(".as_ptr());
     }
     if (*expr).typ == XmlExpNodeType::XmlExpEmpty as u8 {
-        xml_buffer_write_char(buf, c"empty".as_ptr());
+        xml_buf_ccat(buf, c"empty".as_ptr());
     } else if (*expr).typ == XmlExpNodeType::XmlExpForbid as u8 {
-        xml_buffer_write_char(buf, c"forbidden".as_ptr());
+        xml_buf_ccat(buf, c"forbidden".as_ptr());
     } else if (*expr).typ == XmlExpNodeType::XmlExpAtom as u8 {
-        xml_buffer_write_xml_char(buf, (*expr).field.f_str);
+        xml_buf_cat(buf, (*expr).field.f_str);
     } else if (*expr).typ == XmlExpNodeType::XmlExpSeq as u8 {
         c = (*expr).exp_left;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
@@ -8314,7 +8314,7 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, gl
         } else {
             xml_exp_dump_int(buf, c, 0);
         }
-        xml_buffer_write_char(buf, c" , ".as_ptr());
+        xml_buf_ccat(buf, c" , ".as_ptr());
         c = (*expr).field.children.f_right;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
         {
@@ -8330,7 +8330,7 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, gl
         } else {
             xml_exp_dump_int(buf, c, 0);
         }
-        xml_buffer_write_char(buf, c" | ".as_ptr());
+        xml_buf_ccat(buf, c" | ".as_ptr());
         c = (*expr).field.children.f_right;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
         {
@@ -8381,13 +8381,13 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, gl
             );
         }
         rep[39] = 0;
-        xml_buffer_write_char(buf, rep.as_ptr());
+        xml_buf_ccat(buf, rep.as_ptr());
     } else {
         eprintln!("Error in tree");
         // fprintf(stderr, "Error in tree\n");
     }
     if glob != 0 {
-        xml_buffer_write_char(buf, c")".as_ptr());
+        xml_buf_ccat(buf, c")".as_ptr());
     }
 }
 
@@ -8399,7 +8399,7 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufferPtr, expr: XmlExpNodePtr, gl
  * Serialize the expression as compiled to the buffer
  */
 #[cfg(feature = "libxml_expr")]
-pub unsafe extern "C" fn xml_exp_dump(buf: XmlBufferPtr, expr: XmlExpNodePtr) {
+pub unsafe extern "C" fn xml_exp_dump(buf: XmlBufPtr, expr: XmlExpNodePtr) {
     if buf.is_null() || expr.is_null() {
         return;
     }
@@ -8478,11 +8478,11 @@ mod tests {
             for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
                 for n_expr in 0..GEN_NB_XML_EXP_NODE_PTR {
                     let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
+                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
                     let expr = gen_xml_exp_node_ptr(n_expr, 1);
 
                     xml_exp_dump(buf, expr);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
+                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
                     des_xml_exp_node_ptr(n_expr, expr, 1);
                     xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {

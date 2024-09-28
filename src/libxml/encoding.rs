@@ -10,21 +10,17 @@ use std::{
     sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
 };
 
-use libc::{memcpy, memmove, memset, snprintf, strcmp};
+use libc::{memcpy, memmove, memset, strcmp};
 
 use crate::{
-    __xml_raise_error,
-    libxml::xmlerror::XmlErrorDomain,
-    private::{enc::xml_enc_input_chunk, error::__xml_simple_error},
+    __xml_raise_error, libxml::xmlerror::XmlErrorDomain, private::error::__xml_simple_error,
 };
 
 use super::{
     globals::{xml_free, xml_malloc, xml_mem_strdup, xml_realloc},
     htmlparser::utf8_to_html,
     parser::xml_init_parser,
-    tree::{xml_buffer_grow, xml_buffer_shrink, XmlBufferPtr},
     xmlerror::XmlParserErrors,
-    xmlstring::{xml_get_utf8_char, XmlChar},
 };
 
 /*
@@ -2192,347 +2188,347 @@ pub(crate) unsafe extern "C" fn xml_enc_output_chunk(
     ret
 }
 
-/**
- * xmlCharEncOutFunc:
- * @handler:    c_char encoding transformation data structure
- * @out:  an xmlBuffer for the output.
- * @in:  an xmlBuffer for the input
- *
- * Generic front-end for the encoding handler output function
- * a first call with @in.is_null() has to be made firs to initiate the
- * output in case of non-stateless encoding needing to initiate their
- * state or the output (like the BOM in UTF16).
- * In case of UTF8 sequence conversion errors for the given encoder,
- * the content will be automatically remapped to a CharRef sequence.
- *
- * Returns the number of byte written if success, or
- *     -1 general error
- *     -2 if the transcoding fails (for *in is not valid utf8 string or
- *        the result of transformation can't fit into the encoding we want), or
- */
-pub unsafe extern "C" fn xml_char_enc_out_func(
-    handler: *mut XmlCharEncodingHandler,
-    out: XmlBufferPtr,
-    input: XmlBufferPtr,
-) -> c_int {
-    let mut ret: c_int;
-    let mut written: c_int;
-    let mut writtentot: c_int = 0;
-    let mut toconv: c_int;
+// /**
+//  * xmlCharEncOutFunc:
+//  * @handler:    c_char encoding transformation data structure
+//  * @out:  an xmlBuffer for the output.
+//  * @in:  an xmlBuffer for the input
+//  *
+//  * Generic front-end for the encoding handler output function
+//  * a first call with @in.is_null() has to be made firs to initiate the
+//  * output in case of non-stateless encoding needing to initiate their
+//  * state or the output (like the BOM in UTF16).
+//  * In case of UTF8 sequence conversion errors for the given encoder,
+//  * the content will be automatically remapped to a CharRef sequence.
+//  *
+//  * Returns the number of byte written if success, or
+//  *     -1 general error
+//  *     -2 if the transcoding fails (for *in is not valid utf8 string or
+//  *        the result of transformation can't fit into the encoding we want), or
+//  */
+// pub unsafe extern "C" fn xml_char_enc_out_func(
+//     handler: *mut XmlCharEncodingHandler,
+//     out: XmlBufferPtr,
+//     input: XmlBufferPtr,
+// ) -> c_int {
+//     let mut ret: c_int;
+//     let mut written: c_int;
+//     let mut writtentot: c_int = 0;
+//     let mut toconv: c_int;
 
-    if handler.is_null() {
-        return -1;
-    }
-    if out.is_null() {
-        return -1;
-    }
+//     if handler.is_null() {
+//         return -1;
+//     }
+//     if out.is_null() {
+//         return -1;
+//     }
 
-    // retry:
-    'retry: loop {
-        written = (*out).size as i32 - (*out).using as i32;
+//     // retry:
+//     'retry: loop {
+//         written = (*out).size as i32 - (*out).using as i32;
 
-        if written > 0 {
-            written -= 1; /* Gennady: count '/0' */
-        }
+//         if written > 0 {
+//             written -= 1; /* Gennady: count '/0' */
+//         }
 
-        /*
-         * First specific handling of input = NULL, i.e. the initialization call
-         */
-        if input.is_null() {
-            toconv = 0;
-            /* TODO: Check return value. */
-            xml_enc_output_chunk(
-                handler,
-                (*out).content.add((*out).using as usize),
-                addr_of_mut!(written),
-                null_mut(),
-                addr_of_mut!(toconv),
-            );
-            (*out).using += written as u32;
-            *(*out).content.add((*out).using as usize) = 0;
-            // #ifdef DEBUG_ENCODING
-            // 	xmlGenericError(xmlGenericErrorContext,
-            // 		"initialized encoder\n");
-            // #endif
-            return 0;
-        }
+//         /*
+//          * First specific handling of input = NULL, i.e. the initialization call
+//          */
+//         if input.is_null() {
+//             toconv = 0;
+//             /* TODO: Check return value. */
+//             xml_enc_output_chunk(
+//                 handler,
+//                 (*out).content.add((*out).using as usize),
+//                 addr_of_mut!(written),
+//                 null_mut(),
+//                 addr_of_mut!(toconv),
+//             );
+//             (*out).using += written as u32;
+//             *(*out).content.add((*out).using as usize) = 0;
+//             // #ifdef DEBUG_ENCODING
+//             // 	xmlGenericError(xmlGenericErrorContext,
+//             // 		"initialized encoder\n");
+//             // #endif
+//             return 0;
+//         }
 
-        /*
-         * Conversion itself.
-         */
-        toconv = (*input).using as i32;
-        if toconv == 0 {
-            return 0;
-        }
-        if toconv * 4 >= written {
-            xml_buffer_grow(out, toconv as u32 * 4);
-            written = (*out).size as i32 - (*out).using as i32 - 1;
-        }
-        ret = xml_enc_output_chunk(
-            handler,
-            (*out).content.add((*out).using as usize),
-            addr_of_mut!(written),
-            (*input).content,
-            addr_of_mut!(toconv),
-        );
-        xml_buffer_shrink(input, toconv as u32);
-        (*out).using += written as u32;
-        writtentot += written;
-        *(*out).content.add((*out).using as usize) = 0;
-        if ret == -1 {
-            if written > 0 {
-                /* Can be a limitation of iconv or uconv */
-                // goto retry;
-                continue 'retry;
-            }
-            ret = -3;
-        }
+//         /*
+//          * Conversion itself.
+//          */
+//         toconv = (*input).using as i32;
+//         if toconv == 0 {
+//             return 0;
+//         }
+//         if toconv * 4 >= written {
+//             xml_buffer_grow(out, toconv as u32 * 4);
+//             written = (*out).size as i32 - (*out).using as i32 - 1;
+//         }
+//         ret = xml_enc_output_chunk(
+//             handler,
+//             (*out).content.add((*out).using as usize),
+//             addr_of_mut!(written),
+//             (*input).content,
+//             addr_of_mut!(toconv),
+//         );
+//         xml_buffer_shrink(input, toconv as u32);
+//         (*out).using += written as u32;
+//         writtentot += written;
+//         *(*out).content.add((*out).using as usize) = 0;
+//         if ret == -1 {
+//             if written > 0 {
+//                 /* Can be a limitation of iconv or uconv */
+//                 // goto retry;
+//                 continue 'retry;
+//             }
+//             ret = -3;
+//         }
 
-        /*
-         * Attempt to handle error cases
-         */
-        match ret {
-            0 => {
-                // #ifdef DEBUG_ENCODING
-                // 	    xmlGenericError(xmlGenericErrorContext,
-                // 		    "converted %d bytes to %d bytes of output\n",
-                // 	            toconv, written);
-                // #endif
-                break;
-            }
-            -1 => {
-                // #ifdef DEBUG_ENCODING
-                // 	    xmlGenericError(xmlGenericErrorContext,
-                // 		    "output conversion failed by lack of space\n");
-                // #endif
-                break;
-            }
-            -3 => {
-                // #ifdef DEBUG_ENCODING
-                // 	    xmlGenericError(xmlGenericErrorContext,"converted %d bytes to %d bytes of output %d left\n",
-                // 	            toconv, written, (*input).using);
-                // #endif
-                break;
-            }
-            -4 => {
-                xml_encoding_err(
-                    XmlParserErrors::XmlI18nNoOutput,
-                    c"xmlCharEncOutFunc: no output function !\n".as_ptr() as _,
-                    null(),
-                );
-                ret = -1;
-                break;
-            }
-            -2 => {
-                let mut charref: [XmlChar; 20] = [0; 20];
-                let mut len: c_int = (*input).using as _;
-                let utf: *const XmlChar = (*input).content as *const XmlChar;
+//         /*
+//          * Attempt to handle error cases
+//          */
+//         match ret {
+//             0 => {
+//                 // #ifdef DEBUG_ENCODING
+//                 // 	    xmlGenericError(xmlGenericErrorContext,
+//                 // 		    "converted %d bytes to %d bytes of output\n",
+//                 // 	            toconv, written);
+//                 // #endif
+//                 break;
+//             }
+//             -1 => {
+//                 // #ifdef DEBUG_ENCODING
+//                 // 	    xmlGenericError(xmlGenericErrorContext,
+//                 // 		    "output conversion failed by lack of space\n");
+//                 // #endif
+//                 break;
+//             }
+//             -3 => {
+//                 // #ifdef DEBUG_ENCODING
+//                 // 	    xmlGenericError(xmlGenericErrorContext,"converted %d bytes to %d bytes of output %d left\n",
+//                 // 	            toconv, written, (*input).using);
+//                 // #endif
+//                 break;
+//             }
+//             -4 => {
+//                 xml_encoding_err(
+//                     XmlParserErrors::XmlI18nNoOutput,
+//                     c"xmlCharEncOutFunc: no output function !\n".as_ptr() as _,
+//                     null(),
+//                 );
+//                 ret = -1;
+//                 break;
+//             }
+//             -2 => {
+//                 let mut charref: [XmlChar; 20] = [0; 20];
+//                 let mut len: c_int = (*input).using as _;
+//                 let utf: *const XmlChar = (*input).content as *const XmlChar;
 
-                let cur: c_int = xml_get_utf8_char(utf, addr_of_mut!(len));
-                if cur <= 0 {
-                    break;
-                }
+//                 let cur: c_int = xml_get_utf8_char(utf, addr_of_mut!(len));
+//                 if cur <= 0 {
+//                     break;
+//                 }
 
-                // #ifdef DEBUG_ENCODING
-                //             xmlGenericError(xmlGenericErrorContext,
-                //                     "handling output conversion error\n");
-                //             xmlGenericError(xmlGenericErrorContext,
-                //                     "Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n",
-                //                     *(*input).content.add(0), *(*input).content.add(1),
-                //                     *(*input).content.add(2), *(*input).content.add(3));
-                // #endif
-                /*
-                 * Removes the UTF8 sequence, and replace it by a charref
-                 * and continue the transcoding phase, hoping the error
-                 * did not mangle the encoder state.
-                 */
-                let charref_len: c_int = snprintf(
-                    addr_of_mut!(charref[0]) as _,
-                    size_of_val(&charref),
-                    c"&#%d;".as_ptr() as _,
-                    cur,
-                );
-                xml_buffer_shrink(input, len as u32);
-                xml_buffer_grow(out, charref_len as u32 * 4);
-                written = (*out).size as i32 - (*out).using as i32 - 1;
-                toconv = charref_len;
-                ret = xml_enc_output_chunk(
-                    handler,
-                    (*out).content.add((*out).using as usize),
-                    addr_of_mut!(written),
-                    charref.as_ptr() as _,
-                    addr_of_mut!(toconv),
-                );
+//                 // #ifdef DEBUG_ENCODING
+//                 //             xmlGenericError(xmlGenericErrorContext,
+//                 //                     "handling output conversion error\n");
+//                 //             xmlGenericError(xmlGenericErrorContext,
+//                 //                     "Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n",
+//                 //                     *(*input).content.add(0), *(*input).content.add(1),
+//                 //                     *(*input).content.add(2), *(*input).content.add(3));
+//                 // #endif
+//                 /*
+//                  * Removes the UTF8 sequence, and replace it by a charref
+//                  * and continue the transcoding phase, hoping the error
+//                  * did not mangle the encoder state.
+//                  */
+//                 let charref_len: c_int = snprintf(
+//                     addr_of_mut!(charref[0]) as _,
+//                     size_of_val(&charref),
+//                     c"&#%d;".as_ptr() as _,
+//                     cur,
+//                 );
+//                 xml_buffer_shrink(input, len as u32);
+//                 xml_buffer_grow(out, charref_len as u32 * 4);
+//                 written = (*out).size as i32 - (*out).using as i32 - 1;
+//                 toconv = charref_len;
+//                 ret = xml_enc_output_chunk(
+//                     handler,
+//                     (*out).content.add((*out).using as usize),
+//                     addr_of_mut!(written),
+//                     charref.as_ptr() as _,
+//                     addr_of_mut!(toconv),
+//                 );
 
-                if ret < 0 || (toconv != charref_len) {
-                    let mut buf: [c_char; 50] = [0; 50];
+//                 if ret < 0 || (toconv != charref_len) {
+//                     let mut buf: [c_char; 50] = [0; 50];
 
-                    snprintf(
-                        buf.as_mut_ptr() as _,
-                        49,
-                        c"0x%02X 0x%02X 0x%02X 0x%02X".as_ptr() as _,
-                        *(*input).content.add(0) as u32,
-                        *(*input).content.add(1) as u32,
-                        *(*input).content.add(2) as u32,
-                        *(*input).content.add(3) as u32,
-                    );
-                    buf[49] = 0;
-                    xml_encoding_err(
-                        XmlParserErrors::XmlI18nConvFailed,
-                        c"output conversion failed due to conv error, bytes %s\n".as_ptr() as _,
-                        buf.as_ptr() as _,
-                    );
-                    *(*input).content.add(0) = b' ';
-                    break;
-                }
+//                     snprintf(
+//                         buf.as_mut_ptr() as _,
+//                         49,
+//                         c"0x%02X 0x%02X 0x%02X 0x%02X".as_ptr() as _,
+//                         *(*input).content.add(0) as u32,
+//                         *(*input).content.add(1) as u32,
+//                         *(*input).content.add(2) as u32,
+//                         *(*input).content.add(3) as u32,
+//                     );
+//                     buf[49] = 0;
+//                     xml_encoding_err(
+//                         XmlParserErrors::XmlI18nConvFailed,
+//                         c"output conversion failed due to conv error, bytes %s\n".as_ptr() as _,
+//                         buf.as_ptr() as _,
+//                     );
+//                     *(*input).content.add(0) = b' ';
+//                     break;
+//                 }
 
-                (*out).using += written as u32;
-                writtentot += written;
-                *(*out).content.add((*out).using as usize) = 0;
-                // goto retry;
-                continue 'retry;
-            }
-            _ => {
-                break;
-            }
-        }
-    }
+//                 (*out).using += written as u32;
+//                 writtentot += written;
+//                 *(*out).content.add((*out).using as usize) = 0;
+//                 // goto retry;
+//                 continue 'retry;
+//             }
+//             _ => {
+//                 break;
+//             }
+//         }
+//     }
 
-    if writtentot != 0 {
-        writtentot
-    } else {
-        ret
-    }
-}
+//     if writtentot != 0 {
+//         writtentot
+//     } else {
+//         ret
+//     }
+// }
 
-/**
- * xmlCharEncInFunc:
- * @handler:    c_char encoding transformation data structure
- * @out:  an xmlBuffer for the output.
- * @in:  an xmlBuffer for the input
- *
- * Generic front-end for the encoding handler input function
- *
- * Returns the number of byte written if success, or
- *     -1 general error
- *     -2 if the transcoding fails (for *in is not valid utf8 string or
- *        the result of transformation can't fit into the encoding we want), or
- */
-pub unsafe extern "C" fn xml_char_enc_in_func(
-    handler: *mut XmlCharEncodingHandler,
-    out: XmlBufferPtr,
-    input: XmlBufferPtr,
-) -> c_int {
-    let mut ret: c_int;
-    let mut written: c_int;
-    let mut toconv: c_int;
+// /**
+//  * xmlCharEncInFunc:
+//  * @handler:    c_char encoding transformation data structure
+//  * @out:  an xmlBuffer for the output.
+//  * @in:  an xmlBuffer for the input
+//  *
+//  * Generic front-end for the encoding handler input function
+//  *
+//  * Returns the number of byte written if success, or
+//  *     -1 general error
+//  *     -2 if the transcoding fails (for *in is not valid utf8 string or
+//  *        the result of transformation can't fit into the encoding we want), or
+//  */
+// pub unsafe extern "C" fn xml_char_enc_in_func(
+//     handler: *mut XmlCharEncodingHandler,
+//     out: XmlBufferPtr,
+//     input: XmlBufferPtr,
+// ) -> c_int {
+//     let mut ret: c_int;
+//     let mut written: c_int;
+//     let mut toconv: c_int;
 
-    if handler.is_null() {
-        return -1;
-    }
-    if out.is_null() {
-        return -1;
-    }
-    if input.is_null() {
-        return -1;
-    }
+//     if handler.is_null() {
+//         return -1;
+//     }
+//     if out.is_null() {
+//         return -1;
+//     }
+//     if input.is_null() {
+//         return -1;
+//     }
 
-    toconv = (*input).using as _;
-    if toconv == 0 {
-        return 0;
-    }
-    written = (*out).size as i32 - (*out).using as i32 - 1; /* count '\0' */
-    if toconv * 2 >= written {
-        xml_buffer_grow(out, (*out).size + toconv as u32 * 2);
-        written = (*out).size as i32 - (*out).using as i32 - 1;
-    }
-    ret = xml_enc_input_chunk(
-        handler,
-        (*out).content.add((*out).using as usize) as _,
-        addr_of_mut!(written),
-        (*input).content,
-        addr_of_mut!(toconv),
-        1,
-    );
-    xml_buffer_shrink(input, toconv as u32);
-    (*out).using += written as u32;
-    *(*out).content.add((*out).using as usize) = 0;
-    if ret == -1 {
-        ret = -3;
-    }
+//     toconv = (*input).using as _;
+//     if toconv == 0 {
+//         return 0;
+//     }
+//     written = (*out).size as i32 - (*out).using as i32 - 1; /* count '\0' */
+//     if toconv * 2 >= written {
+//         xml_buffer_grow(out, (*out).size + toconv as u32 * 2);
+//         written = (*out).size as i32 - (*out).using as i32 - 1;
+//     }
+//     ret = xml_enc_input_chunk(
+//         handler,
+//         (*out).content.add((*out).using as usize) as _,
+//         addr_of_mut!(written),
+//         (*input).content,
+//         addr_of_mut!(toconv),
+//         1,
+//     );
+//     xml_buffer_shrink(input, toconv as u32);
+//     (*out).using += written as u32;
+//     *(*out).content.add((*out).using as usize) = 0;
+//     if ret == -1 {
+//         ret = -3;
+//     }
 
-    match ret {
-        0 => {
-            // #ifdef DEBUG_ENCODING
-            //             xmlGenericError(xmlGenericErrorContext,
-            //                             "converted %d bytes to %d bytes of input\n",
-            //                             toconv, written);
-            // #endif
-        }
-        -1 => {
-            // #ifdef DEBUG_ENCODING
-            //             xmlGenericError(xmlGenericErrorContext,
-            //                          "converted %d bytes to %d bytes of input, %d left\n",
-            //                             toconv, written, (*input).using);
-            // #endif
-        }
-        -3 => {
-            // #ifdef DEBUG_ENCODING
-            //             xmlGenericError(xmlGenericErrorContext,
-            //                         "converted %d bytes to %d bytes of input, %d left\n",
-            //                             toconv, written, (*input).using);
-            // #endif
-        }
-        -2 => {
-            let mut buf: [c_char; 50] = [0; 50];
+//     match ret {
+//         0 => {
+//             // #ifdef DEBUG_ENCODING
+//             //             xmlGenericError(xmlGenericErrorContext,
+//             //                             "converted %d bytes to %d bytes of input\n",
+//             //                             toconv, written);
+//             // #endif
+//         }
+//         -1 => {
+//             // #ifdef DEBUG_ENCODING
+//             //             xmlGenericError(xmlGenericErrorContext,
+//             //                          "converted %d bytes to %d bytes of input, %d left\n",
+//             //                             toconv, written, (*input).using);
+//             // #endif
+//         }
+//         -3 => {
+//             // #ifdef DEBUG_ENCODING
+//             //             xmlGenericError(xmlGenericErrorContext,
+//             //                         "converted %d bytes to %d bytes of input, %d left\n",
+//             //                             toconv, written, (*input).using);
+//             // #endif
+//         }
+//         -2 => {
+//             let mut buf: [c_char; 50] = [0; 50];
 
-            snprintf(
-                buf.as_mut_ptr() as _,
-                49,
-                c"0x%02X 0x%02X 0x%02X 0x%02X".as_ptr() as _,
-                *(*input).content.add(0) as u32,
-                *(*input).content.add(1) as u32,
-                *(*input).content.add(2) as u32,
-                *(*input).content.add(3) as u32,
-            );
-            buf[49] = 0;
-            xml_encoding_err(
-                XmlParserErrors::XmlI18nConvFailed,
-                c"input conversion failed due to input error, bytes %s\n".as_ptr() as _,
-                buf.as_ptr() as _,
-            );
-        }
-        _ => {}
-    }
-    /*
-     * Ignore when input buffer is not on a boundary
-     */
-    if ret == -3 {
-        ret = 0;
-    }
-    if written != 0 {
-        written
-    } else {
-        ret
-    }
-}
+//             snprintf(
+//                 buf.as_mut_ptr() as _,
+//                 49,
+//                 c"0x%02X 0x%02X 0x%02X 0x%02X".as_ptr() as _,
+//                 *(*input).content.add(0) as u32,
+//                 *(*input).content.add(1) as u32,
+//                 *(*input).content.add(2) as u32,
+//                 *(*input).content.add(3) as u32,
+//             );
+//             buf[49] = 0;
+//             xml_encoding_err(
+//                 XmlParserErrors::XmlI18nConvFailed,
+//                 c"input conversion failed due to input error, bytes %s\n".as_ptr() as _,
+//                 buf.as_ptr() as _,
+//             );
+//         }
+//         _ => {}
+//     }
+//     /*
+//      * Ignore when input buffer is not on a boundary
+//      */
+//     if ret == -3 {
+//         ret = 0;
+//     }
+//     if written != 0 {
+//         written
+//     } else {
+//         ret
+//     }
+// }
 
-/**
- * xmlCharEncFirstLine:
- * @handler:    c_char encoding transformation data structure
- * @out:  an xmlBuffer for the output.
- * @in:  an xmlBuffer for the input
- *
- * DEPERECATED: Don't use.
- */
-#[deprecated]
-pub unsafe extern "C" fn xml_char_enc_first_line(
-    handler: *mut XmlCharEncodingHandler,
-    out: XmlBufferPtr,
-    input: XmlBufferPtr,
-) -> c_int {
-    xml_char_enc_in_func(handler, out, input)
-}
+// /**
+//  * xmlCharEncFirstLine:
+//  * @handler:    c_char encoding transformation data structure
+//  * @out:  an xmlBuffer for the output.
+//  * @in:  an xmlBuffer for the input
+//  *
+//  * DEPERECATED: Don't use.
+//  */
+// #[deprecated]
+// pub unsafe extern "C" fn xml_char_enc_first_line(
+//     handler: *mut XmlCharEncodingHandler,
+//     out: XmlBufferPtr,
+//     input: XmlBufferPtr,
+// ) -> c_int {
+//     xml_char_enc_in_func(handler, out, input)
+// }
 
 /**
  * xmlCharEncCloseFunc:
@@ -4082,117 +4078,117 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_char_enc_first_line() {
-        let mut leaks = 0;
+    // #[test]
+    // fn test_xml_char_enc_first_line() {
+    //     let mut leaks = 0;
 
-        unsafe {
-            for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                for n_out in 0..GEN_NB_XML_BUFFER_PTR {
-                    for n_in in 0..GEN_NB_XML_BUFFER_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
-                        let out = gen_xml_buffer_ptr(n_out, 1);
-                        let input = gen_xml_buffer_ptr(n_in, 2);
+    //     unsafe {
+    //         for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
+    //             for n_out in 0..GEN_NB_XML_BUFFER_PTR {
+    //                 for n_in in 0..GEN_NB_XML_BUFFER_PTR {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
+    //                     let out = gen_xml_buffer_ptr(n_out, 1);
+    //                     let input = gen_xml_buffer_ptr(n_in, 2);
 
-                        let ret_val = xml_char_enc_first_line(handler, out, input);
-                        desret_int(ret_val);
-                        des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
-                        des_xml_buffer_ptr(n_out, out, 1);
-                        des_xml_buffer_ptr(n_in, input, 2);
-                        xml_reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlCharEncFirstLine",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_handler);
-                            eprint!(" {}", n_out);
-                            eprintln!(" {}", n_in);
-                        }
-                    }
-                }
-            }
+    //                     let ret_val = xml_char_enc_first_line(handler, out, input);
+    //                     desret_int(ret_val);
+    //                     des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
+    //                     des_xml_buffer_ptr(n_out, out, 1);
+    //                     des_xml_buffer_ptr(n_in, input, 2);
+    //                     xml_reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlCharEncFirstLine",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         eprint!(" {}", n_handler);
+    //                         eprint!(" {}", n_out);
+    //                         eprintln!(" {}", n_in);
+    //                     }
+    //                 }
+    //             }
+    //         }
 
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlCharEncFirstLine()"
-            );
-        }
-    }
+    //         assert!(
+    //             leaks == 0,
+    //             "{leaks} Leaks are found in xmlCharEncFirstLine()"
+    //         );
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_char_enc_in_func() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_char_enc_in_func() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                for n_out in 0..GEN_NB_XML_BUFFER_PTR {
-                    for n_in in 0..GEN_NB_XML_BUFFER_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
-                        let out = gen_xml_buffer_ptr(n_out, 1);
-                        let input = gen_xml_buffer_ptr(n_in, 2);
+    //         for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
+    //             for n_out in 0..GEN_NB_XML_BUFFER_PTR {
+    //                 for n_in in 0..GEN_NB_XML_BUFFER_PTR {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
+    //                     let out = gen_xml_buffer_ptr(n_out, 1);
+    //                     let input = gen_xml_buffer_ptr(n_in, 2);
 
-                        let ret_val = xml_char_enc_in_func(handler, out, input);
-                        desret_int(ret_val);
-                        des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
-                        des_xml_buffer_ptr(n_out, out, 1);
-                        des_xml_buffer_ptr(n_in, input, 2);
-                        xml_reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlCharEncInFunc",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_handler);
-                            eprint!(" {}", n_out);
-                            eprintln!(" {}", n_in);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCharEncInFunc()");
-        }
-    }
+    //                     let ret_val = xml_char_enc_in_func(handler, out, input);
+    //                     desret_int(ret_val);
+    //                     des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
+    //                     des_xml_buffer_ptr(n_out, out, 1);
+    //                     des_xml_buffer_ptr(n_in, input, 2);
+    //                     xml_reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlCharEncInFunc",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         eprint!(" {}", n_handler);
+    //                         eprint!(" {}", n_out);
+    //                         eprintln!(" {}", n_in);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlCharEncInFunc()");
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_char_enc_out_func() {
-        unsafe {
-            let mut leaks = 0;
-            for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                for n_out in 0..GEN_NB_XML_BUFFER_PTR {
-                    for n_in in 0..GEN_NB_XML_BUFFER_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
-                        let out = gen_xml_buffer_ptr(n_out, 1);
-                        let input = gen_xml_buffer_ptr(n_in, 2);
+    // #[test]
+    // fn test_xml_char_enc_out_func() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
+    //             for n_out in 0..GEN_NB_XML_BUFFER_PTR {
+    //                 for n_in in 0..GEN_NB_XML_BUFFER_PTR {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
+    //                     let out = gen_xml_buffer_ptr(n_out, 1);
+    //                     let input = gen_xml_buffer_ptr(n_in, 2);
 
-                        let ret_val = xml_char_enc_out_func(handler, out, input);
-                        desret_int(ret_val);
-                        des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
-                        des_xml_buffer_ptr(n_out, out, 1);
-                        des_xml_buffer_ptr(n_in, input, 2);
-                        xml_reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlCharEncOutFunc",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_handler);
-                            eprint!(" {}", n_out);
-                            eprintln!(" {}", n_in);
-                        }
-                    }
-                }
-            }
+    //                     let ret_val = xml_char_enc_out_func(handler, out, input);
+    //                     desret_int(ret_val);
+    //                     des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
+    //                     des_xml_buffer_ptr(n_out, out, 1);
+    //                     des_xml_buffer_ptr(n_in, input, 2);
+    //                     xml_reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlCharEncOutFunc",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         eprint!(" {}", n_handler);
+    //                         eprint!(" {}", n_out);
+    //                         eprintln!(" {}", n_in);
+    //                     }
+    //                 }
+    //             }
+    //         }
 
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCharEncOutFunc()");
-        }
-    }
+    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlCharEncOutFunc()");
+    //     }
+    // }
 
     #[test]
     fn test_xml_cleanup_char_encoding_handlers() {

@@ -5,15 +5,16 @@
 
 use std::{
     any::type_name,
-    ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_ushort, CStr},
+    ffi::{c_char, c_int, c_long, c_ulong, c_ushort, CStr},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::{AtomicI32, AtomicPtr, Ordering},
 };
 
-use libc::{fwrite, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen, FILE};
+use libc::{memcpy, memset, ptrdiff_t, size_t, snprintf, strlen, FILE};
 
+pub(crate) use crate::buf::libxml_api::*;
 use crate::{
     libxml::{
         dict::xml_dict_free,
@@ -24,14 +25,13 @@ use crate::{
     },
     private::{
         buf::{
-            xml_buf_add, xml_buf_back_to_buffer, xml_buf_cat, xml_buf_create, xml_buf_create_size,
-            xml_buf_detach, xml_buf_free, xml_buf_from_buffer, xml_buf_is_empty,
-            xml_buf_set_allocation_scheme,
+            xml_buf_add, xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_detach,
+            xml_buf_free, xml_buf_is_empty, xml_buf_set_allocation_scheme,
         },
         entities::{xml_encode_attribute_entities, XML_ENT_EXPANDING, XML_ENT_PARSED},
         error::__xml_simple_error,
     },
-    CHECK_COMPAT, IS_BLANK_CH, UPDATE_COMPAT,
+    IS_BLANK_CH,
 };
 
 use super::{
@@ -42,8 +42,8 @@ use super::{
         XmlEntitiesTablePtr, XmlEntityType,
     },
     globals::{
-        xml_buffer_alloc_scheme, xml_default_buffer_size, xml_deregister_node_default_value,
-        xml_free, xml_malloc, xml_malloc_atomic, xml_realloc, xml_register_node_default_value,
+        xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc,
+        xml_register_node_default_value,
     },
     hash::{xml_hash_lookup, xml_hash_remove_entry},
     parser_internals::{
@@ -58,7 +58,7 @@ use super::{
     xmlerror::{XmlErrorDomain, XmlParserErrors},
     xmlregexp::XmlRegexpPtr,
     xmlstring::{
-        xml_str_equal, xml_strcasecmp, xml_strcat, xml_strchr, xml_strdup, xml_strlen, xml_strncat,
+        xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
         xml_strncat_new, xml_strncmp, xml_strndup,
     },
 };
@@ -119,50 +119,6 @@ impl TryFrom<i32> for XmlBufferAllocationScheme {
         }
     }
 }
-
-/**
- * xmlBuffer:
- *
- * A buffer structure, this old construct is limited to 2GB and
- * is being deprecated, use API with xmlBuf instead
- */
-pub type XmlBufferPtr = *mut XmlBuffer;
-#[repr(C)]
-pub struct XmlBuffer {
-    pub content: *mut XmlChar,                   /* The buffer content UTF8 */
-    pub using: c_uint,                           /* The buffer size used */
-    pub(crate) size: c_uint,                     /* The buffer size */
-    pub(crate) alloc: XmlBufferAllocationScheme, /* The realloc method */
-    pub(crate) content_io: *mut XmlChar,         /* in IO mode we may have a different base */
-}
-
-/**
- * xmlBuf:
- *
- * A buffer structure, new one, the actual structure internals are not public
- */
-
-#[repr(C)]
-pub struct XmlBuf {
-    pub(crate) content: *mut XmlChar, /* The buffer content UTF8 */
-    pub(crate) compat_use: c_uint,    /* for binary compatibility */
-    pub(crate) compat_size: c_uint,   /* for binary compatibility */
-    pub(crate) alloc: XmlBufferAllocationScheme, /* The realloc method */
-    pub(crate) content_io: *mut XmlChar, /* in IO mode we may have a different base */
-    pub(crate) using: size_t,         /* The buffer size used */
-    pub(crate) size: size_t,          /* The buffer size */
-    pub(crate) buffer: XmlBufferPtr,  /* wrapper for an old buffer */
-    pub(crate) error: c_int,          /* an error code if a failure occurred */
-}
-
-/**
- * xmlBufPtr:
- *
- * A pointer to a buffer structure, the actual structure internals are not
- * public
- */
-
-pub type XmlBufPtr = *mut XmlBuf;
 
 pub(crate) static __XML_REGISTER_CALLBACKS: AtomicI32 = AtomicI32::new(0);
 
@@ -866,120 +822,6 @@ macro_rules! CUR_SCHAR {
  * A few public routines for xmlBuf. As those are expected to be used
  * mostly internally the bulk of the routines are internal in buf.h
  */
-/**
- * xmlBufContent:
- * @buf:  the buffer
- *
- * Function to extract the content of a buffer
- *
- * Returns the internal content
- */
-pub unsafe extern "C" fn xml_buf_content(buf: *const XmlBuf) -> *mut XmlChar {
-    if buf.is_null() || (*buf).error != 0 {
-        return null_mut();
-    }
-
-    (*buf).content
-}
-
-/**
- * xmlBufEnd:
- * @buf:  the buffer
- *
- * Function to extract the end of the content of a buffer
- *
- * Returns the end of the internal content or NULL in case of error
- */
-pub unsafe extern "C" fn xml_buf_end(buf: XmlBufPtr) -> *mut XmlChar {
-    if buf.is_null() || (*buf).error != 0 {
-        return null_mut();
-    }
-    CHECK_COMPAT!(buf);
-
-    (*buf).content.add((*buf).using)
-}
-
-/**
- * xmlBufUse:
- * @buf:  the buffer
- *
- * Function to get the length of a buffer
- *
- * Returns the length of data in the internal content
- */
-pub unsafe extern "C" fn xml_buf_use(buf: XmlBufPtr) -> size_t {
-    if buf.is_null() || (*buf).error != 0 {
-        return 0;
-    }
-    CHECK_COMPAT!(buf);
-
-    (*buf).using
-}
-/**
- * xmlBufShrink:
- * @buf:  the buffer to dump
- * @len:  the number of XmlChar to remove
- *
- * Remove the beginning of an XML buffer.
- * NOTE that this routine behaviour differs from xmlBufferShrink()
- * as it will return 0 on error instead of -1 due to size_t being
- * used as the return type.
- *
- * Returns the number of byte removed or 0 in case of failure
- */
-pub unsafe extern "C" fn xml_buf_shrink(buf: XmlBufPtr, len: size_t) -> size_t {
-    if buf.is_null() || (*buf).error != 0 {
-        return 0;
-    }
-    CHECK_COMPAT!(buf);
-    if len == 0 {
-        return 0;
-    }
-    if len > (*buf).using {
-        return 0;
-    }
-
-    (*buf).using -= len;
-    if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        && !(*buf).content_io.is_null()
-    {
-        /*
-         * we just move the content pointer, but also make sure
-         * the perceived buffer size has shrunk accordingly
-         */
-        (*buf).content = (*buf).content.add(len);
-        (*buf).size -= len;
-
-        /*
-         * sometimes though it maybe be better to really shrink
-         * on IO buffers
-         */
-        if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-            && !(*buf).content_io.is_null()
-        {
-            let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
-            if start_buf >= (*buf).size {
-                memmove(
-                    (*buf).content_io as _,
-                    (*buf).content.add(0) as _,
-                    (*buf).using,
-                );
-                (*buf).content = (*buf).content_io;
-                *(*buf).content.add((*buf).using) = 0;
-                (*buf).size += start_buf;
-            }
-        }
-    } else {
-        memmove(
-            (*buf).content as _,
-            (*buf).content.add(len) as _,
-            (*buf).using,
-        );
-        *(*buf).content.add((*buf).using) = 0;
-    }
-    UPDATE_COMPAT!(buf);
-    len
-}
 
 /*
  * Variables.
@@ -1608,743 +1450,706 @@ pub unsafe extern "C" fn xml_split_qname3(name: *const XmlChar, len: *mut c_int)
  * Handling Buffers, the old ones see @xmlBuf for the new ones.
  */
 
-/**
- * xmlSetBufferAllocationScheme:
- * @scheme:  allocation method to use
- *
- * Set the buffer allocation method.  Types are
- * xmlBufferAllocationScheme::XML_BUFFER_ALLOC_EXACT - use exact sizes, keeps memory usage down
- * xmlBufferAllocationScheme::XML_BUFFER_ALLOC_DOUBLEIT - double buffer when extra needed,
- *                             improves performance
- */
-pub unsafe extern "C" fn xml_set_buffer_allocation_scheme(scheme: XmlBufferAllocationScheme) {
-    if matches!(
-        scheme,
-        XmlBufferAllocationScheme::XmlBufferAllocExact
-            | XmlBufferAllocationScheme::XmlBufferAllocDoubleit
-            | XmlBufferAllocationScheme::XmlBufferAllocHybrid
-    ) {
-        *xml_buffer_alloc_scheme() = scheme;
-    }
-}
+// /**
+//  * xmlBufferCreate:
+//  *
+//  * routine to create an XML buffer.
+//  * returns the new structure.
+//  */
+// pub unsafe extern "C" fn xml_buffer_create() -> XmlBufferPtr {
+//     let ret: XmlBufferPtr = xml_malloc(size_of::<XmlBuffer>()) as _;
+//     if ret.is_null() {
+//         xml_tree_err_memory(c"creating buffer".as_ptr() as _);
+//         return null_mut();
+//     }
+//     (*ret).using = 0;
+//     (*ret).size = *xml_default_buffer_size() as _;
+//     (*ret).alloc = *xml_buffer_alloc_scheme();
+//     (*ret).content = xml_malloc_atomic((*ret).size as usize) as _;
+//     if (*ret).content.is_null() {
+//         xml_tree_err_memory(c"creating buffer".as_ptr() as _);
+//         xml_free(ret as _);
+//         return null_mut();
+//     }
+//     *(*ret).content.add(0) = 0;
+//     (*ret).content_io = null_mut();
+//     ret
+// }
 
-/**
- * xmlGetBufferAllocationScheme:
- *
- * Types are
- * xmlBufferAllocationScheme::XML_BUFFER_ALLOC_EXACT - use exact sizes, keeps memory usage down
- * xmlBufferAllocationScheme::XML_BUFFER_ALLOC_DOUBLEIT - double buffer when extra needed,
- *                             improves performance
- * xmlBufferAllocationScheme::XML_BUFFER_ALLOC_HYBRID - use exact sizes on small strings to keep memory usage tight
- *                            in normal usage, and doubleit on large strings to avoid
- *                            pathological performance.
- *
- * Returns the current allocation scheme
- */
-pub unsafe extern "C" fn xml_get_buffer_allocation_scheme() -> XmlBufferAllocationScheme {
-    *xml_buffer_alloc_scheme()
-}
+// /**
+//  * xmlBufferCreateSize:
+//  * @size: initial size of buffer
+//  *
+//  * routine to create an XML buffer.
+//  * returns the new structure.
+//  */
+// pub unsafe extern "C" fn xml_buffer_create_size(size: size_t) -> XmlBufferPtr {
+//     if size >= u32::MAX as usize {
+//         return null_mut();
+//     }
+//     let ret: XmlBufferPtr = xml_malloc(size_of::<XmlBuffer>()) as _;
+//     if ret.is_null() {
+//         xml_tree_err_memory(c"creating buffer".as_ptr() as _);
+//         return null_mut();
+//     }
+//     (*ret).using = 0;
+//     (*ret).alloc = *xml_buffer_alloc_scheme();
+//     (*ret).size = if size != 0 { size as u32 + 1 } else { 0 }; /* +1 for ending null */
+//     if (*ret).size != 0 {
+//         (*ret).content = xml_malloc_atomic((*ret).size as usize) as _;
+//         if (*ret).content.is_null() {
+//             xml_tree_err_memory(c"creating buffer".as_ptr() as _);
+//             xml_free(ret as _);
+//             return null_mut();
+//         }
+//         *(*ret).content.add(0) = 0;
+//     } else {
+//         (*ret).content = null_mut();
+//     }
+//     (*ret).content_io = null_mut();
+//     ret
+// }
 
-/**
- * xmlBufferCreate:
- *
- * routine to create an XML buffer.
- * returns the new structure.
- */
-pub unsafe extern "C" fn xml_buffer_create() -> XmlBufferPtr {
-    let ret: XmlBufferPtr = xml_malloc(size_of::<XmlBuffer>()) as _;
-    if ret.is_null() {
-        xml_tree_err_memory(c"creating buffer".as_ptr() as _);
-        return null_mut();
-    }
-    (*ret).using = 0;
-    (*ret).size = *xml_default_buffer_size() as _;
-    (*ret).alloc = *xml_buffer_alloc_scheme();
-    (*ret).content = xml_malloc_atomic((*ret).size as usize) as _;
-    if (*ret).content.is_null() {
-        xml_tree_err_memory(c"creating buffer".as_ptr() as _);
-        xml_free(ret as _);
-        return null_mut();
-    }
-    *(*ret).content.add(0) = 0;
-    (*ret).content_io = null_mut();
-    ret
-}
+// /**
+//  * xmlBufferCreateStatic:
+//  * @mem: the memory area
+//  * @size:  the size in byte
+//  *
+//  * Create an XML buffer initialized with bytes.
+//  */
+// pub unsafe extern "C" fn xml_buffer_create_static(mem: *mut c_void, size: size_t) -> XmlBufferPtr {
+//     let buf: XmlBufferPtr = xml_buffer_create_size(size);
 
-/**
- * xmlBufferCreateSize:
- * @size: initial size of buffer
- *
- * routine to create an XML buffer.
- * returns the new structure.
- */
-pub unsafe extern "C" fn xml_buffer_create_size(size: size_t) -> XmlBufferPtr {
-    if size >= u32::MAX as usize {
-        return null_mut();
-    }
-    let ret: XmlBufferPtr = xml_malloc(size_of::<XmlBuffer>()) as _;
-    if ret.is_null() {
-        xml_tree_err_memory(c"creating buffer".as_ptr() as _);
-        return null_mut();
-    }
-    (*ret).using = 0;
-    (*ret).alloc = *xml_buffer_alloc_scheme();
-    (*ret).size = if size != 0 { size as u32 + 1 } else { 0 }; /* +1 for ending null */
-    if (*ret).size != 0 {
-        (*ret).content = xml_malloc_atomic((*ret).size as usize) as _;
-        if (*ret).content.is_null() {
-            xml_tree_err_memory(c"creating buffer".as_ptr() as _);
-            xml_free(ret as _);
-            return null_mut();
-        }
-        *(*ret).content.add(0) = 0;
-    } else {
-        (*ret).content = null_mut();
-    }
-    (*ret).content_io = null_mut();
-    ret
-}
+//     xml_buffer_add(buf, mem as _, size as _);
+//     buf
+// }
 
-/**
- * xmlBufferCreateStatic:
- * @mem: the memory area
- * @size:  the size in byte
- *
- * Create an XML buffer initialized with bytes.
- */
-pub unsafe extern "C" fn xml_buffer_create_static(mem: *mut c_void, size: size_t) -> XmlBufferPtr {
-    let buf: XmlBufferPtr = xml_buffer_create_size(size);
+// /**
+//  * xmlBufferResize:
+//  * @buf:  the buffer to resize
+//  * @size:  the desired size
+//  *
+//  * Resize a buffer to accommodate minimum size of @size.
+//  *
+//  * Returns  0 in case of problems, 1 otherwise
+//  */
+// pub unsafe extern "C" fn xml_buffer_resize(buf: XmlBufferPtr, size: c_uint) -> c_int {
+//     let mut new_size: c_uint;
+//     let rebuf: *mut XmlChar;
+//     let start_buf: size_t;
 
-    xml_buffer_add(buf, mem as _, size as _);
-    buf
-}
+//     if buf.is_null() {
+//         return 0;
+//     }
 
-/**
- * xmlBufferResize:
- * @buf:  the buffer to resize
- * @size:  the desired size
- *
- * Resize a buffer to accommodate minimum size of @size.
- *
- * Returns  0 in case of problems, 1 otherwise
- */
-pub unsafe extern "C" fn xml_buffer_resize(buf: XmlBufferPtr, size: c_uint) -> c_int {
-    let mut new_size: c_uint;
-    let rebuf: *mut XmlChar;
-    let start_buf: size_t;
+//     /* Don't resize if we don't have to */
+//     if size < (*buf).size {
+//         return 1;
+//     }
 
-    if buf.is_null() {
-        return 0;
-    }
+//     if size > u32::MAX - 10 {
+//         xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
+//         return 0;
+//     }
 
-    /* Don't resize if we don't have to */
-    if size < (*buf).size {
-        return 1;
-    }
+//     /* figure out new size */
+//     match (*buf).alloc {
+//         XmlBufferAllocationScheme::XmlBufferAllocIo
+//         | XmlBufferAllocationScheme::XmlBufferAllocDoubleit => {
+//             /*take care of empty case*/
+//             if (*buf).size == 0 {
+//                 new_size = if size > u32::MAX - 10 {
+//                     u32::MAX
+//                 } else {
+//                     size + 10
+//                 };
+//             } else {
+//                 new_size = (*buf).size;
+//             }
+//             while size > new_size {
+//                 if new_size > u32::MAX / 2 {
+//                     xml_tree_err_memory(c"growing buffer".as_ptr() as _);
+//                     return 0;
+//                 }
+//                 new_size *= 2;
+//             }
+//         }
+//         XmlBufferAllocationScheme::XmlBufferAllocExact => {
+//             new_size = if size > u32::MAX - 10 {
+//                 u32::MAX
+//             } else {
+//                 size + 10
+//             };
+//         }
+//         XmlBufferAllocationScheme::XmlBufferAllocHybrid => {
+//             if (*buf).using < BASE_BUFFER_SIZE as u32 {
+//                 new_size = size;
+//             } else {
+//                 new_size = (*buf).size;
+//                 while size > new_size {
+//                     if new_size > u32::MAX / 2 {
+//                         xml_tree_err_memory(c"growing buffer".as_ptr() as _);
+//                         return 0;
+//                     }
+//                     new_size *= 2;
+//                 }
+//             }
+//         }
+//         _ => {
+//             new_size = if size > u32::MAX - 10 {
+//                 u32::MAX
+//             } else {
+//                 size + 10
+//             };
+//         }
+//     }
 
-    if size > u32::MAX - 10 {
-        xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
-        return 0;
-    }
+//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+//         && !(*buf).content_io.is_null()
+//     {
+//         start_buf = (*buf).content.offset_from((*buf).content_io) as _;
 
-    /* figure out new size */
-    match (*buf).alloc {
-        XmlBufferAllocationScheme::XmlBufferAllocIo
-        | XmlBufferAllocationScheme::XmlBufferAllocDoubleit => {
-            /*take care of empty case*/
-            if (*buf).size == 0 {
-                new_size = if size > u32::MAX - 10 {
-                    u32::MAX
-                } else {
-                    size + 10
-                };
-            } else {
-                new_size = (*buf).size;
-            }
-            while size > new_size {
-                if new_size > u32::MAX / 2 {
-                    xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-                    return 0;
-                }
-                new_size *= 2;
-            }
-        }
-        XmlBufferAllocationScheme::XmlBufferAllocExact => {
-            new_size = if size > u32::MAX - 10 {
-                u32::MAX
-            } else {
-                size + 10
-            };
-        }
-        XmlBufferAllocationScheme::XmlBufferAllocHybrid => {
-            if (*buf).using < BASE_BUFFER_SIZE as u32 {
-                new_size = size;
-            } else {
-                new_size = (*buf).size;
-                while size > new_size {
-                    if new_size > u32::MAX / 2 {
-                        xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-                        return 0;
-                    }
-                    new_size *= 2;
-                }
-            }
-        }
-        _ => {
-            new_size = if size > u32::MAX - 10 {
-                u32::MAX
-            } else {
-                size + 10
-            };
-        }
-    }
+//         if start_buf > new_size as usize {
+//             /* move data back to start */
+//             memmove(
+//                 (*buf).content_io as _,
+//                 (*buf).content as _,
+//                 (*buf).using as usize,
+//             );
+//             (*buf).content = (*buf).content_io;
+//             *(*buf).content.add((*buf).using as usize) = 0;
+//             (*buf).size += start_buf as u32;
+//         } else {
+//             rebuf = xml_realloc((*buf).content_io as _, start_buf + new_size as usize) as _;
+//             if rebuf.is_null() {
+//                 xml_tree_err_memory(c"growing buffer".as_ptr() as _);
+//                 return 0;
+//             }
+//             (*buf).content_io = rebuf;
+//             (*buf).content = rebuf.add(start_buf as usize);
+//         }
+//     } else {
+//         if (*buf).content.is_null() {
+//             rebuf = xml_malloc_atomic(new_size as usize) as _;
+//             (*buf).using = 0;
+//             *rebuf.add((*buf).using as usize) = 0;
+//         } else if (*buf).size - (*buf).using < 100 {
+//             rebuf = xml_realloc((*buf).content as _, new_size as usize) as _;
+//         } else {
+//             /*
+//              * if we are reallocating a buffer far from being full, it's
+//              * better to make a new allocation and copy only the used range
+//              * and free the old one.
+//              */
+//             rebuf = xml_malloc_atomic(new_size as usize) as _;
+//             if !rebuf.is_null() {
+//                 memcpy(rebuf as _, (*buf).content as _, (*buf).using as usize);
+//                 xml_free((*buf).content as _);
+//                 *rebuf.add((*buf).using as usize) = 0;
+//             }
+//         }
+//         if rebuf.is_null() {
+//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
+//             return 0;
+//         }
+//         (*buf).content = rebuf;
+//     }
+//     (*buf).size = new_size;
 
-    if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        && !(*buf).content_io.is_null()
-    {
-        start_buf = (*buf).content.offset_from((*buf).content_io) as _;
+//     1
+// }
 
-        if start_buf > new_size as usize {
-            /* move data back to start */
-            memmove(
-                (*buf).content_io as _,
-                (*buf).content as _,
-                (*buf).using as usize,
-            );
-            (*buf).content = (*buf).content_io;
-            *(*buf).content.add((*buf).using as usize) = 0;
-            (*buf).size += start_buf as u32;
-        } else {
-            rebuf = xml_realloc((*buf).content_io as _, start_buf + new_size as usize) as _;
-            if rebuf.is_null() {
-                xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-                return 0;
-            }
-            (*buf).content_io = rebuf;
-            (*buf).content = rebuf.add(start_buf as usize);
-        }
-    } else {
-        if (*buf).content.is_null() {
-            rebuf = xml_malloc_atomic(new_size as usize) as _;
-            (*buf).using = 0;
-            *rebuf.add((*buf).using as usize) = 0;
-        } else if (*buf).size - (*buf).using < 100 {
-            rebuf = xml_realloc((*buf).content as _, new_size as usize) as _;
-        } else {
-            /*
-             * if we are reallocating a buffer far from being full, it's
-             * better to make a new allocation and copy only the used range
-             * and free the old one.
-             */
-            rebuf = xml_malloc_atomic(new_size as usize) as _;
-            if !rebuf.is_null() {
-                memcpy(rebuf as _, (*buf).content as _, (*buf).using as usize);
-                xml_free((*buf).content as _);
-                *rebuf.add((*buf).using as usize) = 0;
-            }
-        }
-        if rebuf.is_null() {
-            xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-            return 0;
-        }
-        (*buf).content = rebuf;
-    }
-    (*buf).size = new_size;
+// /**
+//  * xmlBufferFree:
+//  * @buf:  the buffer to free
+//  *
+//  * Frees an XML buffer. It frees both the content and the structure which
+//  * encapsulate it.
+//  */
+// pub unsafe extern "C" fn xml_buffer_free(buf: XmlBufferPtr) {
+//     if buf.is_null() {
+//         // #ifdef DEBUG_BUFFER
+//         //         xmlGenericError(xmlGenericErrorContext,
+//         // 		c"xmlBufferFree: buf.is_null()\n".as_ptr() as _);
+//         // #endif
+//         return;
+//     }
 
-    1
-}
+//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+//         && !(*buf).content_io.is_null()
+//     {
+//         xml_free((*buf).content_io as _);
+//     } else if !(*buf).content.is_null() {
+//         xml_free((*buf).content as _);
+//     }
+//     xml_free(buf as _);
+// }
 
-/**
- * xmlBufferFree:
- * @buf:  the buffer to free
- *
- * Frees an XML buffer. It frees both the content and the structure which
- * encapsulate it.
- */
-pub unsafe extern "C" fn xml_buffer_free(buf: XmlBufferPtr) {
-    if buf.is_null() {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlBufferFree: buf.is_null()\n".as_ptr() as _);
-        // #endif
-        return;
-    }
+// /**
+//  * xmlBufferDump:
+//  * @file:  the file output
+//  * @buf:  the buffer to dump
+//  *
+//  * Dumps an XML buffer to  a FILE *.
+//  * Returns the number of #XmlChar written
+//  */
+// pub unsafe extern "C" fn xml_buffer_dump(mut file: *mut FILE, buf: XmlBufferPtr) -> c_int {
+//     if buf.is_null() {
+//         // #ifdef DEBUG_BUFFER
+//         //         xmlGenericError(xmlGenericErrorContext,
+//         // 		c"xmlBufferDump: buf.is_null()\n".as_ptr() as _);
+//         // #endif
+//         return 0;
+//     }
+//     if (*buf).content.is_null() {
+//         // #ifdef DEBUG_BUFFER
+//         //         xmlGenericError(xmlGenericErrorContext,
+//         // 		c"xmlBufferDump: (*buf).content.is_null()\n".as_ptr() as _);
+//         // #endif
+//         return 0;
+//     }
+//     if file.is_null() {
+//         extern "C" {
+//             // Does it work ?????
+//             static stdout: *mut FILE;
+//         }
+//         file = stdout;
+//     }
+//     let ret: size_t = fwrite((*buf).content as _, 1, (*buf).using as _, file);
+//     if ret > i32::MAX as usize {
+//         i32::MAX
+//     } else {
+//         ret as _
+//     }
+// }
 
-    if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        && !(*buf).content_io.is_null()
-    {
-        xml_free((*buf).content_io as _);
-    } else if !(*buf).content.is_null() {
-        xml_free((*buf).content as _);
-    }
-    xml_free(buf as _);
-}
+// /**
+//  * xmlBufferAdd:
+//  * @buf:  the buffer to dump
+//  * @str:  the #XmlChar string
+//  * @len:  the number of #XmlChar to add
+//  *
+//  * Add a string range to an XML buffer. if len == -1, the length of
+//  * str is recomputed.
+//  *
+//  * Returns 0 successful, a positive error code number otherwise
+//  *         and -1 in case of internal or API error.
+//  */
+// pub unsafe extern "C" fn xml_buffer_add(
+//     buf: XmlBufferPtr,
+//     str: *const XmlChar,
+//     mut len: c_int,
+// ) -> c_int {
+//     let need_size: c_uint;
 
-/**
- * xmlBufferDump:
- * @file:  the file output
- * @buf:  the buffer to dump
- *
- * Dumps an XML buffer to  a FILE *.
- * Returns the number of #XmlChar written
- */
-pub unsafe extern "C" fn xml_buffer_dump(mut file: *mut FILE, buf: XmlBufferPtr) -> c_int {
-    if buf.is_null() {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlBufferDump: buf.is_null()\n".as_ptr() as _);
-        // #endif
-        return 0;
-    }
-    if (*buf).content.is_null() {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlBufferDump: (*buf).content.is_null()\n".as_ptr() as _);
-        // #endif
-        return 0;
-    }
-    if file.is_null() {
-        extern "C" {
-            // Does it work ?????
-            static stdout: *mut FILE;
-        }
-        file = stdout;
-    }
-    let ret: size_t = fwrite((*buf).content as _, 1, (*buf).using as _, file);
-    if ret > i32::MAX as usize {
-        i32::MAX
-    } else {
-        ret as _
-    }
-}
+//     if str.is_null() || buf.is_null() {
+//         return -1;
+//     }
+//     if len < -1 {
+//         // #ifdef DEBUG_BUFFER
+//         //         xmlGenericError(xmlGenericErrorContext,
+//         // 		c"xmlBufferAdd: len < 0\n".as_ptr() as _);
+//         // #endif
+//         return -1;
+//     }
+//     if len == 0 {
+//         return 0;
+//     }
 
-/**
- * xmlBufferAdd:
- * @buf:  the buffer to dump
- * @str:  the #XmlChar string
- * @len:  the number of #XmlChar to add
- *
- * Add a string range to an XML buffer. if len == -1, the length of
- * str is recomputed.
- *
- * Returns 0 successful, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
-pub unsafe extern "C" fn xml_buffer_add(
-    buf: XmlBufferPtr,
-    str: *const XmlChar,
-    mut len: c_int,
-) -> c_int {
-    let need_size: c_uint;
+//     if len < 0 {
+//         len = xml_strlen(str);
+//     }
 
-    if str.is_null() || buf.is_null() {
-        return -1;
-    }
-    if len < -1 {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlBufferAdd: len < 0\n".as_ptr() as _);
-        // #endif
-        return -1;
-    }
-    if len == 0 {
-        return 0;
-    }
+//     if len < 0 {
+//         return -1;
+//     }
+//     if len == 0 {
+//         return 0;
+//     }
 
-    if len < 0 {
-        len = xml_strlen(str);
-    }
+//     /* Note that both (*buf).size and (*buf).using can be zero here. */
+//     if len as u32 >= (*buf).size - (*buf).using {
+//         if len as u32 >= u32::MAX - (*buf).using {
+//             xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
+//             return XmlParserErrors::XmlErrNoMemory as i32;
+//         }
+//         need_size = (*buf).using + len as u32 + 1;
+//         if xml_buffer_resize(buf, need_size) == 0 {
+//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
+//             return XmlParserErrors::XmlErrNoMemory as i32;
+//         }
+//     }
 
-    if len < 0 {
-        return -1;
-    }
-    if len == 0 {
-        return 0;
-    }
+//     memmove(
+//         (*buf).content.add((*buf).using as usize) as _,
+//         str as _,
+//         len as usize,
+//     );
+//     (*buf).using += len as u32;
+//     *(*buf).content.add((*buf).using as usize) = 0;
+//     0
+// }
 
-    /* Note that both (*buf).size and (*buf).using can be zero here. */
-    if len as u32 >= (*buf).size - (*buf).using {
-        if len as u32 >= u32::MAX - (*buf).using {
-            xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
-            return XmlParserErrors::XmlErrNoMemory as i32;
-        }
-        need_size = (*buf).using + len as u32 + 1;
-        if xml_buffer_resize(buf, need_size) == 0 {
-            xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-            return XmlParserErrors::XmlErrNoMemory as i32;
-        }
-    }
+// /**
+//  * xmlBufferAddHead:
+//  * @buf:  the buffer
+//  * @str:  the #XmlChar string
+//  * @len:  the number of #XmlChar to add
+//  *
+//  * Add a string range to the beginning of an XML buffer.
+//  * if len == -1, the length of @str is recomputed.
+//  *
+//  * Returns 0 successful, a positive error code number otherwise
+//  *         and -1 in case of internal or API error.
+//  */
+// pub unsafe extern "C" fn xml_buffer_add_head(
+//     buf: XmlBufferPtr,
+//     str: *const XmlChar,
+//     mut len: c_int,
+// ) -> c_int {
+//     let need_size: c_uint;
 
-    memmove(
-        (*buf).content.add((*buf).using as usize) as _,
-        str as _,
-        len as usize,
-    );
-    (*buf).using += len as u32;
-    *(*buf).content.add((*buf).using as usize) = 0;
-    0
-}
+//     if buf.is_null() {
+//         return -1;
+//     }
+//     if str.is_null() {
+//         // #ifdef DEBUG_BUFFER
+//         //         xmlGenericError(xmlGenericErrorContext,
+//         // 		c"xmlBufferAddHead: str.is_null()\n".as_ptr() as _);
+//         // #endif
+//         return -1;
+//     }
+//     if len < -1 {
+//         // #ifdef DEBUG_BUFFER
+//         //         xmlGenericError(xmlGenericErrorContext,
+//         // 		c"xmlBufferAddHead: len < 0\n".as_ptr() as _);
+//         // #endif
+//         return -1;
+//     }
+//     if len == 0 {
+//         return 0;
+//     }
 
-/**
- * xmlBufferAddHead:
- * @buf:  the buffer
- * @str:  the #XmlChar string
- * @len:  the number of #XmlChar to add
- *
- * Add a string range to the beginning of an XML buffer.
- * if len == -1, the length of @str is recomputed.
- *
- * Returns 0 successful, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
-pub unsafe extern "C" fn xml_buffer_add_head(
-    buf: XmlBufferPtr,
-    str: *const XmlChar,
-    mut len: c_int,
-) -> c_int {
-    let need_size: c_uint;
+//     if len < 0 {
+//         len = xml_strlen(str);
+//     }
 
-    if buf.is_null() {
-        return -1;
-    }
-    if str.is_null() {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlBufferAddHead: str.is_null()\n".as_ptr() as _);
-        // #endif
-        return -1;
-    }
-    if len < -1 {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlBufferAddHead: len < 0\n".as_ptr() as _);
-        // #endif
-        return -1;
-    }
-    if len == 0 {
-        return 0;
-    }
+//     if len <= 0 {
+//         return -1;
+//     }
 
-    if len < 0 {
-        len = xml_strlen(str);
-    }
+//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+//         && !(*buf).content_io.is_null()
+//     {
+//         let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
 
-    if len <= 0 {
-        return -1;
-    }
+//         if start_buf > len as usize {
+//             /*
+//              * We can add it in the space previously shrunk
+//              */
+//             (*buf).content = (*buf).content.sub(len as usize);
+//             memmove((*buf).content.add(0) as _, str as _, len as _);
+//             (*buf).using += len as u32;
+//             (*buf).size += len as u32;
+//             *(*buf).content.add((*buf).using as usize) = 0;
+//             return 0;
+//         }
+//     }
+//     /* Note that both (*buf).size and (*buf).using can be zero here. */
+//     if len as u32 >= (*buf).size - (*buf).using {
+//         if len as u32 >= u32::MAX - (*buf).using {
+//             xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
+//             return -1;
+//         }
+//         need_size = (*buf).using + len as u32 + 1;
+//         if xml_buffer_resize(buf, need_size) == 0 {
+//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
+//             return XmlParserErrors::XmlErrNoMemory as i32;
+//         }
+//     }
 
-    if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        && !(*buf).content_io.is_null()
-    {
-        let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
+//     memmove(
+//         (*buf).content.add(len as usize) as _,
+//         (*buf).content.add(0) as _,
+//         (*buf).using as usize,
+//     );
+//     memmove((*buf).content.add(0) as _, str as _, len as usize);
+//     (*buf).using += len as u32;
+//     *(*buf).content.add((*buf).using as usize) = 0;
+//     0
+// }
 
-        if start_buf > len as usize {
-            /*
-             * We can add it in the space previously shrunk
-             */
-            (*buf).content = (*buf).content.sub(len as usize);
-            memmove((*buf).content.add(0) as _, str as _, len as _);
-            (*buf).using += len as u32;
-            (*buf).size += len as u32;
-            *(*buf).content.add((*buf).using as usize) = 0;
-            return 0;
-        }
-    }
-    /* Note that both (*buf).size and (*buf).using can be zero here. */
-    if len as u32 >= (*buf).size - (*buf).using {
-        if len as u32 >= u32::MAX - (*buf).using {
-            xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
-            return -1;
-        }
-        need_size = (*buf).using + len as u32 + 1;
-        if xml_buffer_resize(buf, need_size) == 0 {
-            xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-            return XmlParserErrors::XmlErrNoMemory as i32;
-        }
-    }
+// /**
+//  * xmlBufferCat:
+//  * @buf:  the buffer to add to
+//  * @str:  the #XmlChar string
+//  *
+//  * Append a zero terminated string to an XML buffer.
+//  *
+//  * Returns 0 successful, a positive error code number otherwise
+//  *         and -1 in case of internal or API error.
+//  */
+// pub unsafe extern "C" fn xml_buffer_cat(buf: XmlBufferPtr, str: *const XmlChar) -> c_int {
+//     if buf.is_null() {
+//         return -1;
+//     }
+//     if str.is_null() {
+//         return -1;
+//     }
+//     xml_buffer_add(buf, str, -1)
+// }
 
-    memmove(
-        (*buf).content.add(len as usize) as _,
-        (*buf).content.add(0) as _,
-        (*buf).using as usize,
-    );
-    memmove((*buf).content.add(0) as _, str as _, len as usize);
-    (*buf).using += len as u32;
-    *(*buf).content.add((*buf).using as usize) = 0;
-    0
-}
+// /**
+//  * xmlBufferCCat:
+//  * @buf:  the buffer to dump
+//  * @str:  the C c_char string
+//  *
+//  * Append a zero terminated C string to an XML buffer.
+//  *
+//  * Returns 0 successful, a positive error code number otherwise
+//  *         and -1 in case of internal or API error.
+//  */
+// pub unsafe extern "C" fn xml_buffer_ccat(buf: XmlBufferPtr, str: *const c_char) -> c_int {
+//     xml_buffer_cat(buf, str as _)
+// }
 
-/**
- * xmlBufferCat:
- * @buf:  the buffer to add to
- * @str:  the #XmlChar string
- *
- * Append a zero terminated string to an XML buffer.
- *
- * Returns 0 successful, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
-pub unsafe extern "C" fn xml_buffer_cat(buf: XmlBufferPtr, str: *const XmlChar) -> c_int {
-    if buf.is_null() {
-        return -1;
-    }
-    if str.is_null() {
-        return -1;
-    }
-    xml_buffer_add(buf, str, -1)
-}
+// /**
+//  * xmlBufferShrink:
+//  * @buf:  the buffer to dump
+//  * @len:  the number of XmlChar to remove
+//  *
+//  * Remove the beginning of an XML buffer.
+//  *
+//  * Returns the number of #XmlChar removed, or -1 in case of failure.
+//  */
+// pub unsafe extern "C" fn xml_buffer_shrink(buf: XmlBufferPtr, len: c_uint) -> c_int {
+//     if buf.is_null() {
+//         return -1;
+//     }
+//     if len == 0 {
+//         return 0;
+//     }
+//     if len > (*buf).using {
+//         return -1;
+//     }
 
-/**
- * xmlBufferCCat:
- * @buf:  the buffer to dump
- * @str:  the C c_char string
- *
- * Append a zero terminated C string to an XML buffer.
- *
- * Returns 0 successful, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
-pub unsafe extern "C" fn xml_buffer_ccat(buf: XmlBufferPtr, str: *const c_char) -> c_int {
-    xml_buffer_cat(buf, str as _)
-}
+//     (*buf).using -= len;
+//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+//         && !(*buf).content_io.is_null()
+//     {
+//         /*
+//          * we just move the content pointer, but also make sure
+//          * the perceived buffer size has shrunk accordingly
+//          */
+//         (*buf).content = (*buf).content.add(len as usize);
+//         (*buf).size -= len;
 
-/**
- * xmlBufferShrink:
- * @buf:  the buffer to dump
- * @len:  the number of XmlChar to remove
- *
- * Remove the beginning of an XML buffer.
- *
- * Returns the number of #XmlChar removed, or -1 in case of failure.
- */
-pub unsafe extern "C" fn xml_buffer_shrink(buf: XmlBufferPtr, len: c_uint) -> c_int {
-    if buf.is_null() {
-        return -1;
-    }
-    if len == 0 {
-        return 0;
-    }
-    if len > (*buf).using {
-        return -1;
-    }
+//         /*
+//          * sometimes though it maybe be better to really shrink
+//          * on IO buffers
+//          */
+//         if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+//             && !(*buf).content_io.is_null()
+//         {
+//             let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
+//             if start_buf >= (*buf).size as usize {
+//                 memmove(
+//                     (*buf).content_io as _,
+//                     (*buf).content.add(0) as _,
+//                     (*buf).using as usize,
+//                 );
+//                 (*buf).content = (*buf).content_io;
+//                 *(*buf).content.add((*buf).using as usize) = 0;
+//                 (*buf).size += start_buf as u32;
+//             }
+//         }
+//     } else {
+//         memmove(
+//             (*buf).content as _,
+//             (*buf).content.add(len as usize) as _,
+//             (*buf).using as usize,
+//         );
+//         *(*buf).content.add((*buf).using as usize) = 0;
+//     }
+//     len as _
+// }
 
-    (*buf).using -= len;
-    if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        && !(*buf).content_io.is_null()
-    {
-        /*
-         * we just move the content pointer, but also make sure
-         * the perceived buffer size has shrunk accordingly
-         */
-        (*buf).content = (*buf).content.add(len as usize);
-        (*buf).size -= len;
+// /**
+//  * xmlBufferGrow:
+//  * @buf:  the buffer
+//  * @len:  the minimum free size to allocate
+//  *
+//  * Grow the available space of an XML buffer.
+//  *
+//  * Returns the new available space or -1 in case of error
+//  */
+// pub unsafe extern "C" fn xml_buffer_grow(buf: XmlBufferPtr, len: c_uint) -> c_int {
+//     let mut size: c_uint;
+//     let newbuf: *mut XmlChar;
 
-        /*
-         * sometimes though it maybe be better to really shrink
-         * on IO buffers
-         */
-        if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-            && !(*buf).content_io.is_null()
-        {
-            let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
-            if start_buf >= (*buf).size as usize {
-                memmove(
-                    (*buf).content_io as _,
-                    (*buf).content.add(0) as _,
-                    (*buf).using as usize,
-                );
-                (*buf).content = (*buf).content_io;
-                *(*buf).content.add((*buf).using as usize) = 0;
-                (*buf).size += start_buf as u32;
-            }
-        }
-    } else {
-        memmove(
-            (*buf).content as _,
-            (*buf).content.add(len as usize) as _,
-            (*buf).using as usize,
-        );
-        *(*buf).content.add((*buf).using as usize) = 0;
-    }
-    len as _
-}
+//     if buf.is_null() {
+//         return -1;
+//     }
 
-/**
- * xmlBufferGrow:
- * @buf:  the buffer
- * @len:  the minimum free size to allocate
- *
- * Grow the available space of an XML buffer.
- *
- * Returns the new available space or -1 in case of error
- */
-pub unsafe extern "C" fn xml_buffer_grow(buf: XmlBufferPtr, len: c_uint) -> c_int {
-    let mut size: c_uint;
-    let newbuf: *mut XmlChar;
+//     if len < (*buf).size - (*buf).using {
+//         return 0;
+//     }
+//     if len >= u32::MAX - (*buf).using {
+//         xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
+//         return -1;
+//     }
 
-    if buf.is_null() {
-        return -1;
-    }
+//     if (*buf).size > len {
+//         size = if (*buf).size > u32::MAX / 2 {
+//             u32::MAX
+//         } else {
+//             (*buf).size * 2
+//         };
+//     } else {
+//         size = (*buf).using + len;
+//         size = if size > u32::MAX - 100 {
+//             u32::MAX
+//         } else {
+//             size + 100
+//         };
+//     }
 
-    if len < (*buf).size - (*buf).using {
-        return 0;
-    }
-    if len >= u32::MAX - (*buf).using {
-        xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
-        return -1;
-    }
+//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+//         && !(*buf).content_io.is_null()
+//     {
+//         let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
 
-    if (*buf).size > len {
-        size = if (*buf).size > u32::MAX / 2 {
-            u32::MAX
-        } else {
-            (*buf).size * 2
-        };
-    } else {
-        size = (*buf).using + len;
-        size = if size > u32::MAX - 100 {
-            u32::MAX
-        } else {
-            size + 100
-        };
-    }
+//         newbuf = xml_realloc((*buf).content_io as _, start_buf + size as usize) as _;
+//         if newbuf.is_null() {
+//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
+//             return -1;
+//         }
+//         (*buf).content_io = newbuf;
+//         (*buf).content = newbuf.add(start_buf);
+//     } else {
+//         newbuf = xml_realloc((*buf).content as _, size as usize) as _;
+//         if newbuf.is_null() {
+//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
+//             return -1;
+//         }
+//         (*buf).content = newbuf;
+//     }
+//     (*buf).size = size;
+//     ((*buf).size - (*buf).using - 1) as i32
+// }
 
-    if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        && !(*buf).content_io.is_null()
-    {
-        let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
+// /**
+//  * xmlBufferEmpty:
+//  * @buf:  the buffer
+//  *
+//  * empty a buffer.
+//  */
+// pub unsafe extern "C" fn xml_buffer_empty(buf: XmlBufferPtr) {
+//     if buf.is_null() {
+//         return;
+//     }
+//     if (*buf).content.is_null() {
+//         return;
+//     }
+//     (*buf).using = 0;
+//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+//         && !(*buf).content_io.is_null()
+//     {
+//         let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
 
-        newbuf = xml_realloc((*buf).content_io as _, start_buf + size as usize) as _;
-        if newbuf.is_null() {
-            xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-            return -1;
-        }
-        (*buf).content_io = newbuf;
-        (*buf).content = newbuf.add(start_buf);
-    } else {
-        newbuf = xml_realloc((*buf).content as _, size as usize) as _;
-        if newbuf.is_null() {
-            xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-            return -1;
-        }
-        (*buf).content = newbuf;
-    }
-    (*buf).size = size;
-    ((*buf).size - (*buf).using - 1) as i32
-}
+//         (*buf).size += start_buf as u32;
+//         (*buf).content = (*buf).content_io;
+//         *(*buf).content.add(0) = 0;
+//     } else {
+//         *(*buf).content.add(0) = 0;
+//     }
+// }
 
-/**
- * xmlBufferEmpty:
- * @buf:  the buffer
- *
- * empty a buffer.
- */
-pub unsafe extern "C" fn xml_buffer_empty(buf: XmlBufferPtr) {
-    if buf.is_null() {
-        return;
-    }
-    if (*buf).content.is_null() {
-        return;
-    }
-    (*buf).using = 0;
-    if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-        && !(*buf).content_io.is_null()
-    {
-        let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
+// /**
+//  * xmlBufferContent:
+//  * @buf:  the buffer
+//  *
+//  * Function to extract the content of a buffer
+//  *
+//  * Returns the internal content
+//  */
+// pub unsafe extern "C" fn xml_buffer_content(buf: *const XmlBuffer) -> *const XmlChar {
+//     if buf.is_null() {
+//         return null_mut();
+//     }
 
-        (*buf).size += start_buf as u32;
-        (*buf).content = (*buf).content_io;
-        *(*buf).content.add(0) = 0;
-    } else {
-        *(*buf).content.add(0) = 0;
-    }
-}
+//     (*buf).content
+// }
 
-/**
- * xmlBufferContent:
- * @buf:  the buffer
- *
- * Function to extract the content of a buffer
- *
- * Returns the internal content
- */
-pub unsafe extern "C" fn xml_buffer_content(buf: *const XmlBuffer) -> *const XmlChar {
-    if buf.is_null() {
-        return null_mut();
-    }
+// /**
+//  * xmlBufferDetach:
+//  * @buf:  the buffer
+//  *
+//  * Remove the string contained in a buffer and gie it back to the
+//  * caller. The buffer is reset to an empty content.
+//  * This doesn't work with immutable buffers as they can't be reset.
+//  *
+//  * Returns the previous string contained by the buffer.
+//  */
+// pub unsafe extern "C" fn xml_buffer_detach(buf: XmlBufferPtr) -> *mut XmlChar {
+//     if buf.is_null() {
+//         return null_mut();
+//     }
 
-    (*buf).content
-}
+//     let ret: *mut XmlChar = (*buf).content;
+//     (*buf).content = null_mut();
+//     (*buf).size = 0;
+//     (*buf).using = 0;
 
-/**
- * xmlBufferDetach:
- * @buf:  the buffer
- *
- * Remove the string contained in a buffer and gie it back to the
- * caller. The buffer is reset to an empty content.
- * This doesn't work with immutable buffers as they can't be reset.
- *
- * Returns the previous string contained by the buffer.
- */
-pub unsafe extern "C" fn xml_buffer_detach(buf: XmlBufferPtr) -> *mut XmlChar {
-    if buf.is_null() {
-        return null_mut();
-    }
+//     ret
+// }
 
-    let ret: *mut XmlChar = (*buf).content;
-    (*buf).content = null_mut();
-    (*buf).size = 0;
-    (*buf).using = 0;
+// /**
+//  * xmlBufferSetAllocationScheme:
+//  * @buf:  the buffer to tune
+//  * @scheme:  allocation scheme to use
+//  *
+//  * Sets the allocation scheme for this buffer
+//  */
+// pub unsafe extern "C" fn xml_buffer_set_allocation_scheme(
+//     buf: XmlBufferPtr,
+//     scheme: XmlBufferAllocationScheme,
+// ) {
+//     if buf.is_null() {
+//         // #ifdef DEBUG_BUFFER
+//         //         xmlGenericError(xmlGenericErrorContext,
+//         // 		c"xmlBufferSetAllocationScheme: buf.is_null()\n".as_ptr() as _);
+//         // #endif
+//         return;
+//     }
+//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo) {
+//         return;
+//     }
+//     if matches!(
+//         scheme,
+//         XmlBufferAllocationScheme::XmlBufferAllocDoubleit
+//             | XmlBufferAllocationScheme::XmlBufferAllocExact
+//             | XmlBufferAllocationScheme::XmlBufferAllocHybrid
+//     ) {
+//         (*buf).alloc = scheme;
+//     }
+// }
 
-    ret
-}
+// /**
+//  * xmlBufferLength:
+//  * @buf:  the buffer
+//  *
+//  * Function to get the length of a buffer
+//  *
+//  * Returns the length of data in the internal content
+//  */
+// pub unsafe extern "C" fn xml_buffer_length(buf: *const XmlBuffer) -> c_int {
+//     if buf.is_null() {
+//         return 0;
+//     }
 
-/**
- * xmlBufferSetAllocationScheme:
- * @buf:  the buffer to tune
- * @scheme:  allocation scheme to use
- *
- * Sets the allocation scheme for this buffer
- */
-pub unsafe extern "C" fn xml_buffer_set_allocation_scheme(
-    buf: XmlBufferPtr,
-    scheme: XmlBufferAllocationScheme,
-) {
-    if buf.is_null() {
-        // #ifdef DEBUG_BUFFER
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlBufferSetAllocationScheme: buf.is_null()\n".as_ptr() as _);
-        // #endif
-        return;
-    }
-    if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo) {
-        return;
-    }
-    if matches!(
-        scheme,
-        XmlBufferAllocationScheme::XmlBufferAllocDoubleit
-            | XmlBufferAllocationScheme::XmlBufferAllocExact
-            | XmlBufferAllocationScheme::XmlBufferAllocHybrid
-    ) {
-        (*buf).alloc = scheme;
-    }
-}
-
-/**
- * xmlBufferLength:
- * @buf:  the buffer
- *
- * Function to get the length of a buffer
- *
- * Returns the length of data in the internal content
- */
-pub unsafe extern "C" fn xml_buffer_length(buf: *const XmlBuffer) -> c_int {
-    if buf.is_null() {
-        return 0;
-    }
-
-    (*buf).using as _
-}
+//     (*buf).using as _
+// }
 
 /*
  * Creating/freeing new structures.
@@ -8655,34 +8460,34 @@ pub unsafe extern "C" fn xml_node_get_content(cur: *const XmlNode) -> *mut XmlCh
     // return null_mut();
 }
 
-/**
- * xmlNodeBufGetContent:
- * @buffer:  a buffer
- * @cur:  the node being read
- *
- * Read the value of a node @cur, this can be either the text carried
- * directly by this node if it's a TEXT node or the aggregate string
- * of the values carried by this node child's (TEXT and ENTITY_REF).
- * Entity references are substituted.
- * Fills up the buffer @buffer with this value
- *
- * Returns 0 in case of success and -1 in case of error.
- */
-pub unsafe extern "C" fn xml_node_buf_get_content(
-    mut buffer: XmlBufferPtr,
-    cur: *const XmlNode,
-) -> c_int {
-    if cur.is_null() || buffer.is_null() {
-        return -1;
-    }
-    let buf: XmlBufPtr = xml_buf_from_buffer(buffer);
-    let ret: c_int = xml_buf_get_node_content(buf, cur);
-    buffer = xml_buf_back_to_buffer(buf);
-    if ret < 0 || buffer.is_null() {
-        return -1;
-    }
-    0
-}
+// /**
+//  * xmlNodeBufGetContent:
+//  * @buffer:  a buffer
+//  * @cur:  the node being read
+//  *
+//  * Read the value of a node @cur, this can be either the text carried
+//  * directly by this node if it's a TEXT node or the aggregate string
+//  * of the values carried by this node child's (TEXT and ENTITY_REF).
+//  * Entity references are substituted.
+//  * Fills up the buffer @buffer with this value
+//  *
+//  * Returns 0 in case of success and -1 in case of error.
+//  */
+// pub unsafe extern "C" fn xml_node_buf_get_content(
+//     mut buffer: XmlBufferPtr,
+//     cur: *const XmlNode,
+// ) -> c_int {
+//     if cur.is_null() || buffer.is_null() {
+//         return -1;
+//     }
+//     let buf: XmlBufPtr = xml_buf_from_buffer(buffer);
+//     let ret: c_int = xml_buf_get_node_content(buf, cur);
+//     buffer = xml_buf_back_to_buffer(buf);
+//     if ret < 0 || buffer.is_null() {
+//         return -1;
+//     }
+//     0
+// }
 
 /**
  * xmlBufGetNodeContent:
@@ -9256,116 +9061,116 @@ pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) 
 /*
  * Internal, don't use.
  */
-/**
- * xmlBufferWriteCHAR:
- * @buf:  the XML buffer
- * @string:  the string to add
- *
- * routine which manages and grows an output buffer. This one adds
- * xmlChars at the end of the buffer.
- */
-pub unsafe extern "C" fn xml_buffer_write_xml_char(buf: XmlBufferPtr, string: *const XmlChar) {
-    if buf.is_null() {
-        return;
-    }
-    xml_buffer_cat(buf, string);
-}
+// /**
+//  * xmlBufferWriteCHAR:
+//  * @buf:  the XML buffer
+//  * @string:  the string to add
+//  *
+//  * routine which manages and grows an output buffer. This one adds
+//  * xmlChars at the end of the buffer.
+//  */
+// pub unsafe extern "C" fn xml_buffer_write_xml_char(buf: XmlBufferPtr, string: *const XmlChar) {
+//     if buf.is_null() {
+//         return;
+//     }
+//     xml_buffer_cat(buf, string);
+// }
 
-/**
- * xmlBufferWriteChar:
- * @buf:  the XML buffer output
- * @string:  the string to add
- *
- * routine which manage and grows an output buffer. This one add
- * C chars at the end of the array.
- */
-pub unsafe extern "C" fn xml_buffer_write_char(buf: XmlBufferPtr, string: *const c_char) {
-    if buf.is_null() {
-        return;
-    }
-    xml_buffer_ccat(buf, string);
-}
+// /**
+//  * xmlBufferWriteChar:
+//  * @buf:  the XML buffer output
+//  * @string:  the string to add
+//  *
+//  * routine which manage and grows an output buffer. This one add
+//  * C chars at the end of the array.
+//  */
+// pub unsafe extern "C" fn xml_buffer_write_char(buf: XmlBufferPtr, string: *const c_char) {
+//     if buf.is_null() {
+//         return;
+//     }
+//     xml_buffer_ccat(buf, string);
+// }
 
-/**
- * xmlBufferWriteQuotedString:
- * @buf:  the XML buffer output
- * @string:  the string to add
- *
- * routine which manage and grows an output buffer. This one writes
- * a quoted or double quoted #XmlChar string, checking first if it holds
- * quote or double-quotes internally
- */
-pub unsafe extern "C" fn xml_buffer_write_quoted_string(buf: XmlBufferPtr, string: *const XmlChar) {
-    let mut cur: *const XmlChar;
-    let mut base: *const XmlChar;
-    if buf.is_null() {
-        return;
-    }
-    if !xml_strchr(string, b'\"').is_null() {
-        if !xml_strchr(string, b'\'').is_null() {
-            // #ifdef DEBUG_BUFFER
-            // 	    xmlGenericError(xmlGenericErrorContext(),
-            //  "xmlBufferWriteQuotedString: string contains quote and double-quotes !\n".as_ptr() as _);
-            // #endif
-            xml_buffer_ccat(buf, c"\"".as_ptr() as _);
-            base = string;
-            cur = string;
-            while *cur != 0 {
-                if *cur == b'"' {
-                    if base != cur {
-                        xml_buffer_add(buf, base, cur.offset_from(base) as _);
-                    }
-                    xml_buffer_add(buf, c"&quot;".as_ptr() as _, 6);
-                    cur = cur.add(1);
-                    base = cur;
-                } else {
-                    cur = cur.add(1);
-                }
-            }
-            if base != cur {
-                xml_buffer_add(buf, base, cur.offset_from(base) as _);
-            }
-            xml_buffer_ccat(buf, c"\"".as_ptr() as _);
-        } else {
-            xml_buffer_ccat(buf, c"\'".as_ptr() as _);
-            xml_buffer_cat(buf, string);
-            xml_buffer_ccat(buf, c"\'".as_ptr() as _);
-        }
-    } else {
-        xml_buffer_ccat(buf, c"\"".as_ptr() as _);
-        xml_buffer_cat(buf, string);
-        xml_buffer_ccat(buf, c"\"".as_ptr() as _);
-    }
-}
+// /**
+//  * xmlBufferWriteQuotedString:
+//  * @buf:  the XML buffer output
+//  * @string:  the string to add
+//  *
+//  * routine which manage and grows an output buffer. This one writes
+//  * a quoted or double quoted #XmlChar string, checking first if it holds
+//  * quote or double-quotes internally
+//  */
+// pub unsafe extern "C" fn xml_buffer_write_quoted_string(buf: XmlBufferPtr, string: *const XmlChar) {
+//     let mut cur: *const XmlChar;
+//     let mut base: *const XmlChar;
+//     if buf.is_null() {
+//         return;
+//     }
+//     if !xml_strchr(string, b'\"').is_null() {
+//         if !xml_strchr(string, b'\'').is_null() {
+//             // #ifdef DEBUG_BUFFER
+//             // 	    xmlGenericError(xmlGenericErrorContext(),
+//             //  "xmlBufferWriteQuotedString: string contains quote and double-quotes !\n".as_ptr() as _);
+//             // #endif
+//             xml_buffer_ccat(buf, c"\"".as_ptr() as _);
+//             base = string;
+//             cur = string;
+//             while *cur != 0 {
+//                 if *cur == b'"' {
+//                     if base != cur {
+//                         xml_buffer_add(buf, base, cur.offset_from(base) as _);
+//                     }
+//                     xml_buffer_add(buf, c"&quot;".as_ptr() as _, 6);
+//                     cur = cur.add(1);
+//                     base = cur;
+//                 } else {
+//                     cur = cur.add(1);
+//                 }
+//             }
+//             if base != cur {
+//                 xml_buffer_add(buf, base, cur.offset_from(base) as _);
+//             }
+//             xml_buffer_ccat(buf, c"\"".as_ptr() as _);
+//         } else {
+//             xml_buffer_ccat(buf, c"\'".as_ptr() as _);
+//             xml_buffer_cat(buf, string);
+//             xml_buffer_ccat(buf, c"\'".as_ptr() as _);
+//         }
+//     } else {
+//         xml_buffer_ccat(buf, c"\"".as_ptr() as _);
+//         xml_buffer_cat(buf, string);
+//         xml_buffer_ccat(buf, c"\"".as_ptr() as _);
+//     }
+// }
 
-/**
- * xmlAttrSerializeTxtContent:
- * @buf:  the XML buffer output
- * @doc:  the document
- * @attr: the attribute node
- * @string: the text content
- *
- * Serialize text attribute values to an xml simple buffer
- */
-#[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_attr_serialize_txt_content(
-    buf: XmlBufferPtr,
-    doc: XmlDocPtr,
-    attr: XmlAttrPtr,
-    string: *const XmlChar,
-) {
-    use crate::private::save::xml_buf_attr_serialize_txt_content;
+// /**
+//  * xmlAttrSerializeTxtContent:
+//  * @buf:  the XML buffer output
+//  * @doc:  the document
+//  * @attr: the attribute node
+//  * @string: the text content
+//  *
+//  * Serialize text attribute values to an xml simple buffer
+//  */
+// #[cfg(feature = "output")]
+// pub unsafe extern "C" fn xml_attr_serialize_txt_content(
+//     buf: XmlBufferPtr,
+//     doc: XmlDocPtr,
+//     attr: XmlAttrPtr,
+//     string: *const XmlChar,
+// ) {
+//     use crate::private::save::xml_buf_attr_serialize_txt_content;
 
-    if buf.is_null() || string.is_null() {
-        return;
-    }
-    let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
-    if buffer.is_null() {
-        return;
-    }
-    xml_buf_attr_serialize_txt_content(buffer, doc, attr, string);
-    xml_buf_back_to_buffer(buffer);
-}
+//     if buf.is_null() || string.is_null() {
+//         return;
+//     }
+//     let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
+//     if buffer.is_null() {
+//         return;
+//     }
+//     xml_buf_attr_serialize_txt_content(buffer, doc, attr, string);
+//     xml_buf_back_to_buffer(buffer);
+// }
 
 /*
  * Namespace handling.
@@ -9981,44 +9786,44 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     ret as _
 }
 
-/**
- * xmlNodeDump:
- * @buf:  the XML buffer output
- * @doc:  the document
- * @cur:  the current node
- * @level: the imbrication level for indenting
- * @format: is formatting allowed
- *
- * Dump an XML node, recursive behaviour,children are printed too.
- * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
- * or xmlKeepBlanksDefault(0) was called.
- * Since this is using xmlBuffer structures it is limited to 2GB and somehow
- * deprecated, use xmlNodeDumpOutput() instead.
- *
- * Returns the number of bytes written to the buffer or -1 in case of error
- */
-#[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_node_dump(
-    buf: XmlBufferPtr,
-    doc: XmlDocPtr,
-    cur: XmlNodePtr,
-    level: c_int,
-    format: c_int,
-) -> c_int {
-    if buf.is_null() || cur.is_null() {
-        return -1;
-    }
-    let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
-    if buffer.is_null() {
-        return -1;
-    }
-    let ret: size_t = xml_buf_node_dump(buffer, doc, cur, level, format);
-    xml_buf_back_to_buffer(buffer);
-    if ret > i32::MAX as usize {
-        return -1;
-    }
-    ret as _
-}
+// /**
+//  * xmlNodeDump:
+//  * @buf:  the XML buffer output
+//  * @doc:  the document
+//  * @cur:  the current node
+//  * @level: the imbrication level for indenting
+//  * @format: is formatting allowed
+//  *
+//  * Dump an XML node, recursive behaviour,children are printed too.
+//  * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
+//  * or xmlKeepBlanksDefault(0) was called.
+//  * Since this is using xmlBuffer structures it is limited to 2GB and somehow
+//  * deprecated, use xmlNodeDumpOutput() instead.
+//  *
+//  * Returns the number of bytes written to the buffer or -1 in case of error
+//  */
+// #[cfg(feature = "output")]
+// pub unsafe extern "C" fn xml_node_dump(
+//     buf: XmlBufferPtr,
+//     doc: XmlDocPtr,
+//     cur: XmlNodePtr,
+//     level: c_int,
+//     format: c_int,
+// ) -> c_int {
+//     if buf.is_null() || cur.is_null() {
+//         return -1;
+//     }
+//     let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
+//     if buffer.is_null() {
+//         return -1;
+//     }
+//     let ret: size_t = xml_buf_node_dump(buffer, doc, cur, level, format);
+//     xml_buf_back_to_buffer(buffer);
+//     if ret > i32::MAX as usize {
+//         return -1;
+//     }
+//     ret as _
+// }
 
 /**
  * xmlSaveFileTo:
@@ -13832,635 +13637,635 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_attr_serialize_txt_content() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_attr_serialize_txt_content() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                        for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let buf = gen_xml_buffer_ptr(n_buf, 0);
-                            let doc = gen_xml_doc_ptr(n_doc, 1);
-                            let attr = gen_xml_attr_ptr(n_attr, 2);
-                            let string = gen_const_xml_char_ptr(n_string, 3);
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_doc in 0..GEN_NB_XML_DOC_PTR {
+    //                 for n_attr in 0..GEN_NB_XML_ATTR_PTR {
+    //                     for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
+    //                         let mem_base = xml_mem_blocks();
+    //                         let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                         let doc = gen_xml_doc_ptr(n_doc, 1);
+    //                         let attr = gen_xml_attr_ptr(n_attr, 2);
+    //                         let string = gen_const_xml_char_ptr(n_string, 3);
 
-                            xml_attr_serialize_txt_content(buf, doc, attr, string);
-                            des_xml_buffer_ptr(n_buf, buf, 0);
-                            des_xml_doc_ptr(n_doc, doc, 1);
-                            des_xml_attr_ptr(n_attr, attr, 2);
-                            des_const_xml_char_ptr(n_string, string, 3);
-                            xml_reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlAttrSerializeTxtContent",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlAttrSerializeTxtContent()"
-                                );
-                                eprint!(" {}", n_buf);
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_attr);
-                                eprintln!(" {}", n_string);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //                         xml_attr_serialize_txt_content(buf, doc, attr, string);
+    //                         des_xml_buffer_ptr(n_buf, buf, 0);
+    //                         des_xml_doc_ptr(n_doc, doc, 1);
+    //                         des_xml_attr_ptr(n_attr, attr, 2);
+    //                         des_const_xml_char_ptr(n_string, string, 3);
+    //                         xml_reset_last_error();
+    //                         if mem_base != xml_mem_blocks() {
+    //                             leaks += 1;
+    //                             eprint!(
+    //                                 "Leak of {} blocks found in xmlAttrSerializeTxtContent",
+    //                                 xml_mem_blocks() - mem_base
+    //                             );
+    //                             assert!(
+    //                                 leaks == 0,
+    //                                 "{leaks} Leaks are found in xmlAttrSerializeTxtContent()"
+    //                             );
+    //                             eprint!(" {}", n_buf);
+    //                             eprint!(" {}", n_doc);
+    //                             eprint!(" {}", n_attr);
+    //                             eprintln!(" {}", n_string);
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buf_content() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_CONST_XML_BUF_PTR {
-                let mem_base = xml_mem_blocks();
-                let buf = gen_const_xml_buf_ptr(n_buf, 0);
+    // #[test]
+    // fn test_xml_buf_content() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_CONST_XML_BUF_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let buf = gen_const_xml_buf_ptr(n_buf, 0);
 
-                let ret_val = xml_buf_content(buf);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_buf_ptr(n_buf, buf, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlBufContent",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlBufContent()");
-                    eprintln!(" {}", n_buf);
-                }
-            }
-        }
-    }
+    //             let ret_val = xml_buf_content(buf);
+    //             desret_xml_char_ptr(ret_val);
+    //             des_const_xml_buf_ptr(n_buf, buf, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlBufContent",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufContent()");
+    //                 eprintln!(" {}", n_buf);
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buf_end() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUF_PTR {
-                let mem_base = xml_mem_blocks();
-                let buf = gen_xml_buf_ptr(n_buf, 0);
+    // #[test]
+    // fn test_xml_buf_end() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUF_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let buf = gen_xml_buf_ptr(n_buf, 0);
 
-                let ret_val = xml_buf_end(buf as _);
-                desret_xml_char_ptr(ret_val);
-                des_xml_buf_ptr(n_buf, buf, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlBufEnd",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlBufEnd()");
-                    eprintln!(" {}", n_buf);
-                }
-            }
-        }
-    }
+    //             let ret_val = xml_buf_end(buf as _);
+    //             desret_xml_char_ptr(ret_val);
+    //             des_xml_buf_ptr(n_buf, buf, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlBufEnd",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufEnd()");
+    //                 eprintln!(" {}", n_buf);
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buf_get_node_content() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUF_PTR {
-                for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buf_ptr(n_buf, 0);
-                    let cur = gen_const_xml_node_ptr(n_cur, 1);
+    // #[test]
+    // fn test_xml_buf_get_node_content() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUF_PTR {
+    //             for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buf_ptr(n_buf, 0);
+    //                 let cur = gen_const_xml_node_ptr(n_cur, 1);
 
-                    let ret_val = xml_buf_get_node_content(buf as _, cur);
-                    desret_int(ret_val);
-                    des_xml_buf_ptr(n_buf, buf, 0);
-                    des_const_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufGetNodeContent",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlBufGetNodeContent()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_buf_get_node_content(buf as _, cur);
+    //                 desret_int(ret_val);
+    //                 des_xml_buf_ptr(n_buf, buf, 0);
+    //                 des_const_xml_node_ptr(n_cur, cur, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufGetNodeContent",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlBufGetNodeContent()"
+    //                     );
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_cur);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buf_node_dump() {
+    // #[test]
+    // fn test_xml_buf_node_dump() {
 
-        /* missing type support */
-    }
+    //     /* missing type support */
+    // }
 
-    #[test]
-    fn test_xml_buf_shrink() {
+    // #[test]
+    // fn test_xml_buf_shrink() {
 
-        /* missing type support */
-    }
+    //     /* missing type support */
+    // }
 
-    #[test]
-    fn test_xml_buf_use() {
+    // #[test]
+    // fn test_xml_buf_use() {
 
-        /* missing type support */
-    }
+    //     /* missing type support */
+    // }
 
-    #[test]
-    fn test_xml_buffer_add() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let buf = gen_xml_buffer_ptr(n_buf, 0);
-                        let str = gen_const_xml_char_ptr(n_str, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !str.is_null() && len > xml_strlen(str) {
-                            len = 0;
-                        }
+    // #[test]
+    // fn test_xml_buffer_add() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
+    //                 for n_len in 0..GEN_NB_INT {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                     let str = gen_const_xml_char_ptr(n_str, 1);
+    //                     let mut len = gen_int(n_len, 2);
+    //                     if !str.is_null() && len > xml_strlen(str) {
+    //                         len = 0;
+    //                     }
 
-                        let ret_val = xml_buffer_add(buf, str, len);
-                        desret_int(ret_val);
-                        des_xml_buffer_ptr(n_buf, buf, 0);
-                        des_const_xml_char_ptr(n_str, str, 1);
-                        des_int(n_len, len, 2);
-                        xml_reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlBufferAdd",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferAdd()");
-                            eprint!(" {}", n_buf);
-                            eprint!(" {}", n_str);
-                            eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //                     let ret_val = xml_buffer_add(buf, str, len);
+    //                     desret_int(ret_val);
+    //                     des_xml_buffer_ptr(n_buf, buf, 0);
+    //                     des_const_xml_char_ptr(n_str, str, 1);
+    //                     des_int(n_len, len, 2);
+    //                     xml_reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlBufferAdd",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferAdd()");
+    //                         eprint!(" {}", n_buf);
+    //                         eprint!(" {}", n_str);
+    //                         eprintln!(" {}", n_len);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_add_head() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let buf = gen_xml_buffer_ptr(n_buf, 0);
-                        let str = gen_const_xml_char_ptr(n_str, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !str.is_null() && len > xml_strlen(str) {
-                            len = 0;
-                        }
+    // #[test]
+    // fn test_xml_buffer_add_head() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
+    //                 for n_len in 0..GEN_NB_INT {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                     let str = gen_const_xml_char_ptr(n_str, 1);
+    //                     let mut len = gen_int(n_len, 2);
+    //                     if !str.is_null() && len > xml_strlen(str) {
+    //                         len = 0;
+    //                     }
 
-                        let ret_val = xml_buffer_add_head(buf, str, len);
-                        desret_int(ret_val);
-                        des_xml_buffer_ptr(n_buf, buf, 0);
-                        des_const_xml_char_ptr(n_str, str, 1);
-                        des_int(n_len, len, 2);
-                        xml_reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlBufferAddHead",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferAddHead()");
-                            eprint!(" {}", n_buf);
-                            eprint!(" {}", n_str);
-                            eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //                     let ret_val = xml_buffer_add_head(buf, str, len);
+    //                     desret_int(ret_val);
+    //                     des_xml_buffer_ptr(n_buf, buf, 0);
+    //                     des_const_xml_char_ptr(n_str, str, 1);
+    //                     des_int(n_len, len, 2);
+    //                     xml_reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlBufferAddHead",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferAddHead()");
+    //                         eprint!(" {}", n_buf);
+    //                         eprint!(" {}", n_str);
+    //                         eprintln!(" {}", n_len);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_ccat() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_str in 0..GEN_NB_CONST_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let str = gen_const_char_ptr(n_str, 1);
+    // #[test]
+    // fn test_xml_buffer_ccat() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_str in 0..GEN_NB_CONST_CHAR_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let str = gen_const_char_ptr(n_str, 1);
 
-                    let ret_val = xml_buffer_ccat(buf, str);
-                    desret_int(ret_val);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_const_char_ptr(n_str, str, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferCCat",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCCat()");
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_str);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_buffer_ccat(buf, str);
+    //                 desret_int(ret_val);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_const_char_ptr(n_str, str, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferCCat",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCCat()");
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_str);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_cat() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let str = gen_const_xml_char_ptr(n_str, 1);
+    // #[test]
+    // fn test_xml_buffer_cat() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let str = gen_const_xml_char_ptr(n_str, 1);
 
-                    let ret_val = xml_buffer_cat(buf, str);
-                    desret_int(ret_val);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_const_xml_char_ptr(n_str, str, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferCat",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCat()");
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_str);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_buffer_cat(buf, str);
+    //                 desret_int(ret_val);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_const_xml_char_ptr(n_str, str, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferCat",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCat()");
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_str);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_content() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_CONST_XML_BUFFER_PTR {
-                let mem_base = xml_mem_blocks();
-                let buf = gen_const_xml_buffer_ptr(n_buf, 0);
+    // #[test]
+    // fn test_xml_buffer_content() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_CONST_XML_BUFFER_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let buf = gen_const_xml_buffer_ptr(n_buf, 0);
 
-                let ret_val = xml_buffer_content(buf);
-                desret_const_xml_char_ptr(ret_val);
-                des_const_xml_buffer_ptr(n_buf, buf, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlBufferContent",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferContent()");
-                    eprintln!(" {}", n_buf);
-                }
-            }
-        }
-    }
+    //             let ret_val = xml_buffer_content(buf);
+    //             desret_const_xml_char_ptr(ret_val);
+    //             des_const_xml_buffer_ptr(n_buf, buf, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlBufferContent",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferContent()");
+    //                 eprintln!(" {}", n_buf);
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_create() {
-        unsafe {
-            let mut leaks = 0;
-            let mem_base = xml_mem_blocks();
+    // #[test]
+    // fn test_xml_buffer_create() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         let mem_base = xml_mem_blocks();
 
-            let ret_val = xml_buffer_create();
-            desret_xml_buffer_ptr(ret_val);
-            xml_reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlBufferCreate",
-                    xml_mem_blocks() - mem_base
-                );
-                assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCreate()");
-            }
-        }
-    }
+    //         let ret_val = xml_buffer_create();
+    //         desret_xml_buffer_ptr(ret_val);
+    //         xml_reset_last_error();
+    //         if mem_base != xml_mem_blocks() {
+    //             leaks += 1;
+    //             eprintln!(
+    //                 "Leak of {} blocks found in xmlBufferCreate",
+    //                 xml_mem_blocks() - mem_base
+    //             );
+    //             assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCreate()");
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_create_size() {
+    // #[test]
+    // fn test_xml_buffer_create_size() {
 
-        /* missing type support */
-    }
+    //     /* missing type support */
+    // }
 
-    #[test]
-    fn test_xml_buffer_create_static() {
+    // #[test]
+    // fn test_xml_buffer_create_static() {
 
-        /* missing type support */
-    }
+    //     /* missing type support */
+    // }
 
-    #[test]
-    fn test_xml_buffer_detach() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                let mem_base = xml_mem_blocks();
-                let buf = gen_xml_buffer_ptr(n_buf, 0);
+    // #[test]
+    // fn test_xml_buffer_detach() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let buf = gen_xml_buffer_ptr(n_buf, 0);
 
-                let ret_val = xml_buffer_detach(buf);
-                desret_xml_char_ptr(ret_val);
-                des_xml_buffer_ptr(n_buf, buf, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlBufferDetach",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferDetach()");
-                    eprintln!(" {}", n_buf);
-                }
-            }
-        }
-    }
+    //             let ret_val = xml_buffer_detach(buf);
+    //             desret_xml_char_ptr(ret_val);
+    //             des_xml_buffer_ptr(n_buf, buf, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlBufferDetach",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferDetach()");
+    //                 eprintln!(" {}", n_buf);
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_empty() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                let mem_base = xml_mem_blocks();
-                let buf = gen_xml_buffer_ptr(n_buf, 0);
+    // #[test]
+    // fn test_xml_buffer_empty() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let buf = gen_xml_buffer_ptr(n_buf, 0);
 
-                xml_buffer_empty(buf);
-                des_xml_buffer_ptr(n_buf, buf, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlBufferEmpty",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferEmpty()");
-                    eprintln!(" {}", n_buf);
-                }
-            }
-        }
-    }
+    //             xml_buffer_empty(buf);
+    //             des_xml_buffer_ptr(n_buf, buf, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlBufferEmpty",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferEmpty()");
+    //                 eprintln!(" {}", n_buf);
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_grow() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_len in 0..GEN_NB_UNSIGNED_INT {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let len = gen_unsigned_int(n_len, 1);
+    // #[test]
+    // fn test_xml_buffer_grow() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_len in 0..GEN_NB_UNSIGNED_INT {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let len = gen_unsigned_int(n_len, 1);
 
-                    let ret_val = xml_buffer_grow(buf, len);
-                    desret_int(ret_val);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_unsigned_int(n_len, len, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferGrow",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferGrow()");
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_len);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_buffer_grow(buf, len);
+    //                 desret_int(ret_val);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_unsigned_int(n_len, len, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferGrow",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferGrow()");
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_len);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_length() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_CONST_XML_BUFFER_PTR {
-                let mem_base = xml_mem_blocks();
-                let buf = gen_const_xml_buffer_ptr(n_buf, 0);
+    // #[test]
+    // fn test_xml_buffer_length() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_CONST_XML_BUFFER_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let buf = gen_const_xml_buffer_ptr(n_buf, 0);
 
-                let ret_val = xml_buffer_length(buf);
-                desret_int(ret_val);
-                des_const_xml_buffer_ptr(n_buf, buf, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlBufferLength",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferLength()");
-                    eprintln!(" {}", n_buf);
-                }
-            }
-        }
-    }
+    //             let ret_val = xml_buffer_length(buf);
+    //             desret_int(ret_val);
+    //             des_const_xml_buffer_ptr(n_buf, buf, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlBufferLength",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferLength()");
+    //                 eprintln!(" {}", n_buf);
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_resize() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_size in 0..GEN_NB_UNSIGNED_INT {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let size = gen_unsigned_int(n_size, 1);
+    // #[test]
+    // fn test_xml_buffer_resize() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_size in 0..GEN_NB_UNSIGNED_INT {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let size = gen_unsigned_int(n_size, 1);
 
-                    let ret_val = xml_buffer_resize(buf, size);
-                    desret_int(ret_val);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_unsigned_int(n_size, size, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferResize",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferResize()");
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_size);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_buffer_resize(buf, size);
+    //                 desret_int(ret_val);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_unsigned_int(n_size, size, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferResize",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferResize()");
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_size);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_set_allocation_scheme() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_scheme in 0..GEN_NB_XML_BUFFER_ALLOCATION_SCHEME {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let scheme = gen_xml_buffer_allocation_scheme(n_scheme, 1);
+    // #[test]
+    // fn test_xml_buffer_set_allocation_scheme() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_scheme in 0..GEN_NB_XML_BUFFER_ALLOCATION_SCHEME {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let scheme = gen_xml_buffer_allocation_scheme(n_scheme, 1);
 
-                    xml_buffer_set_allocation_scheme(buf, scheme);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_xml_buffer_allocation_scheme(n_scheme, scheme, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferSetAllocationScheme",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlBufferSetAllocationScheme()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_scheme);
-                    }
-                }
-            }
-        }
-    }
+    //                 xml_buffer_set_allocation_scheme(buf, scheme);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_xml_buffer_allocation_scheme(n_scheme, scheme, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferSetAllocationScheme",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlBufferSetAllocationScheme()"
+    //                     );
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_scheme);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_shrink() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_len in 0..GEN_NB_UNSIGNED_INT {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let len = gen_unsigned_int(n_len, 1);
+    // #[test]
+    // fn test_xml_buffer_shrink() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_len in 0..GEN_NB_UNSIGNED_INT {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let len = gen_unsigned_int(n_len, 1);
 
-                    let ret_val = xml_buffer_shrink(buf, len);
-                    desret_int(ret_val);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_unsigned_int(n_len, len, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferShrink",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferShrink()");
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_len);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_buffer_shrink(buf, len);
+    //                 desret_int(ret_val);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_unsigned_int(n_len, len, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferShrink",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferShrink()");
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_len);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_write_char() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let string = gen_const_xml_char_ptr(n_string, 1);
+    // #[test]
+    // fn test_xml_buffer_write_char() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let string = gen_const_xml_char_ptr(n_string, 1);
 
-                    xml_buffer_write_xml_char(buf, string);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_const_xml_char_ptr(n_string, string, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferWriteCHAR",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlBufferWriteCHAR()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_string);
-                    }
-                }
-            }
-        }
-    }
+    //                 xml_buffer_write_xml_char(buf, string);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_const_xml_char_ptr(n_string, string, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferWriteCHAR",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlBufferWriteCHAR()"
+    //                     );
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_string);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_write_ichar() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_string in 0..GEN_NB_CONST_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let string = gen_const_char_ptr(n_string, 1);
+    // #[test]
+    // fn test_xml_buffer_write_ichar() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_string in 0..GEN_NB_CONST_CHAR_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let string = gen_const_char_ptr(n_string, 1);
 
-                    xml_buffer_write_char(buf, string);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_const_char_ptr(n_string, string, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferWriteChar",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlBufferWriteChar()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_string);
-                    }
-                }
-            }
-        }
-    }
+    //                 xml_buffer_write_char(buf, string);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_const_char_ptr(n_string, string, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferWriteChar",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlBufferWriteChar()"
+    //                     );
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_string);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_buffer_write_quoted_string() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let string = gen_const_xml_char_ptr(n_string, 1);
+    // #[test]
+    // fn test_xml_buffer_write_quoted_string() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let string = gen_const_xml_char_ptr(n_string, 1);
 
-                    xml_buffer_write_quoted_string(buf, string);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_const_xml_char_ptr(n_string, string, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlBufferWriteQuotedString",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlBufferWriteQuotedString()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_string);
-                    }
-                }
-            }
-        }
-    }
+    //                 xml_buffer_write_quoted_string(buf, string);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_const_xml_char_ptr(n_string, string, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlBufferWriteQuotedString",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlBufferWriteQuotedString()"
+    //                     );
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_string);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_build_qname() {
@@ -15495,28 +15300,28 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_get_buffer_allocation_scheme() {
-        unsafe {
-            let mem_base = xml_mem_blocks();
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_get_buffer_allocation_scheme() {
+    //     unsafe {
+    //         let mem_base = xml_mem_blocks();
+    //         let mut leaks = 0;
 
-            let ret_val = xml_get_buffer_allocation_scheme();
-            desret_xml_buffer_allocation_scheme(ret_val);
-            xml_reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlGetBufferAllocationScheme",
-                    xml_mem_blocks() - mem_base
-                );
-                assert!(
-                    leaks == 0,
-                    "{leaks} Leaks are found in xmlGetBufferAllocationScheme()"
-                );
-            }
-        }
-    }
+    //         let ret_val = xml_get_buffer_allocation_scheme();
+    //         desret_xml_buffer_allocation_scheme(ret_val);
+    //         xml_reset_last_error();
+    //         if mem_base != xml_mem_blocks() {
+    //             leaks += 1;
+    //             eprintln!(
+    //                 "Leak of {} blocks found in xmlGetBufferAllocationScheme",
+    //                 xml_mem_blocks() - mem_base
+    //             );
+    //             assert!(
+    //                 leaks == 0,
+    //                 "{leaks} Leaks are found in xmlGetBufferAllocationScheme()"
+    //             );
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_get_compress_mode() {
@@ -16928,85 +16733,85 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_node_buf_get_content() {
-        unsafe {
-            let mut leaks = 0;
-            for n_buffer in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buffer = gen_xml_buffer_ptr(n_buffer, 0);
-                    let cur = gen_const_xml_node_ptr(n_cur, 1);
+    // #[test]
+    // fn test_xml_node_buf_get_content() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_buffer in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buffer = gen_xml_buffer_ptr(n_buffer, 0);
+    //                 let cur = gen_const_xml_node_ptr(n_cur, 1);
 
-                    let ret_val = xml_node_buf_get_content(buffer, cur);
-                    desret_int(ret_val);
-                    des_xml_buffer_ptr(n_buffer, buffer, 0);
-                    des_const_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNodeBufGetContent",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNodeBufGetContent()"
-                        );
-                        eprint!(" {}", n_buffer);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_node_buf_get_content(buffer, cur);
+    //                 desret_int(ret_val);
+    //                 des_xml_buffer_ptr(n_buffer, buffer, 0);
+    //                 des_const_xml_node_ptr(n_cur, cur, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlNodeBufGetContent",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlNodeBufGetContent()"
+    //                     );
+    //                     eprint!(" {}", n_buffer);
+    //                     eprintln!(" {}", n_cur);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_node_dump() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_node_dump() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                        for n_level in 0..GEN_NB_INT {
-                            for n_format in 0..GEN_NB_INT {
-                                let mem_base = xml_mem_blocks();
-                                let buf = gen_xml_buffer_ptr(n_buf, 0);
-                                let doc = gen_xml_doc_ptr(n_doc, 1);
-                                let cur = gen_xml_node_ptr(n_cur, 2);
-                                let level = gen_int(n_level, 3);
-                                let format = gen_int(n_format, 4);
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_doc in 0..GEN_NB_XML_DOC_PTR {
+    //                 for n_cur in 0..GEN_NB_XML_NODE_PTR {
+    //                     for n_level in 0..GEN_NB_INT {
+    //                         for n_format in 0..GEN_NB_INT {
+    //                             let mem_base = xml_mem_blocks();
+    //                             let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                             let doc = gen_xml_doc_ptr(n_doc, 1);
+    //                             let cur = gen_xml_node_ptr(n_cur, 2);
+    //                             let level = gen_int(n_level, 3);
+    //                             let format = gen_int(n_format, 4);
 
-                                let ret_val = xml_node_dump(buf, doc, cur, level, format);
-                                desret_int(ret_val);
-                                des_xml_buffer_ptr(n_buf, buf, 0);
-                                des_xml_doc_ptr(n_doc, doc, 1);
-                                des_xml_node_ptr(n_cur, cur, 2);
-                                des_int(n_level, level, 3);
-                                des_int(n_format, format, 4);
-                                xml_reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlNodeDump",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeDump()");
-                                    eprint!(" {}", n_buf);
-                                    eprint!(" {}", n_doc);
-                                    eprint!(" {}", n_cur);
-                                    eprint!(" {}", n_level);
-                                    eprintln!(" {}", n_format);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //                             let ret_val = xml_node_dump(buf, doc, cur, level, format);
+    //                             desret_int(ret_val);
+    //                             des_xml_buffer_ptr(n_buf, buf, 0);
+    //                             des_xml_doc_ptr(n_doc, doc, 1);
+    //                             des_xml_node_ptr(n_cur, cur, 2);
+    //                             des_int(n_level, level, 3);
+    //                             des_int(n_format, format, 4);
+    //                             xml_reset_last_error();
+    //                             if mem_base != xml_mem_blocks() {
+    //                                 leaks += 1;
+    //                                 eprint!(
+    //                                     "Leak of {} blocks found in xmlNodeDump",
+    //                                     xml_mem_blocks() - mem_base
+    //                                 );
+    //                                 assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeDump()");
+    //                                 eprint!(" {}", n_buf);
+    //                                 eprint!(" {}", n_doc);
+    //                                 eprint!(" {}", n_cur);
+    //                                 eprint!(" {}", n_level);
+    //                                 eprintln!(" {}", n_format);
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_node_dump_output() {
@@ -17906,32 +17711,32 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_set_buffer_allocation_scheme() {
-        unsafe {
-            let mut leaks = 0;
-            for n_scheme in 0..GEN_NB_XML_BUFFER_ALLOCATION_SCHEME {
-                let mem_base = xml_mem_blocks();
-                let scheme = gen_xml_buffer_allocation_scheme(n_scheme, 0);
+    // #[test]
+    // fn test_xml_set_buffer_allocation_scheme() {
+    //     unsafe {
+    //         let mut leaks = 0;
+    //         for n_scheme in 0..GEN_NB_XML_BUFFER_ALLOCATION_SCHEME {
+    //             let mem_base = xml_mem_blocks();
+    //             let scheme = gen_xml_buffer_allocation_scheme(n_scheme, 0);
 
-                xml_set_buffer_allocation_scheme(scheme);
-                des_xml_buffer_allocation_scheme(n_scheme, scheme, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSetBufferAllocationScheme",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlSetBufferAllocationScheme()"
-                    );
-                    eprintln!(" {}", n_scheme);
-                }
-            }
-        }
-    }
+    //             xml_set_buffer_allocation_scheme(scheme);
+    //             des_xml_buffer_allocation_scheme(n_scheme, scheme, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlSetBufferAllocationScheme",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(
+    //                     leaks == 0,
+    //                     "{leaks} Leaks are found in xmlSetBufferAllocationScheme()"
+    //                 );
+    //                 eprintln!(" {}", n_scheme);
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_set_compress_mode() {

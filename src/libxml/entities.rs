@@ -18,6 +18,9 @@ use libc::{memset, size_t, snprintf, strchr};
 use crate::generic_error;
 use crate::{
     __xml_raise_error,
+    buf::libxml_api::{
+        xml_buf_add, xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string, XmlBufPtr,
+    },
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         globals::{xml_free, xml_malloc},
@@ -26,9 +29,8 @@ use crate::{
             xml_hash_free, xml_hash_lookup, xml_hash_scan, XmlHashTable,
         },
         tree::{
-            xml_buffer_add, xml_buffer_ccat, xml_buffer_write_char, xml_buffer_write_quoted_string,
-            xml_buffer_write_xml_char, xml_free_node_list, XmlBufferPtr, XmlDoc, XmlDocPtr, XmlDtd,
-            XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr,
+            xml_free_node_list, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode,
+            XmlNodePtr,
         },
         xmlerror::{XmlErrorDomain, XmlParserErrors},
         xmlstring::{
@@ -1431,7 +1433,7 @@ pub unsafe extern "C" fn xml_free_entities_table(table: XmlEntitiesTablePtr) {
 #[cfg(feature = "output")]
 extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _name: *const XmlChar) {
     unsafe {
-        xml_dump_entity_decl(buf as XmlBufferPtr, ent as XmlEntityPtr);
+        xml_dump_entity_decl(buf as XmlBufPtr, ent as XmlEntityPtr);
     }
 }
 
@@ -1443,7 +1445,7 @@ extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _nam
  * This will dump the content of the entity table as an XML DTD definition
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufferPtr, table: XmlEntitiesTablePtr) {
+pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntitiesTablePtr) {
     xml_hash_scan(table, Some(xml_dump_entity_decl_scan), buf as _);
 }
 
@@ -1456,27 +1458,27 @@ pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufferPtr, table: XmlEn
  * treatment required by %
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufferPtr, content: *const XmlChar) {
+unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufPtr, content: *const XmlChar) {
     if !xml_strchr(content, b'%').is_null() {
         let mut base: *const XmlChar;
         let mut cur: *const XmlChar;
 
-        xml_buffer_ccat(buf, c"\"".as_ptr() as _);
+        xml_buf_ccat(buf, c"\"".as_ptr() as _);
         base = content;
         cur = content;
         while *cur != 0 {
             if *cur == b'"' {
                 if base != cur {
-                    xml_buffer_add(buf, base, cur.offset_from(base) as _);
+                    xml_buf_add(buf, base, cur.offset_from(base) as _);
                 }
-                xml_buffer_add(buf, c"&quot;".as_ptr() as _, 6);
+                xml_buf_add(buf, c"&quot;".as_ptr() as _, 6);
                 cur = cur.add(1);
                 base = cur;
             } else if *cur == b'%' {
                 if base != cur {
-                    xml_buffer_add(buf, base, cur.offset_from(base) as _);
+                    xml_buf_add(buf, base, cur.offset_from(base) as _);
                 }
-                xml_buffer_add(buf, c"&#x25;".as_ptr() as _, 6);
+                xml_buf_add(buf, c"&#x25;".as_ptr() as _, 6);
                 cur = cur.add(1);
                 base = cur;
             } else {
@@ -1484,11 +1486,11 @@ unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufferPtr, content: *const 
             }
         }
         if base != cur {
-            xml_buffer_add(buf, base, cur.offset_from(base) as _);
+            xml_buf_add(buf, base, cur.offset_from(base) as _);
         }
-        xml_buffer_ccat(buf, c"\"".as_ptr() as _);
+        xml_buf_ccat(buf, c"\"".as_ptr() as _);
     } else {
-        xml_buffer_write_quoted_string(buf, content);
+        xml_buf_write_quoted_string(buf, content);
     }
 }
 
@@ -1500,92 +1502,83 @@ unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufferPtr, content: *const 
  * This will dump the content of the entity table as an XML DTD definition
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufferPtr, ent: XmlEntityPtr) {
+pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
     if buf.is_null() || ent.is_null() {
         return;
     }
     match (*ent).etype {
         Some(XmlEntityType::XmlInternalGeneralEntity) => {
-            xml_buffer_write_char(buf, c"<!ENTITY ".as_ptr() as _);
-            xml_buffer_write_xml_char(buf, (*ent).name.load(Ordering::Relaxed) as _);
-            xml_buffer_write_char(buf, c" ".as_ptr() as _);
+            xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
+            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
+            xml_buf_ccat(buf, c" ".as_ptr() as _);
             if !(*ent).orig.load(Ordering::Relaxed).is_null() {
-                xml_buffer_write_quoted_string(buf, (*ent).orig.load(Ordering::Relaxed) as _);
+                xml_buf_write_quoted_string(buf, (*ent).orig.load(Ordering::Relaxed) as _);
             } else {
                 xml_dump_entity_content(buf, (*ent).content.load(Ordering::Relaxed) as _);
             }
-            xml_buffer_write_char(buf, c">\n".as_ptr() as _);
+            xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
         Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
-            xml_buffer_write_char(buf, c"<!ENTITY ".as_ptr() as _);
-            xml_buffer_write_xml_char(buf, (*ent).name.load(Ordering::Relaxed) as _);
+            xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
+            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-                xml_buffer_write_char(buf, c" PUBLIC ".as_ptr() as _);
-                xml_buffer_write_quoted_string(
-                    buf,
-                    (*ent).external_id.load(Ordering::Relaxed) as _,
-                );
-                xml_buffer_write_char(buf, c" ".as_ptr() as _);
-                xml_buffer_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" PUBLIC ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).external_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
             } else {
-                xml_buffer_write_char(buf, c" SYSTEM ".as_ptr() as _);
-                xml_buffer_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" SYSTEM ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
             }
-            xml_buffer_write_char(buf, c">\n".as_ptr() as _);
+            xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
         Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-            xml_buffer_write_char(buf, c"<!ENTITY ".as_ptr() as _);
-            xml_buffer_write_xml_char(buf, (*ent).name.load(Ordering::Relaxed) as _);
+            xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
+            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-                xml_buffer_write_char(buf, c" PUBLIC ".as_ptr() as _);
-                xml_buffer_write_quoted_string(
-                    buf,
-                    (*ent).external_id.load(Ordering::Relaxed) as _,
-                );
-                xml_buffer_write_char(buf, c" ".as_ptr() as _);
-                xml_buffer_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" PUBLIC ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).external_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
             } else {
-                xml_buffer_write_char(buf, c" SYSTEM ".as_ptr() as _);
-                xml_buffer_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" SYSTEM ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
             }
             if !(*ent).content.load(Ordering::Relaxed).is_null() {
                 /* Should be true ! */
-                xml_buffer_write_char(buf, c" NDATA ".as_ptr() as _);
+                xml_buf_ccat(buf, c" NDATA ".as_ptr() as _);
                 if !(*ent).orig.load(Ordering::Relaxed).is_null() {
-                    xml_buffer_write_xml_char(buf, (*ent).orig.load(Ordering::Acquire) as _);
+                    xml_buf_cat(buf, (*ent).orig.load(Ordering::Acquire) as _);
                 } else {
-                    xml_buffer_write_xml_char(buf, (*ent).content.load(Ordering::Acquire) as _);
+                    xml_buf_cat(buf, (*ent).content.load(Ordering::Acquire) as _);
                 }
             }
-            xml_buffer_write_char(buf, c">\n".as_ptr() as _);
+            xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
         Some(XmlEntityType::XmlInternalParameterEntity) => {
-            xml_buffer_write_char(buf, c"<!ENTITY % ".as_ptr() as _);
-            xml_buffer_write_xml_char(buf, (*ent).name.load(Ordering::Relaxed) as _);
-            xml_buffer_write_char(buf, c" ".as_ptr() as _);
+            xml_buf_ccat(buf, c"<!ENTITY % ".as_ptr() as _);
+            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
+            xml_buf_ccat(buf, c" ".as_ptr() as _);
             if (*ent).orig.load(Ordering::Relaxed).is_null() {
                 xml_dump_entity_content(buf, (*ent).content.load(Ordering::Relaxed) as _);
             } else {
-                xml_buffer_write_quoted_string(buf, (*ent).orig.load(Ordering::Relaxed) as _);
+                xml_buf_write_quoted_string(buf, (*ent).orig.load(Ordering::Relaxed) as _);
             }
-            xml_buffer_write_char(buf, c">\n".as_ptr() as _);
+            xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
         Some(XmlEntityType::XmlExternalParameterEntity) => {
-            xml_buffer_write_char(buf, c"<!ENTITY % ".as_ptr() as _);
-            xml_buffer_write_xml_char(buf, (*ent).name.load(Ordering::Relaxed) as _);
+            xml_buf_ccat(buf, c"<!ENTITY % ".as_ptr() as _);
+            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-                xml_buffer_write_char(buf, c" PUBLIC ".as_ptr() as _);
-                xml_buffer_write_quoted_string(
-                    buf,
-                    (*ent).external_id.load(Ordering::Relaxed) as _,
-                );
-                xml_buffer_write_char(buf, c" ".as_ptr() as _);
-                xml_buffer_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" PUBLIC ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).external_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
             } else {
-                xml_buffer_write_char(buf, c" SYSTEM ".as_ptr() as _);
-                xml_buffer_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                xml_buf_ccat(buf, c" SYSTEM ".as_ptr() as _);
+                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
             }
-            xml_buffer_write_char(buf, c">\n".as_ptr() as _);
+            xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
         _ => {
             xml_entities_err(
@@ -1751,11 +1744,11 @@ mod tests {
             for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
                 for n_table in 0..GEN_NB_XML_ENTITIES_TABLE_PTR {
                     let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
+                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
                     let table = gen_xml_entities_table_ptr(n_table, 1);
 
                     xml_dump_entities_table(buf, table);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
+                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
                     des_xml_entities_table_ptr(n_table, table, 1);
                     xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -1785,11 +1778,11 @@ mod tests {
             for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
                 for n_ent in 0..GEN_NB_XML_ENTITY_PTR {
                     let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
+                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
                     let ent = gen_xml_entity_ptr(n_ent, 1);
 
                     xml_dump_entity_decl(buf, ent);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
+                    des_const_xml_buf_ptr(n_buf, buf, 0);
                     des_xml_entity_ptr(n_ent, ent, 1);
                     xml_reset_last_error();
                     if mem_base != xml_mem_blocks() {

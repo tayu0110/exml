@@ -7,68 +7,71 @@ use std::{
 
 use libc::{fclose, fopen, snprintf, FILE};
 
-use crate::libxml::{
-    catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
-    chvalid::XmlChRangeGroup,
-    debug_xml::XmlShellCtxtPtr,
-    dict::{xml_dict_create, xml_dict_free, XmlDictPtr},
-    encoding::{XmlCharEncoding, XmlCharEncodingHandlerPtr},
-    entities::{XmlEntitiesTablePtr, XmlEntityPtr},
-    globals::xml_free,
-    hash::{xml_hash_create, xml_hash_free, XmlHashDeallocator, XmlHashTablePtr},
-    htmlparser::{
-        html_free_parser_ctxt, HtmlDocPtr, HtmlElemDesc, HtmlEntityDesc, HtmlNodePtr,
-        HtmlParserCtxtPtr, HtmlSaxhandlerPtr, HtmlStatus,
-    },
-    list::{xml_list_create, xml_list_delete, XmlLinkPtr, XmlList, XmlListPtr},
-    parser::{
-        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_memory, XmlFeature, XmlParserCtxt,
-        XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq,
-        XmlParserNodeInfoSeqPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
-        XmlSaxlocatorPtr,
-    },
-    parser_internals::{xml_create_memory_parser_ctxt, xml_free_input_stream},
-    pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
-    relaxng::{
-        XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr,
-        XmlRelaxNGValidityErrorFunc, XmlRelaxNGValidityWarningFunc,
-    },
-    schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
-    schematron::XmlSchematronValidCtxtPtr,
-    tree::{
-        xml_buffer_create, xml_buffer_create_static, xml_buffer_free, xml_free_doc, xml_free_node,
-        xml_new_doc, xml_new_dtd, xml_new_pi, xml_new_text, xml_set_prop, xml_unlink_node, XmlAttr,
-        XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlBuf, XmlBuffer,
-        XmlBufferAllocationScheme, XmlBufferPtr, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr, XmlDtd,
-        XmlDtdPtr, XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
-        XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNs, XmlNsPtr,
-    },
-    uri::XmlURIPtr,
-    valid::{
-        xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt, XmlAttributeTablePtr,
-        XmlElementTablePtr, XmlNotationTablePtr, XmlValidCtxtPtr,
-    },
-    xinclude::XmlXincludeCtxtPtr,
-    xml_io::{
-        xml_free_parser_input_buffer, xml_parser_input_buffer_create_filename, XmlOutputBufferPtr,
-        XmlParserInputBufferPtr,
-    },
-    xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
-    xmlerror::{XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors},
-    xmlmodule::XmlModulePtr,
-    xmlreader::{XmlTextReaderErrorFunc, XmlTextReaderLocatorPtr, XmlTextReaderPtr},
-    xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
-    xmlsave::XmlSaveCtxtPtr,
-    xmlschemas::{
-        XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaSAXPlugPtr, XmlSchemaValidCtxtPtr,
-        XmlSchemaValidityErrorFunc, XmlSchemaValidityWarningFunc,
-    },
-    xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
-    xmlstring::{xml_strdup, XmlChar},
-    xmlwriter::{xml_free_text_writer, XmlTextWriterPtr},
-    xpath::{
-        XmlNodeSetPtr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
-        XmlXPathParserContextPtr,
+use crate::{
+    buf::XmlBuf,
+    libxml::{
+        catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
+        chvalid::XmlChRangeGroup,
+        debug_xml::XmlShellCtxtPtr,
+        dict::{xml_dict_create, xml_dict_free, XmlDictPtr},
+        encoding::{XmlCharEncoding, XmlCharEncodingHandlerPtr},
+        entities::{XmlEntitiesTablePtr, XmlEntityPtr},
+        globals::xml_free,
+        hash::{xml_hash_create, xml_hash_free, XmlHashDeallocator, XmlHashTablePtr},
+        htmlparser::{
+            html_free_parser_ctxt, HtmlDocPtr, HtmlElemDesc, HtmlEntityDesc, HtmlNodePtr,
+            HtmlParserCtxtPtr, HtmlSaxhandlerPtr, HtmlStatus,
+        },
+        list::{xml_list_create, xml_list_delete, XmlLinkPtr, XmlList, XmlListPtr},
+        parser::{
+            xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_memory, XmlFeature, XmlParserCtxt,
+            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq,
+            XmlParserNodeInfoSeqPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
+            XmlSaxlocatorPtr,
+        },
+        parser_internals::{xml_create_memory_parser_ctxt, xml_free_input_stream},
+        pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
+        relaxng::{
+            XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr,
+            XmlRelaxNGValidityErrorFunc, XmlRelaxNGValidityWarningFunc,
+        },
+        schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
+        schematron::XmlSchematronValidCtxtPtr,
+        tree::{
+            xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, xml_new_text,
+            xml_set_prop, xml_unlink_node, XmlAttr, XmlAttrPtr, XmlAttributeDefault,
+            XmlAttributePtr, XmlAttributeType, XmlBufferAllocationScheme, XmlDOMWrapCtxtPtr,
+            XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementContentType,
+            XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
+            XmlNodePtr, XmlNotationPtr, XmlNs, XmlNsPtr,
+        },
+        uri::XmlURIPtr,
+        valid::{
+            xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
+            XmlAttributeTablePtr, XmlElementTablePtr, XmlNotationTablePtr, XmlValidCtxtPtr,
+        },
+        xinclude::XmlXincludeCtxtPtr,
+        xml_io::{
+            xml_free_parser_input_buffer, xml_parser_input_buffer_create_filename,
+            XmlOutputBufferPtr, XmlParserInputBufferPtr,
+        },
+        xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
+        xmlerror::{XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors},
+        xmlmodule::XmlModulePtr,
+        xmlreader::{XmlTextReaderErrorFunc, XmlTextReaderLocatorPtr, XmlTextReaderPtr},
+        xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
+        xmlsave::XmlSaveCtxtPtr,
+        xmlschemas::{
+            XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaSAXPlugPtr, XmlSchemaValidCtxtPtr,
+            XmlSchemaValidityErrorFunc, XmlSchemaValidityWarningFunc,
+        },
+        xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
+        xmlstring::{xml_strdup, XmlChar},
+        xmlwriter::{xml_free_text_writer, XmlTextWriterPtr},
+        xpath::{
+            XmlNodeSetPtr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
+            XmlXPathParserContextPtr,
+        },
     },
 };
 
@@ -980,10 +983,6 @@ pub(crate) fn des_xml_buffer_allocation_scheme(
 
 pub(crate) fn desret_xml_buffer_allocation_scheme(_val: XmlBufferAllocationScheme) {}
 
-pub(crate) unsafe extern "C" fn desret_xml_buffer_ptr(val: XmlBufferPtr) {
-    xml_buffer_free(val);
-}
-
 unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
     #[cfg(any(
         feature = "tree",
@@ -1066,18 +1065,6 @@ pub(crate) fn gen_const_xml_buf_ptr(_no: i32, _nr: i32) -> *const XmlBuf {
 }
 
 pub(crate) fn des_const_xml_buf_ptr(_no: i32, _val: *const XmlBuf, _nr: i32) {}
-
-pub(crate) fn gen_xml_buf_ptr(_no: i32, _nr: i32) -> XmlBufferPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_buf_ptr(_no: i32, _val: XmlBufferPtr, _nr: i32) {}
-
-pub(crate) fn gen_const_xml_buffer_ptr(_no: i32, _nr: i32) -> *const XmlBuffer {
-    null()
-}
-
-pub(crate) fn des_const_xml_buffer_ptr(_no: i32, _val: *const XmlBuffer, _nr: i32) {}
 
 pub(crate) fn gen_xml_domwrap_ctxt_ptr(_no: i32, _nr: i32) -> XmlDOMWrapCtxtPtr {
     null_mut()
@@ -1763,21 +1750,6 @@ pub(crate) unsafe extern "C" fn des_xml_node_ptr(no: c_int, val: XmlNodePtr, _nr
     } else if !val.is_null() {
         xml_unlink_node(val);
         xml_free_node(val);
-    }
-}
-
-pub(crate) unsafe extern "C" fn gen_xml_buffer_ptr(no: c_int, _nr: c_int) -> XmlBufferPtr {
-    if no == 0 {
-        return xml_buffer_create();
-    }
-    if no == 1 {
-        return xml_buffer_create_static(STATIC_BUF_CONTENT.as_ptr() as _, 13);
-    }
-    null_mut()
-}
-pub(crate) unsafe extern "C" fn des_xml_buffer_ptr(_no: c_int, val: XmlBufferPtr, _nr: c_int) {
-    if !val.is_null() {
-        xml_buffer_free(val);
     }
 }
 

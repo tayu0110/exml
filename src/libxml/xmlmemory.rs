@@ -42,10 +42,6 @@ struct Memnod {
     mh_type: c_uint,
     mh_number: c_ulong,
     mh_size: size_t,
-    // #[cfg(feature = "debug_memory_location")]
-    // mh_next: *mut memnod,
-    // #[cfg(feature = "debug_memory_location")]
-    // mh_prev: *mut memnod,
     mh_file: *const c_char,
     mh_line: c_uint,
 }
@@ -85,51 +81,13 @@ static mut XML_MEM_TRACE_BLOCK_AT: *mut c_void = null_mut();
  */
 unsafe extern "C" fn debugmem_tag_error(addr: *mut c_void) {
     generic_error!("Memory tag error occurs :{:?} \n\t bye\n", addr);
-    // #ifdef MEM_LIST
-    // if cfg!(feature = "debug_memory_location") && (stderr) {
-    //     xmlMemDisplay(stderr);
-    // }
-    // #endif
 }
-
-// #[cfg(feature = "debug_memory_location")]
-// unsafe extern "C" fn debugmem_list_add(p: *mut Memhdr) {
-//     (*p).mh_next = memlist;
-//     (*p).mh_prev = null_mut();
-//     if !memlist.is_null() {
-//         (*memlist).mh_prev = p;
-//     }
-//     memlist = p;
-//     // #ifdef MEM_LIST_DEBUG
-//     // 	if (stderr)
-//     // 	Mem_Display(stderr);
-//     // #endif
-// }
-// #[cfg(feature = "debug_memory_location")]
-// unsafe extern "C" fn debugmem_list_delete(p: *mut Memhdr) {
-//     if !(*p).mh_next.is_null() {
-//         (*(*p).mh_next).mh_prev = (*p).mh_prev;
-//     }
-//     if !(*p).mh_prev.is_null() {
-//         (*(*p).mh_prev).mh_next = (*p).mh_next;
-//     } else {
-//         memlist = (*p).mh_next;
-//     }
-//     // #ifdef MEM_LIST_DEBUG
-//     // 	if (stderr)
-//     // 	Mem_Display(stderr);
-//     // #endif
-// }
 
 macro_rules! mem_tag_err {
     ( $t:expr ) => {
         debugmem_tag_error($t)
     };
 }
-
-// #ifndef TEST_POINT
-// #define TEST_POINT
-// #endif
 
 /*
  * The XML memory wrapper support 4 basic overloadable functions.
@@ -439,18 +397,6 @@ pub unsafe extern "C" fn xml_mem_blocks() -> c_int {
  * show in-extenso the memory blocks allocated
  */
 pub unsafe extern "C" fn xml_mem_display(mut fp: *mut FILE) {
-    // #[cfg(feature = "debug_memory_location")]
-    // let p: *mut Memhdr;
-    // #[cfg(feature = "debug_memory_location")]
-    // let idx: c_uint;
-    // #[cfg(feature = "debug_memory_location")]
-    // let nb: c_int = 0;
-    // #[cfg(feature = "debug_memory_location")]
-    // let currentTime: time_t;
-    // #[cfg(feature = "debug_memory_location")]
-    // let buf: [c_char; 500];
-    // #[cfg(feature = "debug_memory_location")]
-    // let tstruct: *mut tm;
     let old_fp: *mut FILE = fp;
 
     if fp.is_null() {
@@ -460,79 +406,10 @@ pub unsafe extern "C" fn xml_mem_display(mut fp: *mut FILE) {
         }
     }
 
-    // if cfg!(feature = "debug_memory_location") {
-    //     currentTime = time(null_mut());
-    //     tstruct = localtime(&currentTime);
-    //     strftime(
-    //         buf.as_mut_ptr(),
-    //         size_of_val(&buf) - 1,
-    //         c"%I:%M:%S %p".as_ptr() as _,
-    //         tstruct,
-    //     );
-    //     fprintf(fp, c"      %s\n\n".as_ptr() as _, buf);
-
-    //     fprintf(
-    //         fp,
-    //         c"      MEMORY ALLOCATED : %lu, MAX was %lu\n".as_ptr() as _,
-    //         debugMemSize,
-    //         debugMaxMemSize,
-    //     );
-    //     fprintf(fp, c"BLOCK  NUMBER   SIZE  TYPE\n".as_ptr() as _);
-    //     idx = 0;
-    //     xmlMutexLock(addr_of_mut!(xmlMemMutex));
-    //     p = memlist;
-    //     while !p.is_null() {
-    //         fprintf(
-    //             fp,
-    //             c"%-5u  %6lu %6lu ".as_ptr() as _,
-    //             idx,
-    //             (*p).mh_number,
-    //             (*p).mh_size as c_ulong,
-    //         );
-    //         idx += 1;
-    //         match ((*p).mh_type) as _ {
-    //             STRDUP_TYPE => {
-    //                 fprintf(fp, c"strdup()  in ".as_ptr() as _);
-    //             }
-    //             MALLOC_TYPE => {
-    //                 fprintf(fp, c"malloc()  in ".as_ptr() as _);
-    //             }
-    //             REALLOC_TYPE => {
-    //                 fprintf(fp, c"realloc() in ".as_ptr() as _);
-    //             }
-    //             MALLOC_ATOMIC_TYPE => {
-    //                 fprintf(fp, c"atomicmalloc()  in ".as_ptr() as _);
-    //             }
-    //             REALLOC_ATOMIC_TYPE => {
-    //                 fprintf(fp, c"atomicrealloc() in ".as_ptr() as _);
-    //             }
-    //             _ => {
-    //                 fprintf(fp, c"Unknown memory block, may be corrupted".as_ptr() as _);
-    //                 xmlMutexUnlock(addr_of_mut!(xmlMemMutex));
-    //                 if old_fp.is_null() {
-    //                     fclose(fp);
-    //                 }
-    //                 return;
-    //             }
-    //         }
-    //         if (*p).mh_file != null_mut() {
-    //             fprintf(fp, c"%s(%u)".as_ptr() as _, (*p).mh_file, (*p).mh_line);
-    //         }
-    //         if (*p).mh_tag != MEMTAG as _ {
-    //             fprintf(fp, c"  INVALID".as_ptr() as _);
-    //         }
-    //         nb += 1;
-
-    //         fprintf(fp, c"\n".as_ptr() as _);
-    //         p = (*p).mh_next;
-    //     }
-    //     xmlMutexUnlock(addr_of_mut!(xmlMemMutex));
-    // } else {
     fprintf(
         fp,
         c"Memory list not compiled (MEM_LIST not defined !)\n".as_ptr() as _,
     );
-    // }
     if old_fp.is_null() {
         fclose(fp);
     }
@@ -548,12 +425,6 @@ pub unsafe extern "C" fn xml_mem_display(mut fp: *mut FILE) {
  * the memory left allocated between two places at runtime.
  */
 pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: c_long) {
-    // #[cfg(feature = "debug_memory_location")]
-    // let p: *mut Memhdr;
-    // #[cfg(feature = "debug_memory_location")]
-    // let idx: c_uint;
-    // #[cfg(feature = "debug_memory_location")]
-    // let nb: c_int = 0;
     let old_fp: *mut FILE = fp;
 
     if nb_bytes <= 0 {
@@ -567,71 +438,10 @@ pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: c_lon
         }
     }
 
-    // if cfg!(feature = "debug_memory_location") {
-    //     fprintf(
-    //         fp,
-    //         c"   Last %li MEMORY ALLOCATED : %lu, MAX was %lu\n".as_ptr() as _,
-    //         nbBytes,
-    //         debugMemSize,
-    //         debugMaxMemSize,
-    //     );
-    //     fprintf(fp, c"BLOCK  NUMBER   SIZE  TYPE\n".as_ptr() as _);
-    //     idx = 0;
-    //     xmlMutexLock(addr_of_mut!(xmlMemMutex));
-    //     p = memlist;
-    //     while !p.is_null() && nbBytes > 0 {
-    //         fprintf(
-    //             fp,
-    //             c"%-5u  %6lu %6lu ".as_ptr() as _,
-    //             idx,
-    //             (*p).mh_number,
-    //             (*p).mh_size as c_ulong,
-    //         );
-    //         idx += 1;
-    //         match (*p).mh_type as _ {
-    //             STRDUP_TYPE => {
-    //                 fprintf(fp, c"strdup()  in ".as_ptr() as _);
-    //             }
-    //             MALLOC_TYPE => {
-    //                 fprintf(fp, c"malloc()  in ".as_ptr() as _);
-    //             }
-    //             REALLOC_TYPE => {
-    //                 fprintf(fp, c"realloc() in ".as_ptr() as _);
-    //             }
-    //             MALLOC_ATOMIC_TYPE => {
-    //                 fprintf(fp, c"atomicmalloc()  in ".as_ptr() as _);
-    //             }
-    //             REALLOC_ATOMIC_TYPE => {
-    //                 fprintf(fp, c"atomicrealloc() in ".as_ptr() as _);
-    //             }
-    //             _ => {
-    //                 fprintf(fp, c"Unknown memory block, may be corrupted".as_ptr() as _);
-    //                 xmlMutexUnlock(addr_of_mut!(xmlMemMutex));
-    //                 if old_fp.is_null() {
-    //                     fclose(fp);
-    //                 }
-    //                 return;
-    //             }
-    //         }
-    //         if (*p).mh_file != null_mut() {
-    //             fprintf(fp, c"%s(%u)".as_ptr() as _, (*p).mh_file, (*p).mh_line);
-    //         }
-    //         if (*p).mh_tag != MEMTAG as _ {
-    //             fprintf(fp, c"  INVALID".as_ptr() as _);
-    //         }
-    //         nb += 1;
-
-    //         fprintf(fp, c"\n".as_ptr() as _);
-    //         nbBytes -= (*p).mh_size as _;
-    //         p = (*p).mh_next;
-    //     }
-    //     xmlMutexUnlock(addr_of_mut!(xmlMemMutex));
-    // } else {
     fprintf(
         fp,
         c"Memory list not compiled (MEM_LIST not defined !)\n".as_ptr() as _,
     );
-    // }
     if old_fp.is_null() {
         fclose(fp);
     }
@@ -657,51 +467,6 @@ pub unsafe extern "C" fn xml_mem_show(fp: *mut FILE, _nr: c_int) {
             DEBUG_MAX_MEM_SIZE,
         );
     }
-    // if cfg!(feature = "debug_memory_location") {
-    //     xmlMutexLock(addr_of_mut!(xmlMemMutex));
-    //     if nr > 0 {
-    //         fprintf(fp, c"NUMBER   SIZE  TYPE   WHERE\n".as_ptr() as _);
-    //         p = memlist;
-    //         while !p.is_null() && nr > 0 {
-    //             fprintf(
-    //                 fp,
-    //                 c"%6lu %6lu ".as_ptr() as _,
-    //                 (*p).mh_number,
-    //                 (*p).mh_size as c_ulong,
-    //             );
-    //             match (*p).mh_type as _ {
-    //                 STRDUP_TYPE => {
-    //                     fprintf(fp, c"strdup()  in ".as_ptr() as _);
-    //                 }
-    //                 MALLOC_TYPE => {
-    //                     fprintf(fp, c"malloc()  in ".as_ptr() as _);
-    //                 }
-    //                 MALLOC_ATOMIC_TYPE => {
-    //                     fprintf(fp, c"atomicmalloc()  in ".as_ptr() as _);
-    //                 }
-    //                 REALLOC_TYPE => {
-    //                     fprintf(fp, c"realloc() in ".as_ptr() as _);
-    //                 }
-    //                 REALLOC_ATOMIC_TYPE => {
-    //                     fprintf(fp, c"atomicrealloc() in ".as_ptr() as _);
-    //                 }
-    //                 _ => {
-    //                     fprintf(fp, c"   ???    in ".as_ptr() as _);
-    //                 }
-    //             }
-    //             if (*p).mh_file != null_mut() {
-    //                 fprintf(fp, c"%s(%u)".as_ptr() as _, (*p).mh_file, (*p).mh_line);
-    //             }
-    //             if (*p).mh_tag != MEMTAG as _ {
-    //                 fprintf(fp, c"  INVALID".as_ptr() as _);
-    //             }
-    //             fprintf(fp, c"\n".as_ptr() as _);
-    //             nr -= 1;
-    //             p = (*p).mh_next;
-    //         }
-    //     }
-    //     xmlMutexUnlock(addr_of_mut!(xmlMemMutex));
-    // }
 }
 
 /**
@@ -709,27 +474,7 @@ pub unsafe extern "C" fn xml_mem_show(fp: *mut FILE, _nr: c_int) {
  *
  * Dump in-extenso the memory blocks allocated to the file .memorylist
  */
-pub unsafe extern "C" fn xml_memory_dump() {
-    // if cfg!(feature = "debug_memory_location") {
-    //     let dump: *mut FILE;
-
-    //     if debugMaxMemSize == 0 {
-    //         return;
-    //     }
-    //     dump = fopen(c".memdump".as_ptr() as _, c"w".as_ptr() as _);
-    //     if dump == null_mut() {
-    //         xmlMemoryDumpFile = stderr;
-    //     } else {
-    //         xmlMemoryDumpFile = dump;
-    //     }
-
-    //     xmlMemDisplay(xmlMemoryDumpFile);
-
-    //     if dump != null_mut() {
-    //         fclose(dump);
-    //     }
-    // }
-}
+pub unsafe extern "C" fn xml_memory_dump() {}
 
 /**
  * xmlMemMalloc:
@@ -763,9 +508,6 @@ pub unsafe extern "C" fn xml_mem_realloc(ptr: *mut c_void, size: size_t) -> *mut
  * a free() equivalent, with error checking.
  */
 pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
-    // #[cfg(feature = "debug_memory")]
-    // let size: size_t;
-
     if ptr.is_null() {
         return;
     }
@@ -780,8 +522,6 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
             generic_error!("{:?} : Freed()\n", XML_MEM_TRACE_BLOCK_AT);
             xml_malloc_breakpoint();
         }
-
-        // TEST_POINT
 
         let target: *mut char = ptr as _;
 
@@ -798,17 +538,9 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
         xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
         DEBUG_MEM_SIZE -= (*p).mh_size as u64;
         DEBUG_MEM_BLOCKS -= 1;
-        // if cfg!(feature = "debug_memory") {
-        //     size = (*p).mh_size;
-        // }
-        // if cfg!(feature = "debug_memory_location") {
-        //     debugmem_list_delete(p);
-        // }
         xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
         free(p as _);
-
-        // TEST_POINT
 
         return;
     }
@@ -847,8 +579,6 @@ pub unsafe extern "C" fn xml_malloc_loc(
 ) -> *mut c_void {
     xml_init_parser();
 
-    // TEST_POINT
-
     if size > MAX_SIZE_T - RESERVE_SIZE {
         generic_error!("xmlMallocLoc : Unsigned overflow\n");
         xml_memory_dump();
@@ -875,9 +605,6 @@ pub unsafe extern "C" fn xml_malloc_loc(
     if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
         DEBUG_MAX_MEM_SIZE = DEBUG_MEM_SIZE;
     }
-    // if cfg!(feature = "debug_memory_location") {
-    //     debugmem_list_add(p);
-    // }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     if XML_MEM_STOP_AT_BLOCK == (*p).mh_number as _ {
@@ -894,8 +621,6 @@ pub unsafe extern "C" fn xml_malloc_loc(
         );
         xml_malloc_breakpoint();
     }
-
-    // TEST_POINT
 
     ret
 }
@@ -919,15 +644,11 @@ pub unsafe extern "C" fn xml_realloc_loc(
 ) -> *mut c_void {
     let mut p: *mut Memhdr;
 
-    // #[cfg(feature = "debug_memory")]
-    // let oldsize: size_t;
-
     if ptr.is_null() {
         return xml_malloc_loc(size, file, line);
     }
 
     xml_init_parser();
-    //  TEST_POINT
 
     p = CLIENT_2_HDR!(ptr);
     let number: c_ulong = (*p).mh_number;
@@ -943,13 +664,6 @@ pub unsafe extern "C" fn xml_realloc_loc(
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     DEBUG_MEM_SIZE -= (*p).mh_size as u64;
     DEBUG_MEM_BLOCKS -= 1;
-    // if cfg!(feature = "debug_memory") {
-    //     oldsize = (*p).mh_size;
-    // }
-
-    // if cfg!(feature = "debug_memory_location") {
-    //     debugmem_list_delete(p);
-    // }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
@@ -986,12 +700,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
     if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
         DEBUG_MAX_MEM_SIZE = DEBUG_MEM_SIZE;
     }
-    // if cfg!(feature = "debug_memory_location") {
-    //     debugmem_list_add(p);
-    // }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
-
-    //  TEST_POINT
 
     HDR_2_CLIENT!(p) as _
 
@@ -1015,8 +724,6 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     line: c_int,
 ) -> *mut c_void {
     xml_init_parser();
-
-    //  TEST_POINT
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
         generic_error!("xmlMallocAtomicLoc : Unsigned overflow\n");
@@ -1044,9 +751,6 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
         DEBUG_MAX_MEM_SIZE = DEBUG_MEM_SIZE;
     }
-    // if cfg!(feature = "debug_memory_location") {
-    //     debugmem_list_add(p);
-    // }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     if XML_MEM_STOP_AT_BLOCK == (*p).mh_number as _ {
@@ -1063,8 +767,6 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
         );
         xml_malloc_breakpoint();
     }
-
-    //  TEST_POINT
 
     ret
 }
@@ -1087,7 +789,6 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
     let size: size_t = strlen(str) + 1;
 
     xml_init_parser();
-    //  TEST_POINT
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
         generic_error!("xmlMemStrdupLoc : Unsigned overflow\n");
@@ -1112,9 +813,6 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
     if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
         DEBUG_MAX_MEM_SIZE = DEBUG_MEM_SIZE;
     }
-    // if cfg!(feature = "debug_memory_location") {
-    //     debugmem_list_add(p);
-    // }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     let s: *mut char = HDR_2_CLIENT!(p) as _;
@@ -1125,8 +823,6 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
 
     strcpy(s as _, str);
 
-    //  TEST_POINT
-
     if XML_MEM_TRACE_BLOCK_AT == s as _ {
         generic_error!("{:?} : Strdup() Ok\n", XML_MEM_TRACE_BLOCK_AT);
         xml_malloc_breakpoint();
@@ -1134,69 +830,6 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
 
     s
 }
-
-// /* *
-//  * xmlMalloc:
-//  * @size:  number of bytes to allocate
-//  *
-//  * Wrapper for the malloc() function used in the XML library.
-//  *
-//  * Returns the pointer to the allocated area or NULL in case of error.
-//  */
-// macro_rules! xmlMalloc {
-// 	( $( $t:tt ),* ) => {
-// 		if cfg!(feature = "debug_memory_location") && (cfg!(feature = "thread") || cfg!(feature = "thread_alloc")) {
-// 			xmlMallocLoc($($t)*, __FILE__, __LINE__)
-// 		}
-// 	}
-// }
-// /* *
-//  * xmlMallocAtomic:
-//  * @size:  number of bytes to allocate
-//  *
-//  * Wrapper for the malloc() function used in the XML library for allocation
-//  * of block not containing pointers to other areas.
-//  *
-//  * Returns the pointer to the allocated area or NULL in case of error.
-//  */
-// macro_rules! xmlMallocAtomic {
-// 	( $( $t:tt ),* ) => {
-// 		if cfg!(feature = "debug_memory_location") && (cfg!(feature = "thread") || cfg!(feature = "thread_alloc")) {
-// 			xmlMallocAtomicLoc($($t)*, __FILE__, __LINE__)
-// 		}
-// 	}
-// }
-// /* *
-//  * xmlRealloc:
-//  * @ptr:  pointer to the existing allocated area
-//  * @size:  number of bytes to allocate
-//  *
-//  * Wrapper for the realloc() function used in the XML library.
-//  *
-//  * Returns the pointer to the allocated area or NULL in case of error.
-//  */
-// macro_rules! xmlRealloc {
-// 	( $( $t:tt ),* ) => {
-// 		if cfg!(feature = "debug_memory_location") {
-// 			xmlReallocLoc($($t)*, __FILE__, __LINE__)
-// 		}
-// 	}
-// }
-// /* *
-//  * xmlMemStrdup:
-//  * @str:  pointer to the existing string
-//  *
-//  * Wrapper for the strdup() function, xmlStrdup() is usually preferred.
-//  *
-//  * Returns the pointer to the allocated area or NULL in case of error.
-//  */
-// macro_rules! xmlMemStrdup {
-// 	( $( $t:tt ),* ) => {
-// 		if cfg!(feature = "debug_memory_location") && (cfg!(feature = "thread") || cfg!(feature = "thread_alloc")) {
-// 			xmlMemStrdupLoc($($t)*, __FILE__, __LINE__)
-// 		}
-// 	}
-// }
 
 /**
  * xmlInitMemoryInternal:
@@ -1207,10 +840,6 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
  */
 pub(crate) unsafe extern "C" fn xml_init_memory_internal() {
     let mut breakpoint: *mut c_char;
-    // #ifdef DEBUG_MEMORY
-    //      xmlGenericError(xmlGenericErrorContext,
-    // 	     "xmlInitMemory()\n");
-    // #endif
     xml_init_mutex(addr_of_mut!(XML_MEM_MUTEX));
 
     breakpoint = getenv(c"XML_MEM_BREAKPOINT".as_ptr());
@@ -1229,11 +858,6 @@ pub(crate) unsafe extern "C" fn xml_init_memory_internal() {
             addr_of_mut!(XML_MEM_TRACE_BLOCK_AT),
         );
     }
-
-    // #ifdef DEBUG_MEMORY
-    //      xmlGenericError(xmlGenericErrorContext,
-    // 	     "xmlInitMemory() Ok\n");
-    // #endif
 }
 
 /**
@@ -1243,14 +867,5 @@ pub(crate) unsafe extern "C" fn xml_init_memory_internal() {
  * use. This should not be called by user level code.
  */
 pub(crate) unsafe extern "C" fn xml_cleanup_memory_internal() {
-    // #ifdef DEBUG_MEMORY
-    //      xmlGenericError(xmlGenericErrorContext,
-    // 	     "xmlCleanupMemory()\n");
-    // #endif
-
     xml_cleanup_mutex(addr_of_mut!(XML_MEM_MUTEX));
-    // #ifdef DEBUG_MEMORY
-    //      xmlGenericError(xmlGenericErrorContext,
-    // 	     "xmlCleanupMemory() Ok\n");
-    // #endif
 }

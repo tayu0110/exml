@@ -16,7 +16,9 @@ use libc::strcmp;
 use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen, strncmp, strstr};
 
 use crate::{
-    __xml_raise_error, generic_error,
+    __xml_raise_error,
+    buf::libxml_api::xml_buf_create,
+    generic_error,
     hash::XmlHashTableRef,
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
@@ -67,13 +69,12 @@ use crate::{
             xml_sax_version,
         },
         tree::{
-            xml_add_child, xml_buf_content, xml_buf_end, xml_buf_use, xml_buffer_add,
-            xml_buffer_create, xml_buffer_free, xml_buffer_set_allocation_scheme, xml_build_qname,
+            xml_add_child, xml_buf_content, xml_buf_end, xml_buf_use, xml_build_qname,
             xml_free_doc, xml_free_node, xml_free_node_list, xml_get_last_child, xml_new_doc,
             xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, xml_node_is_text,
             xml_search_ns_by_href, xml_set_tree_doc, xml_unlink_node, XmlAttrPtr,
-            XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlBufferPtr,
-            XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
+            XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties,
+            XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
             XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
             XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
         },
@@ -106,8 +107,8 @@ use crate::{
     },
     private::{
         buf::{
-            xml_buf_get_input_base, xml_buf_is_empty, xml_buf_reset_input,
-            xml_buf_set_input_base_cur,
+            xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_get_input_base, xml_buf_is_empty,
+            xml_buf_reset_input, xml_buf_set_allocation_scheme, xml_buf_set_input_base_cur,
         },
         enc::{xml_char_enc_input, xml_init_encoding_internal},
         entities::{
@@ -6500,7 +6501,8 @@ unsafe extern "C" fn xml_load_entity_content(
         );
     }
 
-    let buf: XmlBufferPtr = xml_buffer_create();
+    // let buf: XmlBufferPtr = xml_buffer_create();
+    let buf = xml_buf_create();
     if buf.is_null() {
         xml_fatal_err(
             ctxt,
@@ -6509,7 +6511,8 @@ unsafe extern "C" fn xml_load_entity_content(
         );
         return -1;
     }
-    xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
 
     let input: XmlParserInputPtr = xml_new_entity_input_stream(ctxt, entity);
     if input.is_null() {
@@ -6518,7 +6521,8 @@ unsafe extern "C" fn xml_load_entity_content(
             XmlParserErrors::XmlErrInternalError,
             c"xmlLoadEntityContent input error".as_ptr() as _,
         );
-        xml_buffer_free(buf);
+        // xml_buffer_free(buf);
+        xml_buf_free(buf);
         return -1;
     }
 
@@ -6527,7 +6531,8 @@ unsafe extern "C" fn xml_load_entity_content(
      * saving to the buffer until the end of the entity or an error
      */
     if xml_push_input(ctxt, input) < 0 {
-        xml_buffer_free(buf);
+        // xml_buffer_free(buf);
+        xml_buf_free(buf);
         xml_free_input_stream(input);
         return -1;
     }
@@ -6535,12 +6540,14 @@ unsafe extern "C" fn xml_load_entity_content(
     GROW!(ctxt);
     c = CUR_CHAR!(ctxt, l);
     while (*ctxt).input == input && (*(*ctxt).input).cur < (*(*ctxt).input).end && IS_CHAR!(c) {
-        xml_buffer_add(buf, (*(*ctxt).input).cur, l);
+        // xml_buffer_add(buf, (*(*ctxt).input).cur, l);
+        xml_buf_add(buf, (*(*ctxt).input).cur, l);
         NEXTL!(ctxt, l);
         c = CUR_CHAR!(ctxt, l);
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        xml_buffer_free(buf);
+        // xml_buffer_free(buf);
+        xml_buf_free(buf);
         return -1;
     }
 
@@ -6557,13 +6564,19 @@ unsafe extern "C" fn xml_load_entity_content(
             c"xmlLoadEntityContent: invalid char value %d\n".as_ptr() as _,
             c,
         );
-        xml_buffer_free(buf);
+        // xml_buffer_free(buf);
+        xml_buf_free(buf);
         return -1;
     }
-    (*entity).content.store((*buf).content, Ordering::Relaxed);
-    (*entity).length = (*buf).using as _;
-    (*buf).content = null_mut();
-    xml_buffer_free(buf);
+    (*entity).length = xml_buf_use(buf) as i32;
+    (*entity)
+        .content
+        .store(xml_buf_detach(buf), Ordering::Relaxed);
+    // (*entity).content.store((*buf).content, Ordering::Relaxed);
+    // (*entity).length = (*buf).using as _;
+    // (*buf).content = null_mut();
+    // xml_buffer_free(buf);
+    xml_buf_free(buf);
 
     0
 }

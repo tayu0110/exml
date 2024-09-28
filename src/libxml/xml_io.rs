@@ -67,8 +67,8 @@ use super::{
     parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption},
     parser_internals::xml_new_input_from_file,
     tree::{
-        xml_buf_content, xml_buf_end, xml_buf_shrink, xml_buf_use, xml_buffer_add, XmlBufPtr,
-        XmlBufferAllocationScheme, XmlBufferPtr,
+        xml_buf_content, xml_buf_end, xml_buf_shrink, xml_buf_use, XmlBufPtr,
+        XmlBufferAllocationScheme,
     },
     uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
     xmlerror::{
@@ -1803,52 +1803,52 @@ pub unsafe extern "C" fn xml_output_buffer_create_file(
     ret
 }
 
-/**
- * xmlBufferWrite:
- * @context:  the xmlBuffer
- * @buffer:  the data to write
- * @len:  number of bytes to write
- *
- * Write @len bytes from @buffer to the xml buffer
- *
- * Returns the number of bytes written
- */
-#[cfg(feature = "output")]
-unsafe extern "C" fn xml_buffer_write(
-    context: *mut c_void,
-    buffer: *const c_char,
-    len: c_int,
-) -> c_int {
-    let ret: c_int = xml_buffer_add(context as XmlBufferPtr, buffer as _, len);
-    if ret != 0 {
-        return -1;
-    }
-    len
-}
+// /**
+//  * xmlBufferWrite:
+//  * @context:  the xmlBuffer
+//  * @buffer:  the data to write
+//  * @len:  number of bytes to write
+//  *
+//  * Write @len bytes from @buffer to the xml buffer
+//  *
+//  * Returns the number of bytes written
+//  */
+// #[cfg(feature = "output")]
+// unsafe extern "C" fn xml_buffer_write(
+//     context: *mut c_void,
+//     buffer: *const c_char,
+//     len: c_int,
+// ) -> c_int {
+//     let ret: c_int = xml_buffer_add(context as XmlBufferPtr, buffer as _, len);
+//     if ret != 0 {
+//         return -1;
+//     }
+//     len
+// }
 
-/**
- * xmlOutputBufferCreateBuffer:
- * @buffer:  a xmlBufferPtr
- * @encoder:  the encoding converter or NULL
- *
- * Create a buffered output for the progressive saving to a xmlBuffer
- *
- * Returns the new parser output or NULL
- */
-#[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_create_buffer(
-    buffer: XmlBufferPtr,
-    encoder: XmlCharEncodingHandlerPtr,
-) -> XmlOutputBufferPtr {
-    if buffer.is_null() {
-        return null_mut();
-    }
+// /**
+//  * xmlOutputBufferCreateBuffer:
+//  * @buffer:  a xmlBufferPtr
+//  * @encoder:  the encoding converter or NULL
+//  *
+//  * Create a buffered output for the progressive saving to a xmlBuffer
+//  *
+//  * Returns the new parser output or NULL
+//  */
+// #[cfg(feature = "output")]
+// pub unsafe extern "C" fn xml_output_buffer_create_buffer(
+//     buffer: XmlBufferPtr,
+//     encoder: XmlCharEncodingHandlerPtr,
+// ) -> XmlOutputBufferPtr {
+//     if buffer.is_null() {
+//         return null_mut();
+//     }
 
-    let ret: XmlOutputBufferPtr =
-        xml_output_buffer_create_io(Some(xml_buffer_write), None, buffer as _, encoder);
+//     let ret: XmlOutputBufferPtr =
+//         xml_output_buffer_create_io(Some(xml_buffer_write), None, buffer as _, encoder);
 
-    ret
-}
+//     ret
+// }
 
 /**
  * xmlFdWrite:
@@ -4261,40 +4261,40 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_output_buffer_create_buffer() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_output_buffer_create_buffer() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_buffer in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buffer = gen_xml_buffer_ptr(n_buffer, 0);
-                    let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
+    //         for n_buffer in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buffer = gen_xml_buffer_ptr(n_buffer, 0);
+    //                 let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
 
-                    let ret_val = xml_output_buffer_create_buffer(buffer, encoder);
-                    desret_xml_output_buffer_ptr(ret_val);
-                    des_xml_buffer_ptr(n_buffer, buffer, 0);
-                    des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlOutputBufferCreateBuffer",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlOutputBufferCreateBuffer()"
-                        );
-                        eprint!(" {}", n_buffer);
-                        eprintln!(" {}", n_encoder);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_output_buffer_create_buffer(buffer, encoder);
+    //                 desret_xml_output_buffer_ptr(ret_val);
+    //                 des_xml_buffer_ptr(n_buffer, buffer, 0);
+    //                 des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlOutputBufferCreateBuffer",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlOutputBufferCreateBuffer()"
+    //                     );
+    //                     eprint!(" {}", n_buffer);
+    //                     eprintln!(" {}", n_encoder);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_output_buffer_create_fd() {

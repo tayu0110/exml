@@ -7,6 +7,7 @@ use std::{
     ptr::{addr_of_mut, null_mut},
 };
 
+use exml::buf::libxml_api::xml_buf_content;
 use exml::libxml::{
     encoding::XmlCharEncoding,
     globals::{xml_free, xml_malloc},
@@ -15,7 +16,7 @@ use exml::libxml::{
         xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
     },
     parser_internals::{input_push, xml_current_char, xml_new_input_stream},
-    tree::{xml_buf_content, xml_free_doc, XmlDocPtr},
+    tree::{xml_free_doc, XmlDocPtr},
     xml_io::{
         xml_free_parser_input_buffer, xml_parser_input_buffer_create_mem, XmlParserInputBufferPtr,
     },

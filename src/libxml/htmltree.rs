@@ -19,8 +19,7 @@ use super::{
     tree::{
         xml_add_child, xml_add_prev_sibling, xml_create_int_subset, xml_free_node,
         xml_new_doc_node, xml_new_prop, xml_set_prop, xml_unlink_node, XmlAttrPtr, XmlBufPtr,
-        XmlBufferPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
-        __XML_REGISTER_CALLBACKS,
+        XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
     xml_io::XmlOutputBufferPtr,
     xmlstring::{xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strstr, XmlChar},
@@ -804,33 +803,27 @@ unsafe extern "C" fn html_buf_node_dump_format(
  * Returns the number of byte written or -1 in case of error
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_node_dump(
-    buf: XmlBufferPtr,
-    doc: XmlDocPtr,
-    cur: XmlNodePtr,
-) -> c_int {
-    use crate::{
-        libxml::parser::xml_init_parser,
-        private::buf::{xml_buf_back_to_buffer, xml_buf_from_buffer},
-    };
+pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
+    use crate::libxml::parser::xml_init_parser;
 
     if buf.is_null() || cur.is_null() {
         return -1;
     }
 
     xml_init_parser();
-    let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
-    if buffer.is_null() {
-        return -1;
-    }
+    // let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
+    // if buffer.is_null() {
+    //     return -1;
+    // }
 
-    let ret: size_t = html_buf_node_dump_format(buffer, doc, cur, 1);
+    // let ret: size_t = html_buf_node_dump_format(buffer, doc, cur, 1);
+    let ret: size_t = html_buf_node_dump_format(buf, doc, cur, 1);
 
-    xml_buf_back_to_buffer(buffer);
+    // xml_buf_back_to_buffer(buffer);
 
-    if ret > i32::MAX as usize {
-        return -1;
-    }
+    // if ret > i32::MAX as usize {
+    //     return -1;
+    // }
     ret as _
 }
 
@@ -1869,13 +1862,13 @@ mod tests {
                 for n_doc in 0..GEN_NB_XML_DOC_PTR {
                     for n_cur in 0..GEN_NB_XML_NODE_PTR {
                         let mem_base = xml_mem_blocks();
-                        let buf = gen_xml_buffer_ptr(n_buf, 0);
+                        let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
                         let doc = gen_xml_doc_ptr(n_doc, 1);
                         let cur = gen_xml_node_ptr(n_cur, 2);
 
                         let ret_val = html_node_dump(buf, doc, cur);
                         desret_int(ret_val);
-                        des_xml_buffer_ptr(n_buf, buf, 0);
+                        des_const_xml_buf_ptr(n_buf, buf, 0);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_cur, cur, 2);
                         xml_reset_last_error();

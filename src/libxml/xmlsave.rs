@@ -31,17 +31,16 @@ use crate::{
         parser::xml_init_parser,
         parser_internals::XML_STRING_TEXT_NOENC,
         tree::{
-            xml_buffer_create, xml_buffer_set_allocation_scheme, xml_get_int_subset, xml_is_xhtml,
-            XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlBufferPtr,
-            XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
-            XML_LOCAL_NAMESPACE,
+            xml_get_int_subset, xml_is_xhtml, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
+            XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
+            XmlNodePtr, XmlNsPtr, XML_LOCAL_NAMESPACE,
         },
         valid::{
             xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table,
             XmlNotationTablePtr,
         },
         xml_io::{
-            xml_output_buffer_close, xml_output_buffer_create_buffer, xml_output_buffer_create_fd,
+            xml_output_buffer_close, xml_output_buffer_create_fd,
             xml_output_buffer_create_filename, xml_output_buffer_create_io,
             xml_output_buffer_flush, xml_output_buffer_write, xml_output_buffer_write_escape,
             xml_output_buffer_write_string, XmlOutputBufferPtr, XmlOutputCloseCallback,
@@ -52,7 +51,7 @@ use crate::{
     },
     private::{
         buf::{
-            xml_buf_add, xml_buf_create, xml_buf_free, xml_buf_merge_buffer,
+            xml_buf_add, xml_buf_create, xml_buf_free, xml_buf_set_allocation_scheme,
             xml_buf_write_quoted_string,
         },
         enc::xml_char_enc_output,
@@ -570,16 +569,18 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
  * This will dump the content of the notation table as an XML DTD definition
  */
 unsafe extern "C" fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
-    let buffer: XmlBufferPtr = xml_buffer_create();
-    if buffer.is_null() {
-        /*
-         * TODO set the error in buf
-         */
-        return;
-    }
-    xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_dump_notation_table(buffer, table);
-    xml_buf_merge_buffer(buf, buffer);
+    // let buffer: XmlBufferPtr = xml_buffer_create();
+    // if buffer.is_null() {
+    //     /*
+    //      * TODO set the error in buf
+    //      */
+    //     return;
+    // }
+    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_dump_notation_table(buf, table);
+    // xml_dump_notation_table(buffer, table);
+    // xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -591,16 +592,18 @@ unsafe extern "C" fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: XmlNotat
  * DTD definition
  */
 unsafe extern "C" fn xml_buf_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
-    let buffer: XmlBufferPtr = xml_buffer_create();
-    if buffer.is_null() {
-        /*
-         * TODO set the error in buf
-         */
-        return;
-    }
-    xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_dump_element_decl(buffer, elem);
-    xml_buf_merge_buffer(buf, buffer);
+    // let buffer: XmlBufferPtr = xml_buffer_create();
+    // if buffer.is_null() {
+    //     /*
+    //      * TODO set the error in buf
+    //      */
+    //     return;
+    // }
+    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_dump_element_decl(buffer, elem);
+    xml_dump_element_decl(buf, elem);
+    // xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -612,16 +615,18 @@ unsafe extern "C" fn xml_buf_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
  * DTD definition
  */
 unsafe extern "C" fn xml_buf_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
-    let buffer: XmlBufferPtr = xml_buffer_create();
-    if buffer.is_null() {
-        /*
-         * TODO set the error in buf
-         */
-        return;
-    }
-    xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_dump_attribute_decl(buffer, attr);
-    xml_buf_merge_buffer(buf, buffer);
+    // let buffer: XmlBufferPtr = xml_buffer_create();
+    // if buffer.is_null() {
+    //     /*
+    //      * TODO set the error in buf
+    //      */
+    //     return;
+    // }
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_dump_attribute_decl(buffer, attr);
+    xml_dump_attribute_decl(buf, attr);
+    // xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -632,16 +637,18 @@ unsafe extern "C" fn xml_buf_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttrib
  * This will dump the content of the entity table as an XML DTD definition
  */
 unsafe extern "C" fn xml_buf_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
-    let buffer: XmlBufferPtr = xml_buffer_create();
-    if buffer.is_null() {
-        /*
-         * TODO set the error in buf
-         */
-        return;
-    }
-    xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_dump_entity_decl(buffer, ent);
-    xml_buf_merge_buffer(buf, buffer);
+    // let buffer: XmlBufferPtr = xml_buffer_create();
+    // if buffer.is_null() {
+    //     /*
+    //      * TODO set the error in buf
+    //      */
+    //     return;
+    // }
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_dump_entity_decl(buffer, ent);
+    xml_dump_entity_decl(buf, ent);
+    // xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -2027,34 +2034,34 @@ pub unsafe extern "C" fn xml_save_to_filename(
     ret
 }
 
-/**
- * xmlSaveToBuffer:
- * @buffer:  a buffer
- * @encoding:  the encoding name to use or NULL
- * @options:  a set of xmlSaveOptions
- *
- * Create a document saving context serializing to a buffer
- * with the encoding and the options given
- *
- * Returns a new serialization context or NULL in case of error.
- */
-pub unsafe extern "C" fn xml_save_to_buffer(
-    buffer: XmlBufferPtr,
-    encoding: *const c_char,
-    options: c_int,
-) -> XmlSaveCtxtPtr {
-    let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
-    if ret.is_null() {
-        return null_mut();
-    }
-    (*ret).buf = xml_output_buffer_create_buffer(buffer, (*ret).handler);
-    if (*ret).buf.is_null() {
-        xml_char_enc_close_func((*ret).handler);
-        xml_free_save_ctxt(ret);
-        return null_mut();
-    }
-    ret
-}
+// /**
+//  * xmlSaveToBuffer:
+//  * @buffer:  a buffer
+//  * @encoding:  the encoding name to use or NULL
+//  * @options:  a set of xmlSaveOptions
+//  *
+//  * Create a document saving context serializing to a buffer
+//  * with the encoding and the options given
+//  *
+//  * Returns a new serialization context or NULL in case of error.
+//  */
+// pub unsafe extern "C" fn xml_save_to_buffer(
+//     buffer: XmlBufferPtr,
+//     encoding: *const c_char,
+//     options: c_int,
+// ) -> XmlSaveCtxtPtr {
+//     let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
+//     if ret.is_null() {
+//         return null_mut();
+//     }
+//     (*ret).buf = xml_output_buffer_create_buffer(buffer, (*ret).handler);
+//     if (*ret).buf.is_null() {
+//         xml_char_enc_close_func((*ret).handler);
+//         xml_free_save_ctxt(ret);
+//         return null_mut();
+//     }
+//     ret
+// }
 
 /**
  * xmlSaveToIO:

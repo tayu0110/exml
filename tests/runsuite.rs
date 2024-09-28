@@ -10,48 +10,53 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use exml::libxml::{
-    globals::{xml_free, xml_get_warnings_default_value},
-    parser::{
-        xml_cleanup_parser, xml_init_parser, xml_pedantic_parser_default, xml_read_file,
-        xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr,
-        XmlParserOption,
+use exml::{
+    buf::libxml_api::{
+        xml_buf_add, xml_buf_content, xml_buf_create, xml_buf_empty, xml_buf_free,
+        xml_buf_set_allocation_scheme, xml_buf_use,
     },
-    parser_internals::xml_new_string_input_stream,
-    relaxng::{
-        xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
-        xml_relaxng_init_types, xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt,
-        xml_relaxng_parse, xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
-        xml_relaxng_validate_doc, XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr,
+    libxml::{
+        globals::{xml_free, xml_get_warnings_default_value},
+        parser::{
+            xml_cleanup_parser, xml_init_parser, xml_pedantic_parser_default, xml_read_file,
+            xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr,
+            XmlParserOption,
+        },
+        parser_internals::xml_new_string_input_stream,
+        relaxng::{
+            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
+            xml_relaxng_init_types, xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt,
+            xml_relaxng_parse, xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
+            xml_relaxng_validate_doc, XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr,
+            XmlRelaxNGValidCtxtPtr,
+        },
+        tree::{
+            xml_buf_node_dump, xml_doc_get_root_element, xml_free_doc, xml_get_line_no,
+            xml_get_prop, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr,
+        },
+        uri::xml_build_uri,
+        xml_io::xml_no_net_external_entity_loader,
+        xmlerror::{xml_reset_last_error, xml_set_generic_error_func},
+        xmlmemory::{
+            xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
+            xml_memory_dump, xml_memory_strdup,
+        },
+        xmlschemas::{
+            xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
+            xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt, xml_schema_parse,
+            xml_schema_set_parser_errors, xml_schema_set_valid_errors, xml_schema_validate_doc,
+            XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaValidCtxtPtr,
+        },
+        xmlschemastypes::xml_schema_init_types,
+        xmlstring::{xml_str_equal, xml_strdup, XmlChar},
+        xpath::{
+            xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_context_set_cache,
+            xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
+            xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContext, XmlXPathObjectPtr,
+            XmlXPathObjectType,
+        },
+        xpath_internals::xml_xpath_register_ns,
     },
-    tree::{
-        xml_buffer_add, xml_buffer_create, xml_buffer_empty, xml_buffer_free,
-        xml_buffer_set_allocation_scheme, xml_doc_get_root_element, xml_free_doc, xml_get_line_no,
-        xml_get_prop, xml_node_dump, XmlBufferAllocationScheme, XmlBufferPtr, XmlDocPtr,
-        XmlNodePtr,
-    },
-    uri::xml_build_uri,
-    xml_io::xml_no_net_external_entity_loader,
-    xmlerror::{xml_reset_last_error, xml_set_generic_error_func},
-    xmlmemory::{
-        xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
-        xml_memory_dump, xml_memory_strdup,
-    },
-    xmlschemas::{
-        xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
-        xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt, xml_schema_parse,
-        xml_schema_set_parser_errors, xml_schema_set_valid_errors, xml_schema_validate_doc,
-        XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaValidCtxtPtr,
-    },
-    xmlschemastypes::xml_schema_init_types,
-    xmlstring::{xml_str_equal, xml_strdup, XmlChar},
-    xpath::{
-        xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_context_set_cache,
-        xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
-        xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContext, XmlXPathObjectPtr,
-        XmlXPathObjectType,
-    },
-    xpath_internals::xml_xpath_register_ns,
 };
 use libc::{snprintf, strcmp, strstr};
 
@@ -333,15 +338,19 @@ unsafe extern "C" fn xsd_incorrect_test_case(
     /*
      * dump the schemas to a buffer, then reparse it and compile the schemas
      */
-    let buf: XmlBufferPtr = xml_buffer_create();
+    // let buf: XmlBufferPtr = xml_buffer_create();
+    let buf = xml_buf_create();
     if buf.is_null() {
         eprintln!("out of memory !");
         fatal_error();
     }
-    xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_node_dump(buf, (*test).doc, test, 0, 0);
+    // xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_node_dump(buf, (*test).doc, test, 0, 0);
+    xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
     let pctxt: XmlRelaxNGParserCtxtPtr =
-        xml_relaxng_new_mem_parser_ctxt((*buf).content as *const c_char, (*buf).using as _);
+        // xml_relaxng_new_mem_parser_ctxt((*buf).content as *const c_char, (*buf).using as _);
+        xml_relaxng_new_mem_parser_ctxt(xml_buf_content(buf) as *const c_char, xml_buf_use(buf) as _);
     xml_relaxng_set_parser_errors(
         pctxt,
         Some(test_error_handler),
@@ -360,7 +369,8 @@ unsafe extern "C" fn xsd_incorrect_test_case(
     }
 
     if !buf.is_null() {
-        xml_buffer_free(buf);
+        // xml_buffer_free(buf);
+        xml_buf_free(buf);
     }
     if !rng.is_null() {
         xml_relaxng_free(rng);
@@ -384,21 +394,27 @@ unsafe extern "C" fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar
     let mut content: *mut XmlChar;
     let mut res: *mut XmlChar;
 
-    let buf: XmlBufferPtr = xml_buffer_create();
+    // let buf: XmlBufferPtr = xml_buffer_create();
+    let buf = xml_buf_create();
     if buf.is_null() {
         eprintln!("out of memory !");
         fatal_error();
     }
-    xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_node_dump(buf, (*tst).doc, tst, 0, 0);
+    // xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_node_dump(buf, (*tst).doc, tst, 0, 0);
+    xml_buf_node_dump(buf, (*tst).doc, tst, 0, 0);
 
     while !tst.is_null() {
         test = get_next(tst, c"./*".as_ptr() as _);
         if !test.is_null() {
-            xml_buffer_empty(buf);
-            xml_node_dump(buf, (*test).doc, test, 0, 0);
+            // xml_buffer_empty(buf);
+            xml_buf_empty(buf);
+            // xml_node_dump(buf, (*test).doc, test, 0, 0);
+            xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
             name = get_string(tst, c"string(@name)".as_ptr() as _);
-            content = xml_strdup((*buf).content);
+            // content = xml_strdup((*buf).content);
+            content = xml_strdup(xml_buf_content(buf));
             if !name.is_null() && !content.is_null() {
                 res = compose_dir(base, name);
                 xml_free(name as _);
@@ -415,7 +431,8 @@ unsafe extern "C" fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar
         tst = get_next(tst, c"following-sibling::resource[1]".as_ptr() as _);
     }
     if !buf.is_null() {
-        xml_buffer_free(buf);
+        // xml_buffer_free(buf);
+        xml_buf_free(buf);
     }
 }
 
@@ -487,15 +504,19 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
     /*
      * dump the schemas to a buffer, then reparse it and compile the schemas
      */
-    let buf: XmlBufferPtr = xml_buffer_create();
+    // let buf: XmlBufferPtr = xml_buffer_create();
+    let buf = xml_buf_create();
     if buf.is_null() {
         eprintln!("out of memory !");
         fatal_error();
     }
-    xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_node_dump(buf, (*test).doc, test, 0, 0);
+    // xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_node_dump(buf, (*test).doc, test, 0, 0);
+    xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
     let pctxt: XmlRelaxNGParserCtxtPtr =
-        xml_relaxng_new_mem_parser_ctxt((*buf).content as *const c_char, (*buf).using as _);
+        // xml_relaxng_new_mem_parser_ctxt((*buf).content as *const c_char, (*buf).using as _);
+        xml_relaxng_new_mem_parser_ctxt(xml_buf_content(buf) as *const c_char, xml_buf_use(buf) as _);
     xml_relaxng_set_parser_errors(
         pctxt,
         Some(test_error_handler),
@@ -517,7 +538,8 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         NB_ERRORS += 1;
         ret = 1;
         if !buf.is_null() {
-            xml_buffer_free(buf);
+            // xml_buffer_free(buf);
+            xml_buf_free(buf);
         }
         if !rng.is_null() {
             xml_relaxng_free(rng);
@@ -547,20 +569,30 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 xml_get_line_no(tmp),
             );
         } else {
-            xml_buffer_empty(buf);
+            // xml_buffer_empty(buf);
+            xml_buf_empty(buf);
             if !dtd.is_null() {
-                xml_buffer_add(buf, dtd, -1);
+                // xml_buffer_add(buf, dtd, -1);
+                xml_buf_add(buf, dtd, -1);
             }
-            xml_node_dump(buf, (*test).doc, test, 0, 0);
+            // xml_node_dump(buf, (*test).doc, test, 0, 0);
+            xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
 
             /*
              * We are ready to run the test
              */
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
+            // doc = xml_read_memory(
+            //     (*buf).content as *const c_char,
+            //     (*buf).using as _,
+            //     c"test".as_ptr(),
+            //     null_mut(),
+            //     0,
+            // );
             doc = xml_read_memory(
-                (*buf).content as *const c_char,
-                (*buf).using as _,
+                xml_buf_content(buf) as *const c_char,
+                xml_buf_use(buf) as _,
                 c"test".as_ptr(),
                 null_mut(),
                 0,
@@ -633,17 +665,26 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 xml_get_line_no(tmp)
             );
         } else {
-            xml_buffer_empty(buf);
-            xml_node_dump(buf, (*test).doc, test, 0, 0);
+            // xml_buffer_empty(buf);
+            xml_buf_empty(buf);
+            // xml_node_dump(buf, (*test).doc, test, 0, 0);
+            xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
 
             /*
              * We are ready to run the test
              */
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
+            // doc = xml_read_memory(
+            //     (*buf).content as *const c_char,
+            //     (*buf).using as _,
+            //     c"test".as_ptr() as _,
+            //     null_mut(),
+            //     0,
+            // );
             doc = xml_read_memory(
-                (*buf).content as *const c_char,
-                (*buf).using as _,
+                xml_buf_content(buf) as *const c_char,
+                xml_buf_use(buf) as _,
                 c"test".as_ptr() as _,
                 null_mut(),
                 0,
@@ -703,7 +744,8 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
     }
 
     if !buf.is_null() {
-        xml_buffer_free(buf);
+        // xml_buffer_free(buf);
+        xml_buf_free(buf);
     }
     if !rng.is_null() {
         xml_relaxng_free(rng);

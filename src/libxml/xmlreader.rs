@@ -15,6 +15,7 @@ use std::{
 use libc::{memset, size_t};
 
 use crate::{
+    buf::libxml_api::{xml_buf_cat, xml_buf_create, xml_buf_free, XmlBufPtr},
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         encoding::{xml_find_char_encoding_handler, XmlCharEncoding, XmlCharEncodingHandlerPtr},
@@ -40,15 +41,13 @@ use crate::{
         },
         sax2::xml_sax_version,
         tree::{
-            xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_buffer_cat,
-            xml_buffer_create, xml_buffer_free, xml_buffer_set_allocation_scheme, xml_copy_dtd,
+            xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd,
             xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
             xml_free_ns_list, xml_get_line_no, xml_get_no_ns_prop, xml_get_ns_prop,
-            xml_is_blank_node, xml_new_doc_text, xml_node_dump, xml_node_get_base,
-            xml_node_get_lang, xml_node_get_space_preserve, xml_node_list_get_string,
-            xml_search_ns, xml_split_qname2, xml_unlink_node, XmlAttrPtr, XmlBufPtr,
-            XmlBufferAllocationScheme, XmlBufferPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
-            XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+            xml_is_blank_node, xml_new_doc_text, xml_node_get_base, xml_node_get_lang,
+            xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns, xml_split_qname2,
+            xml_unlink_node, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr,
+            XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
         },
         uri::xml_canonic_path,
         valid::{
@@ -81,8 +80,7 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, XmlChar},
     },
     private::buf::{
-        xml_buf_create_size, xml_buf_empty, xml_buf_free, xml_buf_reset_input,
-        xml_buf_set_allocation_scheme,
+        xml_buf_create_size, xml_buf_empty, xml_buf_reset_input, xml_buf_set_allocation_scheme,
     },
 };
 
@@ -2328,41 +2326,61 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: XmlTextReaderPtr) -> c_int
  */
 #[cfg(all(feature = "libxml_reader", feature = "writer"))]
 pub unsafe extern "C" fn xml_text_reader_read_inner_xml(reader: XmlTextReaderPtr) -> *mut XmlChar {
+    use crate::{buf::XmlBufRef, private::buf::xml_buf_detach};
+
+    use super::tree::xml_buf_node_dump;
+
     let mut node: XmlNodePtr;
     let mut cur_node: XmlNodePtr;
-    let mut buff2: XmlBufferPtr;
+    // let mut buff2: XmlBufPtr;
 
     if xml_text_reader_expand(reader).is_null() {
         return null_mut();
     }
     let doc: XmlDocPtr = (*(*reader).node).doc;
-    let buff: XmlBufferPtr = xml_buffer_create();
+    // let buff: XmlBufferPtr = xml_buffer_create();
+    let buff = xml_buf_create();
     if buff.is_null() {
         return null_mut();
     }
-    xml_buffer_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_buffer_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     cur_node = (*(*reader).node).children;
     while !cur_node.is_null() {
         /* XXX: Why is the node copied? */
         node = xml_doc_copy_node(cur_node, doc, 1);
         /* XXX: Why do we need a second buffer? */
-        buff2 = xml_buffer_create();
-        xml_buffer_set_allocation_scheme(buff2, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-        if xml_node_dump(buff2, doc, node, 0, 0) == -1 {
+        // let buff2 = xml_buffer_create();
+        let buff2 = xml_buf_create();
+        // xml_buffer_set_allocation_scheme(buff2, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+        xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+        // if xml_node_dump(buff2, doc, node, 0, 0) == -1 {
+        //     xml_free_node(node);
+        //     xml_buffer_free(buff2);
+        //     xml_buffer_free(buff);
+        //     return null_mut();
+        // }
+        if xml_buf_node_dump(buff2, doc, node, 0, 0) == 0
+            || !XmlBufRef::from_raw(buff2).unwrap().is_ok()
+        {
             xml_free_node(node);
-            xml_buffer_free(buff2);
-            xml_buffer_free(buff);
+            xml_buf_free(buff2);
+            xml_buf_free(buff);
             return null_mut();
         }
-        xml_buffer_cat(buff, (*buff2).content);
+        // xml_buffer_cat(buff, (*buff2).content);
+        xml_buf_cat(buff, xml_buf_content(buff2));
         xml_free_node(node);
-        xml_buffer_free(buff2);
+        // xml_buffer_free(buff2);
+        xml_buf_free(buff2);
         cur_node = (*cur_node).next;
     }
-    let resbuf: *mut XmlChar = (*buff).content;
-    (*buff).content = null_mut();
+    // let resbuf: *mut XmlChar = (*buff).content;
+    // (*buff).content = null_mut();
+    let resbuf = xml_buf_detach(buff);
 
-    xml_buffer_free(buff);
+    // xml_buffer_free(buff);
+    xml_buf_free(buff);
     resbuf
 }
 
@@ -2378,6 +2396,8 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(reader: XmlTextReaderPtr
  */
 #[cfg(all(feature = "libxml_reader", feature = "writer"))]
 pub unsafe extern "C" fn xml_text_reader_read_outer_xml(reader: XmlTextReaderPtr) -> *mut XmlChar {
+    use crate::{buf::XmlBufRef, libxml::tree::xml_buf_node_dump};
+
     let mut node: XmlNodePtr;
 
     if xml_text_reader_expand(reader).is_null() {
@@ -2391,19 +2411,29 @@ pub unsafe extern "C" fn xml_text_reader_read_outer_xml(reader: XmlTextReaderPtr
     } else {
         node = xml_doc_copy_node(node, doc, 1);
     }
-    let buff: XmlBufferPtr = xml_buffer_create();
-    xml_buffer_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    if xml_node_dump(buff, doc, node, 0, 0) == -1 {
+    // let buff: XmlBufferPtr = xml_buffer_create();
+    let buff = xml_buf_create();
+    // xml_buffer_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // if xml_node_dump(buff, doc, node, 0, 0) == -1 {
+    //     xml_free_node(node);
+    //     xml_buffer_free(buff);
+    //     return null_mut();
+    // }
+    if xml_buf_node_dump(buff, doc, node, 0, 0) == 0 || !XmlBufRef::from_raw(buff).unwrap().is_ok()
+    {
         xml_free_node(node);
-        xml_buffer_free(buff);
+        xml_buf_free(buff);
         return null_mut();
     }
 
-    let resbuf: *mut XmlChar = (*buff).content;
-    (*buff).content = null_mut();
+    // let resbuf: *mut XmlChar = (*buff).content;
+    // (*buff).content = null_mut();
+    let resbuf = xml_buf_content(buff);
 
     xml_free_node(node);
-    xml_buffer_free(buff);
+    // xml_buffer_free(buff);
+    xml_buf_free(buff);
     resbuf
 }
 
@@ -2453,20 +2483,24 @@ unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *
         return null_mut();
     }
 
-    let buffer: XmlBufferPtr = xml_buffer_create();
+    // let buffer: XmlBufferPtr = xml_buffer_create();
+    let buffer = xml_buf_create();
     if buffer.is_null() {
         return null_mut();
     }
-    xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+    xml_buf_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
 
     while !node.is_null() {
         match (*node).typ {
             XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode => {
-                xml_buffer_cat(buffer, (*node).content);
+                // xml_buffer_cat(buffer, (*node).content);
+                xml_buf_cat(buffer, (*node).content);
             }
             XmlElementType::XmlElementNode => {
                 let tmp: *mut XmlChar = xml_text_reader_collect_siblings((*node).children);
-                xml_buffer_cat(buffer, tmp);
+                // xml_buffer_cat(buffer, tmp);
+                xml_buf_cat(buffer, tmp);
                 xml_free(tmp as _);
             }
             _ => {}
@@ -2474,9 +2508,11 @@ unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *
 
         node = (*node).next;
     }
-    let ret: *mut XmlChar = (*buffer).content;
-    (*buffer).content = null_mut();
-    xml_buffer_free(buffer);
+    // let ret: *mut XmlChar = (*buffer).content;
+    // (*buffer).content = null_mut();
+    // xml_buffer_free(buffer);
+    let ret = xml_buf_content(buffer);
+    xml_buf_free(buffer);
     ret
 }
 

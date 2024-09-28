@@ -25,15 +25,36 @@ unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
         XmlParserErrors::XmlErrNoMemory as _,
         null_mut(),
         null_mut(),
-        extra.as_ptr() as _,
+        extra.as_ptr(),
     );
     if buf.error.is_ok() {
         buf.error = XmlParserErrors::XmlErrNoMemory;
     }
 }
 
+/**
+ * xmlBufOverflowError:
+ * @extra:  extra information
+ *
+ * Handle a buffer overflow error
+ * To be improved...
+ */
+unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
+    let extra = CString::new(extra).unwrap();
+    __xml_simple_error(
+        XmlErrorDomain::XmlFromBuffer as _,
+        XmlParserErrors::XmlBufOverflow as _,
+        null_mut(),
+        null_mut(),
+        extra.as_ptr(),
+    );
+    if buf.is_ok() {
+        buf.error = XmlParserErrors::XmlBufOverflow;
+    }
+}
+
 #[derive(Debug, Clone)]
-pub(crate) struct XmlBuf {
+pub struct XmlBuf {
     content: Box<[u8]>,
     next_use: usize,
     scheme: XmlBufferAllocationScheme,
@@ -437,9 +458,75 @@ impl XmlBuf {
         self.content[self.next_use] = 0;
         Ok(())
     }
+
+    /// Remove the head of the buffer.  
+    /// `self.len()` will be `self.len() - len` after execution.  
+    /// `self.capacity()` will not be changed.
+    ///
+    /// If `len` is larger than `self.len()`, this method does nothing.
+    ///
+    /// Return `len` if trimming successfully, otherwise return `0`.
+    ///
+    /// # Note
+    /// This method corresponds to `xmlBufShrink` in the original libxml2.  
+    /// However, in the Rust library, `shrink` invokes a reduction of the tail element and the buffer,
+    /// so it is renamed.
+    #[doc(alias = "xmlBufShrink")]
+    pub(crate) fn trim_head(&mut self, len: usize) -> usize {
+        if !self.error.is_ok() || len == 0 || len > self.len() {
+            return 0;
+        }
+
+        self.next_use -= len;
+        // if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+        //     && !(*buf).content_io.is_null()
+        // {
+        //     /*
+        //      * we just move the content pointer, but also make sure
+        //      * the perceived buffer size has shrunk accordingly
+        //      */
+        //     (*buf).content = (*buf).content.add(len);
+        //     (*buf).size -= len;
+
+        //     /*
+        //      * sometimes though it maybe be better to really shrink
+        //      * on IO buffers
+        //      */
+        //     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
+        //         && !(*buf).content_io.is_null()
+        //     {
+        //         let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
+        //         if start_buf >= (*buf).size {
+        //             memmove(
+        //                 (*buf).content_io as _,
+        //                 (*buf).content.add(0) as _,
+        //                 (*buf).using,
+        //             );
+        //             (*buf).content = (*buf).content_io;
+        //             *(*buf).content.add((*buf).using) = 0;
+        //             (*buf).size += start_buf;
+        //         }
+        //     }
+        // } else {
+        self.content.copy_within(len..self.next_use + len, 0);
+        self.content[self.next_use] = 0;
+        // }
+        // UPDATE_COMPAT!(buf);
+        len
+    }
+
+    pub(crate) fn is_ok(&self) -> bool {
+        self.error.is_ok()
+    }
 }
 
-pub(crate) struct XmlBufRef(NonNull<XmlBuf>);
+impl AsRef<[u8]> for XmlBuf {
+    fn as_ref(&self) -> &[u8] {
+        &self.content[..]
+    }
+}
+
+pub struct XmlBufRef(NonNull<XmlBuf>);
 
 impl XmlBufRef {
     pub(crate) fn new() -> Option<Self> {
@@ -488,15 +575,17 @@ impl DerefMut for XmlBufRef {
 }
 
 pub mod libxml_api {
-    use std::{fs::File, mem::forget, os::fd::FromRawFd};
+    use std::{fs::File, mem::forget, os::fd::FromRawFd, slice::from_raw_parts_mut};
 
     use libc::{fileno, FILE};
 
+    use crate::libxml::{globals::xml_malloc, parser::XmlParserInputPtr};
+
     use super::*;
 
-    pub(crate) type XmlBufPtr = *mut XmlBuf;
+    pub type XmlBufPtr = *mut XmlBuf;
 
-    pub(crate) extern "C" fn xml_buf_create() -> XmlBufPtr {
+    pub extern "C" fn xml_buf_create() -> XmlBufPtr {
         XmlBufRef::new().map_or(null_mut(), |ptr| ptr.0.as_ptr())
     }
 
@@ -504,7 +593,7 @@ pub mod libxml_api {
         XmlBufRef::with_capacity(size).map_or(null_mut(), |ptr| ptr.0.as_ptr())
     }
 
-    pub(crate) extern "C" fn xml_buf_set_allocation_scheme(
+    pub extern "C" fn xml_buf_set_allocation_scheme(
         buf: XmlBufPtr,
         scheme: XmlBufferAllocationScheme,
     ) -> i32 {
@@ -525,14 +614,14 @@ pub mod libxml_api {
         buf.scheme as i32
     }
 
-    pub(crate) extern "C" fn xml_buf_free(buf: XmlBufPtr) {
+    pub extern "C" fn xml_buf_free(buf: XmlBufPtr) {
         let Some(buf) = XmlBufRef::from_raw(buf) else {
             return;
         };
         let _ = buf.into_inner();
     }
 
-    pub(crate) extern "C" fn xml_buf_empty(buf: XmlBufPtr) {
+    pub extern "C" fn xml_buf_empty(buf: XmlBufPtr) {
         let Some(mut buf) = XmlBufRef::from_raw(buf) else {
             return;
         };
@@ -561,7 +650,7 @@ pub mod libxml_api {
 
     /// # Safety
     /// - `str` must be a valid NULL-terminated string.
-    pub(crate) unsafe extern "C" fn xml_buf_add(buf: XmlBufPtr, str: *const u8, len: i32) -> i32 {
+    pub unsafe extern "C" fn xml_buf_add(buf: XmlBufPtr, str: *const u8, len: i32) -> i32 {
         let Some(mut buf) = XmlBufRef::from_raw(buf) else {
             return -1;
         };
@@ -644,14 +733,26 @@ pub mod libxml_api {
     }
 
     /// # Safety
-    /// - Returned memory should be managed at Rust API side.   
-    ///   <strong>DO NOT return in any other way than `Box::from_raw`</strong>.
+    /// - This method allocates new memory at C-side.
+    /// - The memory that this method returns should be released C-side.
     pub(crate) unsafe extern "C" fn xml_buf_detach(buf: XmlBufPtr) -> *mut u8 {
         let Some(mut buf) = XmlBufRef::from_raw(buf) else {
             return null_mut();
         };
-        buf.detach()
-            .map_or(null_mut(), |buf| Box::leak(buf).as_mut_ptr())
+
+        let len = buf.len();
+        if let Some(mem) = buf.detach() {
+            // The memory of XmlBuf is managed Rust-side,
+            // so if returned memory is released by C-side, UB may occurs.
+            // To prevent the above, allocate new memory at C-side and copy the original data to it.
+            let new_mem = xml_malloc(len + 1) as *mut u8;
+            let slice = from_raw_parts_mut(new_mem, len + 1);
+            slice[..len].copy_from_slice(&mem[..len]);
+            slice[len] = 0;
+            new_mem
+        } else {
+            null_mut()
+        }
     }
 
     /// # Safety
@@ -673,5 +774,104 @@ pub mod libxml_api {
             forget(file);
             res.unwrap_or(0)
         }
+    }
+
+    /// # Safety
+    /// - If the content of the buffer is changed, it may not be consistent.
+    pub unsafe extern "C" fn xml_buf_content(buf: XmlBufPtr) -> *mut u8 {
+        let Some(buf) = XmlBufRef::from_raw(buf) else {
+            return null_mut();
+        };
+        if !buf.error.is_ok() {
+            return null_mut();
+        }
+        buf.as_ref().as_ptr() as _
+    }
+
+    /// # Safety
+    /// - If the content of the buffer is changed, it may not be consistent.
+    pub(crate) unsafe extern "C" fn xml_buf_end(buf: XmlBufPtr) -> *mut u8 {
+        let Some(buf) = XmlBufRef::from_raw(buf) else {
+            return null_mut();
+        };
+        if !buf.error.is_ok() {
+            return null_mut();
+        }
+        buf.as_ref().as_ptr().add(buf.next_use) as _
+    }
+
+    pub extern "C" fn xml_buf_use(buf: XmlBufPtr) -> usize {
+        let Some(buf) = XmlBufRef::from_raw(buf) else {
+            return 0;
+        };
+        buf.next_use
+    }
+
+    pub(crate) extern "C" fn xml_buf_shrink(buf: XmlBufPtr, len: usize) -> usize {
+        XmlBufRef::from_raw(buf).map_or(0, |mut buf| buf.trim_head(len))
+    }
+
+    /// TODO: this should be implemented as the method of `XmlParserInput`.
+    ///
+    /// # Safety
+    /// - The contents of `buf` are shared with `input`
+    ///   and may be inconsistent if the contents are modified from one of the interfaces thereafter.
+    /// - DO NOT release buffers from `input`.
+    pub(crate) unsafe extern "C" fn xml_buf_reset_input(
+        buf: XmlBufPtr,
+        input: XmlParserInputPtr,
+    ) -> i32 {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return -1;
+        };
+        if !buf.is_ok() || input.is_null() {
+            return -1;
+        }
+
+        (*input).base = buf.as_mut_ptr();
+        (*input).cur = buf.as_mut_ptr();
+        (*input).end = buf.as_mut_ptr().add(buf.len());
+        0
+    }
+
+    pub(crate) unsafe extern "C" fn xml_buf_get_input_base(
+        buf: XmlBufPtr,
+        input: XmlParserInputPtr,
+    ) -> usize {
+        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
+            return 0;
+        };
+        if !buf.is_ok() || input.is_null() {
+            return 0;
+        }
+
+        let mut base = (*input).base.offset_from(buf.as_mut_ptr()) as usize;
+        if base > buf.capacity() {
+            xml_buf_overflow_error(buf.deref_mut(), "Input reference outside of the buffer");
+            base = 0;
+        }
+        base
+    }
+
+    pub(crate) unsafe extern "C" fn xml_buf_set_input_base_cur(
+        buf: XmlBufPtr,
+        input: XmlParserInputPtr,
+        base: usize,
+        cur: usize,
+    ) -> i32 {
+        if input.is_null() {
+            return -1;
+        }
+        let Some(mut buf) = XmlBufRef::from_raw(buf).filter(|buf| buf.is_ok()) else {
+            (*input).base = c"".as_ptr() as _;
+            (*input).cur = (*input).base;
+            (*input).end = (*input).base;
+            return -1;
+        };
+
+        (*input).base = buf.as_mut_ptr().add(base);
+        (*input).cur = (*input).base.add(cur);
+        (*input).end = buf.as_mut_ptr().add(buf.len());
+        0
     }
 }

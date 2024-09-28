@@ -14,7 +14,9 @@ use std::{
 use libc::{malloc, memset, snprintf, sprintf, FILE};
 
 use crate::{
-    __xml_raise_error, generic_error,
+    __xml_raise_error,
+    buf::libxml_api::XmlBufPtr,
+    generic_error,
     libxml::{
         tree::XmlElementType, xmlerror::XmlGenericErrorFunc, xmlstring::xml_str_equal,
         xpath::xml_xpath_ctxt_compile,
@@ -31,7 +33,7 @@ use super::{
     },
     tree::{
         xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_no_ns_prop,
-        xml_get_node_path, xml_node_get_content, XmlBufferPtr, XmlDocPtr, XmlNodePtr,
+        xml_get_node_path, xml_node_get_content, XmlDocPtr, XmlNodePtr,
     },
     xml_io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     xmlerror::{XmlErrorDomain, XmlParserErrors, XmlStructuredErrorFunc},
@@ -196,8 +198,8 @@ pub struct XmlSchematronValidCtxt {
     schema: XmlSchematronPtr,
     xctxt: XmlXPathContextPtr,
 
-    output_file: *mut FILE,      /* if using XML_SCHEMATRON_OUT_FILE */
-    output_buffer: XmlBufferPtr, /* if using XML_SCHEMATRON_OUT_BUFFER */
+    output_file: *mut FILE,   /* if using XML_SCHEMATRON_OUT_FILE */
+    output_buffer: XmlBufPtr, /* if using XML_SCHEMATRON_OUT_BUFFER */
     #[cfg(feature = "output")]
     iowrite: Option<XmlOutputWriteCallback>, /* if using XML_SCHEMATRON_OUT_IO */
     #[cfg(feature = "output")]

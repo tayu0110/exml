@@ -36,16 +36,12 @@ use crate::{
             XmlParserInputState, XmlSAXHandler, XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        tree::{
-            xml_free_doc, xml_new_doc, xml_set_doc_compress_mode, XmlBufferPtr, XmlDocPtr,
-            XmlNodePtr,
-        },
+        tree::{xml_free_doc, xml_new_doc, xml_set_doc_compress_mode, XmlDocPtr, XmlNodePtr},
         uri::xml_canonic_path,
         xml_io::{
-            xml_output_buffer_close, xml_output_buffer_create_buffer,
-            xml_output_buffer_create_filename, xml_output_buffer_create_io,
-            xml_output_buffer_flush, xml_output_buffer_write, xml_output_buffer_write_string,
-            XmlOutputBufferPtr,
+            xml_output_buffer_close, xml_output_buffer_create_filename,
+            xml_output_buffer_create_io, xml_output_buffer_flush, xml_output_buffer_write,
+            xml_output_buffer_write_string, XmlOutputBufferPtr,
         },
         xmlerror::XmlParserErrors,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
@@ -395,45 +391,45 @@ pub unsafe extern "C" fn xml_new_text_writer_filename(
     ret
 }
 
-/**
- * xmlNewTextWriterMemory:
- * @buf:  xmlBufferPtr
- * @compression:  compress the output?
- *
- * Create a new xmlNewTextWriter structure with @buf as output
- * TODO: handle compression
- *
- * Returns the new xmlTextWriterPtr or NULL in case of error
- */
-pub unsafe extern "C" fn xml_new_text_writer_memory(
-    buf: XmlBufferPtr,
-    _compression: c_int,
-) -> XmlTextWriterPtr {
-    /*::todo handle compression */
-    let out: XmlOutputBufferPtr = xml_output_buffer_create_buffer(buf, null_mut());
+// /**
+//  * xmlNewTextWriterMemory:
+//  * @buf:  xmlBufferPtr
+//  * @compression:  compress the output?
+//  *
+//  * Create a new xmlNewTextWriter structure with @buf as output
+//  * TODO: handle compression
+//  *
+//  * Returns the new xmlTextWriterPtr or NULL in case of error
+//  */
+// pub unsafe extern "C" fn xml_new_text_writer_memory(
+//     buf: XmlBufferPtr,
+//     _compression: c_int,
+// ) -> XmlTextWriterPtr {
+//     /*::todo handle compression */
+//     let out: XmlOutputBufferPtr = xml_output_buffer_create_buffer(buf, null_mut());
 
-    if out.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrNoMemory,
-            c"xmlNewTextWriterMemory : out of memory!\n".as_ptr() as _,
-        );
-        return null_mut();
-    }
+//     if out.is_null() {
+//         xml_writer_err_msg(
+//             null_mut(),
+//             XmlParserErrors::XmlErrNoMemory,
+//             c"xmlNewTextWriterMemory : out of memory!\n".as_ptr() as _,
+//         );
+//         return null_mut();
+//     }
 
-    let ret: XmlTextWriterPtr = xml_new_text_writer(out);
-    if ret.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrNoMemory,
-            c"xmlNewTextWriterMemory : out of memory!\n".as_ptr() as _,
-        );
-        xml_output_buffer_close(out);
-        return null_mut();
-    }
+//     let ret: XmlTextWriterPtr = xml_new_text_writer(out);
+//     if ret.is_null() {
+//         xml_writer_err_msg(
+//             null_mut(),
+//             XmlParserErrors::XmlErrNoMemory,
+//             c"xmlNewTextWriterMemory : out of memory!\n".as_ptr() as _,
+//         );
+//         xml_output_buffer_close(out);
+//         return null_mut();
+//     }
 
-    ret
-}
+//     ret
+// }
 
 /**
  * xmlWriterErrMsgInt:
@@ -5188,40 +5184,40 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_new_text_writer_memory() {
-        #[cfg(feature = "writer")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_new_text_writer_memory() {
+    //     #[cfg(feature = "writer")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_compression in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_xml_buffer_ptr(n_buf, 0);
-                    let compression = gen_int(n_compression, 1);
+    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
+    //             for n_compression in 0..GEN_NB_INT {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
+    //                 let compression = gen_int(n_compression, 1);
 
-                    let ret_val = xml_new_text_writer_memory(buf, compression);
-                    desret_xml_text_writer_ptr(ret_val);
-                    des_xml_buffer_ptr(n_buf, buf, 0);
-                    des_int(n_compression, compression, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewTextWriterMemory",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNewTextWriterMemory()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_compression);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_new_text_writer_memory(buf, compression);
+    //                 desret_xml_text_writer_ptr(ret_val);
+    //                 des_xml_buffer_ptr(n_buf, buf, 0);
+    //                 des_int(n_compression, compression, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlNewTextWriterMemory",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlNewTextWriterMemory()"
+    //                     );
+    //                     eprint!(" {}", n_buf);
+    //                     eprintln!(" {}", n_compression);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_new_text_writer_push_parser() {
