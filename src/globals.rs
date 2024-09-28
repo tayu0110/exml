@@ -140,3 +140,33 @@ pub fn set_generic_error(func: Option<GenericError>, context: Option<impl Write 
         });
     });
 }
+
+/// Update default buffer allocation scheme.
+///
+/// The user can set the following 3 schemes
+///
+/// - `XmlBufferAllocationScheme::XmlBufferAllocExact`
+/// - `XmlBufferAllocationScheme::XmlBufferAllocDoubleit`
+/// - `XmlBufferAllocationScheme::XmlBufferAllocHybrid`
+///
+/// Other schemes cannot set as default scheme.
+///
+/// # Panics
+/// - Do not specify unsupported schemes.
+pub fn set_default_buffer_allocation_scheme(scheme: XmlBufferAllocationScheme) {
+    match scheme {
+        XmlBufferAllocationScheme::XmlBufferAllocExact
+        | XmlBufferAllocationScheme::XmlBufferAllocDoubleit
+        | XmlBufferAllocationScheme::XmlBufferAllocHybrid => {
+            GLOBAL_STATE.with_borrow_mut(|state| state.buffer_alloc_scheme = scheme);
+        }
+        scheme => {
+            panic!("Cannot set {scheme:?} as a default scheme.");
+        }
+    }
+}
+
+/// Get the current default buffer allocation scheme.
+pub fn get_default_buffer_allocation_scheme() -> XmlBufferAllocationScheme {
+    GLOBAL_STATE.with_borrow(|state| state.buffer_alloc_scheme)
+}
