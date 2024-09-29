@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_long, c_uchar, CString},
+    ffi::{c_char, c_int, c_long, c_uchar, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -50,10 +50,7 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, XmlChar},
     },
     private::{
-        buf::{
-            xml_buf_add, xml_buf_create, xml_buf_free, xml_buf_set_allocation_scheme,
-            xml_buf_write_quoted_string,
-        },
+        buf::{xml_buf_create, xml_buf_free, xml_buf_set_allocation_scheme},
         enc::xml_char_enc_output,
         error::__xml_simple_error,
         save::xml_buf_attr_serialize_txt_content,
@@ -557,7 +554,11 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
             xml_output_buffer_write(buf, 5, c"xmlns".as_ptr() as _);
         }
         xml_output_buffer_write(buf, 1, c"=".as_ptr() as _);
-        xml_buf_write_quoted_string((*buf).buffer, (*cur).href.load(Ordering::Relaxed));
+        if let Some(mut buf) = (*buf).buffer {
+            buf.push_quoted_str(CStr::from_ptr(
+                (*cur).href.load(Ordering::Relaxed) as *const i8
+            ));
+        }
     }
 }
 
@@ -569,18 +570,8 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
  * This will dump the content of the notation table as an XML DTD definition
  */
 unsafe extern "C" fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
-    // let buffer: XmlBufferPtr = xml_buffer_create();
-    // if buffer.is_null() {
-    //     /*
-    //      * TODO set the error in buf
-    //      */
-    //     return;
-    // }
-    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_notation_table(buf, table);
-    // xml_dump_notation_table(buffer, table);
-    // xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -592,18 +583,8 @@ unsafe extern "C" fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: XmlNotat
  * DTD definition
  */
 unsafe extern "C" fn xml_buf_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
-    // let buffer: XmlBufferPtr = xml_buffer_create();
-    // if buffer.is_null() {
-    //     /*
-    //      * TODO set the error in buf
-    //      */
-    //     return;
-    // }
-    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    // xml_dump_element_decl(buffer, elem);
     xml_dump_element_decl(buf, elem);
-    // xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -615,18 +596,8 @@ unsafe extern "C" fn xml_buf_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
  * DTD definition
  */
 unsafe extern "C" fn xml_buf_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
-    // let buffer: XmlBufferPtr = xml_buffer_create();
-    // if buffer.is_null() {
-    //     /*
-    //      * TODO set the error in buf
-    //      */
-    //     return;
-    // }
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    // xml_dump_attribute_decl(buffer, attr);
     xml_dump_attribute_decl(buf, attr);
-    // xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -637,18 +608,8 @@ unsafe extern "C" fn xml_buf_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttrib
  * This will dump the content of the entity table as an XML DTD definition
  */
 unsafe extern "C" fn xml_buf_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
-    // let buffer: XmlBufferPtr = xml_buffer_create();
-    // if buffer.is_null() {
-    //     /*
-    //      * TODO set the error in buf
-    //      */
-    //     return;
-    // }
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    // xml_dump_entity_decl(buffer, ent);
     xml_dump_entity_decl(buf, ent);
-    // xml_buf_merge_buffer(buf, buffer);
 }
 
 /**
@@ -682,20 +643,18 @@ unsafe extern "C" fn xml_attr_serialize_content(buf: XmlOutputBufferPtr, attr: X
         match (*children).typ {
             XmlElementType::XmlTextNode => {
                 xml_buf_attr_serialize_txt_content(
-                    (*buf).buffer,
+                    (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
                     (*attr).doc,
                     attr,
                     (*children).content,
                 );
             }
             XmlElementType::XmlEntityRefNode => {
-                xml_buf_add((*buf).buffer, c"&".as_ptr() as _, 1);
-                xml_buf_add(
-                    (*buf).buffer,
-                    (*children).name,
-                    xml_strlen((*children).name),
-                );
-                xml_buf_add((*buf).buffer, c";".as_ptr() as _, 1);
+                if let Some(mut buf) = (*buf).buffer {
+                    buf.push_bytes(b"&");
+                    buf.push_str(CStr::from_ptr((*children).name as *const i8));
+                    buf.push_bytes(b";");
+                }
             }
             _ => { /* should not happen unless we have a badly built tree */ }
         }
@@ -776,13 +735,22 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xml_buf_dump_element_decl((*buf).buffer, cur as _);
+                xml_buf_dump_element_decl(
+                    (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+                    cur as _,
+                );
             }
             XmlElementType::XmlAttributeDecl => {
-                xml_buf_dump_attribute_decl((*buf).buffer, cur as _);
+                xml_buf_dump_attribute_decl(
+                    (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+                    cur as _,
+                );
             }
             XmlElementType::XmlEntityDecl => {
-                xml_buf_dump_entity_decl((*buf).buffer, cur as _);
+                xml_buf_dump_entity_decl(
+                    (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+                    cur as _,
+                );
             }
             XmlElementType::XmlElementNode => {
                 if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
@@ -1072,12 +1040,18 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     xml_output_buffer_write_string(buf, (*dtd).name as _);
     if !(*dtd).external_id.is_null() {
         xml_output_buffer_write(buf, 8, c" PUBLIC ".as_ptr() as _);
-        xml_buf_write_quoted_string((*buf).buffer, (*dtd).external_id);
+        if let Some(mut buf) = (*buf).buffer {
+            buf.push_quoted_str(CStr::from_ptr((*dtd).external_id as *const i8));
+        }
         xml_output_buffer_write(buf, 1, c" ".as_ptr() as _);
-        xml_buf_write_quoted_string((*buf).buffer, (*dtd).system_id);
+        if let Some(mut buf) = (*buf).buffer {
+            buf.push_quoted_str(CStr::from_ptr((*dtd).system_id as *const i8));
+        }
     } else if !(*dtd).system_id.is_null() {
         xml_output_buffer_write(buf, 8, c" SYSTEM ".as_ptr() as _);
-        xml_buf_write_quoted_string((*buf).buffer, (*dtd).system_id);
+        if let Some(mut buf) = (*buf).buffer {
+            buf.push_quoted_str(CStr::from_ptr((*dtd).system_id as *const i8));
+        }
     }
     if (*dtd).entities.is_null()
         && (*dtd).elements.is_null()
@@ -1094,7 +1068,10 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
      * Do this only on a standalone DTD or on the internal subset though.
      */
     if !(*dtd).notations.is_null() && ((*dtd).doc.is_null() || (*(*dtd).doc).int_subset == dtd) {
-        xml_buf_dump_notation_table((*buf).buffer, (*dtd).notations as _);
+        xml_buf_dump_notation_table(
+            (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+            (*dtd).notations as _,
+        );
     }
     let format: c_int = (*ctxt).format;
     let level: c_int = (*ctxt).level;
@@ -1367,13 +1344,22 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xml_buf_dump_element_decl((*buf).buffer, cur as _);
+                xml_buf_dump_element_decl(
+                    (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+                    cur as _,
+                );
             }
             XmlElementType::XmlAttributeDecl => {
-                xml_buf_dump_attribute_decl((*buf).buffer, cur as _);
+                xml_buf_dump_attribute_decl(
+                    (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+                    cur as _,
+                );
             }
             XmlElementType::XmlEntityDecl => {
-                xml_buf_dump_entity_decl((*buf).buffer, cur as _);
+                xml_buf_dump_entity_decl(
+                    (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+                    cur as _,
+                );
             }
             XmlElementType::XmlElementNode => {
                 addmeta = 0;
@@ -1825,13 +1811,17 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         if (*ctxt).options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
             xml_output_buffer_write(buf, 14, c"<?xml version=".as_ptr() as _);
             if !(*cur).version.is_null() {
-                xml_buf_write_quoted_string((*buf).buffer, (*cur).version);
+                if let Some(mut buf) = (*buf).buffer {
+                    buf.push_quoted_str(CStr::from_ptr((*cur).version as *const i8));
+                }
             } else {
                 xml_output_buffer_write(buf, 5, c"\"1.0\"".as_ptr() as _);
             }
             if !encoding.is_null() {
                 xml_output_buffer_write(buf, 10, c" encoding=".as_ptr() as _);
-                xml_buf_write_quoted_string((*buf).buffer, encoding);
+                if let Some(mut buf) = (*buf).buffer {
+                    buf.push_quoted_str(CStr::from_ptr(encoding as *const i8));
+                }
             }
             match (*cur).standalone {
                 0 => {

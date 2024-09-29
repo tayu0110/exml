@@ -8,7 +8,7 @@ use std::{
     ffi::{c_char, c_int},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
+    ptr::{addr_of_mut, null, null_mut},
     sync::atomic::Ordering,
 };
 
@@ -23,9 +23,9 @@ use super::{
         XmlListPtr,
     },
     tree::{
-        xml_buf_content, xml_buf_use, xml_free_prop_list, xml_has_ns_prop, xml_new_ns_prop,
-        xml_node_list_get_string, xml_search_ns, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
-        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_has_ns_prop, xml_new_ns_prop, xml_node_list_get_string,
+        xml_search_ns, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr,
+        XML_XML_NAMESPACE,
     },
     uri::{xml_build_uri, xml_free_uri, xml_parse_uri, XmlURIPtr},
     xml_io::{
@@ -333,9 +333,12 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
         return -1;
     }
 
-    ret = xml_buf_use((*buf).buffer) as _;
+    ret = (*buf).buffer.map_or(0, |buf| buf.len() as i32);
     if ret >= 0 {
-        *doc_txt_ptr = xml_strndup(xml_buf_content((*buf).buffer), ret);
+        *doc_txt_ptr = xml_strndup(
+            (*buf).buffer.map_or(null(), |buf| buf.as_ref().as_ptr()),
+            ret,
+        );
     }
     xml_output_buffer_close(buf);
 
@@ -942,7 +945,10 @@ unsafe extern "C" fn xml_c14n_print_namespaces(ns: XmlNsPtr, ctx: XmlC14NCtxPtr)
         xml_output_buffer_write_string((*ctx).buf, c" xmlns=".as_ptr() as _);
     }
     if !(*ns).href.load(Ordering::Relaxed).is_null() {
-        xml_buf_write_quoted_string((*(*ctx).buf).buffer, (*ns).href.load(Ordering::Relaxed));
+        xml_buf_write_quoted_string(
+            (*(*ctx).buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+            (*ns).href.load(Ordering::Relaxed),
+        );
     } else {
         xml_output_buffer_write_string((*ctx).buf, c"\"\"".as_ptr() as _);
     }

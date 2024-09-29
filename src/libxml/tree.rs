@@ -9558,8 +9558,13 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
         *doc_txt_len = xml_buf_use((*out_buff).conv) as _;
         *doc_txt_ptr = xml_strndup(xml_buf_content((*out_buff).conv), *doc_txt_len);
     } else {
-        *doc_txt_len = xml_buf_use((*out_buff).buffer) as _;
-        *doc_txt_ptr = xml_strndup(xml_buf_content((*out_buff).buffer), *doc_txt_len);
+        *doc_txt_len = (*out_buff).buffer.map_or(0, |buf| buf.len() as i32);
+        *doc_txt_ptr = xml_strndup(
+            (*out_buff)
+                .buffer
+                .map_or(null(), |buf| buf.as_ref().as_ptr()),
+            *doc_txt_len,
+        );
     }
     xml_output_buffer_close(out_buff);
 
@@ -9749,6 +9754,7 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     format: c_int,
 ) -> size_t {
     use crate::{
+        buf::XmlBufRef,
         libxml::{xml_io::XmlOutputBufferPtr, xmlsave::xml_save_err_memory},
         private::buf::xml_buf_get_allocation_scheme,
     };
@@ -9769,7 +9775,7 @@ pub unsafe extern "C" fn xml_buf_node_dump(
         return usize::MAX;
     }
     memset(outbuf as _, 0, size_of::<XmlOutputBuffer>());
-    (*outbuf).buffer = buf;
+    (*outbuf).buffer = XmlBufRef::from_raw(buf);
     (*outbuf).encoder = null_mut();
     (*outbuf).writecallback = None;
     (*outbuf).closecallback = None;

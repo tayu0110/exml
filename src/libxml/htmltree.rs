@@ -587,8 +587,17 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         *size = xml_buf_use((*buf).conv) as _;
         *mem = xml_strndup(xml_buf_content((*buf).conv), *size);
     } else {
-        *size = xml_buf_use((*buf).buffer) as _;
-        *mem = xml_strndup(xml_buf_content((*buf).buffer), *size);
+        *size = (*buf).buffer.map_or(0, |buf| buf.len() as i32);
+        *mem = xml_strndup(
+            (*buf).buffer.map_or(null(), |buf| {
+                if buf.is_ok() {
+                    buf.as_ref().as_ptr()
+                } else {
+                    null()
+                }
+            }),
+            *size,
+        );
     }
     xml_output_buffer_close(buf);
 }
@@ -764,7 +773,10 @@ unsafe extern "C" fn html_buf_node_dump_format(
     cur: XmlNodePtr,
     format: c_int,
 ) -> size_t {
-    use crate::libxml::{globals::xml_free, tree::xml_buf_use, xml_io::XmlOutputBuffer};
+    use crate::{
+        buf::XmlBufRef,
+        libxml::{globals::xml_free, tree::xml_buf_use, xml_io::XmlOutputBuffer},
+    };
 
     if cur.is_null() {
         return usize::MAX;
@@ -778,7 +790,7 @@ unsafe extern "C" fn html_buf_node_dump_format(
         return usize::MAX;
     }
     memset(outbuf as _, 0, size_of::<XmlOutputBuffer>());
-    (*outbuf).buffer = buf;
+    (*outbuf).buffer = XmlBufRef::from_raw(buf);
     (*outbuf).encoder = null_mut();
     (*outbuf).writecallback = None;
     (*outbuf).closecallback = None;
@@ -1024,12 +1036,10 @@ unsafe extern "C" fn html_dtd_dump_output(
     doc: XmlDocPtr,
     _encoding: *const c_char,
 ) {
-    use crate::{
-        libxml::{
-            xml_io::xml_output_buffer_write_string, xmlerror::XmlParserErrors,
-            xmlstring::xml_strcmp,
-        },
-        private::buf::xml_buf_write_quoted_string,
+    use std::ffi::CStr;
+
+    use crate::libxml::{
+        xml_io::xml_output_buffer_write_string, xmlerror::XmlParserErrors, xmlstring::xml_strcmp,
     };
 
     use super::tree::XmlDtdPtr;
@@ -1048,16 +1058,22 @@ unsafe extern "C" fn html_dtd_dump_output(
     xml_output_buffer_write_string(buf, (*cur).name as _);
     if !(*cur).external_id.is_null() {
         xml_output_buffer_write_string(buf, c" PUBLIC ".as_ptr() as _);
-        xml_buf_write_quoted_string((*buf).buffer, (*cur).external_id);
+        if let Some(mut buf) = (*buf).buffer {
+            buf.push_quoted_str(CStr::from_ptr((*cur).external_id as *const i8));
+        }
         if !(*cur).system_id.is_null() {
             xml_output_buffer_write_string(buf, c" ".as_ptr() as _);
-            xml_buf_write_quoted_string((*buf).buffer, (*cur).system_id);
+            if let Some(mut buf) = (*buf).buffer {
+                buf.push_quoted_str(CStr::from_ptr((*cur).system_id as *const i8));
+            }
         }
     } else if !(*cur).system_id.is_null()
         && xml_strcmp((*cur).system_id, c"about:legacy-compat".as_ptr() as _) != 0
     {
         xml_output_buffer_write_string(buf, c" SYSTEM ".as_ptr() as _);
-        xml_buf_write_quoted_string((*buf).buffer, (*cur).system_id);
+        if let Some(mut buf) = (*buf).buffer {
+            buf.push_quoted_str(CStr::from_ptr((*cur).system_id as *const i8));
+        }
     }
     xml_output_buffer_write_string(buf, c">\n".as_ptr() as _);
 }
@@ -1076,12 +1092,13 @@ unsafe extern "C" fn html_attr_dump_output(
     doc: XmlDocPtr,
     cur: XmlAttrPtr,
 ) {
+    use std::ffi::CStr;
+
     use crate::{
         libxml::{
             globals::xml_free, tree::xml_node_list_get_string, uri::xml_uri_escape_str,
             xml_io::xml_output_buffer_write_string,
         },
-        private::buf::xml_buf_write_quoted_string,
         IS_BLANK_CH,
     };
 
@@ -1133,13 +1150,15 @@ unsafe extern "C" fn html_attr_dump_output(
                 let escaped: *mut XmlChar =
                     xml_uri_escape_str(tmp, c"\"#$%&+,/:;<=>?@[\\]^`{|}".as_ptr() as _);
                 if !escaped.is_null() {
-                    xml_buf_write_quoted_string((*buf).buffer, escaped);
+                    if let Some(mut buf) = (*buf).buffer {
+                        buf.push_quoted_str(CStr::from_ptr(escaped as *const i8));
+                    }
                     xml_free(escaped as _);
-                } else {
-                    xml_buf_write_quoted_string((*buf).buffer, value);
+                } else if let Some(mut buf) = (*buf).buffer {
+                    buf.push_quoted_str(CStr::from_ptr(value as *const i8));
                 }
-            } else {
-                xml_buf_write_quoted_string((*buf).buffer, value);
+            } else if let Some(mut buf) = (*buf).buffer {
+                buf.push_quoted_str(CStr::from_ptr(value as *const i8));
             }
             xml_free(value as _);
         } else {

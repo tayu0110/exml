@@ -2427,16 +2427,14 @@ pub unsafe extern "C" fn xml_text_writer_write_string(
         if !p.is_null() {
             match (*p).state {
                 XmlTextWriterState::XmlTextwriterName | XmlTextWriterState::XmlTextwriterText => {
-                    // #if 0
-                    //                     buf = null_mut();
-                    //             xmlOutputBufferWriteEscape((*writer).out, content, null_mut());
-                    // #endif
                     buf = xml_encode_special_chars(null_mut(), content);
                 }
                 XmlTextWriterState::XmlTextwriterAttribute => {
                     buf = null_mut();
                     xml_buf_attr_serialize_txt_content(
-                        (*(*writer).out).buffer,
+                        (*(*writer).out)
+                            .buffer
+                            .map_or(null_mut(), |buf| buf.as_ptr()),
                         (*writer).doc,
                         null_mut(),
                         content,

@@ -239,13 +239,13 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
 
     if output.is_null()
         || (*output).encoder.is_null()
-        || (*output).buffer.is_null()
+        || (*output).buffer.is_none()
         || (*output).conv.is_null()
     {
         return -1;
     }
     let out: XmlBufPtr = (*output).conv;
-    let bufin: XmlBufPtr = (*output).buffer;
+    let bufin: XmlBufPtr = (*output).buffer.expect("Internal Error").as_ptr();
 
     // retry:
     'retry: loop {
