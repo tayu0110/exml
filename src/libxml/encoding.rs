@@ -47,30 +47,30 @@ use super::{
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlCharEncoding {
-    XmlCharEncodingError = -1,    /* No c_char encoding detected */
-    XmlCharEncodingNone = 0,      /* No c_char encoding detected */
-    XmlCharEncodingUtf8 = 1,      /* UTF-8 */
-    XmlCharEncodingUtf16le = 2,   /* UTF-16 little endian */
-    XmlCharEncodingUtf16be = 3,   /* UTF-16 big endian */
-    XmlCharEncodingUcs4le = 4,    /* UCS-4 little endian */
-    XmlCharEncodingUcs4be = 5,    /* UCS-4 big endian */
-    XmlCharEncodingEbcdic = 6,    /* EBCDIC uh! */
-    XmlCharEncodingUcs4_2143 = 7, /* UCS-4 unusual ordering */
-    XmlCharEncodingUcs4_3412 = 8, /* UCS-4 unusual ordering */
-    XmlCharEncodingUcs2 = 9,      /* UCS-2 */
-    XmlCharEncoding8859_1 = 10,   /* ISO-8859-1 ISO Latin 1 */
-    XmlCharEncoding8859_2 = 11,   /* ISO-8859-2 ISO Latin 2 */
-    XmlCharEncoding8859_3 = 12,   /* ISO-8859-3 */
-    XmlCharEncoding8859_4 = 13,   /* ISO-8859-4 */
-    XmlCharEncoding8859_5 = 14,   /* ISO-8859-5 */
-    XmlCharEncoding8859_6 = 15,   /* ISO-8859-6 */
-    XmlCharEncoding8859_7 = 16,   /* ISO-8859-7 */
-    XmlCharEncoding8859_8 = 17,   /* ISO-8859-8 */
-    XmlCharEncoding8859_9 = 18,   /* ISO-8859-9 */
-    XmlCharEncoding2022Jp = 19,   /* ISO-2022-JP */
-    XmlCharEncodingShiftJis = 20, /* Shift_JIS */
-    XmlCharEncodingEucJp = 21,    /* EUC-JP */
-    XmlCharEncodingAscii = 22,    /* pure ASCII */
+    Error = -1,     /* No char encoding detected */
+    None = 0,       /* No char encoding detected */
+    UTF8 = 1,       /* UTF-8 */
+    UTF16LE = 2,    /* UTF-16 little endian */
+    UTF16BE = 3,    /* UTF-16 big endian */
+    UCS4LE = 4,     /* UCS-4 little endian */
+    UCS4BE = 5,     /* UCS-4 big endian */
+    EBCDIC = 6,     /* EBCDIC uh! */
+    UCS4_2143 = 7,  /* UCS-4 unusual ordering */
+    UCS4_3412 = 8,  /* UCS-4 unusual ordering */
+    UCS2 = 9,       /* UCS-2 */
+    ISO8859_1 = 10, /* ISO-8859-1 ISO Latin 1 */
+    ISO8859_2 = 11, /* ISO-8859-2 ISO Latin 2 */
+    ISO8859_3 = 12, /* ISO-8859-3 */
+    ISO8859_4 = 13, /* ISO-8859-4 */
+    ISO8859_5 = 14, /* ISO-8859-5 */
+    ISO8859_6 = 15, /* ISO-8859-6 */
+    ISO8859_7 = 16, /* ISO-8859-7 */
+    ISO8859_8 = 17, /* ISO-8859-8 */
+    ISO8859_9 = 18, /* ISO-8859-9 */
+    ISO2022JP = 19, /* ISO-2022-JP */
+    ShiftJIS = 20,  /* Shift_JIS */
+    EUCJP = 21,     /* EUC-JP */
+    ASCII = 22,     /* pure ASCII */
 }
 
 /**
@@ -1226,22 +1226,22 @@ pub unsafe extern "C" fn xml_get_char_encoding_handler(
     let mut handler: XmlCharEncodingHandlerPtr;
 
     match enc {
-        XmlCharEncoding::XmlCharEncodingError => {
+        XmlCharEncoding::Error => {
             return null_mut();
         }
-        XmlCharEncoding::XmlCharEncodingNone => {
+        XmlCharEncoding::None => {
             return null_mut();
         }
-        XmlCharEncoding::XmlCharEncodingUtf8 => {
+        XmlCharEncoding::UTF8 => {
             return null_mut();
         }
-        XmlCharEncoding::XmlCharEncodingUtf16le => {
+        XmlCharEncoding::UTF16LE => {
             return XML_UTF16_LEHANDLER as *const XmlCharEncodingHandler as _;
         }
-        XmlCharEncoding::XmlCharEncodingUtf16be => {
+        XmlCharEncoding::UTF16BE => {
             return XML_UTF16_BEHANDLER as *const XmlCharEncodingHandler as _;
         }
-        XmlCharEncoding::XmlCharEncodingEbcdic => {
+        XmlCharEncoding::EBCDIC => {
             handler = xml_find_char_encoding_handler(c"EBCDIC".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
@@ -1259,7 +1259,7 @@ pub unsafe extern "C" fn xml_get_char_encoding_handler(
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncodingUcs4be => {
+        XmlCharEncoding::UCS4BE => {
             handler = xml_find_char_encoding_handler(c"ISO-10646-UCS-4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
@@ -1273,7 +1273,7 @@ pub unsafe extern "C" fn xml_get_char_encoding_handler(
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncodingUcs4le => {
+        XmlCharEncoding::UCS4LE => {
             handler = xml_find_char_encoding_handler(c"ISO-10646-UCS-4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
@@ -1287,9 +1287,9 @@ pub unsafe extern "C" fn xml_get_char_encoding_handler(
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncodingUcs4_2143 => {}
-        XmlCharEncoding::XmlCharEncodingUcs4_3412 => {}
-        XmlCharEncoding::XmlCharEncodingUcs2 => {
+        XmlCharEncoding::UCS4_2143 => {}
+        XmlCharEncoding::UCS4_3412 => {}
+        XmlCharEncoding::UCS2 => {
             handler = xml_find_char_encoding_handler(c"ISO-10646-UCS-2".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
@@ -1310,68 +1310,68 @@ pub unsafe extern "C" fn xml_get_char_encoding_handler(
          * this has been removed. One can still change this
          * back by registering no-ops encoders for those
          */
-        XmlCharEncoding::XmlCharEncoding8859_1 => {
+        XmlCharEncoding::ISO8859_1 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-1".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncoding8859_2 => {
+        XmlCharEncoding::ISO8859_2 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-2".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncoding8859_3 => {
+        XmlCharEncoding::ISO8859_3 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-3".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncoding8859_4 => {
+        XmlCharEncoding::ISO8859_4 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-4".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncoding8859_5 => {
+        XmlCharEncoding::ISO8859_5 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-5".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncoding8859_6 => {
+        XmlCharEncoding::ISO8859_6 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-6".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncoding8859_7 => {
+        XmlCharEncoding::ISO8859_7 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-7".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncoding8859_8 => {
+        XmlCharEncoding::ISO8859_8 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-8".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncoding8859_9 => {
+        XmlCharEncoding::ISO8859_9 => {
             handler = xml_find_char_encoding_handler(c"ISO-8859-9".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
 
-        XmlCharEncoding::XmlCharEncoding2022Jp => {
+        XmlCharEncoding::ISO2022JP => {
             handler = xml_find_char_encoding_handler(c"ISO-2022-JP".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncodingShiftJis => {
+        XmlCharEncoding::ShiftJIS => {
             handler = xml_find_char_encoding_handler(c"SHIFT-JIS".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
@@ -1385,7 +1385,7 @@ pub unsafe extern "C" fn xml_get_char_encoding_handler(
                 return handler;
             }
         }
-        XmlCharEncoding::XmlCharEncodingEucJp => {
+        XmlCharEncoding::EUCJP => {
             handler = xml_find_char_encoding_handler(c"EUC-JP".as_ptr() as _);
             if !handler.is_null() {
                 return handler;
@@ -1570,7 +1570,7 @@ pub unsafe extern "C" fn xml_find_char_encoding_handler(
      * Fallback using the canonical names
      */
     let alias: XmlCharEncoding = xml_parse_char_encoding(norig);
-    if !matches!(alias, XmlCharEncoding::XmlCharEncodingError) {
+    if !matches!(alias, XmlCharEncoding::Error) {
         let canon: *const c_char = xml_get_char_encoding_name(alias);
         if !canon.is_null() && strcmp(name, canon) != 0 {
             return xml_find_char_encoding_handler(canon);
@@ -1869,7 +1869,7 @@ pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> Xml
     let mut upper: [c_char; 500] = [0; 500];
 
     if name.is_null() {
-        return XmlCharEncoding::XmlCharEncodingNone;
+        return XmlCharEncoding::None;
     }
 
     /*
@@ -1889,13 +1889,13 @@ pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> Xml
     *upper.last_mut().unwrap() = 0;
 
     if strcmp(upper.as_ptr() as _, c"".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingNone;
+        return XmlCharEncoding::None;
     }
     if strcmp(upper.as_ptr() as _, c"UTF-8".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUtf8;
+        return XmlCharEncoding::UTF8;
     }
     if strcmp(upper.as_ptr() as _, c"UTF8".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUtf8;
+        return XmlCharEncoding::UTF8;
     }
 
     /*
@@ -1903,20 +1903,20 @@ pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> Xml
      *       already found and in use
      */
     if strcmp(upper.as_ptr() as _, c"UTF-16".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUtf16le;
+        return XmlCharEncoding::UTF16LE;
     }
     if strcmp(upper.as_ptr() as _, c"UTF16".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUtf16le;
+        return XmlCharEncoding::UTF16LE;
     }
 
     if strcmp(upper.as_ptr() as _, c"ISO-10646-UCS-2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUcs2;
+        return XmlCharEncoding::UCS2;
     }
     if strcmp(upper.as_ptr() as _, c"UCS-2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUcs2;
+        return XmlCharEncoding::UCS2;
     }
     if strcmp(upper.as_ptr() as _, c"UCS2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUcs2;
+        return XmlCharEncoding::UCS2;
     }
 
     /*
@@ -1924,71 +1924,71 @@ pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> Xml
      *       already found and in use
      */
     if strcmp(upper.as_ptr() as _, c"ISO-10646-UCS-4".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUcs4le;
+        return XmlCharEncoding::UCS4LE;
     }
     if strcmp(upper.as_ptr() as _, c"UCS-4".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUcs4le;
+        return XmlCharEncoding::UCS4LE;
     }
     if strcmp(upper.as_ptr() as _, c"UCS4".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingUcs4le;
+        return XmlCharEncoding::UCS4LE;
     }
 
     if strcmp(upper.as_ptr() as _, c"ISO-8859-1".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_1;
+        return XmlCharEncoding::ISO8859_1;
     }
     if strcmp(upper.as_ptr() as _, c"ISO-LATIN-1".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_1;
+        return XmlCharEncoding::ISO8859_1;
     }
     if strcmp(upper.as_ptr() as _, c"ISO LATIN 1".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_1;
+        return XmlCharEncoding::ISO8859_1;
     }
 
     if strcmp(upper.as_ptr() as _, c"ISO-8859-2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_2;
+        return XmlCharEncoding::ISO8859_2;
     }
     if strcmp(upper.as_ptr() as _, c"ISO-LATIN-2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_2;
+        return XmlCharEncoding::ISO8859_2;
     }
     if strcmp(upper.as_ptr() as _, c"ISO LATIN 2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_2;
+        return XmlCharEncoding::ISO8859_2;
     }
 
     if strcmp(upper.as_ptr() as _, c"ISO-8859-3".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_3;
+        return XmlCharEncoding::ISO8859_3;
     }
     if strcmp(upper.as_ptr() as _, c"ISO-8859-4".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_4;
+        return XmlCharEncoding::ISO8859_4;
     }
     if strcmp(upper.as_ptr() as _, c"ISO-8859-5".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_5;
+        return XmlCharEncoding::ISO8859_5;
     }
     if strcmp(upper.as_ptr() as _, c"ISO-8859-6".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_6;
+        return XmlCharEncoding::ISO8859_6;
     }
     if strcmp(upper.as_ptr() as _, c"ISO-8859-7".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_7;
+        return XmlCharEncoding::ISO8859_7;
     }
     if strcmp(upper.as_ptr() as _, c"ISO-8859-8".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_8;
+        return XmlCharEncoding::ISO8859_8;
     }
     if strcmp(upper.as_ptr() as _, c"ISO-8859-9".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding8859_9;
+        return XmlCharEncoding::ISO8859_9;
     }
 
     if strcmp(upper.as_ptr() as _, c"ISO-2022-JP".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncoding2022Jp;
+        return XmlCharEncoding::ISO2022JP;
     }
     if strcmp(upper.as_ptr() as _, c"SHIFT_JIS".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingShiftJis;
+        return XmlCharEncoding::ShiftJIS;
     }
     if strcmp(upper.as_ptr() as _, c"EUC-JP".as_ptr() as _) == 0 {
-        return XmlCharEncoding::XmlCharEncodingEucJp;
+        return XmlCharEncoding::EUCJP;
     }
 
     // #ifdef DEBUG_ENCODING
     //     xmlGenericError(xmlGenericErrorContext, "Unknown encoding %s\n", name);
     // #endif
-    XmlCharEncoding::XmlCharEncodingError
+    XmlCharEncoding::Error
 }
 
 /**
@@ -2003,30 +2003,30 @@ pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> Xml
  */
 pub unsafe extern "C" fn xml_get_char_encoding_name(enc: XmlCharEncoding) -> *const c_char {
     match enc {
-        XmlCharEncoding::XmlCharEncodingError => null(),
-        XmlCharEncoding::XmlCharEncodingNone => null(),
-        XmlCharEncoding::XmlCharEncodingUtf8 => c"UTF-8".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingUtf16le => c"UTF-16".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingUtf16be => c"UTF-16".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingEbcdic => c"EBCDIC".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingUcs4le => c"ISO-10646-UCS-4".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingUcs4be => c"ISO-10646-UCS-4".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingUcs4_2143 => c"ISO-10646-UCS-4".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingUcs4_3412 => c"ISO-10646-UCS-4".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingUcs2 => c"ISO-10646-UCS-2".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_1 => c"ISO-8859-1".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_2 => c"ISO-8859-2".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_3 => c"ISO-8859-3".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_4 => c"ISO-8859-4".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_5 => c"ISO-8859-5".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_6 => c"ISO-8859-6".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_7 => c"ISO-8859-7".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_8 => c"ISO-8859-8".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding8859_9 => c"ISO-8859-9".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncoding2022Jp => c"ISO-2022-JP".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingShiftJis => c"Shift-JIS".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingEucJp => c"EUC-JP".as_ptr() as _,
-        XmlCharEncoding::XmlCharEncodingAscii => null(),
+        XmlCharEncoding::Error => null(),
+        XmlCharEncoding::None => null(),
+        XmlCharEncoding::UTF8 => c"UTF-8".as_ptr() as _,
+        XmlCharEncoding::UTF16LE => c"UTF-16".as_ptr() as _,
+        XmlCharEncoding::UTF16BE => c"UTF-16".as_ptr() as _,
+        XmlCharEncoding::EBCDIC => c"EBCDIC".as_ptr() as _,
+        XmlCharEncoding::UCS4LE => c"ISO-10646-UCS-4".as_ptr() as _,
+        XmlCharEncoding::UCS4BE => c"ISO-10646-UCS-4".as_ptr() as _,
+        XmlCharEncoding::UCS4_2143 => c"ISO-10646-UCS-4".as_ptr() as _,
+        XmlCharEncoding::UCS4_3412 => c"ISO-10646-UCS-4".as_ptr() as _,
+        XmlCharEncoding::UCS2 => c"ISO-10646-UCS-2".as_ptr() as _,
+        XmlCharEncoding::ISO8859_1 => c"ISO-8859-1".as_ptr() as _,
+        XmlCharEncoding::ISO8859_2 => c"ISO-8859-2".as_ptr() as _,
+        XmlCharEncoding::ISO8859_3 => c"ISO-8859-3".as_ptr() as _,
+        XmlCharEncoding::ISO8859_4 => c"ISO-8859-4".as_ptr() as _,
+        XmlCharEncoding::ISO8859_5 => c"ISO-8859-5".as_ptr() as _,
+        XmlCharEncoding::ISO8859_6 => c"ISO-8859-6".as_ptr() as _,
+        XmlCharEncoding::ISO8859_7 => c"ISO-8859-7".as_ptr() as _,
+        XmlCharEncoding::ISO8859_8 => c"ISO-8859-8".as_ptr() as _,
+        XmlCharEncoding::ISO8859_9 => c"ISO-8859-9".as_ptr() as _,
+        XmlCharEncoding::ISO2022JP => c"ISO-2022-JP".as_ptr() as _,
+        XmlCharEncoding::ShiftJIS => c"Shift-JIS".as_ptr() as _,
+        XmlCharEncoding::EUCJP => c"EUC-JP".as_ptr() as _,
+        XmlCharEncoding::ASCII => null(),
     }
 }
 
@@ -2049,7 +2049,7 @@ pub unsafe extern "C" fn xml_detect_char_encoding(
     len: c_int,
 ) -> XmlCharEncoding {
     if input.is_null() {
-        return XmlCharEncoding::XmlCharEncodingNone;
+        return XmlCharEncoding::None;
     }
     if len >= 4 {
         if *input.add(0) == 0x00
@@ -2057,42 +2057,42 @@ pub unsafe extern "C" fn xml_detect_char_encoding(
             && *input.add(2) == 0x00
             && *input.add(3) == 0x3C
         {
-            return XmlCharEncoding::XmlCharEncodingUcs4be;
+            return XmlCharEncoding::UCS4BE;
         }
         if *input.add(0) == 0x3C
             && *input.add(1) == 0x00
             && *input.add(2) == 0x00
             && *input.add(3) == 0x00
         {
-            return XmlCharEncoding::XmlCharEncodingUcs4le;
+            return XmlCharEncoding::UCS4LE;
         }
         if *input.add(0) == 0x00
             && *input.add(1) == 0x00
             && *input.add(2) == 0x3C
             && *input.add(3) == 0x00
         {
-            return XmlCharEncoding::XmlCharEncodingUcs4_2143;
+            return XmlCharEncoding::UCS4_2143;
         }
         if *input.add(0) == 0x00
             && *input.add(1) == 0x3C
             && *input.add(2) == 0x00
             && *input.add(3) == 0x00
         {
-            return XmlCharEncoding::XmlCharEncodingUcs4_3412;
+            return XmlCharEncoding::UCS4_3412;
         }
         if *input.add(0) == 0x4C
             && *input.add(1) == 0x6F
             && *input.add(2) == 0xA7
             && *input.add(3) == 0x94
         {
-            return XmlCharEncoding::XmlCharEncodingEbcdic;
+            return XmlCharEncoding::EBCDIC;
         }
         if *input.add(0) == 0x3C
             && *input.add(1) == 0x3F
             && *input.add(2) == 0x78
             && *input.add(3) == 0x6D
         {
-            return XmlCharEncoding::XmlCharEncodingUtf8;
+            return XmlCharEncoding::UTF8;
         }
         /*
          * Although not part of the recommendation, we also
@@ -2104,14 +2104,14 @@ pub unsafe extern "C" fn xml_detect_char_encoding(
             && *input.add(2) == 0x3F
             && *input.add(3) == 0x00
         {
-            return XmlCharEncoding::XmlCharEncodingUtf16le;
+            return XmlCharEncoding::UTF16LE;
         }
         if *input.add(0) == 0x00
             && *input.add(1) == 0x3C
             && *input.add(2) == 0x00
             && *input.add(3) == 0x3F
         {
-            return XmlCharEncoding::XmlCharEncodingUtf16be;
+            return XmlCharEncoding::UTF16BE;
         }
     }
     if len >= 3 {
@@ -2120,19 +2120,19 @@ pub unsafe extern "C" fn xml_detect_char_encoding(
          * We now allow an UTF8 encoded BOM
          */
         if *input.add(0) == 0xEF && *input.add(1) == 0xBB && *input.add(2) == 0xBF {
-            return XmlCharEncoding::XmlCharEncodingUtf8;
+            return XmlCharEncoding::UTF8;
         }
     }
     /* For UTF-16 we can recognize by the BOM */
     if len >= 2 {
         if *input.add(0) == 0xFE && *input.add(1) == 0xFF {
-            return XmlCharEncoding::XmlCharEncodingUtf16be;
+            return XmlCharEncoding::UTF16BE;
         }
         if *input.add(0) == 0xFF && *input.add(1) == 0xFE {
-            return XmlCharEncoding::XmlCharEncodingUtf16le;
+            return XmlCharEncoding::UTF16LE;
         }
     }
-    XmlCharEncoding::XmlCharEncodingNone
+    XmlCharEncoding::None
 }
 
 /**

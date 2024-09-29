@@ -2069,7 +2069,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     let mut i: c_int;
     let mut ret: c_int = -1;
     let mut encoding: *mut XmlChar = null_mut();
-    let mut enc: XmlCharEncoding = XmlCharEncoding::XmlCharEncodingNone;
+    let mut enc: XmlCharEncoding = XmlCharEncoding::None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut input_stream: XmlParserInputPtr = null_mut();
 
@@ -2190,7 +2190,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
          *       encoding supported by iconv
          */
         enc = xml_parse_char_encoding(encoding as _);
-        if matches!(enc, XmlCharEncoding::XmlCharEncodingError) {
+        if matches!(enc, XmlCharEncoding::Error) {
             xml_xinclude_err(
                 ctxt,
                 (*refe).elem,

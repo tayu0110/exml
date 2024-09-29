@@ -2649,7 +2649,7 @@ pub unsafe extern "C" fn xml_new_doc(mut version: *const XmlChar) -> XmlDocPtr {
      * This field will never change and would
      * be obsolete if not for binary compatibility.
      */
-    (*cur).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+    (*cur).charset = XmlCharEncoding::UTF8 as i32;
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()

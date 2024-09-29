@@ -1339,9 +1339,9 @@ pub unsafe extern "C" fn xml_sax2_end_document(ctx: *mut c_void) {
     {
         (*(*ctxt).my_doc).encoding = xml_strdup((*(*(*ctxt).input_tab.add(0))).encoding);
     }
-    if (*ctxt).charset != XmlCharEncoding::XmlCharEncodingNone as i32
+    if (*ctxt).charset != XmlCharEncoding::None as i32
         && !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).charset == XmlCharEncoding::XmlCharEncodingNone as i32
+        && (*(*ctxt).my_doc).charset == XmlCharEncoding::None as i32
     {
         (*(*ctxt).my_doc).charset = (*ctxt).charset;
     }

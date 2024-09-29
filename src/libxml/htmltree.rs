@@ -122,7 +122,7 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     (*cur).ids = null_mut();
     (*cur).refs = null_mut();
     (*cur)._private = null_mut();
-    (*cur).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+    (*cur).charset = XmlCharEncoding::UTF8 as i32;
     (*cur).properties =
         XmlDocProperties::XmlDocHtml as i32 | XmlDocProperties::XmlDocUserbuilt as i32;
     if !external_id.is_null() || !uri.is_null() {
@@ -550,7 +550,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
 
     if !encoding.is_null() {
         let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
+        if !matches!(enc, XmlCharEncoding::UTF8) {
             handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
@@ -640,7 +640,7 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
 
     if !encoding.is_null() {
         let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
+        if !matches!(enc, XmlCharEncoding::UTF8) {
             handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
@@ -703,7 +703,7 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
 
     if !encoding.is_null() {
         let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
+        if !matches!(enc, XmlCharEncoding::UTF8) {
             handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
@@ -896,7 +896,7 @@ pub unsafe extern "C" fn html_node_dump_file_format(
 
     if !encoding.is_null() {
         let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
+        if !matches!(enc, XmlCharEncoding::UTF8) {
             handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(
@@ -988,7 +988,7 @@ pub unsafe extern "C" fn html_save_file_format(
 
     if !encoding.is_null() {
         let enc: XmlCharEncoding = xml_parse_char_encoding(encoding);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) {
+        if !matches!(enc, XmlCharEncoding::UTF8) {
             handler = xml_find_char_encoding_handler(encoding);
             if handler.is_null() {
                 html_save_err(

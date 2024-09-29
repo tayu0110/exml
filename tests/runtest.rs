@@ -2214,7 +2214,7 @@ unsafe extern "C" fn push_parse_test(
             base.add(cur as _),
             chunk_size,
             filename,
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         )
     } else {
         xml_create_push_parser_ctxt(
@@ -2566,7 +2566,7 @@ unsafe extern "C" fn push_boundary_test(
             base,
             1,
             filename,
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         )
     } else {
         xml_create_push_parser_ctxt(addr_of_mut!(bnd_sax) as _, null_mut(), base, 1, filename)
@@ -6865,9 +6865,9 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
     let mut mem: c_int;
 
     let ebcdic_handler: XmlCharEncodingHandlerPtr =
-        xml_get_char_encoding_handler(XmlCharEncoding::XmlCharEncodingEbcdic);
+        xml_get_char_encoding_handler(XmlCharEncoding::EBCDIC);
     let euc_jp_handler: XmlCharEncodingHandlerPtr =
-        xml_get_char_encoding_handler(XmlCharEncoding::XmlCharEncodingEucJp);
+        xml_get_char_encoding_handler(XmlCharEncoding::EUCJP);
 
     if let Some(input) = tst.input {
         let mut globbuf: glob_t = unsafe { zeroed() };

@@ -1710,7 +1710,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
         {
             let buf: XmlParserInputBufferPtr = xml_parser_input_buffer_create_filename(
                 filename,
-                XmlCharEncoding::XmlCharEncodingNone,
+                XmlCharEncoding::None,
             );
             if buf.is_null() {
                 return;
@@ -1734,7 +1734,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
             let ret: c_int = xml_schema_validate_stream(
                 vctxt,
                 buf,
-                XmlCharEncoding::XmlCharEncodingNone,
+                XmlCharEncoding::None,
                 handler,
                 user_data.as_ptr() as _,
             );
@@ -2400,7 +2400,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         chars.as_ptr(),
                         res,
                         filename,
-                        XmlCharEncoding::XmlCharEncodingNone,
+                        XmlCharEncoding::None,
                     );
                     if ctxt.is_null() {
                         PROGRESULT = XmllintReturnCode::ErrMem;

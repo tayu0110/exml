@@ -30956,14 +30956,14 @@ pub unsafe extern "C" fn xml_schema_validate_file(
     }
 
     let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None);
     if input.is_null() {
         return -1;
     }
     let ret: c_int = xml_schema_validate_stream(
         ctxt,
         input,
-        XmlCharEncoding::XmlCharEncodingNone,
+        XmlCharEncoding::None,
         null_mut(),
         null_mut(),
     );

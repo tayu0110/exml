@@ -3946,7 +3946,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
     }
 
     let buf: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None);
     if buf.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();

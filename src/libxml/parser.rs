@@ -2519,7 +2519,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
         let enc = xml_detect_char_encoding(addr_of_mut!(start[0]), 4);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+        if !matches!(enc, XmlCharEncoding::None) {
             xml_switch_encoding(ctxt, enc);
         }
     }
@@ -2730,7 +2730,7 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> c_i
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
         enc = xml_detect_char_encoding(start.as_ptr(), 4);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+        if !matches!(enc, XmlCharEncoding::None) {
             xml_switch_encoding(ctxt, enc);
         }
     }
@@ -3429,8 +3429,7 @@ pub unsafe extern "C" fn xml_io_parse_dtd(
      * generate a parser input from the I/O handler
      */
 
-    let pinput: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let pinput: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if pinput.is_null() {
         xml_free_parser_input_buffer(input);
         xml_free_parser_ctxt(ctxt);
@@ -3444,7 +3443,7 @@ pub unsafe extern "C" fn xml_io_parse_dtd(
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
-    if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+    if !matches!(enc, XmlCharEncoding::None) {
         xml_switch_encoding(ctxt, enc);
     }
 
@@ -3472,7 +3471,7 @@ pub unsafe extern "C" fn xml_io_parse_dtd(
         c"none".as_ptr() as _,
     );
 
-    if matches!(enc, XmlCharEncoding::XmlCharEncodingNone)
+    if matches!(enc, XmlCharEncoding::None)
         && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4
     {
         /*
@@ -3485,7 +3484,7 @@ pub unsafe extern "C" fn xml_io_parse_dtd(
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
         enc = xml_detect_char_encoding(start.as_ptr(), 4);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+        if !matches!(enc, XmlCharEncoding::None) {
             xml_switch_encoding(ctxt, enc);
         }
     }
@@ -4205,7 +4204,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
         enc = xml_detect_char_encoding(start.as_ptr(), 4);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+        if !matches!(enc, XmlCharEncoding::None) {
             xml_switch_encoding(ctxt, enc);
         }
     }
@@ -4666,7 +4665,7 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
     (*ctxt).in_subset = 0;
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
-    (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+    (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
     (*ctxt).catalogs = null_mut();
     (*ctxt).sizeentities = 0;
     (*ctxt).sizeentcopy = 0;
@@ -5266,8 +5265,7 @@ pub unsafe extern "C" fn xml_create_push_parser_ctxt(
     size: c_int,
     filename: *const c_char,
 ) -> XmlParserCtxtPtr {
-    let buf: XmlParserInputBufferPtr =
-        xml_alloc_parser_input_buffer(XmlCharEncoding::XmlCharEncodingNone);
+    let buf: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(XmlCharEncoding::None);
     if buf.is_null() {
         return null_mut();
     }
@@ -5320,7 +5318,7 @@ pub unsafe extern "C" fn xml_create_push_parser_ctxt(
      * the encoding, we set the context to xmlCharEncoding::XML_CHAR_ENCODING_NONE so
      * that it can be automatically determined later
      */
-    (*ctxt).charset = XmlCharEncoding::XmlCharEncodingNone as i32;
+    (*ctxt).charset = XmlCharEncoding::None as i32;
 
     if size != 0 && !chunk.is_null() && !(*ctxt).input.is_null() && !(*(*ctxt).input).buf.is_null()
     {
@@ -9671,7 +9669,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     return ret;
                 }
                 XmlParserInputState::XmlParserStart => 'to_break: {
-                    if (*ctxt).charset == XmlCharEncoding::XmlCharEncodingNone as i32 {
+                    if (*ctxt).charset == XmlCharEncoding::None as i32 {
                         let mut start: [XmlChar; 4] = [0; 4];
 
                         /*
@@ -9698,10 +9696,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                          * We need more bytes to detect EBCDIC code pages.
                          * See xmlDetectEBCDIC.
                          */
-                        if matches!(enc, XmlCharEncoding::XmlCharEncodingEbcdic)
-                            && terminate == 0
-                            && avail < 200
-                        {
+                        if matches!(enc, XmlCharEncoding::EBCDIC) && terminate == 0 && avail < 200 {
                             // goto done;
                             return ret;
                         }
@@ -10679,7 +10674,7 @@ pub unsafe extern "C" fn xml_new_io_input_stream(
         input_stream,
     );
 
-    if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+    if !matches!(enc, XmlCharEncoding::None) {
         xml_switch_encoding(ctxt, enc);
     }
 
@@ -11134,7 +11129,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     (*ctxt).in_subset = 0;
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
-    (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+    (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
     (*ctxt).catalogs = null_mut();
     (*ctxt).sizeentities = 0;
     (*ctxt).sizeentcopy = 0;
@@ -11179,7 +11174,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
     filename: *const c_char,
     encoding: *const c_char,
 ) -> c_int {
-    let mut enc: XmlCharEncoding = XmlCharEncoding::XmlCharEncodingNone;
+    let mut enc: XmlCharEncoding = XmlCharEncoding::None;
 
     if ctxt.is_null() {
         return 1;
@@ -11264,7 +11259,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
                 encoding as _,
             );
         }
-    } else if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+    } else if !matches!(enc, XmlCharEncoding::None) {
         xml_switch_encoding(ctxt, enc);
     }
 
@@ -11444,7 +11439,7 @@ pub unsafe extern "C" fn xml_read_fd(
     xml_init_parser();
 
     let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::None);
     if input.is_null() {
         return null_mut();
     }
@@ -11454,8 +11449,7 @@ pub unsafe extern "C" fn xml_read_fd(
         xml_free_parser_input_buffer(input);
         return null_mut();
     }
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         xml_free_parser_ctxt(ctxt);
@@ -11491,12 +11485,8 @@ pub unsafe extern "C" fn xml_read_io(
     }
     xml_init_parser();
 
-    let input: XmlParserInputBufferPtr = xml_parser_input_buffer_create_io(
-        ioread,
-        ioclose,
-        ioctx,
-        XmlCharEncoding::XmlCharEncodingNone,
-    );
+    let input: XmlParserInputBufferPtr =
+        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None);
     if input.is_null() {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
@@ -11508,8 +11498,7 @@ pub unsafe extern "C" fn xml_read_io(
         xml_free_parser_input_buffer(input);
         return null_mut();
     }
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         xml_free_parser_ctxt(ctxt);
@@ -11614,13 +11603,12 @@ pub unsafe extern "C" fn xml_ctxt_read_memory(
     xml_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None);
     if input.is_null() {
         return null_mut();
     }
 
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         return null_mut();
@@ -11663,13 +11651,12 @@ pub unsafe extern "C" fn xml_ctxt_read_fd(
     xml_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::None);
     if input.is_null() {
         return null_mut();
     }
     (*input).closecallback = None;
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         return null_mut();
@@ -11712,20 +11699,15 @@ pub unsafe extern "C" fn xml_ctxt_read_io(
 
     xml_ctxt_reset(ctxt);
 
-    let input: XmlParserInputBufferPtr = xml_parser_input_buffer_create_io(
-        ioread,
-        ioclose,
-        ioctx,
-        XmlCharEncoding::XmlCharEncodingNone,
-    );
+    let input: XmlParserInputBufferPtr =
+        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None);
     if input.is_null() {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
         }
         return null_mut();
     }
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         return null_mut();

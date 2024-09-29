@@ -1247,43 +1247,43 @@ pub(crate) unsafe extern "C" fn gen_xml_parser_input_buffer_ptr(
     if no == 0 {
         return xml_parser_input_buffer_create_filename(
             c"missing.xml".as_ptr(),
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         );
     }
     if no == 1 {
         return xml_parser_input_buffer_create_filename(
             c"<foo/>".as_ptr(),
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         );
     }
     if no == 2 {
         return xml_parser_input_buffer_create_filename(
             c"test/ent2".as_ptr(),
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         );
     }
     if no == 3 {
         return xml_parser_input_buffer_create_filename(
             c"test/valid/REC-xml-19980210.xml".as_ptr(),
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         );
     }
     if no == 4 {
         return xml_parser_input_buffer_create_filename(
             c"test/valid/dtds/xhtml1-strict.dtd".as_ptr(),
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         );
     }
     if no == 5 {
         return xml_parser_input_buffer_create_filename(
             REMOTE1GOOD.as_ptr(),
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         );
     }
     if no == 6 {
         return xml_parser_input_buffer_create_filename(
             REMOTE1BAD.as_ptr(),
-            XmlCharEncoding::XmlCharEncodingNone,
+            XmlCharEncoding::None,
         );
     }
     null_mut()
@@ -2110,15 +2110,15 @@ pub(crate) fn des_filepath(_no: c_int, _val: *const c_char, _nr: c_int) {}
 
 pub(crate) fn gen_xml_char_encoding(no: c_int, _nr: c_int) -> XmlCharEncoding {
     if no == 0 {
-        return XmlCharEncoding::XmlCharEncodingUtf8;
+        return XmlCharEncoding::UTF8;
     }
     if no == 1 {
-        return XmlCharEncoding::XmlCharEncodingNone;
+        return XmlCharEncoding::None;
     }
     if no == 2 {
-        return XmlCharEncoding::XmlCharEncoding8859_1;
+        return XmlCharEncoding::ISO8859_1;
     }
-    XmlCharEncoding::XmlCharEncodingError
+    XmlCharEncoding::Error
 }
 
 pub(crate) fn des_xml_char_encoding(_no: c_int, _val: XmlCharEncoding, _nr: c_int) {}

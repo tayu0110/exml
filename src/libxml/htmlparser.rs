@@ -5930,7 +5930,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
         return 0;
     }
 
-    if (*ctxt).charset != XmlCharEncoding::XmlCharEncodingUtf8 as i32 {
+    if (*ctxt).charset != XmlCharEncoding::UTF8 as i32 {
         let handler: XmlCharEncodingHandlerPtr;
 
         /*
@@ -5957,7 +5957,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
          */
         let guess: *mut XmlChar = html_find_encoding(ctxt);
         if guess.is_null() {
-            xml_switch_encoding(ctxt, XmlCharEncoding::XmlCharEncoding8859_1);
+            xml_switch_encoding(ctxt, XmlCharEncoding::ISO8859_1);
         } else {
             if !(*(*ctxt).input).encoding.is_null() {
                 xml_free((*(*ctxt).input).encoding as _);
@@ -5985,7 +5985,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
                 );
             }
         }
-        (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+        (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
     }
 
     /*
@@ -6120,7 +6120,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
      * impossible, see Gitlab issue #34.
      */
     if !(*(*ctxt).input).buf.is_null() && (*(*(*ctxt).input).buf).encoder.is_null() {
-        xml_switch_encoding(ctxt, XmlCharEncoding::XmlCharEncoding8859_1);
+        xml_switch_encoding(ctxt, XmlCharEncoding::ISO8859_1);
     }
     *len = 1;
     *(*(*ctxt).input).cur as _
@@ -7129,13 +7129,13 @@ unsafe extern "C" fn html_check_encoding_direct(
         /*
          * registered set of known encodings
          */
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingError) {
+        if !matches!(enc, XmlCharEncoding::Error) {
             if matches!(
                 enc,
-                XmlCharEncoding::XmlCharEncodingUtf16le
-                    | XmlCharEncoding::XmlCharEncodingUtf16be
-                    | XmlCharEncoding::XmlCharEncodingUcs4le
-                    | XmlCharEncoding::XmlCharEncodingUcs4be
+                XmlCharEncoding::UTF16LE
+                    | XmlCharEncoding::UTF16BE
+                    | XmlCharEncoding::UCS4LE
+                    | XmlCharEncoding::UCS4BE
             ) && !(*(*ctxt).input).buf.is_null()
                 && (*(*(*ctxt).input).buf).encoder.is_null()
             {
@@ -7149,7 +7149,7 @@ unsafe extern "C" fn html_check_encoding_direct(
             } else {
                 xml_switch_encoding(ctxt, enc);
             }
-            (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+            (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
         } else {
             /*
              * fallback for unknown encodings
@@ -7157,7 +7157,7 @@ unsafe extern "C" fn html_check_encoding_direct(
             handler = xml_find_char_encoding_handler(encoding as _);
             if !handler.is_null() {
                 xml_switch_to_encoding(ctxt, handler);
-                (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+                (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
             } else {
                 html_parse_err(
                     ctxt,
@@ -9543,7 +9543,7 @@ pub unsafe extern "C" fn html_create_memory_parser_ctxt(
     }
 
     let buf: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None);
     if buf.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -9978,7 +9978,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
         );
     }
 
-    if (*ctxt).encoding == XmlCharEncoding::XmlCharEncodingNone as usize as _
+    if (*ctxt).encoding == XmlCharEncoding::None as usize as _
         && ((*(*ctxt).input).end.offset_from((*(*ctxt).input).cur)) >= 4
     {
         /*
@@ -9991,7 +9991,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
         enc = xml_detect_char_encoding(addr_of_mut!(start[0]), 4);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+        if !matches!(enc, XmlCharEncoding::None) {
             xml_switch_encoding(ctxt, enc);
         }
     }
@@ -10135,7 +10135,7 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
         /*
          * registered set of known encodings
          */
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingError) {
+        if !matches!(enc, XmlCharEncoding::Error) {
             xml_switch_encoding(ctxt, enc);
             if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
                 html_parse_err(
@@ -10749,8 +10749,8 @@ pub unsafe extern "C" fn html_create_push_parser_ctxt(
         xml_free_parser_input_buffer(buf);
         return null_mut();
     }
-    if matches!(enc, XmlCharEncoding::XmlCharEncodingUtf8) || !(*buf).encoder.is_null() {
-        (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+    if matches!(enc, XmlCharEncoding::UTF8) || !(*buf).encoder.is_null() {
+        (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
     }
     if filename.is_null() {
         (*ctxt).directory = null_mut();
@@ -12090,7 +12090,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).in_subset = 0;
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
-    (*ctxt).charset = XmlCharEncoding::XmlCharEncodingNone as i32;
+    (*ctxt).charset = XmlCharEncoding::None as i32;
     (*ctxt).catalogs = null_mut();
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
 
@@ -12337,7 +12337,7 @@ pub unsafe extern "C" fn html_read_fd(
 
     xml_init_parser();
     let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::None);
     if input.is_null() {
         return null_mut();
     }
@@ -12347,8 +12347,7 @@ pub unsafe extern "C" fn html_read_fd(
         xml_free_parser_input_buffer(input);
         return null_mut();
     }
-    let stream: HtmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: HtmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         html_free_parser_ctxt(ctxt);
@@ -12384,12 +12383,8 @@ pub unsafe extern "C" fn html_read_io(
     }
     xml_init_parser();
 
-    let input: XmlParserInputBufferPtr = xml_parser_input_buffer_create_io(
-        ioread,
-        ioclose,
-        ioctx,
-        XmlCharEncoding::XmlCharEncodingNone,
-    );
+    let input: XmlParserInputBufferPtr =
+        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None);
     if input.is_null() {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
@@ -12401,8 +12396,7 @@ pub unsafe extern "C" fn html_read_io(
         xml_free_parser_input_buffer(input);
         return null_mut();
     }
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         xml_free_parser_ctxt(ctxt);
@@ -12507,13 +12501,12 @@ pub unsafe extern "C" fn html_ctxt_read_memory(
     html_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None);
     if input.is_null() {
         return null_mut();
     }
 
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         return null_mut();
@@ -12554,12 +12547,11 @@ pub unsafe extern "C" fn html_ctxt_read_fd(
     html_ctxt_reset(ctxt);
 
     let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_fd(fd, XmlCharEncoding::None);
     if input.is_null() {
         return null_mut();
     }
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         return null_mut();
@@ -12602,20 +12594,15 @@ pub unsafe extern "C" fn html_ctxt_read_io(
 
     html_ctxt_reset(ctxt);
 
-    let input: XmlParserInputBufferPtr = xml_parser_input_buffer_create_io(
-        ioread,
-        ioclose,
-        ioctx,
-        XmlCharEncoding::XmlCharEncodingNone,
-    );
+    let input: XmlParserInputBufferPtr =
+        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None);
     if input.is_null() {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
         }
         return null_mut();
     }
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, XmlCharEncoding::XmlCharEncodingNone);
+    let stream: XmlParserInputPtr = xml_new_io_input_stream(ctxt, input, XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_input_buffer(input);
         return null_mut();

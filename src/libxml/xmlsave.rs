@@ -1782,9 +1782,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         {
             if !matches!(
                 enc,
-                XmlCharEncoding::XmlCharEncodingUtf8
-                    | XmlCharEncoding::XmlCharEncodingNone
-                    | XmlCharEncoding::XmlCharEncodingAscii
+                XmlCharEncoding::UTF8 | XmlCharEncoding::None | XmlCharEncoding::ASCII
             ) {
                 /*
                  * we need to match to this encoding but just for this

@@ -810,7 +810,7 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
     }
 
     let buf: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None);
     if buf.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -944,7 +944,7 @@ unsafe extern "C" fn xml_detect_ebcdic(input: XmlParserInputPtr) -> XmlCharEncod
      * To detect the EBCDIC code page, we convert the first 200 bytes
      * to EBCDIC-US and try to find the encoding declaration.
      */
-    handler = xml_get_char_encoding_handler(XmlCharEncoding::XmlCharEncodingEbcdic);
+    handler = xml_get_char_encoding_handler(XmlCharEncoding::EBCDIC);
     if handler.is_null() {
         return null_mut();
     }
@@ -1047,9 +1047,9 @@ pub unsafe extern "C" fn xml_switch_encoding(
         && (*(*ctxt).input).cur == (*(*ctxt).input).base
         && matches!(
             enc,
-            XmlCharEncoding::XmlCharEncodingUtf8
-                | XmlCharEncoding::XmlCharEncodingUtf16le
-                | XmlCharEncoding::XmlCharEncodingUtf16be
+            XmlCharEncoding::UTF8
+                | XmlCharEncoding::UTF16LE
+                | XmlCharEncoding::UTF16BE
         )
     {
         /*
@@ -1066,7 +1066,7 @@ pub unsafe extern "C" fn xml_switch_encoding(
     }
 
     let handler = match enc {
-        XmlCharEncoding::XmlCharEncodingError => {
+        XmlCharEncoding::Error => {
             __xml_err_encoding(
                 ctxt,
                 XmlParserErrors::XmlErrUnknownEncoding,
@@ -1076,17 +1076,17 @@ pub unsafe extern "C" fn xml_switch_encoding(
             );
             return -1;
         }
-        XmlCharEncoding::XmlCharEncodingNone => {
+        XmlCharEncoding::None => {
             /* let's assume it's UTF-8 without the XML decl */
-            (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+            (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
             return 0;
         }
-        XmlCharEncoding::XmlCharEncodingUtf8 => {
+        XmlCharEncoding::UTF8 => {
             /* default encoding, no conversion should be needed */
-            (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+            (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
             return 0;
         }
-        XmlCharEncoding::XmlCharEncodingEbcdic => xml_detect_ebcdic((*ctxt).input),
+        XmlCharEncoding::EBCDIC => xml_detect_ebcdic((*ctxt).input),
         _ => xml_get_char_encoding_handler(enc),
     };
     if handler.is_null() {
@@ -1094,12 +1094,12 @@ pub unsafe extern "C" fn xml_switch_encoding(
          * Default handlers.
          */
         match enc {
-            XmlCharEncoding::XmlCharEncodingAscii => {
+            XmlCharEncoding::ASCII => {
                 /* default encoding, no conversion should be needed */
-                (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+                (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
                 return 0;
             }
-            XmlCharEncoding::XmlCharEncoding8859_1 => {
+            XmlCharEncoding::ISO8859_1 => {
                 if (*ctxt).input_nr == 1
                     && (*ctxt).encoding.is_null()
                     && !(*ctxt).input.is_null()
@@ -1218,7 +1218,7 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
         return 0;
     }
 
-    (*ctxt).charset = XmlCharEncoding::XmlCharEncodingUtf8 as i32;
+    (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
     (*input_buf).encoder = handler;
 
     /*
@@ -1359,7 +1359,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
     let buf: XmlParserInputBufferPtr = xml_parser_input_buffer_create_mem(
         buffer as *const c_char,
         xml_strlen(buffer),
-        XmlCharEncoding::XmlCharEncodingNone,
+        XmlCharEncoding::None,
     );
     if buf.is_null() {
         xml_err_memory(ctxt, null());
@@ -1791,7 +1791,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
         return null_mut();
     }
     let buf: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::XmlCharEncodingNone);
+        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None);
     if buf.is_null() {
         if filename.is_null() {
             __xml_loader_err(
@@ -4856,7 +4856,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         if value == 0 {
             return;
         }
-        if (*ctxt).charset != XmlCharEncoding::XmlCharEncodingUtf8 as i32 {
+        if (*ctxt).charset != XmlCharEncoding::UTF8 as i32 {
             /*
              * So we are using non-UTF-8 buffers
              * Check that the c_char fit on 8bits, if not
@@ -5561,7 +5561,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     start[2] = NXT!(ctxt, 2);
                     start[3] = NXT!(ctxt, 3);
                     enc = xml_detect_char_encoding(start.as_ptr() as _, 4);
-                    if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+                    if !matches!(enc, XmlCharEncoding::None) {
                         xml_switch_encoding(ctxt, enc);
                     }
                 }
@@ -6624,7 +6624,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
         let enc: XmlCharEncoding = xml_detect_char_encoding(start.as_ptr() as _, 4);
-        if !matches!(enc, XmlCharEncoding::XmlCharEncodingNone) {
+        if !matches!(enc, XmlCharEncoding::None) {
             xml_switch_encoding(ctxt, enc);
         }
     }
@@ -7043,7 +7043,7 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
         return 0;
     }
     'encoding_error: {
-        if ctxt.is_null() || (*ctxt).charset == XmlCharEncoding::XmlCharEncodingUtf8 as i32 {
+        if ctxt.is_null() || (*ctxt).charset == XmlCharEncoding::UTF8 as i32 {
             /*
              * We are supposed to handle UTF8, check it's valid
              * From rfc2044: encoding of the Unicode values on UTF-8:
@@ -7572,7 +7572,7 @@ pub unsafe extern "C" fn xml_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_in
     }
     'incomplete_sequence: {
         'encoding_error: {
-            if (*ctxt).charset == XmlCharEncoding::XmlCharEncodingUtf8 as i32 {
+            if (*ctxt).charset == XmlCharEncoding::UTF8 as i32 {
                 /*
                  * We are supposed to handle UTF8, check it's valid
                  * From rfc2044: encoding of the Unicode values on UTF-8:
@@ -7724,7 +7724,7 @@ pub unsafe extern "C" fn xml_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_in
                 null(),
             );
         }
-        (*ctxt).charset = XmlCharEncoding::XmlCharEncoding8859_1 as i32;
+        (*ctxt).charset = XmlCharEncoding::ISO8859_1 as i32;
         *len = 1;
         return *(*(*ctxt).input).cur as i32;
     }
@@ -7858,7 +7858,7 @@ pub(crate) unsafe extern "C" fn xml_next_char(ctxt: XmlParserCtxtPtr) {
     }
 
     'encoding_error: {
-        if (*ctxt).charset == XmlCharEncoding::XmlCharEncodingUtf8 as i32 {
+        if (*ctxt).charset == XmlCharEncoding::UTF8 as i32 {
             /*
              *   2.11 End-of-Line Handling
              *   the literal two-character sequence "#xD#xA" or a standalone
@@ -7994,7 +7994,7 @@ pub(crate) unsafe extern "C" fn xml_next_char(ctxt: XmlParserCtxtPtr) {
             null(),
         );
     }
-    (*ctxt).charset = XmlCharEncoding::XmlCharEncoding8859_1 as i32;
+    (*ctxt).charset = XmlCharEncoding::ISO8859_1 as i32;
     (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
 }
 
