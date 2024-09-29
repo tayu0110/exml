@@ -59,8 +59,8 @@ use super::{
         XmlCharEncodingHandlerPtr, XmlCharEncodingOutputFunc,
     },
     globals::{
-        __xml_parser_input_buffer_create_filename_value, xml_default_buffer_size, xml_free,
-        xml_malloc, xml_output_buffer_create_filename_value,
+        __xml_parser_input_buffer_create_filename_value, xml_free, xml_malloc,
+        xml_output_buffer_create_filename_value,
     },
     nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
     nanohttp::{
@@ -181,7 +181,7 @@ pub struct XmlParserInputBuffer {
     pub(crate) encoder: XmlCharEncodingHandlerPtr, /* I18N conversions to UTF-8 */
 
     pub buffer: Option<XmlBufRef>, /* Local buffer encoded in UTF-8 */
-    pub(crate) raw: XmlBufPtr,     /* if encoder != NULL buffer for raw input */
+    pub(crate) raw: Option<XmlBufRef>, /* if encoder != NULL buffer for raw input */
     pub(crate) compressed: c_int,  /* -1=unknown, 0=not compressed, 1=compressed */
     pub(crate) error: c_int,
     pub(crate) rawconsumed: c_ulong, /* amount consumed from raw */
@@ -371,11 +371,11 @@ pub unsafe extern "C" fn xml_alloc_parser_input_buffer(
     (*ret).buffer = Some(new_buf);
     new_buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     (*ret).encoder = xml_get_char_encoding_handler(enc);
-    if !(*ret).encoder.is_null() {
-        (*ret).raw = xml_buf_create_size(2 * *xml_default_buffer_size() as usize);
+    (*ret).raw = if !(*ret).encoder.is_null() {
+        XmlBufRef::with_capacity(2 * default_buffer_size)
     } else {
-        (*ret).raw = null_mut();
-    }
+        None
+    };
     (*ret).readcallback = None;
     (*ret).closecallback = None;
     (*ret).context = null_mut();
@@ -880,10 +880,10 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
         if (*input).readcallback.is_none() {
             return 0;
         }
-        (*input).buffer.map_or(null_mut(), |ptr| ptr.as_ptr())
+        (*input).buffer
     } else {
-        if (*input).raw.is_null() {
-            (*input).raw = xml_buf_create();
+        if (*input).raw.is_none() {
+            (*input).raw = XmlBufRef::new();
         }
         (*input).raw
     };
@@ -892,13 +892,19 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
      * Call the read method for this I/O type.
      */
     if let Some(callback) = (*input).readcallback {
-        if xml_buf_grow(buf, len + 1) < 0 {
+        if buf.map_or(true, |mut buf| buf.grow((len + 1) as usize).is_err()) {
             xml_ioerr_memory(c"growing input buffer".as_ptr() as _);
             (*input).error = XmlParserErrors::XmlErrNoMemory as i32;
             return -1;
         }
 
-        res = callback((*input).context, xml_buf_end(buf) as _, len);
+        res = callback(
+            (*input).context,
+            buf.map_or(null_mut(), |buf| {
+                buf.as_ref().as_ptr().add(buf.len()) as *mut i8
+            }),
+            len,
+        );
         if res <= 0 {
             (*input).readcallback = Some(end_of_input);
         }
@@ -906,7 +912,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
             return -1;
         }
 
-        if xml_buf_add_len(buf, res as _) < 0 {
+        if buf.map_or(true, |mut buf| buf.add_len(res as usize).is_err()) {
             return -1;
         }
     }
@@ -925,14 +931,14 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
         /*
          * convert as much as possible to the parser reading buffer.
          */
-        let using: size_t = xml_buf_use(buf);
+        let using: size_t = buf.map_or(0, |buf| buf.len());
         res = xml_char_enc_input(input, 1);
         if res < 0 {
             xml_ioerr(XmlParserErrors::XmlIoEncoder as i32, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
         }
-        let consumed: size_t = using - xml_buf_use(buf);
+        let consumed: size_t = using - buf.map_or(0, |buf| buf.len());
         if consumed as u64 > u64::MAX || (*input).rawconsumed > u64::MAX - consumed as c_ulong {
             (*input).rawconsumed = u64::MAX;
         } else {
@@ -966,7 +972,6 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
     buf: *const c_char,
 ) -> c_int {
     let nbchars: c_int;
-    let ret: c_int;
 
     if len < 0 {
         return 0;
@@ -978,25 +983,29 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
         /*
          * Store the data in the incoming raw buffer
          */
-        if (*input).raw.is_null() {
-            (*input).raw = xml_buf_create();
+        if (*input).raw.is_none() {
+            (*input).raw = XmlBufRef::new();
         }
-        ret = xml_buf_add((*input).raw, buf as _, len as _);
-        if ret != 0 {
+        if buf.is_null()
+            || (*input).raw.map_or(true, |mut raw| {
+                raw.push_bytes(from_raw_parts(buf as *const u8, len as usize))
+                    .is_err()
+            })
+        {
             return -1;
         }
 
         /*
          * convert as much as possible to the parser reading buffer.
          */
-        let using: size_t = xml_buf_use((*input).raw);
+        let using: size_t = (*input).raw.map_or(0, |raw| raw.len());
         nbchars = xml_char_enc_input(input, 1);
         if nbchars < 0 {
             xml_ioerr(XmlParserErrors::XmlIoEncoder as i32, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
         }
-        let consumed: size_t = using - xml_buf_use((*input).raw);
+        let consumed: size_t = using - (*input).raw.map_or(0, |raw| raw.len());
         if consumed as u64 > u64::MAX || ((*input).rawconsumed > u64::MAX - consumed as c_ulong) {
             (*input).rawconsumed = u64::MAX;
         } else {
@@ -1028,9 +1037,8 @@ pub unsafe extern "C" fn xml_free_parser_input_buffer(input: XmlParserInputBuffe
         return;
     }
 
-    if !(*input).raw.is_null() {
-        xml_buf_free((*input).raw);
-        (*input).raw = null_mut();
+    if let Some(raw) = (*input).raw.take() {
+        raw.free();
     }
     if !(*input).encoder.is_null() {
         xml_char_enc_close_func((*input).encoder);

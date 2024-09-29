@@ -106,8 +106,8 @@ use crate::{
     },
     private::{
         buf::{
-            xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_get_input_base, xml_buf_is_empty,
-            xml_buf_reset_input, xml_buf_set_allocation_scheme, xml_buf_set_input_base_cur,
+            xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_get_input_base, xml_buf_reset_input,
+            xml_buf_set_allocation_scheme, xml_buf_set_input_base_cur,
         },
         enc::{xml_char_enc_input, xml_init_encoding_internal},
         entities::{
@@ -9634,8 +9634,8 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                  * remaining chars to avoid them stalling in the non-converted
                  * buffer.
                  */
-                if !(*(*(*ctxt).input).buf).raw.is_null()
-                    && xml_buf_is_empty((*(*(*ctxt).input).buf).raw) == 0
+                if (*(*(*ctxt).input).buf).raw.is_some()
+                    && !(*(*(*ctxt).input).buf).raw.unwrap().is_empty()
                 {
                     let base: size_t = xml_buf_get_input_base(
                         (*(*(*ctxt).input).buf)
@@ -10497,7 +10497,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
         && (!(*ctxt).input.is_null() && !(*(*ctxt).input).buf.is_null())
     {
         let input: XmlParserInputBufferPtr = (*(*ctxt).input).buf;
-        if !(*input).encoder.is_null() && (*input).buffer.is_some() && !(*input).raw.is_null() {
+        if !(*input).encoder.is_null() && (*input).buffer.is_some() && (*input).raw.is_some() {
             let base: size_t =
                 xml_buf_get_input_base((*input).buffer.unwrap().as_ptr(), (*ctxt).input);
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;

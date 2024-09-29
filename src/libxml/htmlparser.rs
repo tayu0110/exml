@@ -7171,7 +7171,7 @@ unsafe extern "C" fn html_check_encoding_direct(
 
         if !(*(*ctxt).input).buf.is_null()
             && !(*(*(*ctxt).input).buf).encoder.is_null()
-            && !(*(*(*ctxt).input).buf).raw.is_null()
+            && (*(*(*ctxt).input).buf).raw.is_some()
             && (*(*(*ctxt).input).buf).buffer.is_some()
         {
             /*
@@ -11915,7 +11915,7 @@ pub unsafe extern "C" fn html_parse_chunk(
         && (!(*ctxt).input.is_null() && !(*(*ctxt).input).buf.is_null())
     {
         let input: XmlParserInputBufferPtr = (*(*ctxt).input).buf;
-        if !(*input).encoder.is_null() && (*input).buffer.is_some() && !(*input).raw.is_null() {
+        if !(*input).encoder.is_null() && (*input).buffer.is_some() && (*input).raw.is_some() {
             let base: size_t =
                 xml_buf_get_input_base((*input).buffer.unwrap().as_ptr(), (*ctxt).input);
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;

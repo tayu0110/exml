@@ -122,12 +122,12 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
     if input.is_null()
         || (*input).encoder.is_null()
         || (*input).buffer.is_none()
-        || (*input).raw.is_null()
+        || (*input).raw.is_none()
     {
         return -1;
     }
-    let out: XmlBufPtr = (*input).buffer.unwrap().as_ptr();
-    let bufin: XmlBufPtr = (*input).raw;
+    let out: XmlBufPtr = (*input).buffer.expect("Internal Error").as_ptr();
+    let bufin: XmlBufPtr = (*input).raw.expect("Internal Error").as_ptr();
 
     toconv = xml_buf_use(bufin);
     if toconv == 0 {

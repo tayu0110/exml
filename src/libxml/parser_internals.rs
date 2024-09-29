@@ -76,7 +76,7 @@ use super::parser::{
 };
 use super::sax2::xml_sax2_ignorable_whitespace;
 use super::tree::{
-    xml_add_child, xml_add_child_list, xml_buf_use, xml_doc_copy_node, xml_free_doc, xml_free_node,
+    xml_add_child, xml_add_child_list, xml_doc_copy_node, xml_free_doc, xml_free_node,
     xml_free_node_list, xml_new_doc_node, xml_set_tree_doc, xml_split_qname3, XmlDocPtr,
     XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
 };
@@ -1282,11 +1282,11 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
         let processed: size_t = (*input).cur.offset_from((*input).base) as usize;
         buf.trim_head(processed as usize);
         (*input).consumed += processed as u64;
-        (*input_buf).raw = buf.as_ptr();
+        (*input_buf).raw = Some(buf);
         (*input_buf).buffer = XmlBufRef::new();
         assert!((*input_buf).buffer.is_some());
         (*input_buf).rawconsumed = processed as u64;
-        let using: size_t = xml_buf_use((*input_buf).raw);
+        let using: size_t = buf.len();
 
         /*
          * TODO: We must flush and decode the whole buffer to make functions
@@ -1313,7 +1313,7 @@ pub(crate) unsafe extern "C" fn xml_switch_input_encoding(
             xml_halt_parser(ctxt);
             return -1;
         }
-        let consumed: size_t = using - xml_buf_use((*input_buf).raw);
+        let consumed: size_t = using - (*input_buf).raw.map_or(0, |raw| raw.len());
         if consumed as u64 > u64::MAX || (*input_buf).rawconsumed > u64::MAX - consumed as c_ulong {
             (*input_buf).rawconsumed = u64::MAX;
         } else {
