@@ -1065,12 +1065,12 @@ unsafe extern "C" fn html_dtd_dump_output(
     if !(*cur).external_id.is_null() {
         xml_output_buffer_write_string(buf, c" PUBLIC ".as_ptr() as _);
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_str(CStr::from_ptr((*cur).external_id as *const i8));
+            buf.push_quoted_cstr(CStr::from_ptr((*cur).external_id as *const i8));
         }
         if !(*cur).system_id.is_null() {
             xml_output_buffer_write_string(buf, c" ".as_ptr() as _);
             if let Some(mut buf) = (*buf).buffer {
-                buf.push_quoted_str(CStr::from_ptr((*cur).system_id as *const i8));
+                buf.push_quoted_cstr(CStr::from_ptr((*cur).system_id as *const i8));
             }
         }
     } else if !(*cur).system_id.is_null()
@@ -1078,7 +1078,7 @@ unsafe extern "C" fn html_dtd_dump_output(
     {
         xml_output_buffer_write_string(buf, c" SYSTEM ".as_ptr() as _);
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_str(CStr::from_ptr((*cur).system_id as *const i8));
+            buf.push_quoted_cstr(CStr::from_ptr((*cur).system_id as *const i8));
         }
     }
     xml_output_buffer_write_string(buf, c">\n".as_ptr() as _);
@@ -1157,14 +1157,14 @@ unsafe extern "C" fn html_attr_dump_output(
                     xml_uri_escape_str(tmp, c"\"#$%&+,/:;<=>?@[\\]^`{|}".as_ptr() as _);
                 if !escaped.is_null() {
                     if let Some(mut buf) = (*buf).buffer {
-                        buf.push_quoted_str(CStr::from_ptr(escaped as *const i8));
+                        buf.push_quoted_cstr(CStr::from_ptr(escaped as *const i8));
                     }
                     xml_free(escaped as _);
                 } else if let Some(mut buf) = (*buf).buffer {
-                    buf.push_quoted_str(CStr::from_ptr(value as *const i8));
+                    buf.push_quoted_cstr(CStr::from_ptr(value as *const i8));
                 }
             } else if let Some(mut buf) = (*buf).buffer {
-                buf.push_quoted_str(CStr::from_ptr(value as *const i8));
+                buf.push_quoted_cstr(CStr::from_ptr(value as *const i8));
             }
             xml_free(value as _);
         } else {

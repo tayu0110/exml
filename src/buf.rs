@@ -354,35 +354,35 @@ impl XmlBuf {
         Ok(())
     }
 
-    pub(crate) fn push_str(&mut self, s: &CStr) -> Result<(), Option<XmlParserErrors>> {
+    pub(crate) fn push_cstr(&mut self, s: &CStr) -> Result<(), Option<XmlParserErrors>> {
         self.push_bytes(s.to_bytes())
     }
 
-    pub(crate) fn push_quoted_str(&mut self, s: &CStr) -> Result<(), Option<XmlParserErrors>> {
+    pub(crate) fn push_quoted_cstr(&mut self, s: &CStr) -> Result<(), Option<XmlParserErrors>> {
         if s.to_bytes().contains(&b'"') {
             if s.to_bytes().contains(&b'\'') {
                 // If `s` contains both single and double-quote, quote with double-quote
                 // and escape inner double-quotes
-                self.push_str(c"\"")?;
+                self.push_cstr(c"\"")?;
                 let bytes = s.to_bytes();
                 let mut split = bytes.split(|&c| c == b'"');
                 self.push_bytes(split.next().unwrap())?;
                 for chunk in split {
-                    self.push_str(c"&quot;")?;
+                    self.push_cstr(c"&quot;")?;
                     self.push_bytes(chunk)?;
                 }
-                self.push_str(c"\"")
+                self.push_cstr(c"\"")
             } else {
                 // If `s` contains only double-quote, quote with single-quote
-                self.push_str(c"'")?;
-                self.push_str(s)?;
-                self.push_str(c"'")
+                self.push_cstr(c"'")?;
+                self.push_cstr(s)?;
+                self.push_cstr(c"'")
             }
         } else {
             // If `s` does not contain double-quotes, quote with double-quote
-            self.push_str(c"\"")?;
-            self.push_str(s)?;
-            self.push_str(c"\"")
+            self.push_cstr(c"\"")?;
+            self.push_cstr(s)?;
+            self.push_cstr(c"\"")
         }
     }
 
@@ -676,7 +676,7 @@ pub mod libxml_api {
             return -1;
         };
         let s = CStr::from_ptr(string as *const i8);
-        match buf.push_quoted_str(s) {
+        match buf.push_quoted_cstr(s) {
             Ok(_) => 0,
             Err(_) => -1,
         }

@@ -554,7 +554,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
         }
         xml_output_buffer_write(buf, 1, c"=".as_ptr() as _);
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_str(CStr::from_ptr(
+            buf.push_quoted_cstr(CStr::from_ptr(
                 (*cur).href.load(Ordering::Relaxed) as *const i8
             ));
         }
@@ -651,7 +651,7 @@ unsafe extern "C" fn xml_attr_serialize_content(buf: XmlOutputBufferPtr, attr: X
             XmlElementType::XmlEntityRefNode => {
                 if let Some(mut buf) = (*buf).buffer {
                     buf.push_bytes(b"&");
-                    buf.push_str(CStr::from_ptr((*children).name as *const i8));
+                    buf.push_cstr(CStr::from_ptr((*children).name as *const i8));
                     buf.push_bytes(b";");
                 }
             }
@@ -1040,16 +1040,16 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     if !(*dtd).external_id.is_null() {
         xml_output_buffer_write(buf, 8, c" PUBLIC ".as_ptr() as _);
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_str(CStr::from_ptr((*dtd).external_id as *const i8));
+            buf.push_quoted_cstr(CStr::from_ptr((*dtd).external_id as *const i8));
         }
         xml_output_buffer_write(buf, 1, c" ".as_ptr() as _);
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_str(CStr::from_ptr((*dtd).system_id as *const i8));
+            buf.push_quoted_cstr(CStr::from_ptr((*dtd).system_id as *const i8));
         }
     } else if !(*dtd).system_id.is_null() {
         xml_output_buffer_write(buf, 8, c" SYSTEM ".as_ptr() as _);
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_str(CStr::from_ptr((*dtd).system_id as *const i8));
+            buf.push_quoted_cstr(CStr::from_ptr((*dtd).system_id as *const i8));
         }
     }
     if (*dtd).entities.is_null()
@@ -1812,7 +1812,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
             xml_output_buffer_write(buf, 14, c"<?xml version=".as_ptr() as _);
             if !(*cur).version.is_null() {
                 if let Some(mut buf) = (*buf).buffer {
-                    buf.push_quoted_str(CStr::from_ptr((*cur).version as *const i8));
+                    buf.push_quoted_cstr(CStr::from_ptr((*cur).version as *const i8));
                 }
             } else {
                 xml_output_buffer_write(buf, 5, c"\"1.0\"".as_ptr() as _);
@@ -1820,7 +1820,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
             if !encoding.is_null() {
                 xml_output_buffer_write(buf, 10, c" encoding=".as_ptr() as _);
                 if let Some(mut buf) = (*buf).buffer {
-                    buf.push_quoted_str(CStr::from_ptr(encoding as *const i8));
+                    buf.push_quoted_cstr(CStr::from_ptr(encoding as *const i8));
                 }
             }
             match (*cur).standalone {
