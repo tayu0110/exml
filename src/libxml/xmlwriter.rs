@@ -21,6 +21,7 @@ use libc::memset;
 
 use crate::{
     __xml_raise_error,
+    buf::XmlBufRef,
     libxml::{
         encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
         entities::xml_encode_special_chars,
@@ -46,10 +47,7 @@ use crate::{
         xmlerror::XmlParserErrors,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
-    private::{
-        buf::xml_buf_create_size, enc::xml_char_enc_output,
-        save::xml_buf_attr_serialize_txt_content,
-    },
+    private::{enc::xml_char_enc_output, save::xml_buf_attr_serialize_txt_content},
 };
 
 /*
@@ -950,8 +948,8 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
 
     (*(*writer).out).encoder = encoder;
     if !encoder.is_null() {
-        if (*(*writer).out).conv.is_null() {
-            (*(*writer).out).conv = xml_buf_create_size(4000);
+        if (*(*writer).out).conv.is_none() {
+            (*(*writer).out).conv = XmlBufRef::with_capacity(4000);
         }
         xml_char_enc_output((*writer).out, 1);
         if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_null() {
@@ -959,7 +957,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
                 xml_strdup((*(*(*writer).out).encoder).name.load(Ordering::Relaxed) as _);
         }
     } else {
-        (*(*writer).out).conv = null_mut();
+        (*(*writer).out).conv = None;
     }
 
     sum = 0;

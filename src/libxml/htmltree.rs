@@ -524,7 +524,6 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
     use crate::libxml::{
         encoding::{xml_find_char_encoding_handler, xml_parse_char_encoding},
         parser::xml_init_parser,
-        tree::{xml_buf_content, xml_buf_use},
         xml_io::{
             xml_alloc_output_buffer_internal, xml_output_buffer_close, xml_output_buffer_flush,
         },
@@ -583,9 +582,16 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
     html_doc_content_dump_format_output(buf, cur, null_mut(), format);
 
     xml_output_buffer_flush(buf);
-    if !(*buf).conv.is_null() {
-        *size = xml_buf_use((*buf).conv) as _;
-        *mem = xml_strndup(xml_buf_content((*buf).conv), *size);
+    if let Some(conv) = (*buf).conv {
+        *size = conv.len() as i32;
+        *mem = xml_strndup(
+            if conv.is_ok() {
+                conv.as_ref().as_ptr()
+            } else {
+                null()
+            },
+            *size,
+        );
     } else {
         *size = (*buf).buffer.map_or(0, |buf| buf.len() as i32);
         *mem = xml_strndup(

@@ -38,7 +38,6 @@ use crate::{
         xmlstring::{xml_strdup, xml_strstr},
     },
     private::{
-        buf::{xml_buf_create, xml_buf_create_size, xml_buf_free},
         enc::{xml_char_enc_input, xml_char_enc_output},
         error::__xml_simple_error,
         parser::__xml_err_encoding,
@@ -66,7 +65,7 @@ use super::{
     },
     parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption},
     parser_internals::xml_new_input_from_file,
-    tree::{xml_buf_content, xml_buf_shrink, xml_buf_use, XmlBufPtr, XmlBufferAllocationScheme},
+    tree::XmlBufferAllocationScheme,
     uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
     xmlerror::{
         XmlErrorDomain, XmlErrorLevel, XmlGenericErrorFunc, XmlParserErrors, XmlStructuredErrorFunc,
@@ -192,7 +191,7 @@ pub struct XmlOutputBuffer {
     pub(crate) encoder: XmlCharEncodingHandlerPtr, /* I18N conversions to UTF-8 */
 
     pub(crate) buffer: Option<XmlBufRef>, /* Local buffer encoded in UTF-8 or ISOLatin */
-    pub(crate) conv: XmlBufPtr,           /* if encoder != NULL buffer for output */
+    pub(crate) conv: Option<XmlBufRef>,   /* if encoder != NULL buffer for output */
     pub(crate) written: c_int,            /* total number of byte written */
     pub(crate) error: c_int,
 }
@@ -1678,8 +1677,8 @@ pub unsafe extern "C" fn xml_alloc_output_buffer(
 
     (*ret).encoder = encoder;
     if !encoder.is_null() {
-        (*ret).conv = xml_buf_create_size(4000);
-        if (*ret).conv.is_null() {
+        (*ret).conv = XmlBufRef::with_capacity(4000);
+        if (*ret).conv.is_none() {
             buf.free();
             xml_free(ret as _);
             return null_mut();
@@ -1690,7 +1689,7 @@ pub unsafe extern "C" fn xml_alloc_output_buffer(
          */
         xml_char_enc_output(ret, 1);
     } else {
-        (*ret).conv = null_mut();
+        (*ret).conv = None;
     }
     (*ret).writecallback = None;
     (*ret).closecallback = None;
@@ -1984,8 +1983,8 @@ pub unsafe extern "C" fn xml_output_buffer_write(
             /*
              * Store the data in the incoming raw buffer
              */
-            if (*out).conv.is_null() {
-                (*out).conv = xml_buf_create();
+            if (*out).conv.is_none() {
+                (*out).conv = XmlBufRef::new();
             }
             if buf.is_null()
                 || (*out).buffer.map_or(true, |mut buffer| {
@@ -2012,7 +2011,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
                 return -1;
             }
             if (*out).writecallback.is_some() {
-                nbchars = xml_buf_use((*out).conv) as i32;
+                nbchars = (*out).conv.map_or(0, |buf| buf.len() as i32);
             } else {
                 nbchars = if ret >= 0 { ret } else { 0 };
             }
@@ -2045,9 +2044,17 @@ pub unsafe extern "C" fn xml_output_buffer_write(
              * second write the stuff to the I/O channel
              */
             if !(*out).encoder.is_null() {
-                ret = writecallback((*out).context, xml_buf_content((*out).conv) as _, nbchars);
+                ret = writecallback(
+                    (*out).context,
+                    (*out)
+                        .conv
+                        .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
+                    nbchars,
+                );
                 if ret >= 0 {
-                    xml_buf_shrink((*out).conv, ret as _);
+                    if let Some(mut conv) = (*out).conv {
+                        conv.trim_head(ret as usize);
+                    }
                 }
             } else {
                 ret = writecallback(
@@ -2278,8 +2285,8 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
             /*
              * Store the data in the incoming raw buffer
              */
-            if (*out).conv.is_null() {
-                (*out).conv = xml_buf_create();
+            if (*out).conv.is_none() {
+                (*out).conv = XmlBufRef::new();
             }
             ret = escaping(
                 (*out).buffer.map_or(null_mut(), |buf| {
@@ -2314,7 +2321,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
                 return -1;
             }
             if (*out).writecallback.is_some() {
-                nbchars = xml_buf_use((*out).conv) as _;
+                nbchars = (*out).conv.map_or(0, |conv| conv.len() as i32);
             } else {
                 nbchars = if ret >= 0 { ret } else { 0 };
             }
@@ -2357,11 +2364,19 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
             if !(*out).encoder.is_null() {
                 ret = writecallback(
                     (*out).context,
-                    xml_buf_content((*out).conv) as *const c_char,
+                    (*out).conv.map_or(null(), |conv| {
+                        if conv.is_ok() {
+                            conv.as_ref().as_ptr()
+                        } else {
+                            null()
+                        }
+                    }) as *const c_char,
                     nbchars,
                 );
                 if ret >= 0 {
-                    xml_buf_shrink((*out).conv, ret as _);
+                    if let Some(mut conv) = (*out).conv {
+                        conv.trim_head(ret as usize);
+                    }
                 }
             } else {
                 ret = writecallback(
@@ -2426,7 +2441,7 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
     /*
      * first handle encoding stuff.
      */
-    if !(*out).conv.is_null() && !(*out).encoder.is_null() {
+    if (*out).conv.is_some() && !(*out).encoder.is_null() {
         /*
          * convert as much as possible to the parser output buffer.
          */
@@ -2445,14 +2460,22 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
     /*
      * second flush the stuff to the I/O channel
      */
-    if !(*out).conv.is_null() && !(*out).encoder.is_null() && (*out).writecallback.is_some() {
+    if let Some(mut conv) = (*out)
+        .conv
+        .filter(|_| !(*out).encoder.is_null() && (*out).writecallback.is_some())
+    {
+        // if !(*out).conv.is_null() && !(*out).encoder.is_null() && (*out).writecallback.is_some() {
         ret = ((*out).writecallback.unwrap())(
             (*out).context,
-            xml_buf_content((*out).conv) as _,
-            xml_buf_use((*out).conv) as _,
+            if conv.is_ok() {
+                conv.as_ref().as_ptr() as *const i8
+            } else {
+                null()
+            },
+            conv.len() as i32,
         );
         if ret >= 0 {
-            xml_buf_shrink((*out).conv, ret as _);
+            conv.trim_head(ret as usize);
         }
     } else if (*out).writecallback.is_some() {
         ret = ((*out).writecallback.unwrap())(
@@ -2505,9 +2528,8 @@ pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_i
         err_rc = closecallback((*out).context);
     }
     let written: c_int = (*out).written;
-    if !(*out).conv.is_null() {
-        xml_buf_free((*out).conv);
-        (*out).conv = null_mut();
+    if let Some(conv) = (*out).conv.take() {
+        conv.free();
     }
     if !(*out).encoder.is_null() {
         xml_char_enc_close_func((*out).encoder);
@@ -2589,8 +2611,8 @@ pub(crate) unsafe extern "C" fn xml_alloc_output_buffer_internal(
 
     (*ret).encoder = encoder;
     if !encoder.is_null() {
-        (*ret).conv = xml_buf_create_size(4000);
-        if (*ret).conv.is_null() {
+        (*ret).conv = XmlBufRef::with_capacity(4000);
+        if (*ret).conv.is_none() {
             buf.free();
             xml_free(ret as _);
             return null_mut();
@@ -2601,7 +2623,7 @@ pub(crate) unsafe extern "C" fn xml_alloc_output_buffer_internal(
          */
         xml_char_enc_output(ret, 1);
     } else {
-        (*ret).conv = null_mut();
+        (*ret).conv = None;
     }
     (*ret).writecallback = None;
     (*ret).closecallback = None;

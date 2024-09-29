@@ -9554,9 +9554,16 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt), out_doc);
     xml_output_buffer_flush(out_buff);
-    if !(*out_buff).conv.is_null() {
-        *doc_txt_len = xml_buf_use((*out_buff).conv) as _;
-        *doc_txt_ptr = xml_strndup(xml_buf_content((*out_buff).conv), *doc_txt_len);
+    if let Some(conv) = (*out_buff).conv {
+        *doc_txt_len = conv.len() as i32;
+        *doc_txt_ptr = xml_strndup(
+            if conv.is_ok() {
+                conv.as_ref().as_ptr()
+            } else {
+                null()
+            },
+            *doc_txt_len,
+        );
     } else {
         *doc_txt_len = (*out_buff).buffer.map_or(0, |buf| buf.len() as i32);
         *doc_txt_ptr = xml_strndup(
