@@ -131,14 +131,6 @@ pub struct XmlCharEncodingHandler {
     pub(crate) name: AtomicPtr<c_char>,
     pub(crate) input: Option<XmlCharEncodingInputFunc>,
     pub(crate) output: Option<XmlCharEncodingOutputFunc>,
-    // #ifdef LIBXML_ICONV_ENABLED
-    //     iconv_t                    iconv_in;
-    //     iconv_t                    iconv_out;
-    // #endif /* LIBXML_ICONV_ENABLED */
-    // #ifdef LIBXML_ICU_ENABLED
-    //     struct _uconv_t            *uconv_in;
-    //     struct _uconv_t            *uconv_out;
-    // #endif /* LIBXML_ICU_ENABLED */
 }
 
 /*
@@ -901,10 +893,6 @@ unsafe extern "C" fn utf8_to_utf16(
             *outb.add(1) = 0xFE;
             *outlen = 2;
             *inlen = 0;
-            // #ifdef DEBUG_ENCODING
-            //             xmlGenericError(xmlGenericErrorContext,
-            // 		    "Added FFFE Byte Order Mark\n");
-            // #endif
             return 2;
         }
         *outlen = 0;
@@ -1120,8 +1108,6 @@ static mut DEFAULT_HANDLERS: &mut [XmlCharEncodingHandler] = &mut [
     MAKE_HANDLER!(c"ASCII".as_ptr(), Some(ascii_to_utf8), None),
     #[cfg(not(feature = "output"))]
     MAKE_HANDLER!(c"US-ASCII".as_ptr(), Some(ascii_to_utf8), None),
-    // #if !defined(LIBXML_ICONV_ENABLED) && !defined(LIBXML_ICU_ENABLED) && \
-    //     defined(LIBXML_ISO8859X_ENABLED)
     #[cfg(feature = "libxml_iso8859x")]
     MAKE_HANDLER!(
         c"ISO-8859-2".as_ptr(),
@@ -1206,7 +1192,6 @@ static mut DEFAULT_HANDLERS: &mut [XmlCharEncodingHandler] = &mut [
         Some(iso8859_16_to_utf8),
         Some(utf8_to_iso8859_16)
     ),
-    // #endif
 ];
 
 static XML_UTF16_LEHANDLER: &XmlCharEncodingHandler = unsafe { &DEFAULT_HANDLERS[1] };
@@ -1394,10 +1379,6 @@ pub unsafe extern "C" fn xml_get_char_encoding_handler(
         _ => {}
     }
 
-    // #ifdef DEBUG_ENCODING
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "No handler found for encoding %d\n", enc);
-    // #endif
     null_mut()
 }
 
@@ -1415,14 +1396,6 @@ static NUM_DEFAULT_HANDLERS: usize = unsafe { DEFAULT_HANDLERS.len() };
 pub unsafe extern "C" fn xml_find_char_encoding_handler(
     mut name: *const c_char,
 ) -> XmlCharEncodingHandlerPtr {
-    // #ifdef LIBXML_ICONV_ENABLED
-    //     let enc: xmlCharEncodingHandlerPtr;
-    //     iconv_t icv_in, icv_out;
-    // #endif /* LIBXML_ICONV_ENABLED */
-    // #ifdef LIBXML_ICU_ENABLED
-    //     xmlCharEncodingHandlerPtr encu;
-    //     uconv_t *ucv_in, *ucv_out;
-    // #endif /* LIBXML_ICU_ENABLED */
     let mut upper: [c_char; 100] = [0; 100];
 
     if name.is_null() {
@@ -1470,101 +1443,10 @@ pub unsafe extern "C" fn xml_find_char_encoding_handler(
                 (*(*handlers.add(i))).name.load(Ordering::Relaxed) as _,
             ) == 0
             {
-                // #ifdef DEBUG_ENCODING
-                //                 xmlGenericError(xmlGenericErrorContext,
-                //                         "Found registered handler for encoding %s\n", name);
-                // #endif
                 return *handlers.add(i);
             }
         }
     }
-
-    // #ifdef LIBXML_ICONV_ENABLED
-    //     /* check whether iconv can handle this */
-    //     icv_in = iconv_open("UTF-8", name);
-    //     icv_out = iconv_open(name, "UTF-8");
-    //     if (icv_in == (iconv_t) -1) {
-    //         icv_in = iconv_open("UTF-8", upper);
-    //     }
-    //     if (icv_out == (iconv_t) -1) {
-    // 	icv_out = iconv_open(upper, "UTF-8");
-    //     }
-    //     if ((icv_in != (iconv_t) -1) && (icv_out != (iconv_t) -1)) {
-    // 	    enc = (xmlCharEncodingHandlerPtr)
-    // 	          xmlMalloc(size_of::<xmlCharEncodingHandler>());
-    // 	    if enc.is_null() {
-    // 	        iconv_close(icv_in);
-    // 	        iconv_close(icv_out);
-    // 		return null_mut();
-    // 	    }
-    //             memset(enc, 0, size_of::<xmlCharEncodingHandler>());
-    // 	    (*enc).name = xmlMemStrdup(name);
-    //             if (*enc).name.is_null() {
-    //                 xmlFree(enc);
-    //                 iconv_close(icv_in);
-    //                 iconv_close(icv_out);
-    //                 return null_mut();
-    //             }
-    // 	    (*enc).input = NULL;
-    // 	    (*enc).output = NULL;
-    // 	    (*enc).iconv_in = icv_in;
-    // 	    (*enc).iconv_out = icv_out;
-    // // #ifdef DEBUG_ENCODING
-    // //             xmlGenericError(xmlGenericErrorContext,
-    // // 		    "Found iconv handler for encoding %s\n", name);
-    // // #endif
-    // 	    return enc;
-    //     } else if ((icv_in != (iconv_t) -1) || icv_out != (iconv_t) -1) {
-    // 	    xmlEncodingErr(XML_ERR_INTERNAL_ERROR,
-    // 		    "iconv : problems with filters for '%s'\n", name);
-    // 	    if (icv_in != (iconv_t) -1) {
-    //             iconv_close(icv_in);
-    //         }
-    // 	    else {
-    //             iconv_close(icv_out);
-    //         }
-    //     }
-    // #endif /* LIBXML_ICONV_ENABLED */
-    // #ifdef LIBXML_ICU_ENABLED
-    //     /* check whether icu can handle this */
-    //     ucv_in = openIcuConverter(name, 1);
-    //     ucv_out = openIcuConverter(name, 0);
-    //     if (ucv_in != NULL && ucv_out != NULL) {
-    // 	    encu = (xmlCharEncodingHandlerPtr)
-    // 	           xmlMalloc(size_of::<xmlCharEncodingHandler>());
-    // 	    if encu.is_null() {
-    //                 closeIcuConverter(ucv_in);
-    //                 closeIcuConverter(ucv_out);
-    // 		return null_mut();
-    // 	    }
-    //             memset(encu, 0, size_of::<xmlCharEncodingHandler>());
-    // 	    (*encu).name = xmlMemStrdup(name);
-    //             if ((*encu).name.is_null()) {
-    //                 xmlFree(encu);
-    //                 closeIcuConverter(ucv_in);
-    //                 closeIcuConverter(ucv_out);
-    //                 return null_mut();
-    //             }
-    // 	    (*encu).input = NULL;
-    // 	    (*encu).output = NULL;
-    // 	    (*encu).uconv_in = ucv_in;
-    // 	    (*encu).uconv_out = ucv_out;
-    // // #ifdef DEBUG_ENCODING
-    // //             xmlGenericError(xmlGenericErrorContext,
-    // // 		    "Found ICU converter handler for encoding %s\n", name);
-    // // #endif
-    // 	    return encu;
-    //     } else if (ucv_in != NULL || ucv_out != NULL) {
-    //             closeIcuConverter(ucv_in);
-    //             closeIcuConverter(ucv_out);
-    // 	    xmlEncodingErr(XML_ERR_INTERNAL_ERROR,
-    // 		    "ICU converter : problems with filters for '%s'\n", name);
-    //     }
-    // #endif /* LIBXML_ICU_ENABLED */
-    // #ifdef DEBUG_ENCODING
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "No handler found for encoding %s\n", name);
-    // #endif
 
     /*
      * Fallback using the canonical names
@@ -1646,23 +1528,10 @@ pub unsafe extern "C" fn xml_new_char_encoding_handler(
     (*handler).output = Some(output);
     (*handler).name = AtomicPtr::new(up);
 
-    // #ifdef LIBXML_ICONV_ENABLED
-    //     (*handler).iconv_in = null_mut();
-    //     (*handler).iconv_out = null_mut();
-    // #endif
-    // #ifdef LIBXML_ICU_ENABLED
-    //     (*handler).uconv_in = null_mut();
-    //     (*handler).uconv_out = null_mut();
-    // #endif
-
     /*
      * registers and returns the handler.
      */
     xml_register_char_encoding_handler(handler);
-    // #ifdef DEBUG_ENCODING
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "Registered encoding handler for %s\n", name);
-    // #endif
     handler
 }
 
@@ -1985,9 +1854,6 @@ pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> Xml
         return XmlCharEncoding::EUCJP;
     }
 
-    // #ifdef DEBUG_ENCODING
-    //     xmlGenericError(xmlGenericErrorContext, "Unknown encoding %s\n", name);
-    // #endif
     XmlCharEncoding::Error
 }
 
@@ -2163,17 +2029,6 @@ pub(crate) unsafe extern "C" fn xml_enc_output_chunk(
 ) -> c_int {
     let mut ret: c_int;
 
-    // #ifdef LIBXML_ICONV_ENABLED
-    //     else if ((*handler).iconv_out != NULL) {
-    //         ret = xmlIconvWrapper((*handler).iconv_out, out, outlen, input, inlen);
-    //     }
-    // #endif /* LIBXML_ICONV_ENABLED */
-    // #ifdef LIBXML_ICU_ENABLED
-    //     else if ((*handler).uconv_out != NULL) {
-    //         ret = xmlUconvWrapper((*handler).uconv_out, 0, out, outlen, input, inlen,
-    //                               1);
-    //     }
-    // #endif /* LIBXML_ICU_ENABLED */
     if let Some(output) = (*handler).output {
         ret = output(out, outlen, input, inlen);
         if ret > 0 {
@@ -2561,40 +2416,6 @@ pub unsafe extern "C" fn xml_char_enc_close_func(handler: *mut XmlCharEncodingHa
             }
         }
     }
-    // #ifdef LIBXML_ICONV_ENABLED
-    //     /*
-    //      * Iconv HANDLERS can be used only once, free the whole block.
-    //      * and the associated icon resources.
-    //      */
-    //     if (((*handler).iconv_out != NULL) || ((*handler).iconv_in != NULL)) {
-    //         tofree = 1;
-    // 	if ((*handler).iconv_out != NULL) {
-    // 	    if (iconv_close((*handler).iconv_out)) {
-    //             ret = -1;
-    //         }
-    // 	    (*handler).iconv_out = NULL;
-    // 	}
-    // 	if ((*handler).iconv_in != NULL) {
-    // 	    if (iconv_close((*handler).iconv_in)) {
-    //             ret = -1;
-    //         }
-    // 	    (*handler).iconv_in = NULL;
-    // 	}
-    //     }
-    // #endif /* LIBXML_ICONV_ENABLED */
-    // #ifdef LIBXML_ICU_ENABLED
-    //     if (((*handler).uconv_out != NULL) || ((*handler).uconv_in != NULL)) {
-    //         tofree = 1;
-    // 	if ((*handler).uconv_out != NULL) {
-    // 	    closeIcuConverter((*handler).uconv_out);
-    // 	    (*handler).uconv_out = NULL;
-    // 	}
-    // 	if ((*handler).uconv_in != NULL) {
-    // 	    closeIcuConverter((*handler).uconv_in);
-    // 	    (*handler).uconv_in = NULL;
-    // 	}
-    //     }
-    // #endif
     if tofree != 0 {
         /* free up only dynamic HANDLERS iconv/uconv */
         if !(*handler).name.load(Ordering::Relaxed).is_null() {
@@ -2603,14 +2424,6 @@ pub unsafe extern "C" fn xml_char_enc_close_func(handler: *mut XmlCharEncodingHa
         (*handler).name = AtomicPtr::new(null_mut());
         xml_free(handler as _);
     }
-    // #ifdef DEBUG_ENCODING
-    //     if (ret)
-    //         xmlGenericError(xmlGenericErrorContext,
-    // 		"failed to close the encoding handler\n");
-    //     else
-    //         xmlGenericError(xmlGenericErrorContext,
-    // 		"closed the encoding handler\n");
-    // #endif
 
     ret
 }

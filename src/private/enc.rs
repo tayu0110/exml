@@ -72,17 +72,6 @@ pub(crate) unsafe extern "C" fn xml_enc_input_chunk(
 ) -> c_int {
     let mut ret: c_int;
 
-    // #ifdef LIBXML_ICONV_ENABLED
-    //     else if ((*handler).iconv_in != NULL) {
-    //         ret = xmlIconvWrapper((*handler).iconv_in, out, outlen, input, inlen);
-    //     }
-    // #endif /* LIBXML_ICONV_ENABLED */
-    // #ifdef LIBXML_ICU_ENABLED
-    //     else if ((*handler).uconv_in != NULL) {
-    //         ret = xmlUconvWrapper((*handler).uconv_in, 1, out, outlen, input, inlen,
-    //                               flush);
-    //     }
-    // #endif /* LIBXML_ICU_ENABLED */
     if let Some(finput) = (*handler).input {
         ret = finput(out, outlen, input, inlen);
         if ret > 0 {
