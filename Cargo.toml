@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 const_format = { version = "0.2.32" }
+encoding_rs = "0.8.34"
 libc = "0.2.155"
 rand = "0.8.5"
 
