@@ -2387,7 +2387,7 @@ pub(crate) unsafe extern "C" fn xml_enc_output_chunk(
 
 /**
  * xmlCharEncCloseFunc:
- * @handler:    c_char encoding transformation data structure
+ * @handler:    char encoding transformation data structure
  *
  * Generic front-end for encoding handler close function
  *
