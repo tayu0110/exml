@@ -136,7 +136,9 @@ impl FromStr for XmlCharEncoding {
         } else if name == "EUC-JP" {
             Ok(XmlCharEncoding::EUCJP)
         } else {
-            Err(EncodingError("No encoding matches.".into()))
+            Err(EncodingError::Other {
+                msg: "No encoding matches.".into(),
+            })
         }
     }
 }
@@ -188,10 +190,7 @@ impl PredefinedEncodingHandler {
                 self.elast = true;
                 Ok((read, write))
             }
-            EncoderResult::Unmappable(c) => Err(EncodingError(format!(
-                "Failed to map `{c}` on encoding {}",
-                self.name
-            ))),
+            EncoderResult::Unmappable(c) => Err(EncodingError::Unmappable { read, write, c }),
         }
     }
 
@@ -205,10 +204,12 @@ impl PredefinedEncodingHandler {
                 self.dlast = true;
                 Ok((read, write))
             }
-            DecoderResult::Malformed(c, d) => Err(EncodingError(format!(
-                "Failed to decode {} byte sequence [{c}, {d}]",
-                self.name
-            ))),
+            DecoderResult::Malformed(c, d) => Err(EncodingError::Malformed {
+                read,
+                write,
+                length: c,
+                offset: d,
+            }),
         }
     }
 
@@ -233,17 +234,82 @@ impl From<&'static Encoding> for PredefinedEncodingHandler {
 }
 
 #[derive(Debug, Clone)]
-pub struct EncodingError(pub String);
+pub enum EncodingError {
+    BufferTooShort,
+    Malformed {
+        read: usize,
+        write: usize,
+        length: u8,
+        offset: u8,
+    },
+    Unmappable {
+        read: usize,
+        write: usize,
+        c: char,
+    },
+    Other {
+        msg: Cow<'static, str>,
+    },
+}
 
 impl EncodingError {
-    pub fn new(msg: &str) -> Self {
-        Self(msg.to_owned())
+    pub fn buffer_too_short(&self) -> bool {
+        matches!(self, EncodingError::BufferTooShort)
+    }
+
+    pub fn malformed(&self) -> bool {
+        matches!(
+            self,
+            EncodingError::Malformed {
+                read: _,
+                write: _,
+                length: _,
+                offset: _
+            }
+        )
+    }
+
+    pub fn unmappable(&self) -> bool {
+        matches!(
+            self,
+            EncodingError::Unmappable {
+                read: _,
+                write: _,
+                c: _
+            }
+        )
+    }
+
+    pub fn other(&self) -> bool {
+        matches!(self, EncodingError::Other { msg: _ })
     }
 }
 
 impl Display for EncodingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Encoding Error: {}", self.0)
+        write!(f, "Encoding Error: ")?;
+        match self {
+            Self::BufferTooShort => write!(f, "Buffer too short"),
+            Self::Malformed {
+                read,
+                write: _,
+                length,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "Malformed byte sequence occurs at {}..={}",
+                    read - *length as usize - *offset as usize,
+                    read - *offset as usize - 1
+                )
+            }
+            Self::Unmappable {
+                read: _,
+                write: _,
+                c,
+            } => write!(f, "Unmappable character '{c}'"),
+            Self::Other { msg } => write!(f, "{msg}"),
+        }
     }
 }
 
@@ -338,9 +404,9 @@ pub fn register_encoding_handler(handler: CustomEncodingHandler) -> Result<(), E
                 c"xmlRegisterCharEncodingHandler: Too many handler registered, see %s\n".as_ptr(),
                 c"MAX_ENCODING_HANDLERS".as_ptr() as _,
             );
-            return Err(EncodingError(
-                "Too many CustomEncodingHandlers are registerd.".into(),
-            ));
+            return Err(EncodingError::Other {
+                msg: "Too many CustomEncodingHandlers are registerd.".into(),
+            });
         }
     }
     handlers.push(handler);
@@ -370,9 +436,12 @@ fn decode_utf16le(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingE
     let mut decoder = UTF_16LE.new_decoder();
     let (res, read, write) = decoder.decode_to_str_without_replacement(src, dst, false);
     match res {
-        DecoderResult::Malformed(c, d) => Err(EncodingError(format!(
-            "The byte sequence [{c}, {d}] is not a valid UTF-16LE."
-        ))),
+        DecoderResult::Malformed(c, d) => Err(EncodingError::Malformed {
+            read,
+            write,
+            length: c,
+            offset: d,
+        }),
         _ => Ok((read, write)),
     }
 }
@@ -400,9 +469,12 @@ fn decode_utf16be(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingE
     let mut decoder = UTF_16BE.new_decoder();
     let (res, read, write) = decoder.decode_to_str_without_replacement(src, dst, false);
     match res {
-        DecoderResult::Malformed(c, d) => Err(EncodingError(format!(
-            "The byte sequence [{c}, {d}] is not a valid UTF-16BE."
-        ))),
+        DecoderResult::Malformed(c, d) => Err(EncodingError::Malformed {
+            read,
+            write,
+            length: c,
+            offset: d,
+        }),
         _ => Ok((read, write)),
     }
 }
@@ -423,16 +495,13 @@ fn encode_latin1(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingEr
     // The convertion methods from UTF-8 to Latin1 requests
     // the length of destination buffer must be equal of larger than the length of source buffer.
     if len == 0 {
-        return Err(EncodingError(
-            "The length of destination buffer is too short".into(),
-        ));
+        return Err(EncodingError::BufferTooShort);
     }
 
-    //
     if !is_str_latin1(&src[..len]) {
-        return Err(EncodingError(
-            "Source buffer is not compatible with Latin1.".into(),
-        ));
+        return Err(EncodingError::Other {
+            msg: "Source buffer is not compatible with Latin1.".into(),
+        });
     }
     let write = convert_utf8_to_latin1_lossy(&src.as_bytes()[..len], dst);
     Ok((len, write))
@@ -440,9 +509,7 @@ fn encode_latin1(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingEr
 
 fn decode_latin1(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
     if dst.len() <= 1 {
-        return Err(EncodingError(
-            "The length of destination buffer is too short".into(),
-        ));
+        return Err(EncodingError::BufferTooShort);
     }
     // This method requests the length of destination buffer must be at least
     // the length of the source buffer times two.
@@ -454,9 +521,7 @@ fn decode_latin1(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingEr
 
 fn encode_ucs4be(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
     if !src.is_empty() && dst.len() < 4 {
-        return Err(EncodingError(
-            "The length of destination buffer is too short".into(),
-        ));
+        return Err(EncodingError::BufferTooShort);
     }
 
     let (mut read, mut write) = (0, 0);
@@ -474,17 +539,20 @@ fn encode_ucs4be(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingEr
 
 fn decode_ucs4be(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
     if src.len() % 4 != 0 {
-        return Err(EncodingError(
-            "The length of UCS-4 sequence must be a multiple of 4.".into(),
-        ));
+        return Err(EncodingError::Other {
+            msg: "The length of UCS-4 sequence must be a multiple of 4.".into(),
+        });
     }
 
     let dst = unsafe { dst.as_bytes_mut() };
     let (mut read, mut write) = (0, 0);
     for chunk in src.chunks_exact(4) {
         let code = chunk.iter().fold(0u32, |s, &v| (s << 8) | v as u32);
-        let c = char::from_u32(code).ok_or_else(|| {
-            EncodingError(format!("{code:0X} is not a valid Unicode Scalar Value"))
+        let c = char::from_u32(code).ok_or_else(|| EncodingError::Malformed {
+            read: read + 4,
+            write,
+            length: 4,
+            offset: 0,
         })?;
         let len = c.len_utf8();
         if write + len > dst.len() {
@@ -499,9 +567,7 @@ fn decode_ucs4be(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingEr
 
 fn encode_ucs4le(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
     if !src.is_empty() && dst.len() < 4 {
-        return Err(EncodingError(
-            "The length of destination buffer is too short".into(),
-        ));
+        return Err(EncodingError::BufferTooShort);
     }
 
     let (mut read, mut write) = (0, 0);
@@ -519,17 +585,20 @@ fn encode_ucs4le(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingEr
 
 fn decode_ucs4le(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
     if src.len() % 4 != 0 {
-        return Err(EncodingError(
-            "The length of UCS-4 sequence must be a multiple of 4.".into(),
-        ));
+        return Err(EncodingError::Other {
+            msg: "The length of UCS-4 sequence must be a multiple of 4.".into(),
+        });
     }
 
     let dst = unsafe { dst.as_bytes_mut() };
     let (mut read, mut write) = (0, 0);
     for chunk in src.chunks_exact(4) {
         let code = chunk.iter().rev().fold(0u32, |s, &v| (s << 8) | v as u32);
-        let c = char::from_u32(code).ok_or_else(|| {
-            EncodingError(format!("{code:0X} is not a valid Unicode Scalar Value"))
+        let c = char::from_u32(code).ok_or_else(|| EncodingError::Malformed {
+            read: read + 4,
+            write,
+            length: 4,
+            offset: 0,
         })?;
         let len = c.len_utf8();
         if write + len > dst.len() {
