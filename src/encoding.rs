@@ -515,8 +515,9 @@ fn decode_latin1(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingEr
     // the length of the source buffer times two.
     //
     // ref: https://docs.rs/encoding_rs/latest/encoding_rs/mem/fn.convert_latin1_to_str.html
-    let write = convert_latin1_to_str(&src[..dst.len() / 2], dst);
-    Ok((dst.len() / 2, write))
+    let len = src.len().min(dst.len() / 2);
+    let write = convert_latin1_to_str(&src[..len], dst);
+    Ok((len, write))
 }
 
 fn encode_ucs4be(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
