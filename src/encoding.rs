@@ -160,6 +160,13 @@ impl XmlCharEncodingHandler {
             Self::Custom(handler) => (handler.decode)(src, dst),
         }
     }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Predefined(handler) => handler.name(),
+            Self::Custom(handler) => handler.name(),
+        }
+    }
 }
 
 pub struct PredefinedEncodingHandler {
@@ -203,6 +210,10 @@ impl PredefinedEncodingHandler {
                 self.name
             ))),
         }
+    }
+
+    pub fn name(&self) -> &'static str {
+        self.name
     }
 }
 
@@ -275,6 +286,10 @@ impl CustomEncodingHandler {
         };
         register_encoding_handler(new.clone())?;
         Ok(new)
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 
