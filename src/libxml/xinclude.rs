@@ -17,12 +17,9 @@ use libc::{memset, size_t, strcmp};
 use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
     __xml_raise_error,
+    encoding::get_encoding_handler,
     libxml::{
         dict::{xml_dict_free, xml_dict_reference},
-        encoding::{
-            xml_char_enc_close_func, xml_get_char_encoding_handler, xml_parse_char_encoding,
-            XmlCharEncoding,
-        },
         entities::{xml_add_doc_entity, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{xml_hash_scan, XmlHashTablePtr},
@@ -2069,7 +2066,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     let mut i: c_int;
     let mut ret: c_int = -1;
     let mut encoding: *mut XmlChar = null_mut();
-    let mut enc: XmlCharEncoding = XmlCharEncoding::None;
+    let mut enc = crate::encoding::XmlCharEncoding::None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut input_stream: XmlParserInputPtr = null_mut();
 
@@ -2189,23 +2186,29 @@ unsafe extern "C" fn xml_xinclude_load_txt(
          *       xmlParserInputBufferCreateFilename should allow any
          *       encoding supported by iconv
          */
-        enc = xml_parse_char_encoding(encoding as _);
-        if matches!(enc, XmlCharEncoding::Error) {
-            xml_xinclude_err(
-                ctxt,
-                (*refe).elem,
-                XmlParserErrors::XmlXincludeUnknownEncoding as i32,
-                c"encoding %s not supported\n".as_ptr() as _,
-                encoding,
-            );
-            // goto error;
-            xml_free_node(node);
-            xml_free_input_stream(input_stream);
-            xml_free_parser_ctxt(pctxt);
-            xml_free(encoding as _);
-            xml_free_uri(uri);
-            xml_free(url as _);
-            return ret;
+        match CStr::from_ptr(encoding as *const i8)
+            .to_str()
+            .ok()
+            .map(|s| s.parse::<crate::encoding::XmlCharEncoding>())
+        {
+            Some(Ok(e)) => enc = e,
+            _ => {
+                xml_xinclude_err(
+                    ctxt,
+                    (*refe).elem,
+                    XmlParserErrors::XmlXincludeUnknownEncoding as i32,
+                    c"encoding %s not supported\n".as_ptr() as _,
+                    encoding,
+                );
+                // goto error;
+                xml_free_node(node);
+                xml_free_input_stream(input_stream);
+                xml_free_parser_ctxt(pctxt);
+                xml_free(encoding as _);
+                xml_free_uri(uri);
+                xml_free(url as _);
+                return ret;
+            }
         }
     }
 
@@ -2236,10 +2239,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         xml_free(url as _);
         return ret;
     }
-    if !(*buf).encoder.is_null() {
-        xml_char_enc_close_func((*buf).encoder);
-    }
-    (*buf).encoder = xml_get_char_encoding_handler(enc);
+    (*buf).encoder = get_encoding_handler(enc);
     node = xml_new_doc_text((*ctxt).doc, null_mut());
     if node.is_null() {
         xml_xinclude_err_memory(ctxt, (*refe).elem, null());

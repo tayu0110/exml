@@ -4,18 +4,17 @@ use const_format::concatcp;
 use libc::{free, malloc, realloc};
 
 use crate::{
+    encoding::XmlCharEncoding,
     error::generic_error_default,
     libxml::{
-        globals::{
-            XmlDeregisterNodeFunc, XmlOutputBufferCreateFilenameFunc,
-            XmlParserInputBufferCreateFilenameFunc, XmlRegisterNodeFunc,
-        },
+        globals::{XmlDeregisterNodeFunc, XmlOutputBufferCreateFilenameFunc, XmlRegisterNodeFunc},
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
         sax2::{
             xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
             xml_sax2_get_system_id,
         },
         tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
+        xml_io::XmlParserInputBuffer,
         xmlerror::{XmlError, XmlErrorLevel, XmlStructuredErrorFunc},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
         xmlstring::xml_strdup,
@@ -23,6 +22,8 @@ use crate::{
 };
 
 type GenericError = for<'a> fn(Option<&mut (dyn Write + 'static)>, &str);
+type ParserInputBufferCreateFilename =
+    fn(uri: &str, enc: XmlCharEncoding) -> *mut XmlParserInputBuffer;
 
 pub struct XmlGlobalState {
     parser_version: Cow<'static, str>,
@@ -55,7 +56,7 @@ pub struct XmlGlobalState {
     register_node_default_value: Option<XmlRegisterNodeFunc>,
     deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
     last_error: XmlError,
-    parser_input_buffer_create_filename_value: Option<XmlParserInputBufferCreateFilenameFunc>,
+    pub(crate) parser_input_buffer_create_filename_value: Option<ParserInputBufferCreateFilename>,
     output_buffer_create_filename_value: Option<XmlOutputBufferCreateFilenameFunc>,
 }
 

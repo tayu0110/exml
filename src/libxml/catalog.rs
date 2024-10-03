@@ -18,7 +18,6 @@ use crate::{
     __xml_raise_error, generic_error,
     hash::XmlHashTableRef,
     libxml::{
-        encoding::XmlCharEncoding,
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_create, xml_hash_free, xml_hash_lookup,
@@ -3946,7 +3945,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
     }
 
     let buf: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None);
+        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None);
     if buf.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();

@@ -9,12 +9,13 @@ use libc::{fclose, fopen, snprintf, FILE};
 
 use crate::{
     buf::XmlBuf,
+    encoding::XmlCharEncoding,
     libxml::{
         catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
         chvalid::XmlChRangeGroup,
         debug_xml::XmlShellCtxtPtr,
         dict::{xml_dict_create, xml_dict_free, XmlDictPtr},
-        encoding::{XmlCharEncoding, XmlCharEncodingHandlerPtr},
+        encoding::XmlCharEncodingHandlerPtr,
         entities::{XmlEntitiesTablePtr, XmlEntityPtr},
         globals::xml_free,
         hash::{xml_hash_create, xml_hash_free, XmlHashDeallocator, XmlHashTablePtr},
@@ -1251,10 +1252,7 @@ pub(crate) unsafe extern "C" fn gen_xml_parser_input_buffer_ptr(
         );
     }
     if no == 1 {
-        return xml_parser_input_buffer_create_filename(
-            c"<foo/>".as_ptr(),
-            XmlCharEncoding::None,
-        );
+        return xml_parser_input_buffer_create_filename(c"<foo/>".as_ptr(), XmlCharEncoding::None);
     }
     if no == 2 {
         return xml_parser_input_buffer_create_filename(
@@ -1281,10 +1279,7 @@ pub(crate) unsafe extern "C" fn gen_xml_parser_input_buffer_ptr(
         );
     }
     if no == 6 {
-        return xml_parser_input_buffer_create_filename(
-            REMOTE1BAD.as_ptr(),
-            XmlCharEncoding::None,
-        );
+        return xml_parser_input_buffer_create_filename(REMOTE1BAD.as_ptr(), XmlCharEncoding::None);
     }
     null_mut()
 }

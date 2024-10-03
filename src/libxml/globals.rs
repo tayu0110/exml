@@ -27,7 +27,7 @@ use crate::{
 };
 
 use super::{
-    encoding::{XmlCharEncoding, XmlCharEncodingHandlerPtr},
+    encoding::XmlCharEncodingHandlerPtr,
     parser::xml_init_parser,
     sax2::{
         xml_sax2_attribute_decl, xml_sax2_cdata_block, xml_sax2_characters, xml_sax2_comment,
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn xml_cleanup_globals() {}
  *         method was found.
  */
 pub type XmlParserInputBufferCreateFilenameFunc =
-    unsafe extern "C" fn(URI: *const c_char, enc: XmlCharEncoding) -> XmlParserInputBufferPtr;
+    unsafe fn(URI: *const c_char, enc: crate::encoding::XmlCharEncoding) -> XmlParserInputBufferPtr;
 
 /**
  * xmlOutputBufferCreateFilenameFunc:
@@ -111,7 +111,7 @@ pub type XmlOutputBufferCreateFilenameFunc = unsafe extern "C" fn(
  *
  * Returns the old value of the registration function
  */
-pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_default(
+pub unsafe fn xml_parser_input_buffer_create_filename_default(
     func: Option<XmlParserInputBufferCreateFilenameFunc>,
 ) -> XmlParserInputBufferCreateFilenameFunc {
     let old: XmlParserInputBufferCreateFilenameFunc =
@@ -626,7 +626,7 @@ pub unsafe extern "C" fn xml_thr_def_output_buffer_create_filename_default(
     old
 }
 
-pub unsafe extern "C" fn xml_thr_def_parser_input_buffer_create_filename_default(
+pub unsafe fn xml_thr_def_parser_input_buffer_create_filename_default(
     func: Option<XmlParserInputBufferCreateFilenameFunc>,
 ) -> XmlParserInputBufferCreateFilenameFunc {
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -1533,7 +1533,7 @@ pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
     _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
 }
 
-pub(crate) unsafe extern "C" fn __xml_parser_input_buffer_create_filename_value(
+pub(crate) unsafe fn __xml_parser_input_buffer_create_filename_value(
 ) -> Option<XmlParserInputBufferCreateFilenameFunc> {
     if IS_MAIN_THREAD!() != 0 {
         _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
@@ -1543,9 +1543,9 @@ pub(crate) unsafe extern "C" fn __xml_parser_input_buffer_create_filename_value(
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_value(
+pub unsafe fn xml_parser_input_buffer_create_filename_value(
     uri: *const c_char,
-    enc: XmlCharEncoding,
+    enc: crate::encoding::XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
         f(uri, enc)

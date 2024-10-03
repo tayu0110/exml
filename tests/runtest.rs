@@ -167,10 +167,10 @@ unsafe extern "C" fn channel(_ctx: *mut c_void, msg: *const c_char) {
         return;
     }
     let m = CStr::from_ptr(msg);
-    if TEST_ERRORS_SIZE + m.to_bytes().len() >= 32768 {
+    if TEST_ERRORS_SIZE + m.to_bytes().len() >= TEST_ERRORS.len() {
         TEST_ERRORS[TEST_ERRORS_SIZE..]
             .copy_from_slice(&m.to_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-        TEST_ERRORS_SIZE = 32768;
+        TEST_ERRORS_SIZE = TEST_ERRORS.len();
     } else {
         TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + m.to_bytes().len()]
             .copy_from_slice(m.to_bytes());
@@ -2178,10 +2178,12 @@ unsafe extern "C" fn push_parse_test(
     err: *const c_char,
     options: c_int,
 ) -> c_int {
-    use exml::libxml::{
+    use exml::{
         encoding::XmlCharEncoding,
-        htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
-        parser::{xml_create_push_parser_ctxt, xml_parse_chunk},
+        libxml::{
+            htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
+            parser::{xml_create_push_parser_ctxt, xml_parse_chunk},
+        },
     };
 
     let mut base: *const c_char = null();
@@ -2491,15 +2493,17 @@ unsafe extern "C" fn push_boundary_test(
     err: *const c_char,
     options: c_int,
 ) -> c_int {
-    use exml::libxml::{
+    use exml::{
         encoding::XmlCharEncoding,
-        htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
-        htmltree::html_doc_dump_memory,
-        parser::{
-            xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
+        libxml::{
+            htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
+            htmltree::html_doc_dump_memory,
+            parser::{
+                xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
+            },
+            sax2::{xml_sax2_init_html_default_sax_handler, xml_sax_version},
+            tree::xml_doc_dump_memory,
         },
-        sax2::{xml_sax2_init_html_default_sax_handler, xml_sax_version},
-        tree::xml_doc_dump_memory,
     };
     use libc::memset;
 
@@ -6320,12 +6324,13 @@ unsafe extern "C" fn automata_test(
 }
 
 const TEST_DESCRIPTIONS: &[TestDesc] = &[
+    #[cfg(feature = "libxml_reader")]
     TestDesc {
         desc: "for debug",
-        func: old_parse_test,
-        input: Some(c"./test/att10"),
+        func: stream_parse_test,
+        input: Some(c"./test/text-4-byte-UTF-16-BE-offset.xml"),
         out: Some(c"./result/"),
-        suffix: Some(c""),
+        suffix: Some(c".rdr"),
         err: None,
         options: 0,
     },

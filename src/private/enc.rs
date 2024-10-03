@@ -5,18 +5,25 @@
 
 use std::{
     ffi::{c_char, c_int, c_uchar, c_ushort},
+    fmt::Write,
     ptr::{addr_of_mut, null, null_mut},
+    str::from_utf8_mut,
     sync::atomic::Ordering,
 };
 
 use libc::{size_t, snprintf};
 
-use crate::libxml::{
-    encoding::{xml_enc_output_chunk, xml_encoding_err, XmlCharEncodingHandler, XML_LITTLE_ENDIAN},
-    tree::{xml_buf_content, xml_buf_end, xml_buf_shrink, xml_buf_use, XmlBufPtr},
-    xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr},
-    xmlerror::XmlParserErrors,
-    xmlstring::{xml_get_utf8_char, XmlChar},
+use crate::{
+    encoding::EncodingError,
+    libxml::{
+        encoding::{
+            xml_enc_output_chunk, xml_encoding_err, XmlCharEncodingHandler, XML_LITTLE_ENDIAN,
+        },
+        tree::{xml_buf_content, xml_buf_end, xml_buf_shrink, xml_buf_use, XmlBufPtr},
+        xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr},
+        xmlerror::XmlParserErrors,
+        xmlstring::{xml_get_utf8_char, XmlChar},
+    },
 };
 
 use super::buf::{xml_buf_add_len, xml_buf_avail, xml_buf_grow};
@@ -56,7 +63,7 @@ pub(crate) unsafe extern "C" fn xml_init_encoding_internal() {
  *     -1 by lack of space, or
  *     -2 if the transcoding fails (for *in is not valid utf8 string or
  *        the result of transformation can't fit into the encoding we want), or
- *     -3 if there the last byte can't form a single output c_char.
+ *     -3 if there the last byte can't form a single output char.
  *
  * The value of @inlen after return is the number of octets consumed
  *     as the return value is 0, else unpredictable.
@@ -102,96 +109,80 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
     input: XmlParserInputBufferPtr,
     flush: c_int,
 ) -> c_int {
-    let mut ret: c_int;
-    let mut written: size_t;
-    let mut toconv: size_t;
-    let mut c_in: c_int;
-    let mut c_out: c_int;
-
     if input.is_null()
-        || (*input).encoder.is_null()
+        || (*input).encoder.is_none()
         || (*input).buffer.is_none()
         || (*input).raw.is_none()
     {
         return -1;
     }
-    let out: XmlBufPtr = (*input).buffer.expect("Internal Error").as_ptr();
-    let bufin: XmlBufPtr = (*input).raw.expect("Internal Error").as_ptr();
+    let mut out = (*input).buffer.expect("Internal Error");
+    let mut bufin = (*input).raw.expect("Internal Error");
 
-    toconv = xml_buf_use(bufin);
+    let mut toconv = bufin.len();
     if toconv == 0 {
         return 0;
     }
     if toconv > 64 * 1024 && flush == 0 {
         toconv = 64 * 1024;
     }
-    written = xml_buf_avail(out);
+    let mut written = out.avail();
     if toconv * 2 >= written {
-        if xml_buf_grow(out, toconv as i32 * 2) < 0 {
+        if out.grow(toconv * 2).is_err() {
             return -1;
         }
-        written = xml_buf_avail(out);
+        written = out.avail();
     }
     if written > 128 * 1024 && flush == 0 {
         written = 128 * 1024;
     }
 
-    c_in = toconv as _;
-    c_out = written as _;
-    ret = xml_enc_input_chunk(
-        (*input).encoder,
-        xml_buf_end(out),
-        addr_of_mut!(c_out),
-        xml_buf_content(bufin),
-        addr_of_mut!(c_in),
-        flush,
-    );
-    xml_buf_shrink(bufin, c_in as usize);
-    xml_buf_add_len(out, c_out as usize);
-    if ret == -1 {
-        ret = -3;
-    }
-
-    match ret {
-        0 => {
+    let c_in = toconv;
+    let c_out = written;
+    let src = &bufin.as_ref()[..c_in];
+    let mut outstr = vec![0; c_out];
+    let dst = from_utf8_mut(&mut outstr).unwrap();
+    let ret = match (*input).encoder.as_mut().unwrap().decode(src, dst) {
+        Ok((read, write)) => {
+            bufin.trim_head(read);
+            out.push_bytes(&outstr[..write]);
             // no-op
+            0
         }
-        -1 => {
+        Err(EncodingError::BufferTooShort) => {
             // no-op
+            0
         }
-        -3 => {
-            // no-op
-        }
-        -2 => {
-            let mut buf: [c_char; 50] = [0; 50];
-            let content: *const XmlChar = xml_buf_content(bufin);
-
-            snprintf(
-                buf.as_mut_ptr().add(0) as _,
-                49,
-                c"0x%02X 0x%02X 0x%02X 0x%02X".as_ptr() as _,
-                *content.add(0) as u32,
-                *content.add(1) as u32,
-                *content.add(2) as u32,
-                *content.add(3) as u32,
+        Err(EncodingError::Malformed {
+            read,
+            write,
+            length,
+            offset,
+        }) => {
+            bufin.trim_head(read - length - offset);
+            out.push_bytes(&outstr[..write]);
+            let content = bufin.as_ref();
+            let mut buf = String::new();
+            write!(
+                buf,
+                "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\0",
+                content.first().unwrap_or(&0),
+                content.get(1).unwrap_or(&0),
+                content.get(2).unwrap_or(&0),
+                content.get(3).unwrap_or(&0)
             );
-            buf[49] = 0;
+
             xml_encoding_err(
                 XmlParserErrors::XmlI18nConvFailed,
                 c"input conversion failed due to input error, bytes %s\n".as_ptr() as _,
                 buf.as_ptr() as _,
             );
+            -2
         }
-        _ => {}
-    }
-    /*
-     * Ignore when input buffer is not on a boundary
-     */
-    if ret == -3 {
-        ret = 0;
-    }
+        _ => 0,
+    };
     if c_out != 0 {
-        c_out
+        c_out as i32
     } else {
         ret
     }

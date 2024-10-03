@@ -10,7 +10,7 @@ use encoding_rs::{
     mem::{convert_latin1_to_str, convert_utf8_to_latin1_lossy, is_str_latin1},
     Decoder, DecoderResult, Encoder, EncoderResult, Encoding, EUC_JP, ISO_2022_JP, ISO_8859_10,
     ISO_8859_13, ISO_8859_14, ISO_8859_15, ISO_8859_16, ISO_8859_2, ISO_8859_3, ISO_8859_4,
-    ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, SHIFT_JIS, UTF_16BE, UTF_16LE, WINDOWS_1254,
+    ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, SHIFT_JIS, WINDOWS_1254,
 };
 
 use crate::{__xml_raise_error, libxml::xmlerror::XmlParserErrors};
@@ -175,21 +175,16 @@ pub struct PredefinedEncodingHandler {
     name: &'static str,
     encoder: Encoder,
     decoder: Decoder,
-    elast: bool,
-    dlast: bool,
 }
 
 impl PredefinedEncodingHandler {
     pub fn encode(&mut self, src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
         let (res, read, write) = self
             .encoder
-            .encode_from_utf8_without_replacement(src, dst, self.elast);
+            .encode_from_utf8_without_replacement(src, dst, false);
         match res {
             EncoderResult::OutputFull => Ok((read, write)),
-            EncoderResult::InputEmpty => {
-                self.elast = true;
-                Ok((read, write))
-            }
+            EncoderResult::InputEmpty => Ok((read, write)),
             EncoderResult::Unmappable(c) => Err(EncodingError::Unmappable { read, write, c }),
         }
     }
@@ -197,18 +192,15 @@ impl PredefinedEncodingHandler {
     pub fn decode(&mut self, src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
         let (res, read, write) = self
             .decoder
-            .decode_to_str_without_replacement(src, dst, self.dlast);
+            .decode_to_str_without_replacement(src, dst, false);
         match res {
             DecoderResult::OutputFull => Ok((read, write)),
-            DecoderResult::InputEmpty => {
-                self.dlast = true;
-                Ok((read, write))
-            }
+            DecoderResult::InputEmpty => Ok((read, write)),
             DecoderResult::Malformed(c, d) => Err(EncodingError::Malformed {
                 read,
                 write,
-                length: c,
-                offset: d,
+                length: c as usize,
+                offset: d as usize,
             }),
         }
     }
@@ -227,8 +219,6 @@ impl From<&'static Encoding> for PredefinedEncodingHandler {
             name,
             encoder,
             decoder,
-            elast: false,
-            dlast: false,
         }
     }
 }
@@ -239,8 +229,8 @@ pub enum EncodingError {
     Malformed {
         read: usize,
         write: usize,
-        length: u8,
-        offset: u8,
+        length: usize,
+        offset: usize,
     },
     Unmappable {
         read: usize,
@@ -299,8 +289,8 @@ impl Display for EncodingError {
                 write!(
                     f,
                     "Malformed byte sequence occurs at {}..={}",
-                    read - *length as usize - *offset as usize,
-                    read - *offset as usize - 1
+                    read - length - offset,
+                    read - offset - 1
                 )
             }
             Self::Unmappable {
@@ -433,16 +423,42 @@ fn encode_utf16le(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingE
 }
 
 fn decode_utf16le(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
-    let mut decoder = UTF_16LE.new_decoder();
-    let (res, read, write) = decoder.decode_to_str_without_replacement(src, dst, false);
-    match res {
-        DecoderResult::Malformed(c, d) => Err(EncodingError::Malformed {
-            read,
-            write,
-            length: c,
-            offset: d,
-        }),
-        _ => Ok((read, write)),
+    let bytes = unsafe { dst.as_bytes_mut() };
+    let (mut read, mut write) = (0, 0);
+    let mut chunks = src.chunks_exact(2);
+    for c in char::decode_utf16(
+        chunks
+            .by_ref()
+            .map(|c| ((c[1] as u16) << 8) | (c[0] as u16)),
+    ) {
+        match c {
+            Ok(c) => {
+                let len = c.len_utf8();
+                if write + len > bytes.len() {
+                    break;
+                }
+                c.encode_utf8(&mut bytes[write..]);
+                read += c.len_utf16() * 2;
+                write += len;
+            }
+            Err(_) => {
+                if read + 2 >= src.len() {
+                    // If `src` is split at middle of surrogate pair, this error may occur.
+                    break;
+                }
+                return Err(EncodingError::Malformed {
+                    read: read + 2,
+                    write,
+                    length: 2,
+                    offset: 0,
+                });
+            }
+        }
+    }
+    if read == 0 {
+        Err(EncodingError::BufferTooShort)
+    } else {
+        Ok((read, write))
     }
 }
 
@@ -466,16 +482,42 @@ fn encode_utf16be(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingE
 }
 
 fn decode_utf16be(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
-    let mut decoder = UTF_16BE.new_decoder();
-    let (res, read, write) = decoder.decode_to_str_without_replacement(src, dst, false);
-    match res {
-        DecoderResult::Malformed(c, d) => Err(EncodingError::Malformed {
-            read,
-            write,
-            length: c,
-            offset: d,
-        }),
-        _ => Ok((read, write)),
+    let bytes = unsafe { dst.as_bytes_mut() };
+    let (mut read, mut write) = (0, 0);
+    let mut chunks = src.chunks_exact(2);
+    for c in char::decode_utf16(
+        chunks
+            .by_ref()
+            .map(|c| ((c[0] as u16) << 8) | (c[1] as u16)),
+    ) {
+        match c {
+            Ok(c) => {
+                let len = c.len_utf8();
+                if write + len > bytes.len() {
+                    break;
+                }
+                c.encode_utf8(&mut bytes[write..]);
+                read += c.len_utf16() * 2;
+                write += len;
+            }
+            Err(_) => {
+                if read + 2 >= src.len() {
+                    // If `src` is split at middle of surrogate pair, this error may occur.
+                    break;
+                }
+                return Err(EncodingError::Malformed {
+                    read: read + 2,
+                    write,
+                    length: 2,
+                    offset: 0,
+                });
+            }
+        }
+    }
+    if read == 0 {
+        Err(EncodingError::BufferTooShort)
+    } else {
+        Ok((read, write))
     }
 }
 
@@ -612,6 +654,44 @@ fn decode_ucs4le(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingEr
     Ok((read, write))
 }
 
+const UTF16LE_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
+    name: Cow::Borrowed("UTF-16LE"),
+    encode: encode_utf16le,
+    decode: decode_utf16le,
+};
+
+const UTF16BE_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
+    name: Cow::Borrowed("UTF-16BE"),
+    encode: encode_utf16be,
+    decode: decode_utf16be,
+};
+
+const UCS4BE_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
+    name: Cow::Borrowed("UCS-4"),
+    encode: encode_ucs4be,
+    decode: decode_ucs4be,
+};
+
+const UCS4LE_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
+    name: Cow::Borrowed("UCS-4"),
+    encode: encode_ucs4le,
+    decode: decode_ucs4le,
+};
+
+const ISO8859_1_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
+    name: Cow::Borrowed("ISO-8859-1"),
+    encode: encode_latin1,
+    decode: decode_latin1,
+};
+
+const PREDEFINED_CUSTOM_HANDLERS: &[CustomEncodingHandler] = &[
+    UTF16BE_HANDLER,
+    UTF16LE_HANDLER,
+    UCS4BE_HANDLER,
+    UCS4LE_HANDLER,
+    ISO8859_1_HANDLER,
+];
+
 pub fn get_encoding_handler(enc: XmlCharEncoding) -> Option<XmlCharEncodingHandler> {
     match enc {
         XmlCharEncoding::Error | XmlCharEncoding::None => None,
@@ -620,29 +700,13 @@ pub fn get_encoding_handler(enc: XmlCharEncoding) -> Option<XmlCharEncodingHandl
         // Therefore, we should provide them as CustomEncodingHandler.
         //
         // ref: https://docs.rs/encoding_rs/latest/encoding_rs/index.html#utf-16le-utf-16be-and-unicode-encoding-schemes
-        XmlCharEncoding::UTF16LE => Some(XmlCharEncodingHandler::Custom(CustomEncodingHandler {
-            name: UTF_16LE.name().into(),
-            encode: encode_utf16le,
-            decode: decode_utf16le,
-        })),
-        XmlCharEncoding::UTF16BE => Some(XmlCharEncodingHandler::Custom(CustomEncodingHandler {
-            name: UTF_16BE.name().into(),
-            encode: encode_utf16be,
-            decode: decode_utf16be,
-        })),
+        XmlCharEncoding::UTF16LE => Some(XmlCharEncodingHandler::Custom(UTF16LE_HANDLER)),
+        XmlCharEncoding::UTF16BE => Some(XmlCharEncodingHandler::Custom(UTF16BE_HANDLER)),
         XmlCharEncoding::EBCDIC => ["EBCDIC", "ebcdic", "EBCDIC-US", "IBM-037"]
             .into_iter()
             .find_map(find_encoding_handler),
-        XmlCharEncoding::UCS4BE => Some(XmlCharEncodingHandler::Custom(CustomEncodingHandler {
-            name: "UCS-4".into(),
-            encode: encode_ucs4be,
-            decode: decode_ucs4be,
-        })),
-        XmlCharEncoding::UCS4LE => Some(XmlCharEncodingHandler::Custom(CustomEncodingHandler {
-            name: "UCS-4".into(),
-            encode: encode_ucs4le,
-            decode: decode_ucs4le,
-        })),
+        XmlCharEncoding::UCS4BE => Some(XmlCharEncodingHandler::Custom(UCS4BE_HANDLER)),
+        XmlCharEncoding::UCS4LE => Some(XmlCharEncodingHandler::Custom(UCS4LE_HANDLER)),
         XmlCharEncoding::UCS4_2143 | XmlCharEncoding::UCS4_3412 => None,
         XmlCharEncoding::UCS2 => ["ISO-10646-UCS-2", "UCS-2", "UCS2"]
             .into_iter()
@@ -652,11 +716,7 @@ pub fn get_encoding_handler(enc: XmlCharEncoding) -> Option<XmlCharEncodingHandl
         // I have not understood yet...
         //
         // ref: https://docs.rs/encoding_rs/latest/encoding_rs/index.html#iso-8859-1
-        XmlCharEncoding::ISO8859_1 => Some(XmlCharEncodingHandler::Custom(CustomEncodingHandler {
-            name: "ISO-8859-1".into(),
-            encode: encode_latin1,
-            decode: decode_latin1,
-        })),
+        XmlCharEncoding::ISO8859_1 => Some(XmlCharEncodingHandler::Custom(ISO8859_1_HANDLER)),
         XmlCharEncoding::ISO8859_2 => Some(XmlCharEncodingHandler::Predefined(ISO_8859_2.into())),
         XmlCharEncoding::ISO8859_3 => Some(XmlCharEncodingHandler::Predefined(ISO_8859_3.into())),
         XmlCharEncoding::ISO8859_4 => Some(XmlCharEncodingHandler::Predefined(ISO_8859_4.into())),
@@ -693,6 +753,20 @@ pub fn find_encoding_handler(name: &str) -> Option<XmlCharEncodingHandler> {
                 return Some(XmlCharEncodingHandler::Custom(handler.clone()));
             }
         }
+    }
+
+    if let Some(default) = PREDEFINED_CUSTOM_HANDLERS
+        .iter()
+        .find(|handler| handler.name() == name)
+        .cloned()
+    {
+        return Some(XmlCharEncodingHandler::Custom(default));
+    }
+
+    if let Some(default) = Encoding::for_label(name.as_bytes())
+        .map(|enc| XmlCharEncodingHandler::Predefined(enc.into()))
+    {
+        return Some(default);
     }
 
     // If the alias matches nothing, use canonical name

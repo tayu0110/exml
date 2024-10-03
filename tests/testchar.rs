@@ -7,21 +7,24 @@ use std::{
     ptr::{addr_of_mut, null_mut},
 };
 
-use exml::libxml::{
+use exml::{
     encoding::XmlCharEncoding,
-    globals::{xml_free, xml_malloc},
-    parser::{
-        xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt,
-        xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
+    libxml::{
+        globals::{xml_free, xml_malloc},
+        parser::{
+            xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt,
+            xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
+        },
+        parser_internals::{input_push, xml_current_char, xml_new_input_stream},
+        tree::{xml_free_doc, XmlDocPtr},
+        xml_io::{
+            xml_free_parser_input_buffer, xml_parser_input_buffer_create_mem,
+            XmlParserInputBufferPtr,
+        },
+        xmlerror::{xml_set_structured_error_func, XmlErrorPtr, XmlParserErrors},
+        xmlmemory::xml_memory_dump,
+        xmlstring::XmlChar,
     },
-    parser_internals::{input_push, xml_current_char, xml_new_input_stream},
-    tree::{xml_free_doc, XmlDocPtr},
-    xml_io::{
-        xml_free_parser_input_buffer, xml_parser_input_buffer_create_mem, XmlParserInputBufferPtr,
-    },
-    xmlerror::{xml_set_structured_error_func, XmlErrorPtr, XmlParserErrors},
-    xmlmemory::xml_memory_dump,
-    xmlstring::XmlChar,
 };
 use libc::{fflush, fprintf, memset, printf, strlen, FILE};
 
@@ -379,7 +382,7 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
     *data.add(3) = 0;
     for i in 0..0xFF {
         *data.add(0) = i as c_char;
-        (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
+        (*ctxt).charset = XmlCharEncoding::UTF8;
         (*ctxt).nb_errors = 0;
 
         LAST_ERROR = 0;
@@ -429,7 +432,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
         for j in 0..0xFF {
             *data.add(0) = i as c_char;
             *data.add(1) = j as c_char;
-            (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
+            (*ctxt).charset = XmlCharEncoding::UTF8;
             (*ctxt).nb_errors = 0;
 
             LAST_ERROR = 0;
@@ -544,7 +547,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                 let nk = low as i32;
                 *data.add(2) = nk as c_char;
                 let value = (nk & 0x3F) + ((j & 0x3F) << 6) + ((i & 0xF) << 12);
-                (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
+                (*ctxt).charset = XmlCharEncoding::UTF8;
                 (*ctxt).nb_errors = 0;
 
                 LAST_ERROR = 0;
@@ -649,7 +652,7 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                     *data.add(3) = nl as c_char;
                     let value =
                         (nl & 0x3F) + ((nk & 0x3F) << 6) + ((j & 0x3F) << 12) + ((i & 0x7) << 18);
-                    (*ctxt).charset = XmlCharEncoding::UTF8 as i32;
+                    (*ctxt).charset = XmlCharEncoding::UTF8;
                     (*ctxt).nb_errors = 0;
 
                     LAST_ERROR = 0;

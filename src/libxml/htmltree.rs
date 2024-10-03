@@ -122,7 +122,7 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     (*cur).ids = null_mut();
     (*cur).refs = null_mut();
     (*cur)._private = null_mut();
-    (*cur).charset = XmlCharEncoding::UTF8 as i32;
+    (*cur).charset = crate::encoding::XmlCharEncoding::UTF8;
     (*cur).properties =
         XmlDocProperties::XmlDocHtml as i32 | XmlDocProperties::XmlDocUserbuilt as i32;
     if !external_id.is_null() || !uri.is_null() {

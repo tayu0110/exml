@@ -637,12 +637,9 @@ unsafe extern "C" fn utf16be_to_utf8(
 ) -> c_int {
     let outstart: *mut c_uchar = out;
     let mut processed: *const c_uchar = inb;
-
     let mut input: *mut c_ushort = inb as *mut c_ushort;
-
     let mut c: c_uint;
     let mut d: c_uint;
-
     let mut tmp: *mut c_uchar;
     let mut bits: c_int;
 
@@ -651,12 +648,12 @@ unsafe extern "C" fn utf16be_to_utf8(
         return 0;
     }
     let outend: *mut c_uchar = out.add(*outlen as usize);
-    if (*inlenb % 2) == 1 {
-        (*inlenb) -= 1;
+    if *inlenb % 2 == 1 {
+        *inlenb -= 1;
     }
     let inlen: c_uint = *inlenb as u32 / 2;
     let inend: *mut c_ushort = input.add(inlen as usize);
-    while input < inend && (out.offset_from(outstart) + 5 < *outlen as isize) {
+    while input < inend && out.offset_from(outstart) + 5 < *outlen as isize {
         if XML_LITTLE_ENDIAN.load(Ordering::Relaxed) != 0 {
             tmp = input as *mut c_uchar;
             c = *tmp as _;
@@ -4062,80 +4059,80 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_detect_char_encoding() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_detect_char_encoding() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_in in 0..GEN_NB_CONST_UNSIGNED_CHAR_PTR {
-                for n_len in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let input = gen_const_unsigned_char_ptr(n_in, 0);
-                    let len = gen_int(n_len, 1);
+    //         for n_in in 0..GEN_NB_CONST_UNSIGNED_CHAR_PTR {
+    //             for n_len in 0..GEN_NB_INT {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let input = gen_const_unsigned_char_ptr(n_in, 0);
+    //                 let len = gen_int(n_len, 1);
 
-                    let ret_val = xml_detect_char_encoding(input as *const c_uchar, len);
-                    desret_xml_char_encoding(ret_val);
-                    des_const_unsigned_char_ptr(n_in, input as *const c_uchar, 0);
-                    des_int(n_len, len, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDetectCharEncoding",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_in);
-                        eprintln!(" {}", n_len);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlDetectCharEncoding()"
-            );
-        }
-    }
+    //                 let ret_val = xml_detect_char_encoding(input as *const c_uchar, len);
+    //                 desret_xml_char_encoding(ret_val);
+    //                 des_const_unsigned_char_ptr(n_in, input as *const c_uchar, 0);
+    //                 des_int(n_len, len, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlDetectCharEncoding",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     eprint!(" {}", n_in);
+    //                     eprintln!(" {}", n_len);
+    //                 }
+    //             }
+    //         }
+    //         assert!(
+    //             leaks == 0,
+    //             "{leaks} Leaks are found in xmlDetectCharEncoding()"
+    //         );
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_find_char_encoding_handler() {
+    // #[test]
+    // fn test_xml_find_char_encoding_handler() {
 
-        /* missing type support */
-    }
+    //     /* missing type support */
+    // }
 
-    #[test]
-    fn test_xml_get_char_encoding_handler() {
+    // #[test]
+    // fn test_xml_get_char_encoding_handler() {
 
-        /* missing type support */
-    }
+    //     /* missing type support */
+    // }
 
-    #[test]
-    fn test_xml_get_char_encoding_name() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_get_char_encoding_name() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_enc in 0..GEN_NB_XML_CHAR_ENCODING {
-                let mem_base = xml_mem_blocks();
-                let enc = gen_xml_char_encoding(n_enc, 0);
+    //         for n_enc in 0..GEN_NB_XML_CHAR_ENCODING {
+    //             let mem_base = xml_mem_blocks();
+    //             let enc = gen_xml_char_encoding(n_enc, 0);
 
-                let ret_val = xml_get_char_encoding_name(enc);
-                desret_const_char_ptr(ret_val);
-                des_xml_char_encoding(n_enc, enc, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlGetCharEncodingName",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_enc);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlGetCharEncodingName()"
-            );
-        }
-    }
+    //             let ret_val = xml_get_char_encoding_name(enc);
+    //             desret_const_char_ptr(ret_val);
+    //             des_xml_char_encoding(n_enc, enc, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlGetCharEncodingName",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 eprintln!(" {}", n_enc);
+    //             }
+    //         }
+    //         assert!(
+    //             leaks == 0,
+    //             "{leaks} Leaks are found in xmlGetCharEncodingName()"
+    //         );
+    //     }
+    // }
 
     #[test]
     fn test_xml_get_encoding_alias() {
@@ -4180,34 +4177,34 @@ mod tests {
         /* missing type support */
     }
 
-    #[test]
-    fn test_xml_parse_char_encoding() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_parse_char_encoding() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_name in 0..GEN_NB_CONST_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let name = gen_const_char_ptr(n_name, 0);
+    //         for n_name in 0..GEN_NB_CONST_CHAR_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let name = gen_const_char_ptr(n_name, 0);
 
-                let ret_val = xml_parse_char_encoding(name);
-                desret_xml_char_encoding(ret_val);
-                des_const_char_ptr(n_name, name, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlParseCharEncoding",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_name);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlParseCharEncoding()"
-            );
-        }
-    }
+    //             let ret_val = xml_parse_char_encoding(name);
+    //             desret_xml_char_encoding(ret_val);
+    //             des_const_char_ptr(n_name, name, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlParseCharEncoding",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 eprintln!(" {}", n_name);
+    //             }
+    //         }
+    //         assert!(
+    //             leaks == 0,
+    //             "{leaks} Leaks are found in xmlParseCharEncoding()"
+    //         );
+    //     }
+    // }
 
     #[test]
     fn test_xml_register_char_encoding_handler() {

@@ -7,6 +7,7 @@ use std::{
     ffi::{c_char, c_int, c_uint, c_ulong, c_void},
     mem::size_of,
     ptr::{addr_of_mut, null, null_mut},
+    slice::from_raw_parts,
     sync::atomic::Ordering,
 };
 
@@ -14,8 +15,8 @@ use libc::{memcpy, memset, ptrdiff_t, size_t, INT_MAX};
 
 use crate::{
     __xml_raise_error,
+    encoding::detect_encoding,
     libxml::{
-        encoding::XmlCharEncoding,
         entities::XmlEntityPtr,
         htmltree::html_new_doc_no_dtd,
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlSaxlocatorPtr},
@@ -35,7 +36,6 @@ use crate::{
 
 use super::{
     dict::{xml_dict_lookup, xml_dict_owns, xml_dict_qlookup, xml_dict_reference},
-    encoding::xml_detect_char_encoding,
     entities::{
         xml_add_doc_entity, xml_add_dtd_entity, xml_get_doc_entity, xml_get_parameter_entity,
         xml_get_predefined_entity, XmlEntityType,
@@ -116,10 +116,6 @@ pub unsafe extern "C" fn xml_sax2_get_system_id(ctx: *mut c_void) -> *const XmlC
  */
 pub unsafe extern "C" fn xml_sax2_set_document_locator(_ctx: *mut c_void, _loc: XmlSaxlocatorPtr) {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2SetDocumentLocator()\n".as_ptr() as _);
-    // #endif
 }
 
 /**
@@ -283,11 +279,6 @@ pub unsafe extern "C" fn xml_sax2_internal_subset(
     if ctx.is_null() {
         return;
     }
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2InternalSubset(%s, %s, %s)\n",
-    //             name, ExternalID, SystemID);
-    // #endif
 
     if (*ctxt).my_doc.is_null() {
         return;
@@ -327,17 +318,11 @@ pub unsafe extern "C" fn xml_sax2_external_subset(
     if ctx.is_null() {
         return;
     }
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2ExternalSubset(%s, %s, %s)\n",
-    //             name, ExternalID, SystemID);
-    // #endif
     if (!external_id.is_null() || !system_id.is_null())
         && (((*ctxt).validate != 0 || (*ctxt).loadsubset != 0)
             && ((*ctxt).well_formed != 0 && !(*ctxt).my_doc.is_null()))
     {
         let mut input: XmlParserInputPtr = null_mut();
-        let enc: XmlCharEncoding;
         let mut consumed: c_ulong;
 
         /*
@@ -363,7 +348,7 @@ pub unsafe extern "C" fn xml_sax2_external_subset(
         let oldinput_nr: c_int = (*ctxt).input_nr;
         let oldinput_max: c_int = (*ctxt).input_max;
         let oldinput_tab: *mut XmlParserInputPtr = (*ctxt).input_tab;
-        let oldcharset: c_int = (*ctxt).charset;
+        let oldcharset = (*ctxt).charset;
         let oldencoding: *const XmlChar = (*ctxt).encoding;
         let oldprogressive: c_int = (*ctxt).progressive;
         (*ctxt).encoding = null();
@@ -391,7 +376,8 @@ pub unsafe extern "C" fn xml_sax2_external_subset(
          * On the fly encoding conversion if needed
          */
         if (*(*ctxt).input).length >= 4 {
-            enc = xml_detect_char_encoding((*(*ctxt).input).cur, 4);
+            let input = from_raw_parts((*(*ctxt).input).cur, 4);
+            let enc = detect_encoding(input);
             xml_switch_encoding(ctxt, enc);
         }
 
@@ -526,10 +512,6 @@ pub unsafe extern "C" fn xml_sax2_get_entity(
     if ctx.is_null() {
         return null_mut();
     }
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2GetEntity(%s)\n", name);
-    // #endif
 
     if (*ctxt).in_subset == 0 {
         ret = xml_get_predefined_entity(name);
@@ -584,10 +566,6 @@ pub unsafe extern "C" fn xml_sax2_get_parameter_entity(
     if ctx.is_null() {
         return null_mut();
     }
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2GetParameterEntity(%s)\n", name);
-    // #endif
 
     xml_get_parameter_entity((*ctxt).my_doc, name)
 }
@@ -626,12 +604,6 @@ pub unsafe extern "C" fn xml_sax2_resolve_entity(
     }
 
     let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
-
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2ResolveEntity(%s, %s)\n", publicId, systemId);
-    // #endif
-
     let ret: XmlParserInputPtr = xml_load_external_entity(uri as _, public_id as _, ctxt);
     if !uri.is_null() {
         xml_free(uri as _);
@@ -710,11 +682,6 @@ pub unsafe extern "C" fn xml_sax2_entity_decl(
     if ctx.is_null() {
         return;
     }
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2EntityDecl(%s, %d, %s, %s, %s)\n".as_ptr() as _,
-    //             name, type, publicId, systemId, content);
-    // #endif
     if (*ctxt).in_subset == 1 {
         ent = xml_add_doc_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
         if ent.is_null() && (*ctxt).pedantic != 0 {
@@ -881,11 +848,6 @@ pub unsafe extern "C" fn xml_sax2_attribute_decl(
         return;
     }
 
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2AttributeDecl(%s, %s, %d, %d, %s, ...)\n".as_ptr() as _,
-    //             elem, fullname, type, def, defaultValue);
-    // #endif
     if xml_str_equal(fullname, c"xml:id".as_ptr() as _)
         && typ != XmlAttributeType::XmlAttributeId as i32
     {
@@ -985,11 +947,6 @@ pub unsafe extern "C" fn xml_sax2_element_decl(
         return;
     }
 
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    //                     c"SAX.xmlSAX2ElementDecl(%s, %d, ...)\n", name, type);
-    // #endif
-
     if (*ctxt).in_subset == 1 {
         elem = xml_add_element_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
@@ -1053,11 +1010,6 @@ pub unsafe extern "C" fn xml_sax2_notation_decl(
     if ctxt.is_null() || (*ctxt).my_doc.is_null() {
         return;
     }
-
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2NotationDecl(%s, %s, %s)\n", name, publicId, systemId);
-    // #endif
 
     if public_id.is_null() && system_id.is_null() {
         xml_fatal_err_msg(
@@ -1131,11 +1083,6 @@ pub unsafe extern "C" fn xml_sax2_unparsed_entity_decl(
     if ctx.is_null() {
         return;
     }
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2UnparsedEntityDecl(%s, %s, %s, %s)\n",
-    //             name, publicId, systemId, notationName);
-    // #endif
     if (*ctxt).in_subset == 1 {
         ent = xml_add_doc_entity(
             (*ctxt).my_doc,
@@ -1229,10 +1176,6 @@ pub unsafe extern "C" fn xml_sax2_start_document(ctx: *mut c_void) {
         return;
     }
 
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2StartDocument()\n".as_ptr() as _);
-    // #endif
     if (*ctxt).html != 0 {
         #[cfg(feature = "html")]
         {
@@ -1301,10 +1244,6 @@ pub unsafe extern "C" fn xml_sax2_start_document(ctx: *mut c_void) {
  */
 pub unsafe extern "C" fn xml_sax2_end_document(ctx: *mut c_void) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2EndDocument()\n".as_ptr() as _);
-    // #endif
     if ctx.is_null() {
         return;
     }
@@ -1339,9 +1278,9 @@ pub unsafe extern "C" fn xml_sax2_end_document(ctx: *mut c_void) {
     {
         (*(*ctxt).my_doc).encoding = xml_strdup((*(*(*ctxt).input_tab.add(0))).encoding);
     }
-    if (*ctxt).charset != XmlCharEncoding::None as i32
+    if (*ctxt).charset != crate::encoding::XmlCharEncoding::None
         && !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).charset == XmlCharEncoding::None as i32
+        && (*(*ctxt).my_doc).charset == crate::encoding::XmlCharEncoding::None
     {
         (*(*ctxt).my_doc).charset = (*ctxt).charset;
     }
@@ -2184,10 +2123,6 @@ pub unsafe extern "C" fn xml_sax2_start_element(
         return;
     }
     parent = (*ctxt).node;
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2StartElement(%s)\n", fullname);
-    // #endif
 
     /*
      * First check on validity:
@@ -2234,9 +2169,6 @@ pub unsafe extern "C" fn xml_sax2_start_element(
         return;
     }
     if (*(*ctxt).my_doc).children.is_null() {
-        // #ifdef DEBUG_SAX_TREE
-        // 	xmlGenericError(xmlGenericErrorContext, c"Setting %s as root\n", name);
-        // #endif
         xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
     } else if parent.is_null() {
         parent = (*(*ctxt).my_doc).children;
@@ -2253,9 +2185,6 @@ pub unsafe extern "C" fn xml_sax2_start_element(
     /*
      * We are parsing a new node.
      */
-    // #ifdef DEBUG_SAX_TREE
-    //     xmlGenericError(xmlGenericErrorContext, c"pushing(%s)\n", name);
-    // #endif
     if node_push(ctxt, ret) < 0 {
         xml_unlink_node(ret);
         xml_free_node(ret);
@@ -2270,17 +2199,8 @@ pub unsafe extern "C" fn xml_sax2_start_element(
      */
     if !parent.is_null() {
         if matches!((*parent).typ, XmlElementType::XmlElementNode) {
-            // #ifdef DEBUG_SAX_TREE
-            // 	    xmlGenericError(xmlGenericErrorContext,
-            // 		    "adding child %s to %s\n", name, (*parent).name);
-            // #endif
             xml_add_child(parent, ret);
         } else {
-            // #ifdef DEBUG_SAX_TREE
-            // 	    xmlGenericError(xmlGenericErrorContext,
-            // 		    "adding sibling %s to ", name);
-            // 	    xmlDebugDumpOneNode(stderr, parent, 0);
-            // #endif
             xml_add_sibling(parent, ret);
         }
     }
@@ -2436,12 +2356,6 @@ pub unsafe extern "C" fn xml_sax2_end_element(ctx: *mut c_void, _name: *const Xm
         return;
     }
     let cur: XmlNodePtr = (*ctxt).node;
-    // #ifdef DEBUG_SAX
-    //     if (name.is_null())
-    //         xmlGenericError(xmlGenericErrorContext, c"SAX.xmlSAX2EndElement(NULL)\n".as_ptr() as _);
-    //     else
-    // 	xmlGenericError(xmlGenericErrorContext, c"SAX.xmlSAX2EndElement(%s)\n", name);
-    // #endif
 
     (*ctxt).nodemem = -1;
 
@@ -2460,9 +2374,6 @@ pub unsafe extern "C" fn xml_sax2_end_element(ctx: *mut c_void, _name: *const Xm
     /*
      * end of parsing of this node.
      */
-    // #ifdef DEBUG_SAX_TREE
-    //     xmlGenericError(xmlGenericErrorContext, c"popping(%s)\n", cur->name);
-    // #endif
     node_pop(ctxt);
 }
 
@@ -3277,19 +3188,11 @@ pub unsafe extern "C" fn xml_sax2_reference(ctx: *mut c_void, name: *const XmlCh
     if ctx.is_null() {
         return;
     }
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2Reference(%s)\n", name);
-    // #endif
     let ret = if *name.add(0) == b'#' {
         xml_new_char_ref((*ctxt).my_doc, name)
     } else {
         xml_new_reference((*ctxt).my_doc, name)
     };
-    // #ifdef DEBUG_SAX_TREE
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "add xmlSAX2Reference %s to %s \n", name, (*(*ctxt).node).name);
-    // #endif
     if xml_add_child((*ctxt).node, ret).is_null() {
         xml_free_node(ret);
     }
@@ -3318,28 +3221,15 @@ unsafe extern "C" fn xml_sax2_text(
     if ctxt.is_null() {
         return;
     }
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2Characters(%.30s, %d)\n", ch, len);
-    // #endif
     /*
      * Handle the data if any. If there is no child
      * add it as content, otherwise if the last child is text,
      * concatenate it, else create a new node of type text.
      */
-
     if (*ctxt).node.is_null() {
-        // #ifdef DEBUG_SAX_TREE
-        // 	xmlGenericError(xmlGenericErrorContext,
-        // 		"add chars: (*ctxt).node.is_null() !\n".as_ptr() as _);
-        // #endif
         return;
     }
     last_child = (*(*ctxt).node).last;
-    // #ifdef DEBUG_SAX_TREE
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "add chars to %s \n", (*(*ctxt).node).name);
-    // #endif
 
     /*
      * Here we needed an accelerator mechanism in case of very large
@@ -3489,10 +3379,6 @@ pub unsafe extern "C" fn xml_sax2_ignorable_whitespace(
     _len: c_int,
 ) {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2IgnorableWhitespace(%.30s, %d)\n", ch, len);
-    // #endif
 }
 
 /**
@@ -3514,10 +3400,6 @@ pub unsafe extern "C" fn xml_sax2_processing_instruction(
         return;
     }
     let parent: XmlNodePtr = (*ctxt).node;
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "SAX.xmlSAX2ProcessingInstruction(%s, %s)\n", target, data);
-    // #endif
 
     let ret: XmlNodePtr = xml_new_doc_pi((*ctxt).my_doc, target, data);
     if ret.is_null() {
@@ -3539,25 +3421,12 @@ pub unsafe extern "C" fn xml_sax2_processing_instruction(
         return;
     }
     if parent.is_null() {
-        // #ifdef DEBUG_SAX_TREE
-        // 	    xmlGenericError(xmlGenericErrorContext,
-        // 		    "Setting PI %s as root\n", target);
-        // #endif
         xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
         return;
     }
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
-        // #ifdef DEBUG_SAX_TREE
-        // 	xmlGenericError(xmlGenericErrorContext,
-        // 		"adding PI %s child to %s\n", target, (*parent).name);
-        // #endif
         xml_add_child(parent, ret);
     } else {
-        // #ifdef DEBUG_SAX_TREE
-        // 	xmlGenericError(xmlGenericErrorContext,
-        // 		"adding PI %s sibling to ", target);
-        // 	xmlDebugDumpOneNode(stderr, parent, 0);
-        // #endif
         xml_add_sibling(parent, ret);
     }
 }
@@ -3576,9 +3445,6 @@ pub unsafe extern "C" fn xml_sax2_comment(ctx: *mut c_void, value: *const XmlCha
         return;
     }
     let parent: XmlNodePtr = (*ctxt).node;
-    // #ifdef DEBUG_SAX
-    //     xmlGenericError(xmlGenericErrorContext, c"SAX.xmlSAX2Comment(%s)\n", value);
-    // #endif
     let ret: XmlNodePtr = xml_new_doc_comment((*ctxt).my_doc, value);
     if ret.is_null() {
         return;
@@ -3599,25 +3465,12 @@ pub unsafe extern "C" fn xml_sax2_comment(ctx: *mut c_void, value: *const XmlCha
         return;
     }
     if parent.is_null() {
-        // #ifdef DEBUG_SAX_TREE
-        // 	    xmlGenericError(xmlGenericErrorContext,
-        // 		    "Setting xmlSAX2Comment as root\n".as_ptr() as _);
-        // #endif
         xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
         return;
     }
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
-        // #ifdef DEBUG_SAX_TREE
-        // 	xmlGenericError(xmlGenericErrorContext,
-        // 		"adding xmlSAX2Comment child to %s\n", (*parent).name);
-        // #endif
         xml_add_child(parent, ret);
     } else {
-        // #ifdef DEBUG_SAX_TREE
-        // 	xmlGenericError(xmlGenericErrorContext,
-        // 		"adding xmlSAX2Comment sibling to ".as_ptr() as _);
-        // 	xmlDebugDumpOneNode(stderr, parent, 0);
-        // #endif
         xml_add_sibling(parent, ret);
     }
 }

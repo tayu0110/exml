@@ -22,11 +22,12 @@ use std::{
 
 use const_format::concatcp;
 use exml::{
+    encoding::XmlCharEncoding,
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
-        encoding::{xml_add_encoding_alias, XmlCharEncoding},
+        encoding::xml_add_encoding_alias,
         entities::{xml_encode_entities_reentrant, XmlEntityPtr},
         globals::{
             xml_deregister_node_default, xml_free, xml_generic_error, xml_generic_error_context,
@@ -1708,10 +1709,8 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
     if f {
         #[cfg(feature = "schema")]
         {
-            let buf: XmlParserInputBufferPtr = xml_parser_input_buffer_create_filename(
-                filename,
-                XmlCharEncoding::None,
-            );
+            let buf: XmlParserInputBufferPtr =
+                xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None);
             if buf.is_null() {
                 return;
             }

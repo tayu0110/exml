@@ -36,7 +36,6 @@ use crate::{
 
 use super::{
     dict::{xml_dict_lookup, xml_dict_owns, XmlDict, XmlDictPtr},
-    encoding::XmlCharEncoding,
     entities::{
         xml_encode_entities_reentrant, xml_free_entities_table, xml_get_doc_entity,
         XmlEntitiesTablePtr, XmlEntityType,
@@ -463,8 +462,6 @@ impl TryFrom<i32> for XmlElementTypeVal {
     }
 }
 
-// #include <libxml/xmlregexp.h>
-
 /**
  * xmlElement:
  *
@@ -708,7 +705,7 @@ pub struct XmlDoc {
     pub(crate) ids: *mut c_void,        /* Hash table for ID attributes if any */
     pub(crate) refs: *mut c_void,       /* Hash table for IDREFs attributes if any */
     pub(crate) url: *const XmlChar,     /* The URI for that document */
-    pub(crate) charset: c_int,          /* Internal flag for charset handling,
+    pub(crate) charset: crate::encoding::XmlCharEncoding, /* Internal flag for charset handling,
                                         actually an xmlCharEncoding */
     pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
     pub(crate) psvi: *mut c_void, /* for type/PSVI information */
@@ -2649,7 +2646,7 @@ pub unsafe extern "C" fn xml_new_doc(mut version: *const XmlChar) -> XmlDocPtr {
      * This field will never change and would
      * be obsolete if not for binary compatibility.
      */
-    (*cur).charset = XmlCharEncoding::UTF8 as i32;
+    (*cur).charset = crate::encoding::XmlCharEncoding::UTF8;
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()

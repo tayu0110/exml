@@ -215,7 +215,7 @@ pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
         return 0;
     }
     /* Don't grow memory buffers. */
-    if (*buf).encoder.is_null() && (*buf).readcallback.is_none() {
+    if (*buf).encoder.is_none() && (*buf).readcallback.is_none() {
         return 0;
     }
 
@@ -260,7 +260,7 @@ pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
 
     /* Don't shrink pull parser memory buffers. */
     if buf.is_null()
-        || (*ctxt).progressive == 0 && (*buf).encoder.is_null() && (*buf).readcallback.is_none()
+        || (*ctxt).progressive == 0 && (*buf).encoder.is_none() && (*buf).readcallback.is_none()
     {
         return;
     }
