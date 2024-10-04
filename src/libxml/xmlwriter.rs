@@ -10,11 +10,12 @@
 //! since it is easy to write the format to a single String using `format!`.
 
 use std::{
-    ffi::{c_char, c_int, c_uchar, CStr},
+    cell::RefCell,
+    ffi::{c_char, c_int, c_uchar, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
-    sync::atomic::Ordering,
+    rc::Rc,
 };
 
 use libc::memset;
@@ -22,8 +23,8 @@ use libc::memset;
 use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
+    encoding::find_encoding_handler,
     libxml::{
-        encoding::{xml_find_char_encoding_handler, XmlCharEncodingHandlerPtr},
         entities::xml_encode_special_chars,
         globals::{xml_free, xml_malloc},
         htmltree::html_new_doc_no_dtd,
@@ -363,7 +364,7 @@ pub unsafe extern "C" fn xml_new_text_writer_filename(
     uri: *const c_char,
     compression: c_int,
 ) -> XmlTextWriterPtr {
-    let out: XmlOutputBufferPtr = xml_output_buffer_create_filename(uri, null_mut(), compression);
+    let out: XmlOutputBufferPtr = xml_output_buffer_create_filename(uri, None, compression);
     if out.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -580,7 +581,7 @@ pub unsafe extern "C" fn xml_new_text_writer_push_parser(
         Some(xml_text_writer_write_doc_callback),
         Some(xml_text_writer_close_doc_callback),
         ctxt as _,
-        null_mut(),
+        None,
     );
     if out.is_null() {
         xml_writer_err_msg(
@@ -912,7 +913,6 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
 ) -> c_int {
     let mut count: c_int;
     let mut sum: c_int;
-    let mut encoder: XmlCharEncodingHandlerPtr;
 
     if writer.is_null() || (*writer).out.is_null() {
         xml_writer_err_msg(
@@ -933,28 +933,32 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
         return -1;
     }
 
-    encoder = null_mut();
-    if !encoding.is_null() {
-        encoder = xml_find_char_encoding_handler(encoding);
-        if encoder.is_null() {
+    let encoder = if let Some(Ok(encoding)) =
+        (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str())
+    {
+        let Some(encoder) = find_encoding_handler(encoding) else {
             xml_writer_err_msg(
                 writer,
                 XmlParserErrors::XmlErrUnsupportedEncoding,
                 c"xmlTextWriterStartDocument : unsupported encoding\n".as_ptr() as _,
             );
             return -1;
-        }
-    }
+        };
+        Some(encoder)
+    } else {
+        None
+    };
 
-    (*(*writer).out).encoder = encoder;
-    if !encoder.is_null() {
+    (*(*writer).out).encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
+    if (*(*writer).out).encoder.is_some() {
         if (*(*writer).out).conv.is_none() {
             (*(*writer).out).conv = XmlBufRef::with_capacity(4000);
         }
         xml_char_enc_output((*writer).out, 1);
         if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_null() {
-            (*(*writer).doc).encoding =
-                xml_strdup((*(*(*writer).out).encoder).name.load(Ordering::Relaxed) as _);
+            let name =
+                CString::new((*(*writer).out).encoder.as_ref().unwrap().borrow().name()).unwrap();
+            (*(*writer).doc).encoding = xml_strdup(name.as_ptr() as *const u8);
         }
     } else {
         (*(*writer).out).conv = None;
@@ -985,7 +989,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
         return -1;
     }
     sum += count;
-    if !(*(*writer).out).encoder.is_null() {
+    if (*(*writer).out).encoder.is_some() {
         count = xml_output_buffer_write_string((*writer).out, c" encoding=".as_ptr() as _);
         if count < 0 {
             return -1;
@@ -996,10 +1000,9 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write_string(
-            (*writer).out,
-            (*(*(*writer).out).encoder).name.load(Ordering::Relaxed) as _,
-        );
+        let name =
+            CString::new((*(*writer).out).encoder.as_ref().unwrap().borrow().name()).unwrap();
+        count = xml_output_buffer_write_string((*writer).out, name.as_ptr());
         if count < 0 {
             return -1;
         }

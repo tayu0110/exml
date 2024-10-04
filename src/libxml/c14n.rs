@@ -317,7 +317,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     /*
      * create memory buffer with UTF8 (default) encoding
      */
-    let buf: XmlOutputBufferPtr = xml_alloc_output_buffer(null_mut());
+    let buf: XmlOutputBufferPtr = xml_alloc_output_buffer(None);
     if buf.is_null() {
         xml_c14n_err_memory(c"creating output buffer".as_ptr() as _);
         return -1;
@@ -395,8 +395,7 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
     /*
      * save the content to a temp buffer, use default UTF8 encoding.
      */
-    let buf: XmlOutputBufferPtr =
-        xml_output_buffer_create_filename(filename, null_mut(), compression);
+    let buf: XmlOutputBufferPtr = xml_output_buffer_create_filename(filename, None, compression);
     if buf.is_null() {
         xml_c14n_err_internal(c"creating temporary filename".as_ptr() as _);
         return -1;
@@ -574,7 +573,7 @@ unsafe extern "C" fn xml_c14n_new_ctx(
     /*
      *  Validate the encoding output buffer encoding
      */
-    if !(*buf).encoder.is_null() {
+    if (*buf).encoder.is_some() {
         xml_c14n_err(
             ctx,
             doc as _,
@@ -2512,7 +2511,7 @@ pub unsafe extern "C" fn xml_c14n_execute(
     /*
      *  Validate the encoding output buffer encoding
      */
-    if !(*buf).encoder.is_null() {
+    if (*buf).encoder.is_some() {
         xml_c14n_err(
             null_mut(),
             doc as XmlNodePtr,

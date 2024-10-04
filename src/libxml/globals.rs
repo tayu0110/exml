@@ -4,9 +4,11 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
+    cell::RefCell,
     ffi::{c_char, c_int, c_void},
     mem::{size_of, zeroed},
     ptr::{addr_of_mut, null_mut},
+    rc::Rc,
     sync::atomic::{AtomicI32, AtomicPtr, Ordering},
 };
 
@@ -15,6 +17,7 @@ use libc::{free, malloc, memset, realloc};
 #[cfg(feature = "legacy")]
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
+    encoding::XmlCharEncodingHandler,
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
         xml_io::{
@@ -27,7 +30,6 @@ use crate::{
 };
 
 use super::{
-    encoding::XmlCharEncodingHandlerPtr,
     parser::xml_init_parser,
     sax2::{
         xml_sax2_attribute_decl, xml_sax2_cdata_block, xml_sax2_characters, xml_sax2_comment,
@@ -97,9 +99,9 @@ pub type XmlParserInputBufferCreateFilenameFunc =
  * Returns the new xmlOutputBufferPtr in case of success or NULL if no
  *         method was found.
  */
-pub type XmlOutputBufferCreateFilenameFunc = unsafe extern "C" fn(
+pub type XmlOutputBufferCreateFilenameFunc = unsafe fn(
     URI: *const c_char,
-    encoder: XmlCharEncodingHandlerPtr,
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     compression: c_int,
 ) -> XmlOutputBufferPtr;
 
@@ -130,7 +132,7 @@ pub unsafe fn xml_parser_input_buffer_create_filename_default(
 *
 * Returns the old value of the registration function
 */
-pub unsafe extern "C" fn xml_output_buffer_create_filename_default(
+pub unsafe fn xml_output_buffer_create_filename_default(
     func: Option<XmlOutputBufferCreateFilenameFunc>,
 ) -> Option<XmlOutputBufferCreateFilenameFunc> {
     let old = _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE;
@@ -609,7 +611,7 @@ pub unsafe extern "C" fn xml_thr_def_deregister_node_default(
     old
 }
 
-pub unsafe extern "C" fn xml_thr_def_output_buffer_create_filename_default(
+pub unsafe fn xml_thr_def_output_buffer_create_filename_default(
     func: XmlOutputBufferCreateFilenameFunc,
 ) -> Option<XmlOutputBufferCreateFilenameFunc> {
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -1563,7 +1565,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_value(
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xml_output_buffer_create_filename_value(
+pub unsafe fn __xml_output_buffer_create_filename_value(
 ) -> Option<XmlOutputBufferCreateFilenameFunc> {
     if IS_MAIN_THREAD!() != 0 {
         _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE
@@ -1573,9 +1575,9 @@ pub unsafe extern "C" fn __xml_output_buffer_create_filename_value(
 }
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_output_buffer_create_filename_value(
+pub unsafe fn xml_output_buffer_create_filename_value(
     uri: *const c_char,
-    encoder: XmlCharEncodingHandlerPtr,
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     compression: c_int,
 ) -> XmlOutputBufferPtr {
     if let Some(fvalue) = __xml_output_buffer_create_filename_value() {
@@ -1588,7 +1590,7 @@ pub unsafe extern "C" fn xml_output_buffer_create_filename_value(
 #[cfg(not(feature = "thread"))]
 pub unsafe extern "C" fn xml_output_buffer_create_filename_value(
     uri: *const c_char,
-    encoder: XmlCharEncodingHandlerPtr,
+    encoder: Option<XmlCharEncodingHandler>,
     compression: c_int,
 ) -> XmlOutputBufferPtr {
     _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE.unwrap()(uri, encoder, compression)

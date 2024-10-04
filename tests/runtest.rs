@@ -6324,15 +6324,15 @@ unsafe extern "C" fn automata_test(
 }
 
 const TEST_DESCRIPTIONS: &[TestDesc] = &[
-    #[cfg(feature = "libxml_reader")]
+    #[cfg(feature = "html")]
     TestDesc {
         desc: "for debug",
-        func: stream_parse_test,
-        input: Some(c"./test/text-4-byte-UTF-16-BE-offset.xml"),
-        out: Some(c"./result/"),
-        suffix: Some(c".rdr"),
-        err: None,
-        options: 0,
+        func: err_parse_test,
+        input: Some(c"./test/HTML/doc3.htm"),
+        out: Some(c"./result/HTML/"),
+        suffix: Some(c""),
+        err: Some(c".err"),
+        options: XML_PARSE_HTML,
     },
     TestDesc {
         desc: "XML regression tests",

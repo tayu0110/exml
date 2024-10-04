@@ -2263,7 +2263,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     extern "C" {
                         static stdout: *mut FILE;
                     }
-                    buf = xml_output_buffer_create_file(stdout, null_mut());
+                    buf = xml_output_buffer_create_file(stdout, None);
                     if buf.is_null() {
                         eprintln!("Out of memory for XPath");
                         PROGRESULT = XmllintReturnCode::ErrMem;

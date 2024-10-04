@@ -1,20 +1,20 @@
-use std::{borrow::Cow, cell::RefCell, ffi::c_void, io::Write, ptr::null_mut};
+use std::{borrow::Cow, cell::RefCell, ffi::c_void, io::Write, ptr::null_mut, rc::Rc};
 
 use const_format::concatcp;
 use libc::{free, malloc, realloc};
 
 use crate::{
-    encoding::XmlCharEncoding,
+    encoding::{XmlCharEncoding, XmlCharEncodingHandler},
     error::generic_error_default,
     libxml::{
-        globals::{XmlDeregisterNodeFunc, XmlOutputBufferCreateFilenameFunc, XmlRegisterNodeFunc},
+        globals::{XmlDeregisterNodeFunc, XmlRegisterNodeFunc},
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
         sax2::{
             xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
             xml_sax2_get_system_id,
         },
         tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
-        xml_io::XmlParserInputBuffer,
+        xml_io::{XmlOutputBuffer, XmlParserInputBuffer},
         xmlerror::{XmlError, XmlErrorLevel, XmlStructuredErrorFunc},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
         xmlstring::xml_strdup,
@@ -24,6 +24,11 @@ use crate::{
 type GenericError = for<'a> fn(Option<&mut (dyn Write + 'static)>, &str);
 type ParserInputBufferCreateFilename =
     fn(uri: &str, enc: XmlCharEncoding) -> *mut XmlParserInputBuffer;
+type OutputBufferCreateFilename = fn(
+    uri: &str,
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
+    compression: i32,
+) -> *mut XmlOutputBuffer;
 
 pub struct XmlGlobalState {
     parser_version: Cow<'static, str>,
@@ -57,7 +62,7 @@ pub struct XmlGlobalState {
     deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
     last_error: XmlError,
     pub(crate) parser_input_buffer_create_filename_value: Option<ParserInputBufferCreateFilename>,
-    output_buffer_create_filename_value: Option<XmlOutputBufferCreateFilenameFunc>,
+    pub(crate) output_buffer_create_filename_value: Option<OutputBufferCreateFilename>,
 }
 
 impl XmlGlobalState {

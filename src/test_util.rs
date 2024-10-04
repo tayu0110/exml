@@ -1981,7 +1981,7 @@ pub(crate) unsafe extern "C" fn gen_xml_output_buffer_ptr(
     use crate::libxml::xml_io::xml_output_buffer_create_filename;
 
     if no == 0 {
-        return xml_output_buffer_create_filename(c"test.out".as_ptr() as _, null_mut(), 0);
+        return xml_output_buffer_create_filename(c"test.out".as_ptr() as _, None, 0);
     }
     null_mut()
 }

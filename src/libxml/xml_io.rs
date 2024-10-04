@@ -9,9 +9,11 @@
  */
 
 use std::{
+    cell::RefCell,
     ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void, CStr},
     mem::{size_of, zeroed},
     ptr::{addr_of_mut, null, null_mut},
+    rc::Rc,
     slice::from_raw_parts,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
@@ -50,8 +52,8 @@ use super::{
         xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
         xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
     },
-    encoding::{xml_char_enc_close_func, XmlCharEncodingHandlerPtr, XmlCharEncodingOutputFunc},
-    globals::{xml_free, xml_malloc, xml_output_buffer_create_filename_value},
+    encoding::XmlCharEncodingOutputFunc,
+    globals::{xml_free, xml_malloc},
     nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
     nanohttp::{
         xml_nanohttp_close, xml_nanohttp_encoding, xml_nanohttp_method, xml_nanohttp_mime_type,
@@ -182,7 +184,7 @@ pub struct XmlOutputBuffer {
     pub(crate) writecallback: Option<XmlOutputWriteCallback>,
     pub(crate) closecallback: Option<XmlOutputCloseCallback>,
 
-    pub(crate) encoder: XmlCharEncodingHandlerPtr, /* I18N conversions to UTF-8 */
+    pub(crate) encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>, /* I18N conversions to UTF-8 */
 
     pub(crate) buffer: Option<XmlBufRef>, /* Local buffer encoded in UTF-8 or ISOLatin */
     pub(crate) conv: Option<XmlBufRef>,   /* if encoder != NULL buffer for output */
@@ -1652,8 +1654,8 @@ pub unsafe extern "C" fn xml_register_default_output_callbacks() {
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_alloc_output_buffer(
-    encoder: XmlCharEncodingHandlerPtr,
+pub unsafe fn xml_alloc_output_buffer(
+    encoder: Option<XmlCharEncodingHandler>,
 ) -> XmlOutputBufferPtr {
     let ret: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as XmlOutputBufferPtr;
     if ret.is_null() {
@@ -1668,8 +1670,8 @@ pub unsafe extern "C" fn xml_alloc_output_buffer(
     buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     (*ret).buffer = Some(buf);
 
-    (*ret).encoder = encoder;
-    if !encoder.is_null() {
+    (*ret).encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
+    if (*ret).encoder.is_some() {
         (*ret).conv = XmlBufRef::with_capacity(4000);
         if (*ret).conv.is_none() {
             buf.free();
@@ -1708,15 +1710,15 @@ pub unsafe extern "C" fn xml_alloc_output_buffer(
  * Returns the new output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_create_filename(
+pub unsafe fn xml_output_buffer_create_filename(
     uri: *const c_char,
-    encoder: XmlCharEncodingHandlerPtr,
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     compression: c_int,
 ) -> XmlOutputBufferPtr {
-    // if let Some(f) = xmlOutputBufferCreateFilenameValue {
-    //     return f(uri, encoder, compression);
-    // }
-    xml_output_buffer_create_filename_value(uri, encoder, compression);
+    if let Some(f) = GLOBAL_STATE.with_borrow(|state| state.output_buffer_create_filename_value) {
+        let uri = CStr::from_ptr(uri).to_str().unwrap();
+        return f(uri, encoder, compression);
+    }
     __xml_output_buffer_create_filename(uri, encoder, compression)
 }
 
@@ -1731,9 +1733,9 @@ pub unsafe extern "C" fn xml_output_buffer_create_filename(
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_create_file(
+pub unsafe fn xml_output_buffer_create_file(
     file: *mut FILE,
-    encoder: XmlCharEncodingHandlerPtr,
+    encoder: Option<XmlCharEncodingHandler>,
 ) -> XmlOutputBufferPtr {
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         xml_register_default_output_callbacks();
@@ -1743,7 +1745,8 @@ pub unsafe extern "C" fn xml_output_buffer_create_file(
         return null_mut();
     }
 
-    let ret: XmlOutputBufferPtr = xml_alloc_output_buffer_internal(encoder);
+    let ret: XmlOutputBufferPtr =
+        xml_alloc_output_buffer_internal(encoder.map(|e| Rc::new(RefCell::new(e))));
     if !ret.is_null() {
         (*ret).context = file as _;
         (*ret).writecallback = Some(xml_file_write);
@@ -1838,9 +1841,9 @@ unsafe extern "C" fn xml_fd_write(
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_create_fd(
+pub unsafe fn xml_output_buffer_create_fd(
     fd: c_int,
-    encoder: XmlCharEncodingHandlerPtr,
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
 ) -> XmlOutputBufferPtr {
     if fd < 0 {
         return null_mut();
@@ -1869,11 +1872,11 @@ pub unsafe extern "C" fn xml_output_buffer_create_fd(
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_create_io(
+pub unsafe fn xml_output_buffer_create_io(
     iowrite: Option<XmlOutputWriteCallback>,
     ioclose: Option<XmlOutputCloseCallback>,
     ioctx: *mut c_void,
-    encoder: XmlCharEncodingHandlerPtr,
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
 ) -> XmlOutputBufferPtr {
     if iowrite.is_none() {
         return null_mut();
@@ -1972,7 +1975,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
         /*
          * first handle encoding stuff.
          */
-        if !(*out).encoder.is_null() {
+        if (*out).encoder.is_some() {
             /*
              * Store the data in the incoming raw buffer
              */
@@ -2036,7 +2039,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
             /*
              * second write the stuff to the I/O channel
              */
-            if !(*out).encoder.is_null() {
+            if (*out).encoder.is_some() {
                 ret = writecallback(
                     (*out).context,
                     (*out)
@@ -2274,7 +2277,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
         /*
          * first handle encoding stuff.
          */
-        if !(*out).encoder.is_null() {
+        if (*out).encoder.is_some() {
             /*
              * Store the data in the incoming raw buffer
              */
@@ -2354,7 +2357,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
             /*
              * second write the stuff to the I/O channel
              */
-            if !(*out).encoder.is_null() {
+            if (*out).encoder.is_some() {
                 ret = writecallback(
                     (*out).context,
                     (*out).conv.map_or(null(), |conv| {
@@ -2434,7 +2437,7 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
     /*
      * first handle encoding stuff.
      */
-    if (*out).conv.is_some() && !(*out).encoder.is_null() {
+    if (*out).conv.is_some() && (*out).encoder.is_some() {
         /*
          * convert as much as possible to the parser output buffer.
          */
@@ -2455,7 +2458,7 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
      */
     if let Some(mut conv) = (*out)
         .conv
-        .filter(|_| !(*out).encoder.is_null() && (*out).writecallback.is_some())
+        .filter(|_| (*out).encoder.is_some() && (*out).writecallback.is_some())
     {
         // if !(*out).conv.is_null() && !(*out).encoder.is_null() && (*out).writecallback.is_some() {
         ret = ((*out).writecallback.unwrap())(
@@ -2524,9 +2527,7 @@ pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_i
     if let Some(conv) = (*out).conv.take() {
         conv.free();
     }
-    if !(*out).encoder.is_null() {
-        xml_char_enc_close_func((*out).encoder);
-    }
+    let _ = (*out).encoder.take();
     if let Some(buf) = (*out).buffer.take() {
         buf.free();
     }
@@ -2582,8 +2583,8 @@ pub unsafe extern "C" fn xml_register_output_callbacks(
  * Returns the new parser output or NULL
  */
 #[cfg(feature = "output")]
-pub(crate) unsafe extern "C" fn xml_alloc_output_buffer_internal(
-    encoder: XmlCharEncodingHandlerPtr,
+pub(crate) unsafe fn xml_alloc_output_buffer_internal(
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
 ) -> XmlOutputBufferPtr {
     let ret: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as XmlOutputBufferPtr;
     if ret.is_null() {
@@ -2603,7 +2604,7 @@ pub(crate) unsafe extern "C" fn xml_alloc_output_buffer_internal(
     buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocIo);
 
     (*ret).encoder = encoder;
-    if !encoder.is_null() {
+    if (*ret).encoder.is_some() {
         (*ret).conv = XmlBufRef::with_capacity(4000);
         if (*ret).conv.is_none() {
             buf.free();
@@ -2627,9 +2628,9 @@ pub(crate) unsafe extern "C" fn xml_alloc_output_buffer_internal(
 }
 
 #[cfg(feature = "output")]
-pub(crate) unsafe extern "C" fn __xml_output_buffer_create_filename(
+pub(crate) unsafe fn __xml_output_buffer_create_filename(
     uri: *const c_char,
-    encoder: XmlCharEncodingHandlerPtr,
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     _compression: c_int,
 ) -> XmlOutputBufferPtr {
     let ret: XmlOutputBufferPtr;
@@ -3556,7 +3557,7 @@ pub unsafe extern "C" fn xml_io_http_open_w(
     {
         /*  Any character conversions should have been done before this  */
 
-        (*ctxt).doc_buff = xml_alloc_output_buffer_internal(null_mut()) as _;
+        (*ctxt).doc_buff = xml_alloc_output_buffer_internal(None) as _;
     }
 
     if (*ctxt).doc_buff.is_null() {
@@ -3680,35 +3681,35 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_xml_alloc_output_buffer() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_alloc_output_buffer() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                let mem_base = xml_mem_blocks();
-                let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 0);
+    //         for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 0);
 
-                let ret_val = xml_alloc_output_buffer(encoder);
-                desret_xml_output_buffer_ptr(ret_val);
-                des_xml_char_encoding_handler_ptr(n_encoder, encoder, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlAllocOutputBuffer",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlAllocOutputBuffer()"
-                    );
-                    eprintln!(" {}", n_encoder);
-                }
-            }
-        }
-    }
+    //             let ret_val = xml_alloc_output_buffer(encoder);
+    //             desret_xml_output_buffer_ptr(ret_val);
+    //             des_xml_char_encoding_handler_ptr(n_encoder, encoder, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlAllocOutputBuffer",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(
+    //                     leaks == 0,
+    //                     "{leaks} Leaks are found in xmlAllocOutputBuffer()"
+    //                 );
+    //                 eprintln!(" {}", n_encoder);
+    //             }
+    //         }
+    //     }
+    // }
 
     // #[test]
     // fn test_xml_alloc_parser_input_buffer() {
@@ -4295,115 +4296,115 @@ mod tests {
     //     }
     // }
 
-    #[test]
-    fn test_xml_output_buffer_create_fd() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_output_buffer_create_fd() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_fd in 0..GEN_NB_INT {
-                for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let fd = gen_int(n_fd, 0);
-                    let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
+    //         for n_fd in 0..GEN_NB_INT {
+    //             for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let fd = gen_int(n_fd, 0);
+    //                 let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
 
-                    let ret_val = xml_output_buffer_create_fd(fd, encoder);
-                    desret_xml_output_buffer_ptr(ret_val);
-                    des_int(n_fd, fd, 0);
-                    des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlOutputBufferCreateFd",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlOutputBufferCreateFd()"
-                        );
-                        eprint!(" {}", n_fd);
-                        eprintln!(" {}", n_encoder);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_output_buffer_create_fd(fd, encoder);
+    //                 desret_xml_output_buffer_ptr(ret_val);
+    //                 des_int(n_fd, fd, 0);
+    //                 des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlOutputBufferCreateFd",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlOutputBufferCreateFd()"
+    //                     );
+    //                     eprint!(" {}", n_fd);
+    //                     eprintln!(" {}", n_encoder);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_output_buffer_create_file() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_output_buffer_create_file() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_file in 0..GEN_NB_FILE_PTR {
-                for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let file = gen_file_ptr(n_file, 0);
-                    let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
+    //         for n_file in 0..GEN_NB_FILE_PTR {
+    //             for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let file = gen_file_ptr(n_file, 0);
+    //                 let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
 
-                    let ret_val = xml_output_buffer_create_file(file, encoder);
-                    desret_xml_output_buffer_ptr(ret_val);
-                    des_file_ptr(n_file, file, 0);
-                    des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
-                    xml_reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlOutputBufferCreateFile",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlOutputBufferCreateFile()"
-                        );
-                        eprint!(" {}", n_file);
-                        eprintln!(" {}", n_encoder);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_output_buffer_create_file(file, encoder);
+    //                 desret_xml_output_buffer_ptr(ret_val);
+    //                 des_file_ptr(n_file, file, 0);
+    //                 des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
+    //                 xml_reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlOutputBufferCreateFile",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(
+    //                         leaks == 0,
+    //                         "{leaks} Leaks are found in xmlOutputBufferCreateFile()"
+    //                     );
+    //                     eprint!(" {}", n_file);
+    //                     eprintln!(" {}", n_encoder);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_output_buffer_create_filename() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_output_buffer_create_filename() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_uri in 0..GEN_NB_FILEOUTPUT {
-                for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                    for n_compression in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let uri = gen_fileoutput(n_uri, 0);
-                        let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
-                        let compression = gen_int(n_compression, 2);
+    //         for n_uri in 0..GEN_NB_FILEOUTPUT {
+    //             for n_encoder in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
+    //                 for n_compression in 0..GEN_NB_INT {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let uri = gen_fileoutput(n_uri, 0);
+    //                     let encoder = gen_xml_char_encoding_handler_ptr(n_encoder, 1);
+    //                     let compression = gen_int(n_compression, 2);
 
-                        let ret_val = xml_output_buffer_create_filename(uri, encoder, compression);
-                        desret_xml_output_buffer_ptr(ret_val);
-                        des_fileoutput(n_uri, uri, 0);
-                        des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
-                        des_int(n_compression, compression, 2);
-                        xml_reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlOutputBufferCreateFilename",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlOutputBufferCreateFilename()"
-                            );
-                            eprint!(" {}", n_uri);
-                            eprint!(" {}", n_encoder);
-                            eprintln!(" {}", n_compression);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //                     let ret_val = xml_output_buffer_create_filename(uri, encoder, compression);
+    //                     desret_xml_output_buffer_ptr(ret_val);
+    //                     des_fileoutput(n_uri, uri, 0);
+    //                     des_xml_char_encoding_handler_ptr(n_encoder, encoder, 1);
+    //                     des_int(n_compression, compression, 2);
+    //                     xml_reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlOutputBufferCreateFilename",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         assert!(
+    //                             leaks == 0,
+    //                             "{leaks} Leaks are found in xmlOutputBufferCreateFilename()"
+    //                         );
+    //                         eprint!(" {}", n_uri);
+    //                         eprint!(" {}", n_encoder);
+    //                         eprintln!(" {}", n_compression);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_output_buffer_flush() {

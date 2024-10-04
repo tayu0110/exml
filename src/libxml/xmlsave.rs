@@ -4,10 +4,12 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
+    cell::RefCell,
     ffi::{c_char, c_int, c_long, c_uchar, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
+    rc::Rc,
     sync::atomic::Ordering,
 };
 
@@ -15,12 +17,10 @@ use libc::{memcpy, memset};
 
 use crate::{
     buf::XmlBufRef,
+    encoding::{find_encoding_handler, XmlCharEncodingHandler},
     generic_error,
     libxml::{
-        encoding::{
-            xml_char_enc_close_func, xml_find_char_encoding_handler, xml_parse_char_encoding,
-            XmlCharEncoding, XmlCharEncodingHandlerPtr, XmlCharEncodingOutputFunc,
-        },
+        encoding::{xml_parse_char_encoding, XmlCharEncoding, XmlCharEncodingOutputFunc},
         entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{
             xml_free, xml_indent_tree_output, xml_malloc, xml_save_no_empty_tags,
@@ -85,7 +85,7 @@ pub struct XmlSaveCtxt {
     pub(crate) fd: c_int,
     pub(crate) filename: *const XmlChar,
     pub(crate) encoding: *const XmlChar,
-    pub(crate) handler: XmlCharEncodingHandlerPtr,
+    pub(crate) handler: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     pub(crate) buf: XmlOutputBufferPtr,
     pub(crate) options: c_int,
     pub(crate) level: c_int,
@@ -464,9 +464,10 @@ unsafe extern "C" fn xml_save_switch_encoding(
 ) -> c_int {
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
 
-    if !encoding.is_null() && (*buf).encoder.is_null() && (*buf).conv.is_none() {
-        (*buf).encoder = xml_find_char_encoding_handler(encoding);
-        if (*buf).encoder.is_null() {
+    if !encoding.is_null() && (*buf).encoder.is_none() && (*buf).conv.is_none() {
+        (*buf).encoder = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
+            .map(|e| Rc::new(RefCell::new(e)));
+        if (*buf).encoder.is_none() {
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding as i32,
                 null_mut(),
@@ -476,7 +477,6 @@ unsafe extern "C" fn xml_save_switch_encoding(
         }
         (*buf).conv = XmlBufRef::new();
         if (*buf).conv.is_none() {
-            xml_char_enc_close_func((*buf).encoder);
             xml_save_err_memory(c"creating encoding buffer".as_ptr() as _);
             return -1;
         }
@@ -1684,11 +1684,10 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
 unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> c_int {
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     xml_output_buffer_flush(buf);
-    xml_char_enc_close_func((*buf).encoder);
+    let _ = (*buf).encoder.take();
     if let Some(conv) = (*buf).conv.take() {
         conv.free();
     }
-    (*buf).encoder = null_mut();
     0
 }
 
@@ -1748,7 +1747,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
             }
             if (!encoding.is_null()
                 && oldctxtenc.is_null()
-                && (*buf).encoder.is_null()
+                && (*buf).encoder.is_none()
                 && (*buf).conv.is_none())
                 && xml_save_switch_encoding(ctxt, encoding as _) < 0
             {
@@ -1776,7 +1775,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         enc = xml_parse_char_encoding(encoding as _);
         if !encoding.is_null()
             && oldctxtenc.is_null()
-            && (*buf).encoder.is_null()
+            && (*buf).encoder.is_none()
             && (*buf).conv.is_none()
             && ((*ctxt).options & XmlSaveOption::XmlSaveNoDecl as i32) == 0
         {
@@ -1924,9 +1923,9 @@ unsafe extern "C" fn xml_new_save_ctxt(
     }
     memset(ret as _, 0, size_of::<XmlSaveCtxt>());
 
-    if !encoding.is_null() {
-        (*ret).handler = xml_find_char_encoding_handler(encoding);
-        if (*ret).handler.is_null() {
+    if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
+        (*ret).handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
+        if (*ret).handler.is_none() {
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding as i32,
                 null_mut(),
@@ -1981,9 +1980,8 @@ pub unsafe extern "C" fn xml_save_to_fd(
     if ret.is_null() {
         return null_mut();
     }
-    (*ret).buf = xml_output_buffer_create_fd(fd, (*ret).handler);
+    (*ret).buf = xml_output_buffer_create_fd(fd, (*ret).handler.clone());
     if (*ret).buf.is_null() {
-        xml_char_enc_close_func((*ret).handler);
         xml_free_save_ctxt(ret);
         return null_mut();
     }
@@ -2013,9 +2011,8 @@ pub unsafe extern "C" fn xml_save_to_filename(
     if ret.is_null() {
         return null_mut();
     }
-    (*ret).buf = xml_output_buffer_create_filename(filename, (*ret).handler, compression);
+    (*ret).buf = xml_output_buffer_create_filename(filename, (*ret).handler.clone(), compression);
     if (*ret).buf.is_null() {
-        xml_char_enc_close_func((*ret).handler);
         xml_free_save_ctxt(ret);
         return null_mut();
     }
@@ -2075,9 +2072,8 @@ pub unsafe extern "C" fn xml_save_to_io(
     if ret.is_null() {
         return null_mut();
     }
-    (*ret).buf = xml_output_buffer_create_io(iowrite, ioclose, ioctx, (*ret).handler);
+    (*ret).buf = xml_output_buffer_create_io(iowrite, ioclose, ioctx, (*ret).handler.clone());
     if (*ret).buf.is_null() {
-        xml_char_enc_close_func((*ret).handler);
         xml_free_save_ctxt(ret);
         return null_mut();
     }
@@ -2149,7 +2145,7 @@ unsafe extern "C" fn html_node_dump_output_internal(
     }
     if !encoding.is_null()
         && oldctxtenc.is_null()
-        && (*buf).encoder.is_null()
+        && (*buf).encoder.is_none()
         && (*buf).conv.is_none()
     {
         if xml_save_switch_encoding(ctxt, encoding as _) < 0 {

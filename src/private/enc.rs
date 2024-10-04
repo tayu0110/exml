@@ -4,29 +4,21 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_uchar, c_ushort},
+    ffi::{c_int, c_uchar, c_ushort},
     fmt::Write,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null},
     str::from_utf8_mut,
     sync::atomic::Ordering,
 };
 
-use libc::{size_t, snprintf};
-
 use crate::{
     encoding::EncodingError,
     libxml::{
-        encoding::{
-            xml_enc_output_chunk, xml_encoding_err, XmlCharEncodingHandler, XML_LITTLE_ENDIAN,
-        },
-        tree::{xml_buf_content, xml_buf_end, xml_buf_shrink, xml_buf_use, XmlBufPtr},
+        encoding::{xml_encoding_err, XmlCharEncodingHandler, XML_LITTLE_ENDIAN},
         xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr},
         xmlerror::XmlParserErrors,
-        xmlstring::{xml_get_utf8_char, XmlChar},
     },
 };
-
-use super::buf::{xml_buf_add_len, xml_buf_avail, xml_buf_grow};
 
 /**
  * xmlInitEncodingInternal:
@@ -210,169 +202,153 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
     output: XmlOutputBufferPtr,
     init: c_int,
 ) -> c_int {
-    let mut ret: c_int;
-    let mut written: size_t;
-    let mut writtentot: c_int = 0;
-    let mut toconv: size_t;
-    let mut c_in: c_int;
-    let mut c_out: c_int;
+    use std::str::from_utf8;
+
+    use crate::encoding::floor_char_boundary;
+
+    let ret: c_int;
+    let mut writtentot: usize = 0;
 
     if output.is_null()
-        || (*output).encoder.is_null()
+        || (*output).encoder.is_none()
         || (*output).buffer.is_none()
         || (*output).conv.is_none()
     {
         return -1;
     }
-    let out: XmlBufPtr = (*output).conv.map_or(null_mut(), |buf| buf.as_ptr());
-    let bufin: XmlBufPtr = (*output).buffer.expect("Internal Error").as_ptr();
+    let mut out = (*output).conv.unwrap();
+    let mut bufin = (*output).buffer.unwrap();
+    let mut encoder = (*output).encoder.as_mut().unwrap().borrow_mut();
 
     // retry:
-    'retry: loop {
-        written = xml_buf_avail(out);
+    loop {
+        let mut written = out.avail();
 
         /*
          * First specific handling of the initialization call
          */
         if init != 0 {
-            c_in = 0;
-            c_out = written as _;
+            let c_out = written;
             /* TODO: Check return value. */
-            xml_enc_output_chunk(
-                (*output).encoder,
-                xml_buf_end(out),
-                addr_of_mut!(c_out),
-                null_mut(),
-                addr_of_mut!(c_in) as _,
-            );
-            xml_buf_add_len(out, c_out as _);
-            return c_out;
+            let mut dst = vec![0; c_out];
+            return match encoder.encode("", &mut dst) {
+                Ok((_, write)) => {
+                    out.push_bytes(&dst[..write]);
+                    write as i32
+                }
+                Err(EncodingError::Unmappable {
+                    read: _,
+                    write,
+                    c: _,
+                }) => {
+                    out.push_bytes(&dst[..write]);
+                    write as i32
+                }
+                _ => 0,
+            };
         }
 
         /*
          * Conversion itself.
          */
-        toconv = xml_buf_use(bufin);
+        let mut toconv = bufin.len();
         if toconv == 0 {
-            return writtentot;
+            return writtentot as i32;
         }
         if toconv > 64 * 1024 {
             toconv = 64 * 1024;
         }
         if toconv * 4 >= written {
-            xml_buf_grow(out, toconv as i32 * 4);
-            written = xml_buf_avail(out);
+            out.grow(toconv * 4);
+            written = out.avail();
         }
         if written > 256 * 1024 {
             written = 256 * 1024;
         }
 
-        c_in = toconv as _;
-        c_out = written as _;
-        ret = xml_enc_output_chunk(
-            (*output).encoder,
-            xml_buf_end(out),
-            addr_of_mut!(c_out) as _,
-            xml_buf_content(bufin),
-            addr_of_mut!(c_in) as _,
-        );
-        xml_buf_shrink(bufin, c_in as usize);
-        xml_buf_add_len(out, c_out as usize);
-        writtentot += c_out;
-        if ret == -1 {
-            if c_out > 0 {
-                /* Can be a limitation of iconv or uconv */
-                // goto retry;
-                continue 'retry;
-            }
-            ret = -3;
-        }
-
-        /*
-         * Attempt to handle error cases
-         */
-        match ret {
-            0 => {
-                // no-op
+        let c_in = floor_char_boundary(bufin.as_ref(), toconv);
+        let c_out = written;
+        let mut dst = vec![0; c_out];
+        match encoder.encode(from_utf8(&bufin.as_ref()[..c_in]).unwrap(), &mut dst) {
+            Ok((read, write)) => {
+                ret = 0;
+                bufin.trim_head(read);
+                out.push_bytes(&dst[..write]);
+                writtentot += write;
                 break;
             }
-            -1 => {
-                // no-op
+            Err(EncodingError::BufferTooShort) => {
+                ret = -3;
                 break;
             }
-            -3 => {
-                // no-op
-                break;
-            }
-            -4 => {
-                xml_encoding_err(
-                    XmlParserErrors::XmlI18nNoOutput,
-                    c"xmlCharEncOutFunc: no output function !\n".as_ptr() as _,
-                    null(),
-                );
-                ret = -1;
-                break;
-            }
-            -2 => {
-                let mut charref: [XmlChar; 20] = [0; 20];
-                let mut len: c_int = xml_buf_use(bufin) as _;
-                let content: *mut XmlChar = xml_buf_content(bufin);
-                let charref_len: c_int;
+            Err(EncodingError::Unmappable { read, write, c }) => {
+                // `ret` should be set -2, but it is overwritten in next loop.
+                // Therefore, ommit it.
+                // ret = -2;
+                bufin.trim_head(read);
+                out.push_bytes(&dst[..write]);
+                writtentot += write;
 
-                let cur: c_int = xml_get_utf8_char(content, addr_of_mut!(len) as _);
-                if cur <= 0 {
-                    break;
-                } else {
-                    charref_len = snprintf(
-                        charref.as_mut_ptr().add(0) as _,
-                        charref.len(),
-                        c"&#%d;".as_ptr() as _,
-                        cur,
-                    );
-                    xml_buf_shrink(bufin, len as usize);
-                    xml_buf_grow(out, charref_len * 4);
-                    c_out = xml_buf_avail(out) as _;
-                    c_in = charref_len;
-                    ret = xml_enc_output_chunk(
-                        (*output).encoder,
-                        xml_buf_end(out),
-                        addr_of_mut!(c_out) as _,
-                        charref.as_ptr() as _,
-                        addr_of_mut!(c_in) as _,
-                    );
+                let mut charref = String::new();
+                write!(charref, "&#{};", c as u32);
+                let charref_len = charref.len();
 
-                    if ret < 0 || c_in != charref_len {
-                        let mut buf: [c_char; 50] = [0; 50];
+                out.grow(charref_len * 4);
+                let c_out = out.avail();
+                let mut dst = vec![0; c_out];
+                let result = encoder.encode(&charref, &mut dst);
 
-                        snprintf(
-                            buf.as_mut_ptr().add(0) as _,
-                            49,
-                            c"0x%02X 0x%02X 0x%02X 0x%02X".as_ptr() as _,
-                            *content.add(0) as u32,
-                            *content.add(1) as u32,
-                            *content.add(2) as u32,
-                            *content.add(3) as u32,
-                        );
-                        buf[49] = 0;
+                match result {
+                    Ok((read, write)) if read == charref_len => {
+                        out.push_bytes(&dst[..write]);
+                        writtentot += write;
+                    }
+                    e => {
+                        ret = match e {
+                            Ok(_) => 0,
+                            Err(EncodingError::Unmappable {
+                                read: _,
+                                write: _,
+                                c: _,
+                            }) => -2,
+                            Err(_) => -1,
+                        };
+                        let content = bufin.as_ref();
+                        let mut msg = String::new();
+                        write!(
+                            msg,
+                            "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\0",
+                            content.first().unwrap_or(&0),
+                            content.get(1).unwrap_or(&0),
+                            content.get(2).unwrap_or(&0),
+                            content.get(3).unwrap_or(&0)
+                        )
+                        .ok();
+
                         xml_encoding_err(
                             XmlParserErrors::XmlI18nConvFailed,
                             c"output conversion failed due to conv error, bytes %s\n".as_ptr() as _,
-                            buf.as_ptr() as _,
+                            msg.as_ptr() as _,
                         );
-                        *content.add(0) = b' ';
+                        out.push_bytes(b" ");
                         break;
                     }
-
-                    xml_buf_add_len(out, c_out as _);
-                    writtentot += c_out;
-                    // goto retry;
                 }
+                // goto retry;
             }
-            _ => {}
+            Err(EncodingError::Other { msg: _ }) => {
+                ret = -1;
+                // unreachable!(msg);
+                break;
+            }
+            _ => {
+                // ret = -1;
+                unreachable!()
+            }
         }
     }
     if writtentot != 0 {
-        writtentot
+        writtentot as i32
     } else {
         ret
     }

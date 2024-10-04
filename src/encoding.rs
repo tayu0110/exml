@@ -2,12 +2,12 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     fmt::Display,
-    str::FromStr,
+    str::{from_utf8, FromStr},
     sync::{Mutex, RwLock},
 };
 
 use encoding_rs::{
-    mem::{convert_latin1_to_str, convert_utf8_to_latin1_lossy, is_str_latin1},
+    mem::{convert_latin1_to_str, convert_utf8_to_latin1_lossy, str_latin1_up_to},
     Decoder, DecoderResult, Encoder, EncoderResult, Encoding, EUC_JP, ISO_2022_JP, ISO_8859_10,
     ISO_8859_13, ISO_8859_14, ISO_8859_15, ISO_8859_16, ISO_8859_2, ISO_8859_3, ISO_8859_4,
     ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, SHIFT_JIS, WINDOWS_1254,
@@ -225,21 +225,31 @@ impl From<&'static Encoding> for PredefinedEncodingHandler {
 
 #[derive(Debug, Clone)]
 pub enum EncodingError {
+    /// The length of the output buffer is too short.  
+    /// If this error is returned, it is guaranteed that the encoder/decoder is consuming the input buffer.
     BufferTooShort,
+    /// Malformed byte sequence is found.  
+    ///
+    /// The input and output buffer have consumed `read` and `write` bytes respectively.  
+    /// Malformed sequence occurs `input[read-length-offset..read-offset]`.  
+    ///
+    /// Only the decoder returns this error.
     Malformed {
         read: usize,
         write: usize,
         length: usize,
         offset: usize,
     },
-    Unmappable {
-        read: usize,
-        write: usize,
-        c: char,
-    },
-    Other {
-        msg: Cow<'static, str>,
-    },
+    /// A UTF-8 character `c` cannot map any codepoints of the target encoding.
+    ///
+    /// The input and output buffer have consumed `read` and `write` bytes respectively.  
+    /// `read` includes the length of `c`. Thus, the correctly read length is `read - c.len_utf8()`.  
+    /// `write` does not include the length of `c` because encoder cannot write unmapped characters.
+    ///
+    /// Only the encoder returns this error.
+    Unmappable { read: usize, write: usize, c: char },
+    /// Other errors.
+    Other { msg: Cow<'static, str> },
 }
 
 impl EncodingError {
@@ -305,6 +315,8 @@ impl Display for EncodingError {
 
 impl std::error::Error for EncodingError {}
 
+// TODO: handle encoding/decoding state
+//       Some encodings require pre and post processing. (e.g. UTF-16, ISO-2022-JP)
 pub type EncoderFunc = fn(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError>;
 pub type DecoderFunc = fn(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError>;
 
@@ -409,7 +421,7 @@ fn encode_utf16le(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingE
     let mut write = 0;
     for c in src.chars() {
         let res = c.encode_utf16(&mut buf);
-        if write + res.len() * 2 >= dst.len() {
+        if write + res.len() * 2 > dst.len() {
             break;
         }
         read += c.len_utf8();
@@ -420,6 +432,53 @@ fn encode_utf16le(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingE
         }
     }
     Ok((read, write))
+}
+
+#[cfg(feature = "html")]
+fn decode_html(_src: &[u8], _dst: &mut str) -> Result<(usize, usize), EncodingError> {
+    Err(EncodingError::Other {
+        msg: "HTML decoder is not implemented.".into(),
+    })
+}
+
+#[cfg(feature = "html")]
+fn encode_html(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
+    use std::ptr::addr_of_mut;
+
+    use crate::libxml::htmlparser::utf8_to_html;
+
+    let mut outlen = dst.len() as i32;
+    let out = dst.as_mut_ptr();
+    let mut inlen = src.len() as i32;
+    let input = src.as_ptr();
+
+    let res = unsafe { utf8_to_html(out, addr_of_mut!(outlen), input, addr_of_mut!(inlen)) };
+    match res {
+        0 => Ok((inlen as usize, outlen as usize)),
+        -2 => Err(EncodingError::Unmappable {
+            read: inlen as usize,
+            write: outlen as usize,
+            c: src[inlen as usize..].chars().next().unwrap(),
+        }),
+        -1 => Err(EncodingError::Other {
+            msg: "Unknown Error in encode_html".into(),
+        }),
+        _ => unreachable!(),
+    }
+}
+
+fn encode_utf16(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
+    // Initialize.
+    // UTF-16 (not UTF-16BE/LE) needs BOM at the beginning of the document.
+    if src.is_empty() {
+        if dst.len() < 2 {
+            return Ok((0, 0));
+        } else {
+            dst[..2].copy_from_slice(&[0xFF, 0xFE]);
+            return Ok((0, 2));
+        }
+    }
+    encode_utf16le(src, dst)
 }
 
 fn decode_utf16le(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
@@ -468,7 +527,7 @@ fn encode_utf16be(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingE
     let mut write = 0;
     for c in src.chars() {
         let res = c.encode_utf16(&mut buf);
-        if write + res.len() * 2 >= dst.len() {
+        if write + res.len() * 2 > dst.len() {
             break;
         }
         read += c.len_utf8();
@@ -522,31 +581,32 @@ fn decode_utf16be(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingE
 }
 
 fn encode_latin1(src: &str, dst: &mut [u8]) -> Result<(usize, usize), EncodingError> {
-    // useful method `str::floor_char_boundary` exists, but this is nightly...
-    //
-    // ref: https://doc.rust-lang.org/1.81.0/src/core/str/mod.rs.html#256
-    let len = if dst.len() >= src.len() {
-        src.len()
-    } else {
-        let lower_bound = dst.len().saturating_sub(3);
-        let new = src.as_bytes()[lower_bound..=dst.len()]
-            .iter()
-            .rposition(|&b| (b as i8) >= -0x40);
-        lower_bound + new.unwrap()
-    };
     // The convertion methods from UTF-8 to Latin1 requests
     // the length of destination buffer must be equal of larger than the length of source buffer.
-    if len == 0 {
+    if dst.is_empty() {
         return Err(EncodingError::BufferTooShort);
     }
+    let len = floor_char_boundary(src.as_bytes(), src.len().min(dst.len()));
+    let up_to = str_latin1_up_to(&src[..len]);
 
-    if !is_str_latin1(&src[..len]) {
-        return Err(EncodingError::Other {
-            msg: "Source buffer is not compatible with Latin1.".into(),
-        });
+    if up_to == len {
+        let write = convert_utf8_to_latin1_lossy(&src.as_bytes()[..len], dst);
+        Ok((len, write))
+    } else {
+        let src = src.as_bytes();
+        let write = convert_utf8_to_latin1_lossy(&src[..up_to], dst);
+        let to = floor_char_boundary(&src[up_to..(up_to + 10).min(src.len())], 10);
+        let c = from_utf8(&src[up_to..up_to + to])
+            .unwrap()
+            .chars()
+            .next()
+            .unwrap();
+        Err(EncodingError::Unmappable {
+            read: up_to + c.len_utf8(),
+            write,
+            c,
+        })
     }
-    let write = convert_utf8_to_latin1_lossy(&src.as_bytes()[..len], dst);
-    Ok((len, write))
 }
 
 fn decode_latin1(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingError> {
@@ -654,6 +714,12 @@ fn decode_ucs4le(src: &[u8], dst: &mut str) -> Result<(usize, usize), EncodingEr
     Ok((read, write))
 }
 
+const UTF16_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
+    name: Cow::Borrowed("UTF-16"),
+    encode: encode_utf16,
+    decode: decode_utf16le,
+};
+
 const UTF16LE_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
     name: Cow::Borrowed("UTF-16LE"),
     encode: encode_utf16le,
@@ -684,12 +750,22 @@ const ISO8859_1_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
     decode: decode_latin1,
 };
 
+#[cfg(feature = "html")]
+const HTML_HANDLER: CustomEncodingHandler = CustomEncodingHandler {
+    name: Cow::Borrowed("HTML"),
+    encode: encode_html,
+    decode: decode_html,
+};
+
 const PREDEFINED_CUSTOM_HANDLERS: &[CustomEncodingHandler] = &[
+    UTF16_HANDLER,
     UTF16BE_HANDLER,
     UTF16LE_HANDLER,
     UCS4BE_HANDLER,
     UCS4LE_HANDLER,
     ISO8859_1_HANDLER,
+    #[cfg(feature = "html")]
+    HTML_HANDLER,
 ];
 
 pub fn get_encoding_handler(enc: XmlCharEncoding) -> Option<XmlCharEncodingHandler> {
@@ -755,6 +831,7 @@ pub fn find_encoding_handler(name: &str) -> Option<XmlCharEncodingHandler> {
         }
     }
 
+    let name = name.to_uppercase();
     if let Some(default) = PREDEFINED_CUSTOM_HANDLERS
         .iter()
         .find(|handler| handler.name() == name)
@@ -829,5 +906,29 @@ pub fn detect_encoding(input: &[u8]) -> XmlCharEncoding {
         // UTF-16 BOM (LE)
         [0xFF, 0xFE, ..] => XmlCharEncoding::UTF16LE,
         _ => XmlCharEncoding::None,
+    }
+}
+
+/// ref: https://doc.rust-lang.org/std/primitive.str.html#method.floor_char_boundary
+///
+/// This is nightly API in Rust 1.81.0, but it is very useful.  
+pub(crate) fn floor_char_boundary(bytes: &[u8], mut index: usize) -> usize {
+    if bytes.is_empty() {
+        return 0;
+    }
+    index = index.min(bytes.len());
+    let lower_bound = index.saturating_sub(4);
+    let new = bytes[lower_bound..index]
+        .iter()
+        .rposition(|&b| (b as i8) >= -0x40);
+    if index == bytes.len() {
+        let start = lower_bound + new.unwrap();
+        if from_utf8(&bytes[start..]).is_ok() {
+            bytes.len()
+        } else {
+            start
+        }
+    } else {
+        lower_bound + new.unwrap()
     }
 }

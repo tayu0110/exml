@@ -3336,7 +3336,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
     /*
      * reserialize it
      */
-    let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(out, null_mut());
+    let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(out, None);
     if buf.is_null() {
         xml_free_doc(doc);
         return -1;
