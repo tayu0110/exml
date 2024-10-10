@@ -5,7 +5,7 @@ use libc::{free, malloc, realloc};
 
 use crate::{
     encoding::{XmlCharEncoding, XmlCharEncodingHandler},
-    error::generic_error_default,
+    error::{generic_error_default, XmlError},
     libxml::{
         globals::{XmlDeregisterNodeFunc, XmlRegisterNodeFunc},
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
@@ -15,7 +15,7 @@ use crate::{
         },
         tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
         xml_io::{XmlOutputBuffer, XmlParserInputBuffer},
-        xmlerror::{XmlError, XmlErrorLevel, XmlStructuredErrorFunc},
+        xmlerror::XmlStructuredErrorFunc,
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
         xmlstring::xml_strdup,
     },
@@ -108,21 +108,7 @@ impl XmlGlobalState {
             tree_indent_string: Cow::Borrowed("  "),
             register_node_default_value: None,
             deregister_node_default_value: None,
-            last_error: XmlError {
-                domain: 0,
-                code: 0,
-                message: null_mut(),
-                level: XmlErrorLevel::XmlErrNone,
-                file: null_mut(),
-                line: 0,
-                str1: null_mut(),
-                str2: null_mut(),
-                str3: null_mut(),
-                int1: 0,
-                int2: 0,
-                ctxt: null_mut(),
-                node: null_mut(),
-            },
+            last_error: XmlError::default(),
             parser_input_buffer_create_filename_value: None,
             output_buffer_create_filename_value: None,
         }
