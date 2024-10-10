@@ -86,7 +86,6 @@ use super::xml_io::{
     xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_mem,
     xml_parser_input_buffer_read,
 };
-use super::xmlerror::xml_copy_error;
 use super::xmlstring::{
     xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
 };
@@ -4701,10 +4700,7 @@ unsafe extern "C" fn xml_parse_balanced_chunk_memory_internal(
         ret = XmlParserErrors::try_from((*ctxt).err_no).unwrap();
         (*oldctxt).err_no = (*ctxt).err_no;
         (*oldctxt).well_formed = 0;
-        xml_copy_error(
-            addr_of_mut!((*ctxt).last_error),
-            addr_of_mut!((*oldctxt).last_error),
-        );
+        (*oldctxt).last_error = (*ctxt).last_error.clone();
     } else {
         ret = XmlParserErrors::XmlErrOK;
     }

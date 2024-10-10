@@ -21,6 +21,7 @@ use crate::{
     __xml_raise_error,
     buf::libxml_api::xml_buf_create,
     encoding::{detect_encoding, find_encoding_handler},
+    error::XmlError,
     generic_error,
     hash::XmlHashTableRef,
     libxml::{
@@ -92,8 +93,8 @@ use crate::{
             XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
         },
         xmlerror::{
-            xml_copy_error, xml_parser_validity_error, xml_parser_validity_warning,
-            xml_reset_error, XmlError, XmlParserErrors, XmlStructuredErrorFunc,
+            xml_parser_validity_error, xml_parser_validity_warning, XmlParserErrors,
+            XmlStructuredErrorFunc,
         },
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
@@ -4288,10 +4289,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_entity_private(
         if !oldctxt.is_null() {
             (*oldctxt).err_no = (*ctxt).err_no;
             (*oldctxt).well_formed = 0;
-            xml_copy_error(
-                addr_of_mut!((*ctxt).last_error),
-                addr_of_mut!((*oldctxt).last_error),
-            );
+            (*oldctxt).last_error = (*ctxt).last_error.clone();
         }
     } else {
         if !list.is_null() {
@@ -4848,21 +4846,21 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     /*
      * cleanup the error strings
      */
-    if !(*ctxt).last_error.message.is_null() {
-        xml_free((*ctxt).last_error.message as _);
-    }
-    if !(*ctxt).last_error.file.is_null() {
-        xml_free((*ctxt).last_error.file as _);
-    }
-    if !(*ctxt).last_error.str1.is_null() {
-        xml_free((*ctxt).last_error.str1 as _);
-    }
-    if !(*ctxt).last_error.str2.is_null() {
-        xml_free((*ctxt).last_error.str2 as _);
-    }
-    if !(*ctxt).last_error.str3.is_null() {
-        xml_free((*ctxt).last_error.str3 as _);
-    }
+    // if !(*ctxt).last_error.message.is_null() {
+    //     xml_free((*ctxt).last_error.message as _);
+    // }
+    // if !(*ctxt).last_error.file.is_null() {
+    //     xml_free((*ctxt).last_error.file as _);
+    // }
+    // if !(*ctxt).last_error.str1.is_null() {
+    //     xml_free((*ctxt).last_error.str1 as _);
+    // }
+    // if !(*ctxt).last_error.str2.is_null() {
+    //     xml_free((*ctxt).last_error.str2 as _);
+    // }
+    // if !(*ctxt).last_error.str3.is_null() {
+    //     xml_free((*ctxt).last_error.str3 as _);
+    // }
 
     #[cfg(feature = "catalog")]
     {
@@ -11176,8 +11174,8 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     }
     (*ctxt).nb_errors = 0;
     (*ctxt).nb_warnings = 0;
-    if (*ctxt).last_error.code != XmlParserErrors::XmlErrOK as i32 {
-        xml_reset_error(addr_of_mut!((*ctxt).last_error));
+    if (*ctxt).last_error.is_err() {
+        (*ctxt).last_error.reset();
     }
 }
 

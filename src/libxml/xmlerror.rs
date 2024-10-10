@@ -1546,17 +1546,17 @@ pub unsafe extern "C" fn xml_reset_last_error() {
  *
  * Returns NULL if no error occurred or a pointer to the error
  */
-pub unsafe extern "C" fn xml_ctxt_get_last_error(ctx: *mut c_void) -> XmlErrorPtr {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+// pub unsafe extern "C" fn xml_ctxt_get_last_error(ctx: *mut c_void) -> XmlErrorPtr {
+//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
 
-    if ctxt.is_null() {
-        return null_mut();
-    }
-    if (*ctxt).last_error.code == XmlParserErrors::XmlErrOK as i32 {
-        return null_mut();
-    }
-    addr_of_mut!((*ctxt).last_error)
-}
+//     if ctxt.is_null() {
+//         return null_mut();
+//     }
+//     if (*ctxt).last_error.code == XmlParserErrors::XmlErrOK as i32 {
+//         return null_mut();
+//     }
+//     addr_of_mut!((*ctxt).last_error)
+// }
 
 /**
  * xmlCtxtResetLastError:
@@ -1565,18 +1565,18 @@ pub unsafe extern "C" fn xml_ctxt_get_last_error(ctx: *mut c_void) -> XmlErrorPt
  * Cleanup the last global error registered. For parsing error
  * this does not change the well-formedness result.
  */
-pub unsafe extern "C" fn xml_ctxt_reset_last_error(ctx: *mut c_void) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+// pub unsafe extern "C" fn xml_ctxt_reset_last_error(ctx: *mut c_void) {
+//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
 
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
-    if (*ctxt).last_error.code == XmlParserErrors::XmlErrOK as i32 {
-        return;
-    }
-    xml_reset_error(addr_of_mut!((*ctxt).last_error));
-}
+//     if ctxt.is_null() {
+//         return;
+//     }
+//     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
+//     if (*ctxt).last_error.code == XmlParserErrors::XmlErrOK as i32 {
+//         return;
+//     }
+//     xml_reset_error(addr_of_mut!((*ctxt).last_error));
+// }
 
 /**
  * xmlResetError:
@@ -1962,33 +1962,33 @@ mod tests {
         /* missing type support */
     }
 
-    #[test]
-    fn test_xml_ctxt_reset_last_error() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_ctxt_reset_last_error() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_ctx in 0..GEN_NB_VOID_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctx = gen_void_ptr(n_ctx, 0);
+    //         for n_ctx in 0..GEN_NB_VOID_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let ctx = gen_void_ptr(n_ctx, 0);
 
-                xml_ctxt_reset_last_error(ctx);
-                des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCtxtResetLastError",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlCtxtResetLastError()"
-                    );
-                    eprintln!(" {}", n_ctx);
-                }
-            }
-        }
-    }
+    //             xml_ctxt_reset_last_error(ctx);
+    //             des_void_ptr(n_ctx, ctx, 0);
+    //             xml_reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlCtxtResetLastError",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(
+    //                     leaks == 0,
+    //                     "{leaks} Leaks are found in xmlCtxtResetLastError()"
+    //                 );
+    //                 eprintln!(" {}", n_ctx);
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_get_last_error() {

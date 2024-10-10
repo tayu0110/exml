@@ -50,10 +50,7 @@ use crate::{
             xml_parser_input_buffer_create_mem, xml_parser_input_buffer_push,
             XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
         },
-        xmlerror::{
-            xml_parser_validity_error, xml_parser_validity_warning, xml_reset_error,
-            XmlParserErrors,
-        },
+        xmlerror::{xml_parser_validity_error, xml_parser_validity_warning, XmlParserErrors},
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strcmp, xml_strdup, xml_strlen,
             xml_strncasecmp, xml_strndup, XmlChar,
@@ -12105,8 +12102,8 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
 
     (*ctxt).nb_errors = 0;
     (*ctxt).nb_warnings = 0;
-    if (*ctxt).last_error.code != XmlParserErrors::XmlErrOK as i32 {
-        xml_reset_error(addr_of_mut!((*ctxt).last_error));
+    if (*ctxt).last_error.is_err() {
+        (*ctxt).last_error.reset();
     }
 }
 

@@ -78,6 +78,14 @@ impl XmlError {
             *self = Self::default();
         }
     }
+
+    pub fn is_ok(&self) -> bool {
+        self.code.is_ok()
+    }
+
+    pub fn is_err(&self) -> bool {
+        !self.is_ok()
+    }
 }
 
 /// Default generic error function.
