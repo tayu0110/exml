@@ -205,6 +205,12 @@ macro_rules! impl_xml_parser_errors {
                 Err(anyhow::anyhow!("Invalid convert from value '{value}' to {}", std::any::type_name::<Self>()))
             }
         }
+
+        impl Default for XmlParserErrors {
+            fn default() -> Self {
+                Self::XmlErrOK
+            }
+        }
     };
 }
 impl_xml_parser_errors!(
