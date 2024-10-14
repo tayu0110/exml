@@ -184,8 +184,8 @@ unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
         null_mut(),
         null_mut(),
         null_mut(),
-        XmlErrorDomain::XmlFromCatalog as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromCatalog,
+        XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -1225,7 +1225,7 @@ static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
 unsafe extern "C" fn xml_catalog_err(
     catal: XmlCatalogEntryPtr,
     node: XmlNodePtr,
-    error: c_int,
+    error: XmlParserErrors,
     msg: *const c_char,
     str1: *const XmlChar,
     str2: *const XmlChar,
@@ -1237,7 +1237,7 @@ unsafe extern "C" fn xml_catalog_err(
         null_mut(),
         catal as _,
         node as _,
-        XmlErrorDomain::XmlFromCatalog as i32,
+        XmlErrorDomain::XmlFromCatalog,
         error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
@@ -1289,7 +1289,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             xml_catalog_err(
                 ret,
                 cur,
-                XmlParserErrors::XmlCatalogMissingAttr as i32,
+                XmlParserErrors::XmlCatalogMissingAttr,
                 c"%s entry lacks '%s'\n".as_ptr() as _,
                 name,
                 attr_name,
@@ -1303,7 +1303,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
         xml_catalog_err(
             ret,
             cur,
-            XmlParserErrors::XmlCatalogMissingAttr as i32,
+            XmlParserErrors::XmlCatalogMissingAttr,
             c"%s entry lacks '%s'\n".as_ptr() as _,
             name,
             uri_attr_name,
@@ -1345,7 +1345,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
         xml_catalog_err(
             ret,
             cur,
-            XmlParserErrors::XmlCatalogEntryBroken as i32,
+            XmlParserErrors::XmlCatalogEntryBroken,
             c"%s entry '%s' broken ?: %s\n".as_ptr() as _,
             name,
             uri_attr_name,
@@ -1404,7 +1404,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
                 xml_catalog_err(
                     parent,
                     cur,
-                    XmlParserErrors::XmlCatalogPreferValue as i32,
+                    XmlParserErrors::XmlCatalogPreferValue,
                     c"Invalid value for prefer: '%s'\n".as_ptr() as _,
                     prop,
                     null_mut(),
@@ -1650,7 +1650,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
                 xml_catalog_err(
                     null_mut(),
                     cur,
-                    XmlParserErrors::XmlCatalogPreferValue as i32,
+                    XmlParserErrors::XmlCatalogPreferValue,
                     c"Invalid value for prefer: '%s'\n".as_ptr() as _,
                     prop,
                     null_mut(),
@@ -1665,7 +1665,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
         xml_catalog_err(
             null_mut(),
             doc as _,
-            XmlParserErrors::XmlCatalogNotCatalog as i32,
+            XmlParserErrors::XmlCatalogNotCatalog,
             c"File %s is not an XML Catalog\n".as_ptr() as _,
             filename,
             null_mut(),
@@ -2204,7 +2204,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
         xml_catalog_err(
             catal,
             null_mut(),
-            XmlParserErrors::XmlCatalogRecursion as i32,
+            XmlParserErrors::XmlCatalogRecursion,
             c"Detected recursion in catalog %s\n".as_ptr() as _,
             (*catal).name,
             null_mut(),
@@ -2834,7 +2834,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
         xml_catalog_err(
             catal,
             null_mut(),
-            XmlParserErrors::XmlCatalogRecursion as i32,
+            XmlParserErrors::XmlCatalogRecursion,
             c"Detected recursion in catalog %s\n".as_ptr() as _,
             (*catal).name,
             null_mut(),

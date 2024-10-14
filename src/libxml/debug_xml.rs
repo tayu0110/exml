@@ -154,7 +154,11 @@ const DUMP_TEXT_TYPE: i32 = 1;
  *
  * Handle a debug error.
  */
-unsafe extern "C" fn xml_debug_err(ctxt: XmlDebugCtxtPtr, error: c_int, msg: *const c_char) {
+unsafe extern "C" fn xml_debug_err(
+    ctxt: XmlDebugCtxtPtr,
+    error: XmlParserErrors,
+    msg: *const c_char,
+) {
     (*ctxt).errors += 1;
     __xml_raise_error!(
         None,
@@ -162,7 +166,7 @@ unsafe extern "C" fn xml_debug_err(ctxt: XmlDebugCtxtPtr, error: c_int, msg: *co
         null_mut(),
         null_mut(),
         (*ctxt).node as _,
-        XmlErrorDomain::XmlFromCheck as i32,
+        XmlErrorDomain::XmlFromCheck,
         error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
@@ -178,7 +182,7 @@ unsafe extern "C" fn xml_debug_err(ctxt: XmlDebugCtxtPtr, error: c_int, msg: *co
 }
 unsafe extern "C" fn xml_debug_err2(
     ctxt: XmlDebugCtxtPtr,
-    error: c_int,
+    error: XmlParserErrors,
     msg: *const c_char,
     extra: c_int,
 ) {
@@ -189,7 +193,7 @@ unsafe extern "C" fn xml_debug_err2(
         null_mut(),
         null_mut(),
         (*ctxt).node as _,
-        XmlErrorDomain::XmlFromCheck as i32,
+        XmlErrorDomain::XmlFromCheck,
         error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
@@ -205,7 +209,7 @@ unsafe extern "C" fn xml_debug_err2(
 }
 unsafe extern "C" fn xml_debug_err3(
     ctxt: XmlDebugCtxtPtr,
-    error: c_int,
+    error: XmlParserErrors,
     msg: *const c_char,
     extra: *const c_char,
 ) {
@@ -216,7 +220,7 @@ unsafe extern "C" fn xml_debug_err3(
         null_mut(),
         null_mut(),
         (*ctxt).node as _,
-        XmlErrorDomain::XmlFromCheck as i32,
+        XmlErrorDomain::XmlFromCheck,
         error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
@@ -323,13 +327,13 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
         if (*ns).prefix.load(Ordering::Relaxed).is_null() {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckNsScope as i32,
+                XmlParserErrors::XmlCheckNsScope,
                 c"Reference to default namespace not in scope\n".as_ptr(),
             );
         } else {
             xml_debug_err3(
                 ctxt,
-                XmlParserErrors::XmlCheckNsScope as i32,
+                XmlParserErrors::XmlCheckNsScope,
                 c"Reference to namespace '%s' not in scope\n".as_ptr(),
                 (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
             );
@@ -339,13 +343,13 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
         if (*ns).prefix.load(Ordering::Relaxed).is_null() {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckNsAncestor as i32,
+                XmlParserErrors::XmlCheckNsAncestor,
                 c"Reference to default namespace not on ancestor\n".as_ptr(),
             );
         } else {
             xml_debug_err3(
                 ctxt,
-                XmlParserErrors::XmlCheckNsAncestor as i32,
+                XmlParserErrors::XmlCheckNsAncestor,
                 c"Reference to namespace '%s' not on ancestor\n".as_ptr(),
                 (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
             );
@@ -367,7 +371,7 @@ unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const Xm
     if (*ctxt).check != 0 && xml_check_utf8(str) == 0 {
         xml_debug_err3(
             ctxt,
-            XmlParserErrors::XmlCheckNotUtf8 as i32,
+            XmlParserErrors::XmlCheckNotUtf8,
             c"String is not UTF-8 %s".as_ptr(),
             str as *const c_char,
         );
@@ -387,7 +391,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
         if name.is_null() {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckNoName as i32,
+                XmlParserErrors::XmlCheckNoName,
                 c"Name is NULL".as_ptr(),
             );
             return;
@@ -396,7 +400,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
         if xml_validate_name(name, 0) != 0 {
             xml_debug_err3(
                 ctxt,
-                XmlParserErrors::XmlCheckNotNcname as i32,
+                XmlParserErrors::XmlCheckNotNcname,
                 c"Name is not an NCName '%s'".as_ptr(),
                 name as *const c_char,
             );
@@ -411,7 +415,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
         {
             xml_debug_err3(
                 ctxt,
-                XmlParserErrors::XmlCheckOutsideDict as i32,
+                XmlParserErrors::XmlCheckOutsideDict,
                 c"Name is not from the document dictionary '%s'".as_ptr(),
                 name as *const c_char,
             );
@@ -426,26 +430,20 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     if (*node).parent.is_null() {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNoParent as i32,
+            XmlParserErrors::XmlCheckNoParent,
             c"Node has no parent\n".as_ptr(),
         );
     }
     if (*node).doc.is_null() {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNoDoc as i32,
+            XmlParserErrors::XmlCheckNoDoc,
             c"Node has no doc\n".as_ptr(),
         );
         // dict = null_mut();
     } else {
         dict = (*doc).dict;
         if dict.is_null() && (*ctxt).nodict == 0 {
-            // #if 0
-            //             /* deactivated right now as it raises too many errors */
-            //         if (*doc).typ == xmlElementType::XML_DOCUMENT_NODE
-            //         xmlDebugErr(ctxt, XML_CHECK_NO_DICT,
-            //            c"Document has no dictionary\n".as_ptr());
-            // #endif
             (*ctxt).nodict = 1;
         }
         if (*ctxt).doc.is_null() {
@@ -462,7 +460,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckWrongDoc as i32,
+            XmlParserErrors::XmlCheckWrongDoc,
             c"Node doc differs from parent's one\n".as_ptr(),
         );
     }
@@ -471,21 +469,21 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             if !(*node).parent.is_null() && node != (*(*node).parent).properties as XmlNodePtr {
                 xml_debug_err(
                     ctxt,
-                    XmlParserErrors::XmlCheckNoPrev as i32,
+                    XmlParserErrors::XmlCheckNoPrev,
                     c"Attr has no prev and not first of attr list\n".as_ptr(),
                 );
             }
         } else if !(*node).parent.is_null() && (*(*node).parent).children != node {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckNoPrev as i32,
+                XmlParserErrors::XmlCheckNoPrev,
                 c"Node has no prev and not first of parent list\n".as_ptr(),
             );
         }
     } else if (*(*node).prev).next != node {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckWrongPrev as i32,
+            XmlParserErrors::XmlCheckWrongPrev,
             c"Node prev->next : back link wrong\n".as_ptr(),
         );
     }
@@ -497,7 +495,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckNoNext as i32,
+                XmlParserErrors::XmlCheckNoNext,
                 c"Node has no next and not last of parent list\n".as_ptr(),
             );
         }
@@ -505,14 +503,14 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         if (*(*node).next).prev != node {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckWrongNext as i32,
+                XmlParserErrors::XmlCheckWrongNext,
                 c"Node next->prev : forward link wrong\n".as_ptr(),
             );
         }
         if (*(*node).next).parent != (*node).parent {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckWrongParent as i32,
+                XmlParserErrors::XmlCheckWrongParent,
                 c"Node next->prev : forward link wrong\n".as_ptr(),
             );
         }
@@ -563,7 +561,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 } else {
                     xml_debug_err3(
                         ctxt,
-                        XmlParserErrors::XmlCheckWrongName as i32,
+                        XmlParserErrors::XmlCheckWrongName,
                         c"Text node has wrong name '%s'".as_ptr(),
                         (*node).name as *const c_char,
                     );
@@ -576,7 +574,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             } else {
                 xml_debug_err3(
                     ctxt,
-                    XmlParserErrors::XmlCheckWrongName as i32,
+                    XmlParserErrors::XmlCheckWrongName,
                     c"Comment node has wrong name '%s'".as_ptr(),
                     (*node).name as *const c_char,
                 );
@@ -591,7 +589,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             } else {
                 xml_debug_err3(
                     ctxt,
-                    XmlParserErrors::XmlCheckNameNotNull as i32,
+                    XmlParserErrors::XmlCheckNameNotNull,
                     c"CData section has non NULL name '%s'".as_ptr(),
                     (*node).name as *const c_char,
                 );
@@ -628,7 +626,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
     if (*dtd).typ != XmlElementType::XmlDtdNode {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNotDtd as i32,
+            XmlParserErrors::XmlCheckNotDtd,
             c"Node is not a DTD".as_ptr(),
         );
         return;
@@ -701,7 +699,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
     if (*elem).typ != XmlElementType::XmlElementDecl {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNotElemDecl as i32,
+            XmlParserErrors::XmlCheckNotElemDecl,
             c"Node is not an element declaration".as_ptr(),
         );
         return;
@@ -715,7 +713,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
     } else {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNoName as i32,
+            XmlParserErrors::XmlCheckNoName,
             c"Element declaration has no name".as_ptr(),
         );
     }
@@ -766,7 +764,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
     if (*attr).typ != XmlElementType::XmlAttributeDecl {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNotAttrDecl as i32,
+            XmlParserErrors::XmlCheckNotAttrDecl,
             c"Node is not an attribute declaration".as_ptr(),
         );
         return;
@@ -782,7 +780,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
     } else {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNoName as i32,
+            XmlParserErrors::XmlCheckNoName,
             c"Node attribute declaration has no name".as_ptr(),
         );
     }
@@ -797,7 +795,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
     } else {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNoElem as i32,
+            XmlParserErrors::XmlCheckNoElem,
             c"Node attribute declaration has no element name".as_ptr(),
         );
     }
@@ -892,7 +890,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
     if (*ent).typ != XmlElementType::XmlEntityDecl {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNotEntityDecl as i32,
+            XmlParserErrors::XmlCheckNotEntityDecl,
             c"Node is not an entity declaration".as_ptr(),
         );
         return;
@@ -906,7 +904,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
     } else {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNoName as i32,
+            XmlParserErrors::XmlCheckNoName,
             c"Entity declaration has no name".as_ptr(),
         );
     }
@@ -982,7 +980,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
     if (*ns).typ != Some(XmlElementType::XmlNamespaceDecl) {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNotNsDecl as i32,
+            XmlParserErrors::XmlCheckNotNsDecl,
             c"Node is not a namespace declaration".as_ptr(),
         );
         return;
@@ -991,14 +989,14 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
         if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
             xml_debug_err3(
                 ctxt,
-                XmlParserErrors::XmlCheckNoHref as i32,
+                XmlParserErrors::XmlCheckNoHref,
                 c"Incomplete namespace %s href=NULL\n".as_ptr(),
                 (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
             );
         } else {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckNoHref as i32,
+                XmlParserErrors::XmlCheckNoHref,
                 c"Incomplete default namespace href=NULL\n".as_ptr(),
             );
         }
@@ -1277,7 +1275,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             }
             xml_debug_err2(
                 ctxt,
-                XmlParserErrors::XmlCheckUnknownNode as i32,
+                XmlParserErrors::XmlCheckUnknownNode,
                 c"Unknown node type %d\n".as_ptr(),
                 (*node).typ as i32,
             );
@@ -1392,7 +1390,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr)
     if (*attr).name.is_null() {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNoName as i32,
+            XmlParserErrors::XmlCheckNoName,
             c"Attribute has no name".as_ptr(),
         );
     }
@@ -1548,56 +1546,56 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         XmlElementType::XmlElementNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundElement as i32,
+                XmlParserErrors::XmlCheckFoundElement,
                 c"Misplaced ELEMENT node\n".as_ptr(),
             );
         }
         XmlElementType::XmlAttributeNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundAttribute as i32,
+                XmlParserErrors::XmlCheckFoundAttribute,
                 c"Misplaced ATTRIBUTE node\n".as_ptr(),
             );
         }
         XmlElementType::XmlTextNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundText as i32,
+                XmlParserErrors::XmlCheckFoundText,
                 c"Misplaced TEXT node\n".as_ptr(),
             );
         }
         XmlElementType::XmlCdataSectionNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundCdata as i32,
+                XmlParserErrors::XmlCheckFoundCdata,
                 c"Misplaced CDATA node\n".as_ptr(),
             );
         }
         XmlElementType::XmlEntityRefNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundEntityref as i32,
+                XmlParserErrors::XmlCheckFoundEntityref,
                 c"Misplaced ENTITYREF node\n".as_ptr(),
             );
         }
         XmlElementType::XmlEntityNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundEntity as i32,
+                XmlParserErrors::XmlCheckFoundEntity,
                 c"Misplaced ENTITY node\n".as_ptr(),
             );
         }
         XmlElementType::XmlPiNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundPi as i32,
+                XmlParserErrors::XmlCheckFoundPi,
                 c"Misplaced PI node\n".as_ptr(),
             );
         }
         XmlElementType::XmlCommentNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundComment as i32,
+                XmlParserErrors::XmlCheckFoundComment,
                 c"Misplaced COMMENT node\n".as_ptr(),
             );
         }
@@ -1614,28 +1612,28 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         XmlElementType::XmlDocumentTypeNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundDoctype as i32,
+                XmlParserErrors::XmlCheckFoundDoctype,
                 c"Misplaced DOCTYPE node\n".as_ptr(),
             );
         }
         XmlElementType::XmlDocumentFragNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundFragment as i32,
+                XmlParserErrors::XmlCheckFoundFragment,
                 c"Misplaced FRAGMENT node\n".as_ptr(),
             );
         }
         XmlElementType::XmlNotationNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundNotation as i32,
+                XmlParserErrors::XmlCheckFoundNotation,
                 c"Misplaced NOTATION node\n".as_ptr(),
             );
         }
         _ => {
             xml_debug_err2(
                 ctxt,
-                XmlParserErrors::XmlCheckUnknownNode as i32,
+                XmlParserErrors::XmlCheckUnknownNode,
                 c"Unknown node type %d\n".as_ptr(),
                 (*doc).typ as i32,
             );
@@ -1822,7 +1820,7 @@ extern "C" fn xml_ctxt_dump_entity_callback(
                 Some(e) => {
                     xml_debug_err2(
                         ctxt,
-                        XmlParserErrors::XmlCheckEntityType as i32,
+                        XmlParserErrors::XmlCheckEntityType,
                         c"Unknown entity type %d\n".as_ptr(),
                         e as i32,
                     );
@@ -2829,11 +2827,13 @@ pub unsafe extern "C" fn xml_shell_validate(
 
     use libc::memset;
 
-    use crate::libxml::{
-        globals::xml_generic_error,
-        parser::xml_parse_dtd,
-        tree::xml_free_dtd,
-        valid::{xml_validate_document, xml_validate_dtd},
+    use crate::{
+        globals::GLOBAL_STATE,
+        libxml::{
+            parser::xml_parse_dtd,
+            tree::xml_free_dtd,
+            valid::{xml_validate_document, xml_validate_dtd},
+        },
     };
 
     use super::valid::XmlValidCtxt;
@@ -2845,8 +2845,8 @@ pub unsafe extern "C" fn xml_shell_validate(
         return -1;
     }
     memset(addr_of_mut!(vctxt) as _, 0, size_of_val(&vctxt));
-    vctxt.error = Some(xml_generic_error);
-    vctxt.warning = Some(xml_generic_error);
+    vctxt.error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
+    vctxt.warning = vctxt.error;
 
     if dtd.is_null() || *dtd.add(0) == 0 {
         res = xml_validate_document(addr_of_mut!(vctxt), (*ctxt).doc);
@@ -3025,9 +3025,9 @@ unsafe extern "C" fn xml_shell_rng_validate(
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> c_int {
-    use crate::libxml::{
-        globals::xml_generic_error,
-        relaxng::{
+    use crate::{
+        globals::GLOBAL_STATE,
+        libxml::relaxng::{
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
             xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
@@ -3038,12 +3038,8 @@ unsafe extern "C" fn xml_shell_rng_validate(
     use super::relaxng::XmlRelaxNGPtr;
 
     let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(schemas);
-    xml_relaxng_set_parser_errors(
-        ctxt,
-        Some(xml_generic_error),
-        Some(xml_generic_error),
-        null_mut(),
-    );
+    let generic_error = GLOBAL_STATE.with_borrow(|state| state.generic_error);
+    xml_relaxng_set_parser_errors(ctxt, Some(generic_error), Some(generic_error), null_mut());
     let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
     xml_relaxng_free_parser_ctxt(ctxt);
     if relaxngschemas.is_null() {
@@ -3054,12 +3050,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
         return -1;
     }
     let vctxt: XmlRelaxNGValidCtxtPtr = xml_relaxng_new_valid_ctxt(relaxngschemas);
-    xml_relaxng_set_valid_errors(
-        vctxt,
-        Some(xml_generic_error),
-        Some(xml_generic_error),
-        null_mut(),
-    );
+    xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), null_mut());
     let ret: c_int = xml_relaxng_validate_doc(vctxt, (*sctxt).doc);
 
     extern "C" {

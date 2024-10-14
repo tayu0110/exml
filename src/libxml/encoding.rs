@@ -12,9 +12,7 @@ use std::{
 
 use libc::{memcpy, memmove, memset, strcmp};
 
-use crate::{
-    __xml_raise_error, libxml::xmlerror::XmlErrorDomain, private::error::__xml_simple_error,
-};
+use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simple_error};
 
 use super::{
     globals::{xml_free, xml_malloc, xml_mem_strdup, xml_realloc},
@@ -211,8 +209,8 @@ pub(crate) unsafe extern "C" fn xml_encoding_err(
         null_mut(),
         null_mut(),
         null_mut(),
-        XmlErrorDomain::XmlFromI18N as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromI18N,
+        error,
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
@@ -234,8 +232,8 @@ pub(crate) unsafe extern "C" fn xml_encoding_err(
  */
 unsafe extern "C" fn xml_encoding_err_memory(extra: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromI18N as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromI18N,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null(),
         extra as _,

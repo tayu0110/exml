@@ -21,11 +21,12 @@ use libc::{
 };
 
 use crate::{
+    error::XmlErrorDomain,
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc},
         uri::{xml_free_uri, xml_parse_uri_raw, XmlURIPtr},
         xml_io::__xml_ioerr,
-        xmlerror::{XmlErrorDomain, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_char_strndup, xml_strcat, xml_strdup, xml_strncasecmp, xml_strndup, xml_strstr,
             XmlChar,
@@ -181,8 +182,8 @@ pub unsafe extern "C" fn xml_nanohttp_scan_proxy(url: *const c_char) {
         || (*uri).server.is_null()
     {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromHttp as i32,
-            XmlParserErrors::XmlHttpUrlSyntax as i32,
+            XmlErrorDomain::XmlFromHTTP,
+            XmlParserErrors::XmlHttpUrlSyntax,
             c"Syntax Error\n".as_ptr() as _,
         );
         if !uri.is_null() {
@@ -207,8 +208,8 @@ pub unsafe extern "C" fn xml_nanohttp_scan_proxy(url: *const c_char) {
  */
 unsafe extern "C" fn xml_http_err_memory(extra: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromHttp as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromHTTP,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null(),
         extra,
@@ -286,8 +287,8 @@ unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHttpctxtPtr) -> c_int {
                 }
                 _ => {
                     __xml_ioerr(
-                        XmlErrorDomain::XmlFromHttp as i32,
-                        0,
+                        XmlErrorDomain::XmlFromHTTP,
+                        XmlParserErrors::default(),
                         c"recv failed\n".as_ptr() as _,
                     );
                     return -1;
@@ -743,8 +744,8 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         //          perror(c"socket".as_ptr() as _);
         //  #endif
         __xml_ioerr(
-            XmlErrorDomain::XmlFromHttp as i32,
-            0,
+            XmlErrorDomain::XmlFromHTTP,
+            XmlParserErrors::default(),
             c"socket failed\n".as_ptr() as _,
         );
         return INVALID_SOCKET;
@@ -766,8 +767,8 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         //          perror(c"nonblocking".as_ptr() as _);
         //  #endif
         __xml_ioerr(
-            XmlErrorDomain::XmlFromHttp as i32,
-            0,
+            XmlErrorDomain::XmlFromHTTP,
+            XmlParserErrors::default(),
             c"error setting non-blocking IO\n".as_ptr() as _,
         );
         closesocket(s);
@@ -779,8 +780,8 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
             EINPROGRESS | EWOULDBLOCK => {}
             _ => {
                 __xml_ioerr(
-                    XmlErrorDomain::XmlFromHttp as i32,
-                    0,
+                    XmlErrorDomain::XmlFromHTTP,
+                    XmlParserErrors::default(),
                     c"error connecting to HTTP server".as_ptr() as _,
                 );
                 closesocket(s);
@@ -794,8 +795,8 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         0 => {
             /* Time out */
             __xml_ioerr(
-                XmlErrorDomain::XmlFromHttp as i32,
-                0,
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::default(),
                 c"Connect attempt timed out".as_ptr() as _,
             );
             closesocket(s);
@@ -804,8 +805,8 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         -1 => {
             /* Ermm.. ?? */
             __xml_ioerr(
-                XmlErrorDomain::XmlFromHttp as i32,
-                0,
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::default(),
                 c"Connect failed".as_ptr() as _,
             );
             closesocket(s);
@@ -828,8 +829,8 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         {
             /* Solaris error code */
             __xml_ioerr(
-                XmlErrorDomain::XmlFromHttp as i32,
-                0,
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::default(),
                 c"getsockopt failed\n".as_ptr() as _,
             );
             closesocket(s);
@@ -837,8 +838,8 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         }
         if status != 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromHttp as i32,
-                0,
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::default(),
                 c"Error connecting to remote host".as_ptr() as _,
             );
             closesocket(s);
@@ -848,8 +849,8 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
     } else {
         /* pbm */
         __xml_ioerr(
-            XmlErrorDomain::XmlFromHttp as i32,
-            0,
+            XmlErrorDomain::XmlFromHTTP,
+            XmlParserErrors::default(),
             c"select failed\n".as_ptr() as _,
         );
         closesocket(s);
@@ -898,8 +899,8 @@ unsafe extern "C" fn xml_nanohttp_connect_host(host: *const c_char, port: c_int)
         );
         if status != 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromHttp as i32,
-                0,
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::default(),
                 c"getaddrinfo failed\n".as_ptr() as _,
             );
             return INVALID_SOCKET;
@@ -910,8 +911,8 @@ unsafe extern "C" fn xml_nanohttp_connect_host(host: *const c_char, port: c_int)
             if (*res).ai_family == AF_INET {
                 if (*res).ai_addrlen as usize > size_of_val(&sockin) {
                     __xml_ioerr(
-                        XmlErrorDomain::XmlFromHttp as i32,
-                        0,
+                        XmlErrorDomain::XmlFromHTTP,
+                        XmlParserErrors::default(),
                         c"address size mismatch\n".as_ptr() as _,
                     );
                     freeaddrinfo(result);
@@ -928,8 +929,8 @@ unsafe extern "C" fn xml_nanohttp_connect_host(host: *const c_char, port: c_int)
             } else if (*res).ai_family == AF_INET6 {
                 if (*res).ai_addrlen as usize > size_of_val(&sockin6) {
                     __xml_ioerr(
-                        XmlErrorDomain::XmlFromHttp as i32,
-                        0,
+                        XmlErrorDomain::XmlFromHTTP,
+                        XmlParserErrors::default(),
                         c"address size mismatch\n".as_ptr() as _,
                     );
                     freeaddrinfo(result);
@@ -995,8 +996,8 @@ unsafe extern "C" fn xml_nanohttp_send(
                 && *__errno_location() != EWOULDBLOCK
             {
                 __xml_ioerr(
-                    XmlErrorDomain::XmlFromHttp as i32,
-                    0,
+                    XmlErrorDomain::XmlFromHTTP,
+                    XmlParserErrors::default(),
                     c"send failed\n".as_ptr() as _,
                 );
                 if total_sent == 0 {
@@ -1315,8 +1316,8 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
 
         if (*ctxt).protocol.is_null() || strcmp((*ctxt).protocol as _, c"http".as_ptr() as _) != 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromHttp as i32,
-                XmlParserErrors::XmlHttpUrlSyntax as i32,
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::XmlHttpUrlSyntax,
                 c"Not a valid HTTP URI".as_ptr() as _,
             );
             xml_nanohttp_free_ctxt(ctxt);
@@ -1327,8 +1328,8 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
         }
         if (*ctxt).hostname.is_null() {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromHttp as i32,
-                XmlParserErrors::XmlHttpUnknownHost as i32,
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::XmlHttpUnknownHost,
                 c"Failed to identify host in URI".as_ptr() as _,
             );
             xml_nanohttp_free_ctxt(ctxt);

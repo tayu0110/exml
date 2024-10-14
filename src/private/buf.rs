@@ -21,7 +21,7 @@ use crate::libxml::{
     parser::XmlParserInputPtr,
     parser_internals::XML_MAX_TEXT_LENGTH,
     tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
-    xmlerror::{XmlErrorDomain, XmlParserErrors},
+    xmlerror::XmlParserErrors,
     xmlstring::{xml_strchr, xml_strlen, XmlChar},
 };
 
@@ -31,6 +31,8 @@ const SIZE_MAX: size_t = size_t::MAX;
 
 mod legacy {
     use std::ffi::c_uint;
+
+    use crate::error::XmlErrorDomain;
 
     use super::*;
 
@@ -128,8 +130,8 @@ mod legacy {
      */
     unsafe extern "C" fn xml_buf_memory_error(buf: XmlBufPtr, extra: *const c_char) {
         __xml_simple_error(
-            XmlErrorDomain::XmlFromBuffer as _,
-            XmlParserErrors::XmlErrNoMemory as _,
+            XmlErrorDomain::XmlFromBuffer,
+            XmlParserErrors::XmlErrNoMemory,
             null_mut(),
             null(),
             extra as _,

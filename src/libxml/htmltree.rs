@@ -21,6 +21,7 @@ use super::{
         XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
     xml_io::XmlOutputBufferPtr,
+    xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strstr, XmlChar},
 };
 
@@ -488,19 +489,19 @@ pub unsafe extern "C" fn html_doc_dump_memory(
  * Handle an out of memory condition
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn html_save_err(code: c_int, node: XmlNodePtr, extra: *const c_char) {
-    use crate::{libxml::xmlerror::XmlErrorDomain, private::error::__xml_simple_error};
+unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
+    use crate::{error::XmlErrorDomain, private::error::__xml_simple_error};
 
     use super::xmlerror::XmlParserErrors;
 
-    let msg = match XmlParserErrors::try_from(code) {
-        Ok(XmlParserErrors::XmlSaveNotUtf8) => c"string is not in UTF-8\n".as_ptr() as _,
-        Ok(XmlParserErrors::XmlSaveCharInvalid) => c"invalid character value\n".as_ptr() as _,
-        Ok(XmlParserErrors::XmlSaveUnknownEncoding) => c"unknown encoding %s\n".as_ptr() as _,
-        Ok(XmlParserErrors::XmlSaveNoDoctype) => c"HTML has no DOCTYPE\n".as_ptr() as _,
+    let msg = match code {
+        XmlParserErrors::XmlSaveNotUtf8 => c"string is not in UTF-8\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveCharInvalid => c"invalid character value\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveUnknownEncoding => c"unknown encoding %s\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveNoDoctype => c"HTML has no DOCTYPE\n".as_ptr() as _,
         _ => c"unexpected error number\n".as_ptr() as _,
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromOutput as i32, code, node, msg, extra);
+    __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, msg, extra);
 }
 
 /**
@@ -554,7 +555,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
                 let handler = find_encoding_handler(enc);
                 if handler.is_none() {
                     html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding as i32,
+                        XmlParserErrors::XmlSaveUnknownEncoding,
                         null_mut(),
                         encoding,
                     );
@@ -643,7 +644,7 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
                 let handler = find_encoding_handler(enc);
                 if handler.is_none() {
                     html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding as i32,
+                        XmlParserErrors::XmlSaveUnknownEncoding,
                         null_mut(),
                         encoding,
                     );
@@ -704,7 +705,7 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
                 let handler = find_encoding_handler(enc);
                 if handler.is_none() {
                     html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding as i32,
+                        XmlParserErrors::XmlSaveUnknownEncoding,
                         null_mut(),
                         encoding,
                     );
@@ -745,13 +746,13 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
     use crate::{
-        libxml::xmlerror::{XmlErrorDomain, XmlParserErrors},
+        error::XmlErrorDomain, libxml::xmlerror::XmlParserErrors,
         private::error::__xml_simple_error,
     };
 
     __xml_simple_error(
-        XmlErrorDomain::XmlFromOutput as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromOutput,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null_mut(),
         extra,
@@ -898,7 +899,7 @@ pub unsafe extern "C" fn html_node_dump_file_format(
                 let handler = find_encoding_handler(enc);
                 if handler.is_none() {
                     html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding as i32,
+                        XmlParserErrors::XmlSaveUnknownEncoding,
                         null_mut(),
                         encoding,
                     );
@@ -988,7 +989,7 @@ pub unsafe extern "C" fn html_save_file_format(
                 let handler = find_encoding_handler(enc);
                 if handler.is_none() {
                     html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding as i32,
+                        XmlParserErrors::XmlSaveUnknownEncoding,
                         null_mut(),
                         encoding,
                     );
@@ -1050,11 +1051,7 @@ unsafe extern "C" fn html_dtd_dump_output(
     let cur: XmlDtdPtr = (*doc).int_subset;
 
     if cur.is_null() {
-        html_save_err(
-            XmlParserErrors::XmlSaveNoDoctype as i32,
-            doc as _,
-            null_mut(),
-        );
+        html_save_err(XmlParserErrors::XmlSaveNoDoctype, doc as _, null_mut());
         return;
     }
     xml_output_buffer_write_string(buf, c"<!DOCTYPE ".as_ptr() as _);

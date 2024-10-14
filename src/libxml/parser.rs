@@ -21,8 +21,9 @@ use crate::{
     __xml_raise_error,
     buf::libxml_api::xml_buf_create,
     encoding::{detect_encoding, find_encoding_handler},
-    error::XmlError,
+    error::{parser_validity_error, parser_validity_warning, XmlError},
     generic_error,
+    globals::{GenericError, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
@@ -92,10 +93,7 @@ use crate::{
             xml_register_default_input_callbacks, xml_register_default_output_callbacks,
             XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
         },
-        xmlerror::{
-            xml_parser_validity_error, xml_parser_validity_warning, XmlParserErrors,
-            XmlStructuredErrorFunc,
-        },
+        xmlerror::XmlParserErrors,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::{
@@ -941,8 +939,8 @@ pub struct XmlSAXHandler {
     pub ignorable_whitespace: Option<IgnorableWhitespaceSAXFunc>,
     pub processing_instruction: Option<ProcessingInstructionSAXFunc>,
     pub comment: Option<CommentSAXFunc>,
-    pub warning: Option<WarningSAXFunc>,
-    pub error: Option<ErrorSAXFunc>,
+    pub warning: Option<GenericError>,
+    pub error: Option<GenericError>,
     pub fatal_error: Option<FatalErrorSAXFunc>, /* unused error() get all the errors */
     pub get_parameter_entity: Option<GetParameterEntitySAXFunc>,
     pub cdata_block: Option<CdataBlockSAXFunc>,
@@ -952,7 +950,7 @@ pub struct XmlSAXHandler {
     pub _private: AtomicPtr<c_void>,
     pub start_element_ns: Option<StartElementNsSAX2Func>,
     pub end_element_ns: Option<EndElementNsSAX2Func>,
-    pub serror: Option<XmlStructuredErrorFunc>,
+    pub serror: Option<StructuredError>,
 }
 
 /*
@@ -1246,8 +1244,8 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromParser as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromParser,
+        error,
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
@@ -1297,8 +1295,8 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromParser as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromParser,
+        error,
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
@@ -1348,8 +1346,8 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_int(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromParser as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromParser,
+        error,
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
@@ -1386,7 +1384,7 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
-    let mut schannel: Option<XmlStructuredErrorFunc> = None;
+    let mut schannel: Option<StructuredError> = None;
 
     if !ctxt.is_null()
         && (*ctxt).disable_sax != 0
@@ -1411,8 +1409,8 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
             (*ctxt).user_data,
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromParser as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromParser,
+            error,
             XmlErrorLevel::XmlErrWarning,
             null_mut(),
             0,
@@ -1432,8 +1430,8 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
             null_mut(),
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromParser as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromParser,
+            error,
             XmlErrorLevel::XmlErrWarning,
             null_mut(),
             0,
@@ -1479,8 +1477,8 @@ pub(crate) unsafe extern "C" fn xml_err_msg_str(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromParser as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromParser,
+        error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -1510,7 +1508,7 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
-    let mut schannel: Option<XmlStructuredErrorFunc> = None;
+    let mut schannel: Option<StructuredError> = None;
 
     if !ctxt.is_null()
         && (*ctxt).disable_sax != 0
@@ -1531,8 +1529,8 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
             (*ctxt).vctxt.user_data,
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromDtd as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromDTD,
+            error,
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
@@ -1553,8 +1551,8 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
             null_mut(),
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromDtd as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromDTD,
+            error,
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
@@ -1604,8 +1602,8 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str_int_str(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromParser as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromParser,
+        error,
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
@@ -1660,8 +1658,8 @@ pub(crate) unsafe extern "C" fn xml_ns_err(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromNamespace as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromNamespace,
+        error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -4646,13 +4644,13 @@ unsafe extern "C" fn xml_init_sax_parser_ctxt(
 
     (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
     (*ctxt).vctxt.user_data = ctxt as _;
-    (*ctxt).vctxt.error = Some(xml_parser_validity_error);
-    (*ctxt).vctxt.warning = Some(xml_parser_validity_warning);
+    (*ctxt).vctxt.error = Some(parser_validity_error);
+    (*ctxt).vctxt.warning = Some(parser_validity_warning);
     if (*ctxt).validate != 0 {
         if *xml_get_warnings_default_value() == 0 {
             (*ctxt).vctxt.warning = None;
         } else {
-            (*ctxt).vctxt.warning = Some(xml_parser_validity_warning);
+            (*ctxt).vctxt.warning = Some(parser_validity_warning);
         }
         (*ctxt).vctxt.node_max = 0;
         (*ctxt).options |= XmlParserOption::XmlParseDtdvalid as i32;
@@ -7817,8 +7815,8 @@ unsafe extern "C" fn xml_ns_warn(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromNamespace as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromNamespace,
+        error,
         XmlErrorLevel::XmlErrWarning,
         null_mut(),
         0,
@@ -7864,8 +7862,8 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             null_mut(),
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromParser as i32,
-            XmlParserErrors::XmlErrAttributeRedefined as i32,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrAttributeRedefined,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -7884,8 +7882,8 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             null_mut(),
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromParser as i32,
-            XmlParserErrors::XmlErrAttributeRedefined as i32,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrAttributeRedefined,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,

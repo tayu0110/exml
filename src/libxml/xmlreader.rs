@@ -6,6 +6,7 @@
 use std::{
     any::type_name,
     ffi::{c_char, c_int, c_long, c_uint, c_ulong},
+    io::Write,
     mem::{size_of, size_of_val},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -16,6 +17,10 @@ use libc::{memset, size_t};
 
 use crate::{
     buf::libxml_api::{xml_buf_cat, xml_buf_create, xml_buf_free, XmlBufPtr},
+    error::{
+        parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
+    },
+    globals::StructuredError,
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
@@ -63,10 +68,6 @@ use crate::{
             xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
             xml_parser_input_buffer_read, XmlInputCloseCallback, XmlInputReadCallback,
             XmlParserInputBufferPtr,
-        },
-        xmlerror::{
-            xml_parser_error, xml_parser_validity_error, xml_parser_validity_warning,
-            xml_parser_warning, XmlErrorPtr, XmlStructuredErrorFunc,
         },
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
@@ -299,7 +300,7 @@ pub struct XmlTextReader {
     preserves: c_int,    /* level of preserves */
     parser_flags: c_int, /* the set of options set */
     /* Structured error handling */
-    serror_func: Option<XmlStructuredErrorFunc>, /* callback function */
+    serror_func: Option<StructuredError>, /* callback function */
 }
 
 const NODE_IS_EMPTY: i32 = 0x1;
@@ -4934,38 +4935,46 @@ pub unsafe extern "C" fn xml_text_reader_is_valid(reader: XmlTextReaderPtr) -> c
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_generic_error(
-    ctxt: *mut c_void,
+fn xml_text_reader_generic_error(
+    ctxt: Option<&mut (dyn Write + 'static)>,
     severity: XmlParserSeverities,
-    str: *mut c_char,
+    str: &str,
 ) {
-    let ctx: XmlParserCtxtPtr = ctxt as XmlParserCtxtPtr;
+    use std::ffi::CString;
 
-    let reader: XmlTextReaderPtr = (*ctx)._private as XmlTextReaderPtr;
+    use crate::error::ErrorContextWrap;
 
-    if !str.is_null() {
-        if let Some(error) = (*reader).error_func {
-            error(
-                (*reader).error_func_arg,
-                str,
-                severity,
-                ctx as XmlTextReaderLocatorPtr,
-            );
+    if let Some(ctxt) = ctxt {
+        unsafe {
+            let ctxt = ctxt as *mut dyn Write as *mut ErrorContextWrap<XmlParserCtxtPtr>;
+            let ctx = (*ctxt).0;
+
+            let reader: XmlTextReaderPtr = (*ctx)._private as XmlTextReaderPtr;
+
+            if let Some(error) = (*reader).error_func {
+                let str = CString::new(str).unwrap();
+                error(
+                    (*reader).error_func_arg,
+                    str.as_ptr(),
+                    severity,
+                    ctx as XmlTextReaderLocatorPtr,
+                );
+            }
+            // In the original code, `str` is dynamic memory allocated to construct strings from variable-length arguments,
+            // but since variable-length arguments are not available in Rust, it is just a lateral pass of the passed message.
+            //
+            // Since we do not know where the memory of `str` should be handled, it is safe not to free it,
+            // although we expect it to leak memory.
+            // xml_free(str as _);
         }
-        // In the original code, `str` is dynamic memory allocated to construct strings from variable-length arguments,
-        // but since variable-length arguments are not available in Rust, it is just a lateral pass of the passed message.
-        //
-        // Since we do not know where the memory of `str` should be handled, it is safe not to free it,
-        // although we expect it to leak memory.
-        // xml_free(str as _);
     }
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_validity_error(ctxt: *mut c_void, msg: *const c_char) {
-    let len: c_int = xml_strlen(msg as _);
+fn xml_text_reader_validity_error(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    let len = msg.len();
 
-    if len > 1 && *msg.add(len as usize - 2) != b':' as i8 {
+    if len > 1 && msg.as_bytes()[len - 2] != b':' {
         /*
          * some callbacks only report locator information:
          * skip them (mimicking behaviour in error.c)
@@ -4973,7 +4982,7 @@ unsafe extern "C" fn xml_text_reader_validity_error(ctxt: *mut c_void, msg: *con
         xml_text_reader_generic_error(
             ctxt,
             XmlParserSeverities::XmlParserSeverityValidityError,
-            msg as _,
+            msg,
         );
     }
 
@@ -4997,18 +5006,28 @@ unsafe extern "C" fn xml_text_reader_validity_error(ctxt: *mut c_void, msg: *con
 }
 
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-unsafe extern "C" fn xml_text_reader_validity_error_relay(ctx: *mut c_void, msg: *const c_char) {
-    let reader: XmlTextReaderPtr = ctx as XmlTextReaderPtr;
+fn xml_text_reader_validity_error_relay(ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    use std::ffi::CString;
 
-    if let Some(error) = (*reader).error_func {
-        error(
-            (*reader).error_func_arg,
-            msg,
-            XmlParserSeverities::XmlParserSeverityValidityError,
-            null_mut(), /* locator */
-        );
-    } else {
-        xml_text_reader_validity_error(ctx, msg);
+    use crate::error::ErrorContextWrap;
+
+    if let Some(ctx) = ctx {
+        let ctx = ctx as *mut dyn Write as *mut ErrorContextWrap<XmlTextReaderPtr>;
+
+        unsafe {
+            let reader = (*ctx).0;
+            if let Some(error) = (*reader).error_func {
+                let msg = CString::new(msg).unwrap();
+                error(
+                    (*reader).error_func_arg,
+                    msg.as_ptr(),
+                    XmlParserSeverities::XmlParserSeverityValidityError,
+                    null_mut(), /* locator */
+                );
+            } else {
+                xml_text_reader_validity_error(Some(&mut ErrorContextWrap(reader)), msg);
+            }
+        }
     }
 
     // original code is the following, but Rust cannot handle variable length arguments.
@@ -5035,10 +5054,10 @@ unsafe extern "C" fn xml_text_reader_validity_error_relay(ctx: *mut c_void, msg:
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_validity_warning(ctxt: *mut c_void, msg: *const c_char) {
-    let len: c_int = xml_strlen(msg as _);
+fn xml_text_reader_validity_warning(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    let len = msg.len();
 
-    if len != 0 && *msg.add(len as usize - 1) != b':' as i8 {
+    if len != 0 && msg.as_bytes()[len - 1] != b':' {
         /*
          * some callbacks only report locator information:
          * skip them (mimicking behaviour in error.c)
@@ -5070,18 +5089,28 @@ unsafe extern "C" fn xml_text_reader_validity_warning(ctxt: *mut c_void, msg: *c
 }
 
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-unsafe extern "C" fn xml_text_reader_validity_warning_relay(ctx: *mut c_void, msg: *const c_char) {
-    let reader: XmlTextReaderPtr = ctx as XmlTextReaderPtr;
+fn xml_text_reader_validity_warning_relay(ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    use std::ffi::CString;
 
-    if let Some(error) = (*reader).error_func {
-        error(
-            (*reader).error_func_arg,
-            msg,
-            XmlParserSeverities::XmlParserSeverityValidityWarning,
-            null_mut(), /* locator */
-        );
-    } else {
-        xml_text_reader_validity_warning(ctx, msg);
+    use crate::error::ErrorContextWrap;
+
+    if let Some(ctx) = ctx {
+        let ctx = ctx as *mut dyn Write as *mut ErrorContextWrap<XmlTextReaderPtr>;
+
+        unsafe {
+            let reader = (*ctx).0;
+            if let Some(error) = (*reader).error_func {
+                let msg = CString::new(msg).unwrap();
+                error(
+                    (*reader).error_func_arg,
+                    msg.as_ptr(),
+                    XmlParserSeverities::XmlParserSeverityValidityWarning,
+                    null_mut(), /* locator */
+                );
+            } else {
+                xml_text_reader_validity_warning(Some(&mut ErrorContextWrap(reader)), msg);
+            }
+        }
     }
 
     // original code is the following, but Rust cannot handle variable length arguments.
@@ -5108,29 +5137,30 @@ unsafe extern "C" fn xml_text_reader_validity_warning_relay(ctx: *mut c_void, ms
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_structured_error(ctxt: *mut c_void, error: XmlErrorPtr) {
+fn xml_text_reader_structured_error(ctxt: *mut c_void, error: &XmlError) {
     let ctx: XmlParserCtxtPtr = ctxt as XmlParserCtxtPtr;
 
-    let reader: XmlTextReaderPtr = (*ctx)._private as XmlTextReaderPtr;
+    unsafe {
+        let reader: XmlTextReaderPtr = (*ctx)._private as XmlTextReaderPtr;
 
-    if !error.is_null() {
+        // if !error.is_null() {
         if let Some(serror) = (*reader).serror_func {
-            serror((*reader).error_func_arg, error as XmlErrorPtr);
+            serror((*reader).error_func_arg, error);
         }
+        // }
     }
 }
 
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-unsafe extern "C" fn xml_text_reader_validity_structured_relay(
-    user_data: *mut c_void,
-    error: XmlErrorPtr,
-) {
+fn xml_text_reader_validity_structured_relay(user_data: *mut c_void, error: &XmlError) {
     let reader: XmlTextReaderPtr = user_data as XmlTextReaderPtr;
 
-    if let Some(serror) = (*reader).serror_func {
-        serror((*reader).error_func_arg, error);
-    } else {
-        xml_text_reader_structured_error(reader as _, error);
+    unsafe {
+        if let Some(serror) = (*reader).serror_func {
+            serror((*reader).error_func_arg, error);
+        } else {
+            xml_text_reader_structured_error(reader as _, error);
+        }
     }
 }
 
@@ -6356,7 +6386,7 @@ pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_error(ctxt: *mut c_void, msg: *const c_char) {
+fn xml_text_reader_error(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
     xml_text_reader_generic_error(ctxt, XmlParserSeverities::XmlParserSeverityError, msg as _);
     // original code is the following, but Rust cannot handle variable length arguments.
 
@@ -6370,12 +6400,8 @@ unsafe extern "C" fn xml_text_reader_error(ctxt: *mut c_void, msg: *const c_char
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_warning(ctxt: *mut c_void, msg: *const c_char) {
-    xml_text_reader_generic_error(
-        ctxt,
-        XmlParserSeverities::XmlParserSeverityWarning,
-        msg as _,
-    );
+fn xml_text_reader_warning(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    xml_text_reader_generic_error(ctxt, XmlParserSeverities::XmlParserSeverityWarning, msg);
 
     // original code is the following, but Rust cannot handle variable length arguments.
 
@@ -6440,10 +6466,10 @@ pub unsafe extern "C" fn xml_text_reader_set_error_handler(
         }
     } else {
         /* restore defaults */
-        (*(*(*reader).ctxt).sax).error = Some(xml_parser_error);
-        (*(*reader).ctxt).vctxt.error = Some(xml_parser_validity_error);
-        (*(*(*reader).ctxt).sax).warning = Some(xml_parser_warning);
-        (*(*reader).ctxt).vctxt.warning = Some(xml_parser_validity_warning);
+        (*(*(*reader).ctxt).sax).error = Some(parser_error);
+        (*(*reader).ctxt).vctxt.error = Some(parser_validity_error);
+        (*(*(*reader).ctxt).sax).warning = Some(parser_warning);
+        (*(*reader).ctxt).vctxt.warning = Some(parser_validity_warning);
         (*reader).error_func = None;
         (*reader).serror_func = None;
         (*reader).error_func_arg = null_mut();
@@ -6476,11 +6502,13 @@ pub unsafe extern "C" fn xml_text_reader_set_error_handler(
  * If @f is NULL, the default error and warning handlers are restored.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_set_structured_error_handler(
+pub unsafe fn xml_text_reader_set_structured_error_handler(
     reader: XmlTextReaderPtr,
-    f: Option<XmlStructuredErrorFunc>,
+    f: Option<StructuredError>,
     arg: *mut c_void,
 ) {
+    use crate::error::parser_validity_warning;
+
     if f.is_some() {
         (*(*(*reader).ctxt).sax).error = None;
         (*(*(*reader).ctxt).sax).serror = Some(xml_text_reader_structured_error);
@@ -6511,11 +6539,11 @@ pub unsafe extern "C" fn xml_text_reader_set_structured_error_handler(
         }
     } else {
         /* restore defaults */
-        (*(*(*reader).ctxt).sax).error = Some(xml_parser_error);
+        (*(*(*reader).ctxt).sax).error = Some(parser_error);
         (*(*(*reader).ctxt).sax).serror = None;
-        (*(*reader).ctxt).vctxt.error = Some(xml_parser_validity_error);
-        (*(*(*reader).ctxt).sax).warning = Some(xml_parser_warning);
-        (*(*reader).ctxt).vctxt.warning = Some(xml_parser_validity_warning);
+        (*(*reader).ctxt).vctxt.error = Some(parser_validity_error);
+        (*(*(*reader).ctxt).sax).warning = Some(parser_warning);
+        (*(*reader).ctxt).vctxt.warning = Some(parser_validity_warning);
         (*reader).error_func = None;
         (*reader).serror_func = None;
         (*reader).error_func_arg = null_mut();

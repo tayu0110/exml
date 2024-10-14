@@ -1998,9 +1998,9 @@ macro_rules! CHECK_CTXT {
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
-                $crate::libxml::xmlerror::XmlErrorDomain::XmlFromXpath as i32,
-                $crate::libxml::xmlerror::XmlParserErrors::XmlErrInternalError as i32,
-                $crate::libxml::xmlerror::XmlErrorLevel::XmlErrFatal,
+                $crate::error::XmlErrorDomain::XmlFromXPath,
+                $crate::libxml::xmlerror::XmlParserErrors::XmlErrInternalError,
+                $crate::error::XmlErrorLevel::XmlErrFatal,
                 file!().as_ptr() as _,
                 line!() as i32,
                 std::ptr::null(),
@@ -2233,10 +2233,6 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
 
     if !comp.is_null() {
         (*comp).expr = xml_strdup(str);
-        // #ifdef DEBUG_EVAL_COUNTS
-        // 	(*comp).string = xmlStrdup(str);
-        // 	(*comp).nb = 0;
-        // #endif
     }
     comp
 }
@@ -2251,9 +2247,9 @@ macro_rules! CHECK_CTXT_NEG {
                 null_mut(),
                 null_mut(),
                 null_mut(),
-                $crate::libxml::xmlerror::XmlErrorDomain::XmlFromXpath as i32,
-                $crate::libxml::xmlerror::XmlParserErrors::XmlErrInternalError as i32,
-                $crate::libxml::xmlerror::XmlErrorLevel::XmlErrFatal,
+                $crate::error::XmlErrorDomain::XmlFromXPath,
+                $crate::libxml::xmlerror::XmlParserErrors::XmlErrInternalError,
+                $crate::error::XmlErrorLevel::XmlErrFatal,
                 file.as_ptr() as _,
                 line!() as i32,
                 null(),

@@ -91,8 +91,8 @@ unsafe extern "C" fn xml_xptr_err_memory(extra: *const c_char) {
         null_mut(),
         null_mut(),
         null_mut(),
-        XmlErrorDomain::XmlFromXpointer as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromXPointer,
+        XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -2381,12 +2381,12 @@ macro_rules! NEXT {
  */
 unsafe extern "C" fn xml_xptr_err(
     ctxt: XmlXPathParserContextPtr,
-    error: c_int,
+    error: XmlParserErrors,
     msg: *const c_char,
     extra: *const XmlChar,
 ) {
     if !ctxt.is_null() {
-        (*ctxt).error = error;
+        (*ctxt).error = error as i32;
     }
     if ctxt.is_null() || (*ctxt).context.is_null() {
         __xml_raise_error!(
@@ -2395,7 +2395,7 @@ unsafe extern "C" fn xml_xptr_err(
             null_mut(),
             null_mut(),
             null_mut(),
-            XmlErrorDomain::XmlFromXpointer as i32,
+            XmlErrorDomain::XmlFromXPointer,
             error,
             XmlErrorLevel::XmlErrError,
             null_mut(),
@@ -2415,7 +2415,7 @@ unsafe extern "C" fn xml_xptr_err(
     xml_reset_error(addr_of_mut!((*(*ctxt).context).last_error));
 
     (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXpointer as i32;
-    (*(*ctxt).context).last_error.code = error;
+    (*(*ctxt).context).last_error.code = error as i32;
     (*(*ctxt).context).last_error.level = XmlErrorLevel::XmlErrError;
     (*(*ctxt).context).last_error.str1 = xml_strdup((*ctxt).base) as _;
     (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
@@ -2432,7 +2432,7 @@ unsafe extern "C" fn xml_xptr_err(
             null_mut(),
             null_mut(),
             (*(*ctxt).context).debug_node as _,
-            XmlErrorDomain::XmlFromXpointer as i32,
+            XmlErrorDomain::XmlFromXPointer,
             error,
             XmlErrorLevel::XmlErrError,
             null_mut(),
@@ -2494,7 +2494,7 @@ unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, nam
     if name.is_null() && CUR!(ctxt) == b'/' && NXT!(ctxt, 1) != b'1' {
         xml_xptr_err(
             ctxt,
-            XmlParserErrors::XmlXptrChildseqStart as i32,
+            XmlParserErrors::XmlXptrChildseqStart,
             c"warning: ChildSeq not starting by /1\n".as_ptr() as _,
             null_mut(),
         );
@@ -2704,7 +2704,7 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
     } else {
         xml_xptr_err(
             ctxt,
-            XmlParserErrors::XmlXptrUnknownScheme as i32,
+            XmlParserErrors::XmlXptrUnknownScheme,
             c"unsupported scheme '%s'\n".as_ptr() as _,
             name,
         );
@@ -2893,7 +2893,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
     if f {
         xml_xptr_err(
             ctxt,
-            XmlParserErrors::XmlXptrEvalFailed as i32,
+            XmlParserErrors::XmlXptrEvalFailed,
             c"xmlXPtrEval: evaluation failed to return a node set\n".as_ptr() as _,
             null(),
         );
@@ -2928,7 +2928,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
     if stack != 0 {
         xml_xptr_err(
             ctxt,
-            XmlParserErrors::XmlXptrExtraObjects as i32,
+            XmlParserErrors::XmlXptrExtraObjects,
             c"xmlXPtrEval: object(s) left on the eval stack\n".as_ptr() as _,
             null(),
         );

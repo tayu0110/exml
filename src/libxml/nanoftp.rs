@@ -19,11 +19,12 @@ use libc::{
 };
 
 use crate::{
+    error::XmlErrorDomain,
     libxml::{
         globals::{xml_free, xml_malloc, xml_mem_strdup},
         uri::{xml_free_uri, xml_parse_uri_raw, xml_uri_unescape_string, XmlURIPtr},
         xml_io::__xml_ioerr,
-        xmlerror::{XmlErrorDomain, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlstring::xml_strndup,
     },
     private::error::__xml_simple_error,
@@ -212,8 +213,8 @@ pub unsafe extern "C" fn xml_nanoftp_cleanup() {
  */
 unsafe extern "C" fn xml_ftp_err_memory(extra: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromFtp as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromFTP,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null(),
         extra,
@@ -480,8 +481,8 @@ unsafe extern "C" fn xml_nanoftp_send_user(ctx: *mut c_void) -> c_int {
     let res: c_int = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"send failed".as_ptr() as _,
         );
         return res;
@@ -518,8 +519,8 @@ unsafe extern "C" fn xml_nanoftp_send_passwd(ctx: *mut c_void) -> c_int {
     let res: c_int = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"send failed".as_ptr() as _,
         );
         return res;
@@ -586,8 +587,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
             ) != 0
             {
                 __xml_ioerr(
-                    XmlErrorDomain::XmlFromFtp as i32,
-                    0,
+                    XmlErrorDomain::XmlFromFTP,
+                    XmlParserErrors::default(),
                     c"getaddrinfo failed".as_ptr() as _,
                 );
                 return -1;
@@ -600,8 +601,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
         ) != 0
         {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"getaddrinfo failed".as_ptr() as _,
             );
             return -1;
@@ -620,8 +621,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
                 freeaddrinfo(result);
             }
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"getaddrinfo failed".as_ptr() as _,
             );
             return -1;
@@ -631,8 +632,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
                 freeaddrinfo(result);
             }
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"gethostbyname address mismatch".as_ptr() as _,
             );
             return -1;
@@ -670,8 +671,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
         }
         if hp.is_null() {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"gethostbyname failed".as_ptr() as _,
             );
             return -1;
@@ -680,8 +681,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
             > size_of_val(&(*(addr_of_mut!((*ctxt).ftp_addr) as *mut sockaddr_in)).sin_addr) as u32
         {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"gethostbyname address mismatch".as_ptr() as _,
             );
             return -1;
@@ -704,8 +705,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
 
     if (*ctxt).control_fd == INVALID_SOCKET {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"socket failed".as_ptr() as _,
         );
         return -1;
@@ -721,8 +722,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
     ) < 0
     {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"Failed to create a connection".as_ptr() as _,
         );
         closesocket((*ctxt).control_fd);
@@ -799,8 +800,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
             res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
             if res < 0 {
                 __xml_ioerr(
-                    XmlErrorDomain::XmlFromFtp as i32,
-                    0,
+                    XmlErrorDomain::XmlFromFTP,
+                    XmlParserErrors::default(),
                     c"send failed".as_ptr() as _,
                 );
                 closesocket((*ctxt).control_fd);
@@ -836,8 +837,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
                         res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
                         if res < 0 {
                             __xml_ioerr(
-                                XmlErrorDomain::XmlFromFtp as i32,
-                                0,
+                                XmlErrorDomain::XmlFromFTP,
+                                XmlParserErrors::default(),
                                 c"send failed".as_ptr() as _,
                             );
                             closesocket((*ctxt).control_fd);
@@ -884,8 +885,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
                     res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
                     if res < 0 {
                         __xml_ioerr(
-                            XmlErrorDomain::XmlFromFtp as i32,
-                            0,
+                            XmlErrorDomain::XmlFromFTP,
+                            XmlParserErrors::default(),
                             c"send failed".as_ptr() as _,
                         );
                         closesocket((*ctxt).control_fd);
@@ -932,8 +933,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
                         res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
                         if res < 0 {
                             __xml_ioerr(
-                                XmlErrorDomain::XmlFromFtp as i32,
-                                0,
+                                XmlErrorDomain::XmlFromFTP,
+                                XmlParserErrors::default(),
                                 c"send failed".as_ptr() as _,
                             );
                             closesocket((*ctxt).control_fd);
@@ -969,8 +970,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
                         res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
                         if res < 0 {
                             __xml_ioerr(
-                                XmlErrorDomain::XmlFromFtp as i32,
-                                0,
+                                XmlErrorDomain::XmlFromFTP,
+                                XmlParserErrors::default(),
                                 c"send failed".as_ptr() as _,
                             );
                             closesocket((*ctxt).control_fd);
@@ -1039,8 +1040,8 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
         r @ 3 | r @ 1 | r @ 4 | r @ 5 | r @ -1 | r => {
             if r == 3 {
                 __xml_ioerr(
-                    XmlErrorDomain::XmlFromFtp as i32,
-                    XmlParserErrors::XmlFtpAccnt as i32,
+                    XmlErrorDomain::XmlFromFTP,
+                    XmlParserErrors::XmlFtpAccnt,
                     c"FTP server asking for ACCNT on anonymous\n".as_ptr() as _,
                 );
             }
@@ -1109,8 +1110,8 @@ pub unsafe extern "C" fn xml_nanoftp_quit(ctx: *mut c_void) -> c_int {
     let res: c_int = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"send failed".as_ptr() as _,
         );
         return res;
@@ -1155,8 +1156,8 @@ pub unsafe extern "C" fn xml_nanoftp_scan_proxy(url: *const c_char) {
         || (*uri).server.is_null()
     {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            XmlParserErrors::XmlFtpUrlSyntax as i32,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::XmlFtpUrlSyntax,
             c"Syntax Error\n".as_ptr() as _,
         );
         if !uri.is_null() {
@@ -1370,8 +1371,8 @@ unsafe extern "C" fn xml_nanoftp_get_more(ctx: *mut c_void) -> c_int {
     };
     if res {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"recv failed".as_ptr() as _,
         );
         closesocket((*ctxt).control_fd);
@@ -1580,8 +1581,8 @@ pub unsafe extern "C" fn xml_nanoftp_check_response(ctx: *mut c_void) -> c_int {
         }
         -1 => {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"select".as_ptr() as _,
             );
             return -1;
@@ -1639,8 +1640,8 @@ pub unsafe extern "C" fn xml_nanoftp_cwd(ctx: *mut c_void, directory: *const c_c
     res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"send failed".as_ptr() as _,
         );
         return res;
@@ -1701,8 +1702,8 @@ pub unsafe extern "C" fn xml_nanoftp_dele(ctx: *mut c_void, file: *const c_char)
     res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"send failed".as_ptr() as _,
         );
         return res;
@@ -1760,8 +1761,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
 
     if (*ctxt).data_fd == INVALID_SOCKET {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"socket failed".as_ptr() as _,
         );
         return INVALID_SOCKET;
@@ -1780,8 +1781,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
         res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
         if res < 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"send failed".as_ptr() as _,
             );
             closesocket((*ctxt).data_fd);
@@ -1813,8 +1814,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
         if ((*ctxt).ftp_addr).ss_family == AF_INET6 as u16 {
             if sscanf(cur, c"%u".as_ptr() as _, &temp[0]) != 1 {
                 __xml_ioerr(
-                    XmlErrorDomain::XmlFromFtp as i32,
-                    XmlParserErrors::XmlFtpEpsvAnswer as i32,
+                    XmlErrorDomain::XmlFromFTP,
+                    XmlParserErrors::XmlFtpEpsvAnswer,
                     c"Invalid answer to EPSV\n".as_ptr() as _,
                 );
                 if (*ctxt).data_fd != INVALID_SOCKET {
@@ -1843,8 +1844,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
             ) != 6
             {
                 __xml_ioerr(
-                    XmlErrorDomain::XmlFromFtp as i32,
-                    XmlParserErrors::XmlFtpPasvAnswer as i32,
+                    XmlErrorDomain::XmlFromFTP,
+                    XmlParserErrors::XmlFtpPasvAnswer,
                     c"Invalid answer to PASV\n".as_ptr() as _,
                 );
                 if (*ctxt).data_fd != INVALID_SOCKET {
@@ -1870,8 +1871,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
 
         if connect((*ctxt).data_fd, addr_of!(data_addr) as _, data_addr_len) < 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"Failed to create a data connection".as_ptr() as _,
             );
             closesocket((*ctxt).data_fd);
@@ -1892,8 +1893,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
 
         if bind((*ctxt).data_fd, addr_of_mut!(data_addr) as _, data_addr_len) < 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"bind failed".as_ptr() as _,
             );
             closesocket((*ctxt).data_fd);
@@ -1908,8 +1909,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
 
         if listen((*ctxt).data_fd, 1) < 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"listen failed".as_ptr() as _,
             );
             closesocket((*ctxt).data_fd);
@@ -1971,8 +1972,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
         res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
         if res < 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"send failed".as_ptr() as _,
             );
             closesocket((*ctxt).data_fd);
@@ -2336,8 +2337,8 @@ pub unsafe extern "C" fn xml_nanoftp_list(
     res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"send failed".as_ptr() as _,
         );
         closesocket((*ctxt).data_fd);
@@ -2403,7 +2404,11 @@ pub unsafe extern "C" fn xml_nanoftp_list(
             len < 0
         };
         if f {
-            __xml_ioerr(XmlErrorDomain::XmlFromFtp as i32, 0, c"recv".as_ptr() as _);
+            __xml_ioerr(
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
+                c"recv".as_ptr() as _,
+            );
             closesocket((*ctxt).data_fd);
             (*ctxt).data_fd = INVALID_SOCKET;
             (*ctxt).data_fd = INVALID_SOCKET;
@@ -2478,8 +2483,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_socket(
     res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"send failed".as_ptr() as _,
         );
         closesocket((*ctxt).data_fd);
@@ -2515,8 +2520,8 @@ pub unsafe extern "C" fn xml_nanoftp_get_socket(
     res = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(
-            XmlErrorDomain::XmlFromFtp as i32,
-            0,
+            XmlErrorDomain::XmlFromFTP,
+            XmlParserErrors::default(),
             c"send failed".as_ptr() as _,
         );
         closesocket((*ctxt).data_fd);
@@ -2617,8 +2622,8 @@ pub unsafe extern "C" fn xml_nanoftp_get(
         };
         if res {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"recv failed".as_ptr() as _,
             );
             callback(user_data, buf.as_ptr() as _, len);
@@ -2673,8 +2678,8 @@ pub unsafe extern "C" fn xml_nanoftp_read(
     if len <= 0 {
         if len < 0 {
             __xml_ioerr(
-                XmlErrorDomain::XmlFromFtp as i32,
-                0,
+                XmlErrorDomain::XmlFromFTP,
+                XmlParserErrors::default(),
                 c"recv failed".as_ptr() as _,
             );
         }

@@ -5,6 +5,7 @@
 
 use std::{
     ffi::{c_char, c_int, c_uint},
+    io::Write,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -30,7 +31,7 @@ use crate::libxml::xmlstring::xml_strncmp;
 use crate::{
     __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
-    libxml::xmlerror::{XmlParserErrors, XmlStructuredErrorFunc},
+    globals::{GenericError, StructuredError},
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         entities::{xml_get_doc_entity, XmlEntitiesTablePtr, XmlEntityPtr, XmlEntityType},
@@ -61,7 +62,7 @@ use crate::{
             xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
             XmlAutomataStatePtr,
         },
-        xmlerror::XmlGenericErrorFunc,
+        xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
     private::parser::XML_VCTXT_USE_PCTXT,
@@ -132,8 +133,8 @@ pub type XmlValidCtxtPtr = *mut XmlValidCtxt;
 #[repr(C)]
 pub struct XmlValidCtxt {
     pub(crate) user_data: *mut c_void, /* user specific data block */
-    pub error: Option<XmlValidityErrorFunc>, /* the callback in case of errors */
-    pub warning: Option<XmlValidityWarningFunc>, /* the callback in case of warning */
+    pub error: Option<GenericError>,   /* the callback in case of errors */
+    pub warning: Option<GenericError>, /* the callback in case of warning */
 
     /* Node analysis stack used when validating within entities */
     pub(crate) node: XmlNodePtr,          /* Current parsed Node */
@@ -215,7 +216,7 @@ unsafe extern "C" fn xml_err_valid(
     msg: *const c_char,
     extra: *const c_char,
 ) {
-    let mut channel: Option<XmlGenericErrorFunc> = None;
+    let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut data: *mut c_void = null_mut();
 
@@ -235,8 +236,8 @@ unsafe extern "C" fn xml_err_valid(
             data,
             pctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromValid as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromValid,
+            error,
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
@@ -255,8 +256,8 @@ unsafe extern "C" fn xml_err_valid(
             data,
             pctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromValid as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromValid,
+            error,
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
@@ -279,7 +280,7 @@ unsafe extern "C" fn xml_err_valid(
  * Handle an out of memory error
  */
 unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char) {
-    let mut channel: Option<XmlGenericErrorFunc> = None;
+    let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut data: *mut c_void = null_mut();
 
@@ -299,8 +300,8 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             data,
             pctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromValid as i32,
-            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorDomain::XmlFromValid,
+            XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -319,8 +320,8 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             data,
             pctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromValid as i32,
-            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorDomain::XmlFromValid,
+            XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -1090,8 +1091,10 @@ unsafe extern "C" fn xml_err_valid_node(
     str2: *const XmlChar,
     str3: *const XmlChar,
 ) {
-    let schannel: Option<XmlStructuredErrorFunc> = None;
-    let mut channel: Option<XmlGenericErrorFunc> = None;
+    use crate::globals::StructuredError;
+
+    let schannel: Option<StructuredError> = None;
+    let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut data: *mut c_void = null_mut();
 
@@ -1110,8 +1113,8 @@ unsafe extern "C" fn xml_err_valid_node(
         data,
         pctxt as _,
         node as _,
-        XmlErrorDomain::XmlFromValid as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromValid,
+        error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -2113,8 +2116,8 @@ unsafe extern "C" fn xml_err_valid_warning(
     str2: *const XmlChar,
     str3: *const XmlChar,
 ) {
-    let schannel: Option<XmlStructuredErrorFunc> = None;
-    let mut channel: Option<XmlGenericErrorFunc> = None;
+    let schannel: Option<StructuredError> = None;
+    let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut data: *mut c_void = null_mut();
 
@@ -2133,8 +2136,8 @@ unsafe extern "C" fn xml_err_valid_warning(
         data,
         pctxt as _,
         node as _,
-        XmlErrorDomain::XmlFromValid as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromValid,
+        error,
         XmlErrorLevel::XmlErrWarning,
         null_mut(),
         0,
@@ -4076,8 +4079,8 @@ unsafe extern "C" fn xml_err_valid_node_nr(
     int2: c_int,
     str3: *const XmlChar,
 ) {
-    let schannel: Option<XmlStructuredErrorFunc> = None;
-    let mut channel: Option<XmlGenericErrorFunc> = None;
+    let schannel: Option<StructuredError> = None;
+    let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut data: *mut c_void = null_mut();
 
@@ -4096,8 +4099,8 @@ unsafe extern "C" fn xml_err_valid_node_nr(
         data,
         pctxt as _,
         node as _,
-        XmlErrorDomain::XmlFromValid as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromValid,
+        error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -7824,7 +7827,7 @@ pub unsafe extern "C" fn xml_valid_get_potential_children(
 /*
  * Dummy function to suppress messages while we try out valid elements
  */
-unsafe extern "C" fn xml_no_validity_err(_ctx: *mut c_void, _msg: *const c_char) {}
+fn xml_no_validity_err(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {}
 
 /**
  * xmlValidGetValidElements:

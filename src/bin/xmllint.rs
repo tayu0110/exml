@@ -23,6 +23,7 @@ use std::{
 use const_format::concatcp;
 use exml::{
     encoding::XmlCharEncoding,
+    globals::GenericError,
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
@@ -260,8 +261,8 @@ unsafe extern "C" fn xmllint_external_entity_loader(
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let mut ret: XmlParserInputPtr;
-    let mut warning: Option<WarningSAXFunc> = None;
-    let mut err: Option<ErrorSAXFunc> = None;
+    let mut warning: Option<GenericError> = None;
+    let mut err: Option<GenericError> = None;
 
     let mut lastsegment: *const c_char = url;
     let mut iter: *const c_char = url;

@@ -16,6 +16,7 @@ use libc::{memcpy, memset, ptrdiff_t, size_t, snprintf, strlen, FILE};
 
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
+    error::XmlErrorDomain,
     libxml::{
         dict::xml_dict_free,
         entities::XmlEntityPtr,
@@ -54,7 +55,7 @@ use super::{
         xml_get_dtd_attr_desc, xml_is_id, XmlAttributeTablePtr, XmlElementTablePtr,
         XmlNotationTablePtr,
     },
-    xmlerror::{XmlErrorDomain, XmlParserErrors},
+    xmlerror::XmlParserErrors,
     xmlregexp::XmlRegexpPtr,
     xmlstring::{
         xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
@@ -1278,8 +1279,8 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
  */
 unsafe extern "C" fn xml_tree_err_memory(extra: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromTree as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromTree,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null(),
         extra,
@@ -7329,21 +7330,19 @@ pub unsafe extern "C" fn xml_get_ns_prop(
  *
  * Handle an out of memory condition
  */
-unsafe extern "C" fn xml_tree_err(code: c_int, node: XmlNodePtr, extra: *const c_char) {
-    let msg = match XmlParserErrors::try_from(code) {
-        Ok(XmlParserErrors::XmlTreeInvalidHex) => {
+unsafe extern "C" fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
+    let msg = match code {
+        XmlParserErrors::XmlTreeInvalidHex => {
             c"invalid hexadecimal character value\n".as_ptr() as _
         }
-        Ok(XmlParserErrors::XmlTreeInvalidDec) => {
-            c"invalid decimal character value\n".as_ptr() as _
-        }
-        Ok(XmlParserErrors::XmlTreeUnterminatedEntity) => {
+        XmlParserErrors::XmlTreeInvalidDec => c"invalid decimal character value\n".as_ptr() as _,
+        XmlParserErrors::XmlTreeUnterminatedEntity => {
             c"unterminated entity reference %15s\n".as_ptr() as _
         }
-        Ok(XmlParserErrors::XmlTreeNotUtf8) => c"string is not in UTF-8\n".as_ptr() as _,
+        XmlParserErrors::XmlTreeNotUtf8 => c"string is not in UTF-8\n".as_ptr() as _,
         _ => c"unexpected error number\n".as_ptr() as _,
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromTree as i32, code, node, msg, extra);
+    __xml_simple_error(XmlErrorDomain::XmlFromTree, code, node, msg, extra);
 }
 
 /**
@@ -7412,11 +7411,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
                     } else if (b'A'..=b'F').contains(&tmp) {
                         charval = charval * 16 + (tmp - b'A') as i32 + 10;
                     } else {
-                        xml_tree_err(
-                            XmlParserErrors::XmlTreeInvalidHex as i32,
-                            doc as _,
-                            null_mut(),
-                        );
+                        xml_tree_err(XmlParserErrors::XmlTreeInvalidHex, doc as _, null_mut());
                         charval = 0;
                         break;
                     }
@@ -7436,11 +7431,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
                     if tmp.is_ascii_digit() {
                         charval = charval * 10 + (tmp - b'0') as i32;
                     } else {
-                        xml_tree_err(
-                            XmlParserErrors::XmlTreeInvalidDec as i32,
-                            doc as _,
-                            null_mut(),
-                        );
+                        xml_tree_err(XmlParserErrors::XmlTreeInvalidDec, doc as _, null_mut());
                         charval = 0;
                         break;
                     }
@@ -7461,11 +7452,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
                     cur = cur.add(1);
                 }
                 if *cur == 0 {
-                    xml_tree_err(
-                        XmlParserErrors::XmlTreeUnterminatedEntity as i32,
-                        doc as _,
-                        q as _,
-                    );
+                    xml_tree_err(XmlParserErrors::XmlTreeUnterminatedEntity, doc as _, q as _);
                     // goto out;
                     xml_buf_free(buf);
                     if !val.is_null() {
@@ -7721,11 +7708,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
                     } else if (b'A'..=b'F').contains(&tmp) {
                         charval = charval * 16 + (tmp - b'A') as i32 + 10;
                     } else {
-                        xml_tree_err(
-                            XmlParserErrors::XmlTreeInvalidHex as i32,
-                            doc as _,
-                            null_mut(),
-                        );
+                        xml_tree_err(XmlParserErrors::XmlTreeInvalidHex, doc as _, null_mut());
                         charval = 0;
                         break;
                     }
@@ -7753,11 +7736,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
                     if tmp.is_ascii_digit() {
                         charval = charval * 10 + (tmp - b'0') as i32;
                     } else {
-                        xml_tree_err(
-                            XmlParserErrors::XmlTreeInvalidDec as i32,
-                            doc as _,
-                            null_mut(),
-                        );
+                        xml_tree_err(XmlParserErrors::XmlTreeInvalidDec, doc as _, null_mut());
                         charval = 0;
                         break;
                     }
@@ -7782,11 +7761,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
                     cur = cur.add(1);
                 }
                 if cur >= end || *cur == 0 {
-                    xml_tree_err(
-                        XmlParserErrors::XmlTreeUnterminatedEntity as i32,
-                        doc as _,
-                        q as _,
-                    );
+                    xml_tree_err(XmlParserErrors::XmlTreeUnterminatedEntity, doc as _, q as _);
                     // goto out;
                     xml_buf_free(buf);
                     return ret;
@@ -9526,7 +9501,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     {
         let Some(handler) = find_encoding_handler(encoding) else {
             xml_save_err(
-                XmlParserErrors::XmlSaveUnknownEncoding as i32,
+                XmlParserErrors::XmlSaveUnknownEncoding,
                 out_doc as XmlNodePtr,
                 txt_encoding,
             );

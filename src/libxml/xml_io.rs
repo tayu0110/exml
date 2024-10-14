@@ -32,7 +32,8 @@ use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
     encoding::{find_encoding_handler, get_encoding_handler, XmlCharEncodingHandler},
-    globals::GLOBAL_STATE,
+    error::{XmlErrorDomain, XmlErrorLevel},
+    globals::{GenericError, StructuredError, GLOBAL_STATE},
     libxml::{
         globals::xml_mem_strdup,
         parser::{XmlParserInputState, XML_SAX2_MAGIC},
@@ -63,9 +64,7 @@ use super::{
     parser_internals::xml_new_input_from_file,
     tree::XmlBufferAllocationScheme,
     uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
-    xmlerror::{
-        XmlErrorDomain, XmlErrorLevel, XmlGenericErrorFunc, XmlParserErrors, XmlStructuredErrorFunc,
-    },
+    xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strncasecmp, XmlChar},
 };
 
@@ -326,8 +325,8 @@ pub unsafe extern "C" fn xml_register_default_input_callbacks() {
  */
 pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromIO as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromIO,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null(),
         extra as _,
@@ -471,115 +470,119 @@ const IOERR: &[*const c_char] = &[
  *
  * Handle an I/O error
  */
-pub(crate) unsafe extern "C" fn __xml_ioerr(domain: c_int, mut code: c_int, extra: *const c_char) {
+pub(crate) unsafe fn __xml_ioerr(
+    domain: XmlErrorDomain,
+    mut code: XmlParserErrors,
+    extra: *const c_char,
+) {
     let mut idx: c_uint;
     let errno = *__errno_location();
 
-    if code == 0 {
+    if code == XmlParserErrors::XmlErrOK {
         if errno == 0 {
-            code = 0;
+            code = XmlParserErrors::XmlErrOK;
         } else if errno == EACCES {
-            code = XmlParserErrors::XmlIoEacces as i32;
+            code = XmlParserErrors::XmlIoEacces;
         } else if errno == EAGAIN {
-            code = XmlParserErrors::XmlIoEagain as i32;
+            code = XmlParserErrors::XmlIoEagain;
         } else if errno == EBADF {
-            code = XmlParserErrors::XmlIoEbadf as i32;
+            code = XmlParserErrors::XmlIoEbadf;
         } else if errno == EBADMSG {
-            code = XmlParserErrors::XmlIoEbadmsg as i32;
+            code = XmlParserErrors::XmlIoEbadmsg;
         } else if errno == EBUSY {
-            code = XmlParserErrors::XmlIoEbusy as i32;
+            code = XmlParserErrors::XmlIoEbusy;
         } else if errno == ECANCELED {
-            code = XmlParserErrors::XmlIoEcanceled as i32;
+            code = XmlParserErrors::XmlIoEcanceled;
         } else if errno == ECHILD {
-            code = XmlParserErrors::XmlIoEchild as i32;
+            code = XmlParserErrors::XmlIoEchild;
         } else if errno == EDEADLK {
-            code = XmlParserErrors::XmlIoEdeadlk as i32;
+            code = XmlParserErrors::XmlIoEdeadlk;
         } else if errno == EDOM {
-            code = XmlParserErrors::XmlIoEdom as i32;
+            code = XmlParserErrors::XmlIoEdom;
         } else if errno == EEXIST {
-            code = XmlParserErrors::XmlIoEexist as i32;
+            code = XmlParserErrors::XmlIoEexist;
         } else if errno == EFAULT {
-            code = XmlParserErrors::XmlIoEfault as i32;
+            code = XmlParserErrors::XmlIoEfault;
         } else if errno == EFBIG {
-            code = XmlParserErrors::XmlIoEfbig as i32;
+            code = XmlParserErrors::XmlIoEfbig;
         } else if errno == EINPROGRESS {
-            code = XmlParserErrors::XmlIoEinprogress as i32;
+            code = XmlParserErrors::XmlIoEinprogress;
         } else if errno == EINTR {
-            code = XmlParserErrors::XmlIoEintr as i32;
+            code = XmlParserErrors::XmlIoEintr;
         } else if errno == EINVAL {
-            code = XmlParserErrors::XmlIoEinval as i32;
+            code = XmlParserErrors::XmlIoEinval;
         } else if errno == EIO {
-            code = XmlParserErrors::XmlIoEio as i32;
+            code = XmlParserErrors::XmlIoEio;
         } else if errno == EISDIR {
-            code = XmlParserErrors::XmlIoEisdir as i32;
+            code = XmlParserErrors::XmlIoEisdir;
         } else if errno == EMFILE {
-            code = XmlParserErrors::XmlIoEmfile as i32;
+            code = XmlParserErrors::XmlIoEmfile;
         } else if errno == EMLINK {
-            code = XmlParserErrors::XmlIoEmlink as i32;
+            code = XmlParserErrors::XmlIoEmlink;
         } else if errno == EMSGSIZE {
-            code = XmlParserErrors::XmlIoEmsgsize as i32;
+            code = XmlParserErrors::XmlIoEmsgsize;
         } else if errno == ENAMETOOLONG {
-            code = XmlParserErrors::XmlIoEnametoolong as i32;
+            code = XmlParserErrors::XmlIoEnametoolong;
         } else if errno == ENFILE {
-            code = XmlParserErrors::XmlIoEnfile as i32;
+            code = XmlParserErrors::XmlIoEnfile;
         } else if errno == ENODEV {
-            code = XmlParserErrors::XmlIoEnodev as i32;
+            code = XmlParserErrors::XmlIoEnodev;
         } else if errno == ENOENT {
-            code = XmlParserErrors::XmlIoEnoent as i32;
+            code = XmlParserErrors::XmlIoEnoent;
         } else if errno == ENOEXEC {
-            code = XmlParserErrors::XmlIoEnoexec as i32;
+            code = XmlParserErrors::XmlIoEnoexec;
         } else if errno == ENOLCK {
-            code = XmlParserErrors::XmlIoEnolck as i32;
+            code = XmlParserErrors::XmlIoEnolck;
         } else if errno == ENOMEM {
-            code = XmlParserErrors::XmlIoEnomem as i32;
+            code = XmlParserErrors::XmlIoEnomem;
         } else if errno == ENOSPC {
-            code = XmlParserErrors::XmlIoEnospc as i32;
+            code = XmlParserErrors::XmlIoEnospc;
         } else if errno == ENOSYS {
-            code = XmlParserErrors::XmlIoEnosys as i32;
+            code = XmlParserErrors::XmlIoEnosys;
         } else if errno == ENOTDIR {
-            code = XmlParserErrors::XmlIoEnotdir as i32;
+            code = XmlParserErrors::XmlIoEnotdir;
         } else if errno == ENOTEMPTY {
-            code = XmlParserErrors::XmlIoEnotempty as i32;
+            code = XmlParserErrors::XmlIoEnotempty;
         } else if errno == ENOTSUP {
-            code = XmlParserErrors::XmlIoEnotsup as i32;
+            code = XmlParserErrors::XmlIoEnotsup;
         } else if errno == ENOTTY {
-            code = XmlParserErrors::XmlIoEnotty as i32;
+            code = XmlParserErrors::XmlIoEnotty;
         } else if errno == ENXIO {
-            code = XmlParserErrors::XmlIoEnxio as i32;
+            code = XmlParserErrors::XmlIoEnxio;
         } else if errno == EPERM {
-            code = XmlParserErrors::XmlIoEperm as i32;
+            code = XmlParserErrors::XmlIoEperm;
         } else if errno == EPIPE {
-            code = XmlParserErrors::XmlIoEpipe as i32;
+            code = XmlParserErrors::XmlIoEpipe;
         } else if errno == ERANGE {
-            code = XmlParserErrors::XmlIoErange as i32;
+            code = XmlParserErrors::XmlIoErange;
         } else if errno == EROFS {
-            code = XmlParserErrors::XmlIoErofs as i32;
+            code = XmlParserErrors::XmlIoErofs;
         } else if errno == ESPIPE {
-            code = XmlParserErrors::XmlIoEspipe as i32;
+            code = XmlParserErrors::XmlIoEspipe;
         } else if errno == ESRCH {
-            code = XmlParserErrors::XmlIoEsrch as i32;
+            code = XmlParserErrors::XmlIoEsrch;
         } else if errno == ETIMEDOUT {
-            code = XmlParserErrors::XmlIoEtimedout as i32;
+            code = XmlParserErrors::XmlIoEtimedout;
         } else if errno == EXDEV {
-            code = XmlParserErrors::XmlIoExdev as i32;
+            code = XmlParserErrors::XmlIoExdev;
         } else if errno == ENOTSOCK {
-            code = XmlParserErrors::XmlIoEnotsock as i32;
+            code = XmlParserErrors::XmlIoEnotsock;
         } else if errno == EISCONN {
-            code = XmlParserErrors::XmlIoEisconn as i32;
+            code = XmlParserErrors::XmlIoEisconn;
         } else if errno == ECONNREFUSED {
-            code = XmlParserErrors::XmlIoEconnrefused as i32;
+            code = XmlParserErrors::XmlIoEconnrefused;
         } else if errno == EADDRINUSE {
-            code = XmlParserErrors::XmlIoEaddrinuse as i32;
+            code = XmlParserErrors::XmlIoEaddrinuse;
         } else if errno == EALREADY {
-            code = XmlParserErrors::XmlIoEalready as i32;
+            code = XmlParserErrors::XmlIoEalready;
         } else if errno == EAFNOSUPPORT {
-            code = XmlParserErrors::XmlIoEafnosupport as i32;
+            code = XmlParserErrors::XmlIoEafnosupport;
         } else {
-            code = XmlParserErrors::XmlIoUnknown as i32;
+            code = XmlParserErrors::XmlIoUnknown;
         }
     }
     idx = 0;
-    if code >= XmlParserErrors::XmlIoUnknown as i32 {
+    if code as i32 >= XmlParserErrors::XmlIoUnknown as i32 {
         idx = code as u32 - XmlParserErrors::XmlIoUnknown as u32;
     }
     if idx >= IOERR.len() as u32 {
@@ -596,8 +599,8 @@ pub(crate) unsafe extern "C" fn __xml_ioerr(domain: c_int, mut code: c_int, extr
  *
  * Handle an I/O error
  */
-unsafe extern "C" fn xml_ioerr(code: c_int, extra: *const c_char) {
-    __xml_ioerr(XmlErrorDomain::XmlFromIO as i32, code, extra);
+unsafe extern "C" fn xml_ioerr(code: XmlParserErrors, extra: *const c_char) {
+    __xml_ioerr(XmlErrorDomain::XmlFromIO, code, extra);
 }
 
 /**
@@ -616,7 +619,7 @@ unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
         0
     };
     if ret < 0 {
-        xml_ioerr(0, c"fflush()".as_ptr() as _);
+        xml_ioerr(XmlParserErrors::XmlErrOK, c"fflush()".as_ptr() as _);
     }
     ret
 }
@@ -666,7 +669,7 @@ pub unsafe fn xml_parser_input_buffer_create_file(
 unsafe extern "C" fn xml_fd_read(context: *mut c_void, buffer: *mut c_char, len: c_int) -> c_int {
     let ret: c_int = read(context as ptrdiff_t as c_int, buffer.add(0) as _, len as _) as _;
     if ret < 0 {
-        xml_ioerr(0, c"read()".as_ptr() as _);
+        xml_ioerr(XmlParserErrors::XmlErrOK, c"read()".as_ptr() as _);
     }
     ret
 }
@@ -682,7 +685,7 @@ unsafe extern "C" fn xml_fd_read(context: *mut c_void, buffer: *mut c_char, len:
 unsafe extern "C" fn xml_fd_close(context: *mut c_void) -> c_int {
     let ret: c_int = close(context as ptrdiff_t as c_int);
     if ret < 0 {
-        xml_ioerr(0, c"close()".as_ptr() as _);
+        xml_ioerr(XmlParserErrors::XmlErrOK, c"close()".as_ptr() as _);
     }
     ret
 }
@@ -929,7 +932,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
         let using: size_t = buf.map_or(0, |buf| buf.len());
         res = xml_char_enc_input(input, 1);
         if res < 0 {
-            xml_ioerr(XmlParserErrors::XmlIoEncoder as i32, null());
+            xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
         }
@@ -991,7 +994,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
         let using: size_t = (*input).raw.map_or(0, |raw| raw.len());
         nbchars = xml_char_enc_input(input, 1);
         if nbchars < 0 {
-            xml_ioerr(XmlParserErrors::XmlIoEncoder as i32, null());
+            xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
         }
@@ -1344,7 +1347,7 @@ unsafe extern "C" fn xml_file_open_w(filename: *const c_char) -> *mut c_void {
     }
 
     if fd.is_null() {
-        xml_ioerr(0, path);
+        xml_ioerr(XmlParserErrors::XmlErrOK, path);
     }
     fd as _
 }
@@ -1370,7 +1373,7 @@ unsafe extern "C" fn xml_file_write(
     }
     let items: c_int = fwrite(buffer.add(0) as _, len as usize, 1, context as _) as _;
     if items == 0 && ferror(context as _) != 0 {
-        xml_ioerr(0, c"fwrite()".as_ptr() as _);
+        xml_ioerr(XmlParserErrors::XmlErrOK, c"fwrite()".as_ptr() as _);
         return -1;
     }
     items * len
@@ -1445,7 +1448,7 @@ unsafe extern "C" fn xml_io_http_write(
                 c"Error sending document to URI".as_ptr(),
                 (*ctxt).uri
             );
-            xml_ioerr(XmlParserErrors::XmlIoWrite as i32, msg.as_ptr() as _);
+            xml_ioerr(XmlParserErrors::XmlIoWrite, msg.as_ptr() as _);
         }
     }
 
@@ -1542,7 +1545,7 @@ unsafe extern "C" fn xml_io_http_close_write(
             "data to URI",
             (*ctxt).uri
         );
-        xml_ioerr(XmlParserErrors::XmlIoWrite as i32, msg.as_ptr() as _);
+        xml_ioerr(XmlParserErrors::XmlIoWrite, msg.as_ptr() as _);
     } else {
         http_ctxt = xml_nanohttp_method(
             (*ctxt).uri,
@@ -1570,7 +1573,7 @@ unsafe extern "C" fn xml_io_http_close_write(
                     c"failed.  HTTP return code:".as_ptr(),
                     http_rtn
                 );
-                xml_ioerr(XmlParserErrors::XmlIoWrite as i32, msg.as_ptr() as _);
+                xml_ioerr(XmlParserErrors::XmlIoWrite, msg.as_ptr() as _);
             }
 
             xml_nanohttp_close(http_ctxt);
@@ -1824,7 +1827,7 @@ unsafe extern "C" fn xml_fd_write(
     if len > 0 {
         ret = write(context as ptrdiff_t as c_int, buffer.add(0) as _, len as _) as _;
         if ret < 0 {
-            xml_ioerr(0, c"write()".as_ptr() as _);
+            xml_ioerr(XmlParserErrors::XmlErrOK, c"write()".as_ptr() as _);
         }
     }
     ret
@@ -2002,7 +2005,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
              */
             ret = xml_char_enc_output(out, 0);
             if ret < 0 && ret != -3 {
-                xml_ioerr(XmlParserErrors::XmlIoEncoder as i32, null());
+                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 (*out).error = XmlParserErrors::XmlIoEncoder as i32;
                 return -1;
             }
@@ -2067,7 +2070,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
                 }
             }
             if ret < 0 {
-                xml_ioerr(XmlParserErrors::XmlIoWrite as i32, null());
+                xml_ioerr(XmlParserErrors::XmlIoWrite, null());
                 (*out).error = XmlParserErrors::XmlIoWrite as i32;
                 return ret;
             }
@@ -2312,7 +2315,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
              */
             ret = xml_char_enc_output(out, 0);
             if ret < 0 && ret != -3 {
-                xml_ioerr(XmlParserErrors::XmlIoEncoder as i32, null());
+                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 (*out).error = XmlParserErrors::XmlIoEncoder as i32;
                 return -1;
             }
@@ -2393,7 +2396,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
                 }
             }
             if ret < 0 {
-                xml_ioerr(XmlParserErrors::XmlIoWrite as i32, null());
+                xml_ioerr(XmlParserErrors::XmlIoWrite, null());
                 (*out).error = XmlParserErrors::XmlIoWrite as i32;
                 return ret;
             }
@@ -2444,7 +2447,7 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
         while {
             nbchars = xml_char_enc_output(out, 0);
             if nbchars < 0 {
-                xml_ioerr(XmlParserErrors::XmlIoEncoder as i32, null());
+                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 (*out).error = XmlParserErrors::XmlIoEncoder as i32;
                 return -1;
             }
@@ -2488,7 +2491,7 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
         }
     }
     if ret < 0 {
-        xml_ioerr(XmlParserErrors::XmlIoFlush as i32, null());
+        xml_ioerr(XmlParserErrors::XmlIoFlush, null());
         (*out).error = XmlParserErrors::XmlIoFlush as i32;
         return ret;
     }
@@ -2828,8 +2831,8 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
     filename: *const c_char,
 ) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut schannel: Option<XmlStructuredErrorFunc> = None;
-    let mut channel: Option<XmlGenericErrorFunc> = None;
+    let mut schannel: Option<StructuredError> = None;
+    let mut channel: Option<GenericError> = None;
     let mut data: *mut c_void = null_mut();
     let mut level: XmlErrorLevel = XmlErrorLevel::XmlErrError;
 
@@ -2858,8 +2861,8 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
         data,
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromIO as i32,
-        XmlParserErrors::XmlIoLoadError as i32,
+        XmlErrorDomain::XmlFromIO,
+        XmlParserErrors::XmlIoLoadError,
         level,
         null_mut(),
         0,
@@ -3155,7 +3158,7 @@ pub unsafe extern "C" fn xml_no_net_external_entity_loader(
         && (xml_strncasecmp(resource as _, c"ftp://".as_ptr() as _, 6) == 0
             || xml_strncasecmp(resource as _, c"http://".as_ptr() as _, 7) == 0)
     {
-        xml_ioerr(XmlParserErrors::XmlIoNetworkAttempt as i32, resource as _);
+        xml_ioerr(XmlParserErrors::XmlIoNetworkAttempt, resource as _);
         if resource != url as _ {
             xml_free(resource as _);
         }
@@ -3377,7 +3380,7 @@ unsafe extern "C" fn xml_file_open_real(filename: *const c_char) -> *mut c_void 
         fd = fopen(path, c"rb".as_ptr() as _);
     }
     if fd.is_null() {
-        xml_ioerr(0, path);
+        xml_ioerr(XmlParserErrors::XmlErrOK, path);
     }
     fd as _
 }
@@ -3427,7 +3430,7 @@ pub unsafe extern "C" fn xml_file_read(
     }
     let ret: c_int = fread(buffer.add(0) as _, 1, len as _, context as _) as _;
     if ret < 0 {
-        xml_ioerr(0, c"fread()".as_ptr() as _);
+        xml_ioerr(XmlParserErrors::XmlErrOK, c"fread()".as_ptr() as _);
     }
     ret
 }
@@ -3456,7 +3459,7 @@ pub unsafe extern "C" fn xml_file_close(context: *mut c_void) -> c_int {
     if fil == stdout || fil == stderr {
         ret = fflush(fil);
         if ret < 0 {
-            xml_ioerr(0, c"fflush()".as_ptr() as _);
+            xml_ioerr(XmlParserErrors::XmlErrOK, c"fflush()".as_ptr() as _);
         }
         return 0;
     }
@@ -3469,7 +3472,7 @@ pub unsafe extern "C" fn xml_file_close(context: *mut c_void) -> c_int {
         0
     };
     if ret < 0 {
-        xml_ioerr(0, c"fclose()".as_ptr() as _);
+        xml_ioerr(XmlParserErrors::XmlErrOK, c"fclose()".as_ptr() as _);
     }
     ret
 }

@@ -15,13 +15,13 @@ use crate::{
         },
         tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
         xml_io::{XmlOutputBuffer, XmlParserInputBuffer},
-        xmlerror::XmlStructuredErrorFunc,
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
         xmlstring::xml_strdup,
     },
 };
 
-type GenericError = for<'a> fn(Option<&mut (dyn Write + 'static)>, &str);
+pub type GenericError = for<'a> fn(Option<&mut (dyn Write + 'static)>, &str);
+pub type StructuredError = fn(*mut c_void, &XmlError);
 type ParserInputBufferCreateFilename =
     fn(uri: &str, enc: XmlCharEncoding) -> *mut XmlParserInputBuffer;
 type OutputBufferCreateFilename = fn(
@@ -42,8 +42,8 @@ pub struct XmlGlobalState {
     mem_strdup: Option<XmlStrdupFunc>,
     pub(crate) generic_error: GenericError,
     pub(crate) generic_error_context: Option<Box<dyn Write>>,
-    structured_error: Option<XmlStructuredErrorFunc>,
-    structured_error_context: *mut c_void,
+    pub(crate) structured_error: Option<StructuredError>,
+    pub(crate) structured_error_context: *mut c_void,
     old_xml_wd_compatibility: bool,
     pub(crate) buffer_alloc_scheme: XmlBufferAllocationScheme,
     pub(crate) default_buffer_size: usize,
@@ -60,7 +60,7 @@ pub struct XmlGlobalState {
     tree_indent_string: Cow<'static, str>,
     register_node_default_value: Option<XmlRegisterNodeFunc>,
     deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
-    last_error: XmlError,
+    pub(crate) last_error: XmlError,
     pub(crate) parser_input_buffer_create_filename_value: Option<ParserInputBufferCreateFilename>,
     pub(crate) output_buffer_create_filename_value: Option<OutputBufferCreateFilename>,
 }

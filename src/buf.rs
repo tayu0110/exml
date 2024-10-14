@@ -9,11 +9,12 @@ use std::{
 use anyhow::{bail, ensure};
 
 use crate::{
+    error::XmlErrorDomain,
     globals::GLOBAL_STATE,
     libxml::{
         parser_internals::XML_MAX_TEXT_LENGTH,
         tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
-        xmlerror::{XmlErrorDomain, XmlParserErrors},
+        xmlerror::XmlParserErrors,
     },
     private::error::__xml_simple_error,
 };
@@ -21,8 +22,8 @@ use crate::{
 unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
     let extra = CString::new(extra).unwrap();
     __xml_simple_error(
-        XmlErrorDomain::XmlFromBuffer as _,
-        XmlParserErrors::XmlErrNoMemory as _,
+        XmlErrorDomain::XmlFromBuffer,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null_mut(),
         extra.as_ptr(),
@@ -42,8 +43,8 @@ unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
 unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
     let extra = CString::new(extra).unwrap();
     __xml_simple_error(
-        XmlErrorDomain::XmlFromBuffer as _,
-        XmlParserErrors::XmlBufOverflow as _,
+        XmlErrorDomain::XmlFromBuffer,
+        XmlParserErrors::XmlBufOverflow,
         null_mut(),
         null_mut(),
         extra.as_ptr(),

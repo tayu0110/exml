@@ -18,6 +18,7 @@ use libc::{memcpy, memset};
 use crate::{
     buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncodingHandler},
+    error::XmlErrorDomain,
     generic_error,
     libxml::{
         encoding::{xml_parse_char_encoding, XmlCharEncoding, XmlCharEncodingOutputFunc},
@@ -47,7 +48,7 @@ use crate::{
             xml_output_buffer_write_string, XmlOutputBufferPtr, XmlOutputCloseCallback,
             XmlOutputWriteCallback,
         },
-        xmlerror::{XmlErrorDomain, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, XmlChar},
     },
     private::{
@@ -105,15 +106,19 @@ pub struct XmlSaveCtxt {
  *
  * Handle an out of memory condition
  */
-pub(crate) unsafe extern "C" fn xml_save_err(code: c_int, node: XmlNodePtr, extra: *const c_char) {
-    let msg = match XmlParserErrors::try_from(code) {
-        Ok(XmlParserErrors::XmlSaveNotUtf8) => c"string is not in UTF-8\n".as_ptr() as _,
-        Ok(XmlParserErrors::XmlSaveCharInvalid) => c"invalid character value\n".as_ptr() as _,
-        Ok(XmlParserErrors::XmlSaveUnknownEncoding) => c"unknown encoding %s\n".as_ptr() as _,
-        Ok(XmlParserErrors::XmlSaveNoDoctype) => c"document has no DOCTYPE\n".as_ptr() as _,
+pub(crate) unsafe extern "C" fn xml_save_err(
+    code: XmlParserErrors,
+    node: XmlNodePtr,
+    extra: *const c_char,
+) {
+    let msg = match code {
+        XmlParserErrors::XmlSaveNotUtf8 => c"string is not in UTF-8\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveCharInvalid => c"invalid character value\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveUnknownEncoding => c"unknown encoding %s\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveNoDoctype => c"document has no DOCTYPE\n".as_ptr() as _,
         _ => c"unexpected error number\n".as_ptr() as _,
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromOutput as i32, code, node, msg, extra);
+    __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, msg, extra);
 }
 
 /**
@@ -124,8 +129,8 @@ pub(crate) unsafe extern "C" fn xml_save_err(code: c_int, node: XmlNodePtr, extr
  */
 pub(crate) unsafe extern "C" fn xml_save_err_memory(extra: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromOutput as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromOutput,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null(),
         extra,
@@ -328,11 +333,7 @@ unsafe extern "C" fn xml_escape_entities(
             }
 
             if *input < 0xC0 {
-                xml_save_err(
-                    XmlParserErrors::XmlSaveNotUtf8 as i32,
-                    null_mut(),
-                    null_mut(),
-                );
+                xml_save_err(XmlParserErrors::XmlSaveNotUtf8, null_mut(), null_mut());
                 input = input.add(1);
                 // goto error;
                 *outlen = out.offset_from(outstart) as _;
@@ -369,11 +370,7 @@ unsafe extern "C" fn xml_escape_entities(
                 val |= *input.add(3) as i32;
                 input = input.add(4);
             } else {
-                xml_save_err(
-                    XmlParserErrors::XmlSaveCharInvalid as i32,
-                    null_mut(),
-                    null_mut(),
-                );
+                xml_save_err(XmlParserErrors::XmlSaveCharInvalid, null_mut(), null_mut());
                 input = input.add(1);
                 // goto error;
                 *outlen = out.offset_from(outstart) as _;
@@ -381,11 +378,7 @@ unsafe extern "C" fn xml_escape_entities(
                 return -1;
             }
             if !IS_CHAR!(val) {
-                xml_save_err(
-                    XmlParserErrors::XmlSaveCharInvalid as i32,
-                    null_mut(),
-                    null_mut(),
-                );
+                xml_save_err(XmlParserErrors::XmlSaveCharInvalid, null_mut(), null_mut());
                 input = input.add(1);
                 // goto error;
                 *outlen = out.offset_from(outstart) as _;
@@ -469,7 +462,7 @@ unsafe extern "C" fn xml_save_switch_encoding(
             .map(|e| Rc::new(RefCell::new(e)));
         if (*buf).encoder.is_none() {
             xml_save_err(
-                XmlParserErrors::XmlSaveUnknownEncoding as i32,
+                XmlParserErrors::XmlSaveUnknownEncoding,
                 null_mut(),
                 encoding,
             );
@@ -1927,7 +1920,7 @@ unsafe extern "C" fn xml_new_save_ctxt(
         (*ret).handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
         if (*ret).handler.is_none() {
             xml_save_err(
-                XmlParserErrors::XmlSaveUnknownEncoding as i32,
+                XmlParserErrors::XmlSaveUnknownEncoding,
                 null_mut(),
                 encoding,
             );

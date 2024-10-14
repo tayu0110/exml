@@ -24,6 +24,7 @@ use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
     encoding::find_encoding_handler,
+    error::ErrorContextWrap,
     libxml::{
         entities::xml_encode_special_chars,
         globals::{xml_free, xml_malloc},
@@ -238,8 +239,8 @@ unsafe extern "C" fn xml_writer_err_msg(
             null_mut(),
             (*ctxt).ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromWriter as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromWriter,
+            error,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -258,8 +259,8 @@ unsafe extern "C" fn xml_writer_err_msg(
             null_mut(),
             null_mut(),
             null_mut(),
-            XmlErrorDomain::XmlFromWriter as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromWriter,
+            error,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -452,8 +453,8 @@ unsafe extern "C" fn xml_writer_err_msg_int(
             null_mut(),
             (*ctxt).ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromWriter as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromWriter,
+            error,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -472,8 +473,8 @@ unsafe extern "C" fn xml_writer_err_msg_int(
             null_mut(),
             null_mut(),
             null_mut(),
-            XmlErrorDomain::XmlFromWriter as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromWriter,
+            error,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -627,8 +628,8 @@ unsafe extern "C" fn xml_text_writer_start_document_callback(ctx: *mut c_void) {
             if (*ctxt).my_doc.is_null() {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {
                     (*(*ctxt).sax).error.unwrap()(
-                        (*ctxt).user_data,
-                        c"SAX.startDocument(): out of memory\n".as_ptr() as _,
+                        Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                        "SAX.startDocument(): out of memory\n",
                     );
                 }
                 (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
@@ -667,8 +668,8 @@ unsafe extern "C" fn xml_text_writer_start_document_callback(ctx: *mut c_void) {
         } else {
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {
                 (*(*ctxt).sax).error.unwrap()(
-                    (*ctxt).user_data,
-                    c"SAX.startDocument(): out of memory\n".as_ptr() as _,
+                    Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                    "SAX.startDocument(): out of memory\n",
                 );
             }
             (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;

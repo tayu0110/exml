@@ -14,6 +14,7 @@ use std::{
 use libc::{c_uint, memcpy, memmove, memset, size_t, snprintf, sscanf};
 
 use crate::{
+    error::XmlErrorDomain,
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
@@ -36,7 +37,7 @@ use crate::{
         },
         uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
         valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
-        xmlerror::{XmlErrorDomain, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlregexp::{xml_reg_free_regexp, xml_regexp_compile, xml_regexp_exec},
         xmlschemas::{
             xml_schema_custom_err, xml_schema_custom_err4, xml_schema_facet_type_to_string,
@@ -418,8 +419,8 @@ unsafe extern "C" fn xml_schema_cleanup_types_internal() {
  */
 unsafe extern "C" fn xml_schema_type_err_memory(node: XmlNodePtr, extra: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromDatatype as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromDatatype,
+        XmlParserErrors::XmlErrNoMemory,
         node,
         null(),
         extra,

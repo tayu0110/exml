@@ -21,6 +21,7 @@ use crate::{
     buf::libxml_api::{
         xml_buf_add, xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string, XmlBufPtr,
     },
+    error::XmlErrorDomain,
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         globals::{xml_free, xml_malloc},
@@ -32,7 +33,7 @@ use crate::{
             xml_free_node_list, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode,
             XmlNodePtr,
         },
-        xmlerror::{XmlErrorDomain, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strchr, xml_strdup, xml_strlen, xml_strndup,
             xml_strstr, XmlChar,
@@ -143,8 +144,8 @@ pub unsafe extern "C" fn xmlInitializePredefinedEntities() {}
  */
 unsafe extern "C" fn xml_entities_err_memory(extra: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromTree as i32,
-        XmlParserErrors::XmlErrNoMemory as i32,
+        XmlErrorDomain::XmlFromTree,
+        XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         null(),
         extra as _,
@@ -254,8 +255,8 @@ pub unsafe extern "C" fn xml_new_entity(
  */
 unsafe extern "C" fn xml_entities_err(code: XmlParserErrors, msg: *const c_char) {
     __xml_simple_error(
-        XmlErrorDomain::XmlFromTree as i32,
-        code as i32,
+        XmlErrorDomain::XmlFromTree,
+        code,
         null_mut(),
         msg as _,
         null(),
@@ -280,8 +281,8 @@ unsafe extern "C" fn xml_entities_warn(
         null_mut(),
         null_mut(),
         null_mut(),
-        XmlErrorDomain::XmlFromTree as i32,
-        code as i32,
+        XmlErrorDomain::XmlFromTree,
+        code,
         XmlErrorLevel::XmlErrWarning,
         null_mut(),
         0,

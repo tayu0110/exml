@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_uint, c_ulong, c_void},
+    ffi::{c_char, c_int, c_uint, c_ulong, c_void, CStr},
     mem::size_of,
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
@@ -16,6 +16,8 @@ use libc::{memcpy, memset, ptrdiff_t, size_t, INT_MAX};
 use crate::{
     __xml_raise_error,
     encoding::detect_encoding,
+    error::{parser_error, parser_warning, ErrorContextWrap},
+    globals::StructuredError,
     libxml::{
         entities::XmlEntityPtr,
         htmltree::html_new_doc_no_dtd,
@@ -27,11 +29,10 @@ use crate::{
         valid::{
             xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
         },
-        xmlerror::XmlStructuredErrorFunc,
         xmlstring::XmlChar,
     },
     private::parser::{xml_err_memory, XML_VCTXT_DTD_VALIDATED},
-    xml_error_with_format, IS_BLANK_CH,
+    IS_BLANK_CH,
 };
 
 use super::{
@@ -72,7 +73,7 @@ use super::{
         xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
         xml_validate_root,
     },
-    xmlerror::{xml_parser_error, xml_parser_warning, XmlParserErrors},
+    xmlerror::{xml_parser_error, XmlParserErrors},
     xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strndup},
 };
 
@@ -204,7 +205,7 @@ pub unsafe extern "C" fn xml_sax2_has_external_subset(ctx: *mut c_void) -> c_int
  * @msg:   a string to accompany the error message
  */
 unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_char) {
-    let mut schannel: Option<XmlStructuredErrorFunc> = None;
+    let mut schannel: Option<StructuredError> = None;
     let str1: *const c_char = c"out of memory\n".as_ptr() as _;
 
     if !ctxt.is_null() {
@@ -218,8 +219,8 @@ unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_c
             (*ctxt).vctxt.user_data,
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromParser as i32,
-            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
@@ -242,8 +243,8 @@ unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_c
             null_mut(),
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromParser as i32,
-            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
@@ -470,8 +471,8 @@ unsafe extern "C" fn xml_fatal_err_msg(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromParser as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromParser,
+        error,
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
@@ -642,8 +643,8 @@ unsafe extern "C" fn xml_warn_msg(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromParser as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromParser,
+        error,
         XmlErrorLevel::XmlErrWarning,
         null_mut(),
         0,
@@ -712,11 +713,13 @@ pub unsafe extern "C" fn xml_sax2_entity_decl(
             && !(*ctxt).sax.is_null()
             && (*(*ctxt).sax).warning.is_some()
         {
-            xml_error_with_format!(
-                (*(*ctxt).sax).warning.unwrap(),
-                (*ctxt).user_data as _,
-                c"Entity(%s) already defined in the external subset\n".as_ptr() as _,
-                name
+            (*(*ctxt).sax).warning.unwrap()(
+                Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                format!(
+                    "Entity({}) already defined in the external subset\n",
+                    CStr::from_ptr(name as *const i8).to_string_lossy()
+                )
+                .as_str(),
             );
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
@@ -760,7 +763,7 @@ unsafe extern "C" fn xml_err_valid(
     str1: *const c_char,
     str2: *const c_char,
 ) {
-    let mut schannel: Option<XmlStructuredErrorFunc> = None;
+    let mut schannel: Option<StructuredError> = None;
 
     if !ctxt.is_null()
         && (*ctxt).disable_sax != 0
@@ -779,8 +782,8 @@ unsafe extern "C" fn xml_err_valid(
             (*ctxt).vctxt.user_data,
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromDtd as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromDTD,
+            error,
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
@@ -801,8 +804,8 @@ unsafe extern "C" fn xml_err_valid(
             null_mut(),
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromDtd as i32,
-            error as i32,
+            XmlErrorDomain::XmlFromDTD,
+            error,
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
@@ -1097,11 +1100,13 @@ pub unsafe extern "C" fn xml_sax2_unparsed_entity_decl(
             && !(*ctxt).sax.is_null()
             && (*(*ctxt).sax).warning.is_some()
         {
-            xml_error_with_format!(
-                (*(*ctxt).sax).warning.unwrap(),
-                (*ctxt).user_data,
-                c"Entity(%s) already defined in the internal subset\n".as_ptr() as _,
-                name
+            (*(*ctxt).sax).warning.unwrap()(
+                Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                format!(
+                    "Entity({}) already defined in the internal subset\n",
+                    CStr::from_ptr(name as *const i8).to_string_lossy()
+                )
+                .as_str(),
             )
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
@@ -1131,11 +1136,13 @@ pub unsafe extern "C" fn xml_sax2_unparsed_entity_decl(
             && !(*ctxt).sax.is_null()
             && (*(*ctxt).sax).warning.is_some()
         {
-            xml_error_with_format!(
-                (*(*ctxt).sax).warning.unwrap(),
-                (*ctxt).user_data,
-                c"Entity(%s) already defined in the external subset\n".as_ptr() as _,
-                name
+            (*(*ctxt).sax).warning.unwrap()(
+                Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                format!(
+                    "Entity({}) already defined in the external subset\n",
+                    CStr::from_ptr(name as *const i8).to_string_lossy()
+                )
+                .as_str(),
             )
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
@@ -1317,8 +1324,8 @@ unsafe extern "C" fn xml_ns_warn_msg(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromNamespace as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromNamespace,
+        error,
         XmlErrorLevel::XmlErrWarning,
         null_mut(),
         0,
@@ -1371,8 +1378,8 @@ unsafe extern "C" fn xml_ns_err_msg(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromNamespace as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromNamespace,
+        error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -1534,22 +1541,26 @@ unsafe extern "C" fn xml_sax2_attribute_internal(
             let uri: XmlURIPtr = xml_parse_uri(val as _);
             if uri.is_null() {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).warning.is_some() {
-                    xml_error_with_format!(
-                        (*(*ctxt).sax).warning.unwrap(),
-                        (*ctxt).user_data,
-                        c"xmlns: %s not a valid URI\n".as_ptr() as _,
-                        val
+                    (*(*ctxt).sax).warning.unwrap()(
+                        Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                        format!(
+                            "xmlns: {} not a valid URI\n",
+                            CStr::from_ptr(val as *const i8).to_string_lossy()
+                        )
+                        .as_str(),
                     );
                 }
             } else {
                 if (*uri).scheme.is_null()
                     && (!(*ctxt).sax.is_null() && (*(*ctxt).sax).warning.is_some())
                 {
-                    xml_error_with_format!(
-                        (*(*ctxt).sax).warning.unwrap(),
-                        (*ctxt).user_data,
-                        c"xmlns: URI %s is not absolute\n".as_ptr() as _,
-                        val
+                    (*(*ctxt).sax).warning.unwrap()(
+                        Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                        format!(
+                            "xmlns: URI {} is not absolute\n",
+                            CStr::from_ptr(val as *const i8).to_string_lossy()
+                        )
+                        .as_str(),
                     );
                 }
                 xml_free_uri(uri);
@@ -3572,8 +3583,8 @@ pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: c_in
     (*hdlr).ignorable_whitespace = Some(xml_sax2_characters);
     (*hdlr).processing_instruction = Some(xml_sax2_processing_instruction);
     (*hdlr).comment = Some(xml_sax2_comment);
-    (*hdlr).warning = Some(xml_parser_warning);
-    (*hdlr).error = Some(xml_parser_error);
+    (*hdlr).warning = Some(parser_warning);
+    (*hdlr).error = Some(parser_error);
     (*hdlr).fatal_error = Some(xml_parser_error);
 
     0
@@ -3598,7 +3609,7 @@ pub unsafe extern "C" fn xml_sax2_init_default_sax_handler(
     if warning == 0 {
         (*hdlr).warning = None;
     } else {
-        (*hdlr).warning = Some(xml_parser_warning);
+        (*hdlr).warning = Some(parser_warning);
     }
 }
 
@@ -3638,8 +3649,8 @@ pub unsafe extern "C" fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSA
     (*hdlr).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
     (*hdlr).processing_instruction = Some(xml_sax2_processing_instruction);
     (*hdlr).comment = Some(xml_sax2_comment);
-    (*hdlr).warning = Some(xml_parser_warning);
-    (*hdlr).error = Some(xml_parser_error);
+    (*hdlr).warning = Some(parser_warning);
+    (*hdlr).error = Some(parser_error);
     (*hdlr).fatal_error = Some(xml_parser_error);
 
     (*hdlr).initialized = 1;

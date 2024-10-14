@@ -1074,15 +1074,17 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
         error = MAXERRNO;
     }
     if ctxt.is_null() {
+        let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
+            - XmlXPathError::XpathExpressionOk as i32;
+        let error = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(
             None,
             None,
             null_mut(),
             null_mut(),
             null_mut(),
-            XmlErrorDomain::XmlFromXpath as i32,
-            error + XmlParserErrors::XmlXpathExpressionOk as i32
-                - XmlXPathError::XpathExpressionOk as i32,
+            XmlErrorDomain::XmlFromXPath,
+            error,
             XmlErrorLevel::XmlErrError,
             null(),
             0,
@@ -1102,15 +1104,17 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
     }
     (*ctxt).error = error;
     if (*ctxt).context.is_null() {
+        let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
+            - XmlXPathError::XpathExpressionOk as i32;
+        let error = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(
             None,
             None,
             null_mut(),
             null_mut(),
             null_mut(),
-            XmlErrorDomain::XmlFromXpath as i32,
-            error + XmlParserErrors::XmlXpathExpressionOk as i32
-                - XmlXPathError::XpathExpressionOk as i32,
+            XmlErrorDomain::XmlFromXPath,
+            error,
             XmlErrorLevel::XmlErrError,
             null(),
             0,
@@ -1141,15 +1145,17 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             addr_of_mut!((*(*ctxt).context).last_error),
         );
     } else {
+        let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
+            - XmlXPathError::XpathExpressionOk as i32;
+        let error = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(
             None,
             None,
             null_mut(),
             null_mut(),
             (*(*ctxt).context).debug_node as _,
-            XmlErrorDomain::XmlFromXpath as i32,
-            error + XmlParserErrors::XmlXpathExpressionOk as i32
-                - XmlXPathError::XpathExpressionOk as i32,
+            XmlErrorDomain::XmlFromXPath,
+            error,
             XmlErrorLevel::XmlErrError,
             null(),
             0,
@@ -2658,8 +2664,8 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
             null_mut(),
             null_mut(),
             null_mut(),
-            XmlErrorDomain::XmlFromXpath as i32,
-            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorDomain::XmlFromXPath,
+            XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
             null(),
             0,
@@ -2678,8 +2684,8 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
             null_mut(),
             null_mut(),
             null_mut(),
-            XmlErrorDomain::XmlFromXpath as i32,
-            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorDomain::XmlFromXPath,
+            XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
             null(),
             0,

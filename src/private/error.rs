@@ -3,12 +3,12 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{
-    ffi::{c_char, c_int},
-    ptr::null,
-};
+use std::{ffi::c_char, ptr::null};
 
-use crate::libxml::{tree::XmlNodePtr, xmlerror::XmlParserErrors};
+use crate::{
+    error::XmlErrorDomain,
+    libxml::{tree::XmlNodePtr, xmlerror::XmlParserErrors},
+};
 
 /**
  * __xmlRaiseError:
@@ -38,41 +38,33 @@ use crate::libxml::{tree::XmlNodePtr, xmlerror::XmlParserErrors};
 #[macro_export]
 macro_rules! __xml_raise_error {
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
-        use std::ptr::{
-            addr_of_mut, null_mut
-        };
+        use std::io::Write;
+        use std::ffi::CStr;
+        use std::ptr::{null_mut, NonNull};
 
-        use libc::{
-            c_char, c_int, c_void,
-        };
+        use libc::{c_char, c_int, c_void};
 
-        use $crate::libxml::{
-            globals::{
-                __xml_structured_error, xml_generic_error, xml_generic_error_context, xml_get_warnings_default_value, xml_last_error,
-                xml_structured_error_context,
-            },
-            parser:: {
-                XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC,
-            },
-            tree::{
-                XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr,
-            },
-            xmlerror::{
-                xml_copy_error, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr, xml_generic_error_default_func, XmlGenericErrorFunc,
-                XmlParserErrors, xml_parser_error, xml_parser_validity_error, xml_parser_validity_warning, xml_parser_warning,
-                xml_report_error, xml_reset_error, XmlStructuredErrorFunc, XML_MAX_ERRORS,
-            },
-            xmlstring::{
-                XmlChar, xml_strdup,
-            },
+        use $crate::{
+            globals::{GenericError, StructuredError, GLOBAL_STATE},
+            error::{generic_error_default, report_error, ErrorContextWrap, XmlErrorDomain, XmlErrorLevel},
+            libxml::{
+                globals::{__xml_structured_error, xml_get_warnings_default_value},
+                parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
+                tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
+                xmlerror::{
+                    XmlParserErrors, xml_parser_error, xml_parser_validity_error,
+                    xml_parser_validity_warning, xml_parser_warning, XML_MAX_ERRORS,
+                },
+                xmlstring::{XmlChar, xml_strdup},
+            }
         };
-        (|mut schannel: Option<XmlStructuredErrorFunc>,
-            mut channel: Option<XmlGenericErrorFunc>,
+        (|mut schannel: Option<StructuredError>,
+            mut channel: Option<GenericError>,
             mut data: *mut c_void,
             ctx: *mut c_void,
             nod: *mut c_void,
-            domain: c_int,
-            code: c_int,
+            domain: XmlErrorDomain,
+            code: XmlParserErrors,
             level: XmlErrorLevel,
             mut file: *const c_char,
             mut line: c_int,
@@ -82,219 +74,274 @@ macro_rules! __xml_raise_error {
             int1: c_int,
             mut col: c_int,
             msg: *const c_char| {
-                let mut ctxt: XmlParserCtxtPtr = null_mut();
-                let mut node: XmlNodePtr = nod as XmlNodePtr;
-                let mut str: *mut c_char;
-                let mut input: XmlParserInputPtr;
-                let mut to: XmlErrorPtr = xml_last_error();
-                let mut baseptr: XmlNodePtr = null_mut();
+                GLOBAL_STATE.with_borrow_mut(|state| {
+                    let mut ctxt: XmlParserCtxtPtr = null_mut();
+                    let mut node: XmlNodePtr = nod as XmlNodePtr;
+                    let mut str: *mut c_char;
+                    let mut input: XmlParserInputPtr;
+                    // let mut to: XmlErrorPtr = xml_last_error();
+                    let mut to = &mut state.last_error;
+                    let mut baseptr: XmlNodePtr = null_mut();
 
-                if code == XmlParserErrors::XmlErrOK as i32 {
-                    return;
-                }
-                if *xml_get_warnings_default_value() == 0 && matches!(level, XmlErrorLevel::XmlErrWarning) {
-                    return;
-                }
-                if domain == XmlErrorDomain::XmlFromParser as i32
-                    || domain == XmlErrorDomain::XmlFromHtml as i32
-                    || domain == XmlErrorDomain::XmlFromDtd as i32
-                    || domain == XmlErrorDomain::XmlFromNamespace as i32
-                    || domain == XmlErrorDomain::XmlFromIO as i32
-                    || domain == XmlErrorDomain::XmlFromValid as i32 {
-                    ctxt = ctx as XmlParserCtxtPtr;
+                    if code == XmlParserErrors::XmlErrOK {
+                        return;
+                    }
+                    if *xml_get_warnings_default_value() == 0 && matches!(level, XmlErrorLevel::XmlErrWarning) {
+                        return;
+                    }
+                    if domain == XmlErrorDomain::XmlFromParser
+                        || domain == XmlErrorDomain::XmlFromHTML
+                        || domain == XmlErrorDomain::XmlFromDTD
+                        || domain == XmlErrorDomain::XmlFromNamespace
+                        || domain == XmlErrorDomain::XmlFromIO
+                        || domain == XmlErrorDomain::XmlFromValid {
+                        ctxt = ctx as XmlParserCtxtPtr;
 
-                    if !ctxt.is_null() {
-                        if matches!(level, XmlErrorLevel::XmlErrWarning) {
-                            if (*ctxt).nb_warnings >= XML_MAX_ERRORS as u16 {
-                                return;
-                            }
-                            (*ctxt).nb_warnings += 1;
-                        } else {
-                            if (*ctxt).nb_errors >= XML_MAX_ERRORS as u16 {
-                                return;
-                            }
-                            (*ctxt).nb_errors += 1;
-                        }
-
-                        if schannel.is_none()
-                            && !(*ctxt).sax.is_null()
-                            && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32
-                            && (*(*ctxt).sax).serror.is_some() {
-                            schannel = (*(*ctxt).sax).serror;
-                            data = (*ctxt).user_data;
-                        }
-                    }
-                }
-                /*
-                 * Check if structured error handler set
-                 */
-                if schannel.is_none() {
-                    schannel = __xml_structured_error();
-                    /*
-                     * if user has defined handler, change data ptr to user's choice
-                     */
-                    if schannel.is_some() {
-                        data = *xml_structured_error_context() as _;
-                    }
-                }
-                /*
-                 * Formatting the message
-                 */
-                if msg.is_null() {
-                    str = xml_strdup(c"No error message provided".as_ptr() as _) as *mut c_char;
-                } else {
-                    $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-                }
-
-                /*
-                 * specific processing if a parser context is provided
-                 */
-                if !ctxt.is_null() {
-                    if file.is_null() {
-                        input = (*ctxt).input;
-                        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-                            input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-                        }
-                        if !input.is_null() {
-                            file = (*input).filename;
-                            line = (*input).line;
-                            col = (*input).col;
-                        }
-                    }
-                    to = addr_of_mut!((*ctxt).last_error);
-                } else if !node.is_null() && file.is_null() {
-                    if !(*node).doc.is_null() && !(*(*node).doc).url.is_null() {
-                        baseptr = node;
-                    /*	    file = (const c_char *) (*(*node).doc).URL; */
-                    }
-                    for _ in 0..10 {
-                        if node.is_null() || matches!((*node).typ, XmlElementType::XmlElementNode) {
-                            break;
-                        }
-                        node = (*node).parent;
-                    }
-                    if baseptr.is_null() && !node.is_null() && !(*node).doc.is_null() && !(*(*node).doc).url.is_null() {
-                        baseptr = node;
-                    }
-
-                    if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
-                        line = (*node).line as _;
-                    }
-                    if line == 0 || line == 65535 {
-                        line = xml_get_line_no(node) as _;
-                    }
-                }
-
-                /*
-                 * Save the information about the error
-                 */
-                xml_reset_error(to);
-                (*to).domain = domain;
-                (*to).code = code;
-                (*to).message = str;
-                (*to).level = level;
-                if !file.is_null() {
-                    (*to).file = xml_strdup(file as *const XmlChar) as *mut c_char;
-                } else if !baseptr.is_null() {
-                    #[cfg(feature = "xinclude")]
-                    {
-                        /*
-                         * We check if the error is within an XInclude section and,
-                         * if so, attempt to print out the href of the XInclude instead
-                         * of the usual "base" (doc->URL) for the node (bug 152623).
-                         */
-                        let mut prev: XmlNodePtr = baseptr;
-                        let mut href: *mut c_char = null_mut();
-                        let mut inclcount: c_int = 0;
-                        while !prev.is_null() {
-                            if (*prev).prev.is_null() {
-                                prev = (*prev).parent;
+                        if !ctxt.is_null() {
+                            if matches!(level, XmlErrorLevel::XmlErrWarning) {
+                                if (*ctxt).nb_warnings >= XML_MAX_ERRORS as u16 {
+                                    return;
+                                }
+                                (*ctxt).nb_warnings += 1;
                             } else {
-                                prev = (*prev).prev;
-                                if matches!((*prev).typ, XmlElementType::XmlXincludeStart) {
-                                    if inclcount > 0 {
-                                        inclcount -= 1;
-                                    } else {
-                                        href = xml_get_prop(prev, c"href".as_ptr() as _) as *mut c_char;
-                                        if !href.is_null() {
-                                            break;
+                                if (*ctxt).nb_errors >= XML_MAX_ERRORS as u16 {
+                                    return;
+                                }
+                                (*ctxt).nb_errors += 1;
+                            }
+
+                            if schannel.is_none()
+                                && !(*ctxt).sax.is_null()
+                                && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32
+                                && (*(*ctxt).sax).serror.is_some() {
+                                schannel = (*(*ctxt).sax).serror;
+                                data = (*ctxt).user_data;
+                            }
+                        }
+                    }
+                    /*
+                     * Check if structured error handler set
+                     */
+                    if schannel.is_none() {
+                        schannel = state.structured_error;
+                        /*
+                         * if user has defined handler, change data ptr to user's choice
+                         */
+                        if schannel.is_some() {
+                            data = state.structured_error_context;
+                        }
+                    }
+                    /*
+                     * Formatting the message
+                     */
+                    if msg.is_null() {
+                        str = xml_strdup(c"No error message provided".as_ptr() as _) as *mut c_char;
+                    } else {
+                        $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
+                    }
+
+                    /*
+                     * specific processing if a parser context is provided
+                     */
+                    if !ctxt.is_null() {
+                        if file.is_null() {
+                            input = (*ctxt).input;
+                            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+                                input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+                            }
+                            if !input.is_null() {
+                                file = (*input).filename;
+                                line = (*input).line;
+                                col = (*input).col;
+                            }
+                        }
+                        // to = addr_of_mut!((*ctxt).last_error);
+                        to = &mut (*ctxt).last_error;
+                    } else if !node.is_null() && file.is_null() {
+                        if !(*node).doc.is_null() && !(*(*node).doc).url.is_null() {
+                            baseptr = node;
+                        /*	    file = (const c_char *) (*(*node).doc).URL; */
+                        }
+                        for _ in 0..10 {
+                            if node.is_null() || matches!((*node).typ, XmlElementType::XmlElementNode) {
+                                break;
+                            }
+                            node = (*node).parent;
+                        }
+                        if baseptr.is_null() && !node.is_null() && !(*node).doc.is_null() && !(*(*node).doc).url.is_null() {
+                            baseptr = node;
+                        }
+
+                        if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
+                            line = (*node).line as _;
+                        }
+                        if line == 0 || line == 65535 {
+                            line = xml_get_line_no(node) as _;
+                        }
+                    }
+
+                    /*
+                     * Save the information about the error
+                     */
+                    to.reset();
+                    // xml_reset_error(to);
+                    (*to).domain = domain;
+                    (*to).code = code;
+                    if !str.is_null() {
+                        (*to).message = Some(CStr::from_ptr(str).to_string_lossy().into());
+                    }
+                    // (*to).message = str;
+                    (*to).level = level;
+                    if !file.is_null() {
+                        (*to).file = Some(
+                            CStr::from_ptr(xml_strdup(file as *const XmlChar) as *const i8)
+                                .to_string_lossy()
+                                .into()
+                            );
+                    } else if !baseptr.is_null() {
+                        #[cfg(feature = "xinclude")]
+                        {
+                            /*
+                             * We check if the error is within an XInclude section and,
+                             * if so, attempt to print out the href of the XInclude instead
+                             * of the usual "base" (doc->URL) for the node (bug 152623).
+                             */
+                            let mut prev: XmlNodePtr = baseptr;
+                            let mut href: *mut c_char = null_mut();
+                            let mut inclcount: c_int = 0;
+                            while !prev.is_null() {
+                                if (*prev).prev.is_null() {
+                                    prev = (*prev).parent;
+                                } else {
+                                    prev = (*prev).prev;
+                                    if matches!((*prev).typ, XmlElementType::XmlXincludeStart) {
+                                        if inclcount > 0 {
+                                            inclcount -= 1;
+                                        } else {
+                                            href = xml_get_prop(prev, c"href".as_ptr() as _) as *mut c_char;
+                                            if !href.is_null() {
+                                                break;
+                                            }
                                         }
+                                    } else if matches!((*prev).typ, XmlElementType::XmlXincludeEnd) {
+                                        inclcount += 1;
                                     }
-                                } else if matches!((*prev).typ, XmlElementType::XmlXincludeEnd) {
-                                    inclcount += 1;
                                 }
                             }
+                            if !href.is_null() {
+                                (*to).file = Some(CStr::from_ptr(href).to_string_lossy().into());
+                            } else {
+                                (*to).file = Some(
+                                    CStr::from_ptr(xml_strdup((*(*baseptr).doc).url) as *const i8)
+                                        .to_string_lossy()
+                                        .into()
+                                    );
+                            }
                         }
-                        if !href.is_null() {
-                            (*to).file = href;
+                        #[cfg(not(feature = "xinclude"))] {
+                            (*to).file = Some(
+                                CStr::from_ptr(xml_strdup((*(*baseptr).doc).url) as *const i8)
+                                    .to_string_lossy()
+                                    .into()
+                                );
+                        }
+                        if (*to).file.is_none() && !node.is_null() && !(*node).doc.is_null() {
+                            (*to).file = Some(
+                                CStr::from_ptr(xml_strdup((*(*node).doc).url) as *const i8)
+                                    .to_string_lossy()
+                                    .into()
+                                );
+                        }
+                    }
+                    (*to).line = line as usize;
+                    if !str1.is_null() {
+                        (*to).str1 = Some(
+                            CStr::from_ptr(xml_strdup(str1 as *const XmlChar) as *const i8)
+                                .to_string_lossy()
+                                .into()
+                            );
+                    }
+                    if !str2.is_null() {
+                        (*to).str2 = Some(
+                            CStr::from_ptr(xml_strdup(str2 as *const XmlChar) as *const i8)
+                                .to_string_lossy()
+                                .into()
+                            );
+                    }
+                    if !str3.is_null() {
+                        (*to).str3 = Some(
+                            CStr::from_ptr(xml_strdup(str3 as *const XmlChar) as *const i8)
+                                .to_string_lossy()
+                                .into()
+                            );
+                    }
+                    (*to).int1 = int1;
+                    (*to).int2 = col;
+                    (*to).node = NonNull::new(node as _);
+                    (*to).ctxt = NonNull::new(ctx);
+
+                    state.last_error = to.clone();
+                    if let Some(schannel) = schannel {
+                        schannel(data, &state.last_error);
+                        return;
+                    }
+
+                    /*
+                     * Find the callback channel if channel param is NULL
+                     */
+                    let data = if !ctxt.is_null() && channel.is_none()
+                        && __xml_structured_error().is_none()
+                        && !(*ctxt).sax.is_null() {
+                        if matches!(level, XmlErrorLevel::XmlErrWarning) {
+                            channel = (*(*ctxt).sax).warning;
                         } else {
-                            (*to).file = xml_strdup((*(*baseptr).doc).url) as *mut c_char;
+                            channel = (*(*ctxt).sax).error;
                         }
-                    }
-                    #[cfg(not(feature = "xinclude"))] {
-                        (*to).file = xml_strdup((*(*baseptr).doc).url) as *mut c_char;
-                    }
-                    if (*to).file.is_null() && !node.is_null() && !(*node).doc.is_null() {
-                        (*to).file = xml_strdup((*(*node).doc).url) as *mut c_char;
-                    }
-                }
-                (*to).line = line;
-                if !str1.is_null() {
-                    (*to).str1 = xml_strdup(str1 as *const XmlChar) as *mut c_char;
-                }
-                if !str2.is_null() {
-                    (*to).str2 = xml_strdup(str2 as *const XmlChar) as *mut c_char;
-                }
-                if !str3.is_null() {
-                    (*to).str3 = xml_strdup(str3 as *const XmlChar) as *mut c_char;
-                }
-                (*to).int1 = int1;
-                (*to).int2 = col;
-                (*to).node = node as _;
-                (*to).ctxt = ctx;
-
-                if to != xml_last_error() {
-                    xml_copy_error(to, xml_last_error());
-                }
-
-                if let Some(schannel) = schannel {
-                    schannel(data, to);
-                    return;
-                }
-
-                /*
-                 * Find the callback channel if channel param is NULL
-                 */
-                if !ctxt.is_null() && channel.is_none() && __xml_structured_error().is_none() && !(*ctxt).sax.is_null() {
-                    if matches!(level, XmlErrorLevel::XmlErrWarning) {
-                        channel = (*(*ctxt).sax).warning;
+                        let dum = (*ctxt).user_data as *mut ErrorContextWrap<Box<dyn Write>>;
+                        Some((*dum).0.as_mut())
+                        // data = (*ctxt).user_data;
+                    } else if channel.is_none() {
+                        channel = Some(state.generic_error);
+                        if !ctxt.is_null() {
+                            let dum = ctxt as *mut ErrorContextWrap<Box<dyn Write>>;
+                            Some((*dum).0.as_mut())
+                            // data = ctxt as _;
+                        } else {
+                            state.generic_error_context.as_deref_mut()
+                            // data = xml_generic_error_context();
+                        }
                     } else {
-                        channel = (*(*ctxt).sax).error;
+                        None
+                    };
+                    if channel.is_none() {
+                        return;
                     }
-                    data = (*ctxt).user_data;
-                } else if channel.is_none() {
-                    channel = Some(xml_generic_error);
-                    if !ctxt.is_null() {
-                        data = ctxt as _;
-                    } else {
-                        data = xml_generic_error_context();
-                    }
-                }
-                if channel.is_none() {
-                    return;
-                }
 
-                let channel = channel.unwrap();
-                if channel as usize == xml_parser_error as usize
-                    || channel as usize == xml_parser_warning as usize
-                    || channel as usize == xml_parser_validity_error as usize
-                    || channel as usize == xml_parser_validity_warning as usize {
-                    xml_report_error(to, ctxt, str, None, null_mut());
-                } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */ channel as usize == xml_generic_error_default_func as usize {
-                    xml_report_error(to, ctxt, str, Some(channel), data);
-                } else {
-                    $crate::xml_error_with_format!(channel, data, c"%s".as_ptr(), str);
-                }
+                    let channel = channel.unwrap();
+                    if channel as usize == xml_parser_error as usize
+                        || channel as usize == xml_parser_warning as usize
+                        || channel as usize == xml_parser_validity_error as usize
+                        || channel as usize == xml_parser_validity_warning as usize {
+                        let s = (!str.is_null()).then(|| CStr::from_ptr(str).to_string_lossy().into_owned());
+                        if let Some(s) = s {
+                            report_error(&state.last_error, ctxt, Some(s.as_str()), None, None);
+                        } else {
+                            report_error(&state.last_error, ctxt, None, None, None);
+                        }
+                    } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */
+                        channel as usize == generic_error_default as usize {
+                        let s = (!str.is_null()).then(|| CStr::from_ptr(str).to_string_lossy().into_owned());
+                        if let Some(s) = s {
+                            report_error(&state.last_error, ctxt, Some(s.as_str()), Some(channel), data);
+                        } else {
+                            report_error(&state.last_error, ctxt, None, Some(channel), data);
+                        }
+                    } else {
+                        // Is not NULL check necessary ???
+                        let s = CStr::from_ptr(str).to_string_lossy().into_owned();
+                        channel(data, format!("{s}").as_str());
+                    }
+                });
         })($schannel, $channel, $data, $ctx, $nod, $domain, $code, $level, $file, $line, $str1, $str2, $str3, $int1, $col, $msg);
     }};
 }
@@ -309,14 +356,14 @@ macro_rules! __xml_raise_error {
  * Handle an out of memory condition
  */
 #[doc(hidden)]
-pub(crate) unsafe extern "C" fn __xml_simple_error(
-    domain: c_int,
-    code: c_int,
+pub(crate) unsafe fn __xml_simple_error(
+    domain: XmlErrorDomain,
+    code: XmlParserErrors,
     node: XmlNodePtr,
     msg: *const c_char,
     extra: *const c_char,
 ) {
-    if code == XmlParserErrors::XmlErrNoMemory as i32 {
+    if code == XmlParserErrors::XmlErrNoMemory {
         if !extra.is_null() {
             __xml_raise_error!(
                 None,
@@ -325,7 +372,7 @@ pub(crate) unsafe extern "C" fn __xml_simple_error(
                 null_mut(),
                 node as _,
                 domain,
-                XmlParserErrors::XmlErrNoMemory as i32,
+                XmlParserErrors::XmlErrNoMemory,
                 XmlErrorLevel::XmlErrFatal,
                 null(),
                 0,
@@ -345,7 +392,7 @@ pub(crate) unsafe extern "C" fn __xml_simple_error(
                 null_mut(),
                 node as _,
                 domain,
-                XmlParserErrors::XmlErrNoMemory as i32,
+                XmlParserErrors::XmlErrNoMemory,
                 XmlErrorLevel::XmlErrFatal,
                 null(),
                 0,

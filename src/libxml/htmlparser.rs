@@ -18,6 +18,7 @@ use libc::{
 use crate::{
     __xml_raise_error,
     encoding::{detect_encoding, find_encoding_handler},
+    error::{parser_validity_error, parser_validity_warning},
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         encoding::XmlCharEncoding,
@@ -50,7 +51,7 @@ use crate::{
             xml_parser_input_buffer_create_mem, xml_parser_input_buffer_push,
             XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
         },
-        xmlerror::{xml_parser_validity_error, xml_parser_validity_warning, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strcmp, xml_strdup, xml_strlen,
             xml_strncasecmp, xml_strndup, XmlChar,
@@ -5758,8 +5759,8 @@ unsafe extern "C" fn html_parse_err_int(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromHtml as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromHTML,
+        error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -5875,8 +5876,8 @@ unsafe extern "C" fn html_parse_err(
         null_mut(),
         ctxt as _,
         null_mut(),
-        XmlErrorDomain::XmlFromHtml as i32,
-        error as i32,
+        XmlErrorDomain::XmlFromHTML,
+        error,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -6460,8 +6461,8 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
             null_mut(),
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromParser as i32,
-            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -6480,8 +6481,8 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
             null_mut(),
             ctxt as _,
             null_mut(),
-            XmlErrorDomain::XmlFromParser as i32,
-            XmlParserErrors::XmlErrNoMemory as i32,
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
@@ -9476,8 +9477,8 @@ unsafe extern "C" fn html_init_parser_ctxt(
     (*ctxt).html = 1;
     (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
     (*ctxt).vctxt.user_data = ctxt as _;
-    (*ctxt).vctxt.error = Some(xml_parser_validity_error);
-    (*ctxt).vctxt.warning = Some(xml_parser_validity_warning);
+    (*ctxt).vctxt.error = Some(parser_validity_error);
+    (*ctxt).vctxt.warning = Some(parser_validity_warning);
     (*ctxt).record_info = 0;
     (*ctxt).validate = 0;
     (*ctxt).check_index = 0;
@@ -12079,8 +12080,8 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).valid = 1;
     (*ctxt).vctxt.user_data = ctxt as _;
     (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
-    (*ctxt).vctxt.error = Some(xml_parser_validity_error);
-    (*ctxt).vctxt.warning = Some(xml_parser_validity_warning);
+    (*ctxt).vctxt.error = Some(parser_validity_error);
+    (*ctxt).vctxt.warning = Some(parser_validity_warning);
     (*ctxt).record_info = 0;
     (*ctxt).check_index = 0;
     (*ctxt).end_check_state = 0;
