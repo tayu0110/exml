@@ -38,6 +38,7 @@ use crate::{
 #[macro_export]
 macro_rules! __xml_raise_error {
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
+        use std::borrow::Cow;
         use std::ffi::CStr;
         use std::ptr::{null_mut, NonNull};
 
@@ -54,7 +55,6 @@ macro_rules! __xml_raise_error {
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
                 tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
                 xmlerror::{XmlParserErrors, XML_MAX_ERRORS},
-                xmlstring::xml_strdup,
             }
         };
         (|mut schannel: Option<StructuredError>,
@@ -133,11 +133,17 @@ macro_rules! __xml_raise_error {
                     /*
                      * Formatting the message
                      */
-                    if msg.is_null() {
-                        str = xml_strdup(c"No error message provided".as_ptr() as _) as *mut c_char;
+                    let str = if msg.is_null() {
+                        Cow::Borrowed("No error message provided")
                     } else {
                         $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-                    }
+                        assert!(!str.is_null());
+                        let s = CStr::from_ptr(str).to_string_lossy();
+                        let s = s.into_owned();
+                        assert!(s.as_ptr() as *const i8 as usize != str as usize);
+                        $crate::libxml::globals::xml_free(str as _);
+                        s.into()
+                    };
 
                     /*
                      * specific processing if a parser context is provided
@@ -185,10 +191,7 @@ macro_rules! __xml_raise_error {
                     to.reset();
                     (*to).domain = domain;
                     (*to).code = code;
-                    if !str.is_null() {
-                        (*to).message = Some(CStr::from_ptr(str).to_string_lossy().into());
-                    }
-                    // (*to).message = str;
+                    (*to).message = Some(str.clone());
                     (*to).level = level;
                     if !file.is_null() {
                         (*to).file = Some(CStr::from_ptr(file as *const i8).to_string_lossy().into());
@@ -305,30 +308,14 @@ macro_rules! __xml_raise_error {
                         || channel as usize == parser_warning as usize
                         || channel as usize == parser_validity_error as usize
                         || channel as usize == parser_validity_warning as usize {
-                        let s = (!str.is_null()).then(|| CStr::from_ptr(str).to_string_lossy().into_owned());
                         let error = state.last_error.clone();
-                        if let Some(s) = s {
-                            report_error(&error, ctxt, Some(s.as_str()), None, None, state);
-                        } else {
-                            report_error(&error, ctxt, None, None, None, state);
-                        }
+                        report_error(&error, ctxt, Some(str.as_ref()), None, None, state);
                     } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */
                         channel as usize == generic_error_default as usize {
-                        let s = (!str.is_null()).then(|| CStr::from_ptr(str).to_string_lossy().into_owned());
                         let error = state.last_error.clone();
-                        if let Some(s) = s {
-                            report_error(&error, ctxt, Some(s.as_str()), Some(channel), data, state);
-                        } else {
-                            report_error(&error, ctxt, None, Some(channel), data, state);
-                        }
+                        report_error(&error, ctxt, Some(str.as_ref()), Some(channel), data, state);
                     } else {
-                        if !str.is_null() {
-                            let s = CStr::from_ptr(str).to_string_lossy().into_owned();
-                            channel(data, format!("{s}").as_str());
-                        } else {
-                            // What should we do when str is NULL ???
-                            channel(data, "");
-                        }
+                        channel(data, str.as_ref());
                     }
                 });
         })($schannel, $channel, $data, $ctx, $nod, $domain, $code, $level, $file, $line, $str1, $str2, $str3, $int1, $col, $msg);
