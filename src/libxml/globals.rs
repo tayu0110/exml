@@ -18,6 +18,7 @@ use libc::{free, malloc, memset, realloc};
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
     encoding::XmlCharEncodingHandler,
+    error::{parser_error, parser_warning},
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
         xml_io::{
@@ -45,10 +46,7 @@ use super::{
     threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
     xml_io::__xml_parser_input_buffer_create_filename,
-    xmlerror::{
-        xml_generic_error_default_func, xml_parser_error, xml_parser_warning, xml_reset_error,
-        XmlErrorPtr,
-    },
+    xmlerror::{xml_generic_error_default_func, xml_parser_error, xml_reset_error, XmlErrorPtr},
     xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
     xmlversion::LIBXML_VERSION_STRING,
 };
@@ -896,8 +894,8 @@ static mut _HTML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
     ignorable_whitespace: Some(xml_sax2_ignorable_whitespace),
     processing_instruction: Some(xml_sax2_processing_instruction),
     comment: Some(xml_sax2_comment),
-    warning: Some(xml_parser_warning),
-    error: Some(xml_parser_error),
+    warning: Some(parser_warning),
+    error: Some(parser_error),
     fatal_error: Some(xml_parser_error),
     get_parameter_entity: None,
     cdata_block: Some(xml_sax2_cdata_block),
@@ -1076,8 +1074,8 @@ static mut _XML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
     ignorable_whitespace: Some(xml_sax2_characters),
     processing_instruction: Some(xml_sax2_processing_instruction),
     comment: Some(xml_sax2_comment),
-    warning: Some(xml_parser_warning),
-    error: Some(xml_parser_error),
+    warning: Some(parser_warning),
+    error: Some(parser_error),
     fatal_error: Some(xml_parser_error),
     get_parameter_entity: Some(xml_sax2_get_parameter_entity),
     cdata_block: Some(xml_sax2_cdata_block),

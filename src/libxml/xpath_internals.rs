@@ -1076,7 +1076,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
     if ctxt.is_null() {
         let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32;
-        let error = XmlParserErrors::try_from(code).unwrap();
+        let code = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(
             None,
             None,
@@ -1084,7 +1084,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromXPath,
-            error,
+            code,
             XmlErrorLevel::XmlErrError,
             null(),
             0,
@@ -1106,7 +1106,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
     if (*ctxt).context.is_null() {
         let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32;
-        let error = XmlParserErrors::try_from(code).unwrap();
+        let code = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(
             None,
             None,
@@ -1114,7 +1114,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromXPath,
-            error,
+            code,
             XmlErrorLevel::XmlErrError,
             null(),
             0,
@@ -1147,7 +1147,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
     } else {
         let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32;
-        let error = XmlParserErrors::try_from(code).unwrap();
+        let code = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(
             None,
             None,
@@ -1155,7 +1155,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             null_mut(),
             (*(*ctxt).context).debug_node as _,
             XmlErrorDomain::XmlFromXPath,
-            error,
+            code,
             XmlErrorLevel::XmlErrError,
             null(),
             0,

@@ -982,8 +982,8 @@ pub struct XmlSAXHandlerV1 {
     pub(crate) ignorable_whitespace: Option<IgnorableWhitespaceSAXFunc>,
     pub(crate) processing_instruction: Option<ProcessingInstructionSAXFunc>,
     pub(crate) comment: Option<CommentSAXFunc>,
-    pub(crate) warning: Option<WarningSAXFunc>,
-    pub(crate) error: Option<ErrorSAXFunc>,
+    pub(crate) warning: Option<GenericError>,
+    pub(crate) error: Option<GenericError>,
     pub(crate) fatal_error: Option<FatalErrorSAXFunc>, /* unused error() get all the errors */
     pub(crate) get_parameter_entity: Option<GetParameterEntitySAXFunc>,
     pub(crate) cdata_block: Option<CdataBlockSAXFunc>,
@@ -3962,6 +3962,7 @@ pub unsafe extern "C" fn xml_parse_balanced_chunk_memory_recover(
     let size: c_int = xml_strlen(string);
 
     let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(string as _, size as _);
+    std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
     if ctxt.is_null() {
         return -1;
     }
@@ -4696,6 +4697,7 @@ pub unsafe extern "C" fn xml_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
     if xml_init_sax_parser_ctxt(ctxt, sax, user_data) < 0 {
         xml_free_parser_ctxt(ctxt);
         return null_mut();

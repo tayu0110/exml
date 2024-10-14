@@ -38,7 +38,6 @@ use crate::{
 #[macro_export]
 macro_rules! __xml_raise_error {
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
-        use std::io::Write;
         use std::ffi::CStr;
         use std::ptr::{null_mut, NonNull};
 
@@ -46,16 +45,16 @@ macro_rules! __xml_raise_error {
 
         use $crate::{
             globals::{GenericError, StructuredError, GLOBAL_STATE},
-            error::{generic_error_default, report_error, ErrorContextWrap, XmlErrorDomain, XmlErrorLevel},
+            error::{
+                generic_error_default, parser_error, parser_warning, parser_validity_error,
+                parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel
+            },
             libxml::{
                 globals::{__xml_structured_error, xml_get_warnings_default_value},
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
                 tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
-                xmlerror::{
-                    XmlParserErrors, xml_parser_error, xml_parser_validity_error,
-                    xml_parser_validity_warning, xml_parser_warning, XML_MAX_ERRORS,
-                },
-                xmlstring::{XmlChar, xml_strdup},
+                xmlerror::{XmlParserErrors, XML_MAX_ERRORS},
+                xmlstring::xml_strdup,
             }
         };
         (|mut schannel: Option<StructuredError>,
@@ -184,7 +183,6 @@ macro_rules! __xml_raise_error {
                      * Save the information about the error
                      */
                     to.reset();
-                    // xml_reset_error(to);
                     (*to).domain = domain;
                     (*to).code = code;
                     if !str.is_null() {
@@ -193,11 +191,7 @@ macro_rules! __xml_raise_error {
                     // (*to).message = str;
                     (*to).level = level;
                     if !file.is_null() {
-                        (*to).file = Some(
-                            CStr::from_ptr(xml_strdup(file as *const XmlChar) as *const i8)
-                                .to_string_lossy()
-                                .into()
-                            );
+                        (*to).file = Some(CStr::from_ptr(file as *const i8).to_string_lossy().into());
                     } else if !baseptr.is_null() {
                         #[cfg(feature = "xinclude")]
                         {
@@ -231,49 +225,37 @@ macro_rules! __xml_raise_error {
                             if !href.is_null() {
                                 (*to).file = Some(CStr::from_ptr(href).to_string_lossy().into());
                             } else {
-                                (*to).file = Some(
-                                    CStr::from_ptr(xml_strdup((*(*baseptr).doc).url) as *const i8)
+                                (*to).file = (!(*(*baseptr).doc).url.is_null()).then(|| {
+                                    CStr::from_ptr((*(*baseptr).doc).url as *const i8)
                                         .to_string_lossy()
                                         .into()
-                                    );
+                                });
                             }
                         }
                         #[cfg(not(feature = "xinclude"))] {
-                            (*to).file = Some(
-                                CStr::from_ptr(xml_strdup((*(*baseptr).doc).url) as *const i8)
+                            (*to).file = (!(*(*baseptr).doc).url.is_null()).then(|| {
+                                CStr::from_ptr((*(*baseptr).doc).url as *const i8)
                                     .to_string_lossy()
                                     .into()
-                                );
+                            });
                         }
                         if (*to).file.is_none() && !node.is_null() && !(*node).doc.is_null() {
-                            (*to).file = Some(
-                                CStr::from_ptr(xml_strdup((*(*node).doc).url) as *const i8)
+                            (*to).file = (!(*(*node).doc).url.is_null()).then(|| {
+                                CStr::from_ptr((*(*node).doc).url as *const i8)
                                     .to_string_lossy()
                                     .into()
-                                );
+                            });
                         }
                     }
                     (*to).line = line as usize;
                     if !str1.is_null() {
-                        (*to).str1 = Some(
-                            CStr::from_ptr(xml_strdup(str1 as *const XmlChar) as *const i8)
-                                .to_string_lossy()
-                                .into()
-                            );
+                        (*to).str1 = Some(CStr::from_ptr(str1 as *const i8).to_string_lossy().into());
                     }
                     if !str2.is_null() {
-                        (*to).str2 = Some(
-                            CStr::from_ptr(xml_strdup(str2 as *const XmlChar) as *const i8)
-                                .to_string_lossy()
-                                .into()
-                            );
+                        (*to).str2 = Some(CStr::from_ptr(str2 as *const i8).to_string_lossy().into());
                     }
                     if !str3.is_null() {
-                        (*to).str3 = Some(
-                            CStr::from_ptr(xml_strdup(str3 as *const XmlChar) as *const i8)
-                                .to_string_lossy()
-                                .into()
-                            );
+                        (*to).str3 = Some(CStr::from_ptr(str3 as *const i8).to_string_lossy().into());
                     }
                     (*to).int1 = int1;
                     (*to).int2 = col;
@@ -297,17 +279,18 @@ macro_rules! __xml_raise_error {
                         } else {
                             channel = (*(*ctxt).sax).error;
                         }
-                        let dum = (*ctxt).user_data as *mut ErrorContextWrap<Box<dyn Write>>;
-                        Some((*dum).0.as_mut())
+                        // TODO:
                         // data = (*ctxt).user_data;
+                        None
                     } else if channel.is_none() {
                         channel = Some(state.generic_error);
                         if !ctxt.is_null() {
-                            let dum = ctxt as *mut ErrorContextWrap<Box<dyn Write>>;
-                            Some((*dum).0.as_mut())
+                            // TODO:
                             // data = ctxt as _;
+                            None
                         } else {
-                            state.generic_error_context.as_deref_mut()
+                            None
+                            // state.generic_error_context.as_deref_mut()
                             // data = xml_generic_error_context();
                         }
                     } else {
@@ -318,28 +301,34 @@ macro_rules! __xml_raise_error {
                     }
 
                     let channel = channel.unwrap();
-                    if channel as usize == xml_parser_error as usize
-                        || channel as usize == xml_parser_warning as usize
-                        || channel as usize == xml_parser_validity_error as usize
-                        || channel as usize == xml_parser_validity_warning as usize {
+                    if channel as usize == parser_error as usize
+                        || channel as usize == parser_warning as usize
+                        || channel as usize == parser_validity_error as usize
+                        || channel as usize == parser_validity_warning as usize {
                         let s = (!str.is_null()).then(|| CStr::from_ptr(str).to_string_lossy().into_owned());
+                        let error = state.last_error.clone();
                         if let Some(s) = s {
-                            report_error(&state.last_error, ctxt, Some(s.as_str()), None, None);
+                            report_error(&error, ctxt, Some(s.as_str()), None, None, state);
                         } else {
-                            report_error(&state.last_error, ctxt, None, None, None);
+                            report_error(&error, ctxt, None, None, None, state);
                         }
                     } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */
                         channel as usize == generic_error_default as usize {
                         let s = (!str.is_null()).then(|| CStr::from_ptr(str).to_string_lossy().into_owned());
+                        let error = state.last_error.clone();
                         if let Some(s) = s {
-                            report_error(&state.last_error, ctxt, Some(s.as_str()), Some(channel), data);
+                            report_error(&error, ctxt, Some(s.as_str()), Some(channel), data, state);
                         } else {
-                            report_error(&state.last_error, ctxt, None, Some(channel), data);
+                            report_error(&error, ctxt, None, Some(channel), data, state);
                         }
                     } else {
-                        // Is not NULL check necessary ???
-                        let s = CStr::from_ptr(str).to_string_lossy().into_owned();
-                        channel(data, format!("{s}").as_str());
+                        if !str.is_null() {
+                            let s = CStr::from_ptr(str).to_string_lossy().into_owned();
+                            channel(data, format!("{s}").as_str());
+                        } else {
+                            // What should we do when str is NULL ???
+                            channel(data, "");
+                        }
                     }
                 });
         })($schannel, $channel, $data, $ctx, $nod, $domain, $code, $level, $file, $line, $str1, $str2, $str3, $int1, $col, $msg);

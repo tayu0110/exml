@@ -18,7 +18,7 @@ use libc::{
 use crate::{
     __xml_raise_error,
     encoding::{detect_encoding, find_encoding_handler},
-    error::{parser_validity_error, parser_validity_warning},
+    error::{parser_validity_error, parser_validity_warning, XmlError},
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         encoding::XmlCharEncoding,
@@ -9371,6 +9371,7 @@ unsafe extern "C" fn html_init_parser_ctxt(
         return -1;
     }
     memset(ctxt as _, 0, size_of::<HtmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
 
     (*ctxt).dict = xml_dict_create();
     if (*ctxt).dict.is_null() {
@@ -9507,6 +9508,7 @@ pub unsafe extern "C" fn html_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
     if html_init_parser_ctxt(ctxt, sax, user_data) < 0 {
         html_free_parser_ctxt(ctxt);
         return null_mut();

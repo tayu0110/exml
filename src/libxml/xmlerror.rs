@@ -523,6 +523,12 @@ impl_xml_parser_errors!(
     XmlXpathUndefPrefixError,       /* 1219 */
     XmlXpathEncodingError,          /* 1220 */
     XmlXpathInvalidCharError,       /* 1221 */
+    XmlXpathInvalidCtxt,
+    XmlXpathStackError,
+    XmlXpathForbidVariableError,
+    XmlXpathOpLimitExceeded,
+    XmlXpathRecursionLimitExceeded,
+    XmlXPathUnknownError, // 1227, this must put at the end of XPath errors
     XmlTreeInvalidHex = 1300,
     XmlTreeInvalidDec,         /* 1301 */
     XmlTreeUnterminatedEntity, /* 1302 */
