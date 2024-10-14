@@ -5,7 +5,7 @@ use std::{
     env::args,
     ffi::{c_char, c_int, CStr},
     fs::{metadata, File},
-    os::raw::c_void,
+    io::{Stderr, Write},
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
 };
@@ -15,6 +15,7 @@ use exml::{
         xml_buf_add, xml_buf_content, xml_buf_create, xml_buf_empty, xml_buf_free,
         xml_buf_set_allocation_scheme, xml_buf_use,
     },
+    globals::set_generic_error,
     libxml::{
         globals::{xml_free, xml_get_warnings_default_value},
         parser::{
@@ -36,7 +37,7 @@ use exml::{
         },
         uri::xml_build_uri,
         xml_io::xml_no_net_external_entity_loader,
-        xmlerror::{xml_reset_last_error, xml_set_generic_error_func},
+        xmlerror::xml_reset_last_error,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
@@ -186,24 +187,25 @@ macro_rules! test_log {
     };
 }
 
-unsafe extern "C" fn test_error_handler(_ctx: *mut c_void, msg: *const c_char) {
-    if TEST_ERRORS_SIZE >= 32768 {
-        return;
-    }
+fn test_error_handler(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    unsafe {
+        if TEST_ERRORS_SIZE >= 32768 {
+            return;
+        }
 
-    let m = CStr::from_ptr(msg);
-    if TEST_ERRORS_SIZE + m.to_bytes().len() >= 32768 {
-        TEST_ERRORS[TEST_ERRORS_SIZE..]
-            .copy_from_slice(&m.to_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-        /* buffer is full */
-        TEST_ERRORS_SIZE = 32768;
+        if TEST_ERRORS_SIZE + msg.len() >= 32768 {
+            TEST_ERRORS[TEST_ERRORS_SIZE..]
+                .copy_from_slice(&msg.as_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
+            /* buffer is full */
+            TEST_ERRORS_SIZE = 32768;
+            TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
+        } else {
+            TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + msg.len()]
+                .copy_from_slice(msg.as_bytes());
+            TEST_ERRORS_SIZE += msg.len();
+        }
         TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
-    } else {
-        TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + m.to_bytes().len()]
-            .copy_from_slice(m.to_bytes());
-        TEST_ERRORS_SIZE += m.to_bytes().len();
     }
-    TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
 }
 
 static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
@@ -243,7 +245,8 @@ unsafe extern "C" fn initialize_libxml2() {
         c"xlink".as_ptr() as _,
         c"http://www.w3.org/1999/xlink".as_ptr() as _,
     );
-    xml_set_generic_error_func(null_mut(), Some(test_error_handler));
+    set_generic_error(Some(test_error_handler), None::<Stderr>);
+    // xml_set_generic_error_func(null_mut(), Some(test_error_handler));
     #[cfg(feature = "schema")]
     {
         xml_schema_init_types();

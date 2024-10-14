@@ -5,6 +5,7 @@
  *
  * daniel@veillard.com
  */
+#![allow(unused)]
 
 use std::{
     env::args,
@@ -23,6 +24,7 @@ use std::{
 use const_format::concatcp;
 use exml::{
     encoding::XmlCharEncoding,
+    error::generic_error_default,
     globals::GenericError,
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
@@ -349,19 +351,21 @@ unsafe extern "C" fn xmllint_external_entity_loader(
     if let Some(warning) = warning {
         (*(*ctxt).sax).warning = Some(warning);
         if !url.is_null() {
-            xml_error_with_format!(
-                warning,
-                ctxt as _,
-                c"failed to load external entity \"%s\"\n".as_ptr(),
-                url
-            );
+            todo!()
+            // xml_error_with_format!(
+            //     warning,
+            //     ctxt as _,
+            //     c"failed to load external entity \"%s\"\n".as_ptr(),
+            //     url
+            // );
         } else if !id.is_null() {
-            xml_error_with_format!(
-                warning,
-                ctxt as _,
-                c"failed to load external entity \"%s\"\n".as_ptr(),
-                id
-            );
+            todo!()
+            // xml_error_with_format!(
+            //     warning,
+            //     ctxt as _,
+            //     c"failed to load external entity \"%s\"\n".as_ptr(),
+            //     id
+            // );
         }
     }
     null_mut()
@@ -587,26 +591,27 @@ unsafe extern "C" fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
  * Display and format an error messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn xml_html_error(ctx: *mut c_void, msg: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut input: XmlParserInputPtr;
+fn xml_html_error(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+    todo!()
+    // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    // let mut input: XmlParserInputPtr;
 
-    BUFFER[0] = 0;
-    input = (*ctxt).input;
-    if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-        input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-    }
+    // BUFFER[0] = 0;
+    // input = (*ctxt).input;
+    // if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+    //     input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+    // }
 
-    xml_htmlprint_file_info(input);
+    // xml_htmlprint_file_info(input);
 
-    xml_generic_error!(xml_generic_error_context(), c"<b>error</b>: ".as_ptr());
-    let len = strlen(BUFFER.as_ptr());
-    snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
-    xml_htmlencode_send();
-    xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
+    // xml_generic_error!(xml_generic_error_context(), c"<b>error</b>: ".as_ptr());
+    // let len = strlen(BUFFER.as_ptr());
+    // snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
+    // xml_htmlencode_send();
+    // xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
 
-    xml_htmlprint_file_context(input);
-    xml_htmlencode_send();
+    // xml_htmlprint_file_context(input);
+    // xml_htmlencode_send();
 }
 
 /**
@@ -618,26 +623,27 @@ unsafe extern "C" fn xml_html_error(ctx: *mut c_void, msg: *const c_char) {
  * Display and format a warning messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn xml_html_warning(ctx: *mut c_void, msg: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut input: XmlParserInputPtr;
+fn xml_html_warning(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+    todo!()
+    // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    // let mut input: XmlParserInputPtr;
 
-    BUFFER[0] = 0;
-    input = (*ctxt).input;
-    if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-        input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-    }
+    // BUFFER[0] = 0;
+    // input = (*ctxt).input;
+    // if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+    //     input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+    // }
 
-    xml_htmlprint_file_info(input);
+    // xml_htmlprint_file_info(input);
 
-    xml_generic_error!(xml_generic_error_context(), c"<b>warning</b>: ".as_ptr());
-    let len = strlen(BUFFER.as_ptr());
-    snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
-    xml_htmlencode_send();
-    xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
+    // xml_generic_error!(xml_generic_error_context(), c"<b>warning</b>: ".as_ptr());
+    // let len = strlen(BUFFER.as_ptr());
+    // snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
+    // xml_htmlencode_send();
+    // xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
 
-    xml_htmlprint_file_context(input);
-    xml_htmlencode_send();
+    // xml_htmlprint_file_context(input);
+    // xml_htmlencode_send();
 }
 
 /**
@@ -649,30 +655,31 @@ unsafe extern "C" fn xml_html_warning(ctx: *mut c_void, msg: *const c_char) {
  * Display and format an validity error messages, gives file,
  * line, position and extra parameters.
  */
-unsafe extern "C" fn xml_html_validity_error(ctx: *mut c_void, msg: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut input: XmlParserInputPtr;
+fn xml_html_validity_error(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+    todo!()
+    // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    // let mut input: XmlParserInputPtr;
 
-    BUFFER[0] = 0;
-    input = (*ctxt).input;
-    if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-        input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-    }
+    // BUFFER[0] = 0;
+    // input = (*ctxt).input;
+    // if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+    //     input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+    // }
 
-    xml_htmlprint_file_info(input);
+    // xml_htmlprint_file_info(input);
 
-    xml_generic_error!(
-        xml_generic_error_context(),
-        c"<b>validity error</b>: ".as_ptr()
-    );
-    let len = strlen(BUFFER.as_ptr());
-    snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
-    xml_htmlencode_send();
-    xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
+    // xml_generic_error!(
+    //     xml_generic_error_context(),
+    //     c"<b>validity error</b>: ".as_ptr()
+    // );
+    // let len = strlen(BUFFER.as_ptr());
+    // snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
+    // xml_htmlencode_send();
+    // xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
 
-    xml_htmlprint_file_context(input);
-    xml_htmlencode_send();
-    PROGRESULT = XmllintReturnCode::ErrValid;
+    // xml_htmlprint_file_context(input);
+    // xml_htmlencode_send();
+    // PROGRESULT = XmllintReturnCode::ErrValid;
 }
 
 /**
@@ -684,29 +691,30 @@ unsafe extern "C" fn xml_html_validity_error(ctx: *mut c_void, msg: *const c_cha
  * Display and format a validity warning messages, gives file, line,
  * position and extra parameters.
  */
-unsafe extern "C" fn xml_html_validity_warning(ctx: *mut c_void, msg: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut input: XmlParserInputPtr;
+fn xml_html_validity_warning(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+    todo!()
+    // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+    // let mut input: XmlParserInputPtr;
 
-    BUFFER[0] = 0;
-    input = (*ctxt).input;
-    if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-        input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-    }
+    // BUFFER[0] = 0;
+    // input = (*ctxt).input;
+    // if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+    //     input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+    // }
 
-    xml_htmlprint_file_info(input);
+    // xml_htmlprint_file_info(input);
 
-    xml_generic_error!(
-        xml_generic_error_context(),
-        c"<b>validity warning</b>: ".as_ptr()
-    );
-    let len = strlen(BUFFER.as_ptr());
-    snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
-    xml_htmlencode_send();
-    xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
+    // xml_generic_error!(
+    //     xml_generic_error_context(),
+    //     c"<b>validity warning</b>: ".as_ptr()
+    // );
+    // let len = strlen(BUFFER.as_ptr());
+    // snprintf(addr_of_mut!(BUFFER[len]) as _, BUFFER.len() - len, msg);
+    // xml_htmlencode_send();
+    // xml_generic_error!(xml_generic_error_context(), c"</p>\n".as_ptr());
 
-    xml_htmlprint_file_context(input);
-    xml_htmlencode_send();
+    // xml_htmlprint_file_context(input);
+    // xml_htmlencode_send();
 }
 
 /************************************************************************
@@ -1452,12 +1460,14 @@ unsafe extern "C" fn comment_debug(_ctx: *mut c_void, value: *const XmlChar) {
  * Display and format a warning messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn warning_debug(_ctx: *mut c_void, msg: *const c_char) {
-    CALLBACKS += 1;
-    if NOOUT != 0 {
-        return;
+fn warning_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    unsafe {
+        CALLBACKS += 1;
+        if NOOUT != 0 {
+            return;
+        }
     }
-    print!("SAX.warning: {}", CStr::from_ptr(msg).to_string_lossy());
+    print!("SAX.warning: {}", msg);
 }
 
 /**
@@ -1469,12 +1479,14 @@ unsafe extern "C" fn warning_debug(_ctx: *mut c_void, msg: *const c_char) {
  * Display and format a error messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn error_debug(_ctx: *mut c_void, msg: *const c_char) {
-    CALLBACKS += 1;
-    if NOOUT != 0 {
-        return;
+fn error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    unsafe {
+        CALLBACKS += 1;
+        if NOOUT != 0 {
+            return;
+        }
     }
-    print!("SAX.error: {}", CStr::from_ptr(msg).to_string_lossy());
+    print!("SAX.error: {}", msg);
 }
 
 /**
@@ -1725,8 +1737,8 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
             }
             xml_schema_set_valid_errors(
                 vctxt,
-                Some(xml_generic_error),
-                Some(xml_generic_error),
+                Some(generic_error_default),
+                Some(generic_error_default),
                 null_mut(),
             );
             xml_schema_validate_set_filename(vctxt, filename);
@@ -3119,8 +3131,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 xml_free_dtd(dtd);
                 return;
             }
-            (*cvp).error = Some(xml_generic_error);
-            (*cvp).warning = Some(xml_generic_error);
+            (*cvp).error = Some(generic_error_default);
+            (*cvp).warning = Some(generic_error_default);
 
             if TIMING != 0 && REPEAT == 0 {
                 start_timer();
@@ -3164,8 +3176,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         if TIMING != 0 && REPEAT == 0 {
             start_timer();
         }
-        (*cvp).error = Some(xml_generic_error);
-        (*cvp).warning = Some(xml_generic_error);
+        (*cvp).error = Some(generic_error_default);
+        (*cvp).warning = Some(generic_error_default);
         if xml_validate_document(cvp, doc) == 0 {
             xml_generic_error!(
                 xml_generic_error_context(),
@@ -3241,8 +3253,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         }
         xml_relaxng_set_valid_errors(
             ctxt,
-            Some(xml_generic_error),
-            Some(xml_generic_error),
+            Some(generic_error_default),
+            Some(generic_error_default),
             null_mut(),
         );
         match xml_relaxng_validate_doc(ctxt, doc).cmp(&0) {
@@ -3284,8 +3296,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         }
         xml_schema_set_valid_errors(
             ctxt,
-            Some(xml_generic_error),
-            Some(xml_generic_error),
+            Some(generic_error_default),
+            Some(generic_error_default),
             null_mut(),
         );
         match xml_schema_validate_doc(ctxt, doc).cmp(&0) {
@@ -4130,8 +4142,8 @@ fn main() {
                 }
                 xml_relaxng_set_parser_errors(
                     ctxt,
-                    Some(xml_generic_error),
-                    Some(xml_generic_error),
+                    Some(generic_error_default),
+                    Some(generic_error_default),
                     null_mut(),
                 );
                 RELAXNGSCHEMAS.store(xml_relaxng_parse(ctxt), Ordering::Relaxed);
@@ -4165,8 +4177,8 @@ fn main() {
                 }
                 xml_schema_set_parser_errors(
                     ctxt,
-                    Some(xml_generic_error),
-                    Some(xml_generic_error),
+                    Some(generic_error_default),
+                    Some(generic_error_default),
                     null_mut(),
                 );
                 let wxschemas = xml_schema_parse(ctxt);

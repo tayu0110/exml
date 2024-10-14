@@ -4,6 +4,7 @@
 use std::{
     env::args,
     ffi::{c_char, c_int, c_uint, c_ulong, CStr},
+    io::Write,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null_mut},
     sync::atomic::{AtomicPtr, Ordering},
@@ -1119,8 +1120,10 @@ unsafe extern "C" fn comment_callback(_ctx: *mut c_void, _value: *const XmlChar)
  * Display and format a warning messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn warning_callback(_ctx: *mut c_void, _msg: *const c_char) {
-    CALLBACKS += 1;
+fn warning_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+    unsafe {
+        CALLBACKS += 1;
+    }
 }
 
 /**
@@ -1132,8 +1135,10 @@ unsafe extern "C" fn warning_callback(_ctx: *mut c_void, _msg: *const c_char) {
  * Display and format a error messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn error_callback(_ctx: *mut c_void, _msg: *const c_char) {
-    CALLBACKS += 1;
+fn error_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+    unsafe {
+        CALLBACKS += 1;
+    }
 }
 
 /**

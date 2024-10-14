@@ -664,7 +664,7 @@ unsafe extern "C" fn recursive_detect_test(
      * base of the test, parse with the old API
      */
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), parser_options);
-    if !doc.is_null() || (*ctxt).last_error.code != XmlParserErrors::XmlErrEntityLoop as i32 {
+    if !doc.is_null() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
         eprintln!(
             "Failed to detect recursion in {}",
             CStr::from_ptr(filename).to_string_lossy()

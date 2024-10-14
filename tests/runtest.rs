@@ -5,7 +5,7 @@ use std::{
     env::args,
     ffi::{c_char, c_int, c_uint, c_ulong, CStr, CString},
     fs::{metadata, File},
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Read, Stderr, Write},
     mem::zeroed,
     os::{fd::AsRawFd, raw::c_void},
     process::exit,
@@ -18,6 +18,7 @@ use std::{
 
 use const_format::concatcp;
 use exml::{
+    globals::set_generic_error,
     libxml::{
         encoding::{
             xml_char_enc_close_func, xml_get_char_encoding_handler, XmlCharEncoding,
@@ -142,24 +143,25 @@ unsafe extern "C" fn test_external_entity_loader(
 static mut TEST_ERRORS: [XmlChar; 32769] = [0; 32769];
 static mut TEST_ERRORS_SIZE: usize = 0;
 
-unsafe extern "C" fn test_error_handler(_ctx: *mut c_void, msg: *const c_char) {
-    if TEST_ERRORS_SIZE >= 32768 {
-        return;
-    }
+fn test_error_handler(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    unsafe {
+        if TEST_ERRORS_SIZE >= 32768 {
+            return;
+        }
 
-    let m = CStr::from_ptr(msg);
-    if TEST_ERRORS_SIZE + m.to_bytes().len() >= 32768 {
-        TEST_ERRORS[TEST_ERRORS_SIZE..]
-            .copy_from_slice(&m.to_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-        /* buffer is full */
-        TEST_ERRORS_SIZE = 32768;
+        if TEST_ERRORS_SIZE + msg.len() >= 32768 {
+            TEST_ERRORS[TEST_ERRORS_SIZE..]
+                .copy_from_slice(&msg.as_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
+            /* buffer is full */
+            TEST_ERRORS_SIZE = 32768;
+            TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
+        } else {
+            TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + msg.len()]
+                .copy_from_slice(msg.as_bytes());
+            TEST_ERRORS_SIZE += msg.len();
+        }
         TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
-    } else {
-        TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + m.to_bytes().len()]
-            .copy_from_slice(m.to_bytes());
-        TEST_ERRORS_SIZE += m.to_bytes().len();
     }
-    TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
 }
 
 unsafe extern "C" fn channel(_ctx: *mut c_void, msg: *const c_char) {
@@ -1482,15 +1484,17 @@ unsafe extern "C" fn comment_debug(_ctx: *mut c_void, value: *const XmlChar) {
  * Display and format a warning messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn warning_debug(_ctx: *mut c_void, msg: *const c_char) {
-    CALLBACKS += 1;
-    if QUIET != 0 {
-        return;
+fn warning_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    unsafe {
+        CALLBACKS += 1;
+        if QUIET != 0 {
+            return;
+        }
     }
     write!(
         SAX_DEBUG.lock().unwrap().as_mut().unwrap(),
         "SAX.warning: {}",
-        CStr::from_ptr(msg).to_string_lossy()
+        msg
     )
     .ok();
 }
@@ -1504,12 +1508,14 @@ unsafe extern "C" fn warning_debug(_ctx: *mut c_void, msg: *const c_char) {
  * Display and format a error messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn error_debug(_ctx: *mut c_void, msg: *const c_char) {
-    CALLBACKS += 1;
-    if QUIET != 0 {
-        return;
+fn error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    unsafe {
+        CALLBACKS += 1;
+        if QUIET != 0 {
+            return;
+        }
     }
-    sax_debug!("SAX.error: {}", CStr::from_ptr(msg).to_string_lossy());
+    sax_debug!("SAX.error: {}", msg);
 }
 
 /**
@@ -1943,7 +1949,7 @@ unsafe extern "C" fn sax_parse_test(
 
     /* for SAX we really want the callbacks though the context handlers */
     xml_set_structured_error_func(null_mut(), None);
-    xml_set_generic_error_func(null_mut(), Some(test_error_handler));
+    set_generic_error(Some(test_error_handler), None::<Stderr>);
 
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
@@ -3199,12 +3205,17 @@ unsafe extern "C" fn stream_process_test(
     if !rng.is_null() {
         ret = xml_text_reader_relaxng_validate(reader, rng);
         if ret < 0 {
-            xml_error_with_format!(
-                test_error_handler,
-                null_mut(),
-                c"Relax-NG schema %s failed to compile\n".as_ptr(),
-                rng
+            let rng = CStr::from_ptr(rng).to_string_lossy();
+            test_error_handler(
+                None,
+                format!("Relax-NG schema {rng} failed to compile\n").as_str(),
             );
+            // xml_error_with_format!(
+            //     test_error_handler,
+            //     null_mut(),
+            //     c"Relax-NG schema %s failed to compile\n".as_ptr(),
+            //     rng
+            // );
 
             if !temp.is_null() {
                 unlink(temp);
@@ -3220,29 +3231,33 @@ unsafe extern "C" fn stream_process_test(
         }
         ret = xml_text_reader_read(reader);
     }
+    let filename = CStr::from_ptr(filename).to_string_lossy();
     if ret != 0 {
-        xml_error_with_format!(
-            test_error_handler,
-            null_mut(),
-            c"%s : failed to parse\n".as_ptr(),
-            filename
-        );
+        test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
+        // xml_error_with_format!(
+        //     test_error_handler,
+        //     null_mut(),
+        //     c"%s : failed to parse\n".as_ptr(),
+        //     filename
+        // );
     }
     if !rng.is_null() {
         if xml_text_reader_is_valid(reader) != 1 {
-            xml_error_with_format!(
-                test_error_handler,
-                null_mut(),
-                c"%s fails to validate\n".as_ptr(),
-                filename
-            );
+            test_error_handler(None, format!("{filename} fails to validate\n").as_str());
+            // xml_error_with_format!(
+            //     test_error_handler,
+            //     null_mut(),
+            //     c"%s fails to validate\n".as_ptr(),
+            //     filename
+            // );
         } else {
-            xml_error_with_format!(
-                test_error_handler,
-                null_mut(),
-                c"%s validates\n".as_ptr(),
-                filename
-            );
+            test_error_handler(None, format!("{filename} validates\n").as_str());
+            // xml_error_with_format!(
+            //     test_error_handler,
+            //     null_mut(),
+            //     c"%s validates\n".as_ptr(),
+            //     filename
+            // );
         }
     }
     if t.is_some() {
@@ -3254,7 +3269,8 @@ unsafe extern "C" fn stream_process_test(
         if ret != 0 {
             eprintln!(
                 "Result for {} failed in {}",
-                CStr::from_ptr(filename).to_string_lossy(),
+                // CStr::from_ptr(filename).to_string_lossy(),
+                filename,
                 CStr::from_ptr(result).to_string_lossy()
             );
             return -1;
@@ -3265,7 +3281,8 @@ unsafe extern "C" fn stream_process_test(
         if ret != 0 {
             eprintln!(
                 "Error for {} failed",
-                CStr::from_ptr(filename).to_string_lossy()
+                // CStr::from_ptr(filename).to_string_lossy()
+                filename,
             );
             print!(
                 "{}",
@@ -4541,32 +4558,46 @@ unsafe extern "C" fn rng_one_test(
         ctxt as _,
     );
     ret = xml_relaxng_validate_doc(ctxt, doc);
+    let filename = CStr::from_ptr(filename).to_string_lossy();
     match ret.cmp(&0) {
-        std::cmp::Ordering::Equal => xml_error_with_format!(
-            test_error_handler,
-            null_mut(),
-            c"%s validates\n".as_ptr(),
-            filename
-        ),
-        std::cmp::Ordering::Greater => xml_error_with_format!(
-            test_error_handler,
-            null_mut(),
-            c"%s fails to validate\n".as_ptr(),
-            filename
-        ),
-        std::cmp::Ordering::Less => xml_error_with_format!(
-            test_error_handler,
-            null_mut(),
-            c"%s validation generated an internal error\n".as_ptr(),
-            filename
-        ),
+        std::cmp::Ordering::Equal => {
+            test_error_handler(None, format!("{filename} validates\n").as_str());
+            // xml_error_with_format!(
+            //     test_error_handler,
+            //     null_mut(),
+            //     c"%s validates\n".as_ptr(),
+            //     filename
+            // )
+        }
+        std::cmp::Ordering::Greater => {
+            test_error_handler(None, format!("{filename} fails to validate\n").as_str());
+            // xml_error_with_format!(
+            //     test_error_handler,
+            //     null_mut(),
+            //     c"%s fails to validate\n".as_ptr(),
+            //     filename
+            // )
+        }
+        std::cmp::Ordering::Less => {
+            test_error_handler(
+                None,
+                format!("{filename} validation generated an internal error\n").as_str(),
+            );
+            // xml_error_with_format!(
+            //     test_error_handler,
+            //     null_mut(),
+            //     c"%s validation generated an internal error\n".as_ptr(),
+            //     filename
+            // )
+        }
     }
 
     ret = 0;
     if !result.is_null() && compare_files(temp, result) != 0 {
         eprintln!(
             "Result for {} on {} failed",
-            CStr::from_ptr(filename).to_string_lossy(),
+            // CStr::from_ptr(filename).to_string_lossy(),
+            filename,
             CStr::from_ptr(sch).to_string_lossy()
         );
         ret = 1;
@@ -4629,12 +4660,17 @@ unsafe extern "C" fn rng_test(
     let schemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
     xml_relaxng_free_parser_ctxt(ctxt);
     if schemas.is_null() {
-        xml_error_with_format!(
-            test_error_handler,
-            null_mut(),
-            c"Relax-NG schema %s failed to compile\n".as_ptr(),
-            filename
+        let filename = CStr::from_ptr(filename).to_string_lossy();
+        test_error_handler(
+            None,
+            format!("Relax-NG schema {filename} failed to compile\n").as_str(),
         );
+        // xml_error_with_format!(
+        //     test_error_handler,
+        //     null_mut(),
+        //     c"Relax-NG schema %s failed to compile\n".as_ptr(),
+        //     filename
+        // );
     }
     let parse_errors_size: usize = TEST_ERRORS_SIZE;
 
@@ -5097,12 +5133,17 @@ unsafe extern "C" fn pattern_test(
                     patternc =
                         xml_patterncompile(str.as_ptr(), (*doc).dict, 0, namespaces.as_mut_ptr());
                     if patternc.is_null() {
-                        xml_error_with_format!(
-                            test_error_handler,
-                            null_mut(),
-                            c"Pattern %s failed to compile\n".as_ptr(),
-                            str.as_ptr()
+                        let str = CStr::from_ptr(str.as_ptr() as *const i8).to_string_lossy();
+                        test_error_handler(
+                            None,
+                            format!("Pattern {str} failed to compile\n").as_str(),
                         );
+                        // xml_error_with_format!(
+                        //     test_error_handler,
+                        //     null_mut(),
+                        //     c"Pattern %s failed to compile\n".as_ptr(),
+                        //     str.as_ptr()
+                        // );
                         xml_free_doc(doc);
                         // ret = 1;
                         continue;

@@ -98,6 +98,10 @@ impl XmlError {
     pub fn is_err(&self) -> bool {
         !self.is_ok()
     }
+
+    pub fn code(&self) -> XmlParserErrors {
+        self.code
+    }
 }
 
 /// Default generic error function.
