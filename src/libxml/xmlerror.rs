@@ -4,25 +4,19 @@
 //! Please refer to original libxml2 documents also.
 
 use std::ffi::{c_char, c_int, c_uint, c_void, CStr};
-use std::fs::File;
 use std::io::Write;
 use std::mem::{size_of, size_of_val};
 use std::os::fd::FromRawFd;
 use std::ptr::{addr_of_mut, null_mut};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use libc::{fflush, fileno, memcpy, memset, FILE};
+use libc::{memcpy, memset, FILE};
 
 use crate::error::generic_error_default;
-use crate::globals::set_generic_error;
 use crate::libxml::globals::_XML_GENERIC_ERROR;
 use crate::libxml::parser::{XmlParserCtxtPtr, XmlParserInputPtr};
 
-use super::globals::{
-    xml_free, xml_generic_error, xml_generic_error_context, xml_last_error,
-    _XML_GENERIC_ERROR_CONTEXT,
-};
-use super::threads::{xml_get_global_state, xml_is_main_thread};
+use super::globals::{xml_free, xml_generic_error, xml_generic_error_context, xml_last_error};
 use super::tree::{XmlElementType, XmlNodePtr};
 use super::xmlstring::{xml_get_utf8_char, xml_strdup, xml_strlen, XmlChar};
 
@@ -1012,53 +1006,53 @@ pub(crate) unsafe extern "C" fn xml_generic_error_default_func(
     }
 }
 
-/*
- * Use the following function to reset the two global variables
- * xml_generic_error and xmlGenericErrorContext.
- */
-/**
- * xmlSetGenericErrorFunc:
- * @ctx:  the new error handling context
- * @handler:  the new handler function
- *
- * Function to reset the handler and the error context for out of
- * context error messages.
- * This simply means that @handler will be called for subsequent
- * error messages while not parsing nor validating. And @ctx will
- * be passed as first argument to @handler
- * One can simply force messages to be emitted to another FILE * than
- * stderr by setting @ctx to this file handle and @handler to NULL.
- * For multi-threaded applications, this must be set separately for each thread.
- */
-pub unsafe extern "C" fn xml_set_generic_error_func(
-    ctx: *mut c_void,
-    handler: Option<XmlGenericErrorFunc>,
-) {
-    if xml_is_main_thread() != 0 {
-        _XML_GENERIC_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
-        _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
-    } else {
-        (*xml_get_global_state())
-            .xml_generic_error_context
-            .store(ctx, Ordering::Relaxed);
-        (*xml_get_global_state()).xml_generic_error =
-            handler.or(Some(xml_generic_error_default_func));
-    }
-    set_generic_error(
-        Some({
-            let mut handler = handler.unwrap_or(xml_generic_error_default_func);
-            let ptr_value = addr_of_mut!(handler) as usize;
-            let ptr = ptr_value as *const fn(Option<&mut (dyn Write + 'static)>, &str);
-            *ptr
-        }),
-        (!ctx.is_null()).then(|| {
-            let file = ctx as *mut FILE;
-            fflush(file);
-            let fd = fileno(file);
-            File::from_raw_fd(fd)
-        }),
-    );
-}
+// /*
+//  * Use the following function to reset the two global variables
+//  * xml_generic_error and xmlGenericErrorContext.
+//  */
+// /**
+//  * xmlSetGenericErrorFunc:
+//  * @ctx:  the new error handling context
+//  * @handler:  the new handler function
+//  *
+//  * Function to reset the handler and the error context for out of
+//  * context error messages.
+//  * This simply means that @handler will be called for subsequent
+//  * error messages while not parsing nor validating. And @ctx will
+//  * be passed as first argument to @handler
+//  * One can simply force messages to be emitted to another FILE * than
+//  * stderr by setting @ctx to this file handle and @handler to NULL.
+//  * For multi-threaded applications, this must be set separately for each thread.
+//  */
+// pub unsafe extern "C" fn xml_set_generic_error_func(
+//     ctx: *mut c_void,
+//     handler: Option<XmlGenericErrorFunc>,
+// ) {
+//     if xml_is_main_thread() != 0 {
+//         _XML_GENERIC_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
+//         _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
+//     } else {
+//         (*xml_get_global_state())
+//             .xml_generic_error_context
+//             .store(ctx, Ordering::Relaxed);
+//         (*xml_get_global_state()).xml_generic_error =
+//             handler.or(Some(xml_generic_error_default_func));
+//     }
+//     set_generic_error(
+//         Some({
+//             let mut handler = handler.unwrap_or(xml_generic_error_default_func);
+//             let ptr_value = addr_of_mut!(handler) as usize;
+//             let ptr = ptr_value as *const fn(Option<&mut (dyn Write + 'static)>, &str);
+//             *ptr
+//         }),
+//         (!ctx.is_null()).then(|| {
+//             let file = ctx as *mut FILE;
+//             fflush(file);
+//             let fd = fileno(file);
+//             File::from_raw_fd(fd)
+//         }),
+//     );
+// }
 
 /**
  * initGenericErrorDefaultFunc:
