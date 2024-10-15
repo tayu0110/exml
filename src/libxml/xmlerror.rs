@@ -12,11 +12,10 @@ use std::ptr::{addr_of_mut, null_mut};
 use libc::{memcpy, memset, FILE};
 
 use crate::error::generic_error_default;
-use crate::libxml::parser::{XmlParserCtxtPtr, XmlParserInputPtr};
+use crate::libxml::parser::XmlParserInputPtr;
 
 use super::globals::{xml_free, xml_generic_error, xml_generic_error_context, xml_last_error};
-use super::tree::{XmlElementType, XmlNodePtr};
-use super::xmlstring::{xml_get_utf8_char, xml_strdup, xml_strlen, XmlChar};
+use super::xmlstring::{xml_get_utf8_char, xml_strdup, XmlChar};
 
 // #include "libxml.h"
 
@@ -1661,232 +1660,232 @@ pub unsafe extern "C" fn xml_copy_error(from: XmlErrorPtr, to: XmlErrorPtr) -> c
     0
 }
 
-/**
- * xmlReportError:
- * @err: the error
- * @ctx: the parser context or NULL
- * @str: the formatted error message
- *
- * Report an error with its context, replace the 4 old error/warning
- * routines.
- */
-pub unsafe extern "C" fn xml_report_error(
-    err: XmlErrorPtr,
-    ctxt: XmlParserCtxtPtr,
-    str: *const c_char,
-    mut channel: Option<XmlGenericErrorFunc>,
-    mut data: *mut c_void,
-) {
-    let mut name: *const XmlChar = null_mut();
+// /**
+//  * xmlReportError:
+//  * @err: the error
+//  * @ctx: the parser context or NULL
+//  * @str: the formatted error message
+//  *
+//  * Report an error with its context, replace the 4 old error/warning
+//  * routines.
+//  */
+// pub unsafe extern "C" fn xml_report_error(
+//     err: XmlErrorPtr,
+//     ctxt: XmlParserCtxtPtr,
+//     str: *const c_char,
+//     mut channel: Option<XmlGenericErrorFunc>,
+//     mut data: *mut c_void,
+// ) {
+//     let mut name: *const XmlChar = null_mut();
 
-    let mut input: XmlParserInputPtr = null_mut();
-    let mut cur: XmlParserInputPtr = null_mut();
+//     let mut input: XmlParserInputPtr = null_mut();
+//     let mut cur: XmlParserInputPtr = null_mut();
 
-    if err.is_null() {
-        return;
-    }
+//     if err.is_null() {
+//         return;
+//     }
 
-    if channel.is_none() {
-        channel = Some(xml_generic_error);
-        data = xml_generic_error_context();
-    }
-    let file: *mut c_char = (*err).file;
-    let line: c_int = (*err).line;
-    let code: c_int = (*err).code;
-    let domain: c_int = (*err).domain;
-    let level: XmlErrorLevel = (*err).level;
-    let node: XmlNodePtr = (*err).node as _;
+//     if channel.is_none() {
+//         channel = Some(xml_generic_error);
+//         data = xml_generic_error_context();
+//     }
+//     let file: *mut c_char = (*err).file;
+//     let line: c_int = (*err).line;
+//     let code: c_int = (*err).code;
+//     let domain: c_int = (*err).domain;
+//     let level: XmlErrorLevel = (*err).level;
+//     let node: XmlNodePtr = (*err).node as _;
 
-    if code == XmlParserErrors::XmlErrOK as i32 {
-        return;
-    }
+//     if code == XmlParserErrors::XmlErrOK as i32 {
+//         return;
+//     }
 
-    if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
-        name = (*node).name;
-    }
+//     if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
+//         name = (*node).name;
+//     }
 
-    /*
-     * Maintain the compatibility with the legacy error handling
-     */
-    let channel = channel.unwrap();
-    if !ctxt.is_null() {
-        input = (*ctxt).input;
-        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-            cur = input;
-            input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-        }
-        if !input.is_null() {
-            if !(*input).filename.is_null() {
-                xml_error_with_format!(
-                    channel,
-                    data,
-                    c"%s:%d: ".as_ptr() as _,
-                    (*input).filename,
-                    (*input).line
-                );
-            } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
-                xml_error_with_format!(
-                    channel,
-                    data,
-                    c"Entity: line %d: ".as_ptr() as _,
-                    (*input).line
-                );
-            }
-        }
-    } else if !file.is_null() {
-        xml_error_with_format!(channel, data, c"%s:%d: ".as_ptr() as _, file, line);
-    } else if line != 0
-        && (domain == XmlErrorDomain::XmlFromParser as i32
-            || domain == XmlErrorDomain::XmlFromSchemasv as i32
-            || domain == XmlErrorDomain::XmlFromSchemasp as i32
-            || domain == XmlErrorDomain::XmlFromDtd as i32
-            || domain == XmlErrorDomain::XmlFromRelaxngp as i32
-            || domain == XmlErrorDomain::XmlFromRelaxngv as i32)
-    {
-        xml_error_with_format!(channel, data, c"Entity: line %d: ".as_ptr() as _, line);
-    }
-    if !name.is_null() {
-        xml_error_with_format!(channel, data, c"element %s: ".as_ptr() as _, name);
-    }
-    match XmlErrorDomain::try_from(domain) {
-        Ok(XmlErrorDomain::XmlFromParser) => {
-            xml_error_with_format!(channel, data, c"parser ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromNamespace) => {
-            xml_error_with_format!(channel, data, c"namespace ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromDtd) | Ok(XmlErrorDomain::XmlFromValid) => {
-            xml_error_with_format!(channel, data, c"validity ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromHtml) => {
-            xml_error_with_format!(channel, data, c"HTML parser ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromMemory) => {
-            xml_error_with_format!(channel, data, c"memory ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromOutput) => {
-            xml_error_with_format!(channel, data, c"output ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromIO) => {
-            xml_error_with_format!(channel, data, c"I/O ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromXinclude) => {
-            xml_error_with_format!(channel, data, c"XInclude ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromXpath) => {
-            xml_error_with_format!(channel, data, c"XPath ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromXpointer) => {
-            xml_error_with_format!(channel, data, c"parser ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromRegexp) => {
-            xml_error_with_format!(channel, data, c"regexp ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromModule) => {
-            xml_error_with_format!(channel, data, c"module ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromSchemasv) => {
-            xml_error_with_format!(channel, data, c"Schemas validity ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromSchemasp) => {
-            xml_error_with_format!(channel, data, c"Schemas parser ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromRelaxngp) => {
-            xml_error_with_format!(channel, data, c"Relax-NG parser ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromRelaxngv) => {
-            xml_error_with_format!(channel, data, c"Relax-NG validity ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromCatalog) => {
-            xml_error_with_format!(channel, data, c"Catalog ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromC14N) => {
-            xml_error_with_format!(channel, data, c"C14N ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromXSLT) => {
-            xml_error_with_format!(channel, data, c"XSLT ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromI18N) => {
-            xml_error_with_format!(channel, data, c"encoding ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromSchematronv) => {
-            xml_error_with_format!(channel, data, c"schematron ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromBuffer) => {
-            xml_error_with_format!(channel, data, c"internal buffer ".as_ptr() as _);
-        }
-        Ok(XmlErrorDomain::XmlFromUri) => {
-            xml_error_with_format!(channel, data, c"URI ".as_ptr() as _);
-        }
-        _ => {}
-    }
-    match level {
-        XmlErrorLevel::XmlErrNone => {
-            xml_error_with_format!(channel, data, c": ".as_ptr() as _);
-        }
-        XmlErrorLevel::XmlErrWarning => {
-            xml_error_with_format!(channel, data, c"warning : ".as_ptr() as _);
-        }
-        XmlErrorLevel::XmlErrError => {
-            xml_error_with_format!(channel, data, c"error : ".as_ptr() as _);
-        }
-        XmlErrorLevel::XmlErrFatal => {
-            xml_error_with_format!(channel, data, c"error : ".as_ptr() as _);
-        }
-    }
-    if !str.is_null() {
-        let len: c_int = xml_strlen(str as *const XmlChar);
-        if len > 0 && *str.add(len as usize - 1) != b'\n' as _ {
-            xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, str);
-        } else {
-            xml_error_with_format!(channel, data, c"%s".as_ptr() as _, str);
-        }
-    } else {
-        xml_error_with_format!(
-            channel,
-            data,
-            c"%s\n".as_ptr() as _,
-            c"out of memory error".as_ptr()
-        );
-    }
+//     /*
+//      * Maintain the compatibility with the legacy error handling
+//      */
+//     let channel = channel.unwrap();
+//     if !ctxt.is_null() {
+//         input = (*ctxt).input;
+//         if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+//             cur = input;
+//             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+//         }
+//         if !input.is_null() {
+//             if !(*input).filename.is_null() {
+//                 xml_error_with_format!(
+//                     channel,
+//                     data,
+//                     c"%s:%d: ".as_ptr() as _,
+//                     (*input).filename,
+//                     (*input).line
+//                 );
+//             } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
+//                 xml_error_with_format!(
+//                     channel,
+//                     data,
+//                     c"Entity: line %d: ".as_ptr() as _,
+//                     (*input).line
+//                 );
+//             }
+//         }
+//     } else if !file.is_null() {
+//         xml_error_with_format!(channel, data, c"%s:%d: ".as_ptr() as _, file, line);
+//     } else if line != 0
+//         && (domain == XmlErrorDomain::XmlFromParser as i32
+//             || domain == XmlErrorDomain::XmlFromSchemasv as i32
+//             || domain == XmlErrorDomain::XmlFromSchemasp as i32
+//             || domain == XmlErrorDomain::XmlFromDtd as i32
+//             || domain == XmlErrorDomain::XmlFromRelaxngp as i32
+//             || domain == XmlErrorDomain::XmlFromRelaxngv as i32)
+//     {
+//         xml_error_with_format!(channel, data, c"Entity: line %d: ".as_ptr() as _, line);
+//     }
+//     if !name.is_null() {
+//         xml_error_with_format!(channel, data, c"element %s: ".as_ptr() as _, name);
+//     }
+//     match XmlErrorDomain::try_from(domain) {
+//         Ok(XmlErrorDomain::XmlFromParser) => {
+//             xml_error_with_format!(channel, data, c"parser ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromNamespace) => {
+//             xml_error_with_format!(channel, data, c"namespace ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromDtd) | Ok(XmlErrorDomain::XmlFromValid) => {
+//             xml_error_with_format!(channel, data, c"validity ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromHtml) => {
+//             xml_error_with_format!(channel, data, c"HTML parser ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromMemory) => {
+//             xml_error_with_format!(channel, data, c"memory ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromOutput) => {
+//             xml_error_with_format!(channel, data, c"output ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromIO) => {
+//             xml_error_with_format!(channel, data, c"I/O ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromXinclude) => {
+//             xml_error_with_format!(channel, data, c"XInclude ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromXpath) => {
+//             xml_error_with_format!(channel, data, c"XPath ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromXpointer) => {
+//             xml_error_with_format!(channel, data, c"parser ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromRegexp) => {
+//             xml_error_with_format!(channel, data, c"regexp ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromModule) => {
+//             xml_error_with_format!(channel, data, c"module ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromSchemasv) => {
+//             xml_error_with_format!(channel, data, c"Schemas validity ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromSchemasp) => {
+//             xml_error_with_format!(channel, data, c"Schemas parser ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromRelaxngp) => {
+//             xml_error_with_format!(channel, data, c"Relax-NG parser ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromRelaxngv) => {
+//             xml_error_with_format!(channel, data, c"Relax-NG validity ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromCatalog) => {
+//             xml_error_with_format!(channel, data, c"Catalog ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromC14N) => {
+//             xml_error_with_format!(channel, data, c"C14N ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromXSLT) => {
+//             xml_error_with_format!(channel, data, c"XSLT ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromI18N) => {
+//             xml_error_with_format!(channel, data, c"encoding ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromSchematronv) => {
+//             xml_error_with_format!(channel, data, c"schematron ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromBuffer) => {
+//             xml_error_with_format!(channel, data, c"internal buffer ".as_ptr() as _);
+//         }
+//         Ok(XmlErrorDomain::XmlFromUri) => {
+//             xml_error_with_format!(channel, data, c"URI ".as_ptr() as _);
+//         }
+//         _ => {}
+//     }
+//     match level {
+//         XmlErrorLevel::XmlErrNone => {
+//             xml_error_with_format!(channel, data, c": ".as_ptr() as _);
+//         }
+//         XmlErrorLevel::XmlErrWarning => {
+//             xml_error_with_format!(channel, data, c"warning : ".as_ptr() as _);
+//         }
+//         XmlErrorLevel::XmlErrError => {
+//             xml_error_with_format!(channel, data, c"error : ".as_ptr() as _);
+//         }
+//         XmlErrorLevel::XmlErrFatal => {
+//             xml_error_with_format!(channel, data, c"error : ".as_ptr() as _);
+//         }
+//     }
+//     if !str.is_null() {
+//         let len: c_int = xml_strlen(str as *const XmlChar);
+//         if len > 0 && *str.add(len as usize - 1) != b'\n' as _ {
+//             xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, str);
+//         } else {
+//             xml_error_with_format!(channel, data, c"%s".as_ptr() as _, str);
+//         }
+//     } else {
+//         xml_error_with_format!(
+//             channel,
+//             data,
+//             c"%s\n".as_ptr() as _,
+//             c"out of memory error".as_ptr()
+//         );
+//     }
 
-    if !ctxt.is_null() {
-        xml_parser_print_file_context_internal(input, channel, data);
-        if !cur.is_null() {
-            if !(*cur).filename.is_null() {
-                xml_error_with_format!(
-                    channel,
-                    data,
-                    c"%s:%d: \n".as_ptr() as _,
-                    (*cur).filename,
-                    (*cur).line
-                );
-            } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
-                xml_error_with_format!(
-                    channel,
-                    data,
-                    c"Entity: line %d: \n".as_ptr() as _,
-                    (*cur).line
-                );
-            }
-            xml_parser_print_file_context_internal(cur, channel, data);
-        }
-    }
-    if domain == XmlErrorDomain::XmlFromXpath as i32
-        && !(*err).str1.is_null()
-        && ((*err).int1 < 100)
-        && (*err).int1 < xml_strlen((*err).str1 as *const XmlChar)
-    {
-        let mut buf: [XmlChar; 150] = [0; 150];
-        xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, (*err).str1);
-        for b in buf.iter_mut().take((*err).int1 as usize) {
-            *b = b' ';
-        }
-        buf[(*err).int1 as usize] = b'^';
-        buf[(*err).int1 as usize + 1] = 0;
-        xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, buf);
-    }
-}
+//     if !ctxt.is_null() {
+//         xml_parser_print_file_context_internal(input, channel, data);
+//         if !cur.is_null() {
+//             if !(*cur).filename.is_null() {
+//                 xml_error_with_format!(
+//                     channel,
+//                     data,
+//                     c"%s:%d: \n".as_ptr() as _,
+//                     (*cur).filename,
+//                     (*cur).line
+//                 );
+//             } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
+//                 xml_error_with_format!(
+//                     channel,
+//                     data,
+//                     c"Entity: line %d: \n".as_ptr() as _,
+//                     (*cur).line
+//                 );
+//             }
+//             xml_parser_print_file_context_internal(cur, channel, data);
+//         }
+//     }
+//     if domain == XmlErrorDomain::XmlFromXpath as i32
+//         && !(*err).str1.is_null()
+//         && ((*err).int1 < 100)
+//         && (*err).int1 < xml_strlen((*err).str1 as *const XmlChar)
+//     {
+//         let mut buf: [XmlChar; 150] = [0; 150];
+//         xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, (*err).str1);
+//         for b in buf.iter_mut().take((*err).int1 as usize) {
+//             *b = b' ';
+//         }
+//         buf[(*err).int1 as usize] = b'^';
+//         buf[(*err).int1 as usize + 1] = 0;
+//         xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, buf);
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
