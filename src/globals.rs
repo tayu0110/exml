@@ -162,3 +162,8 @@ pub fn set_default_buffer_allocation_scheme(scheme: XmlBufferAllocationScheme) {
 pub fn get_default_buffer_allocation_scheme() -> XmlBufferAllocationScheme {
     GLOBAL_STATE.with_borrow(|state| state.buffer_alloc_scheme)
 }
+
+/// Reset last global error.
+pub fn reset_last_error() {
+    GLOBAL_STATE.with_borrow_mut(|state| state.last_error.reset());
+}

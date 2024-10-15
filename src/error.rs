@@ -13,7 +13,7 @@ use std::{
 use libc::{fdopen, fflush};
 
 use crate::{
-    globals::{GenericError, XmlGlobalState},
+    globals::{GenericError, GLOBAL_STATE},
     libxml::{
         globals::xml_generic_error,
         parser::{XmlParserCtxtPtr, XmlParserInputPtr},
@@ -259,146 +259,153 @@ pub unsafe fn report_error(
     msg: Option<&str>,
     channel: Option<GenericError>,
     data: Option<&mut (dyn Write + 'static)>,
-    state: &mut XmlGlobalState,
 ) {
     let mut name: *const u8 = null_mut();
     let mut input: XmlParserInputPtr = null_mut();
     let mut cur: XmlParserInputPtr = null_mut();
 
-    let (channel, data) = if let Some(channel) = channel {
-        (channel, data)
-    } else {
-        (
-            state.generic_error,
-            state.generic_error_context.as_deref_mut(),
-        )
-    };
-    let file = err.file.as_ref();
-    let line = err.line;
-    let code = err.code;
-    let domain = err.domain;
-    let level = err.level;
-    let node: XmlNodePtr = err.node.map_or(null_mut(), |n| n.as_ptr()) as _;
-
-    if code.is_ok() {
-        return;
-    }
-
-    if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
-        name = (*node).name;
-    }
-
-    let mut output = String::new();
-    /*
-     * Maintain the compatibility with the legacy error handling
-     */
-    if !ctxt.is_null() {
-        input = (*ctxt).input;
-        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-            cur = input;
-            input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-        }
-        if !input.is_null() {
-            if !(*input).filename.is_null() {
-                write!(
-                    output,
-                    "{}:{}: ",
-                    CStr::from_ptr((*input).filename).to_string_lossy(),
-                    (*input).line
-                );
-            } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                write!(output, "Entity: line {}: ", (*input).line);
-            }
-        }
-    } else if let Some(file) = file {
-        write!(output, "{file}:{line}: ");
-    } else if line != 0
-        && (domain == XmlErrorDomain::XmlFromParser
-            || domain == XmlErrorDomain::XmlFromSchemasv
-            || domain == XmlErrorDomain::XmlFromSchemasp
-            || domain == XmlErrorDomain::XmlFromDTD
-            || domain == XmlErrorDomain::XmlFromRelaxngp
-            || domain == XmlErrorDomain::XmlFromRelaxngv)
-    {
-        write!(output, "Entity: line {line}: ");
-    }
-    if !name.is_null() {
-        write!(
-            output,
-            "element {}: ",
-            CStr::from_ptr(name as *const i8).to_string_lossy()
-        );
-    }
-    match domain {
-        XmlErrorDomain::XmlFromParser => write!(output, "parser "),
-        XmlErrorDomain::XmlFromNamespace => write!(output, "namespace "),
-        XmlErrorDomain::XmlFromDTD | XmlErrorDomain::XmlFromValid => {
-            write!(output, "validity ")
-        }
-        XmlErrorDomain::XmlFromHTML => write!(output, "HTML parser "),
-        XmlErrorDomain::XmlFromMemory => write!(output, "memory "),
-        XmlErrorDomain::XmlFromOutput => write!(output, "output "),
-        XmlErrorDomain::XmlFromIO => write!(output, "I/O "),
-        XmlErrorDomain::XmlFromXInclude => write!(output, "XInclude "),
-        XmlErrorDomain::XmlFromXPath => write!(output, "XPath "),
-        XmlErrorDomain::XmlFromXPointer => write!(output, "parser "),
-        XmlErrorDomain::XmlFromRegexp => write!(output, "regexp "),
-        XmlErrorDomain::XmlFromModule => write!(output, "module "),
-        XmlErrorDomain::XmlFromSchemasv => write!(output, "Schemas validity "),
-        XmlErrorDomain::XmlFromSchemasp => write!(output, "Schemas parser "),
-        XmlErrorDomain::XmlFromRelaxngp => write!(output, "Relax-NG parser "),
-        XmlErrorDomain::XmlFromRelaxngv => write!(output, "Relax-NG validity "),
-        XmlErrorDomain::XmlFromCatalog => write!(output, "Catalog "),
-        XmlErrorDomain::XmlFromC14N => write!(output, "C14N "),
-        XmlErrorDomain::XmlFromXSLT => write!(output, "XSLT "),
-        XmlErrorDomain::XmlFromI18N => write!(output, "encoding "),
-        XmlErrorDomain::XmlFromSchematronv => write!(output, "schematron "),
-        XmlErrorDomain::XmlFromBuffer => write!(output, "internal buffer "),
-        XmlErrorDomain::XmlFromURI => write!(output, "URI "),
-        _ => Ok(()),
-    };
-    match level {
-        XmlErrorLevel::XmlErrNone => write!(output, ": "),
-        XmlErrorLevel::XmlErrWarning => write!(output, "warning : "),
-        XmlErrorLevel::XmlErrError => write!(output, "error : "),
-        XmlErrorLevel::XmlErrFatal => write!(output, "error : "),
-    };
-    if let Some(msg) = msg {
-        if !msg.is_empty() && !msg.ends_with('\n') {
-            writeln!(output, "{msg}").ok();
+    GLOBAL_STATE.with_borrow_mut(|state| {
+        let channel = if let Some(channel) = channel {
+            channel
         } else {
-            write!(output, "{msg}");
-        }
-    } else {
-        writeln!(output, "out of memory error").ok();
-    }
+            state.generic_error
+        };
+        let mut stderr = std::io::stderr();
+        let data = data.unwrap_or(
+            state
+                .generic_error_context
+                .as_deref_mut()
+                .unwrap_or(&mut stderr),
+        );
+        let file = err.file.as_ref();
+        let line = err.line;
+        let code = err.code;
+        let domain = err.domain;
+        let level = err.level;
+        let node: XmlNodePtr = err.node.map_or(null_mut(), |n| n.as_ptr()) as _;
 
-    if !ctxt.is_null() {
-        parser_print_file_context_internal(input, &mut output);
-        if !cur.is_null() {
-            if !(*cur).filename.is_null() {
-                writeln!(
-                    output,
-                    "{}:{}: ",
-                    CStr::from_ptr((*cur).filename).to_string_lossy(),
-                    (*cur).line
-                )
-                .ok();
-            } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                writeln!(output, "Entity: line {}: ", (*cur).line).ok();
+        if code.is_ok() {
+            return;
+        }
+
+        if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
+            name = (*node).name;
+        }
+
+        let mut output = String::new();
+        /*
+         * Maintain the compatibility with the legacy error handling
+         */
+        if !ctxt.is_null() {
+            input = (*ctxt).input;
+            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+                cur = input;
+                input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
             }
-            parser_print_file_context_internal(cur, &mut output);
-        }
-    }
-    if let Some(str1) = err.str1.as_ref() {
-        if domain == XmlErrorDomain::XmlFromXPath && err.int1 < 100 && err.int1 < str1.len() as i32
+            if !input.is_null() {
+                if !(*input).filename.is_null() {
+                    write!(
+                        output,
+                        "{}:{}: ",
+                        CStr::from_ptr((*input).filename).to_string_lossy(),
+                        (*input).line
+                    );
+                } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
+                    write!(output, "Entity: line {}: ", (*input).line);
+                }
+            }
+        } else if let Some(file) = file {
+            write!(output, "{file}:{line}: ");
+        } else if line != 0
+            && (domain == XmlErrorDomain::XmlFromParser
+                || domain == XmlErrorDomain::XmlFromSchemasv
+                || domain == XmlErrorDomain::XmlFromSchemasp
+                || domain == XmlErrorDomain::XmlFromDTD
+                || domain == XmlErrorDomain::XmlFromRelaxngp
+                || domain == XmlErrorDomain::XmlFromRelaxngv)
         {
-            writeln!(output, "{str1}").ok();
-            output.push_str(" ".repeat(err.int1 as usize).as_str());
-            output.push_str("^\n");
+            write!(output, "Entity: line {line}: ");
         }
-    }
-    channel(data, &output);
+        if !name.is_null() {
+            write!(
+                output,
+                "element {}: ",
+                CStr::from_ptr(name as *const i8).to_string_lossy()
+            );
+        }
+        match domain {
+            XmlErrorDomain::XmlFromParser => write!(output, "parser "),
+            XmlErrorDomain::XmlFromNamespace => write!(output, "namespace "),
+            XmlErrorDomain::XmlFromDTD | XmlErrorDomain::XmlFromValid => {
+                write!(output, "validity ")
+            }
+            XmlErrorDomain::XmlFromHTML => write!(output, "HTML parser "),
+            XmlErrorDomain::XmlFromMemory => write!(output, "memory "),
+            XmlErrorDomain::XmlFromOutput => write!(output, "output "),
+            XmlErrorDomain::XmlFromIO => write!(output, "I/O "),
+            XmlErrorDomain::XmlFromXInclude => write!(output, "XInclude "),
+            XmlErrorDomain::XmlFromXPath => write!(output, "XPath "),
+            XmlErrorDomain::XmlFromXPointer => write!(output, "parser "),
+            XmlErrorDomain::XmlFromRegexp => write!(output, "regexp "),
+            XmlErrorDomain::XmlFromModule => write!(output, "module "),
+            XmlErrorDomain::XmlFromSchemasv => write!(output, "Schemas validity "),
+            XmlErrorDomain::XmlFromSchemasp => write!(output, "Schemas parser "),
+            XmlErrorDomain::XmlFromRelaxngp => write!(output, "Relax-NG parser "),
+            XmlErrorDomain::XmlFromRelaxngv => write!(output, "Relax-NG validity "),
+            XmlErrorDomain::XmlFromCatalog => write!(output, "Catalog "),
+            XmlErrorDomain::XmlFromC14N => write!(output, "C14N "),
+            XmlErrorDomain::XmlFromXSLT => write!(output, "XSLT "),
+            XmlErrorDomain::XmlFromI18N => write!(output, "encoding "),
+            XmlErrorDomain::XmlFromSchematronv => write!(output, "schematron "),
+            XmlErrorDomain::XmlFromBuffer => write!(output, "internal buffer "),
+            XmlErrorDomain::XmlFromURI => write!(output, "URI "),
+            _ => Ok(()),
+        };
+        match level {
+            XmlErrorLevel::XmlErrNone => write!(output, ": "),
+            XmlErrorLevel::XmlErrWarning => write!(output, "warning : "),
+            XmlErrorLevel::XmlErrError => write!(output, "error : "),
+            XmlErrorLevel::XmlErrFatal => write!(output, "error : "),
+        };
+        if let Some(msg) = msg {
+            if !msg.is_empty() && !msg.ends_with('\n') {
+                writeln!(output, "{msg}").ok();
+            } else {
+                write!(output, "{msg}");
+            }
+        } else {
+            writeln!(output, "out of memory error").ok();
+        }
+
+        if !ctxt.is_null() {
+            parser_print_file_context_internal(input, &mut output);
+            if !cur.is_null() {
+                if !(*cur).filename.is_null() {
+                    writeln!(
+                        output,
+                        "{}:{}: ",
+                        CStr::from_ptr((*cur).filename).to_string_lossy(),
+                        (*cur).line
+                    )
+                    .ok();
+                } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
+                    writeln!(output, "Entity: line {}: ", (*cur).line).ok();
+                }
+                parser_print_file_context_internal(cur, &mut output);
+            }
+        }
+        if let Some(str1) = err.str1.as_ref() {
+            if domain == XmlErrorDomain::XmlFromXPath
+                && err.int1 < 100
+                && err.int1 < str1.len() as i32
+            {
+                writeln!(output, "{str1}").ok();
+                output.push_str(" ".repeat(err.int1 as usize).as_str());
+                output.push_str("^\n");
+            }
+        }
+        channel(Some(data), &output);
+    });
 }
 
 pub(crate) fn parser_error(ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {

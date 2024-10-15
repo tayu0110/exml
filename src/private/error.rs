@@ -48,7 +48,8 @@ macro_rules! __xml_raise_error {
             globals::{GenericError, StructuredError, GLOBAL_STATE},
             error::{
                 generic_error_default, parser_error, parser_warning, parser_validity_error,
-                parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel
+                parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel,
+                ErrorContextWrap,
             },
             libxml::{
                 globals::xml_get_warnings_default_value,
@@ -73,8 +74,8 @@ macro_rules! __xml_raise_error {
             int1: c_int,
             mut col: c_int,
             msg: *const c_char| {
-                GLOBAL_STATE.with_borrow_mut(|state| {
-                    let mut ctxt: XmlParserCtxtPtr = null_mut();
+                let mut ctxt: XmlParserCtxtPtr = null_mut();
+                let Some((channel, error, s, mut data)) = GLOBAL_STATE.with_borrow_mut(|state| {
                     let mut node: XmlNodePtr = nod as XmlNodePtr;
                     let mut str: *mut c_char;
                     let mut input: XmlParserInputPtr;
@@ -83,10 +84,10 @@ macro_rules! __xml_raise_error {
                     let mut baseptr: XmlNodePtr = null_mut();
 
                     if code == XmlParserErrors::XmlErrOK {
-                        return;
+                        return None;
                     }
                     if *xml_get_warnings_default_value() == 0 && matches!(level, XmlErrorLevel::XmlErrWarning) {
-                        return;
+                        return None;
                     }
                     if domain == XmlErrorDomain::XmlFromParser
                         || domain == XmlErrorDomain::XmlFromHTML
@@ -99,12 +100,12 @@ macro_rules! __xml_raise_error {
                         if !ctxt.is_null() {
                             if matches!(level, XmlErrorLevel::XmlErrWarning) {
                                 if (*ctxt).nb_warnings >= XML_MAX_ERRORS as u16 {
-                                    return;
+                                    return None;
                                 }
                                 (*ctxt).nb_warnings += 1;
                             } else {
                                 if (*ctxt).nb_errors >= XML_MAX_ERRORS as u16 {
-                                    return;
+                                    return None;
                                 }
                                 (*ctxt).nb_errors += 1;
                             }
@@ -226,9 +227,9 @@ macro_rules! __xml_raise_error {
                                 }
                             }
                             if !href.is_null() {
-                                (*to).file = Some(CStr::from_ptr(href).to_string_lossy().into());
+                                to.file = Some(CStr::from_ptr(href).to_string_lossy().into());
                             } else {
-                                (*to).file = (!(*(*baseptr).doc).url.is_null()).then(|| {
+                                to.file = (!(*(*baseptr).doc).url.is_null()).then(|| {
                                     CStr::from_ptr((*(*baseptr).doc).url as *const i8)
                                         .to_string_lossy()
                                         .into()
@@ -236,45 +237,46 @@ macro_rules! __xml_raise_error {
                             }
                         }
                         #[cfg(not(feature = "xinclude"))] {
-                            (*to).file = (!(*(*baseptr).doc).url.is_null()).then(|| {
+                            to.file = (!(*(*baseptr).doc).url.is_null()).then(|| {
                                 CStr::from_ptr((*(*baseptr).doc).url as *const i8)
                                     .to_string_lossy()
                                     .into()
                             });
                         }
-                        if (*to).file.is_none() && !node.is_null() && !(*node).doc.is_null() {
-                            (*to).file = (!(*(*node).doc).url.is_null()).then(|| {
+                        if to.file.is_none() && !node.is_null() && !(*node).doc.is_null() {
+                            to.file = (!(*(*node).doc).url.is_null()).then(|| {
                                 CStr::from_ptr((*(*node).doc).url as *const i8)
                                     .to_string_lossy()
                                     .into()
                             });
                         }
                     }
-                    (*to).line = line as usize;
+                    to.line = line as usize;
                     if !str1.is_null() {
-                        (*to).str1 = Some(CStr::from_ptr(str1 as *const i8).to_string_lossy().into());
+                        to.str1 = Some(CStr::from_ptr(str1 as *const i8).to_string_lossy().into());
                     }
                     if !str2.is_null() {
-                        (*to).str2 = Some(CStr::from_ptr(str2 as *const i8).to_string_lossy().into());
+                        to.str2 = Some(CStr::from_ptr(str2 as *const i8).to_string_lossy().into());
                     }
                     if !str3.is_null() {
-                        (*to).str3 = Some(CStr::from_ptr(str3 as *const i8).to_string_lossy().into());
+                        to.str3 = Some(CStr::from_ptr(str3 as *const i8).to_string_lossy().into());
                     }
-                    (*to).int1 = int1;
-                    (*to).int2 = col;
-                    (*to).node = NonNull::new(node as _);
-                    (*to).ctxt = NonNull::new(ctx);
+                    to.int1 = int1;
+                    to.int2 = col;
+                    to.node = NonNull::new(node as _);
+                    to.ctxt = NonNull::new(ctx);
 
+                    let error = to.clone();
                     state.last_error = to.clone();
                     if let Some(schannel) = schannel {
                         schannel(data, &state.last_error);
-                        return;
+                        return None;
                     }
 
                     /*
                      * Find the callback channel if channel param is NULL
                      */
-                    let data = if !ctxt.is_null() && channel.is_none()
+                    if !ctxt.is_null() && channel.is_none()
                         && state.structured_error.is_none()
                         && !(*ctxt).sax.is_null() {
                         if matches!(level, XmlErrorLevel::XmlErrWarning) {
@@ -284,40 +286,37 @@ macro_rules! __xml_raise_error {
                         }
                         // TODO:
                         // data = (*ctxt).user_data;
-                        None
+                        let data: Box<dyn std::io::Write> = Box::new(ErrorContextWrap((*ctxt).user_data));
+                        channel.map(|c| (c, error, str, Some(data)))
                     } else if channel.is_none() {
                         channel = Some(state.generic_error);
                         if !ctxt.is_null() {
                             // TODO:
                             // data = ctxt as _;
-                            None
+                            let data: Box<dyn std::io::Write> = Box::new(ErrorContextWrap(ctxt));
+                            channel.map(|c| (c, error, str, Some(data)))
                         } else {
-                            None
+                            // TODO:
                             // state.generic_error_context.as_deref_mut()
-                            // data = xml_generic_error_context();
+                            channel.map(|c| (c, error, str, None))
                         }
                     } else {
-                        None
-                    };
-                    if channel.is_none() {
-                        return;
+                        channel.map(|c| (c, error, str, None))
                     }
-
-                    let channel = channel.unwrap();
-                    if channel as usize == parser_error as usize
-                        || channel as usize == parser_warning as usize
-                        || channel as usize == parser_validity_error as usize
-                        || channel as usize == parser_validity_warning as usize {
-                        let error = state.last_error.clone();
-                        report_error(&error, ctxt, Some(str.as_ref()), None, None, state);
-                    } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */
-                        channel as usize == generic_error_default as usize {
-                        let error = state.last_error.clone();
-                        report_error(&error, ctxt, Some(str.as_ref()), Some(channel), data, state);
-                    } else {
-                        channel(data, str.as_ref());
-                    }
-                });
+                }) else {
+                    return;
+                };
+                if channel as usize == parser_error as usize
+                    || channel as usize == parser_warning as usize
+                    || channel as usize == parser_validity_error as usize
+                    || channel as usize == parser_validity_warning as usize {
+                    report_error(&error, ctxt, Some(s.as_ref()), None, None);
+                } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */
+                    channel as usize == generic_error_default as usize {
+                    report_error(&error, ctxt, Some(s.as_ref()), Some(channel), data.as_deref_mut());
+                } else {
+                    channel(data.as_deref_mut(), s.as_ref());
+                }
         })($schannel, $channel, $data, $ctx, $nod, $domain, $code, $level, $file, $line, $str1, $str2, $str3, $int1, $col, $msg);
     }};
 }

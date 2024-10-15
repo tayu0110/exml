@@ -18,7 +18,7 @@ use std::{
 
 use const_format::concatcp;
 use exml::{
-    globals::set_generic_error,
+    globals::{reset_last_error, set_generic_error},
     libxml::{
         encoding::{
             xml_char_enc_close_func, xml_get_char_encoding_handler, XmlCharEncoding,
@@ -55,8 +55,8 @@ use exml::{
             xml_register_input_callbacks,
         },
         xmlerror::{
-            xml_reset_last_error, xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel,
-            XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors,
+            xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr,
+            XmlGenericErrorFunc, XmlParserErrors,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -6970,7 +6970,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                 error,
                 tst.options | XmlParserOption::XmlParseCompact as i32,
             );
-            xml_reset_last_error();
+            reset_last_error();
             if res != 0 {
                 eprintln!(
                     "File {} generated an error",
