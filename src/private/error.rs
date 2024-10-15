@@ -51,7 +51,7 @@ macro_rules! __xml_raise_error {
                 parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel
             },
             libxml::{
-                globals::{__xml_structured_error, xml_get_warnings_default_value},
+                globals::xml_get_warnings_default_value,
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
                 tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
                 xmlerror::{XmlParserErrors, XML_MAX_ERRORS},
@@ -189,12 +189,12 @@ macro_rules! __xml_raise_error {
                      * Save the information about the error
                      */
                     to.reset();
-                    (*to).domain = domain;
-                    (*to).code = code;
-                    (*to).message = Some(str.clone());
-                    (*to).level = level;
+                    to.domain = domain;
+                    to.code = code;
+                    to.message = Some(str.clone());
+                    to.level = level;
                     if !file.is_null() {
-                        (*to).file = Some(CStr::from_ptr(file as *const i8).to_string_lossy().into());
+                        to.file = Some(CStr::from_ptr(file as *const i8).to_string_lossy().into());
                     } else if !baseptr.is_null() {
                         #[cfg(feature = "xinclude")]
                         {
@@ -275,7 +275,7 @@ macro_rules! __xml_raise_error {
                      * Find the callback channel if channel param is NULL
                      */
                     let data = if !ctxt.is_null() && channel.is_none()
-                        && __xml_structured_error().is_none()
+                        && state.structured_error.is_none()
                         && !(*ctxt).sax.is_null() {
                         if matches!(level, XmlErrorLevel::XmlErrWarning) {
                             channel = (*(*ctxt).sax).warning;

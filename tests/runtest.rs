@@ -55,8 +55,8 @@ use exml::{
             xml_register_input_callbacks,
         },
         xmlerror::{
-            xml_reset_last_error, xml_set_generic_error_func, xml_set_structured_error_func,
-            XmlErrorDomain, XmlErrorLevel, XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors,
+            xml_reset_last_error, xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel,
+            XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -2084,7 +2084,8 @@ unsafe extern "C" fn sax_parse_test(
     }
 
     /* switch back to structured error handling */
-    xml_set_generic_error_func(null_mut(), None);
+    set_generic_error(None, None::<Stderr>);
+    // xml_set_generic_error_func(null_mut(), None);
     xml_set_structured_error_func(null_mut(), Some(test_structured_error_handler));
 
     ret
@@ -3399,7 +3400,7 @@ static XPATH_OUTPUT: Mutex<Option<File>> = Mutex::new(None);
 static XPATH_DOCUMENT: AtomicPtr<XmlDoc> = AtomicPtr::new(null_mut());
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-unsafe extern "C" fn ignore_generic_error(_ctx: *mut c_void, _msg: *const c_char) {}
+fn ignore_generic_error(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
@@ -3420,7 +3421,8 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     let ctxt: XmlXPathContextPtr;
 
     /* Don't print generic errors to stderr. */
-    xml_set_generic_error_func(null_mut(), Some(ignore_generic_error));
+    set_generic_error(Some(ignore_generic_error), None::<Stderr>);
+    // xml_set_generic_error_func(null_mut(), Some(ignore_generic_error));
 
     NB_TESTS += 1;
     if cfg!(feature = "libxml_xptr") && xptr != 0 {
@@ -3461,7 +3463,8 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     xml_xpath_free_context(ctxt);
 
     /* Reset generic error handler. */
-    xml_set_generic_error_func(null_mut(), None);
+    set_generic_error(None, None::<Stderr>);
+    // xml_set_generic_error_func(null_mut(), None);
 }
 
 /**
