@@ -1177,45 +1177,45 @@ macro_rules! xml_error_with_format {
  */
 // pub unsafe extern "C" fn xmlParserError(ctx: *mut c_void, msg: *const c_char, ...) {
 // }
-#[macro_export]
-macro_rules! xmlParserError {
-    ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-        (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-            let mut str: *mut libc::c_char;
-            $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-            $crate::libxml::xmlerror::xmlParserError(ctx, str as _);
-            if !str.is_null() {
-                $crate::libxml::globals::xml_free(str as _);
-            }
-        })($ctx, $msg)
-    };
-}
-pub(crate) unsafe extern "C" fn xml_parser_error(ctx: *mut c_void, msg: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut input: XmlParserInputPtr = null_mut();
-    let mut cur: XmlParserInputPtr = null_mut();
+// #[macro_export]
+// macro_rules! xmlParserError {
+//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
+//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
+//             let mut str: *mut libc::c_char;
+//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
+//             $crate::libxml::xmlerror::xmlParserError(ctx, str as _);
+//             if !str.is_null() {
+//                 $crate::libxml::globals::xml_free(str as _);
+//             }
+//         })($ctx, $msg)
+//     };
+// }
+// pub(crate) unsafe extern "C" fn xml_parser_error(ctx: *mut c_void, msg: *const c_char) {
+//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+//     let mut input: XmlParserInputPtr = null_mut();
+//     let mut cur: XmlParserInputPtr = null_mut();
 
-    if !ctxt.is_null() {
-        input = (*ctxt).input;
-        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-            cur = input;
-            input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-        }
-        xml_parser_print_file_info(input);
-    }
+//     if !ctxt.is_null() {
+//         input = (*ctxt).input;
+//         if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+//             cur = input;
+//             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+//         }
+//         xml_parser_print_file_info(input);
+//     }
 
-    xml_generic_error(xml_generic_error_context(), c"error: ".as_ptr() as _);
-    xml_generic_error(xml_generic_error_context(), msg as _);
+//     xml_generic_error(xml_generic_error_context(), c"error: ".as_ptr() as _);
+//     xml_generic_error(xml_generic_error_context(), msg as _);
 
-    if !ctxt.is_null() {
-        xml_parser_print_file_context(input);
-        if !cur.is_null() {
-            xml_parser_print_file_info(cur);
-            xml_generic_error(xml_generic_error_context(), c"\n".as_ptr() as _);
-            xml_parser_print_file_context(cur);
-        }
-    }
-}
+//     if !ctxt.is_null() {
+//         xml_parser_print_file_context(input);
+//         if !cur.is_null() {
+//             xml_parser_print_file_info(cur);
+//             xml_generic_error(xml_generic_error_context(), c"\n".as_ptr() as _);
+//             xml_parser_print_file_context(cur);
+//         }
+//     }
+// }
 
 /**
  * xmlParserWarning:

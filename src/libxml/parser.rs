@@ -941,7 +941,7 @@ pub struct XmlSAXHandler {
     pub comment: Option<CommentSAXFunc>,
     pub warning: Option<GenericError>,
     pub error: Option<GenericError>,
-    pub fatal_error: Option<FatalErrorSAXFunc>, /* unused error() get all the errors */
+    pub fatal_error: Option<GenericError>, /* unused error() get all the errors */
     pub get_parameter_entity: Option<GetParameterEntitySAXFunc>,
     pub cdata_block: Option<CdataBlockSAXFunc>,
     pub external_subset: Option<ExternalSubsetSAXFunc>,
@@ -984,7 +984,7 @@ pub struct XmlSAXHandlerV1 {
     pub(crate) comment: Option<CommentSAXFunc>,
     pub(crate) warning: Option<GenericError>,
     pub(crate) error: Option<GenericError>,
-    pub(crate) fatal_error: Option<FatalErrorSAXFunc>, /* unused error() get all the errors */
+    pub(crate) fatal_error: Option<GenericError>, /* unused error() get all the errors */
     pub(crate) get_parameter_entity: Option<GetParameterEntitySAXFunc>,
     pub(crate) cdata_block: Option<CdataBlockSAXFunc>,
     pub(crate) external_subset: Option<ExternalSubsetSAXFunc>,

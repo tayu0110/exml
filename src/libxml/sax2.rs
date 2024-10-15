@@ -73,7 +73,7 @@ use super::{
         xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
         xml_validate_root,
     },
-    xmlerror::{xml_parser_error, XmlParserErrors},
+    xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strndup},
 };
 
@@ -3585,7 +3585,7 @@ pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: c_in
     (*hdlr).comment = Some(xml_sax2_comment);
     (*hdlr).warning = Some(parser_warning);
     (*hdlr).error = Some(parser_error);
-    (*hdlr).fatal_error = Some(xml_parser_error);
+    (*hdlr).fatal_error = Some(parser_error);
 
     0
 }
@@ -3651,7 +3651,7 @@ pub unsafe extern "C" fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSA
     (*hdlr).comment = Some(xml_sax2_comment);
     (*hdlr).warning = Some(parser_warning);
     (*hdlr).error = Some(parser_error);
-    (*hdlr).fatal_error = Some(xml_parser_error);
+    (*hdlr).fatal_error = Some(parser_error);
 
     (*hdlr).initialized = 1;
 }

@@ -1461,12 +1461,14 @@ fn error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
  * Display and format a fatalError messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn fatal_error_debug(_ctx: *mut c_void, msg: *const c_char) {
-    CALLBACKS += 1;
-    if QUIET != 0 {
-        return;
+fn fatal_error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+    unsafe {
+        CALLBACKS += 1;
+        if QUIET != 0 {
+            return;
+        }
     }
-    sax_debug!("SAX.fatalError: {}", CStr::from_ptr(msg).to_string_lossy());
+    sax_debug!("SAX.fatalError: {msg}");
 }
 
 static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {

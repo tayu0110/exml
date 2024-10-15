@@ -31636,11 +31636,11 @@ fn error_split(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
     //     // TODO
     // }
 }
-unsafe extern "C" fn fatal_error_split(ctx: *mut c_void, _msg: *const c_char) {
-    let ctxt: XmlSchemaSAXPlugPtr = ctx as XmlSchemaSAXPlugPtr;
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).fatal_error.is_some() {
-        // TODO
-    }
+fn fatal_error_split(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+    // let ctxt: XmlSchemaSAXPlugPtr = ctx as XmlSchemaSAXPlugPtr;
+    // if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).fatal_error.is_some() {
+    //     // TODO
+    // }
 }
 
 /*

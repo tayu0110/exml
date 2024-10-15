@@ -1299,7 +1299,7 @@ fn error_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
  * Display and format a fatalError messages, gives file, line, position and
  * extra parameters.
  */
-unsafe extern "C" fn fatal_error_callback(_ctx: *mut c_void, _msg: *const c_char) {}
+fn fatal_error_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {}
 
 /*
  * SAX2 specific callbacks
