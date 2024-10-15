@@ -13,7 +13,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use libc::{memcpy, memset, FILE};
 
 use crate::error::generic_error_default;
-use crate::libxml::globals::_XML_GENERIC_ERROR;
 use crate::libxml::parser::{XmlParserCtxtPtr, XmlParserInputPtr};
 
 use super::globals::{xml_free, xml_generic_error, xml_generic_error_context, xml_last_error};
@@ -1054,19 +1053,19 @@ pub(crate) unsafe extern "C" fn xml_generic_error_default_func(
 //     );
 // }
 
-/**
- * initGenericErrorDefaultFunc:
- * @handler:  the handler
- *
- * DEPRECATED: Use xmlSetGenericErrorFunc.
- *
- * Set or reset (if NULL) the default handler for generic errors
- * to the builtin error function.
- */
-#[deprecated]
-pub unsafe extern "C" fn init_generic_error_default_func(handler: Option<XmlGenericErrorFunc>) {
-    _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
-}
+// /**
+//  * initGenericErrorDefaultFunc:
+//  * @handler:  the handler
+//  *
+//  * DEPRECATED: Use xmlSetGenericErrorFunc.
+//  *
+//  * Set or reset (if NULL) the default handler for generic errors
+//  * to the builtin error function.
+//  */
+// #[deprecated]
+// pub unsafe extern "C" fn init_generic_error_default_func(handler: Option<XmlGenericErrorFunc>) {
+//     _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
+// }
 
 // /**
 //  * xmlSetStructuredErrorFunc:
@@ -1898,33 +1897,33 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_init_generic_error_default_func() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_init_generic_error_default_func() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_handler in 0..GEN_NB_XML_GENERIC_ERROR_FUNC_PTR {
-                let mem_base = xml_mem_blocks();
-                let handler = gen_xml_generic_error_func_ptr(n_handler, 0);
+    //         for n_handler in 0..GEN_NB_XML_GENERIC_ERROR_FUNC_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let handler = gen_xml_generic_error_func_ptr(n_handler, 0);
 
-                init_generic_error_default_func(handler);
-                des_xml_generic_error_func_ptr(n_handler, handler, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in initGenericErrorDefaultFunc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in initGenericErrorDefaultFunc()"
-                    );
-                    eprintln!(" {}", n_handler);
-                }
-            }
-        }
-    }
+    //             init_generic_error_default_func(handler);
+    //             des_xml_generic_error_func_ptr(n_handler, handler, 0);
+    //             reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in initGenericErrorDefaultFunc",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(
+    //                     leaks == 0,
+    //                     "{leaks} Leaks are found in initGenericErrorDefaultFunc()"
+    //                 );
+    //                 eprintln!(" {}", n_handler);
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_copy_error() {
