@@ -1762,10 +1762,7 @@ pub fn xml_is_pubid_char(ch: c_uint) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -1781,7 +1778,7 @@ mod tests {
                 let ret_val = xml_is_base_char(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1807,7 +1804,7 @@ mod tests {
                 let ret_val = xml_is_blank(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1833,7 +1830,7 @@ mod tests {
                 let ret_val = xml_is_char(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1859,7 +1856,7 @@ mod tests {
                 let ret_val = xml_is_combining(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1885,7 +1882,7 @@ mod tests {
                 let ret_val = xml_is_digit(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1911,7 +1908,7 @@ mod tests {
                 let ret_val = xml_is_extender(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1937,7 +1934,7 @@ mod tests {
                 let ret_val = xml_is_ideographic(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1963,7 +1960,7 @@ mod tests {
                 let ret_val = xml_is_pubid_char(ch) as i32;
                 desret_int(ret_val);
                 des_unsigned_int(n_ch, ch, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(

@@ -1531,18 +1531,18 @@ pub unsafe extern "C" fn xml_get_last_error() -> XmlErrorPtr {
     xml_last_error()
 }
 
-/**
- * xmlResetLastError:
- *
- * Cleanup the last global error registered. For parsing error
- * this does not change the well-formedness result.
- */
-pub unsafe extern "C" fn xml_reset_last_error() {
-    if (*xml_last_error()).code == XmlParserErrors::XmlErrOK as _ {
-        return;
-    }
-    xml_reset_error(xml_last_error());
-}
+// /**
+//  * xmlResetLastError:
+//  *
+//  * Cleanup the last global error registered. For parsing error
+//  * this does not change the well-formedness result.
+//  */
+// pub unsafe extern "C" fn xml_reset_last_error() {
+//     if (*xml_last_error()).code == XmlParserErrors::XmlErrOK as _ {
+//         return;
+//     }
+//     xml_reset_error(xml_last_error());
+// }
 
 /**
  * xmlCtxtGetLastError:
@@ -1898,6 +1898,7 @@ pub unsafe extern "C" fn xml_report_error(
 
 #[cfg(test)]
 mod tests {
+    use crate::globals::reset_last_error;
     use crate::libxml::xmlmemory::xml_mem_blocks;
     use crate::test_util::*;
 
@@ -1914,7 +1915,7 @@ mod tests {
 
                 init_generic_error_default_func(handler);
                 des_xml_generic_error_func_ptr(n_handler, handler, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1946,7 +1947,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_error_ptr(n_from, from, 0);
                     des_xml_error_ptr(n_to, to, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1979,7 +1980,7 @@ mod tests {
 
     //             xml_ctxt_reset_last_error(ctx);
     //             des_void_ptr(n_ctx, ctx, 0);
-    //             xml_reset_last_error();
+    //             reset_last_error();
     //             if mem_base != xml_mem_blocks() {
     //                 leaks += 1;
     //                 eprint!(
@@ -2019,7 +2020,7 @@ mod tests {
 
                 xml_parser_print_file_context(input);
                 des_xml_parser_input_ptr(n_input, input, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2047,7 +2048,7 @@ mod tests {
 
                 xml_parser_print_file_info(input);
                 des_xml_parser_input_ptr(n_input, input, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2093,7 +2094,7 @@ mod tests {
 
                 xml_reset_error(err);
                 des_xml_error_ptr(n_err, err, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2109,10 +2110,8 @@ mod tests {
 
     #[test]
     fn test_xml_reset_last_error() {
-        unsafe {
-            xml_reset_last_error();
-            xml_reset_last_error();
-        }
+        reset_last_error();
+        reset_last_error();
     }
 
     #[test]

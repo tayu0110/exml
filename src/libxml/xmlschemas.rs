@@ -31989,10 +31989,7 @@ pub unsafe extern "C" fn xml_schema_validate_set_locator(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -32011,7 +32008,7 @@ mod tests {
                     xml_schema_dump(output, schema);
                     des_file_ptr(n_output, output, 0);
                     des_xml_schema_ptr(n_schema, schema, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -32049,7 +32046,7 @@ mod tests {
     //                         des_xml_schema_validity_error_func_ptr(n_err, err, 1);
     //                         des_xml_schema_validity_warning_func_ptr(n_warn, warn, 2);
     //                         des_void_ptr_ptr(n_ctx, ctx, 3);
-    //                         xml_reset_last_error();
+    //                         reset_last_error();
     //                         if mem_base != xml_mem_blocks() {
     //                             leaks += 1;
     //                             eprint!(
@@ -32094,7 +32091,7 @@ mod tests {
     //                         des_xml_schema_validity_error_func_ptr(n_err, err, 1);
     //                         des_xml_schema_validity_warning_func_ptr(n_warn, warn, 2);
     //                         des_void_ptr_ptr(n_ctx, ctx, 3);
-    //                         xml_reset_last_error();
+    //                         reset_last_error();
     //                         if mem_base != xml_mem_blocks() {
     //                             leaks += 1;
     //                             eprint!(
@@ -32130,7 +32127,7 @@ mod tests {
                 let ret_val = xml_schema_is_valid(ctxt);
                 desret_int(ret_val);
                 des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -32157,7 +32154,7 @@ mod tests {
                 let ret_val = xml_schema_new_doc_parser_ctxt(doc);
                 desret_xml_schema_parser_ctxt_ptr(ret_val);
                 des_xml_doc_ptr(n_doc, doc, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -32193,7 +32190,7 @@ mod tests {
                     desret_xml_schema_parser_ctxt_ptr(ret_val);
                     des_const_char_ptr(n_buffer, buffer, 0);
                     des_int(n_size, size, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -32225,7 +32222,7 @@ mod tests {
                 let ret_val = xml_schema_new_parser_ctxt(url);
                 desret_xml_schema_parser_ctxt_ptr(ret_val);
                 des_const_char_ptr(n_url, url, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -32273,7 +32270,7 @@ mod tests {
                 let ret_val = xml_schema_sax_unplug(plug);
                 desret_int(ret_val);
                 des_xml_schema_saxplug_ptr(n_plug, plug, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -32324,7 +32321,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_int(n_options, options, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -32362,7 +32359,7 @@ mod tests {
                 let ret_val = xml_schema_valid_ctxt_get_options(ctxt);
                 desret_int(ret_val);
                 des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -32392,7 +32389,7 @@ mod tests {
                 let ret_val = xml_schema_valid_ctxt_get_parser_ctxt(ctxt);
                 desret_xml_parser_ctxt_ptr(ret_val);
                 des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -32425,7 +32422,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -32463,7 +32460,7 @@ mod tests {
                         des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                         des_filepath(n_filename, filename, 1);
                         des_int(n_options, options, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -32500,7 +32497,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_elem, elem, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -32534,7 +32531,7 @@ mod tests {
                     xml_schema_validate_set_filename(vctxt, filename);
                     des_xml_schema_valid_ctxt_ptr(n_vctxt, vctxt, 0);
                     des_filepath(n_filename, filename, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -32585,7 +32582,7 @@ mod tests {
     //                             des_xml_char_encoding(n_enc, enc, 2);
     //                             des_xml_saxhandler_ptr(n_sax, sax, 3);
     //                             des_userdata(n_user_data, user_data, 4);
-    //                             xml_reset_last_error();
+    //                             reset_last_error();
     //                             if mem_base != xml_mem_blocks() {
     //                                 leaks += 1;
     //                                 eprint!(

@@ -8085,10 +8085,7 @@ pub unsafe extern "C" fn xml_schema_get_val_type(val: XmlSchemaValPtr) -> XmlSch
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -8114,7 +8111,7 @@ mod tests {
                             des_xml_schema_type_ptr(n_type_decl, type_decl, 1);
                             des_xml_schema_parser_ctxt_ptr(n_pctxt, pctxt, 2);
                             des_const_xml_char_ptr(n_name, name, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -8142,7 +8139,7 @@ mod tests {
         #[cfg(feature = "schema")]
         unsafe {
             xml_schema_cleanup_types();
-            xml_reset_last_error();
+            reset_last_error();
         }
     }
 
@@ -8159,7 +8156,7 @@ mod tests {
                 let ret_val = xml_schema_collapse_string(value as *const XmlChar);
                 desret_xml_char_ptr(ret_val);
                 des_const_xml_char_ptr(n_value, value, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8192,7 +8189,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_schema_val_ptr(n_x, x, 0);
                     des_xml_schema_val_ptr(n_y, y, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8233,7 +8230,7 @@ mod tests {
                             des_xml_schema_whitespace_value_type(n_xws, xws, 1);
                             des_xml_schema_val_ptr(n_y, y, 2);
                             des_xml_schema_whitespace_value_type(n_yws, yws, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -8275,7 +8272,7 @@ mod tests {
                 let ret_val = xml_schema_get_built_in_list_simple_type_item_type(typ);
                 desret_xml_schema_type_ptr(ret_val);
                 des_xml_schema_type_ptr(n_type, typ, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8302,7 +8299,7 @@ mod tests {
                 let ret_val = xml_schema_get_built_in_type(typ);
                 desret_xml_schema_type_ptr(ret_val);
                 des_xml_schema_val_type(n_type, typ, 0);
-                xml_reset_last_error();
+                reset_last_error();
             }
         }
     }
@@ -8323,7 +8320,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_schema_val_ptr(n_val, val, 0);
                     des_const_xml_char_ptr_ptr(n_ret_value, ret_value as *mut *const XmlChar, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8369,7 +8366,7 @@ mod tests {
                             1,
                         );
                         des_xml_schema_whitespace_value_type(n_ws, ws, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -8403,7 +8400,7 @@ mod tests {
                 let ret_val = xml_schema_get_facet_value_as_ulong(facet);
                 desret_unsigned_long(ret_val);
                 des_xml_schema_facet_ptr(n_facet, facet, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8436,7 +8433,7 @@ mod tests {
                     desret_xml_schema_type_ptr(ret_val);
                     des_const_xml_char_ptr(n_name, name, 0);
                     des_const_xml_char_ptr(n_ns, ns, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8468,7 +8465,7 @@ mod tests {
                 let ret_val = xml_schema_get_val_type(val);
                 desret_xml_schema_val_type(ret_val);
                 des_xml_schema_val_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -8491,7 +8488,7 @@ mod tests {
         unsafe {
             let ret_val = xml_schema_init_types();
             desret_int(ret_val);
-            xml_reset_last_error();
+            reset_last_error();
         }
     }
 
@@ -8511,7 +8508,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_schema_type_ptr(n_type, typ, 0);
                     des_int(n_facet_type, facet_type, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8576,7 +8573,7 @@ mod tests {
                             des_const_xml_char_ptr(n_value, value, 1);
                             des_xml_schema_val_ptr_ptr(n_val, val, 2);
                             des_xml_node_ptr(n_node, node, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -8622,7 +8619,7 @@ mod tests {
                             des_const_xml_char_ptr(n_value, value, 1);
                             des_xml_schema_val_ptr_ptr(n_val, val, 2);
                             des_xml_node_ptr(n_node, node, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -8667,7 +8664,7 @@ mod tests {
                             des_xml_schema_facet_ptr(n_facet, facet, 1);
                             des_const_xml_char_ptr(n_value, value, 2);
                             des_xml_schema_val_ptr(n_val, val, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -8720,7 +8717,7 @@ mod tests {
                                     des_const_xml_char_ptr(n_value, value, 3);
                                     des_xml_schema_val_ptr(n_val, val, 4);
                                     des_xml_schema_whitespace_value_type(n_ws, ws, 5);
-                                    xml_reset_last_error();
+                                    reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!("Leak of {} blocks found in xmlSchemaValidateFacetWhtsp", xml_mem_blocks() - mem_base);
@@ -8768,7 +8765,7 @@ mod tests {
                                 des_const_xml_char_ptr(n_value, value, 2);
                                 des_xml_schema_val_ptr(n_val, val, 3);
                                 des_unsigned_long_ptr(n_length, length, 4);
-                                xml_reset_last_error();
+                                reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -8823,7 +8820,7 @@ mod tests {
                                     des_xml_schema_val_ptr(n_val, val, 3);
                                     des_unsigned_long_ptr(n_length, length, 4);
                                     des_xml_schema_whitespace_value_type(n_ws, ws, 5);
-                                    xml_reset_last_error();
+                                    reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!("Leak of {} blocks found in xmlSchemaValidateLengthFacetWhtsp", xml_mem_blocks() - mem_base);
@@ -8871,7 +8868,7 @@ mod tests {
                             des_const_xml_char_ptr(n_value, value, 1);
                             des_unsigned_long(n_actual_len, actual_len, 2);
                             des_unsigned_long_ptr(n_expected_len, expected_len, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!("Leak of {} blocks found in xmlSchemaValidateListSimpleTypeFacet", xml_mem_blocks() - mem_base);
@@ -8907,7 +8904,7 @@ mod tests {
                         des_xml_schema_type_ptr(n_type, typ, 0);
                         des_const_xml_char_ptr(n_value, value, 1);
                         des_xml_schema_val_ptr_ptr(n_val, val, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -8944,7 +8941,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_schema_val_ptr(n_prev, prev, 0);
                     des_xml_schema_val_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -8976,7 +8973,7 @@ mod tests {
                 let ret_val = xml_schema_value_get_as_boolean(val);
                 desret_int(ret_val);
                 des_xml_schema_val_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -9006,7 +9003,7 @@ mod tests {
                 let ret_val = xml_schema_value_get_as_string(val);
                 desret_const_xml_char_ptr(ret_val);
                 des_xml_schema_val_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -9042,7 +9039,7 @@ mod tests {
                 let ret_val = xml_schema_white_space_replace(value as *const XmlChar);
                 desret_xml_char_ptr(ret_val);
                 des_const_xml_char_ptr(n_value, value, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(

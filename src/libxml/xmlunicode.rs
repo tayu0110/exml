@@ -13118,10 +13118,7 @@ unsafe extern "C" fn xml_unicode_lookup(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -13138,7 +13135,7 @@ mod tests {
                 let ret_val = xml_ucs_is_aegean_numbers(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13168,7 +13165,7 @@ mod tests {
                 let ret_val = xml_ucs_is_alphabetic_presentation_forms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13198,7 +13195,7 @@ mod tests {
                 let ret_val = xml_ucs_is_arabic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13225,7 +13222,7 @@ mod tests {
                 let ret_val = xml_ucs_is_arabic_presentation_forms_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13255,7 +13252,7 @@ mod tests {
                 let ret_val = xml_ucs_is_arabic_presentation_forms_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13285,7 +13282,7 @@ mod tests {
                 let ret_val = xml_ucs_is_armenian(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13312,7 +13309,7 @@ mod tests {
                 let ret_val = xml_ucs_is_arrows(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13339,7 +13336,7 @@ mod tests {
                 let ret_val = xml_ucs_is_basic_latin(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13369,7 +13366,7 @@ mod tests {
                 let ret_val = xml_ucs_is_bengali(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13399,7 +13396,7 @@ mod tests {
                     desret_int(ret_val);
                     des_int(n_code, code, 0);
                     des_const_char_ptr(n_block, block, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13428,7 +13425,7 @@ mod tests {
                 let ret_val = xml_ucs_is_block_elements(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13458,7 +13455,7 @@ mod tests {
                 let ret_val = xml_ucs_is_bopomofo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13485,7 +13482,7 @@ mod tests {
                 let ret_val = xml_ucs_is_bopomofo_extended(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13515,7 +13512,7 @@ mod tests {
                 let ret_val = xml_ucs_is_box_drawing(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13545,7 +13542,7 @@ mod tests {
                 let ret_val = xml_ucs_is_braille_patterns(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13575,7 +13572,7 @@ mod tests {
                 let ret_val = xml_ucs_is_buhid(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13602,7 +13599,7 @@ mod tests {
                 let ret_val = xml_ucs_is_byzantine_musical_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13632,7 +13629,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_compatibility(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13662,7 +13659,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_compatibility_forms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13692,7 +13689,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_compatibility_ideographs(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13722,7 +13719,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_compatibility_ideographs_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13752,7 +13749,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_radicals_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13782,7 +13779,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_symbolsand_punctuation(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13812,7 +13809,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_unified_ideographs(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13842,7 +13839,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_unified_ideographs_extension_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13872,7 +13869,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cjk_unified_ideographs_extension_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13905,7 +13902,7 @@ mod tests {
                     desret_int(ret_val);
                     des_int(n_code, code, 0);
                     des_const_char_ptr(n_cat, cat, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -13934,7 +13931,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_c(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13961,7 +13958,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_cc(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -13988,7 +13985,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_cf(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14015,7 +14012,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_co(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14042,7 +14039,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_cs(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14069,7 +14066,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_l(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14096,7 +14093,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_ll(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14123,7 +14120,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_lm(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14150,7 +14147,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_lo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14177,7 +14174,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_lt(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14204,7 +14201,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_lu(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14231,7 +14228,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_m(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14258,7 +14255,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_mc(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14285,7 +14282,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_me(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14312,7 +14309,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_mn(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14339,7 +14336,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_n(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14366,7 +14363,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_nd(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14393,7 +14390,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_nl(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14420,7 +14417,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_no(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14447,7 +14444,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_p(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14474,7 +14471,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_pc(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14501,7 +14498,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_pd(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14528,7 +14525,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_pe(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14555,7 +14552,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_pf(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14582,7 +14579,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_pi(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14609,7 +14606,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_po(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14636,7 +14633,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_ps(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14663,7 +14660,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_s(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14690,7 +14687,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_sc(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14717,7 +14714,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_sk(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14744,7 +14741,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_sm(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14771,7 +14768,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_so(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14798,7 +14795,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_z(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14825,7 +14822,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_zl(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14852,7 +14849,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_zp(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14879,7 +14876,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cat_zs(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14906,7 +14903,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cherokee(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14933,7 +14930,7 @@ mod tests {
                 let ret_val = xml_ucs_is_combining_diacritical_marks(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14963,7 +14960,7 @@ mod tests {
                 let ret_val = xml_ucs_is_combining_diacritical_marksfor_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14993,7 +14990,7 @@ mod tests {
                 let ret_val = xml_ucs_is_combining_half_marks(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15023,7 +15020,7 @@ mod tests {
                 let ret_val = xml_ucs_is_combining_marksfor_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15053,7 +15050,7 @@ mod tests {
                 let ret_val = xml_ucs_is_control_pictures(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15083,7 +15080,7 @@ mod tests {
                 let ret_val = xml_ucs_is_currency_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15113,7 +15110,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cypriot_syllabary(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15143,7 +15140,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cyrillic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15170,7 +15167,7 @@ mod tests {
                 let ret_val = xml_ucs_is_cyrillic_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15200,7 +15197,7 @@ mod tests {
                 let ret_val = xml_ucs_is_deseret(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15227,7 +15224,7 @@ mod tests {
                 let ret_val = xml_ucs_is_devanagari(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15257,7 +15254,7 @@ mod tests {
                 let ret_val = xml_ucs_is_dingbats(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15284,7 +15281,7 @@ mod tests {
                 let ret_val = xml_ucs_is_enclosed_alphanumerics(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15314,7 +15311,7 @@ mod tests {
                 let ret_val = xml_ucs_is_enclosed_cjk_lettersand_months(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15344,7 +15341,7 @@ mod tests {
                 let ret_val = xml_ucs_is_ethiopic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15371,7 +15368,7 @@ mod tests {
                 let ret_val = xml_ucs_is_general_punctuation(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15401,7 +15398,7 @@ mod tests {
                 let ret_val = xml_ucs_is_geometric_shapes(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15431,7 +15428,7 @@ mod tests {
                 let ret_val = xml_ucs_is_georgian(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15458,7 +15455,7 @@ mod tests {
                 let ret_val = xml_ucs_is_gothic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15485,7 +15482,7 @@ mod tests {
                 let ret_val = xml_ucs_is_greek(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15512,7 +15509,7 @@ mod tests {
                 let ret_val = xml_ucs_is_greek_extended(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15542,7 +15539,7 @@ mod tests {
                 let ret_val = xml_ucs_is_greekand_coptic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15572,7 +15569,7 @@ mod tests {
                 let ret_val = xml_ucs_is_gujarati(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15599,7 +15596,7 @@ mod tests {
                 let ret_val = xml_ucs_is_gurmukhi(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15626,7 +15623,7 @@ mod tests {
                 let ret_val = xml_ucs_is_halfwidthand_fullwidth_forms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15656,7 +15653,7 @@ mod tests {
                 let ret_val = xml_ucs_is_hangul_compatibility_jamo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15686,7 +15683,7 @@ mod tests {
                 let ret_val = xml_ucs_is_hangul_jamo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15716,7 +15713,7 @@ mod tests {
                 let ret_val = xml_ucs_is_hangul_syllables(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15746,7 +15743,7 @@ mod tests {
                 let ret_val = xml_ucs_is_hanunoo(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15773,7 +15770,7 @@ mod tests {
                 let ret_val = xml_ucs_is_hebrew(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15800,7 +15797,7 @@ mod tests {
                 let ret_val = xml_ucs_is_high_private_use_surrogates(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15830,7 +15827,7 @@ mod tests {
                 let ret_val = xml_ucs_is_high_surrogates(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15860,7 +15857,7 @@ mod tests {
                 let ret_val = xml_ucs_is_hiragana(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15887,7 +15884,7 @@ mod tests {
                 let ret_val = xml_ucs_is_ipa_extensions(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15917,7 +15914,7 @@ mod tests {
                 let ret_val = xml_ucs_is_ideographic_description_characters(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15947,7 +15944,7 @@ mod tests {
                 let ret_val = xml_ucs_is_kanbun(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15974,7 +15971,7 @@ mod tests {
                 let ret_val = xml_ucs_is_kangxi_radicals(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16004,7 +16001,7 @@ mod tests {
                 let ret_val = xml_ucs_is_kannada(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16031,7 +16028,7 @@ mod tests {
                 let ret_val = xml_ucs_is_katakana(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16058,7 +16055,7 @@ mod tests {
                 let ret_val = xml_ucs_is_katakana_phonetic_extensions(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16088,7 +16085,7 @@ mod tests {
                 let ret_val = xml_ucs_is_khmer(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16115,7 +16112,7 @@ mod tests {
                 let ret_val = xml_ucs_is_khmer_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16145,7 +16142,7 @@ mod tests {
                 let ret_val = xml_ucs_is_lao(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16172,7 +16169,7 @@ mod tests {
                 let ret_val = xml_ucs_is_latin1_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16202,7 +16199,7 @@ mod tests {
                 let ret_val = xml_ucs_is_latin_extended_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16232,7 +16229,7 @@ mod tests {
                 let ret_val = xml_ucs_is_latin_extended_additional(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16262,7 +16259,7 @@ mod tests {
                 let ret_val = xml_ucs_is_latin_extended_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16292,7 +16289,7 @@ mod tests {
                 let ret_val = xml_ucs_is_letterlike_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16322,7 +16319,7 @@ mod tests {
                 let ret_val = xml_ucs_is_limbu(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16349,7 +16346,7 @@ mod tests {
                 let ret_val = xml_ucs_is_linear_bideograms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16379,7 +16376,7 @@ mod tests {
                 let ret_val = xml_ucs_is_linear_bsyllabary(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16409,7 +16406,7 @@ mod tests {
                 let ret_val = xml_ucs_is_low_surrogates(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16439,7 +16436,7 @@ mod tests {
                 let ret_val = xml_ucs_is_malayalam(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16466,7 +16463,7 @@ mod tests {
                 let ret_val = xml_ucs_is_mathematical_alphanumeric_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16496,7 +16493,7 @@ mod tests {
                 let ret_val = xml_ucs_is_mathematical_operators(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16526,7 +16523,7 @@ mod tests {
                 let ret_val = xml_ucs_is_miscellaneous_mathematical_symbols_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16556,7 +16553,7 @@ mod tests {
                 let ret_val = xml_ucs_is_miscellaneous_mathematical_symbols_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16586,7 +16583,7 @@ mod tests {
                 let ret_val = xml_ucs_is_miscellaneous_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16616,7 +16613,7 @@ mod tests {
                 let ret_val = xml_ucs_is_miscellaneous_symbolsand_arrows(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16646,7 +16643,7 @@ mod tests {
                 let ret_val = xml_ucs_is_miscellaneous_technical(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16676,7 +16673,7 @@ mod tests {
                 let ret_val = xml_ucs_is_mongolian(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16703,7 +16700,7 @@ mod tests {
                 let ret_val = xml_ucs_is_musical_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16733,7 +16730,7 @@ mod tests {
                 let ret_val = xml_ucs_is_myanmar(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16760,7 +16757,7 @@ mod tests {
                 let ret_val = xml_ucs_is_number_forms(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16790,7 +16787,7 @@ mod tests {
                 let ret_val = xml_ucs_is_ogham(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16817,7 +16814,7 @@ mod tests {
                 let ret_val = xml_ucs_is_old_italic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16844,7 +16841,7 @@ mod tests {
                 let ret_val = xml_ucs_is_optical_character_recognition(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16874,7 +16871,7 @@ mod tests {
                 let ret_val = xml_ucs_is_oriya(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16901,7 +16898,7 @@ mod tests {
                 let ret_val = xml_ucs_is_osmanya(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16928,7 +16925,7 @@ mod tests {
                 let ret_val = xml_ucs_is_phonetic_extensions(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16958,7 +16955,7 @@ mod tests {
                 let ret_val = xml_ucs_is_private_use(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16988,7 +16985,7 @@ mod tests {
                 let ret_val = xml_ucs_is_private_use_area(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17018,7 +17015,7 @@ mod tests {
                 let ret_val = xml_ucs_is_runic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17045,7 +17042,7 @@ mod tests {
                 let ret_val = xml_ucs_is_shavian(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17072,7 +17069,7 @@ mod tests {
                 let ret_val = xml_ucs_is_sinhala(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17099,7 +17096,7 @@ mod tests {
                 let ret_val = xml_ucs_is_small_form_variants(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17129,7 +17126,7 @@ mod tests {
                 let ret_val = xml_ucs_is_spacing_modifier_letters(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17159,7 +17156,7 @@ mod tests {
                 let ret_val = xml_ucs_is_specials(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17186,7 +17183,7 @@ mod tests {
                 let ret_val = xml_ucs_is_superscriptsand_subscripts(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17216,7 +17213,7 @@ mod tests {
                 let ret_val = xml_ucs_is_supplemental_arrows_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17246,7 +17243,7 @@ mod tests {
                 let ret_val = xml_ucs_is_supplemental_arrows_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17276,7 +17273,7 @@ mod tests {
                 let ret_val = xml_ucs_is_supplemental_mathematical_operators(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17306,7 +17303,7 @@ mod tests {
                 let ret_val = xml_ucs_is_supplementary_private_use_area_a(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17336,7 +17333,7 @@ mod tests {
                 let ret_val = xml_ucs_is_supplementary_private_use_area_b(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17366,7 +17363,7 @@ mod tests {
                 let ret_val = xml_ucs_is_syriac(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17393,7 +17390,7 @@ mod tests {
                 let ret_val = xml_ucs_is_tagalog(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17420,7 +17417,7 @@ mod tests {
                 let ret_val = xml_ucs_is_tagbanwa(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17447,7 +17444,7 @@ mod tests {
                 let ret_val = xml_ucs_is_tags(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17474,7 +17471,7 @@ mod tests {
                 let ret_val = xml_ucs_is_tai_le(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17501,7 +17498,7 @@ mod tests {
                 let ret_val = xml_ucs_is_tai_xuan_jing_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17531,7 +17528,7 @@ mod tests {
                 let ret_val = xml_ucs_is_tamil(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17558,7 +17555,7 @@ mod tests {
                 let ret_val = xml_ucs_is_telugu(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17585,7 +17582,7 @@ mod tests {
                 let ret_val = xml_ucs_is_thaana(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17612,7 +17609,7 @@ mod tests {
                 let ret_val = xml_ucs_is_thai(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17639,7 +17636,7 @@ mod tests {
                 let ret_val = xml_ucs_is_tibetan(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17666,7 +17663,7 @@ mod tests {
                 let ret_val = xml_ucs_is_ugaritic(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17693,7 +17690,7 @@ mod tests {
                 let ret_val = xml_ucs_is_unified_canadian_aboriginal_syllabics(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17723,7 +17720,7 @@ mod tests {
                 let ret_val = xml_ucs_is_variation_selectors(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17753,7 +17750,7 @@ mod tests {
                 let ret_val = xml_ucs_is_variation_selectors_supplement(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17783,7 +17780,7 @@ mod tests {
                 let ret_val = xml_ucs_is_yi_radicals(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17813,7 +17810,7 @@ mod tests {
                 let ret_val = xml_ucs_is_yi_syllables(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17843,7 +17840,7 @@ mod tests {
                 let ret_val = xml_ucs_is_yijing_hexagram_symbols(code);
                 desret_int(ret_val);
                 des_int(n_code, code, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(

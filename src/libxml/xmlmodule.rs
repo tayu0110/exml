@@ -386,10 +386,7 @@ pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> c_int {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -406,7 +403,7 @@ mod tests {
                 let ret_val = xml_module_close(module);
                 desret_int(ret_val);
                 des_xml_module_ptr(n_module, module, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -445,7 +442,7 @@ mod tests {
                         des_xml_module_ptr(n_module, module, 0);
                         des_const_char_ptr(n_name, name, 1);
                         des_void_ptr_ptr(n_symbol, symbol, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(

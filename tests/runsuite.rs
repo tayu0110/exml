@@ -15,7 +15,7 @@ use exml::{
         xml_buf_add, xml_buf_content, xml_buf_create, xml_buf_empty, xml_buf_free,
         xml_buf_set_allocation_scheme, xml_buf_use,
     },
-    globals::set_generic_error,
+    globals::{reset_last_error, set_generic_error},
     libxml::{
         globals::{xml_free, xml_get_warnings_default_value},
         parser::{
@@ -37,7 +37,6 @@ use exml::{
         },
         uri::xml_build_uri,
         xml_io::xml_no_net_external_entity_loader,
-        xmlerror::xml_reset_last_error,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
@@ -378,7 +377,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
     if !rng.is_null() {
         xml_relaxng_free(rng);
     }
-    xml_reset_last_error();
+    reset_last_error();
     if memt < xml_mem_used() && EXTRA_MEMORY_FROM_RESOLVER == 0 {
         test_log!(
             logfile,
@@ -547,7 +546,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         if !rng.is_null() {
             xml_relaxng_free(rng);
         }
-        xml_reset_last_error();
+        reset_last_error();
         if memt != xml_mem_used() && memt != 0 {
             test_log!(
                 logfile,
@@ -639,7 +638,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 }
                 xml_free_doc(doc);
             }
-            xml_reset_last_error();
+            reset_last_error();
             if mem != xml_mem_used() && EXTRA_MEMORY_FROM_RESOLVER == 0 {
                 test_log!(
                     logfile,
@@ -731,7 +730,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 }
                 xml_free_doc(doc);
             }
-            xml_reset_last_error();
+            reset_last_error();
             if mem != xml_mem_used() && EXTRA_MEMORY_FROM_RESOLVER == 0 {
                 test_log!(
                     logfile,
@@ -753,7 +752,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
     if !rng.is_null() {
         xml_relaxng_free(rng);
     }
-    xml_reset_last_error();
+    reset_last_error();
     if memt != xml_mem_used() && memt != 0 {
         test_log!(
             logfile,
@@ -962,7 +961,7 @@ unsafe extern "C" fn xstc_test_instance(
     let mut doc: XmlDocPtr = null_mut();
     let mut ret: c_int;
 
-    xml_reset_last_error();
+    reset_last_error();
     TEST_ERRORS_SIZE = 0;
     TEST_ERRORS[0] = 0;
     let mem: c_int = xml_mem_used();
@@ -1095,7 +1094,7 @@ unsafe extern "C" fn xstc_test_instance(
     if !doc.is_null() {
         xml_free_doc(doc);
     }
-    xml_reset_last_error();
+    reset_last_error();
     if mem != xml_mem_used() {
         test_log!(
             logfile,
@@ -1120,7 +1119,7 @@ unsafe extern "C" fn xstc_test_group(
     let mut instance: XmlNodePtr;
     let mut ret: c_int = 0;
 
-    xml_reset_last_error();
+    reset_last_error();
     TEST_ERRORS_SIZE = 0;
     TEST_ERRORS[0] = 0;
     let mem: c_int = xml_mem_used();
@@ -1278,7 +1277,7 @@ unsafe extern "C" fn xstc_test_group(
     if !schemas.is_null() {
         xml_schema_free(schemas);
     }
-    xml_reset_last_error();
+    reset_last_error();
     if mem != xml_mem_used() && EXTRA_MEMORY_FROM_RESOLVER == 0 {
         test_log!(
             logfile,

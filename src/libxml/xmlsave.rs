@@ -2280,10 +2280,7 @@ pub unsafe extern "C" fn xml_save_set_attr_escape(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -2300,7 +2297,7 @@ mod tests {
                 let ret_val = xml_save_close(ctxt);
                 desret_int(ret_val);
                 des_xml_save_ctxt_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2330,7 +2327,7 @@ mod tests {
                     desret_long(ret_val);
                     des_xml_save_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -2359,7 +2356,7 @@ mod tests {
                 let ret_val = xml_save_flush(ctxt);
                 desret_int(ret_val);
                 des_xml_save_ctxt_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2419,7 +2416,7 @@ mod tests {
                     desret_long(ret_val);
                     des_xml_save_ctxt_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(

@@ -10,29 +10,33 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use exml::libxml::{
-    globals::{xml_free, xml_get_warnings_default_value, xml_last_error},
-    parser::{
-        xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
-        xml_new_parser_ctxt, xml_pedantic_parser_default, xml_read_file,
-        xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
-    },
-    parser_internals::xml_new_input_from_file,
-    tree::{
-        xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop, xml_node_get_base,
-        XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
-    },
-    xmlerror::{
-        xml_reset_last_error, xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel,
-        XmlErrorPtr, XmlParserErrors,
-    },
-    xmlmemory::{
-        xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
-        xml_mem_used, xml_memory_dump, xml_memory_strdup,
-    },
-    xmlstring::{xml_str_equal, xml_strchr, xml_strdup, XmlChar},
-    xpath::{
-        xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
+use exml::{
+    globals::reset_last_error,
+    libxml::{
+        globals::{xml_free, xml_get_warnings_default_value, xml_last_error},
+        parser::{
+            xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
+            xml_new_parser_ctxt, xml_pedantic_parser_default, xml_read_file,
+            xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
+        },
+        parser_internals::xml_new_input_from_file,
+        tree::{
+            xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop,
+            xml_node_get_base, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
+        },
+        xmlerror::{
+            xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr,
+            XmlParserErrors,
+        },
+        xmlmemory::{
+            xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
+            xml_mem_used, xml_memory_dump, xml_memory_strdup,
+        },
+        xmlstring::{xml_str_equal, xml_strchr, xml_strdup, XmlChar},
+        xpath::{
+            xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context,
+            XmlXPathContext,
+        },
     },
 };
 use libc::{fdopen, snprintf, strcmp};
@@ -560,7 +564,7 @@ unsafe extern "C" fn xmlconf_test_item(
                     /*
                      * Reset errors and check memory usage before the test
                      */
-                    xml_reset_last_error();
+                    reset_last_error();
                     TEST_ERRORS_SIZE = 0;
                     TEST_ERRORS[0] = 0;
                     mem = xml_mem_used();
@@ -676,7 +680,7 @@ unsafe extern "C" fn xmlconf_test_item(
                     /*
                      * Reset errors and check memory usage after the test
                      */
-                    xml_reset_last_error();
+                    reset_last_error();
                     is_final = xml_mem_used();
                     if is_final > mem {
                         test_log!(

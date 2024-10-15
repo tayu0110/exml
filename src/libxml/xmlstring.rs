@@ -1274,10 +1274,7 @@ pub unsafe extern "C" fn xml_escape_format_string(msg: *mut *mut XmlChar) -> *mu
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -1293,7 +1290,7 @@ mod tests {
                 let ret_val = xml_char_strdup(cur);
                 desret_xml_char_ptr(ret_val);
                 des_const_char_ptr(n_cur, cur, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1325,7 +1322,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_const_char_ptr(n_cur, cur, 0);
                     des_int(n_len, len, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1353,7 +1350,7 @@ mod tests {
                 let ret_val = xml_check_utf8(utf as *const c_uchar);
                 desret_int(ret_val);
                 des_const_unsigned_char_ptr(n_utf, utf as *const c_uchar, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1382,7 +1379,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_unsigned_char_ptr(n_utf, utf as *const c_uchar, 0);
                     des_int_ptr(n_len, len, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1413,7 +1410,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_xml_char_ptr(n_str1, str1, 0);
                     des_const_xml_char_ptr(n_str2, str2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1453,7 +1450,7 @@ mod tests {
                         des_const_xml_char_ptr(n_pref, pref, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_const_xml_char_ptr(n_str, str, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1492,7 +1489,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_xml_char_ptr(n_str1, str1, 0);
                     des_const_xml_char_ptr(n_str2, str2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1523,7 +1520,7 @@ mod tests {
                     desret_const_xml_char_ptr(ret_val);
                     des_const_xml_char_ptr(n_str, str, 0);
                     des_const_xml_char_ptr(n_val, val, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1554,7 +1551,7 @@ mod tests {
                     desret_const_xml_char_ptr(ret_val);
                     des_const_xml_char_ptr(n_str, str, 0);
                     des_xml_char(n_val, val, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1585,7 +1582,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_xml_char_ptr(n_str1, str1, 0);
                     des_const_xml_char_ptr(n_str2, str2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1613,7 +1610,7 @@ mod tests {
                 let ret_val = xml_strdup(cur as *const XmlChar);
                 desret_xml_char_ptr(ret_val);
                 des_const_xml_char_ptr(n_cur, cur, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1639,7 +1636,7 @@ mod tests {
                 let ret_val = xml_strlen(str as *const XmlChar);
                 desret_int(ret_val);
                 des_const_xml_char_ptr(n_str, str, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1674,7 +1671,7 @@ mod tests {
                         des_const_xml_char_ptr(n_str1, str1, 0);
                         des_const_xml_char_ptr(n_str2, str2, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1713,7 +1710,7 @@ mod tests {
                         des_const_xml_char_ptr(n_str1, str1, 0);
                         des_const_xml_char_ptr(n_str2, str2, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1752,7 +1749,7 @@ mod tests {
                         des_const_xml_char_ptr(n_str1, str1, 0);
                         des_const_xml_char_ptr(n_str2, str2, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1788,7 +1785,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_const_xml_char_ptr(n_cur, cur, 0);
                     des_int(n_len, len, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1819,7 +1816,7 @@ mod tests {
                     desret_const_xml_char_ptr(ret_val);
                     des_const_xml_char_ptr(n_str, str, 0);
                     des_const_xml_char_ptr(n_val, val, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1859,7 +1856,7 @@ mod tests {
                         des_const_xml_char_ptr(n_str, str, 0);
                         des_int(n_start, start, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -1892,7 +1889,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_xml_char_ptr(n_utf1, utf1, 0);
                     des_const_xml_char_ptr(n_utf2, utf2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -1920,7 +1917,7 @@ mod tests {
                 let ret_val = xml_utf8_size(utf as *const XmlChar);
                 desret_int(ret_val);
                 des_const_xml_char_ptr(n_utf, utf, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1946,7 +1943,7 @@ mod tests {
                 let ret_val = xml_utf8_strlen(utf as *const XmlChar);
                 desret_int(ret_val);
                 des_const_xml_char_ptr(n_utf, utf, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1975,7 +1972,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_xml_char_ptr(n_utf, utf, 0);
                     des_const_xml_char_ptr(n_utfchar, utfchar, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -2009,7 +2006,7 @@ mod tests {
                     desret_xml_char_ptr(ret_val);
                     des_const_xml_char_ptr(n_utf, utf, 0);
                     des_int(n_len, len, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -2040,7 +2037,7 @@ mod tests {
                     desret_const_xml_char_ptr(ret_val);
                     des_const_xml_char_ptr(n_utf, utf, 0);
                     des_int(n_pos, pos, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -2074,7 +2071,7 @@ mod tests {
                     desret_int(ret_val);
                     des_const_xml_char_ptr(n_utf, utf, 0);
                     des_int(n_len, len, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -2114,7 +2111,7 @@ mod tests {
                         des_const_xml_char_ptr(n_utf, utf, 0);
                         des_int(n_start, start, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(

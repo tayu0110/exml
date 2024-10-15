@@ -14132,10 +14132,7 @@ pub(crate) unsafe extern "C" fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -14152,7 +14149,7 @@ mod tests {
                 let ret_val = value_pop(ctxt);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14182,7 +14179,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_xpath_object_ptr(n_value, value, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14210,7 +14207,7 @@ mod tests {
 
                 xml_xpath_add_values(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14239,7 +14236,7 @@ mod tests {
                     xml_xpath_boolean_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14273,7 +14270,7 @@ mod tests {
                     xml_xpath_ceiling_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14311,7 +14308,7 @@ mod tests {
                         des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                         des_int(n_inf, inf, 1);
                         des_int(n_strict, strict, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -14347,7 +14344,7 @@ mod tests {
                     xml_xpath_concat_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14381,7 +14378,7 @@ mod tests {
                     xml_xpath_contains_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14415,7 +14412,7 @@ mod tests {
                     xml_xpath_count_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14452,7 +14449,7 @@ mod tests {
                         des_file_ptr(n_output, output, 0);
                         des_xml_xpath_comp_expr_ptr(n_comp, comp, 1);
                         des_int(n_depth, depth, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -14491,7 +14488,7 @@ mod tests {
                         des_file_ptr(n_output, output, 0);
                         des_xml_xpath_object_ptr(n_cur, cur, 1);
                         des_int(n_depth, depth, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -14528,7 +14525,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14560,7 +14557,7 @@ mod tests {
                 let ret_val = xml_xpath_distinct(nodes);
                 desret_xml_node_set_ptr(ret_val);
                 des_xml_node_set_ptr(n_nodes, nodes, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14587,7 +14584,7 @@ mod tests {
                 let ret_val = xml_xpath_distinct_sorted(nodes);
                 desret_xml_node_set_ptr(ret_val);
                 des_xml_node_set_ptr(n_nodes, nodes, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14616,7 +14613,7 @@ mod tests {
 
                 xml_xpath_div_values(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14643,7 +14640,7 @@ mod tests {
                 let ret_val = xml_xpath_equal_values(ctxt);
                 desret_int(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14675,7 +14672,7 @@ mod tests {
                     xml_xpath_err(ctxt, error);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_error, error, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14703,7 +14700,7 @@ mod tests {
 
                 xml_xpath_eval_expr(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14733,7 +14730,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_xpath_object_ptr(n_res, res, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14767,7 +14764,7 @@ mod tests {
                     xml_xpath_false_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14801,7 +14798,7 @@ mod tests {
                     xml_xpath_floor_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14848,7 +14845,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14882,7 +14879,7 @@ mod tests {
                     xml_xpath_id_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14917,7 +14914,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -14949,7 +14946,7 @@ mod tests {
                 let ret_val = xml_xpath_is_node_type(name as *const XmlChar);
                 desret_int(ret_val);
                 des_const_xml_char_ptr(n_name, name, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -14981,7 +14978,7 @@ mod tests {
                     xml_xpath_lang_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15015,7 +15012,7 @@ mod tests {
                     xml_xpath_last_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15050,7 +15047,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15082,7 +15079,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15116,7 +15113,7 @@ mod tests {
                     xml_xpath_local_name_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15147,7 +15144,7 @@ mod tests {
 
                 xml_xpath_mod_values(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15173,7 +15170,7 @@ mod tests {
 
                 xml_xpath_mult_values(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15205,7 +15202,7 @@ mod tests {
                     xml_xpath_namespace_uri_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15237,7 +15234,7 @@ mod tests {
                 let ret_val = xml_xpath_new_boolean(val);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_int(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15267,7 +15264,7 @@ mod tests {
                 let ret_val = xml_xpath_new_cstring(val);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_const_char_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15297,7 +15294,7 @@ mod tests {
                 let ret_val = xml_xpath_new_float(val);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_double(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15324,7 +15321,7 @@ mod tests {
                 let ret_val = xml_xpath_new_node_set(val);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_xml_node_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15354,7 +15351,7 @@ mod tests {
                 let ret_val = xml_xpath_new_node_set_list(val);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_xml_node_set_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15390,7 +15387,7 @@ mod tests {
                 let ret_val = xml_xpath_new_string(val as *const XmlChar);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_const_xml_char_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -15420,7 +15417,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15455,7 +15452,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15490,7 +15487,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15525,7 +15522,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15557,7 +15554,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15592,7 +15589,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15627,7 +15624,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15662,7 +15659,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15697,7 +15694,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15732,7 +15729,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15767,7 +15764,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15802,7 +15799,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15837,7 +15834,7 @@ mod tests {
                     desret_xml_node_ptr(ret_val);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_node_ptr(n_cur, cur, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15869,7 +15866,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes, nodes, 0);
                     des_xml_node_ptr(n_node, node, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15904,7 +15901,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes, nodes, 0);
                     des_xml_node_ptr(n_node, node, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15939,7 +15936,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_node_set_ptr(n_cur, cur, 0);
                     des_xml_node_ptr(n_val, val, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -15977,7 +15974,7 @@ mod tests {
                         des_xml_node_set_ptr(n_cur, cur, 0);
                         des_xml_node_ptr(n_node, node, 1);
                         des_xml_ns_ptr(n_ns, ns, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -16014,7 +16011,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_node_set_ptr(n_cur, cur, 0);
                     des_xml_node_ptr(n_val, val, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16049,7 +16046,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_node_set_ptr(n_cur, cur, 0);
                     des_xml_node_ptr(n_val, val, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16083,7 +16080,7 @@ mod tests {
                     xml_xpath_node_set_del(cur, val);
                     des_xml_node_set_ptr(n_cur, cur, 0);
                     des_xml_node_ptr(n_val, val, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16118,7 +16115,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_val1, val1, 0);
                     des_xml_node_set_ptr(n_val2, val2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16152,7 +16149,7 @@ mod tests {
                     xml_xpath_node_set_remove(cur, val);
                     des_xml_node_set_ptr(n_cur, cur, 0);
                     des_int(n_val, val, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16183,7 +16180,7 @@ mod tests {
 
                 xml_xpath_node_set_sort(set);
                 des_xml_node_set_ptr(n_set, set, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16216,7 +16213,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes, nodes, 0);
                     des_xml_node_ptr(n_node, node, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16251,7 +16248,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes, nodes, 0);
                     des_xml_node_ptr(n_node, node, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16285,7 +16282,7 @@ mod tests {
                     xml_xpath_normalize_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16317,7 +16314,7 @@ mod tests {
                 let ret_val = xml_xpath_not_equal_values(ctxt);
                 desret_int(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16349,7 +16346,7 @@ mod tests {
                     xml_xpath_not_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16384,7 +16381,7 @@ mod tests {
                     desret_const_xml_char_ptr(ret_val);
                     des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
                     des_const_xml_char_ptr(n_prefix, prefix, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16415,7 +16412,7 @@ mod tests {
                     xml_xpath_number_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16447,7 +16444,7 @@ mod tests {
                 let ret_val = xml_xpath_parse_ncname(ctxt);
                 desret_xml_char_ptr(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16477,7 +16474,7 @@ mod tests {
                 let ret_val = xml_xpath_parse_name(ctxt);
                 desret_xml_char_ptr(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16504,7 +16501,7 @@ mod tests {
                 let ret_val = xml_xpath_pop_boolean(ctxt);
                 desret_int(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16534,7 +16531,7 @@ mod tests {
                 let ret_val = xml_xpath_pop_external(ctxt);
                 desret_void_ptr(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16564,7 +16561,7 @@ mod tests {
                 let ret_val = xml_xpath_pop_node_set(ctxt);
                 desret_xml_node_set_ptr(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16594,7 +16591,7 @@ mod tests {
                 let ret_val = xml_xpath_pop_number(ctxt);
                 desret_double(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16621,7 +16618,7 @@ mod tests {
                 let ret_val = xml_xpath_pop_string(ctxt);
                 desret_xml_char_ptr(ret_val);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16650,7 +16647,7 @@ mod tests {
                     xml_xpath_position_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -16681,7 +16678,7 @@ mod tests {
 
                 xml_xpath_register_all_functions(ctxt);
                 des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16735,7 +16732,7 @@ mod tests {
                         des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
                         des_const_xml_char_ptr(n_prefix, prefix, 1);
                         des_const_xml_char_ptr(n_ns_uri, ns_uri, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -16775,7 +16772,7 @@ mod tests {
                         des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_xml_xpath_object_ptr(n_value, value, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -16824,7 +16821,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_ns_uri, ns_uri, 2);
                             des_xml_xpath_object_ptr(n_value, value, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -16859,7 +16856,7 @@ mod tests {
 
                 xml_xpath_registered_funcs_cleanup(ctxt);
                 des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16888,7 +16885,7 @@ mod tests {
 
                 xml_xpath_registered_ns_cleanup(ctxt);
                 des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16917,7 +16914,7 @@ mod tests {
 
                 xml_xpath_registered_variables_cleanup(ctxt);
                 des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16946,7 +16943,7 @@ mod tests {
 
                 xml_xpath_root(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -16975,7 +16972,7 @@ mod tests {
                     xml_xpath_round_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17009,7 +17006,7 @@ mod tests {
                     xml_xpath_starts_with_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17041,7 +17038,7 @@ mod tests {
                 let ret_val = xml_xpath_string_eval_number(str as *const XmlChar);
                 desret_double(ret_val);
                 des_const_xml_char_ptr(n_str, str, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17073,7 +17070,7 @@ mod tests {
                     xml_xpath_string_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17107,7 +17104,7 @@ mod tests {
                     xml_xpath_string_length_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17138,7 +17135,7 @@ mod tests {
 
                 xml_xpath_sub_values(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17167,7 +17164,7 @@ mod tests {
                     xml_xpath_substring_after_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17201,7 +17198,7 @@ mod tests {
                     xml_xpath_substring_before_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17235,7 +17232,7 @@ mod tests {
                     xml_xpath_substring_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17269,7 +17266,7 @@ mod tests {
                     xml_xpath_sum_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17304,7 +17301,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17336,7 +17333,7 @@ mod tests {
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17370,7 +17367,7 @@ mod tests {
                     xml_xpath_translate_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17404,7 +17401,7 @@ mod tests {
                     xml_xpath_true_function(ctxt, nargs);
                     des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                     des_int(n_nargs, nargs, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17435,7 +17432,7 @@ mod tests {
 
                 xml_xpath_value_flip_sign(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17468,7 +17465,7 @@ mod tests {
                     desret_xml_xpath_object_ptr(ret_val);
                     des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -17506,7 +17503,7 @@ mod tests {
                         des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
                         des_const_xml_char_ptr(n_ns_uri, ns_uri, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -17540,7 +17537,7 @@ mod tests {
                 let ret_val = xml_xpath_wrap_cstring(val);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_char_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17570,7 +17567,7 @@ mod tests {
                 let ret_val = xml_xpath_wrap_external(val);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_void_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17600,7 +17597,7 @@ mod tests {
                 let ret_val = xml_xpath_wrap_node_set(val);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_xml_node_set_ptr(n_val, val, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -17638,7 +17635,7 @@ mod tests {
                             des_filepath(n_file, file, 1);
                             des_int(n_line, line, 2);
                             des_int(n_no, no, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(

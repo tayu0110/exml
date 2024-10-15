@@ -3679,10 +3679,7 @@ pub unsafe extern "C" fn xml_default_sax_handler_init() {}
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -3696,7 +3693,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
 
                 html_default_sax_handler_init();
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprintln!(
@@ -3719,7 +3716,7 @@ mod tests {
             let mem_base = xml_mem_blocks();
 
             xml_default_sax_handler_init();
-            xml_reset_last_error();
+            reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -3772,7 +3769,7 @@ mod tests {
                                         des_int(n_def, def, 4);
                                         des_const_xml_char_ptr(n_default_value, default_value, 5);
                                         des_xml_enumeration_ptr(n_tree, tree, 6);
-                                        xml_reset_last_error();
+                                        reset_last_error();
                                         if mem_base != xml_mem_blocks() {
                                             leaks += 1;
                                             eprint!(
@@ -3821,7 +3818,7 @@ mod tests {
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_value, value, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -3859,7 +3856,7 @@ mod tests {
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_ch, ch, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -3891,7 +3888,7 @@ mod tests {
                     xml_sax2_comment(ctx, value);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_const_xml_char_ptr(n_value, value, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -3927,7 +3924,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_int(n_type, typ, 2);
                             des_xml_element_content_ptr(n_content, content, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -3960,7 +3957,7 @@ mod tests {
 
                 xml_sax2_end_document(ctx);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -3998,7 +3995,7 @@ mod tests {
                         xml_sax2_end_element(ctx, name);
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_name, name, 1);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4035,7 +4032,7 @@ mod tests {
                             des_const_xml_char_ptr(n_localname, localname, 1);
                             des_const_xml_char_ptr(n_prefix, prefix, 2);
                             des_const_xml_char_ptr(n_uri, uri, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -4086,7 +4083,7 @@ mod tests {
                                     des_const_xml_char_ptr(n_public_id, public_id, 3);
                                     des_const_xml_char_ptr(n_system_id, system_id, 4);
                                     des_xml_char_ptr(n_content, content, 5);
-                                    xml_reset_last_error();
+                                    reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
                                         eprint!(
@@ -4130,7 +4127,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_external_id, external_id, 2);
                             des_const_xml_char_ptr(n_system_id, system_id, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -4165,7 +4162,7 @@ mod tests {
                 let ret_val = xml_sax2_get_column_number(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4197,7 +4194,7 @@ mod tests {
                     desret_xml_entity_ptr(ret_val);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4225,7 +4222,7 @@ mod tests {
                 let ret_val = xml_sax2_get_line_number(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4257,7 +4254,7 @@ mod tests {
                     desret_xml_entity_ptr(ret_val);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4288,7 +4285,7 @@ mod tests {
                 let ret_val = xml_sax2_get_public_id(ctx);
                 desret_const_xml_char_ptr(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4317,7 +4314,7 @@ mod tests {
                 let ret_val = xml_sax2_get_system_id(ctx);
                 desret_const_xml_char_ptr(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4346,7 +4343,7 @@ mod tests {
                 let ret_val = xml_sax2_has_external_subset(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4375,7 +4372,7 @@ mod tests {
                 let ret_val = xml_sax2_has_internal_subset(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4412,7 +4409,7 @@ mod tests {
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_ch, ch, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4447,7 +4444,7 @@ mod tests {
                     xml_sax2_init_default_sax_handler(hdlr, warning);
                     des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
                     des_int(n_warning, warning, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4478,7 +4475,7 @@ mod tests {
 
                 xml_sax2_init_html_default_sax_handler(hdlr);
                 des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4515,7 +4512,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_external_id, external_id, 2);
                             des_const_xml_char_ptr(n_system_id, system_id, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -4550,7 +4547,7 @@ mod tests {
                 let ret_val = xml_sax2_is_standalone(ctx);
                 desret_int(ret_val);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4587,7 +4584,7 @@ mod tests {
                             des_const_xml_char_ptr(n_name, name, 1);
                             des_const_xml_char_ptr(n_public_id, public_id, 2);
                             des_const_xml_char_ptr(n_system_id, system_id, 3);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -4627,7 +4624,7 @@ mod tests {
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_target, target, 1);
                         des_const_xml_char_ptr(n_data, data, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4662,7 +4659,7 @@ mod tests {
                     xml_sax2_reference(ctx, name);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_const_xml_char_ptr(n_name, name, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4696,7 +4693,7 @@ mod tests {
                         des_void_ptr(n_ctx, ctx, 0);
                         des_const_xml_char_ptr(n_public_id, public_id, 1);
                         des_const_xml_char_ptr(n_system_id, system_id, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -4731,7 +4728,7 @@ mod tests {
                     xml_sax2_set_document_locator(ctx, loc);
                     des_void_ptr(n_ctx, ctx, 0);
                     des_xml_saxlocator_ptr(n_loc, loc, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -4761,7 +4758,7 @@ mod tests {
 
                 xml_sax2_start_document(ctx);
                 des_void_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -4802,7 +4799,7 @@ mod tests {
                             des_void_ptr(n_ctx, ctx, 0);
                             des_const_xml_char_ptr(n_fullname, fullname, 1);
                             des_const_xml_char_ptr_ptr(n_atts, atts as *mut *const XmlChar, 2);
-                            xml_reset_last_error();
+                            reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
                                 eprint!(
@@ -4880,7 +4877,7 @@ mod tests {
                                                     attributes as *mut *const XmlChar,
                                                     8,
                                                 );
-                                                xml_reset_last_error();
+                                                reset_last_error();
                                                 if mem_base != xml_mem_blocks() {
                                                     leaks += 1;
                                                     eprint!("Leak of {} blocks found in xmlSAX2StartElementNs", xml_mem_blocks() - mem_base);
@@ -4939,7 +4936,7 @@ mod tests {
                                 des_const_xml_char_ptr(n_public_id, public_id, 2);
                                 des_const_xml_char_ptr(n_system_id, system_id, 3);
                                 des_const_xml_char_ptr(n_notation_name, notation_name, 4);
-                                xml_reset_last_error();
+                                reset_last_error();
                                 if mem_base != xml_mem_blocks() {
                                     leaks += 1;
                                     eprint!(
@@ -4978,7 +4975,7 @@ mod tests {
                     let ret_val = xml_sax_default_version(version);
                     desret_int(ret_val);
                     des_int(n_version, version, 0);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -5011,7 +5008,7 @@ mod tests {
                     desret_int(ret_val);
                     des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
                     des_int(n_version, version, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(

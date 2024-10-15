@@ -1864,10 +1864,7 @@ pub unsafe extern "C" fn xml_nanohttp_close(ctx: *mut c_void) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        libxml::{xmlerror::xml_reset_last_error, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -1884,7 +1881,7 @@ mod tests {
                 let ret_val = xml_nanohttp_auth_header(ctx);
                 desret_const_char_ptr(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1910,7 +1907,7 @@ mod tests {
             let mem_base = xml_mem_blocks();
 
             xml_nanohttp_cleanup();
-            xml_reset_last_error();
+            reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -1938,7 +1935,7 @@ mod tests {
                 let ret_val = xml_nanohttp_content_length(ctx);
                 desret_int(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -1968,7 +1965,7 @@ mod tests {
                 let ret_val = xml_nanohttp_encoding(ctx);
                 desret_const_char_ptr(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2004,7 +2001,7 @@ mod tests {
                         des_fileoutput(n_url, url, 0);
                         des_fileoutput(n_filename, filename, 1);
                         des_char_ptr_ptr(n_content_type, content_type, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -2031,7 +2028,7 @@ mod tests {
             let mem_base = xml_mem_blocks();
 
             xml_nanohttp_init();
-            xml_reset_last_error();
+            reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
                 eprintln!(
@@ -2056,7 +2053,7 @@ mod tests {
                 let ret_val = xml_nanohttp_mime_type(ctx);
                 desret_const_char_ptr(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2089,7 +2086,7 @@ mod tests {
                     desret_xml_nano_httpctxt_ptr(ret_val);
                     des_filepath(n_url, url, 0);
                     des_char_ptr_ptr(n_content_type, content_type, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -2124,7 +2121,7 @@ mod tests {
                         des_filepath(n_url, url, 0);
                         des_char_ptr_ptr(n_content_type, content_type, 1);
                         des_char_ptr_ptr(n_redir, redir, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -2164,7 +2161,7 @@ mod tests {
                         des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
                         des_void_ptr(n_dest, dest, 1);
                         des_int(n_len, len, 2);
-                        xml_reset_last_error();
+                        reset_last_error();
                         if mem_base != xml_mem_blocks() {
                             leaks += 1;
                             eprint!(
@@ -2201,7 +2198,7 @@ mod tests {
                 let ret_val = xml_nanohttp_return_code(ctx);
                 desret_int(ret_val);
                 des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-                xml_reset_last_error();
+                reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
                     eprint!(
@@ -2234,7 +2231,7 @@ mod tests {
                     desret_int(ret_val);
                     des_void_ptr(n_ctxt, ctxt, 0);
                     des_fileoutput(n_filename, filename, 1);
-                    xml_reset_last_error();
+                    reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
                         eprint!(
@@ -2259,7 +2256,7 @@ mod tests {
 
                 xml_nanohttp_scan_proxy(url);
                 des_filepath(n_url, url, 0);
-                xml_reset_last_error();
+                reset_last_error();
             }
         }
     }
