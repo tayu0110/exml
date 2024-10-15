@@ -3,7 +3,7 @@
 
 use std::{
     env::args,
-    ffi::{c_char, c_int, CStr},
+    ffi::{c_char, c_int, CStr, CString},
     fs::{metadata, File},
     os::{fd::AsRawFd, raw::c_void},
     ptr::{addr_of_mut, null, null_mut},
@@ -11,7 +11,8 @@ use std::{
 };
 
 use exml::{
-    globals::reset_last_error,
+    error::{XmlError, XmlErrorLevel},
+    globals::{reset_last_error, set_structured_error},
     libxml::{
         globals::{xml_free, xml_get_warnings_default_value, xml_last_error},
         parser::{
@@ -24,10 +25,7 @@ use exml::{
             xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop,
             xml_node_get_base, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
         },
-        xmlerror::{
-            xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr,
-            XmlParserErrors,
-        },
+        xmlerror::{XmlErrorDomain, XmlParserErrors},
         xmlmemory::{
             xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
@@ -135,35 +133,35 @@ macro_rules! test_log {
     };
 }
 
-unsafe extern "C" fn test_error_handler(_user_data: *mut c_void, error: XmlErrorPtr) {
-    if TEST_ERRORS_SIZE >= 32768 {
-        return;
-    }
-    let res: c_int = snprintf(
-        addr_of_mut!(TEST_ERRORS[TEST_ERRORS_SIZE]) as _,
-        32768 - TEST_ERRORS_SIZE,
-        c"%s:%d: %s\n".as_ptr(),
-        if !(*error).file.is_null() {
-            (*error).file
+fn test_error_handler(_user_data: *mut c_void, error: &XmlError) {
+    unsafe {
+        if TEST_ERRORS_SIZE >= 32768 {
+            return;
+        }
+        let file = CString::new(error.file().unwrap_or("entity")).unwrap();
+        let message = CString::new(error.message().unwrap_or("")).unwrap();
+        let res: c_int = snprintf(
+            addr_of_mut!(TEST_ERRORS[TEST_ERRORS_SIZE]) as _,
+            32768 - TEST_ERRORS_SIZE,
+            c"%s:%d: %s\n".as_ptr(),
+            file.as_ptr(),
+            error.line(),
+            message,
+        );
+        if error.level() == XmlErrorLevel::XmlErrFatal {
+            NB_FATAL += 1;
+        } else if error.level() == XmlErrorLevel::XmlErrError {
+            NB_ERROR += 1;
+        }
+        if TEST_ERRORS_SIZE + res as usize >= 32768 {
+            /* buffer is full */
+            TEST_ERRORS_SIZE = 32768;
+            TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
         } else {
-            c"entity".as_ptr()
-        },
-        (*error).line,
-        (*error).message,
-    );
-    if (*error).level == XmlErrorLevel::XmlErrFatal {
-        NB_FATAL += 1;
-    } else if (*error).level == XmlErrorLevel::XmlErrError {
-        NB_ERROR += 1;
-    }
-    if TEST_ERRORS_SIZE + res as usize >= 32768 {
-        /* buffer is full */
-        TEST_ERRORS_SIZE = 32768;
+            TEST_ERRORS_SIZE += res as usize;
+        }
         TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
-    } else {
-        TEST_ERRORS_SIZE += res as usize;
     }
-    TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
 }
 
 static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
@@ -192,7 +190,7 @@ unsafe extern "C" fn initialize_libxml2() {
     if !(*CTXT_XPATH.load(Ordering::Relaxed)).cache.is_null() {
         xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
     }
-    xml_set_structured_error_func(null_mut(), Some(test_error_handler));
+    set_structured_error(Some(test_error_handler), null_mut());
 }
 
 /************************************************************************

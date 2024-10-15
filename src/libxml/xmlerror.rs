@@ -20,7 +20,7 @@ use crate::libxml::parser::{XmlParserCtxtPtr, XmlParserInputPtr};
 
 use super::globals::{
     xml_free, xml_generic_error, xml_generic_error_context, xml_last_error,
-    _XML_GENERIC_ERROR_CONTEXT, _XML_STRUCTURED_ERROR, _XML_STRUCTURED_ERROR_CONTEXT,
+    _XML_GENERIC_ERROR_CONTEXT,
 };
 use super::threads::{xml_get_global_state, xml_is_main_thread};
 use super::tree::{XmlElementType, XmlNodePtr};
@@ -1074,32 +1074,32 @@ pub unsafe extern "C" fn init_generic_error_default_func(handler: Option<XmlGene
     _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
 }
 
-/**
- * xmlSetStructuredErrorFunc:
- * @ctx:  the new error handling context
- * @handler:  the new handler function
- *
- * Function to reset the handler and the error context for out of
- * context structured error messages.
- * This simply means that @handler will be called for subsequent
- * error messages while not parsing nor validating. And @ctx will
- * be passed as first argument to @handler
- * For multi-threaded applications, this must be set separately for each thread.
- */
-pub unsafe extern "C" fn xml_set_structured_error_func(
-    ctx: *mut c_void,
-    handler: Option<XmlStructuredErrorFunc>,
-) {
-    if xml_is_main_thread() != 0 {
-        _XML_STRUCTURED_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
-        _XML_STRUCTURED_ERROR = handler;
-    } else {
-        (*xml_get_global_state())
-            .xml_structured_error_context
-            .store(ctx, Ordering::Relaxed);
-        (*xml_get_global_state()).xml_structured_error = handler;
-    }
-}
+// /**
+//  * xmlSetStructuredErrorFunc:
+//  * @ctx:  the new error handling context
+//  * @handler:  the new handler function
+//  *
+//  * Function to reset the handler and the error context for out of
+//  * context structured error messages.
+//  * This simply means that @handler will be called for subsequent
+//  * error messages while not parsing nor validating. And @ctx will
+//  * be passed as first argument to @handler
+//  * For multi-threaded applications, this must be set separately for each thread.
+//  */
+// pub unsafe extern "C" fn xml_set_structured_error_func(
+//     ctx: *mut c_void,
+//     handler: Option<XmlStructuredErrorFunc>,
+// ) {
+//     if xml_is_main_thread() != 0 {
+//         _XML_STRUCTURED_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
+//         _XML_STRUCTURED_ERROR = handler;
+//     } else {
+//         (*xml_get_global_state())
+//             .xml_structured_error_context
+//             .store(ctx, Ordering::Relaxed);
+//         (*xml_get_global_state()).xml_structured_error = handler;
+//     }
+// }
 
 pub const XML_MAX_ERRORS: usize = 100;
 

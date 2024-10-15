@@ -9,6 +9,8 @@ use std::{
 
 use exml::{
     encoding::XmlCharEncoding,
+    error::XmlError,
+    globals::set_structured_error,
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::{
@@ -21,7 +23,7 @@ use exml::{
             xml_free_parser_input_buffer, xml_parser_input_buffer_create_mem,
             XmlParserInputBufferPtr,
         },
-        xmlerror::{xml_set_structured_error_func, XmlErrorPtr, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
@@ -37,9 +39,11 @@ use libc::{fflush, fprintf, memset, printf, strlen, FILE};
 
 static mut LAST_ERROR: c_int = 0;
 
-unsafe extern "C" fn error_handler(unused: *mut c_void, err: XmlErrorPtr) {
-    if unused.is_null() && !err.is_null() && LAST_ERROR == 0 {
-        LAST_ERROR = (*err).code;
+fn error_handler(unused: *mut c_void, err: &XmlError) {
+    unsafe {
+        if unused.is_null() && LAST_ERROR == 0 {
+            LAST_ERROR = err.code() as i32;
+        }
     }
 }
 
@@ -872,7 +876,7 @@ fn main() {
      */
 
     unsafe {
-        xml_set_structured_error_func(null_mut(), Some(error_handler));
+        set_structured_error(Some(error_handler), null_mut());
 
         /*
          * Run the tests

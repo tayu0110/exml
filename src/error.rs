@@ -17,7 +17,7 @@ use crate::{
     libxml::{
         globals::xml_generic_error,
         parser::{XmlParserCtxtPtr, XmlParserInputPtr},
-        tree::{XmlElementType, XmlNodePtr},
+        tree::{XmlElementType, XmlNode, XmlNodePtr},
         xmlerror::XmlParserErrors,
     },
 };
@@ -81,7 +81,7 @@ pub struct XmlError {
     pub(crate) int1: i32,
     pub(crate) int2: i32,
     pub(crate) ctxt: Option<NonNull<c_void>>,
-    pub(crate) node: Option<NonNull<c_void>>,
+    pub(crate) node: Option<NonNull<XmlNode>>,
 }
 
 impl XmlError {
@@ -101,6 +101,42 @@ impl XmlError {
 
     pub fn code(&self) -> XmlParserErrors {
         self.code
+    }
+
+    pub fn message(&self) -> Option<&str> {
+        self.message.as_ref().map(|s| s.as_ref())
+    }
+
+    pub fn file(&self) -> Option<&str> {
+        self.file.as_ref().map(|s| s.as_ref())
+    }
+
+    pub fn line(&self) -> usize {
+        self.line
+    }
+
+    pub fn domain(&self) -> XmlErrorDomain {
+        self.domain
+    }
+
+    pub fn level(&self) -> XmlErrorLevel {
+        self.level
+    }
+
+    pub fn node(&self) -> Option<NonNull<XmlNode>> {
+        self.node
+    }
+
+    pub fn context(&self) -> Option<NonNull<c_void>> {
+        self.ctxt
+    }
+
+    pub fn str1(&self) -> Option<&str> {
+        self.str1.as_ref().map(|s| s.as_ref())
+    }
+
+    pub fn int1(&self) -> i32 {
+        self.int1
     }
 }
 
@@ -180,60 +216,59 @@ impl<T> Write for ErrorContextWrap<T> {
     }
 }
 
-fn parser_print_file_context_internal(input: XmlParserInputPtr, buf: &mut String) {
+#[doc(hidden)]
+pub unsafe fn parser_print_file_context_internal(input: XmlParserInputPtr, buf: &mut String) {
     let mut cur: *const u8;
     const SIZE: usize = 80;
     let mut content = String::with_capacity(SIZE);
 
-    unsafe {
-        if input.is_null() || (*input).cur.is_null() {
-            return;
-        }
-
-        cur = (*input).cur;
-        let base: *const u8 = (*input).base;
-        /* skip backwards over any end-of-lines */
-        while cur > base && (*cur == b'\n' || *cur == b'\r') {
-            cur = cur.sub(1);
-        }
-        let mut n = 0;
-        /* search backwards for beginning-of-line (to max buff size) */
-        while n < SIZE - 1 && cur > base && *cur != b'\n' && *cur != b'\r' {
-            cur = cur.sub(1);
-            n += 1;
-        }
-        if n > 0 && (*cur == b'\n' || *cur == b'\r') {
-            cur = cur.add(1);
-        } else {
-            /* skip over continuation bytes */
-            while cur < (*input).cur && *cur & 0xC0 == 0x80 {
-                cur = cur.add(1);
-            }
-        }
-        /* search forward for end-of-line (to max buff size) */
-        let mut n = 0;
-        let s = CStr::from_ptr(cur as *const i8).to_string_lossy();
-        for c in s.chars().take_while(|&c| c != '\n' && c != '\r') {
-            n += c.len_utf8();
-            if n > SIZE {
-                break;
-            }
-            content.push(c);
-        }
-        /* print out the selected text */
-        buf.push_str(format!("{content}\n").as_str());
-        /* create blank line with problem pointer */
-        let mut ptr = content
-            .chars()
-            .map(|c| if c == '\t' { c } else { ' ' })
-            .collect::<String>();
-        ptr.pop();
-        ptr.push('^');
-        buf.push_str(format!("{ptr}\n").as_str());
+    if input.is_null() || (*input).cur.is_null() {
+        return;
     }
+
+    cur = (*input).cur;
+    let base: *const u8 = (*input).base;
+    /* skip backwards over any end-of-lines */
+    while cur > base && (*cur == b'\n' || *cur == b'\r') {
+        cur = cur.sub(1);
+    }
+    let mut n = 0;
+    /* search backwards for beginning-of-line (to max buff size) */
+    while n < SIZE - 1 && cur > base && *cur != b'\n' && *cur != b'\r' {
+        cur = cur.sub(1);
+        n += 1;
+    }
+    if n > 0 && (*cur == b'\n' || *cur == b'\r') {
+        cur = cur.add(1);
+    } else {
+        /* skip over continuation bytes */
+        while cur < (*input).cur && *cur & 0xC0 == 0x80 {
+            cur = cur.add(1);
+        }
+    }
+    /* search forward for end-of-line (to max buff size) */
+    let mut n = 0;
+    let s = CStr::from_ptr(cur as *const i8).to_string_lossy();
+    for c in s.chars().take_while(|&c| c != '\n' && c != '\r') {
+        n += c.len_utf8();
+        if n > SIZE {
+            break;
+        }
+        content.push(c);
+    }
+    /* print out the selected text */
+    buf.push_str(format!("{content}\n").as_str());
+    /* create blank line with problem pointer */
+    let mut ptr = content
+        .chars()
+        .map(|c| if c == '\t' { c } else { ' ' })
+        .collect::<String>();
+    ptr.pop();
+    ptr.push('^');
+    buf.push_str(format!("{ptr}\n").as_str());
 }
 
-pub fn parser_print_file_context(input: XmlParserInputPtr) {
+pub unsafe fn parser_print_file_context(input: XmlParserInputPtr) {
     let mut buf = String::new();
     parser_print_file_context_internal(input, &mut buf);
     generic_error!("{buf}");
@@ -521,7 +556,9 @@ pub(crate) fn parser_validity_warning(ctx: Option<&mut (dyn Write + 'static)>, m
 
         generic_error!("validity warning: {msg}");
 
-        parser_print_file_context(input);
+        unsafe {
+            parser_print_file_context(input);
+        }
     } else {
         generic_error!("validity warning: {msg}");
     }

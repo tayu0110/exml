@@ -3,7 +3,7 @@
 
 use std::{
     env::args,
-    ffi::{c_char, c_int, c_uint, c_ulong, CStr, CString},
+    ffi::{c_char, c_int, c_ulong, CStr, CString},
     fs::{metadata, File},
     io::{BufRead, BufReader, Read, Stderr, Write},
     mem::zeroed,
@@ -18,7 +18,8 @@ use std::{
 
 use const_format::concatcp;
 use exml::{
-    globals::{reset_last_error, set_generic_error},
+    error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
+    globals::{reset_last_error, set_generic_error, set_structured_error},
     libxml::{
         encoding::{
             xml_char_enc_close_func, xml_get_char_encoding_handler, XmlCharEncoding,
@@ -54,10 +55,7 @@ use exml::{
             xml_no_net_external_entity_loader, xml_pop_input_callbacks,
             xml_register_input_callbacks,
         },
-        xmlerror::{
-            xml_set_structured_error_func, XmlErrorDomain, XmlErrorLevel, XmlErrorPtr,
-            XmlGenericErrorFunc, XmlParserErrors,
-        },
+        xmlerror::XmlParserErrors,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
@@ -66,10 +64,10 @@ use exml::{
         xmlregexp::XmlRegexpPtr,
         xmlschemas::{XmlSchemaPtr, XmlSchemaValidCtxtPtr},
         xmlschemastypes::xml_schema_init_types,
-        xmlstring::{xml_get_utf8_char, xml_strlen, XmlChar},
+        xmlstring::{xml_strlen, XmlChar},
         xpath::XmlXPathObjectPtr,
     },
-    xml_error_with_format, SYSCONFDIR,
+    SYSCONFDIR,
 };
 use libc::{
     close, fdopen, fflush, free, glob, glob_t, globfree, malloc, memcmp, memcpy, open, pthread_t,
@@ -164,311 +162,247 @@ fn test_error_handler(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
     }
 }
 
-unsafe extern "C" fn channel(_ctx: *mut c_void, msg: *const c_char) {
-    if TEST_ERRORS_SIZE >= 32768 {
-        return;
+fn channel(_ctx: *mut c_void, msg: &str) {
+    unsafe {
+        if TEST_ERRORS_SIZE >= 32768 {
+            return;
+        }
+        if TEST_ERRORS_SIZE + msg.len() >= TEST_ERRORS.len() {
+            TEST_ERRORS[TEST_ERRORS_SIZE..]
+                .copy_from_slice(&msg.as_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
+            TEST_ERRORS_SIZE = TEST_ERRORS.len();
+        } else {
+            TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + msg.len()]
+                .copy_from_slice(msg.as_bytes());
+            TEST_ERRORS_SIZE += msg.len();
+        }
+        TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
     }
-    let m = CStr::from_ptr(msg);
-    if TEST_ERRORS_SIZE + m.to_bytes().len() >= TEST_ERRORS.len() {
-        TEST_ERRORS[TEST_ERRORS_SIZE..]
-            .copy_from_slice(&m.to_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-        TEST_ERRORS_SIZE = TEST_ERRORS.len();
-    } else {
-        TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + m.to_bytes().len()]
-            .copy_from_slice(m.to_bytes());
-        TEST_ERRORS_SIZE += m.to_bytes().len();
-    }
-    TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
 }
 
-/**
- * xmlParserPrintFileContextInternal:
- * @input:  an xmlParserInputPtr input
- *
- * Displays current context within the input content for error tracking
- */
+// /**
+//  * xmlParserPrintFileContextInternal:
+//  * @input:  an xmlParserInputPtr input
+//  *
+//  * Displays current context within the input content for error tracking
+//  */
+// unsafe extern "C" fn xml_parser_print_file_context_internal(
+//     input: XmlParserInputPtr,
+//     chanl: XmlGenericErrorFunc,
+//     data: *mut c_void,
+// ) {
+//     let mut cur: *const XmlChar;
+//     let mut n: usize;
+//     /* GCC warns if signed, because compared with sizeof() */
+//     let mut content: [XmlChar; 81] = [0; 81]; /* space for 80 chars + line terminator */
+//     let mut ctnt: *mut XmlChar;
 
-unsafe extern "C" fn xml_parser_print_file_context_internal(
-    input: XmlParserInputPtr,
-    chanl: XmlGenericErrorFunc,
-    data: *mut c_void,
-) {
-    let mut cur: *const XmlChar;
-    let mut n: usize;
-    /* GCC warns if signed, because compared with sizeof() */
-    let mut content: [XmlChar; 81] = [0; 81]; /* space for 80 chars + line terminator */
-    let mut ctnt: *mut XmlChar;
+//     if input.is_null() || (*input).cur.is_null() {
+//         return;
+//     }
 
-    if input.is_null() || (*input).cur.is_null() {
-        return;
-    }
+//     cur = (*input).cur;
+//     let base: *const XmlChar = (*input).base;
+//     /* skip backwards over any end-of-lines */
+//     while cur > base && (*cur == b'\n' || *cur == b'\r') {
+//         cur = cur.sub(1);
+//     }
+//     n = 0;
+//     /* search backwards for beginning-of-line (to max buff size) */
+//     while {
+//         n += 1;
+//         n < content.len()
+//     } && cur > base
+//         && *cur != b'\n'
+//         && *cur != b'\r'
+//     {
+//         cur = cur.sub(1);
+//     }
+//     if *cur == b'\n' || *cur == b'\r' {
+//         cur = cur.add(1);
+//     } else {
+//         /* skip over continuation bytes */
+//         while cur < (*input).cur && *cur & 0xC0 == 0x80 {
+//             cur = cur.add(1);
+//         }
+//     }
+//     /* calculate the error position in terms of the current position */
+//     let col: c_uint = (*input).cur.offset_from(cur) as _;
+//     /* search forward for end-of-line (to max buff size) */
+//     n = 0;
+//     let start: *const XmlChar = cur;
+//     /* copy selected text to our buffer */
+//     while *cur != 0 && *cur != b'\n' && *cur != b'\r' {
+//         let mut len = (*input).end.offset_from(cur) as usize;
+//         let c: c_int = xml_get_utf8_char(cur, addr_of_mut!(len) as _);
 
-    cur = (*input).cur;
-    let base: *const XmlChar = (*input).base;
-    /* skip backwards over any end-of-lines */
-    while cur > base && (*cur == b'\n' || *cur == b'\r') {
-        cur = cur.sub(1);
-    }
-    n = 0;
-    /* search backwards for beginning-of-line (to max buff size) */
-    while {
-        n += 1;
-        n < content.len()
-    } && cur > base
-        && *cur != b'\n'
-        && *cur != b'\r'
-    {
-        cur = cur.sub(1);
-    }
-    if *cur == b'\n' || *cur == b'\r' {
-        cur = cur.add(1);
-    } else {
-        /* skip over continuation bytes */
-        while cur < (*input).cur && *cur & 0xC0 == 0x80 {
-            cur = cur.add(1);
-        }
-    }
-    /* calculate the error position in terms of the current position */
-    let col: c_uint = (*input).cur.offset_from(cur) as _;
-    /* search forward for end-of-line (to max buff size) */
-    n = 0;
-    let start: *const XmlChar = cur;
-    /* copy selected text to our buffer */
-    while *cur != 0 && *cur != b'\n' && *cur != b'\r' {
-        let mut len = (*input).end.offset_from(cur) as usize;
-        let c: c_int = xml_get_utf8_char(cur, addr_of_mut!(len) as _);
+//         if c < 0 || n + len > content.len() - 1 {
+//             break;
+//         }
+//         cur = cur.add(len as _);
+//         n += len;
+//     }
+//     memcpy(content.as_mut_ptr() as _, start as _, n);
+//     content[n] = 0;
+//     /* print out the selected text */
+//     xml_error_with_format!(chanl, data, c"%s\n".as_ptr(), content.as_ptr());
+//     /* create blank line with problem pointer */
+//     n = 0;
+//     ctnt = content.as_mut_ptr();
+//     /* (leave buffer space for pointer + line terminator) */
+//     while n < col as usize
+//         && {
+//             n += 1;
+//             n < content.len() - 1
+//         }
+//         && *ctnt != 0
+//     {
+//         if *ctnt != b'\t' {
+//             *ctnt = b' ';
+//         }
+//         ctnt = ctnt.add(1);
+//     }
+//     *ctnt = b'^';
+//     ctnt = ctnt.add(1);
+//     *ctnt = 0;
+//     xml_error_with_format!(chanl, data, c"%s\n".as_ptr(), content.as_ptr());
+// }
 
-        if c < 0 || n + len > content.len() - 1 {
-            break;
-        }
-        cur = cur.add(len as _);
-        n += len;
-    }
-    memcpy(content.as_mut_ptr() as _, start as _, n);
-    content[n] = 0;
-    /* print out the selected text */
-    xml_error_with_format!(chanl, data, c"%s\n".as_ptr(), content.as_ptr());
-    /* create blank line with problem pointer */
-    n = 0;
-    ctnt = content.as_mut_ptr();
-    /* (leave buffer space for pointer + line terminator) */
-    while n < col as usize
-        && {
-            n += 1;
-            n < content.len() - 1
-        }
-        && *ctnt != 0
-    {
-        if *ctnt != b'\t' {
-            *ctnt = b' ';
-        }
-        ctnt = ctnt.add(1);
-    }
-    *ctnt = b'^';
-    ctnt = ctnt.add(1);
-    *ctnt = 0;
-    xml_error_with_format!(chanl, data, c"%s\n".as_ptr(), content.as_ptr());
-}
-
-unsafe extern "C" fn test_structured_error_handler(_ctx: *mut c_void, err: XmlErrorPtr) {
+fn test_structured_error_handler(_ctx: *mut c_void, err: &XmlError) {
     let data: *mut c_void = null_mut();
     let mut name: *const XmlChar = null_mut();
     let mut input: XmlParserInputPtr = null_mut();
     let mut cur: XmlParserInputPtr = null_mut();
     let mut ctxt: XmlParserCtxtPtr = null_mut();
 
-    if err.is_null() {
-        return;
-    }
-
-    let file: *mut c_char = (*err).file;
-    let line: c_int = (*err).line;
-    let code: c_int = (*err).code;
-    let domain: c_int = (*err).domain;
-    let level: XmlErrorLevel = (*err).level;
-    let node: XmlNodePtr = (*err).node as _;
-    if domain == XmlErrorDomain::XmlFromParser as i32
-        || domain == XmlErrorDomain::XmlFromHtml as i32
-        || domain == XmlErrorDomain::XmlFromDtd as i32
-        || domain == XmlErrorDomain::XmlFromNamespace as i32
-        || domain == XmlErrorDomain::XmlFromIO as i32
-        || domain == XmlErrorDomain::XmlFromValid as i32
+    let file = err.file();
+    let line = err.line();
+    let code = err.code();
+    let domain = err.domain();
+    let level = err.level();
+    let node = err.node();
+    if domain == XmlErrorDomain::XmlFromParser
+        || domain == XmlErrorDomain::XmlFromHTML
+        || domain == XmlErrorDomain::XmlFromDTD
+        || domain == XmlErrorDomain::XmlFromNamespace
+        || domain == XmlErrorDomain::XmlFromIO
+        || domain == XmlErrorDomain::XmlFromValid
     {
-        ctxt = (*err).ctxt as _;
+        ctxt = err.context().map_or(null_mut(), |c| c.as_ptr() as _);
     }
-    let str: *const c_char = (*err).message;
+    let str = err.message();
 
-    if code == XmlParserErrors::XmlErrOK as i32 {
+    if code.is_ok() {
         return;
     }
 
-    if !node.is_null() && (*node).typ == XmlElementType::XmlElementNode {
-        name = (*node).name;
-    }
-
-    /*
-     * Maintain the compatibility with the legacy error handling
-     */
-    if !ctxt.is_null() {
-        input = (*ctxt).input;
-        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-            cur = input;
-            input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+    unsafe {
+        if let Some(node) = node.filter(|n| n.as_ref().typ == XmlElementType::XmlElementNode) {
+            name = node.as_ref().name;
         }
-        if !input.is_null() {
-            if !(*input).filename.is_null() {
-                xml_error_with_format!(
-                    channel,
-                    data,
-                    c"%s:%d: ".as_ptr(),
-                    (*input).filename,
-                    (*input).line
-                );
-            } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
-                xml_error_with_format!(channel, data, c"Entity: line %d: ".as_ptr(), (*input).line);
+
+        /*
+         * Maintain the compatibility with the legacy error handling
+         */
+        if !ctxt.is_null() {
+            input = (*ctxt).input;
+            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+                cur = input;
+                input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
             }
+            if !input.is_null() {
+                if !(*input).filename.is_null() {
+                    let file = CStr::from_ptr((*input).filename).to_string_lossy();
+                    channel(data, format!("{file}:{}: ", (*input).line).as_str());
+                } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
+                    channel(data, format!("Entity: line {}: ", (*input).line).as_str());
+                }
+            }
+        } else if let Some(file) = file {
+            channel(data, format!("{file}:{line}: ").as_str());
+        } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
+            channel(data, format!("Entity: line {line}: ").as_str());
         }
-    } else if !file.is_null() {
-        xml_error_with_format!(channel, data, c"%s:%d: ".as_ptr(), file, line);
-    } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
-        xml_error_with_format!(channel, data, c"Entity: line %d: ".as_ptr(), line);
-    }
-    if !name.is_null() {
-        xml_error_with_format!(channel, data, c"element %s: ".as_ptr(), name);
-    }
-    if code == XmlParserErrors::XmlErrOK as i32 {
-        return;
-    }
-    match XmlErrorDomain::try_from(domain) {
-        Ok(XmlErrorDomain::XmlFromParser) => {
-            channel(data, c"parser ".as_ptr());
+        if !name.is_null() {
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            channel(data, format!("element {name}: ").as_str());
         }
-        Ok(XmlErrorDomain::XmlFromNamespace) => {
-            channel(data, c"namespace ".as_ptr());
+        if code.is_ok() {
+            return;
         }
-        Ok(XmlErrorDomain::XmlFromDtd) | Ok(XmlErrorDomain::XmlFromValid) => {
-            channel(data, c"validity ".as_ptr());
+        match domain {
+            XmlErrorDomain::XmlFromParser => channel(data, "parser "),
+            XmlErrorDomain::XmlFromNamespace => channel(data, "namespace "),
+            XmlErrorDomain::XmlFromDTD | XmlErrorDomain::XmlFromValid => channel(data, "validity "),
+            XmlErrorDomain::XmlFromHTML => channel(data, "HTML parser "),
+            XmlErrorDomain::XmlFromMemory => channel(data, "memory "),
+            XmlErrorDomain::XmlFromOutput => channel(data, "output "),
+            XmlErrorDomain::XmlFromIO => channel(data, "I/O "),
+            XmlErrorDomain::XmlFromXInclude => channel(data, "XInclude "),
+            XmlErrorDomain::XmlFromXPath => channel(data, "XPath "),
+            XmlErrorDomain::XmlFromXPointer => channel(data, "parser "),
+            XmlErrorDomain::XmlFromRegexp => channel(data, "regexp "),
+            XmlErrorDomain::XmlFromModule => channel(data, "module "),
+            XmlErrorDomain::XmlFromSchemasv => channel(data, "Schemas validity "),
+            XmlErrorDomain::XmlFromSchemasp => channel(data, "Schemas parser "),
+            XmlErrorDomain::XmlFromRelaxngp => channel(data, "Relax-NG parser "),
+            XmlErrorDomain::XmlFromRelaxngv => channel(data, "Relax-NG validity "),
+            XmlErrorDomain::XmlFromCatalog => channel(data, "Catalog "),
+            XmlErrorDomain::XmlFromC14N => channel(data, "C14N "),
+            XmlErrorDomain::XmlFromXSLT => channel(data, "XSLT "),
+            _ => {}
         }
-        Ok(XmlErrorDomain::XmlFromHtml) => {
-            channel(data, c"HTML parser ".as_ptr());
+        if code.is_ok() {
+            return;
         }
-        Ok(XmlErrorDomain::XmlFromMemory) => {
-            channel(data, c"memory ".as_ptr());
+        match level {
+            XmlErrorLevel::XmlErrNone => channel(data, ": "),
+            XmlErrorLevel::XmlErrWarning => channel(data, "warning : "),
+            XmlErrorLevel::XmlErrError => channel(data, "error : "),
+            XmlErrorLevel::XmlErrFatal => channel(data, "error : "),
         }
-        Ok(XmlErrorDomain::XmlFromOutput) => {
-            channel(data, c"output ".as_ptr());
+        if code.is_ok() {
+            return;
         }
-        Ok(XmlErrorDomain::XmlFromIO) => {
-            channel(data, c"I/O ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromXinclude) => {
-            channel(data, c"XInclude ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromXpath) => {
-            channel(data, c"XPath ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromXpointer) => {
-            channel(data, c"parser ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromRegexp) => {
-            channel(data, c"regexp ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromModule) => {
-            channel(data, c"module ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromSchemasv) => {
-            channel(data, c"Schemas validity ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromSchemasp) => {
-            channel(data, c"Schemas parser ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromRelaxngp) => {
-            channel(data, c"Relax-NG parser ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromRelaxngv) => {
-            channel(data, c"Relax-NG validity ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromCatalog) => {
-            channel(data, c"Catalog ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromC14N) => {
-            channel(data, c"C14N ".as_ptr());
-        }
-        Ok(XmlErrorDomain::XmlFromXSLT) => {
-            channel(data, c"XSLT ".as_ptr());
-        }
-        _ => {}
-    }
-    if code == XmlParserErrors::XmlErrOK as i32 {
-        return;
-    }
-    match level {
-        XmlErrorLevel::XmlErrNone => {
-            channel(data, c": ".as_ptr());
-        }
-        XmlErrorLevel::XmlErrWarning => {
-            channel(data, c"warning : ".as_ptr());
-        }
-        XmlErrorLevel::XmlErrError => {
-            channel(data, c"error : ".as_ptr());
-        }
-        XmlErrorLevel::XmlErrFatal => {
-            channel(data, c"error : ".as_ptr());
-        }
-    }
-    if code == XmlParserErrors::XmlErrOK as i32 {
-        return;
-    }
-    if !str.is_null() {
-        let len: c_int = xml_strlen(str as *const XmlChar);
-        if len > 0 && *str.add(len as usize - 1) != b'\n' as _ {
-            xml_error_with_format!(channel, data, c"%s\n".as_ptr(), str);
+        if let Some(str) = str {
+            if str.as_bytes().last() != Some(&b'\n') {
+                channel(data, format!("{str}\n").as_str());
+            } else {
+                channel(data, str);
+            }
         } else {
-            xml_error_with_format!(channel, data, c"%s".as_ptr(), str);
+            channel(data, "out of memory error\n");
         }
-    } else {
-        xml_error_with_format!(
-            channel,
-            data,
-            c"%s\n".as_ptr(),
-            c"out of memory error".as_ptr()
-        );
-    }
-    if code == XmlParserErrors::XmlErrOK as i32 {
-        return;
-    }
+        if code.is_ok() {
+            return;
+        }
 
-    if !ctxt.is_null() {
-        xml_parser_print_file_context_internal(input, channel, data);
-        if !cur.is_null() {
-            if !(*cur).filename.is_null() {
-                xml_error_with_format!(
-                    channel,
-                    data,
-                    c"%s:%d: \n".as_ptr(),
-                    (*cur).filename,
-                    (*cur).line
-                );
-            } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
-                xml_error_with_format!(channel, data, c"Entity: line %d: \n".as_ptr(), (*cur).line);
+        if !ctxt.is_null() {
+            let mut buf = String::new();
+            parser_print_file_context_internal(input, &mut buf);
+            channel(data, buf.as_str());
+            if !cur.is_null() {
+                if !(*cur).filename.is_null() {
+                    let file = CStr::from_ptr((*cur).filename).to_string_lossy();
+                    channel(data, format!("{file}:{}: \n", (*cur).line).as_str());
+                } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
+                    channel(data, format!("Entity: line {}: \n", (*cur).line).as_str());
+                }
+                buf.clear();
+                parser_print_file_context_internal(cur, &mut buf);
+                channel(data, buf.as_str());
             }
-            xml_parser_print_file_context_internal(cur, channel, data);
         }
-    }
-    if domain == XmlErrorDomain::XmlFromXpath as i32
-        && !(*err).str1.is_null()
-        && (*err).int1 < 100
-        && (*err).int1 < xml_strlen((*err).str1 as *const XmlChar)
-    {
-        let mut buf: [XmlChar; 150] = [0; 150];
-
-        xml_error_with_format!(channel, data, c"%s\n".as_ptr(), (*err).str1);
-        for i in 0..(*err).int1 {
-            buf[i as usize] = b' ';
+        if let Some(str1) = err.str1().filter(|s| {
+            err.int1() < 100
+                && err.int1() < s.len() as i32
+                && domain == XmlErrorDomain::XmlFromXPath
+        }) {
+            channel(data, format!("{str1}\n").as_str());
+            let mut buf = " ".repeat(err.int1() as usize);
+            buf.push('^');
+            channel(data, format!("{buf}\n").as_str());
         }
-        buf[(*err).int1 as usize] = b'^';
-        buf[(*err).int1 as usize + 1] = 0;
-        xml_error_with_format!(channel, data, c"%s\n".as_ptr(), buf.as_ptr());
     }
 }
 
@@ -490,7 +424,7 @@ unsafe extern "C" fn initialize_libxml2() {
     );
     xml_pedantic_parser_default(0);
     xml_set_external_entity_loader(test_external_entity_loader);
-    xml_set_structured_error_func(null_mut(), Some(test_structured_error_handler));
+    set_structured_error(Some(test_structured_error_handler), null_mut());
     #[cfg(feature = "schema")]
     {
         xml_schema_init_types();
@@ -1948,7 +1882,7 @@ unsafe extern "C" fn sax_parse_test(
     *SAX_DEBUG.lock().unwrap() = Some(out);
 
     /* for SAX we really want the callbacks though the context handlers */
-    xml_set_structured_error_func(null_mut(), None);
+    set_structured_error(None, null_mut());
     set_generic_error(Some(test_error_handler), None::<Stderr>);
 
     #[cfg(feature = "html")]
@@ -2085,8 +2019,7 @@ unsafe extern "C" fn sax_parse_test(
 
     /* switch back to structured error handling */
     set_generic_error(None, None::<Stderr>);
-    // xml_set_generic_error_func(null_mut(), None);
-    xml_set_structured_error_func(null_mut(), Some(test_structured_error_handler));
+    set_structured_error(Some(test_structured_error_handler), null_mut());
 
     ret
 }

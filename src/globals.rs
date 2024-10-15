@@ -133,6 +133,16 @@ pub fn set_generic_error(func: Option<GenericError>, context: Option<impl Write 
     });
 }
 
+/// Set new structured error function and structured error context.
+///
+/// Even if `func` and `context` are `None`, replacements are not set.
+pub fn set_structured_error(func: Option<StructuredError>, context: *mut c_void) {
+    GLOBAL_STATE.with_borrow_mut(|state| {
+        state.structured_error = func;
+        state.structured_error_context = context;
+    });
+}
+
 /// Update default buffer allocation scheme.
 ///
 /// The user can set the following 3 schemes
