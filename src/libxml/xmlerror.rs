@@ -8,7 +8,6 @@ use std::io::Write;
 use std::mem::{size_of, size_of_val};
 use std::os::fd::FromRawFd;
 use std::ptr::{addr_of_mut, null_mut};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use libc::{memcpy, memset, FILE};
 
@@ -1217,165 +1216,165 @@ macro_rules! xml_error_with_format {
 //     }
 // }
 
-/**
- * xmlParserWarning:
- * @ctx:  an XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a warning messages, gives file, line, position and
- * extra parameters.
- */
-// pub unsafe extern "C" fn xmlParserWarning(ctx: *mut c_void, msg: *const c_char, ...) {
+// /**
+//  * xmlParserWarning:
+//  * @ctx:  an XML parser context
+//  * @msg:  the message to display/transmit
+//  * @...:  extra parameters for the message display
+//  *
+//  * Display and format a warning messages, gives file, line, position and
+//  * extra parameters.
+//  */
+// // pub unsafe extern "C" fn xmlParserWarning(ctx: *mut c_void, msg: *const c_char, ...) {
+// // }
+// #[macro_export]
+// macro_rules! xmlParserWarning {
+//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
+//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
+//             let mut str: *mut libc::c_char;
+//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
+//             $crate::libxml::xmlerror::xmlParserWarning(ctx, str as _);
+//             if !str.is_null() {
+//                 $crate::libxml::globals::xml_free(str as _);
+//             }
+//         })($ctx, $msg)
+//     };
 // }
-#[macro_export]
-macro_rules! xmlParserWarning {
-    ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-        (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-            let mut str: *mut libc::c_char;
-            $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-            $crate::libxml::xmlerror::xmlParserWarning(ctx, str as _);
-            if !str.is_null() {
-                $crate::libxml::globals::xml_free(str as _);
-            }
-        })($ctx, $msg)
-    };
-}
 
-pub(crate) unsafe extern "C" fn xml_parser_warning(ctx: *mut c_void, msg: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut input: XmlParserInputPtr = null_mut();
-    let mut cur: XmlParserInputPtr = null_mut();
+// pub(crate) unsafe extern "C" fn xml_parser_warning(ctx: *mut c_void, msg: *const c_char) {
+//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+//     let mut input: XmlParserInputPtr = null_mut();
+//     let mut cur: XmlParserInputPtr = null_mut();
 
-    if !ctxt.is_null() {
-        input = (*ctxt).input;
-        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-            cur = input;
-            input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-        }
-        xml_parser_print_file_info(input);
-    }
+//     if !ctxt.is_null() {
+//         input = (*ctxt).input;
+//         if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+//             cur = input;
+//             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+//         }
+//         xml_parser_print_file_info(input);
+//     }
 
-    xml_generic_error(xml_generic_error_context(), c"warning: ".as_ptr() as _);
-    xml_generic_error(xml_generic_error_context(), msg as _);
+//     xml_generic_error(xml_generic_error_context(), c"warning: ".as_ptr() as _);
+//     xml_generic_error(xml_generic_error_context(), msg as _);
 
-    if !ctxt.is_null() {
-        xml_parser_print_file_context(input);
-        if !cur.is_null() {
-            xml_parser_print_file_info(cur);
-            xml_generic_error(xml_generic_error_context(), c"\n".as_ptr() as _);
-            xml_parser_print_file_context(cur);
-        }
-    }
-}
-
-/**
- * xmlParserValidityError:
- * @ctx:  an XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format an validity error messages, gives file,
- * line, position and extra parameters.
- */
-// pub unsafe extern "C" fn xmlParserValidityError(ctx: *mut c_void, msg: *const c_char, ...) {
+//     if !ctxt.is_null() {
+//         xml_parser_print_file_context(input);
+//         if !cur.is_null() {
+//             xml_parser_print_file_info(cur);
+//             xml_generic_error(xml_generic_error_context(), c"\n".as_ptr() as _);
+//             xml_parser_print_file_context(cur);
+//         }
+//     }
 // }
-#[macro_export]
-macro_rules! xmlParserValidityError {
-    ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-        (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-            let mut str: *mut libc::c_char;
-            $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-            $crate::libxml::xmlerror::xmlParserValidityError(ctx, str);
-            if !str.is_null() {
-                $crate::libxml::globals::xml_free(str as _);
-            }
-        })($ctx, $msg)
-    };
-}
 
-pub(crate) unsafe extern "C" fn xml_parser_validity_error(ctx: *mut c_void, msg: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut input: XmlParserInputPtr = std::ptr::null_mut();
-    let len: libc::c_int = xml_strlen(msg as *const XmlChar);
-    static HAD_INFO: AtomicBool = AtomicBool::new(false);
-
-    if len > 1 && *msg.add(len as usize - 2) != b':' as i8 {
-        if !ctxt.is_null() {
-            input = (*ctxt).input;
-            if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-                input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-            }
-
-            if !HAD_INFO.load(Ordering::Acquire) {
-                xml_parser_print_file_info(input);
-            }
-        }
-        xml_generic_error(
-            xml_generic_error_context(),
-            c"validity error: ".as_ptr() as _,
-        );
-        HAD_INFO.store(false, Ordering::Release)
-    } else {
-        HAD_INFO.store(true, Ordering::Release);
-    }
-
-    xml_generic_error(xml_generic_error_context(), msg as _);
-
-    if !ctxt.is_null() && !input.is_null() {
-        xml_parser_print_file_context(input);
-    }
-}
-
-/**
- * xmlParserValidityWarning:
- * @ctx:  an XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a validity warning messages, gives file, line,
- * position and extra parameters.
- */
-// pub unsafe extern "C" fn xmlParserValidityWarning(ctx: *mut c_void, msg: *const c_char, ...) {
+// /**
+//  * xmlParserValidityError:
+//  * @ctx:  an XML parser context
+//  * @msg:  the message to display/transmit
+//  * @...:  extra parameters for the message display
+//  *
+//  * Display and format an validity error messages, gives file,
+//  * line, position and extra parameters.
+//  */
+// // pub unsafe extern "C" fn xmlParserValidityError(ctx: *mut c_void, msg: *const c_char, ...) {
+// // }
+// #[macro_export]
+// macro_rules! xmlParserValidityError {
+//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
+//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
+//             let mut str: *mut libc::c_char;
+//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
+//             $crate::libxml::xmlerror::xmlParserValidityError(ctx, str);
+//             if !str.is_null() {
+//                 $crate::libxml::globals::xml_free(str as _);
+//             }
+//         })($ctx, $msg)
+//     };
 // }
-#[macro_export]
-macro_rules! xmlParserValidityWarning {
-    ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-        (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-            let mut str: *mut libc::c_char;
-            $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-            $crate::libxml::xmlerror::xmlParserValidityWarning(ctx, str);
-            if !str.is_null() {
-                $crate::libxml::globals::xml_free(str);
-            }
-        })($ctx, $msg)
-    };
-}
 
-pub(crate) unsafe extern "C" fn xml_parser_validity_warning(ctx: *mut c_void, msg: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut input: XmlParserInputPtr = std::ptr::null_mut();
-    let len: c_int = xml_strlen(msg as *const XmlChar);
+// pub(crate) unsafe extern "C" fn xml_parser_validity_error(ctx: *mut c_void, msg: *const c_char) {
+//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+//     let mut input: XmlParserInputPtr = std::ptr::null_mut();
+//     let len: libc::c_int = xml_strlen(msg as *const XmlChar);
+//     static HAD_INFO: AtomicBool = AtomicBool::new(false);
 
-    if !ctxt.is_null() && len != 0 && *msg.add(len as usize - 1) != b':' as i8 {
-        input = (*ctxt).input;
-        if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-            input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-        }
+//     if len > 1 && *msg.add(len as usize - 2) != b':' as i8 {
+//         if !ctxt.is_null() {
+//             input = (*ctxt).input;
+//             if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+//                 input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+//             }
 
-        xml_parser_print_file_info(input);
-    }
+//             if !HAD_INFO.load(Ordering::Acquire) {
+//                 xml_parser_print_file_info(input);
+//             }
+//         }
+//         xml_generic_error(
+//             xml_generic_error_context(),
+//             c"validity error: ".as_ptr() as _,
+//         );
+//         HAD_INFO.store(false, Ordering::Release)
+//     } else {
+//         HAD_INFO.store(true, Ordering::Release);
+//     }
 
-    xml_generic_error(
-        xml_generic_error_context(),
-        c"validity warning: ".as_ptr() as _,
-    );
-    xml_generic_error(xml_generic_error_context(), msg as _);
+//     xml_generic_error(xml_generic_error_context(), msg as _);
 
-    if !ctxt.is_null() {
-        xml_parser_print_file_context(input);
-    }
-}
+//     if !ctxt.is_null() && !input.is_null() {
+//         xml_parser_print_file_context(input);
+//     }
+// }
+
+// /**
+//  * xmlParserValidityWarning:
+//  * @ctx:  an XML parser context
+//  * @msg:  the message to display/transmit
+//  * @...:  extra parameters for the message display
+//  *
+//  * Display and format a validity warning messages, gives file, line,
+//  * position and extra parameters.
+//  */
+// // pub unsafe extern "C" fn xmlParserValidityWarning(ctx: *mut c_void, msg: *const c_char, ...) {
+// // }
+// #[macro_export]
+// macro_rules! xmlParserValidityWarning {
+//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
+//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
+//             let mut str: *mut libc::c_char;
+//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
+//             $crate::libxml::xmlerror::xmlParserValidityWarning(ctx, str);
+//             if !str.is_null() {
+//                 $crate::libxml::globals::xml_free(str);
+//             }
+//         })($ctx, $msg)
+//     };
+// }
+
+// pub(crate) unsafe extern "C" fn xml_parser_validity_warning(ctx: *mut c_void, msg: *const c_char) {
+//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+//     let mut input: XmlParserInputPtr = std::ptr::null_mut();
+//     let len: c_int = xml_strlen(msg as *const XmlChar);
+
+//     if !ctxt.is_null() && len != 0 && *msg.add(len as usize - 1) != b':' as i8 {
+//         input = (*ctxt).input;
+//         if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+//             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+//         }
+
+//         xml_parser_print_file_info(input);
+//     }
+
+//     xml_generic_error(
+//         xml_generic_error_context(),
+//         c"validity warning: ".as_ptr() as _,
+//     );
+//     xml_generic_error(xml_generic_error_context(), msg as _);
+
+//     if !ctxt.is_null() {
+//         xml_parser_print_file_context(input);
+//     }
+// }
 
 /**
  * xmlParserPrintFileContextInternal:
