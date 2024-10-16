@@ -5,9 +5,6 @@
 
 use std::ffi::{c_char, c_int, c_void};
 
-use super::globals::xml_free;
-use super::xmlstring::{xml_strdup, XmlChar};
-
 // #include "libxml.h"
 
 /**
@@ -1006,116 +1003,62 @@ macro_rules! XML_GET_VAR_STR {
     }
 }
 
-// /*
-//  * Extended error information routines
-//  */
 // /**
-//  * xmlGetLastError:
+//  * xmlCopyError:
+//  * @from:  a source error
+//  * @to:  a target error
 //  *
-//  * Get the last global error registered. This is per thread if compiled
-//  * with thread support.
+//  * Save the original error to the new place.
 //  *
-//  * Returns NULL if no error occurred or a pointer to the error
+//  * Returns 0 in case of success and -1 in case of error.
 //  */
-// pub unsafe extern "C" fn xml_get_last_error() -> XmlErrorPtr {
-//     if (*xml_last_error()).code == XmlParserErrors::XmlErrOK as _ {
-//         return null_mut();
+// pub unsafe extern "C" fn xml_copy_error(from: XmlErrorPtr, to: XmlErrorPtr) -> c_int {
+//     if from.is_null() || to.is_null() {
+//         return -1;
 //     }
-//     xml_last_error()
+
+//     let message: *mut c_char = xml_strdup((*from).message as *mut XmlChar) as *mut c_char;
+//     let file: *mut c_char = xml_strdup((*from).file as *mut XmlChar) as *mut c_char;
+//     let str1: *mut c_char = xml_strdup((*from).str1 as *mut XmlChar) as *mut c_char;
+//     let str2: *mut c_char = xml_strdup((*from).str2 as *mut XmlChar) as *mut c_char;
+//     let str3: *mut c_char = xml_strdup((*from).str3 as *mut XmlChar) as *mut c_char;
+
+//     if !(*to).message.is_null() {
+//         xml_free((*to).message as _);
+//     }
+//     if !(*to).file.is_null() {
+//         xml_free((*to).file as _);
+//     }
+//     if !(*to).str1.is_null() {
+//         xml_free((*to).str1 as _);
+//     }
+//     if !(*to).str2.is_null() {
+//         xml_free((*to).str2 as _);
+//     }
+//     if !(*to).str3.is_null() {
+//         xml_free((*to).str3 as _);
+//     }
+//     (*to).domain = (*from).domain;
+//     (*to).code = (*from).code;
+//     (*to).level = (*from).level;
+//     (*to).line = (*from).line;
+//     (*to).node = (*from).node;
+//     (*to).int1 = (*from).int1;
+//     (*to).int2 = (*from).int2;
+//     (*to).node = (*from).node;
+//     (*to).ctxt = (*from).ctxt;
+//     (*to).message = message;
+//     (*to).file = file;
+//     (*to).str1 = str1;
+//     (*to).str2 = str2;
+//     (*to).str3 = str3;
+
+//     0
 // }
-
-// /**
-//  * xmlResetError:
-//  * @err: pointer to the error.
-//  *
-//  * Cleanup the error.
-//  */
-// pub unsafe extern "C" fn xml_reset_error(err: XmlErrorPtr) {
-//     if err.is_null() {
-//         return;
-//     }
-//     if (*err).code == XmlParserErrors::XmlErrOK as i32 {
-//         return;
-//     }
-//     if !(*err).message.is_null() {
-//         xml_free((*err).message as _);
-//     }
-//     if !(*err).file.is_null() {
-//         xml_free((*err).file as _);
-//     }
-//     if !(*err).str1.is_null() {
-//         xml_free((*err).str1 as _);
-//     }
-//     if !(*err).str2.is_null() {
-//         xml_free((*err).str2 as _);
-//     }
-//     if !(*err).str3.is_null() {
-//         xml_free((*err).str3 as _);
-//     }
-//     memset(err as _, 0, size_of::<XmlError>());
-//     (*err).code = XmlParserErrors::XmlErrOK as _;
-// }
-
-/**
- * xmlCopyError:
- * @from:  a source error
- * @to:  a target error
- *
- * Save the original error to the new place.
- *
- * Returns 0 in case of success and -1 in case of error.
- */
-pub unsafe extern "C" fn xml_copy_error(from: XmlErrorPtr, to: XmlErrorPtr) -> c_int {
-    if from.is_null() || to.is_null() {
-        return -1;
-    }
-
-    let message: *mut c_char = xml_strdup((*from).message as *mut XmlChar) as *mut c_char;
-    let file: *mut c_char = xml_strdup((*from).file as *mut XmlChar) as *mut c_char;
-    let str1: *mut c_char = xml_strdup((*from).str1 as *mut XmlChar) as *mut c_char;
-    let str2: *mut c_char = xml_strdup((*from).str2 as *mut XmlChar) as *mut c_char;
-    let str3: *mut c_char = xml_strdup((*from).str3 as *mut XmlChar) as *mut c_char;
-
-    if !(*to).message.is_null() {
-        xml_free((*to).message as _);
-    }
-    if !(*to).file.is_null() {
-        xml_free((*to).file as _);
-    }
-    if !(*to).str1.is_null() {
-        xml_free((*to).str1 as _);
-    }
-    if !(*to).str2.is_null() {
-        xml_free((*to).str2 as _);
-    }
-    if !(*to).str3.is_null() {
-        xml_free((*to).str3 as _);
-    }
-    (*to).domain = (*from).domain;
-    (*to).code = (*from).code;
-    (*to).level = (*from).level;
-    (*to).line = (*from).line;
-    (*to).node = (*from).node;
-    (*to).int1 = (*from).int1;
-    (*to).int2 = (*from).int2;
-    (*to).node = (*from).node;
-    (*to).ctxt = (*from).ctxt;
-    (*to).message = message;
-    (*to).file = file;
-    (*to).str1 = str1;
-    (*to).str2 = str2;
-    (*to).str3 = str3;
-
-    0
-}
 
 #[cfg(test)]
 mod tests {
     use crate::globals::reset_last_error;
-    use crate::libxml::xmlmemory::xml_mem_blocks;
-    use crate::test_util::*;
-
-    use super::*;
 
     // #[test]
     // fn test_init_generic_error_default_func() {
@@ -1145,36 +1088,36 @@ mod tests {
     //     }
     // }
 
-    #[test]
-    fn test_xml_copy_error() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_copy_error() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_from in 0..GEN_NB_XML_ERROR_PTR {
-                for n_to in 0..GEN_NB_XML_ERROR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let from = gen_xml_error_ptr(n_from, 0);
-                    let to = gen_xml_error_ptr(n_to, 1);
+    //         for n_from in 0..GEN_NB_XML_ERROR_PTR {
+    //             for n_to in 0..GEN_NB_XML_ERROR_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let from = gen_xml_error_ptr(n_from, 0);
+    //                 let to = gen_xml_error_ptr(n_to, 1);
 
-                    let ret_val = xml_copy_error(from, to);
-                    desret_int(ret_val);
-                    des_xml_error_ptr(n_from, from, 0);
-                    des_xml_error_ptr(n_to, to, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCopyError",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlCopyError()");
-                        eprint!(" {}", n_from);
-                        eprintln!(" {}", n_to);
-                    }
-                }
-            }
-        }
-    }
+    //                 let ret_val = xml_copy_error(from, to);
+    //                 desret_int(ret_val);
+    //                 des_xml_error_ptr(n_from, from, 0);
+    //                 des_xml_error_ptr(n_to, to, 1);
+    //                 reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlCopyError",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlCopyError()");
+    //                     eprint!(" {}", n_from);
+    //                     eprintln!(" {}", n_to);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_ctxt_get_last_error() {
