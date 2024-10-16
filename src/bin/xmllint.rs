@@ -103,7 +103,7 @@ use exml::{
         xmlstring::XmlChar,
         xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     },
-    xml_error_with_format, SYSCONFDIR,
+    SYSCONFDIR,
 };
 use libc::{
     close, fclose, fopen, fread, free, gettimeofday, malloc, memset, mmap, munmap, open, size_t,

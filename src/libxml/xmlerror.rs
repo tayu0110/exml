@@ -3,16 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::ffi::{c_char, c_int, c_uint, c_void};
-use std::mem::{size_of, size_of_val};
-use std::ptr::{addr_of_mut, null_mut};
+use std::ffi::{c_char, c_int, c_void};
+use std::mem::size_of;
+use std::ptr::null_mut;
 
-use libc::{memcpy, memset};
-
-use crate::libxml::parser::XmlParserInputPtr;
+use libc::memset;
 
 use super::globals::{xml_free, xml_last_error};
-use super::xmlstring::{xml_get_utf8_char, xml_strdup, XmlChar};
+use super::xmlstring::{xml_strdup, XmlChar};
 
 // #include "libxml.h"
 
@@ -1139,23 +1137,23 @@ macro_rules! XML_GET_VAR_STR {
 //     }
 // }
 
-#[macro_export]
-macro_rules! xml_error_with_format {
-    ( $err_func:expr, $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-        (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-            let mut str: *mut libc::c_char;
+// #[macro_export]
+// macro_rules! xml_error_with_format {
+//     ( $err_func:expr, $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
+//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
+//             let mut str: *mut libc::c_char;
 
-            $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-            $err_func(ctx, str as _);
-            if !str.is_null() {
-                $crate::libxml::globals::xml_free(str as _);
-            }
-        })($ctx, $msg)
-    };
-    ( $err_func:expr, $ctx:expr, $msg:expr ) => {
-        $crate::xml_error_with_format!($err_func, $ctx, $msg, )
-    }
-}
+//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
+//             $err_func(ctx, str as _);
+//             if !str.is_null() {
+//                 $crate::libxml::globals::xml_free(str as _);
+//             }
+//         })($ctx, $msg)
+//     };
+//     ( $err_func:expr, $ctx:expr, $msg:expr ) => {
+//         $crate::xml_error_with_format!($err_func, $ctx, $msg, )
+//     }
+// }
 
 /*
  * Default message routines used by SAX and Valid context for error
@@ -1372,95 +1370,95 @@ macro_rules! xml_error_with_format {
 //     }
 // }
 
-/**
- * xmlParserPrintFileContextInternal:
- * @input:  an xmlParserInputPtr input
- *
- * Displays current context within the input content for error tracking
- */
-// static void
-// xmlParserPrintFileContextInternal(xmlParserInputPtr input ,
-// 		xmlGenericErrorFunc channel, void *data ) {
-unsafe extern "C" fn xml_parser_print_file_context_internal(
-    input: XmlParserInputPtr,
-    channel: XmlGenericErrorFunc,
-    data: *mut c_void,
-) {
-    let mut n: c_uint;
-    let mut cur: *const XmlChar;
-    let mut content: [XmlChar; 81] = [0; 81]; /* space for 80 chars + line terminator */
-    let mut ctnt: *mut XmlChar;
+// /**
+//  * xmlParserPrintFileContextInternal:
+//  * @input:  an xmlParserInputPtr input
+//  *
+//  * Displays current context within the input content for error tracking
+//  */
+// // static void
+// // xmlParserPrintFileContextInternal(xmlParserInputPtr input ,
+// // 		xmlGenericErrorFunc channel, void *data ) {
+// unsafe extern "C" fn xml_parser_print_file_context_internal(
+//     input: XmlParserInputPtr,
+//     channel: XmlGenericErrorFunc,
+//     data: *mut c_void,
+// ) {
+//     let mut n: c_uint;
+//     let mut cur: *const XmlChar;
+//     let mut content: [XmlChar; 81] = [0; 81]; /* space for 80 chars + line terminator */
+//     let mut ctnt: *mut XmlChar;
 
-    if input.is_null() || (*input).cur.is_null() {
-        return;
-    }
+//     if input.is_null() || (*input).cur.is_null() {
+//         return;
+//     }
 
-    cur = (*input).cur;
-    let base: *const XmlChar = (*input).base;
-    /* skip backwards over any end-of-lines */
-    while cur > base && (*(cur) == b'\n' || *(cur) == b'\r') {
-        cur = cur.offset(-1);
-    }
-    n = 0;
-    /* search backwards for beginning-of-line (to max buff size) */
-    while (n as usize) < size_of_val(&content) - 1 && cur > base && *cur != b'\n' && *cur != b'\r' {
-        cur = cur.offset(-1);
-        n += 1;
-    }
-    if n > 0 && (*cur == b'\n' || *cur == b'\r') {
-        cur = cur.add(1);
-    } else {
-        /* skip over continuation bytes */
-        while cur < (*input).cur && *cur & 0xC0 == 0x80 {
-            cur = cur.add(1);
-        }
-    }
-    /* calculate the error position in terms of the current position */
-    let col: c_uint = (*input).cur.offset_from(cur) as _;
-    /* search forward for end-of-line (to max buff size) */
-    n = 0;
-    let start: *const XmlChar = cur;
-    /* copy selected text to our buffer */
-    while *cur != 0 && *(cur) != b'\n' && *(cur) != b'\r' {
-        let mut len: c_int = (*input).end.offset_from(cur) as _;
-        let c: c_int = xml_get_utf8_char(cur, addr_of_mut!(len));
+//     cur = (*input).cur;
+//     let base: *const XmlChar = (*input).base;
+//     /* skip backwards over any end-of-lines */
+//     while cur > base && (*(cur) == b'\n' || *(cur) == b'\r') {
+//         cur = cur.offset(-1);
+//     }
+//     n = 0;
+//     /* search backwards for beginning-of-line (to max buff size) */
+//     while (n as usize) < size_of_val(&content) - 1 && cur > base && *cur != b'\n' && *cur != b'\r' {
+//         cur = cur.offset(-1);
+//         n += 1;
+//     }
+//     if n > 0 && (*cur == b'\n' || *cur == b'\r') {
+//         cur = cur.add(1);
+//     } else {
+//         /* skip over continuation bytes */
+//         while cur < (*input).cur && *cur & 0xC0 == 0x80 {
+//             cur = cur.add(1);
+//         }
+//     }
+//     /* calculate the error position in terms of the current position */
+//     let col: c_uint = (*input).cur.offset_from(cur) as _;
+//     /* search forward for end-of-line (to max buff size) */
+//     n = 0;
+//     let start: *const XmlChar = cur;
+//     /* copy selected text to our buffer */
+//     while *cur != 0 && *(cur) != b'\n' && *(cur) != b'\r' {
+//         let mut len: c_int = (*input).end.offset_from(cur) as _;
+//         let c: c_int = xml_get_utf8_char(cur, addr_of_mut!(len));
 
-        if c < 0 || n as usize + len as usize > size_of_val(&content) - 1 {
-            break;
-        }
-        cur = cur.add(len as usize);
-        n += len as u32;
-    }
-    memcpy(content.as_mut_ptr() as _, start as _, n as usize);
-    content[n as usize] = 0;
-    /* print out the selected text */
-    // channel(data, c"%s\n".as_ptr() as _, content);
-    xml_error_with_format!(
-        channel,
-        data,
-        c"%s\n".as_ptr() as _,
-        content.as_ptr() as *const c_char
-    );
-    /* create blank line with problem pointer */
-    n = 0;
-    ctnt = content.as_mut_ptr();
-    /* (leave buffer space for pointer + line terminator) */
-    while {
-        let f = n < col && (n as usize) < size_of_val(&content) - 2 && *ctnt != 0;
-        n += 1;
-        f
-    } {
-        if *(ctnt) != b'\t' {
-            *(ctnt) = b' ';
-        }
-        ctnt = ctnt.add(1);
-    }
-    *ctnt = b'^';
-    ctnt = ctnt.add(1);
-    *ctnt = 0;
-    // channel(data, c"%s\n".as_ptr() as _, content);
-    xml_error_with_format!(channel, c"%s\n".as_ptr() as _, content.as_ptr() as _);
-}
+//         if c < 0 || n as usize + len as usize > size_of_val(&content) - 1 {
+//             break;
+//         }
+//         cur = cur.add(len as usize);
+//         n += len as u32;
+//     }
+//     memcpy(content.as_mut_ptr() as _, start as _, n as usize);
+//     content[n as usize] = 0;
+//     /* print out the selected text */
+//     // channel(data, c"%s\n".as_ptr() as _, content);
+//     xml_error_with_format!(
+//         channel,
+//         data,
+//         c"%s\n".as_ptr() as _,
+//         content.as_ptr() as *const c_char
+//     );
+//     /* create blank line with problem pointer */
+//     n = 0;
+//     ctnt = content.as_mut_ptr();
+//     /* (leave buffer space for pointer + line terminator) */
+//     while {
+//         let f = n < col && (n as usize) < size_of_val(&content) - 2 && *ctnt != 0;
+//         n += 1;
+//         f
+//     } {
+//         if *(ctnt) != b'\t' {
+//             *(ctnt) = b' ';
+//         }
+//         ctnt = ctnt.add(1);
+//     }
+//     *ctnt = b'^';
+//     ctnt = ctnt.add(1);
+//     *ctnt = 0;
+//     // channel(data, c"%s\n".as_ptr() as _, content);
+//     xml_error_with_format!(channel, c"%s\n".as_ptr() as _, content.as_ptr() as _);
+// }
 
 // /**
 //  * xmlParserPrintFileInfo:
