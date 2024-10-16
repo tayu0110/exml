@@ -18,7 +18,7 @@ use crate::{
     __xml_raise_error,
     error::{XmlErrorDomain, XmlErrorLevel},
     generic_error,
-    globals::{GenericError, StructuredError},
+    globals::{GenericError, StructuredError, GLOBAL_STATE},
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         entities::XmlEntityPtr,
@@ -102,7 +102,7 @@ use crate::{
             xml_automata_new_transition2, xml_automata_set_final_state, xml_free_automata,
             xml_new_automata, XmlAutomataPtr, XmlAutomataStatePtr,
         },
-        xmlerror::{xml_get_last_error, XmlErrorPtr, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlreader::{xml_text_reader_lookup_namespace, XmlTextReaderPtr},
         xmlregexp::{
             xml_reg_exec_err_info, xml_reg_exec_next_values, xml_reg_exec_push_string,
@@ -5901,14 +5901,14 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                      * TODO: (2.2) is not supported.
                      */
                     if doc.is_null() {
-                        let lerr: XmlErrorPtr = xml_get_last_error();
+                        let lerr = GLOBAL_STATE.with_borrow(|state| state.last_error.clone());
                         /*
                          * Check if this a parser error, or if the document could
                          * just not be located.
                          * TODO: Try to find specific error codes to react only on
                          * localisation failures.
                          */
-                        if lerr.is_null() || (*lerr).domain != XmlErrorDomain::XmlFromIO as i32 {
+                        if lerr.is_ok() || lerr.domain() != XmlErrorDomain::XmlFromIO {
                             /*
                              * We assume a parser error here.
                              */

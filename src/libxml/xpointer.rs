@@ -4,9 +4,9 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int},
+    ffi::{c_char, c_int, CStr},
     mem::size_of,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{null, null_mut, NonNull},
 };
 
 #[cfg(feature = "libxml_xptr_locs")]
@@ -14,12 +14,13 @@ use libc::{c_void, memset};
 
 use crate::{
     __xml_raise_error,
+    error::{XmlErrorDomain, XmlErrorLevel},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
         parser::xml_init_parser,
         tree::{XmlDocPtr, XmlElementType, XmlNodePtr},
-        xmlerror::{xml_reset_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
-        xmlstring::{xml_str_equal, xml_strdup, xml_strlen, XmlChar},
+        xmlerror::XmlParserErrors,
+        xmlstring::{xml_str_equal, xml_strlen, XmlChar},
         xpath::{
             xml_xpath_free_object, xml_xpath_new_context, XmlNodeSetPtr, XmlXPathContextPtr,
             XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContextPtr,
@@ -2412,19 +2413,22 @@ unsafe extern "C" fn xml_xptr_err(
     }
 
     /* cleanup current last error */
-    xml_reset_error(addr_of_mut!((*(*ctxt).context).last_error));
+    (*(*ctxt).context).last_error.reset();
 
-    (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXpointer as i32;
-    (*(*ctxt).context).last_error.code = error as i32;
+    (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXPointer;
+    (*(*ctxt).context).last_error.code = error;
     (*(*ctxt).context).last_error.level = XmlErrorLevel::XmlErrError;
-    (*(*ctxt).context).last_error.str1 = xml_strdup((*ctxt).base) as _;
+    (*(*ctxt).context).last_error.str1 = (!(*ctxt).base.is_null()).then(|| {
+        CStr::from_ptr((*ctxt).base as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()
+    });
+    // (*(*ctxt).context).last_error.str1 = xml_strdup((*ctxt).base) as _;
     (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
-    (*(*ctxt).context).last_error.node = (*(*ctxt).context).debug_node as _;
+    (*(*ctxt).context).last_error.node = NonNull::new((*(*ctxt).context).debug_node as _);
     if let Some(error) = (*(*ctxt).context).error {
-        error(
-            (*(*ctxt).context).user_data,
-            addr_of_mut!((*(*ctxt).context).last_error),
-        );
+        error((*(*ctxt).context).user_data, &(*(*ctxt).context).last_error);
     } else {
         __xml_raise_error!(
             None,

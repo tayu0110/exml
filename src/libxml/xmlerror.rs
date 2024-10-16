@@ -4,12 +4,8 @@
 //! Please refer to original libxml2 documents also.
 
 use std::ffi::{c_char, c_int, c_void};
-use std::mem::size_of;
-use std::ptr::null_mut;
 
-use libc::memset;
-
-use super::globals::{xml_free, xml_last_error};
+use super::globals::xml_free;
 use super::xmlstring::{xml_strdup, XmlChar};
 
 // #include "libxml.h"
@@ -970,123 +966,6 @@ pub type XmlGenericErrorFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *cons
  */
 pub type XmlStructuredErrorFunc = unsafe extern "C" fn(userData: *mut c_void, error: XmlErrorPtr);
 
-// /**
-//  * xmlGenericErrorDefaultFunc:
-//  * @ctx:  an error context
-//  * @msg:  the message to display/transmit
-//  * @...:  extra parameters for the message display
-//  *
-//  * Default handler for out of context error messages.
-//  */
-// pub(crate) unsafe extern "C" fn xml_generic_error_default_func(
-//     _ctx: *mut c_void,
-//     msg: *const c_char,
-// ) {
-//     let msg = CStr::from_ptr(msg).to_string_lossy();
-//     if xml_generic_error_context().is_null() {
-//         generic_error_default(None::<&mut dyn Write>, &msg);
-//     } else {
-//         let fp = xml_generic_error_context() as *mut FILE;
-//         // The buffers of C/Rust stdio are separated,
-//         // so unless do `fflush`, the order of outputs may be strange.
-//         libc::fflush(fp);
-//         let fd = libc::fileno(fp);
-//         let mut file = std::fs::File::from_raw_fd(fd);
-//         generic_error_default(Some(&mut file), &msg);
-//         // For the same reason, do `std::io::Write::flush`.
-//         file.flush().ok();
-//     }
-// }
-
-// /*
-//  * Use the following function to reset the two global variables
-//  * xml_generic_error and xmlGenericErrorContext.
-//  */
-// /**
-//  * xmlSetGenericErrorFunc:
-//  * @ctx:  the new error handling context
-//  * @handler:  the new handler function
-//  *
-//  * Function to reset the handler and the error context for out of
-//  * context error messages.
-//  * This simply means that @handler will be called for subsequent
-//  * error messages while not parsing nor validating. And @ctx will
-//  * be passed as first argument to @handler
-//  * One can simply force messages to be emitted to another FILE * than
-//  * stderr by setting @ctx to this file handle and @handler to NULL.
-//  * For multi-threaded applications, this must be set separately for each thread.
-//  */
-// pub unsafe extern "C" fn xml_set_generic_error_func(
-//     ctx: *mut c_void,
-//     handler: Option<XmlGenericErrorFunc>,
-// ) {
-//     if xml_is_main_thread() != 0 {
-//         _XML_GENERIC_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
-//         _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
-//     } else {
-//         (*xml_get_global_state())
-//             .xml_generic_error_context
-//             .store(ctx, Ordering::Relaxed);
-//         (*xml_get_global_state()).xml_generic_error =
-//             handler.or(Some(xml_generic_error_default_func));
-//     }
-//     set_generic_error(
-//         Some({
-//             let mut handler = handler.unwrap_or(xml_generic_error_default_func);
-//             let ptr_value = addr_of_mut!(handler) as usize;
-//             let ptr = ptr_value as *const fn(Option<&mut (dyn Write + 'static)>, &str);
-//             *ptr
-//         }),
-//         (!ctx.is_null()).then(|| {
-//             let file = ctx as *mut FILE;
-//             fflush(file);
-//             let fd = fileno(file);
-//             File::from_raw_fd(fd)
-//         }),
-//     );
-// }
-
-// /**
-//  * initGenericErrorDefaultFunc:
-//  * @handler:  the handler
-//  *
-//  * DEPRECATED: Use xmlSetGenericErrorFunc.
-//  *
-//  * Set or reset (if NULL) the default handler for generic errors
-//  * to the builtin error function.
-//  */
-// #[deprecated]
-// pub unsafe extern "C" fn init_generic_error_default_func(handler: Option<XmlGenericErrorFunc>) {
-//     _XML_GENERIC_ERROR = handler.or(Some(xml_generic_error_default_func));
-// }
-
-// /**
-//  * xmlSetStructuredErrorFunc:
-//  * @ctx:  the new error handling context
-//  * @handler:  the new handler function
-//  *
-//  * Function to reset the handler and the error context for out of
-//  * context structured error messages.
-//  * This simply means that @handler will be called for subsequent
-//  * error messages while not parsing nor validating. And @ctx will
-//  * be passed as first argument to @handler
-//  * For multi-threaded applications, this must be set separately for each thread.
-//  */
-// pub unsafe extern "C" fn xml_set_structured_error_func(
-//     ctx: *mut c_void,
-//     handler: Option<XmlStructuredErrorFunc>,
-// ) {
-//     if xml_is_main_thread() != 0 {
-//         _XML_STRUCTURED_ERROR_CONTEXT.store(ctx, Ordering::Relaxed);
-//         _XML_STRUCTURED_ERROR = handler;
-//     } else {
-//         (*xml_get_global_state())
-//             .xml_structured_error_context
-//             .store(ctx, Ordering::Relaxed);
-//         (*xml_get_global_state()).xml_structured_error = handler;
-//     }
-// }
-
 pub const XML_MAX_ERRORS: usize = 100;
 
 #[macro_export]
@@ -1127,480 +1006,55 @@ macro_rules! XML_GET_VAR_STR {
     }
 }
 
-// #[macro_export]
-// macro_rules! xml_generic_error {
-//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-//         $crate::xml_error_with_format!($crate::libxml::globals::xml_generic_error, $ctx, $msg, $( $args ),*);
-//     };
-//     ( $ctx:expr, $msg:expr ) => {
-//         $crate::xml_error_with_format!($crate::libxml::globals::xml_generic_error, $ctx, $msg)
-//     }
-// }
-
-// #[macro_export]
-// macro_rules! xml_error_with_format {
-//     ( $err_func:expr, $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-//             let mut str: *mut libc::c_char;
-
-//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-//             $err_func(ctx, str as _);
-//             if !str.is_null() {
-//                 $crate::libxml::globals::xml_free(str as _);
-//             }
-//         })($ctx, $msg)
-//     };
-//     ( $err_func:expr, $ctx:expr, $msg:expr ) => {
-//         $crate::xml_error_with_format!($err_func, $ctx, $msg, )
-//     }
-// }
-
-/*
- * Default message routines used by SAX and Valid context for error
- * and warning reporting.
- */
-/**
- * xmlParserError:
- * @ctx:  an XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format an error messages, gives file, line, position and
- * extra parameters.
- */
-// pub unsafe extern "C" fn xmlParserError(ctx: *mut c_void, msg: *const c_char, ...) {
-// }
-// #[macro_export]
-// macro_rules! xmlParserError {
-//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-//             let mut str: *mut libc::c_char;
-//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-//             $crate::libxml::xmlerror::xmlParserError(ctx, str as _);
-//             if !str.is_null() {
-//                 $crate::libxml::globals::xml_free(str as _);
-//             }
-//         })($ctx, $msg)
-//     };
-// }
-// pub(crate) unsafe extern "C" fn xml_parser_error(ctx: *mut c_void, msg: *const c_char) {
-//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-//     let mut input: XmlParserInputPtr = null_mut();
-//     let mut cur: XmlParserInputPtr = null_mut();
-
-//     if !ctxt.is_null() {
-//         input = (*ctxt).input;
-//         if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-//             cur = input;
-//             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-//         }
-//         xml_parser_print_file_info(input);
-//     }
-
-//     xml_generic_error(xml_generic_error_context(), c"error: ".as_ptr() as _);
-//     xml_generic_error(xml_generic_error_context(), msg as _);
-
-//     if !ctxt.is_null() {
-//         xml_parser_print_file_context(input);
-//         if !cur.is_null() {
-//             xml_parser_print_file_info(cur);
-//             xml_generic_error(xml_generic_error_context(), c"\n".as_ptr() as _);
-//             xml_parser_print_file_context(cur);
-//         }
-//     }
-// }
-
-// /**
-//  * xmlParserWarning:
-//  * @ctx:  an XML parser context
-//  * @msg:  the message to display/transmit
-//  * @...:  extra parameters for the message display
-//  *
-//  * Display and format a warning messages, gives file, line, position and
-//  * extra parameters.
+// /*
+//  * Extended error information routines
 //  */
-// // pub unsafe extern "C" fn xmlParserWarning(ctx: *mut c_void, msg: *const c_char, ...) {
-// // }
-// #[macro_export]
-// macro_rules! xmlParserWarning {
-//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-//             let mut str: *mut libc::c_char;
-//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-//             $crate::libxml::xmlerror::xmlParserWarning(ctx, str as _);
-//             if !str.is_null() {
-//                 $crate::libxml::globals::xml_free(str as _);
-//             }
-//         })($ctx, $msg)
-//     };
-// }
-
-// pub(crate) unsafe extern "C" fn xml_parser_warning(ctx: *mut c_void, msg: *const c_char) {
-//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-//     let mut input: XmlParserInputPtr = null_mut();
-//     let mut cur: XmlParserInputPtr = null_mut();
-
-//     if !ctxt.is_null() {
-//         input = (*ctxt).input;
-//         if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-//             cur = input;
-//             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-//         }
-//         xml_parser_print_file_info(input);
-//     }
-
-//     xml_generic_error(xml_generic_error_context(), c"warning: ".as_ptr() as _);
-//     xml_generic_error(xml_generic_error_context(), msg as _);
-
-//     if !ctxt.is_null() {
-//         xml_parser_print_file_context(input);
-//         if !cur.is_null() {
-//             xml_parser_print_file_info(cur);
-//             xml_generic_error(xml_generic_error_context(), c"\n".as_ptr() as _);
-//             xml_parser_print_file_context(cur);
-//         }
-//     }
-// }
-
 // /**
-//  * xmlParserValidityError:
-//  * @ctx:  an XML parser context
-//  * @msg:  the message to display/transmit
-//  * @...:  extra parameters for the message display
+//  * xmlGetLastError:
 //  *
-//  * Display and format an validity error messages, gives file,
-//  * line, position and extra parameters.
-//  */
-// // pub unsafe extern "C" fn xmlParserValidityError(ctx: *mut c_void, msg: *const c_char, ...) {
-// // }
-// #[macro_export]
-// macro_rules! xmlParserValidityError {
-//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-//             let mut str: *mut libc::c_char;
-//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-//             $crate::libxml::xmlerror::xmlParserValidityError(ctx, str);
-//             if !str.is_null() {
-//                 $crate::libxml::globals::xml_free(str as _);
-//             }
-//         })($ctx, $msg)
-//     };
-// }
-
-// pub(crate) unsafe extern "C" fn xml_parser_validity_error(ctx: *mut c_void, msg: *const c_char) {
-//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-//     let mut input: XmlParserInputPtr = std::ptr::null_mut();
-//     let len: libc::c_int = xml_strlen(msg as *const XmlChar);
-//     static HAD_INFO: AtomicBool = AtomicBool::new(false);
-
-//     if len > 1 && *msg.add(len as usize - 2) != b':' as i8 {
-//         if !ctxt.is_null() {
-//             input = (*ctxt).input;
-//             if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-//                 input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-//             }
-
-//             if !HAD_INFO.load(Ordering::Acquire) {
-//                 xml_parser_print_file_info(input);
-//             }
-//         }
-//         xml_generic_error(
-//             xml_generic_error_context(),
-//             c"validity error: ".as_ptr() as _,
-//         );
-//         HAD_INFO.store(false, Ordering::Release)
-//     } else {
-//         HAD_INFO.store(true, Ordering::Release);
-//     }
-
-//     xml_generic_error(xml_generic_error_context(), msg as _);
-
-//     if !ctxt.is_null() && !input.is_null() {
-//         xml_parser_print_file_context(input);
-//     }
-// }
-
-// /**
-//  * xmlParserValidityWarning:
-//  * @ctx:  an XML parser context
-//  * @msg:  the message to display/transmit
-//  * @...:  extra parameters for the message display
+//  * Get the last global error registered. This is per thread if compiled
+//  * with thread support.
 //  *
-//  * Display and format a validity warning messages, gives file, line,
-//  * position and extra parameters.
+//  * Returns NULL if no error occurred or a pointer to the error
 //  */
-// // pub unsafe extern "C" fn xmlParserValidityWarning(ctx: *mut c_void, msg: *const c_char, ...) {
-// // }
-// #[macro_export]
-// macro_rules! xmlParserValidityWarning {
-//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-//         (|ctx: *mut libc::c_void, msg: *const libc::c_char| {
-//             let mut str: *mut libc::c_char;
-//             $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
-//             $crate::libxml::xmlerror::xmlParserValidityWarning(ctx, str);
-//             if !str.is_null() {
-//                 $crate::libxml::globals::xml_free(str);
-//             }
-//         })($ctx, $msg)
-//     };
-// }
-
-// pub(crate) unsafe extern "C" fn xml_parser_validity_warning(ctx: *mut c_void, msg: *const c_char) {
-//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-//     let mut input: XmlParserInputPtr = std::ptr::null_mut();
-//     let len: c_int = xml_strlen(msg as *const XmlChar);
-
-//     if !ctxt.is_null() && len != 0 && *msg.add(len as usize - 1) != b':' as i8 {
-//         input = (*ctxt).input;
-//         if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-//             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-//         }
-
-//         xml_parser_print_file_info(input);
-//     }
-
-//     xml_generic_error(
-//         xml_generic_error_context(),
-//         c"validity warning: ".as_ptr() as _,
-//     );
-//     xml_generic_error(xml_generic_error_context(), msg as _);
-
-//     if !ctxt.is_null() {
-//         xml_parser_print_file_context(input);
-//     }
-// }
-
-// /**
-//  * xmlParserPrintFileContextInternal:
-//  * @input:  an xmlParserInputPtr input
-//  *
-//  * Displays current context within the input content for error tracking
-//  */
-// // static void
-// // xmlParserPrintFileContextInternal(xmlParserInputPtr input ,
-// // 		xmlGenericErrorFunc channel, void *data ) {
-// unsafe extern "C" fn xml_parser_print_file_context_internal(
-//     input: XmlParserInputPtr,
-//     channel: XmlGenericErrorFunc,
-//     data: *mut c_void,
-// ) {
-//     let mut n: c_uint;
-//     let mut cur: *const XmlChar;
-//     let mut content: [XmlChar; 81] = [0; 81]; /* space for 80 chars + line terminator */
-//     let mut ctnt: *mut XmlChar;
-
-//     if input.is_null() || (*input).cur.is_null() {
-//         return;
-//     }
-
-//     cur = (*input).cur;
-//     let base: *const XmlChar = (*input).base;
-//     /* skip backwards over any end-of-lines */
-//     while cur > base && (*(cur) == b'\n' || *(cur) == b'\r') {
-//         cur = cur.offset(-1);
-//     }
-//     n = 0;
-//     /* search backwards for beginning-of-line (to max buff size) */
-//     while (n as usize) < size_of_val(&content) - 1 && cur > base && *cur != b'\n' && *cur != b'\r' {
-//         cur = cur.offset(-1);
-//         n += 1;
-//     }
-//     if n > 0 && (*cur == b'\n' || *cur == b'\r') {
-//         cur = cur.add(1);
-//     } else {
-//         /* skip over continuation bytes */
-//         while cur < (*input).cur && *cur & 0xC0 == 0x80 {
-//             cur = cur.add(1);
-//         }
-//     }
-//     /* calculate the error position in terms of the current position */
-//     let col: c_uint = (*input).cur.offset_from(cur) as _;
-//     /* search forward for end-of-line (to max buff size) */
-//     n = 0;
-//     let start: *const XmlChar = cur;
-//     /* copy selected text to our buffer */
-//     while *cur != 0 && *(cur) != b'\n' && *(cur) != b'\r' {
-//         let mut len: c_int = (*input).end.offset_from(cur) as _;
-//         let c: c_int = xml_get_utf8_char(cur, addr_of_mut!(len));
-
-//         if c < 0 || n as usize + len as usize > size_of_val(&content) - 1 {
-//             break;
-//         }
-//         cur = cur.add(len as usize);
-//         n += len as u32;
-//     }
-//     memcpy(content.as_mut_ptr() as _, start as _, n as usize);
-//     content[n as usize] = 0;
-//     /* print out the selected text */
-//     // channel(data, c"%s\n".as_ptr() as _, content);
-//     xml_error_with_format!(
-//         channel,
-//         data,
-//         c"%s\n".as_ptr() as _,
-//         content.as_ptr() as *const c_char
-//     );
-//     /* create blank line with problem pointer */
-//     n = 0;
-//     ctnt = content.as_mut_ptr();
-//     /* (leave buffer space for pointer + line terminator) */
-//     while {
-//         let f = n < col && (n as usize) < size_of_val(&content) - 2 && *ctnt != 0;
-//         n += 1;
-//         f
-//     } {
-//         if *(ctnt) != b'\t' {
-//             *(ctnt) = b' ';
-//         }
-//         ctnt = ctnt.add(1);
-//     }
-//     *ctnt = b'^';
-//     ctnt = ctnt.add(1);
-//     *ctnt = 0;
-//     // channel(data, c"%s\n".as_ptr() as _, content);
-//     xml_error_with_format!(channel, c"%s\n".as_ptr() as _, content.as_ptr() as _);
-// }
-
-// /**
-//  * xmlParserPrintFileInfo:
-//  * @input:  an xmlParserInputPtr input
-//  *
-//  * Displays the associated file and line information for the current input
-//  */
-// pub unsafe extern "C" fn xml_parser_print_file_info(input: XmlParserInputPtr) {
-//     if !input.is_null() {
-//         if !(*input).filename.is_null() {
-//             // xml_generic_error(xmlGenericErrorContext, c"%s:%d: ".as_ptr() as _, (*input).filename, (*input).line);
-//             xml_error_with_format!(
-//                 xml_generic_error,
-//                 xml_generic_error_context(),
-//                 c"%s:%d: ".as_ptr() as _,
-//                 (*input).filename,
-//                 (*input).line
-//             );
-//         } else {
-//             // xml_generic_error(xmlGenericErrorContext, c"Entity: line %d: ".as_ptr() as _, (*input).line);
-//             xml_error_with_format!(
-//                 xml_generic_error,
-//                 xml_generic_error_context(),
-//                 c"Entity: line %d: ".as_ptr() as _,
-//                 (*input).line
-//             );
-//         }
-//     }
-// }
-
-// /**
-//  * xmlParserPrintFileContext:
-//  * @input:  an xmlParserInputPtr input
-//  *
-//  * Displays current context within the input content for error tracking
-//  */
-// pub unsafe extern "C" fn xml_parser_print_file_context(input: XmlParserInputPtr) {
-//     xml_parser_print_file_context_internal(input, xml_generic_error, xml_generic_error_context());
-// }
-
-/*
- * Extended error information routines
- */
-/**
- * xmlGetLastError:
- *
- * Get the last global error registered. This is per thread if compiled
- * with thread support.
- *
- * Returns NULL if no error occurred or a pointer to the error
- */
-pub unsafe extern "C" fn xml_get_last_error() -> XmlErrorPtr {
-    if (*xml_last_error()).code == XmlParserErrors::XmlErrOK as _ {
-        return null_mut();
-    }
-    xml_last_error()
-}
-
-// /**
-//  * xmlResetLastError:
-//  *
-//  * Cleanup the last global error registered. For parsing error
-//  * this does not change the well-formedness result.
-//  */
-// pub unsafe extern "C" fn xml_reset_last_error() {
+// pub unsafe extern "C" fn xml_get_last_error() -> XmlErrorPtr {
 //     if (*xml_last_error()).code == XmlParserErrors::XmlErrOK as _ {
-//         return;
-//     }
-//     xml_reset_error(xml_last_error());
-// }
-
-/**
- * xmlCtxtGetLastError:
- * @ctx:  an XML parser context
- *
- * Get the last parsing error registered.
- *
- * Returns NULL if no error occurred or a pointer to the error
- */
-// pub unsafe extern "C" fn xml_ctxt_get_last_error(ctx: *mut c_void) -> XmlErrorPtr {
-//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-
-//     if ctxt.is_null() {
 //         return null_mut();
 //     }
-//     if (*ctxt).last_error.code == XmlParserErrors::XmlErrOK as i32 {
-//         return null_mut();
-//     }
-//     addr_of_mut!((*ctxt).last_error)
+//     xml_last_error()
 // }
 
-/**
- * xmlCtxtResetLastError:
- * @ctx:  an XML parser context
- *
- * Cleanup the last global error registered. For parsing error
- * this does not change the well-formedness result.
- */
-// pub unsafe extern "C" fn xml_ctxt_reset_last_error(ctx: *mut c_void) {
-//     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-
-//     if ctxt.is_null() {
+// /**
+//  * xmlResetError:
+//  * @err: pointer to the error.
+//  *
+//  * Cleanup the error.
+//  */
+// pub unsafe extern "C" fn xml_reset_error(err: XmlErrorPtr) {
+//     if err.is_null() {
 //         return;
 //     }
-//     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
-//     if (*ctxt).last_error.code == XmlParserErrors::XmlErrOK as i32 {
+//     if (*err).code == XmlParserErrors::XmlErrOK as i32 {
 //         return;
 //     }
-//     xml_reset_error(addr_of_mut!((*ctxt).last_error));
+//     if !(*err).message.is_null() {
+//         xml_free((*err).message as _);
+//     }
+//     if !(*err).file.is_null() {
+//         xml_free((*err).file as _);
+//     }
+//     if !(*err).str1.is_null() {
+//         xml_free((*err).str1 as _);
+//     }
+//     if !(*err).str2.is_null() {
+//         xml_free((*err).str2 as _);
+//     }
+//     if !(*err).str3.is_null() {
+//         xml_free((*err).str3 as _);
+//     }
+//     memset(err as _, 0, size_of::<XmlError>());
+//     (*err).code = XmlParserErrors::XmlErrOK as _;
 // }
-
-/**
- * xmlResetError:
- * @err: pointer to the error.
- *
- * Cleanup the error.
- */
-pub unsafe extern "C" fn xml_reset_error(err: XmlErrorPtr) {
-    if err.is_null() {
-        return;
-    }
-    if (*err).code == XmlParserErrors::XmlErrOK as i32 {
-        return;
-    }
-    if !(*err).message.is_null() {
-        xml_free((*err).message as _);
-    }
-    if !(*err).file.is_null() {
-        xml_free((*err).file as _);
-    }
-    if !(*err).str1.is_null() {
-        xml_free((*err).str1 as _);
-    }
-    if !(*err).str2.is_null() {
-        xml_free((*err).str2 as _);
-    }
-    if !(*err).str3.is_null() {
-        xml_free((*err).str3 as _);
-    }
-    memset(err as _, 0, size_of::<XmlError>());
-    (*err).code = XmlParserErrors::XmlErrOK as _;
-}
 
 /**
  * xmlCopyError:
@@ -1654,233 +1108,6 @@ pub unsafe extern "C" fn xml_copy_error(from: XmlErrorPtr, to: XmlErrorPtr) -> c
 
     0
 }
-
-// /**
-//  * xmlReportError:
-//  * @err: the error
-//  * @ctx: the parser context or NULL
-//  * @str: the formatted error message
-//  *
-//  * Report an error with its context, replace the 4 old error/warning
-//  * routines.
-//  */
-// pub unsafe extern "C" fn xml_report_error(
-//     err: XmlErrorPtr,
-//     ctxt: XmlParserCtxtPtr,
-//     str: *const c_char,
-//     mut channel: Option<XmlGenericErrorFunc>,
-//     mut data: *mut c_void,
-// ) {
-//     let mut name: *const XmlChar = null_mut();
-
-//     let mut input: XmlParserInputPtr = null_mut();
-//     let mut cur: XmlParserInputPtr = null_mut();
-
-//     if err.is_null() {
-//         return;
-//     }
-
-//     if channel.is_none() {
-//         channel = Some(xml_generic_error);
-//         data = xml_generic_error_context();
-//     }
-//     let file: *mut c_char = (*err).file;
-//     let line: c_int = (*err).line;
-//     let code: c_int = (*err).code;
-//     let domain: c_int = (*err).domain;
-//     let level: XmlErrorLevel = (*err).level;
-//     let node: XmlNodePtr = (*err).node as _;
-
-//     if code == XmlParserErrors::XmlErrOK as i32 {
-//         return;
-//     }
-
-//     if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
-//         name = (*node).name;
-//     }
-
-//     /*
-//      * Maintain the compatibility with the legacy error handling
-//      */
-//     let channel = channel.unwrap();
-//     if !ctxt.is_null() {
-//         input = (*ctxt).input;
-//         if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-//             cur = input;
-//             input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
-//         }
-//         if !input.is_null() {
-//             if !(*input).filename.is_null() {
-//                 xml_error_with_format!(
-//                     channel,
-//                     data,
-//                     c"%s:%d: ".as_ptr() as _,
-//                     (*input).filename,
-//                     (*input).line
-//                 );
-//             } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
-//                 xml_error_with_format!(
-//                     channel,
-//                     data,
-//                     c"Entity: line %d: ".as_ptr() as _,
-//                     (*input).line
-//                 );
-//             }
-//         }
-//     } else if !file.is_null() {
-//         xml_error_with_format!(channel, data, c"%s:%d: ".as_ptr() as _, file, line);
-//     } else if line != 0
-//         && (domain == XmlErrorDomain::XmlFromParser as i32
-//             || domain == XmlErrorDomain::XmlFromSchemasv as i32
-//             || domain == XmlErrorDomain::XmlFromSchemasp as i32
-//             || domain == XmlErrorDomain::XmlFromDtd as i32
-//             || domain == XmlErrorDomain::XmlFromRelaxngp as i32
-//             || domain == XmlErrorDomain::XmlFromRelaxngv as i32)
-//     {
-//         xml_error_with_format!(channel, data, c"Entity: line %d: ".as_ptr() as _, line);
-//     }
-//     if !name.is_null() {
-//         xml_error_with_format!(channel, data, c"element %s: ".as_ptr() as _, name);
-//     }
-//     match XmlErrorDomain::try_from(domain) {
-//         Ok(XmlErrorDomain::XmlFromParser) => {
-//             xml_error_with_format!(channel, data, c"parser ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromNamespace) => {
-//             xml_error_with_format!(channel, data, c"namespace ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromDtd) | Ok(XmlErrorDomain::XmlFromValid) => {
-//             xml_error_with_format!(channel, data, c"validity ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromHtml) => {
-//             xml_error_with_format!(channel, data, c"HTML parser ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromMemory) => {
-//             xml_error_with_format!(channel, data, c"memory ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromOutput) => {
-//             xml_error_with_format!(channel, data, c"output ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromIO) => {
-//             xml_error_with_format!(channel, data, c"I/O ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromXinclude) => {
-//             xml_error_with_format!(channel, data, c"XInclude ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromXpath) => {
-//             xml_error_with_format!(channel, data, c"XPath ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromXpointer) => {
-//             xml_error_with_format!(channel, data, c"parser ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromRegexp) => {
-//             xml_error_with_format!(channel, data, c"regexp ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromModule) => {
-//             xml_error_with_format!(channel, data, c"module ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromSchemasv) => {
-//             xml_error_with_format!(channel, data, c"Schemas validity ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromSchemasp) => {
-//             xml_error_with_format!(channel, data, c"Schemas parser ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromRelaxngp) => {
-//             xml_error_with_format!(channel, data, c"Relax-NG parser ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromRelaxngv) => {
-//             xml_error_with_format!(channel, data, c"Relax-NG validity ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromCatalog) => {
-//             xml_error_with_format!(channel, data, c"Catalog ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromC14N) => {
-//             xml_error_with_format!(channel, data, c"C14N ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromXSLT) => {
-//             xml_error_with_format!(channel, data, c"XSLT ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromI18N) => {
-//             xml_error_with_format!(channel, data, c"encoding ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromSchematronv) => {
-//             xml_error_with_format!(channel, data, c"schematron ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromBuffer) => {
-//             xml_error_with_format!(channel, data, c"internal buffer ".as_ptr() as _);
-//         }
-//         Ok(XmlErrorDomain::XmlFromUri) => {
-//             xml_error_with_format!(channel, data, c"URI ".as_ptr() as _);
-//         }
-//         _ => {}
-//     }
-//     match level {
-//         XmlErrorLevel::XmlErrNone => {
-//             xml_error_with_format!(channel, data, c": ".as_ptr() as _);
-//         }
-//         XmlErrorLevel::XmlErrWarning => {
-//             xml_error_with_format!(channel, data, c"warning : ".as_ptr() as _);
-//         }
-//         XmlErrorLevel::XmlErrError => {
-//             xml_error_with_format!(channel, data, c"error : ".as_ptr() as _);
-//         }
-//         XmlErrorLevel::XmlErrFatal => {
-//             xml_error_with_format!(channel, data, c"error : ".as_ptr() as _);
-//         }
-//     }
-//     if !str.is_null() {
-//         let len: c_int = xml_strlen(str as *const XmlChar);
-//         if len > 0 && *str.add(len as usize - 1) != b'\n' as _ {
-//             xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, str);
-//         } else {
-//             xml_error_with_format!(channel, data, c"%s".as_ptr() as _, str);
-//         }
-//     } else {
-//         xml_error_with_format!(
-//             channel,
-//             data,
-//             c"%s\n".as_ptr() as _,
-//             c"out of memory error".as_ptr()
-//         );
-//     }
-
-//     if !ctxt.is_null() {
-//         xml_parser_print_file_context_internal(input, channel, data);
-//         if !cur.is_null() {
-//             if !(*cur).filename.is_null() {
-//                 xml_error_with_format!(
-//                     channel,
-//                     data,
-//                     c"%s:%d: \n".as_ptr() as _,
-//                     (*cur).filename,
-//                     (*cur).line
-//                 );
-//             } else if line != 0 && domain == XmlErrorDomain::XmlFromParser as i32 {
-//                 xml_error_with_format!(
-//                     channel,
-//                     data,
-//                     c"Entity: line %d: \n".as_ptr() as _,
-//                     (*cur).line
-//                 );
-//             }
-//             xml_parser_print_file_context_internal(cur, channel, data);
-//         }
-//     }
-//     if domain == XmlErrorDomain::XmlFromXpath as i32
-//         && !(*err).str1.is_null()
-//         && ((*err).int1 < 100)
-//         && (*err).int1 < xml_strlen((*err).str1 as *const XmlChar)
-//     {
-//         let mut buf: [XmlChar; 150] = [0; 150];
-//         xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, (*err).str1);
-//         for b in buf.iter_mut().take((*err).int1 as usize) {
-//             *b = b' ';
-//         }
-//         buf[(*err).int1 as usize] = b'^';
-//         buf[(*err).int1 as usize + 1] = 0;
-//         xml_error_with_format!(channel, data, c"%s\n".as_ptr() as _, buf);
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
@@ -2069,30 +1296,30 @@ mod tests {
         /* missing type support */
     }
 
-    #[test]
-    fn test_xml_reset_error() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_reset_error() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_err in 0..GEN_NB_XML_ERROR_PTR {
-                let mem_base = xml_mem_blocks();
-                let err = gen_xml_error_ptr(n_err, 0);
+    //         for n_err in 0..GEN_NB_XML_ERROR_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let err = gen_xml_error_ptr(n_err, 0);
 
-                xml_reset_error(err);
-                des_xml_error_ptr(n_err, err, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlResetError",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlResetError()");
-                    eprintln!(" {}", n_err);
-                }
-            }
-        }
-    }
+    //             xml_reset_error(err);
+    //             des_xml_error_ptr(n_err, err, 0);
+    //             reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlResetError",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlResetError()");
+    //                 eprintln!(" {}", n_err);
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_reset_last_error() {

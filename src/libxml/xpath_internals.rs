@@ -7,7 +7,7 @@ use std::{
     ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, CStr},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of, addr_of_mut, null, null_mut},
+    ptr::{addr_of, addr_of_mut, null, null_mut, NonNull},
     sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -22,7 +22,9 @@ use crate::libxml::xpointer::{
     XmlLocationSetPtr,
 };
 use crate::{
-    __xml_raise_error, generic_error,
+    __xml_raise_error,
+    error::{XmlErrorDomain, XmlErrorLevel},
+    generic_error,
     libxml::{
         dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -45,7 +47,7 @@ use crate::{
             XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
         },
         valid::xml_get_id,
-        xmlerror::{xml_reset_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strchr, xml_strdup, xml_strlen, xml_strncmp,
             xml_strndup, xml_strstr, xml_utf8_strlen, xml_utf8_strloc, xml_utf8_strpos,
@@ -1130,20 +1132,26 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
     }
 
     /* cleanup current last error */
-    xml_reset_error(addr_of_mut!((*(*ctxt).context).last_error));
+    (*(*ctxt).context).last_error.reset();
 
-    (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXpath as i32;
-    (*(*ctxt).context).last_error.code = error + XmlParserErrors::XmlXpathExpressionOk as i32
-        - XmlXPathError::XpathExpressionOk as i32;
+    (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXPath;
+    (*(*ctxt).context).last_error.code = XmlParserErrors::try_from(
+        error + XmlParserErrors::XmlXpathExpressionOk as i32
+            - XmlXPathError::XpathExpressionOk as i32,
+    )
+    .unwrap();
     (*(*ctxt).context).last_error.level = XmlErrorLevel::XmlErrError;
-    (*(*ctxt).context).last_error.str1 = xml_strdup((*ctxt).base) as *mut c_char;
+    (*(*ctxt).context).last_error.str1 = (!(*ctxt).base.is_null()).then(|| {
+        CStr::from_ptr((*ctxt).base as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()
+    });
+    // (*(*ctxt).context).last_error.str1 = xml_strdup((*ctxt).base) as *mut c_char;
     (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
-    (*(*ctxt).context).last_error.node = (*(*ctxt).context).debug_node as _;
+    (*(*ctxt).context).last_error.node = NonNull::new((*(*ctxt).context).debug_node as _);
     if let Some(error) = (*(*ctxt).context).error {
-        error(
-            (*(*ctxt).context).user_data,
-            addr_of_mut!((*(*ctxt).context).last_error),
-        );
+        error((*(*ctxt).context).user_data, &(*(*ctxt).context).last_error);
     } else {
         let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32;
@@ -2637,7 +2645,7 @@ unsafe extern "C" fn xml_xpath_cache_wrap_node_set(
  */
 pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *const c_char) {
     if !ctxt.is_null() {
-        xml_reset_error(addr_of_mut!((*ctxt).last_error));
+        (*ctxt).last_error.reset();
         if !extra.is_null() {
             let mut buf: [XmlChar; 200] = [0; 200];
 
@@ -2647,15 +2655,21 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
                 c"Memory allocation failed : %s\n".as_ptr(),
                 extra
             );
-            (*ctxt).last_error.message = xml_strdup(buf.as_ptr()) as *mut c_char;
+            (*ctxt).last_error.message = Some(
+                CStr::from_ptr(buf.as_ptr() as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into(),
+            );
+            // (*ctxt).last_error.message = xml_strdup(buf.as_ptr()) as *mut c_char;
         } else {
-            (*ctxt).last_error.message =
-                xml_strdup(c"Memory allocation failed\n".as_ptr() as _) as *mut c_char;
+            (*ctxt).last_error.message = Some("Memory allocation failed\n".into());
+            // xml_strdup(c"Memory allocation failed\n".as_ptr() as _) as *mut c_char;
         }
-        (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXpath as i32;
-        (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory as i32;
+        (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
+        (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
         if let Some(error) = (*ctxt).error {
-            error((*ctxt).user_data, addr_of_mut!((*ctxt).last_error));
+            error((*ctxt).user_data, &(*ctxt).last_error);
         }
     } else if !extra.is_null() {
         __xml_raise_error!(
@@ -3974,15 +3988,10 @@ pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
         for i in incr..len {
             j = i - incr;
             while j >= 0 {
-                // #ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
                 if xml_xpath_cmp_nodes_ext(
                     *(*set).node_tab.add(j as usize),
                     *(*set).node_tab.add(j as usize + incr as usize),
                 ) == -1
-                // #else
-                // 		if (xmlXPathCmpNodes(*(*set).nodeTab.add(j as usize),
-                // 			*(*set).nodeTab.add(j as usize + incr as usize)) == -1)
-                // #endif
                 {
                     tmp = *(*set).node_tab.add(j as usize);
                     *(*set).node_tab.add(j as usize) =
@@ -3995,9 +4004,6 @@ pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
             }
         }
     }
-    // #else /* WITH_TIM_SORT */
-    //     libxml_domnode_tim_sort((*set).nodeTab, (*set).nodeNr);
-    // #endif /* WITH_TIM_SORT */
 }
 
 /**
@@ -4040,9 +4046,6 @@ unsafe extern "C" fn xml_xpath_cache_new_node_set(
                     (*(*ret).nodesetval).node_nr = 1;
                 }
             }
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathNodeset);
-            // #endif
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             /*
@@ -4051,8 +4054,8 @@ unsafe extern "C" fn xml_xpath_cache_new_node_set(
 
             let set: XmlNodeSetPtr = xml_xpath_node_set_create(val);
             if set.is_null() {
-                (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXpath as i32;
-                (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory as i32;
+                (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
+                (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
                 return null_mut();
             }
 
@@ -4065,9 +4068,6 @@ unsafe extern "C" fn xml_xpath_cache_new_node_set(
             (*ret).typ = XmlXPathObjectType::XpathNodeset;
             (*ret).boolval = 0;
             (*ret).nodesetval = set;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathNodeset);
-            // #endif
             return ret;
         }
     }
@@ -6480,9 +6480,8 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                 if xml_xpath_node_set_add_unique((*(*result_seq)).nodesetval, cur)
                                     < 0
                                 {
-                                    (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXpath as i32;
-                                    (*ctxt).last_error.code =
-                                        XmlParserErrors::XmlErrNoMemory as i32;
+                                    (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
+                                    (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
                                 }
                             }
                             if (*cur).children.is_null() || depth >= max_depth {

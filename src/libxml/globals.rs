@@ -18,13 +18,14 @@ use libc::{free, malloc, memset, realloc};
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
     encoding::XmlCharEncodingHandler,
-    error::{parser_error, parser_warning},
+    error::{parser_error, parser_warning, XmlError, XmlErrorDomain, XmlErrorLevel},
+    globals::GLOBAL_STATE,
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
         xml_io::{
             XmlOutputBufferPtr, XmlParserInputBufferPtr, __xml_output_buffer_create_filename,
         },
-        xmlerror::{XmlError, XmlGenericErrorFunc, XmlStructuredErrorFunc},
+        xmlerror::{XmlGenericErrorFunc, XmlStructuredErrorFunc},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
     private::threads::{__xml_global_init_mutex_destroy, xml_cleanup_mutex, xml_init_mutex},
@@ -46,7 +47,7 @@ use super::{
     threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
     xml_io::__xml_parser_input_buffer_create_filename,
-    xmlerror::{xml_reset_error, XmlErrorPtr},
+    xmlerror::{XmlErrorPtr, XmlParserErrors},
     xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
     xmlversion::LIBXML_VERSION_STRING,
 };
@@ -936,7 +937,21 @@ pub unsafe extern "C" fn __xml_last_error() -> *mut XmlError {
     }
 }
 
-static mut _XML_LAST_ERROR: XmlError = unsafe { zeroed() };
+static mut _XML_LAST_ERROR: XmlError = XmlError {
+    code: XmlParserErrors::XmlErrOK,
+    domain: XmlErrorDomain::XmlFromNone,
+    message: None,
+    level: XmlErrorLevel::XmlErrNone,
+    file: None,
+    line: 0,
+    str1: None,
+    str2: None,
+    str3: None,
+    int1: 0,
+    int2: 0,
+    ctxt: None,
+    node: None,
+};
 
 #[cfg(feature = "thread")]
 pub unsafe extern "C" fn xml_last_error() -> *mut XmlError {
@@ -1609,7 +1624,7 @@ pub(crate) unsafe extern "C" fn xml_init_globals_internal() {
  * Additional cleanup for multi-threading
  */
 pub(crate) unsafe extern "C" fn xml_cleanup_globals_internal() {
-    xml_reset_error(xml_last_error());
+    GLOBAL_STATE.with_borrow_mut(|state| state.last_error.reset());
 
     xml_cleanup_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
     __xml_global_init_mutex_destroy();

@@ -21,7 +21,9 @@ use crate::libxml::xpointer::{
     xml_xptr_free_location_set, xml_xptr_location_set_merge, XmlLocationSetPtr,
 };
 use crate::{
+    error::XmlError,
     generic_error,
+    globals::StructuredError,
     libxml::{
         dict::{xml_dict_free, XmlDictPtr},
         globals::{xml_free, xml_malloc},
@@ -32,7 +34,6 @@ use crate::{
             xml_free_node_list, xml_node_get_content, XmlDocPtr, XmlElementType, XmlNodePtr,
             XmlNsPtr,
         },
-        xmlerror::{xml_reset_error, XmlError, XmlStructuredErrorFunc},
         xmlstring::{xml_strdup, xml_strlen, XmlChar},
         xpath_internals::{
             value_pop, xml_xpath_compile_expr, xml_xpath_err_memory, xml_xpath_eval_expr,
@@ -464,7 +465,7 @@ pub struct XmlXPathContext {
 
     /* error reporting mechanism */
     pub(crate) user_data: *mut c_void, /* user specific data block */
-    pub(crate) error: Option<XmlStructuredErrorFunc>, /* the callback in case of errors */
+    pub(crate) error: Option<StructuredError>, /* the callback in case of errors */
     pub(crate) last_error: XmlError,   /* the last error */
     pub(crate) debug_node: XmlNodePtr, /* the source node XSLT */
 
@@ -1793,7 +1794,7 @@ pub unsafe extern "C" fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
     xml_xpath_registered_ns_cleanup(ctxt);
     xml_xpath_registered_funcs_cleanup(ctxt);
     xml_xpath_registered_variables_cleanup(ctxt);
-    xml_reset_error(addr_of_mut!((*ctxt).last_error));
+    (*ctxt).last_error.reset();
     xml_free(ctxt as _);
 }
 

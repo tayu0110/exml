@@ -177,3 +177,8 @@ pub fn get_default_buffer_allocation_scheme() -> XmlBufferAllocationScheme {
 pub fn reset_last_error() {
     GLOBAL_STATE.with_borrow_mut(|state| state.last_error.reset());
 }
+
+/// Get last global error.
+pub fn get_last_error() -> XmlError {
+    GLOBAL_STATE.with_borrow(|state| state.last_error.clone())
+}

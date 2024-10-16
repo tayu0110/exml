@@ -11,10 +11,10 @@ use std::{
 };
 
 use exml::{
-    error::{XmlError, XmlErrorLevel},
-    globals::{reset_last_error, set_structured_error},
+    error::{XmlError, XmlErrorDomain, XmlErrorLevel},
+    globals::{get_last_error, reset_last_error, set_structured_error},
     libxml::{
-        globals::{xml_free, xml_get_warnings_default_value, xml_last_error},
+        globals::{xml_free, xml_get_warnings_default_value},
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_parser_ctxt, xml_pedantic_parser_default, xml_read_file,
@@ -25,7 +25,7 @@ use exml::{
             xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop,
             xml_node_get_base, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
         },
-        xmlerror::{XmlErrorDomain, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlmemory::{
             xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
@@ -312,8 +312,9 @@ unsafe extern "C" fn xmlconf_test_not_nswf(
         NB_ERRORS += 1;
         ret = 0;
     } else {
-        if (*xml_last_error()).code == XmlParserErrors::XmlErrOK as i32
-            || (*xml_last_error()).domain != XmlErrorDomain::XmlFromNamespace as i32
+        let last_error = get_last_error();
+        if last_error.code() == XmlParserErrors::XmlErrOK
+            || last_error.domain() != XmlErrorDomain::XmlFromNamespace
         {
             test_log!(
                 logfile,
