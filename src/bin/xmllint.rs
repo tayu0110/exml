@@ -25,6 +25,7 @@ use const_format::concatcp;
 use exml::{
     encoding::XmlCharEncoding,
     error::generic_error_default,
+    generic_error,
     globals::GenericError,
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
@@ -33,7 +34,7 @@ use exml::{
         encoding::xml_add_encoding_alias,
         entities::{xml_encode_entities_reentrant, XmlEntityPtr},
         globals::{
-            xml_deregister_node_default, xml_free, xml_generic_error, xml_generic_error_context,
+            xml_deregister_node_default, xml_free, xml_generic_error_context,
             xml_load_ext_dtd_default_value, xml_parser_debug_entities, xml_register_node_default,
             xml_tree_indent_string,
         },
@@ -102,7 +103,7 @@ use exml::{
         xmlstring::XmlChar,
         xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     },
-    xml_error_with_format, xml_generic_error, SYSCONFDIR,
+    xml_error_with_format, SYSCONFDIR,
 };
 use libc::{
     close, fclose, fopen, fread, free, gettimeofday, malloc, memset, mmap, munmap, open, size_t,
@@ -464,7 +465,8 @@ unsafe extern "C" fn xml_htmlencode_send() {
     let result: *mut c_char =
         xml_encode_entities_reentrant(null_mut(), BUFFER.as_ptr() as _) as *mut c_char;
     if !result.is_null() {
-        xml_generic_error!(xml_generic_error_context(), c"%s".as_ptr(), result);
+        let s = CStr::from_ptr(result).to_string_lossy().into_owned();
+        generic_error!("{s}");
         xml_free(result as _);
     }
     BUFFER[0] = 0;
@@ -478,7 +480,7 @@ unsafe extern "C" fn xml_htmlencode_send() {
  */
 
 unsafe extern "C" fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
-    xml_generic_error!(xml_generic_error_context(), c"<p>".as_ptr());
+    generic_error!("<p>");
 
     let len = strlen(BUFFER.as_ptr());
     if !input.is_null() {
@@ -517,7 +519,7 @@ unsafe extern "C" fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
     if input.is_null() {
         return;
     }
-    xml_generic_error!(xml_generic_error_context(), c"<pre>\n".as_ptr());
+    generic_error!("<pre>\n");
     cur = (*input).cur;
     base = (*input).base;
     while cur > base && (*cur == b'\n' || *cur == b'\r') {
@@ -579,7 +581,7 @@ unsafe extern "C" fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
         c"^\n".as_ptr(),
     );
     xml_htmlencode_send();
-    xml_generic_error!(xml_generic_error_context(), c"</pre>".as_ptr());
+    generic_error!("</pre>");
 }
 
 /**
@@ -2013,10 +2015,9 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             }
             ret = xml_text_reader_relaxng_validate(reader, relaxng.as_ref().unwrap().as_ptr());
             if ret < 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Relax-NG schema %s failed to compile\n".as_ptr(),
-                    relaxng.as_ref().unwrap().as_ptr()
+                generic_error!(
+                    "Relax-NG schema {} failed to compile\n",
+                    relaxng.as_ref().unwrap().to_string_lossy()
                 );
                 PROGRESULT = XmllintReturnCode::ErrSchemacomp;
                 *relaxng = None;
@@ -2032,10 +2033,9 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             }
             ret = xml_text_reader_schema_validate(reader, schema.as_ref().unwrap().as_ptr());
             if ret < 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"XSD schema %s failed to compile\n".as_ptr(),
-                    schema.as_ref().unwrap().as_ptr()
+                generic_error!(
+                    "XSD schema {} failed to compile\n",
+                    schema.as_ref().unwrap().to_string_lossy()
                 );
                 PROGRESULT = XmllintReturnCode::ErrSchemacomp;
                 *schema = None;
@@ -2088,11 +2088,8 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
 
         #[cfg(feature = "valid")]
         if VALID != 0 && xml_text_reader_is_valid(reader) != 1 {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Document %s does not validate\n".as_ptr(),
-                filename
-            );
+            let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
+            generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
         #[cfg(feature = "schema")]
@@ -2157,10 +2154,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
 
         let root: XmlNodePtr = xml_doc_get_root_element(doc);
         if root.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Document does not have a root element".as_ptr()
-            );
+            generic_error!("Document does not have a root element");
             PROGRESULT = XmllintReturnCode::ErrUnclass;
             return;
         }
@@ -2188,10 +2182,9 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
                 Ordering::Relaxed,
             );
             if PATTERNC.load(Ordering::Relaxed).is_null() {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Pattern %s failed to compile\n".as_ptr(),
-                    PATTERN.lock().unwrap().as_ref().unwrap().as_ptr()
+                generic_error!(
+                    "Pattern {} failed to compile\n",
+                    PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy()
                 );
                 PROGRESULT = XmllintReturnCode::ErrSchemapat;
                 *PATTERN.lock().unwrap() = None;
@@ -3109,26 +3102,23 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         }
         if dtd.is_null() {
             if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Could not parse DTD %s\n".as_ptr(),
-                    dtd_valid.as_ptr()
-                );
+                generic_error!("Could not parse DTD {}\n", dtd_valid.to_string_lossy());
             } else {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Could not parse DTD %s\n".as_ptr(),
-                    DTDVALIDFPI.lock().unwrap().as_ref().unwrap().as_ptr()
+                generic_error!(
+                    "Could not parse DTD {}\n",
+                    DTDVALIDFPI
+                        .lock()
+                        .unwrap()
+                        .as_ref()
+                        .unwrap()
+                        .to_string_lossy()
                 );
             }
             PROGRESULT = XmllintReturnCode::ErrDtd;
         } else {
             let cvp = xml_new_valid_ctxt();
             if cvp.is_null() {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Couldn't allocate validation context\n".as_ptr()
-                );
+                generic_error!("Couldn't allocate validation context\n");
                 PROGRESULT = XmllintReturnCode::ErrMem;
                 xml_free_dtd(dtd);
                 return;
@@ -3140,19 +3130,21 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 start_timer();
             }
             if xml_validate_dtd(cvp, doc, dtd) == 0 {
+                let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
                 if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Document %s does not validate against %s\n".as_ptr(),
-                        filename,
-                        dtd_valid.as_ptr()
+                    generic_error!(
+                        "Document {filename} does not validate against {}\n",
+                        dtd_valid.to_string_lossy()
                     );
                 } else {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Document %s does not validate against %s\n".as_ptr(),
-                        filename,
-                        DTDVALIDFPI.lock().unwrap().as_ref().unwrap().as_ptr()
+                    generic_error!(
+                        "Document {filename} does not validate against {}\n",
+                        DTDVALIDFPI
+                            .lock()
+                            .unwrap()
+                            .as_ref()
+                            .unwrap()
+                            .to_string_lossy()
                     );
                 }
                 PROGRESULT = XmllintReturnCode::ErrValid;
@@ -3166,10 +3158,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
     } else if POSTVALID != 0 {
         let cvp = xml_new_valid_ctxt();
         if cvp.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Couldn't allocate validation context\n".as_ptr()
-            );
+            generic_error!("Couldn't allocate validation context\n");
             PROGRESULT = XmllintReturnCode::ErrMem;
             xml_free_doc(doc);
             return;
@@ -3181,11 +3170,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         (*cvp).error = Some(generic_error_default);
         (*cvp).warning = Some(generic_error_default);
         if xml_validate_document(cvp, doc) == 0 {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Document %s does not validate\n".as_ptr(),
-                filename
-            );
+            let filename = CStr::from_ptr(filename).to_string_lossy();
+            generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
         if TIMING != 0 && REPEAT == 0 {
@@ -4066,23 +4052,15 @@ fn main() {
         if HTMLOUT != 0 && NOWRAP == 0 {
             let program_name =
                 CString::new(program_name.as_bytes()).expect("Failed to construct program name");
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\"\n".as_ptr()
+            generic_error!("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\"\n");
+            generic_error!("\t\"http://www.w3.org/TR/REC-html40/loose.dtd\">\n");
+            generic_error!(
+                "<html><head><title>{} output</title></head>\n",
+                program_name.to_string_lossy()
             );
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"\t\"http://www.w3.org/TR/REC-html40/loose.dtd\">\n".as_ptr()
-            );
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"<html><head><title>%s output</title></head>\n".as_ptr(),
-                program_name.as_ptr()
-            );
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"<body bgcolor=\"#ffffff\"><h1 align=\"center\">%s output</h1>\n".as_ptr(),
-                program_name.as_ptr()
+            generic_error!(
+                "<body bgcolor=\"#ffffff\"><h1 align=\"center\">{} output</h1>\n",
+                program_name.to_string_lossy()
             );
         }
 
@@ -4110,10 +4088,9 @@ fn main() {
                 }
                 WXSCHEMATRON.store(xml_schematron_parse(ctxt), Ordering::Relaxed);
                 if WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Schematron schema %s failed to compile\n".as_ptr(),
-                        s.as_ptr()
+                    generic_error!(
+                        "Schematron schema {} failed to compile\n",
+                        s.to_string_lossy()
                     );
                     PROGRESULT = XmllintReturnCode::ErrSchemacomp;
                     *schematron = None;
@@ -4150,10 +4127,9 @@ fn main() {
                 );
                 RELAXNGSCHEMAS.store(xml_relaxng_parse(ctxt), Ordering::Relaxed);
                 if RELAXNGSCHEMAS.load(Ordering::Relaxed).is_null() {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Relax-NG schema %s failed to compile\n".as_ptr(),
-                        r.as_ptr()
+                    generic_error!(
+                        "Relax-NG schema {} failed to compile\n",
+                        r.to_string_lossy()
                     );
                     PROGRESULT = XmllintReturnCode::ErrSchemacomp;
                     *relaxng = None;
@@ -4185,11 +4161,7 @@ fn main() {
                 );
                 let wxschemas = xml_schema_parse(ctxt);
                 if wxschemas.is_null() {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"WXS schema %s failed to compile\n".as_ptr(),
-                        s.as_ptr()
-                    );
+                    generic_error!("WXS schema {} failed to compile\n", s.to_string_lossy());
                     PROGRESULT = XmllintReturnCode::ErrSchemacomp;
                     *schema = None;
                 }
@@ -4210,11 +4182,7 @@ fn main() {
                     Ordering::Relaxed,
                 );
                 if PATTERNC.load(Ordering::Relaxed).is_null() {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Pattern %s failed to compile\n".as_ptr(),
-                        p.as_ptr()
-                    );
+                    generic_error!("Pattern {} failed to compile\n", p.to_string_lossy());
                     PROGRESULT = XmllintReturnCode::ErrSchemapat;
                     *pattern = None;
                 }
@@ -4289,7 +4257,7 @@ fn main() {
             parse_and_print_file(null_mut(), null_mut());
         }
         if HTMLOUT != 0 && NOWRAP == 0 {
-            xml_generic_error!(xml_generic_error_context(), c"</body></html>\n".as_ptr());
+            generic_error!("</body></html>\n");
         }
         if files == 0 && GENERATE == 0 && version == 0 {
             usage(&mut stderr(), &program_name);

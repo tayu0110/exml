@@ -21,9 +21,10 @@ use crate::libxml::xpointer::{
     xml_xptr_free_location_set, xml_xptr_location_set_merge, XmlLocationSetPtr,
 };
 use crate::{
+    generic_error,
     libxml::{
         dict::{xml_dict_free, XmlDictPtr},
-        globals::{xml_free, xml_generic_error_context, xml_malloc},
+        globals::{xml_free, xml_malloc},
         hash::{xml_hash_create, XmlHashTablePtr},
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
@@ -46,7 +47,6 @@ use crate::{
             XML_NODESET_DEFAULT,
         },
     },
-    xml_generic_error,
 };
 
 /*
@@ -834,6 +834,8 @@ pub unsafe extern "C" fn xml_xpath_free_node_set(obj: XmlNodeSetPtr) {
  */
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
+    use crate::generic_error;
+
     if val.is_null() {
         return null_mut();
     }
@@ -873,10 +875,9 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
             (*ret).user = (*val).user;
         }
         XmlXPathObjectType::XpathUndefined => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlXPathObjectCopy: unsupported type %d\n".as_ptr(),
-                (*val).typ
+            generic_error!(
+                "xmlXPathObjectCopy: unsupported type {}\n",
+                (*val).typ as i32
             );
         } // _ => {}
     }
@@ -2030,6 +2031,8 @@ pub unsafe extern "C" fn xml_xpath_eval(
     str: *const XmlChar,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
+    use crate::generic_error;
+
     let res: XmlXPathObjectPtr;
 
     CHECK_CTXT!(ctx);
@@ -2047,15 +2050,11 @@ pub unsafe extern "C" fn xml_xpath_eval(
     } else {
         res = value_pop(ctxt);
         if res.is_null() {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlXPathCompiledEval: No result on the stack.\n".as_ptr() as _,
-            );
+            generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
         } else if (*ctxt).value_nr > 0 {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlXPathCompiledEval: %d object(s) left on the stack.\n".as_ptr() as _,
-                (*ctxt).value_nr
+            generic_error!(
+                "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
+                (*ctxt).value_nr as i32
             );
         }
     }
@@ -2103,7 +2102,7 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
     ctxt: XmlXPathContextPtr,
     res: XmlXPathObjectPtr,
 ) -> c_int {
-    use std::ffi::CString;
+    use crate::generic_error;
 
     if ctxt.is_null() || res.is_null() {
         return 0;
@@ -2125,13 +2124,7 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
             return (!(*res).stringval.is_null() && xml_strlen((*res).stringval) != 0) as i32;
         }
         _ => {
-            let file = CString::new(file!()).unwrap();
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Internal error at %s:%d\n".as_ptr() as _,
-                file.as_ptr(),
-                line!()
-            );
+            generic_error!("Internal error at {}:{}\n", file!(), line!());
         }
     }
     0
@@ -2359,16 +2352,12 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
         res_obj = value_pop(pctxt);
         if res_obj.is_null() {
             if to_bool == 0 {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"xmlXPathCompiledEval: No result on the stack.\n".as_ptr() as _
-                );
+                generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
             }
         } else if (*pctxt).value_nr > 0 {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"xmlXPathCompiledEval: %d object(s) left on the stack.\n".as_ptr() as _,
-                (*pctxt).value_nr
+            generic_error!(
+                "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
+                (*pctxt).value_nr as i32
             );
         }
     }

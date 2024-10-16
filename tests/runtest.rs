@@ -3421,7 +3421,7 @@ unsafe extern "C" fn xpath_common_test(
 ) -> c_int {
     use std::io::{BufRead, BufReader};
 
-    use exml::{libxml::globals::xml_generic_error_context, xml_generic_error};
+    use exml::generic_error;
 
     let mut ret: c_int = 0;
 
@@ -3456,11 +3456,8 @@ unsafe extern "C" fn xpath_common_test(
     let mut input = match File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
         Ok(file) => BufReader::new(file),
         _ => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Cannot open %s for reading\n".as_ptr(),
-                filename
-            );
+            let filename = CStr::from_ptr(filename).to_string_lossy();
+            generic_error!("Cannot open {filename} for reading\n");
             free(temp as _);
             return -1;
         }
@@ -5842,11 +5839,8 @@ unsafe extern "C" fn regexp_test(
     use std::io::{BufRead, BufReader};
 
     use exml::{
-        libxml::{
-            globals::xml_generic_error_context,
-            xmlregexp::{xml_reg_free_regexp, xml_regexp_compile},
-        },
-        xml_generic_error,
+        generic_error,
+        libxml::xmlregexp::{xml_reg_free_regexp, xml_regexp_compile},
     };
 
     let mut comp: XmlRegexpPtr = null_mut();
@@ -5859,11 +5853,8 @@ unsafe extern "C" fn regexp_test(
     let mut input = match File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
         Ok(file) => BufReader::new(file),
         _ => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Cannot open %s for reading\n".as_ptr(),
-                filename
-            );
+            let filename = CStr::from_ptr(filename).to_string_lossy();
+            generic_error!("Cannot open {filename} for reading\n");
             return -1;
         }
     };
@@ -6004,8 +5995,8 @@ unsafe extern "C" fn automata_test(
     use std::io::{BufRead, BufReader};
 
     use exml::{
+        generic_error,
         libxml::{
-            globals::xml_generic_error_context,
             xmlautomata::{
                 xml_automata_compile, xml_automata_get_init_state, xml_automata_new_count_trans,
                 xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
@@ -6017,7 +6008,6 @@ unsafe extern "C" fn automata_test(
                 xml_reg_new_exec_ctxt, XmlRegExecCtxtPtr,
             },
         },
-        xml_generic_error,
     };
 
     let mut ret: c_int;
@@ -6032,11 +6022,8 @@ unsafe extern "C" fn automata_test(
     let mut input = match File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
         Ok(file) => BufReader::new(file),
         _ => {
-            xml_generic_error!(
-                xml_generic_error_context(),
-                c"Cannot open %s for reading\n".as_ptr(),
-                filename
-            );
+            let filename = CStr::from_ptr(filename).to_string_lossy();
+            generic_error!("Cannot open {filename} for reading\n");
             return -1;
         }
     };
@@ -6061,18 +6048,12 @@ unsafe extern "C" fn automata_test(
 
     am = xml_new_automata();
     if am.is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Cannot create automata\n".as_ptr()
-        );
+        generic_error!("Cannot create automata\n");
         return -1;
     }
     states[0] = xml_automata_get_init_state(am);
     if states[0].is_null() {
-        xml_generic_error!(
-            xml_generic_error_context(),
-            c"Cannot get start state\n".as_ptr()
-        );
+        generic_error!("Cannot get start state\n");
         xml_free_automata(am);
         return -1;
     }
@@ -6109,11 +6090,8 @@ unsafe extern "C" fn automata_test(
 
                 let from: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Bad line %s\n".as_ptr(),
-                        expr.as_ptr()
-                    );
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Bad line {expr}\n");
                     break;
                 }
                 if states[from].is_null() {
@@ -6122,11 +6100,8 @@ unsafe extern "C" fn automata_test(
                 ptr = ptr.add(1);
                 let to: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Bad line %s\n".as_ptr(),
-                        expr.as_ptr()
-                    );
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Bad line {expr}\n");
                     break;
                 }
                 if states[to].is_null() {
@@ -6139,11 +6114,8 @@ unsafe extern "C" fn automata_test(
 
                 let from: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Bad line %s\n".as_ptr(),
-                        expr.as_ptr()
-                    );
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Bad line {expr}\n");
                     break;
                 }
                 if states[from].is_null() {
@@ -6160,12 +6132,8 @@ unsafe extern "C" fn automata_test(
 
                 let state: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if states[state].is_null() {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Bad state %d : %s\n".as_ptr(),
-                        state,
-                        expr.as_ptr()
-                    );
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Bad state {state} : {expr}\n");
                     break;
                 }
                 xml_automata_set_final_state(am, states[state]);
@@ -6174,11 +6142,8 @@ unsafe extern "C" fn automata_test(
 
                 let from: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Bad line %s\n".as_ptr(),
-                        expr.as_ptr()
-                    );
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Bad line {expr}\n");
                     break;
                 }
                 if states[from].is_null() {
@@ -6187,11 +6152,8 @@ unsafe extern "C" fn automata_test(
                 ptr = ptr.add(1);
                 let to: usize = scan_number(addr_of_mut!(ptr)) as _;
                 if *ptr != b' ' as i8 {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Bad line %s\n".as_ptr(),
-                        expr.as_ptr()
-                    );
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Bad line {expr}\n");
                     break;
                 }
                 if states[to].is_null() {
@@ -6200,21 +6162,15 @@ unsafe extern "C" fn automata_test(
                 ptr = ptr.add(1);
                 let min: c_int = scan_number(addr_of_mut!(ptr));
                 if *ptr != b' ' as i8 {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Bad line %s\n".as_ptr(),
-                        expr.as_ptr()
-                    );
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Bad line {expr}\n");
                     break;
                 }
                 ptr = ptr.add(1);
                 let max: c_int = scan_number(addr_of_mut!(ptr));
                 if *ptr != b' ' as i8 {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Bad line %s\n".as_ptr(),
-                        expr.as_ptr()
-                    );
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Bad line {expr}\n");
                     break;
                 }
                 ptr = ptr.add(1);
@@ -6233,10 +6189,7 @@ unsafe extern "C" fn automata_test(
                 xml_free_automata(am);
                 am = null_mut();
                 if regexp.is_null() {
-                    xml_generic_error!(
-                        xml_generic_error_context(),
-                        c"Failed to compile the automata".as_ptr()
-                    );
+                    generic_error!("Failed to compile the automata");
                     break;
                 }
             } else if expr[0] == b'=' && expr[1] == b'>' {
@@ -6266,11 +6219,8 @@ unsafe extern "C" fn automata_test(
                 }
                 ret = xml_reg_exec_push_string(exec, expr.as_ptr(), null_mut());
             } else {
-                xml_generic_error!(
-                    xml_generic_error_context(),
-                    c"Unexpected line %s\n".as_ptr(),
-                    expr.as_ptr()
-                );
+                let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                generic_error!("Unexpected line {expr}\n");
             }
         }
         expr.clear();

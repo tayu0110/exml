@@ -46,7 +46,7 @@ use super::{
     threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
     xml_io::__xml_parser_input_buffer_create_filename,
-    xmlerror::{xml_generic_error_default_func, xml_reset_error, XmlErrorPtr},
+    xmlerror::{xml_reset_error, XmlErrorPtr},
     xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
     xmlversion::LIBXML_VERSION_STRING,
 };
@@ -365,15 +365,15 @@ static mut XML_SAVE_NO_EMPTY_TAGS_THR_DEF: c_int = 0;
 pub(crate) static _XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
 static mut XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF: c_int = 0;
 
-/**
- * xmlGenericError:
- *
- * Global setting: function used for generic error callbacks
- */
-pub(crate) static mut _XML_GENERIC_ERROR: Option<XmlGenericErrorFunc> =
-    Some(xml_generic_error_default_func);
-static mut XML_GENERIC_ERROR_THR_DEF: Option<XmlGenericErrorFunc> =
-    Some(xml_generic_error_default_func);
+// /**
+//  * xmlGenericError:
+//  *
+//  * Global setting: function used for generic error callbacks
+//  */
+// pub(crate) static mut _XML_GENERIC_ERROR: Option<XmlGenericErrorFunc> =
+//     Some(xml_generic_error_default_func);
+// static mut XML_GENERIC_ERROR_THR_DEF: Option<XmlGenericErrorFunc> =
+//     Some(xml_generic_error_default_func);
 
 /**
  * xmlStructuredError:
@@ -498,7 +498,7 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).xml_save_no_empty_tags = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
     (*gs).xml_substitute_entities_default_value = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
 
-    (*gs).xml_generic_error = XML_GENERIC_ERROR_THR_DEF;
+    // (*gs).xml_generic_error = XML_GENERIC_ERROR_THR_DEF;
     (*gs).xml_structured_error = XML_STRUCTURED_ERROR_THR_DEF;
     (*gs).xml_generic_error_context.store(
         XML_GENERIC_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
@@ -523,19 +523,19 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
-pub unsafe extern "C" fn xml_thr_def_set_generic_error_func(
-    ctx: *mut c_void,
-    handler: Option<XmlGenericErrorFunc>,
-) {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    XML_GENERIC_ERROR_CONTEXT_THR_DEF.store(ctx, Ordering::Relaxed);
-    if let Some(handler) = handler {
-        XML_GENERIC_ERROR_THR_DEF = Some(handler);
-    } else {
-        XML_GENERIC_ERROR_THR_DEF = Some(xml_generic_error_default_func);
-    }
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
-}
+// pub unsafe extern "C" fn xml_thr_def_set_generic_error_func(
+//     ctx: *mut c_void,
+//     handler: Option<XmlGenericErrorFunc>,
+// ) {
+//     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
+//     XML_GENERIC_ERROR_CONTEXT_THR_DEF.store(ctx, Ordering::Relaxed);
+//     if let Some(handler) = handler {
+//         XML_GENERIC_ERROR_THR_DEF = Some(handler);
+//     } else {
+//         XML_GENERIC_ERROR_THR_DEF = Some(xml_generic_error_default_func);
+//     }
+//     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+// }
 
 pub unsafe extern "C" fn xml_thr_def_set_structured_error_func(
     ctx: *mut c_void,
@@ -1151,22 +1151,22 @@ pub unsafe extern "C" fn xml_thr_def_do_validity_checking_default_value(v: c_int
     ret
 }
 
-pub unsafe extern "C" fn __xml_generic_error() -> XmlGenericErrorFunc {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_GENERIC_ERROR.unwrap()
-    } else {
-        (*xml_get_global_state()).xml_generic_error.unwrap()
-    }
-}
+// pub unsafe extern "C" fn __xml_generic_error() -> XmlGenericErrorFunc {
+//     if IS_MAIN_THREAD!() != 0 {
+//         _XML_GENERIC_ERROR.unwrap()
+//     } else {
+//         (*xml_get_global_state()).xml_generic_error.unwrap()
+//     }
+// }
 
-#[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_generic_error(ctx: *mut c_void, msg: *const c_char) {
-    __xml_generic_error()(ctx, msg);
-}
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_generic_error(ctx: *mut c_void, msg: *const c_char) {
-    _XML_GENERIC_ERROR.unwrap()(ctx, msg)
-}
+// #[cfg(feature = "thread")]
+// pub unsafe extern "C" fn xml_generic_error(ctx: *mut c_void, msg: *const c_char) {
+//     __xml_generic_error()(ctx, msg);
+// }
+// #[cfg(not(feature = "thread"))]
+// pub unsafe extern "C" fn xml_generic_error(ctx: *mut c_void, msg: *const c_char) {
+//     _XML_GENERIC_ERROR.unwrap()(ctx, msg)
+// }
 
 pub unsafe extern "C" fn __xml_structured_error() -> Option<XmlStructuredErrorFunc> {
     if IS_MAIN_THREAD!() != 0 {

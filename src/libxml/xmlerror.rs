@@ -3,18 +3,15 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::ffi::{c_char, c_int, c_uint, c_void, CStr};
-use std::io::Write;
+use std::ffi::{c_char, c_int, c_uint, c_void};
 use std::mem::{size_of, size_of_val};
-use std::os::fd::FromRawFd;
 use std::ptr::{addr_of_mut, null_mut};
 
-use libc::{memcpy, memset, FILE};
+use libc::{memcpy, memset};
 
-use crate::error::generic_error_default;
 use crate::libxml::parser::XmlParserInputPtr;
 
-use super::globals::{xml_free, xml_generic_error, xml_generic_error_context, xml_last_error};
+use super::globals::{xml_free, xml_last_error};
 use super::xmlstring::{xml_get_utf8_char, xml_strdup, XmlChar};
 
 // #include "libxml.h"
@@ -975,33 +972,33 @@ pub type XmlGenericErrorFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *cons
  */
 pub type XmlStructuredErrorFunc = unsafe extern "C" fn(userData: *mut c_void, error: XmlErrorPtr);
 
-/**
- * xmlGenericErrorDefaultFunc:
- * @ctx:  an error context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Default handler for out of context error messages.
- */
-pub(crate) unsafe extern "C" fn xml_generic_error_default_func(
-    _ctx: *mut c_void,
-    msg: *const c_char,
-) {
-    let msg = CStr::from_ptr(msg).to_string_lossy();
-    if xml_generic_error_context().is_null() {
-        generic_error_default(None::<&mut dyn Write>, &msg);
-    } else {
-        let fp = xml_generic_error_context() as *mut FILE;
-        // The buffers of C/Rust stdio are separated,
-        // so unless do `fflush`, the order of outputs may be strange.
-        libc::fflush(fp);
-        let fd = libc::fileno(fp);
-        let mut file = std::fs::File::from_raw_fd(fd);
-        generic_error_default(Some(&mut file), &msg);
-        // For the same reason, do `std::io::Write::flush`.
-        file.flush().ok();
-    }
-}
+// /**
+//  * xmlGenericErrorDefaultFunc:
+//  * @ctx:  an error context
+//  * @msg:  the message to display/transmit
+//  * @...:  extra parameters for the message display
+//  *
+//  * Default handler for out of context error messages.
+//  */
+// pub(crate) unsafe extern "C" fn xml_generic_error_default_func(
+//     _ctx: *mut c_void,
+//     msg: *const c_char,
+// ) {
+//     let msg = CStr::from_ptr(msg).to_string_lossy();
+//     if xml_generic_error_context().is_null() {
+//         generic_error_default(None::<&mut dyn Write>, &msg);
+//     } else {
+//         let fp = xml_generic_error_context() as *mut FILE;
+//         // The buffers of C/Rust stdio are separated,
+//         // so unless do `fflush`, the order of outputs may be strange.
+//         libc::fflush(fp);
+//         let fd = libc::fileno(fp);
+//         let mut file = std::fs::File::from_raw_fd(fd);
+//         generic_error_default(Some(&mut file), &msg);
+//         // For the same reason, do `std::io::Write::flush`.
+//         file.flush().ok();
+//     }
+// }
 
 // /*
 //  * Use the following function to reset the two global variables
@@ -1132,15 +1129,15 @@ macro_rules! XML_GET_VAR_STR {
     }
 }
 
-#[macro_export]
-macro_rules! xml_generic_error {
-    ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
-        $crate::xml_error_with_format!($crate::libxml::globals::xml_generic_error, $ctx, $msg, $( $args ),*);
-    };
-    ( $ctx:expr, $msg:expr ) => {
-        $crate::xml_error_with_format!($crate::libxml::globals::xml_generic_error, $ctx, $msg)
-    }
-}
+// #[macro_export]
+// macro_rules! xml_generic_error {
+//     ( $ctx:expr, $msg:expr, $( $args:expr ),* ) => {
+//         $crate::xml_error_with_format!($crate::libxml::globals::xml_generic_error, $ctx, $msg, $( $args ),*);
+//     };
+//     ( $ctx:expr, $msg:expr ) => {
+//         $crate::xml_error_with_format!($crate::libxml::globals::xml_generic_error, $ctx, $msg)
+//     }
+// }
 
 #[macro_export]
 macro_rules! xml_error_with_format {
@@ -1465,44 +1462,44 @@ unsafe extern "C" fn xml_parser_print_file_context_internal(
     xml_error_with_format!(channel, c"%s\n".as_ptr() as _, content.as_ptr() as _);
 }
 
-/**
- * xmlParserPrintFileInfo:
- * @input:  an xmlParserInputPtr input
- *
- * Displays the associated file and line information for the current input
- */
-pub unsafe extern "C" fn xml_parser_print_file_info(input: XmlParserInputPtr) {
-    if !input.is_null() {
-        if !(*input).filename.is_null() {
-            // xml_generic_error(xmlGenericErrorContext, c"%s:%d: ".as_ptr() as _, (*input).filename, (*input).line);
-            xml_error_with_format!(
-                xml_generic_error,
-                xml_generic_error_context(),
-                c"%s:%d: ".as_ptr() as _,
-                (*input).filename,
-                (*input).line
-            );
-        } else {
-            // xml_generic_error(xmlGenericErrorContext, c"Entity: line %d: ".as_ptr() as _, (*input).line);
-            xml_error_with_format!(
-                xml_generic_error,
-                xml_generic_error_context(),
-                c"Entity: line %d: ".as_ptr() as _,
-                (*input).line
-            );
-        }
-    }
-}
+// /**
+//  * xmlParserPrintFileInfo:
+//  * @input:  an xmlParserInputPtr input
+//  *
+//  * Displays the associated file and line information for the current input
+//  */
+// pub unsafe extern "C" fn xml_parser_print_file_info(input: XmlParserInputPtr) {
+//     if !input.is_null() {
+//         if !(*input).filename.is_null() {
+//             // xml_generic_error(xmlGenericErrorContext, c"%s:%d: ".as_ptr() as _, (*input).filename, (*input).line);
+//             xml_error_with_format!(
+//                 xml_generic_error,
+//                 xml_generic_error_context(),
+//                 c"%s:%d: ".as_ptr() as _,
+//                 (*input).filename,
+//                 (*input).line
+//             );
+//         } else {
+//             // xml_generic_error(xmlGenericErrorContext, c"Entity: line %d: ".as_ptr() as _, (*input).line);
+//             xml_error_with_format!(
+//                 xml_generic_error,
+//                 xml_generic_error_context(),
+//                 c"Entity: line %d: ".as_ptr() as _,
+//                 (*input).line
+//             );
+//         }
+//     }
+// }
 
-/**
- * xmlParserPrintFileContext:
- * @input:  an xmlParserInputPtr input
- *
- * Displays current context within the input content for error tracking
- */
-pub unsafe extern "C" fn xml_parser_print_file_context(input: XmlParserInputPtr) {
-    xml_parser_print_file_context_internal(input, xml_generic_error, xml_generic_error_context());
-}
+// /**
+//  * xmlParserPrintFileContext:
+//  * @input:  an xmlParserInputPtr input
+//  *
+//  * Displays current context within the input content for error tracking
+//  */
+// pub unsafe extern "C" fn xml_parser_print_file_context(input: XmlParserInputPtr) {
+//     xml_parser_print_file_context_internal(input, xml_generic_error, xml_generic_error_context());
+// }
 
 /*
  * Extended error information routines
@@ -2000,61 +1997,61 @@ mod tests {
         /* missing type support */
     }
 
-    #[test]
-    fn test_xml_parser_print_file_context() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_parser_print_file_context() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_input in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-                let mem_base = xml_mem_blocks();
-                let input = gen_xml_parser_input_ptr(n_input, 0);
+    //         for n_input in 0..GEN_NB_XML_PARSER_INPUT_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let input = gen_xml_parser_input_ptr(n_input, 0);
 
-                xml_parser_print_file_context(input);
-                des_xml_parser_input_ptr(n_input, input, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlParserPrintFileContext",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlParserPrintFileContext()"
-                    );
-                    eprintln!(" {}", n_input);
-                }
-            }
-        }
-    }
+    //             xml_parser_print_file_context(input);
+    //             des_xml_parser_input_ptr(n_input, input, 0);
+    //             reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlParserPrintFileContext",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(
+    //                     leaks == 0,
+    //                     "{leaks} Leaks are found in xmlParserPrintFileContext()"
+    //                 );
+    //                 eprintln!(" {}", n_input);
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_xml_parser_print_file_info() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_parser_print_file_info() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_input in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-                let mem_base = xml_mem_blocks();
-                let input = gen_xml_parser_input_ptr(n_input, 0);
+    //         for n_input in 0..GEN_NB_XML_PARSER_INPUT_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let input = gen_xml_parser_input_ptr(n_input, 0);
 
-                xml_parser_print_file_info(input);
-                des_xml_parser_input_ptr(n_input, input, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlParserPrintFileInfo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlParserPrintFileInfo()"
-                    );
-                    eprintln!(" {}", n_input);
-                }
-            }
-        }
-    }
+    //             xml_parser_print_file_info(input);
+    //             des_xml_parser_input_ptr(n_input, input, 0);
+    //             reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlParserPrintFileInfo",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(
+    //                     leaks == 0,
+    //                     "{leaks} Leaks are found in xmlParserPrintFileInfo()"
+    //                 );
+    //                 eprintln!(" {}", n_input);
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_parser_validity_error() {

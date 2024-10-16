@@ -1,21 +1,15 @@
 use std::{
-    any::Any,
     borrow::Cow,
-    ffi::{c_void, CStr, CString},
+    ffi::{c_void, CStr},
     fmt::Write as _,
-    fs::File,
     io::{Error, Write},
-    os::fd::AsRawFd,
     ptr::{null_mut, NonNull},
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use libc::{fdopen, fflush};
-
 use crate::{
     globals::{GenericError, GLOBAL_STATE},
     libxml::{
-        globals::xml_generic_error,
         parser::{XmlParserCtxtPtr, XmlParserInputPtr},
         tree::{XmlElementType, XmlNode, XmlNodePtr},
         xmlerror::XmlParserErrors,
@@ -152,36 +146,36 @@ pub fn generic_error_default(out: Option<&mut (dyn Write + 'static)>, msg: &str)
     }
 }
 
-/// # Safety
-/// - `out` must be a valid `File` or `None`.
-/// - If other types are set to `out`, the behaivior is undefined.
-pub(crate) unsafe fn generic_error_wrapper_for_cfunction(
-    out: Option<&mut (dyn Write + 'static)>,
-    msg: &str,
-) {
-    let msg = CString::new(msg).unwrap();
-    if let Some(out) = out {
-        // Does it work ???
-        // It seems so danger...
-        let mut out = Box::from_raw(out as *mut dyn Write as *mut File);
-        {
-            let out = out.as_mut() as &mut dyn Any;
-            if let Some(file) = out.downcast_mut::<File>() {
-                file.flush().ok();
-                let fd = file.as_raw_fd();
-                let fp = fdopen(fd, c"a".as_ptr());
-                xml_generic_error(fp as _, msg.as_ptr());
-                fflush(fp);
-            } else {
-                unimplemented!("Unsupported output stream for generic error function.");
-            }
-        }
-        // prevent to drop maybe-invalid pointer
-        let _ = Box::into_raw(out);
-    } else {
-        xml_generic_error(null_mut(), msg.as_ptr());
-    }
-}
+// /// # Safety
+// /// - `out` must be a valid `File` or `None`.
+// /// - If other types are set to `out`, the behaivior is undefined.
+// pub(crate) unsafe fn generic_error_wrapper_for_cfunction(
+//     out: Option<&mut (dyn Write + 'static)>,
+//     msg: &str,
+// ) {
+//     let msg = CString::new(msg).unwrap();
+//     if let Some(out) = out {
+//         // Does it work ???
+//         // It seems so danger...
+//         let mut out = Box::from_raw(out as *mut dyn Write as *mut File);
+//         {
+//             let out = out.as_mut() as &mut dyn Any;
+//             if let Some(file) = out.downcast_mut::<File>() {
+//                 file.flush().ok();
+//                 let fd = file.as_raw_fd();
+//                 let fp = fdopen(fd, c"a".as_ptr());
+//                 xml_generic_error(fp as _, msg.as_ptr());
+//                 fflush(fp);
+//             } else {
+//                 unimplemented!("Unsupported output stream for generic error function.");
+//             }
+//         }
+//         // prevent to drop maybe-invalid pointer
+//         let _ = Box::into_raw(out);
+//     } else {
+//         xml_generic_error(null_mut(), msg.as_ptr());
+//     }
+// }
 
 #[macro_export]
 macro_rules! generic_error {
