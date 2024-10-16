@@ -18,9 +18,7 @@ use crate::{
     __xml_raise_error, generic_error,
     globals::{GenericError, StructuredError, GLOBAL_STATE},
     libxml::{
-        globals::{
-            xml_free, xml_generic_error_context, xml_malloc, xml_malloc_atomic, xml_realloc,
-        },
+        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_free,
             xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTable, XmlHashTablePtr,
@@ -64,7 +62,7 @@ use crate::{
     IS_BLANK_CH,
 };
 
-use super::hash::CVoidWrapper;
+use super::{globals::xml_generic_error_context, hash::CVoidWrapper};
 
 /**
  * xmlRelaxNGValidityErrorFunc:

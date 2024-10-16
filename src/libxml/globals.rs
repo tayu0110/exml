@@ -18,8 +18,8 @@ use libc::{free, malloc, memset, realloc};
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
     encoding::XmlCharEncodingHandler,
-    error::{parser_error, parser_warning, XmlError, XmlErrorDomain, XmlErrorLevel},
-    globals::GLOBAL_STATE,
+    error::{parser_error, parser_warning, XmlError},
+    globals::reset_last_error,
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
         xml_io::{
@@ -47,7 +47,6 @@ use super::{
     threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
     xml_io::__xml_parser_input_buffer_create_filename,
-    xmlerror::{XmlErrorPtr, XmlParserErrors},
     xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
     xmlversion::LIBXML_VERSION_STRING,
 };
@@ -538,15 +537,15 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
 //     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 // }
 
-pub unsafe extern "C" fn xml_thr_def_set_structured_error_func(
-    ctx: *mut c_void,
-    handler: XmlStructuredErrorFunc,
-) {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.store(ctx, Ordering::Relaxed);
-    XML_STRUCTURED_ERROR_THR_DEF = Some(handler);
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
-}
+// pub unsafe extern "C" fn xml_thr_def_set_structured_error_func(
+//     ctx: *mut c_void,
+//     handler: XmlStructuredErrorFunc,
+// ) {
+//     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
+//     XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.store(ctx, Ordering::Relaxed);
+//     XML_STRUCTURED_ERROR_THR_DEF = Some(handler);
+//     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+// }
 
 /**
  * xmlRegisterNodeDefault:
@@ -929,38 +928,38 @@ mod __globals_internal_for_html {
 #[cfg(feature = "html")]
 pub use __globals_internal_for_html::*;
 
-pub unsafe extern "C" fn __xml_last_error() -> *mut XmlError {
-    if IS_MAIN_THREAD!() != 0 {
-        addr_of_mut!(_XML_LAST_ERROR)
-    } else {
-        addr_of_mut!((*xml_get_global_state()).xml_last_error)
-    }
-}
+// pub unsafe extern "C" fn __xml_last_error() -> *mut XmlError {
+//     if IS_MAIN_THREAD!() != 0 {
+//         addr_of_mut!(_XML_LAST_ERROR)
+//     } else {
+//         addr_of_mut!((*xml_get_global_state()).xml_last_error)
+//     }
+// }
 
-static mut _XML_LAST_ERROR: XmlError = XmlError {
-    code: XmlParserErrors::XmlErrOK,
-    domain: XmlErrorDomain::XmlFromNone,
-    message: None,
-    level: XmlErrorLevel::XmlErrNone,
-    file: None,
-    line: 0,
-    str1: None,
-    str2: None,
-    str3: None,
-    int1: 0,
-    int2: 0,
-    ctxt: None,
-    node: None,
-};
+// static mut _XML_LAST_ERROR: XmlError = XmlError {
+//     code: XmlParserErrors::XmlErrOK,
+//     domain: XmlErrorDomain::XmlFromNone,
+//     message: None,
+//     level: XmlErrorLevel::XmlErrNone,
+//     file: None,
+//     line: 0,
+//     str1: None,
+//     str2: None,
+//     str3: None,
+//     int1: 0,
+//     int2: 0,
+//     ctxt: None,
+//     node: None,
+// };
 
-#[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_last_error() -> *mut XmlError {
-    __xml_last_error()
-}
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_last_error() -> *mut XmlError {
-    addr_of_mut!(_XML_LAST_ERROR)
-}
+// #[cfg(feature = "thread")]
+// pub unsafe extern "C" fn xml_last_error() -> *mut XmlError {
+//     __xml_last_error()
+// }
+// #[cfg(not(feature = "thread"))]
+// pub unsafe extern "C" fn xml_last_error() -> *mut XmlError {
+//     addr_of_mut!(_XML_LAST_ERROR)
+// }
 
 /*
  * Everything starting from the line below is
@@ -1183,24 +1182,24 @@ pub unsafe extern "C" fn xml_thr_def_do_validity_checking_default_value(v: c_int
 //     _XML_GENERIC_ERROR.unwrap()(ctx, msg)
 // }
 
-pub unsafe extern "C" fn __xml_structured_error() -> Option<XmlStructuredErrorFunc> {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_STRUCTURED_ERROR
-    } else {
-        (*xml_get_global_state()).xml_structured_error
-    }
-}
+// pub unsafe extern "C" fn __xml_structured_error() -> Option<XmlStructuredErrorFunc> {
+//     if IS_MAIN_THREAD!() != 0 {
+//         _XML_STRUCTURED_ERROR
+//     } else {
+//         (*xml_get_global_state()).xml_structured_error
+//     }
+// }
 
-#[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_structured_error(user_data: *mut c_void, error: XmlErrorPtr) {
-    if let Some(serror) = __xml_structured_error() {
-        serror(user_data, error)
-    }
-}
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_structured_error(user_data: *mut c_void, error: XmlErrorPtr) {
-    _XML_STRUCTURED_ERROR.unwrap()(user_data, error)
-}
+// #[cfg(feature = "thread")]
+// pub unsafe extern "C" fn xml_structured_error(user_data: *mut c_void, error: XmlErrorPtr) {
+//     if let Some(serror) = __xml_structured_error() {
+//         serror(user_data, error)
+//     }
+// }
+// #[cfg(not(feature = "thread"))]
+// pub unsafe extern "C" fn xml_structured_error(user_data: *mut c_void, error: XmlErrorPtr) {
+//     _XML_STRUCTURED_ERROR.unwrap()(user_data, error)
+// }
 
 pub unsafe extern "C" fn __xml_generic_error_context() -> *mut *mut c_void {
     if IS_MAIN_THREAD!() != 0 {
@@ -1219,24 +1218,24 @@ pub unsafe extern "C" fn xml_generic_error_context() -> *mut c_void {
     *_XML_GENERIC_ERROR_CONTEXT.as_ptr()
 }
 
-pub unsafe extern "C" fn __xml_structured_error_context() -> *mut *mut c_void {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_STRUCTURED_ERROR_CONTEXT.as_ptr()
-    } else {
-        (*xml_get_global_state())
-            .xml_structured_error_context
-            .as_ptr()
-    }
-}
+// pub unsafe extern "C" fn __xml_structured_error_context() -> *mut *mut c_void {
+//     if IS_MAIN_THREAD!() != 0 {
+//         _XML_STRUCTURED_ERROR_CONTEXT.as_ptr()
+//     } else {
+//         (*xml_get_global_state())
+//             .xml_structured_error_context
+//             .as_ptr()
+//     }
+// }
 
-#[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_structured_error_context() -> *mut *mut c_void {
-    __xml_structured_error_context()
-}
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_structured_error_context() -> *mut *mut c_void {
-    _XML_STRUCTURED_ERROR_CONTEXT.as_ptr()
-}
+// #[cfg(feature = "thread")]
+// pub unsafe extern "C" fn xml_structured_error_context() -> *mut *mut c_void {
+//     __xml_structured_error_context()
+// }
+// #[cfg(not(feature = "thread"))]
+// pub unsafe extern "C" fn xml_structured_error_context() -> *mut *mut c_void {
+//     _XML_STRUCTURED_ERROR_CONTEXT.as_ptr()
+// }
 
 pub unsafe extern "C" fn __xml_get_warnings_default_value() -> *mut c_int {
     if IS_MAIN_THREAD!() != 0 {
@@ -1624,7 +1623,7 @@ pub(crate) unsafe extern "C" fn xml_init_globals_internal() {
  * Additional cleanup for multi-threading
  */
 pub(crate) unsafe extern "C" fn xml_cleanup_globals_internal() {
-    GLOBAL_STATE.with_borrow_mut(|state| state.last_error.reset());
+    reset_last_error();
 
     xml_cleanup_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
     __xml_global_init_mutex_destroy();
