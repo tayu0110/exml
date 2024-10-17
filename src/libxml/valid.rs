@@ -5,7 +5,6 @@
 
 use std::{
     ffi::{c_char, c_int, c_uint},
-    io::Write,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -31,7 +30,7 @@ use crate::libxml::xmlstring::xml_strncmp;
 use crate::{
     __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
-    globals::{GenericError, StructuredError},
+    globals::{GenericError, GenericErrorContext, StructuredError},
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         entities::{xml_get_doc_entity, XmlEntitiesTablePtr, XmlEntityPtr, XmlEntityType},
@@ -7827,7 +7826,7 @@ pub unsafe extern "C" fn xml_valid_get_potential_children(
 /*
  * Dummy function to suppress messages while we try out valid elements
  */
-fn xml_no_validity_err(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {}
+fn xml_no_validity_err(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 /**
  * xmlValidGetValidElements:

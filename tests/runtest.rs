@@ -5,7 +5,7 @@ use std::{
     env::args,
     ffi::{c_char, c_int, c_ulong, CStr, CString},
     fs::{metadata, File},
-    io::{BufRead, BufReader, Read, Stderr, Write},
+    io::{BufRead, BufReader, Read, Write},
     mem::zeroed,
     os::{fd::AsRawFd, raw::c_void},
     process::exit,
@@ -19,7 +19,7 @@ use std::{
 use const_format::concatcp;
 use exml::{
     error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
-    globals::{reset_last_error, set_generic_error, set_structured_error},
+    globals::{reset_last_error, set_generic_error, set_structured_error, GenericErrorContext},
     libxml::{
         encoding::{
             xml_char_enc_close_func, xml_get_char_encoding_handler, XmlCharEncoding,
@@ -141,7 +141,7 @@ unsafe extern "C" fn test_external_entity_loader(
 static mut TEST_ERRORS: [XmlChar; 32769] = [0; 32769];
 static mut TEST_ERRORS_SIZE: usize = 0;
 
-fn test_error_handler(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn test_error_handler(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         if TEST_ERRORS_SIZE >= 32768 {
             return;
@@ -1418,7 +1418,7 @@ unsafe extern "C" fn comment_debug(_ctx: *mut c_void, value: *const XmlChar) {
  * Display and format a warning messages, gives file, line, position and
  * extra parameters.
  */
-fn warning_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
         if QUIET != 0 {
@@ -1442,7 +1442,7 @@ fn warning_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
  * Display and format a error messages, gives file, line, position and
  * extra parameters.
  */
-fn error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
         if QUIET != 0 {
@@ -1461,7 +1461,7 @@ fn error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
  * Display and format a fatalError messages, gives file, line, position and
  * extra parameters.
  */
-fn fatal_error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
         if QUIET != 0 {
@@ -1885,7 +1885,7 @@ unsafe extern "C" fn sax_parse_test(
 
     /* for SAX we really want the callbacks though the context handlers */
     set_structured_error(None, null_mut());
-    set_generic_error(Some(test_error_handler), None::<Stderr>);
+    set_generic_error(Some(test_error_handler), None);
 
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
@@ -2020,7 +2020,7 @@ unsafe extern "C" fn sax_parse_test(
     }
 
     /* switch back to structured error handling */
-    set_generic_error(None, None::<Stderr>);
+    set_generic_error(None, None);
     set_structured_error(Some(test_structured_error_handler), null_mut());
 
     ret
@@ -3335,7 +3335,7 @@ static XPATH_OUTPUT: Mutex<Option<File>> = Mutex::new(None);
 static XPATH_DOCUMENT: AtomicPtr<XmlDoc> = AtomicPtr::new(null_mut());
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-fn ignore_generic_error(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {}
+fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
@@ -3356,8 +3356,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     let ctxt: XmlXPathContextPtr;
 
     /* Don't print generic errors to stderr. */
-    set_generic_error(Some(ignore_generic_error), None::<Stderr>);
-    // xml_set_generic_error_func(null_mut(), Some(ignore_generic_error));
+    set_generic_error(Some(ignore_generic_error), None);
 
     NB_TESTS += 1;
     if cfg!(feature = "libxml_xptr") && xptr != 0 {
@@ -3398,8 +3397,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     xml_xpath_free_context(ctxt);
 
     /* Reset generic error handler. */
-    set_generic_error(None, None::<Stderr>);
-    // xml_set_generic_error_func(null_mut(), None);
+    set_generic_error(None, None);
 }
 
 /**

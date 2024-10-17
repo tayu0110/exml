@@ -6,7 +6,6 @@
 use std::{
     any::type_name,
     ffi::{c_char, c_int, c_long, c_uint, c_ulong},
-    io::Write,
     mem::{size_of, size_of_val},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -20,7 +19,7 @@ use crate::{
     error::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
     },
-    globals::StructuredError,
+    globals::{GenericErrorContext, StructuredError},
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
@@ -4936,19 +4935,19 @@ pub unsafe extern "C" fn xml_text_reader_is_valid(reader: XmlTextReaderPtr) -> c
 
 #[cfg(feature = "libxml_reader")]
 fn xml_text_reader_generic_error(
-    ctxt: Option<&mut (dyn Write + 'static)>,
+    ctxt: Option<GenericErrorContext>,
     severity: XmlParserSeverities,
     str: &str,
 ) {
     use std::ffi::CString;
 
-    use crate::error::ErrorContextWrap;
-
     if let Some(ctxt) = ctxt {
-        unsafe {
-            let ctxt = ctxt as *mut dyn Write as *mut ErrorContextWrap<XmlParserCtxtPtr>;
-            let ctx = (*ctxt).0;
+        let lock = ctxt.context.lock().unwrap();
+        let ctx = **lock
+            .downcast_ref::<Box<XmlParserCtxtPtr>>()
+            .expect("ctxt is not XmlParserCtxtPtr");
 
+        unsafe {
             let reader: XmlTextReaderPtr = (*ctx)._private as XmlTextReaderPtr;
 
             if let Some(error) = (*reader).error_func {
@@ -4971,7 +4970,7 @@ fn xml_text_reader_generic_error(
 }
 
 #[cfg(feature = "libxml_reader")]
-fn xml_text_reader_validity_error(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn xml_text_reader_validity_error(ctxt: Option<GenericErrorContext>, msg: &str) {
     let len = msg.len();
 
     if len > 1 && msg.as_bytes()[len - 2] != b':' {
@@ -5006,16 +5005,16 @@ fn xml_text_reader_validity_error(ctxt: Option<&mut (dyn Write + 'static)>, msg:
 }
 
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-fn xml_text_reader_validity_error_relay(ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn xml_text_reader_validity_error_relay(ctx: Option<GenericErrorContext>, msg: &str) {
     use std::ffi::CString;
 
-    use crate::error::ErrorContextWrap;
-
     if let Some(ctx) = ctx {
-        let ctx = ctx as *mut dyn Write as *mut ErrorContextWrap<XmlTextReaderPtr>;
+        let lock = ctx.context.lock().unwrap();
+        let reader = **lock
+            .downcast_ref::<Box<XmlTextReaderPtr>>()
+            .expect("ctxt is not XmlTextReaderPtr");
 
         unsafe {
-            let reader = (*ctx).0;
             if let Some(error) = (*reader).error_func {
                 let msg = CString::new(msg).unwrap();
                 error(
@@ -5025,7 +5024,8 @@ fn xml_text_reader_validity_error_relay(ctx: Option<&mut (dyn Write + 'static)>,
                     null_mut(), /* locator */
                 );
             } else {
-                xml_text_reader_validity_error(Some(&mut ErrorContextWrap(reader)), msg);
+                drop(lock);
+                xml_text_reader_validity_error(Some(ctx), msg);
             }
         }
     }
@@ -5054,7 +5054,7 @@ fn xml_text_reader_validity_error_relay(ctx: Option<&mut (dyn Write + 'static)>,
 }
 
 #[cfg(feature = "libxml_reader")]
-fn xml_text_reader_validity_warning(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn xml_text_reader_validity_warning(ctxt: Option<GenericErrorContext>, msg: &str) {
     let len = msg.len();
 
     if len != 0 && msg.as_bytes()[len - 1] != b':' {
@@ -5089,16 +5089,16 @@ fn xml_text_reader_validity_warning(ctxt: Option<&mut (dyn Write + 'static)>, ms
 }
 
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-fn xml_text_reader_validity_warning_relay(ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn xml_text_reader_validity_warning_relay(ctx: Option<GenericErrorContext>, msg: &str) {
     use std::ffi::CString;
 
-    use crate::error::ErrorContextWrap;
-
     if let Some(ctx) = ctx {
-        let ctx = ctx as *mut dyn Write as *mut ErrorContextWrap<XmlTextReaderPtr>;
+        let lock = ctx.context.lock().unwrap();
+        let reader = **lock
+            .downcast_ref::<Box<XmlTextReaderPtr>>()
+            .expect("ctxt is not XmlTextReaderPtr");
 
         unsafe {
-            let reader = (*ctx).0;
             if let Some(error) = (*reader).error_func {
                 let msg = CString::new(msg).unwrap();
                 error(
@@ -5108,7 +5108,8 @@ fn xml_text_reader_validity_warning_relay(ctx: Option<&mut (dyn Write + 'static)
                     null_mut(), /* locator */
                 );
             } else {
-                xml_text_reader_validity_warning(Some(&mut ErrorContextWrap(reader)), msg);
+                drop(lock);
+                xml_text_reader_validity_warning(Some(ctx), msg);
             }
         }
     }
@@ -6386,7 +6387,7 @@ pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
 }
 
 #[cfg(feature = "libxml_reader")]
-fn xml_text_reader_error(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn xml_text_reader_error(ctxt: Option<GenericErrorContext>, msg: &str) {
     xml_text_reader_generic_error(ctxt, XmlParserSeverities::XmlParserSeverityError, msg as _);
     // original code is the following, but Rust cannot handle variable length arguments.
 
@@ -6400,7 +6401,7 @@ fn xml_text_reader_error(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
 }
 
 #[cfg(feature = "libxml_reader")]
-fn xml_text_reader_warning(ctxt: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn xml_text_reader_warning(ctxt: Option<GenericErrorContext>, msg: &str) {
     xml_text_reader_generic_error(ctxt, XmlParserSeverities::XmlParserSeverityWarning, msg);
 
     // original code is the following, but Rust cannot handle variable length arguments.

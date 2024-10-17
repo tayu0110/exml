@@ -5,7 +5,6 @@ use std::{
     env::args,
     ffi::{c_char, c_int, CStr},
     fs::{metadata, File},
-    io::{Stderr, Write},
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
 };
@@ -15,7 +14,7 @@ use exml::{
         xml_buf_add, xml_buf_content, xml_buf_create, xml_buf_empty, xml_buf_free,
         xml_buf_set_allocation_scheme, xml_buf_use,
     },
-    globals::{reset_last_error, set_generic_error},
+    globals::{reset_last_error, set_generic_error, GenericErrorContext},
     libxml::{
         globals::{xml_free, xml_get_warnings_default_value},
         parser::{
@@ -186,7 +185,7 @@ macro_rules! test_log {
     };
 }
 
-fn test_error_handler(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn test_error_handler(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         if TEST_ERRORS_SIZE >= 32768 {
             return;
@@ -244,8 +243,7 @@ unsafe extern "C" fn initialize_libxml2() {
         c"xlink".as_ptr() as _,
         c"http://www.w3.org/1999/xlink".as_ptr() as _,
     );
-    set_generic_error(Some(test_error_handler), None::<Stderr>);
-    // xml_set_generic_error_func(null_mut(), Some(test_error_handler));
+    set_generic_error(Some(test_error_handler), None);
     #[cfg(feature = "schema")]
     {
         xml_schema_init_types();

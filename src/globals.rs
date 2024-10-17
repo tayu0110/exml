@@ -1,4 +1,12 @@
-use std::{borrow::Cow, cell::RefCell, ffi::c_void, io::Write, ptr::null_mut, rc::Rc};
+use std::{
+    any::Any,
+    borrow::Cow,
+    cell::RefCell,
+    ffi::c_void,
+    ptr::null_mut,
+    rc::Rc,
+    sync::{Mutex, MutexGuard},
+};
 
 use const_format::concatcp;
 use libc::{free, malloc, realloc};
@@ -20,7 +28,7 @@ use crate::{
     },
 };
 
-pub type GenericError = for<'a> fn(Option<&mut (dyn Write + 'static)>, &str);
+pub type GenericError = for<'a> fn(Option<GenericErrorContext>, &str);
 pub type StructuredError = fn(*mut c_void, &XmlError);
 type ParserInputBufferCreateFilename =
     fn(uri: &str, enc: XmlCharEncoding) -> *mut XmlParserInputBuffer;
@@ -29,6 +37,30 @@ type OutputBufferCreateFilename = fn(
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     compression: i32,
 ) -> *mut XmlOutputBuffer;
+
+pub struct GenericErrorContext {
+    pub(crate) context: Rc<Mutex<dyn Any>>,
+}
+
+impl GenericErrorContext {
+    pub fn new<T: ?Sized + 'static>(context: Box<T>) -> Self {
+        Self {
+            context: Rc::new(Mutex::new(context)),
+        }
+    }
+
+    pub fn lock(&self) -> MutexGuard<'_, dyn Any> {
+        self.context.lock().unwrap()
+    }
+}
+
+impl Clone for GenericErrorContext {
+    fn clone(&self) -> Self {
+        Self {
+            context: Rc::clone(&self.context),
+        }
+    }
+}
 
 pub struct XmlGlobalState {
     parser_version: Cow<'static, str>,
@@ -41,7 +73,7 @@ pub struct XmlGlobalState {
     realloc: Option<XmlReallocFunc>,
     mem_strdup: Option<XmlStrdupFunc>,
     pub generic_error: GenericError,
-    pub generic_error_context: Option<Box<dyn Write>>,
+    pub generic_error_context: Option<GenericErrorContext>,
     pub(crate) structured_error: Option<StructuredError>,
     pub(crate) structured_error_context: *mut c_void,
     old_xml_wd_compatibility: bool,
@@ -123,13 +155,10 @@ thread_local! {
 ///
 /// If `func` is `None`, set `generic_error_default`.  
 /// If `context` is `None`, current context is clear and no context is set.  
-pub fn set_generic_error(func: Option<GenericError>, context: Option<impl Write + 'static>) {
+pub fn set_generic_error(func: Option<GenericError>, context: Option<Box<dyn Any>>) {
     GLOBAL_STATE.with_borrow_mut(|state| {
         state.generic_error = func.unwrap_or(generic_error_default);
-        state.generic_error_context = context.map(|context| {
-            let boxed: Box<dyn Write + 'static> = Box::new(context);
-            boxed
-        });
+        state.generic_error_context = context.map(GenericErrorContext::new);
     });
 }
 

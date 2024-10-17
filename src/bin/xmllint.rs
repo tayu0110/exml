@@ -26,7 +26,7 @@ use exml::{
     encoding::XmlCharEncoding,
     error::generic_error_default,
     generic_error,
-    globals::GenericError,
+    globals::{GenericError, GenericErrorContext},
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
@@ -593,7 +593,7 @@ unsafe extern "C" fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
  * Display and format an error messages, gives file, line, position and
  * extra parameters.
  */
-fn xml_html_error(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn xml_html_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
     todo!()
     // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     // let mut input: XmlParserInputPtr;
@@ -625,7 +625,7 @@ fn xml_html_error(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
  * Display and format a warning messages, gives file, line, position and
  * extra parameters.
  */
-fn xml_html_warning(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn xml_html_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
     todo!()
     // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     // let mut input: XmlParserInputPtr;
@@ -657,7 +657,7 @@ fn xml_html_warning(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
  * Display and format an validity error messages, gives file,
  * line, position and extra parameters.
  */
-fn xml_html_validity_error(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn xml_html_validity_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
     todo!()
     // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     // let mut input: XmlParserInputPtr;
@@ -693,7 +693,7 @@ fn xml_html_validity_error(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str)
  * Display and format a validity warning messages, gives file, line,
  * position and extra parameters.
  */
-fn xml_html_validity_warning(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn xml_html_validity_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
     todo!()
     // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     // let mut input: XmlParserInputPtr;
@@ -1462,7 +1462,7 @@ unsafe extern "C" fn comment_debug(_ctx: *mut c_void, value: *const XmlChar) {
  * Display and format a warning messages, gives file, line, position and
  * extra parameters.
  */
-fn warning_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
         if NOOUT != 0 {
@@ -1481,7 +1481,7 @@ fn warning_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
  * Display and format a error messages, gives file, line, position and
  * extra parameters.
  */
-fn error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
         if NOOUT != 0 {
@@ -1500,7 +1500,7 @@ fn error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
  * Display and format a fatalError messages, gives file, line, position and
  * extra parameters.
  */
-fn fatal_error_debug(_ctx: Option<&mut (dyn Write + 'static)>, msg: &str) {
+fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
         if NOOUT != 0 {

@@ -5,7 +5,6 @@
 
 use std::{
     ffi::{c_char, c_int, c_uint, c_ulong, CStr},
-    io::Write,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -18,7 +17,7 @@ use crate::{
     __xml_raise_error,
     error::{XmlErrorDomain, XmlErrorLevel},
     generic_error,
-    globals::{GenericError, StructuredError, GLOBAL_STATE},
+    globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         entities::XmlEntityPtr,
@@ -31624,19 +31623,19 @@ unsafe extern "C" fn comment_split(ctx: *mut c_void, value: *const XmlChar) {
  * Varargs error callbacks to the user application, harder ...
  */
 
-fn warning_split(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn warning_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // let ctxt: XmlSchemaSAXPlugPtr = ctx as XmlSchemaSAXPlugPtr;
     // if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).warning.is_some() {
     //     // TODO
     // }
 }
-fn error_split(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn error_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // let ctxt: XmlSchemaSAXPlugPtr = ctx as XmlSchemaSAXPlugPtr;
     // if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).error.is_some() {
     //     // TODO
     // }
 }
-fn fatal_error_split(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn fatal_error_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // let ctxt: XmlSchemaSAXPlugPtr = ctx as XmlSchemaSAXPlugPtr;
     // if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).fatal_error.is_some() {
     //     // TODO

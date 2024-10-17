@@ -45,11 +45,10 @@ macro_rules! __xml_raise_error {
         use libc::{c_char, c_int, c_void};
 
         use $crate::{
-            globals::{GenericError, StructuredError, GLOBAL_STATE},
+            globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
             error::{
                 generic_error_default, parser_error, parser_warning, parser_validity_error,
                 parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel,
-                ErrorContextWrap,
             },
             libxml::{
                 globals::xml_get_warnings_default_value,
@@ -75,7 +74,7 @@ macro_rules! __xml_raise_error {
             mut col: c_int,
             msg: *const c_char| {
                 let mut ctxt: XmlParserCtxtPtr = null_mut();
-                let Some((channel, error, s, mut data)) = GLOBAL_STATE.with_borrow_mut(|state| {
+                let Some((channel, error, s, data)) = GLOBAL_STATE.with_borrow_mut(|state| {
                     let mut node: XmlNodePtr = nod as XmlNodePtr;
                     let mut str: *mut c_char;
                     let mut input: XmlParserInputPtr;
@@ -286,19 +285,19 @@ macro_rules! __xml_raise_error {
                         }
                         // TODO:
                         // data = (*ctxt).user_data;
-                        let data: Box<dyn std::io::Write> = Box::new(ErrorContextWrap((*ctxt).user_data));
-                        channel.map(|c| (c, error, str, Some(data)))
+                        let context = GenericErrorContext::new(Box::new((*ctxt).user_data));
+                        channel.map(|c| (c, error, str, Some(context)))
                     } else if channel.is_none() {
                         channel = Some(state.generic_error);
                         if !ctxt.is_null() {
                             // TODO:
                             // data = ctxt as _;
-                            let data: Box<dyn std::io::Write> = Box::new(ErrorContextWrap(ctxt));
-                            channel.map(|c| (c, error, str, Some(data)))
+                            let context = GenericErrorContext::new(Box::new(ctxt));
+                            channel.map(|c| (c, error, str, Some(context)))
                         } else {
                             // TODO:
                             // state.generic_error_context.as_deref_mut()
-                            channel.map(|c| (c, error, str, None))
+                            channel.map(|c| (c, error, str, state.generic_error_context.clone()))
                         }
                     } else {
                         channel.map(|c| (c, error, str, None))
@@ -313,9 +312,9 @@ macro_rules! __xml_raise_error {
                     report_error(&error, ctxt, Some(s.as_ref()), None, None);
                 } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */
                     channel as usize == generic_error_default as usize {
-                    report_error(&error, ctxt, Some(s.as_ref()), Some(channel), data.as_deref_mut());
+                    report_error(&error, ctxt, Some(s.as_ref()), Some(channel), data);
                 } else {
-                    channel(data.as_deref_mut(), s.as_ref());
+                    channel(data, s.as_ref());
                 }
         })($schannel, $channel, $data, $ctx, $nod, $domain, $code, $level, $file, $line, $str1, $str2, $str3, $int1, $col, $msg);
     }};

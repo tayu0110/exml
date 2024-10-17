@@ -16,8 +16,8 @@ use libc::{memcpy, memset, ptrdiff_t, size_t, INT_MAX};
 use crate::{
     __xml_raise_error,
     encoding::detect_encoding,
-    error::{parser_error, parser_warning, ErrorContextWrap},
-    globals::StructuredError,
+    error::{parser_error, parser_warning},
+    globals::{GenericErrorContext, StructuredError},
     libxml::{
         entities::XmlEntityPtr,
         htmltree::html_new_doc_no_dtd,
@@ -714,7 +714,7 @@ pub unsafe extern "C" fn xml_sax2_entity_decl(
             && (*(*ctxt).sax).warning.is_some()
         {
             (*(*ctxt).sax).warning.unwrap()(
-                Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
                 format!(
                     "Entity({}) already defined in the external subset\n",
                     CStr::from_ptr(name as *const i8).to_string_lossy()
@@ -1101,7 +1101,7 @@ pub unsafe extern "C" fn xml_sax2_unparsed_entity_decl(
             && (*(*ctxt).sax).warning.is_some()
         {
             (*(*ctxt).sax).warning.unwrap()(
-                Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
                 format!(
                     "Entity({}) already defined in the internal subset\n",
                     CStr::from_ptr(name as *const i8).to_string_lossy()
@@ -1137,7 +1137,7 @@ pub unsafe extern "C" fn xml_sax2_unparsed_entity_decl(
             && (*(*ctxt).sax).warning.is_some()
         {
             (*(*ctxt).sax).warning.unwrap()(
-                Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
                 format!(
                     "Entity({}) already defined in the external subset\n",
                     CStr::from_ptr(name as *const i8).to_string_lossy()
@@ -1542,7 +1542,7 @@ unsafe extern "C" fn xml_sax2_attribute_internal(
             if uri.is_null() {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).warning.is_some() {
                     (*(*ctxt).sax).warning.unwrap()(
-                        Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                        Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
                         format!(
                             "xmlns: {} not a valid URI\n",
                             CStr::from_ptr(val as *const i8).to_string_lossy()
@@ -1555,7 +1555,7 @@ unsafe extern "C" fn xml_sax2_attribute_internal(
                     && (!(*ctxt).sax.is_null() && (*(*ctxt).sax).warning.is_some())
                 {
                     (*(*ctxt).sax).warning.unwrap()(
-                        Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                        Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
                         format!(
                             "xmlns: URI {} is not absolute\n",
                             CStr::from_ptr(val as *const i8).to_string_lossy()

@@ -4,7 +4,6 @@
 use std::{
     env::args,
     ffi::{c_char, c_int, c_uint, c_ulong, CStr},
-    io::Write,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null_mut},
     sync::atomic::{AtomicPtr, Ordering},
@@ -13,7 +12,7 @@ use std::{
 
 use exml::{
     error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
-    globals::set_structured_error,
+    globals::{set_structured_error, GenericErrorContext},
     libxml::{
         entities::XmlEntityPtr,
         globals::xml_get_warnings_default_value,
@@ -1269,7 +1268,7 @@ unsafe extern "C" fn comment_callback(_ctx: *mut c_void, _value: *const XmlChar)
  * Display and format a warning messages, gives file, line, position and
  * extra parameters.
  */
-fn warning_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn warning_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
     unsafe {
         CALLBACKS += 1;
     }
@@ -1284,7 +1283,7 @@ fn warning_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
  * Display and format a error messages, gives file, line, position and
  * extra parameters.
  */
-fn error_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
+fn error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
     unsafe {
         CALLBACKS += 1;
     }
@@ -1299,7 +1298,7 @@ fn error_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {
  * Display and format a fatalError messages, gives file, line, position and
  * extra parameters.
  */
-fn fatal_error_callback(_ctx: Option<&mut (dyn Write + 'static)>, _msg: &str) {}
+fn fatal_error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 /*
  * SAX2 specific callbacks

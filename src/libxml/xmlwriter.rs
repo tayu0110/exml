@@ -24,7 +24,7 @@ use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
     encoding::find_encoding_handler,
-    error::ErrorContextWrap,
+    globals::GenericErrorContext,
     libxml::{
         entities::xml_encode_special_chars,
         globals::{xml_free, xml_malloc},
@@ -628,7 +628,7 @@ unsafe extern "C" fn xml_text_writer_start_document_callback(ctx: *mut c_void) {
             if (*ctxt).my_doc.is_null() {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {
                     (*(*ctxt).sax).error.unwrap()(
-                        Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                        Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
                         "SAX.startDocument(): out of memory\n",
                     );
                 }
@@ -668,7 +668,7 @@ unsafe extern "C" fn xml_text_writer_start_document_callback(ctx: *mut c_void) {
         } else {
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {
                 (*(*ctxt).sax).error.unwrap()(
-                    Some(&mut ErrorContextWrap((*ctxt).user_data)),
+                    Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
                     "SAX.startDocument(): out of memory\n",
                 );
             }

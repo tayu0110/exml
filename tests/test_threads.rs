@@ -70,10 +70,10 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
 
         if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
             *xml_do_validity_checking_default_value() = 0;
-            set_generic_error(None, Some(std::io::stdout()));
+            set_generic_error(None, Some(Box::new(std::io::stdout())));
         } else {
             *xml_do_validity_checking_default_value() = 1;
-            set_generic_error(None, Some(std::io::stderr()));
+            set_generic_error(None, Some(Box::new(std::io::stderr())));
         }
         #[cfg(feature = "sax1")]
         {
