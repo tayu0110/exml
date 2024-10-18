@@ -181,7 +181,7 @@ unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromCatalog,
@@ -1234,7 +1234,7 @@ unsafe extern "C" fn xml_catalog_err(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         catal as _,
         node as _,
         XmlErrorDomain::XmlFromCatalog,

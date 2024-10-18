@@ -236,7 +236,7 @@ unsafe extern "C" fn xml_writer_err_msg(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             (*ctxt).ctxt as _,
             null_mut(),
             XmlErrorDomain::XmlFromWriter,
@@ -256,7 +256,7 @@ unsafe extern "C" fn xml_writer_err_msg(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromWriter,
@@ -450,7 +450,7 @@ unsafe extern "C" fn xml_writer_err_msg_int(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             (*ctxt).ctxt as _,
             null_mut(),
             XmlErrorDomain::XmlFromWriter,
@@ -470,7 +470,7 @@ unsafe extern "C" fn xml_writer_err_msg_int(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromWriter,
@@ -615,8 +615,12 @@ pub unsafe extern "C" fn xml_new_text_writer_push_parser(
  *
  * called at the start of document processing.
  */
-unsafe extern "C" fn xml_text_writer_start_document_callback(ctx: *mut c_void) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
+unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContext>) {
+    let ctxt = {
+        let ctx = ctx.as_ref().unwrap();
+        let lock = ctx.lock();
+        *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
+    };
     let mut doc: XmlDocPtr;
 
     if (*ctxt).html != 0 {
@@ -628,7 +632,7 @@ unsafe extern "C" fn xml_text_writer_start_document_callback(ctx: *mut c_void) {
             if (*ctxt).my_doc.is_null() {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {
                     (*(*ctxt).sax).error.unwrap()(
-                        Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
+                        (*ctxt).user_data.clone(),
                         "SAX.startDocument(): out of memory\n",
                     );
                 }
@@ -668,7 +672,7 @@ unsafe extern "C" fn xml_text_writer_start_document_callback(ctx: *mut c_void) {
         } else {
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {
                 (*(*ctxt).sax).error.unwrap()(
-                    Some(GenericErrorContext::new(Box::new((*ctxt).user_data))),
+                    (*ctxt).user_data.clone(),
                     "SAX.startDocument(): out of memory\n",
                 );
             }
@@ -715,13 +719,8 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
     sax_handler.start_element = Some(xml_sax2_start_element);
     sax_handler.end_element = Some(xml_sax2_end_element);
 
-    let ctxt: XmlParserCtxtPtr = xml_create_push_parser_ctxt(
-        addr_of_mut!(sax_handler),
-        null_mut(),
-        null_mut(),
-        0,
-        null_mut(),
-    );
+    let ctxt: XmlParserCtxtPtr =
+        xml_create_push_parser_ctxt(addr_of_mut!(sax_handler), None, null_mut(), 0, null_mut());
     if ctxt.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -806,13 +805,8 @@ pub unsafe extern "C" fn xml_new_text_writer_tree(
     sax_handler.start_element = Some(xml_sax2_start_element);
     sax_handler.end_element = Some(xml_sax2_end_element);
 
-    let ctxt: XmlParserCtxtPtr = xml_create_push_parser_ctxt(
-        addr_of_mut!(sax_handler),
-        null_mut(),
-        null_mut(),
-        0,
-        null_mut(),
-    );
+    let ctxt: XmlParserCtxtPtr =
+        xml_create_push_parser_ctxt(addr_of_mut!(sax_handler), None, null_mut(), 0, null_mut());
     if ctxt.is_null() {
         xml_writer_err_msg(
             null_mut(),

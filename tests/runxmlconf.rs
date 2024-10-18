@@ -5,14 +5,14 @@ use std::{
     env::args,
     ffi::{c_char, c_int, CStr, CString},
     fs::{metadata, File},
-    os::{fd::AsRawFd, raw::c_void},
+    os::fd::AsRawFd,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::{AtomicPtr, Ordering},
 };
 
 use exml::{
     error::{XmlError, XmlErrorDomain, XmlErrorLevel},
-    globals::{get_last_error, reset_last_error, set_structured_error},
+    globals::{get_last_error, reset_last_error, set_structured_error, GenericErrorContext},
     libxml::{
         globals::{xml_free, xml_get_warnings_default_value},
         parser::{
@@ -133,7 +133,7 @@ macro_rules! test_log {
     };
 }
 
-fn test_error_handler(_user_data: *mut c_void, error: &XmlError) {
+fn test_error_handler(_user_data: Option<GenericErrorContext>, error: &XmlError) {
     unsafe {
         if TEST_ERRORS_SIZE >= 32768 {
             return;
@@ -190,7 +190,7 @@ unsafe extern "C" fn initialize_libxml2() {
     if !(*CTXT_XPATH.load(Ordering::Relaxed)).cache.is_null() {
         xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
     }
-    set_structured_error(Some(test_error_handler), null_mut());
+    set_structured_error(Some(test_error_handler), None);
 }
 
 /************************************************************************

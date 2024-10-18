@@ -59,7 +59,7 @@ unsafe extern "C" fn xml_module_err_memory(module: XmlModulePtr, extra: *const c
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromModule,
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: c_int) -
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromModule,
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn xml_module_symbol(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromModule,
@@ -234,7 +234,7 @@ pub unsafe extern "C" fn xml_module_symbol(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromModule,
@@ -299,7 +299,7 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> c_int {
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromModule,
@@ -323,7 +323,7 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> c_int {
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromModule,
@@ -360,7 +360,7 @@ pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> c_int {
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromModule,

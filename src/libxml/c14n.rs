@@ -202,7 +202,7 @@ unsafe extern "C" fn xml_c14n_err_param(extra: *const c_char) {
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,
@@ -230,7 +230,7 @@ unsafe extern "C" fn xml_c14n_err_memory(extra: *const c_char) {
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,
@@ -258,7 +258,7 @@ unsafe extern "C" fn xml_c14n_err_internal(extra: *const c_char) {
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,
@@ -456,7 +456,7 @@ unsafe extern "C" fn xml_c14n_err(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         ctxt as _,
         node as _,
         XmlErrorDomain::XmlFromC14N,
@@ -652,7 +652,7 @@ unsafe extern "C" fn xml_c14n_err_relative_namespace(ns_uri: *const c_char) {
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,
@@ -2185,7 +2185,7 @@ unsafe extern "C" fn xml_c14n_err_invalid_node(node_type: *const c_char, extra: 
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,
@@ -2214,7 +2214,7 @@ unsafe extern "C" fn xml_c14n_err_unknown_node(node_type: c_int, extra: *const c
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,

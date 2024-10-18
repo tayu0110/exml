@@ -16,7 +16,7 @@ use libc::{fprintf, memcpy, memset, ptrdiff_t, snprintf, FILE};
 
 use crate::{
     __xml_raise_error, generic_error,
-    globals::{GenericError, StructuredError, GLOBAL_STATE},
+    globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
@@ -62,7 +62,7 @@ use crate::{
     IS_BLANK_CH,
 };
 
-use super::{globals::xml_generic_error_context, hash::CVoidWrapper};
+use super::hash::CVoidWrapper;
 
 /**
  * xmlRelaxNGValidityErrorFunc:
@@ -296,9 +296,9 @@ const XML_RELAXNG_IN_NSEXCEPT: i32 = 1 << 9;
 pub type XmlRelaxNGParserCtxtPtr = *mut XmlRelaxNGParserCtxt;
 #[repr(C)]
 pub struct XmlRelaxNGParserCtxt {
-    user_data: *mut c_void,        /* user specific data block */
-    error: Option<GenericError>,   /* the callback in case of errors */
-    warning: Option<GenericError>, /* the callback in case of warning */
+    user_data: Option<GenericErrorContext>, /* user specific data block */
+    error: Option<GenericError>,            /* the callback in case of errors */
+    warning: Option<GenericError>,          /* the callback in case of warning */
     serror: Option<StructuredError>,
     err: XmlRelaxNGValidErr,
 
@@ -445,9 +445,9 @@ pub struct XmlRelaxNGValidError {
 pub type XmlRelaxNGValidCtxtPtr = *mut XmlRelaxNGValidCtxt;
 #[repr(C)]
 pub struct XmlRelaxNGValidCtxt {
-    user_data: *mut c_void,        /* user specific data block */
-    error: Option<GenericError>,   /* the callback in case of errors */
-    warning: Option<GenericError>, /* the callback in case of warning */
+    user_data: Option<GenericErrorContext>, /* user specific data block */
+    error: Option<GenericError>,            /* the callback in case of errors */
+    warning: Option<GenericError>,          /* the callback in case of warning */
     serror: Option<StructuredError>,
     nb_errors: c_int, /* number of errors in validation */
 
@@ -945,7 +945,7 @@ unsafe extern "C" fn xml_rng_verr(
 ) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         if (*ctxt).serror.is_some() {
@@ -953,7 +953,7 @@ unsafe extern "C" fn xml_rng_verr(
         } else {
             channel = (*ctxt).error;
         }
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         (*ctxt).nb_errors += 1;
     }
     let error = XmlParserErrors::try_from(error).unwrap();
@@ -1213,7 +1213,7 @@ unsafe extern "C" fn xml_relaxng_add_valid_error(
 unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *const c_char) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         if let Some(serror) = (*ctxt).serror {
@@ -1221,7 +1221,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
         } else {
             channel = (*ctxt).error;
         }
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         (*ctxt).nb_errors += 1;
     }
     if !extra.is_null() {
@@ -1830,7 +1830,7 @@ pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
 unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *const c_char) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         if (*ctxt).serror.is_some() {
@@ -1838,7 +1838,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
         } else {
             channel = (*ctxt).error;
         }
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         (*ctxt).nb_errors += 1;
     }
     if !extra.is_null() {
@@ -1909,8 +1909,10 @@ pub unsafe extern "C" fn xml_relaxng_new_parser_ctxt(
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
     (*ret).url = xml_strdup(url as _) as _;
-    (*ret).error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
-    (*ret).user_data = xml_generic_error_context();
+    GLOBAL_STATE.with_borrow(|state| {
+        (*ret).error = Some(state.generic_error);
+        (*ret).user_data = state.generic_error_context.clone();
+    });
     ret
 }
 
@@ -1940,8 +1942,10 @@ pub unsafe extern "C" fn xml_relaxng_new_mem_parser_ctxt(
     memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
     (*ret).buffer = buffer;
     (*ret).size = size;
-    (*ret).error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
-    (*ret).user_data = xml_generic_error_context();
+    GLOBAL_STATE.with_borrow(|state| {
+        (*ret).error = Some(state.generic_error);
+        (*ret).user_data = state.generic_error_context.clone();
+    });
     ret
 }
 
@@ -1975,7 +1979,9 @@ pub unsafe extern "C" fn xml_relaxng_new_doc_parser_ctxt(
     memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
     (*ret).document = copy;
     (*ret).freedoc = 1;
-    (*ret).user_data = xml_generic_error_context();
+    GLOBAL_STATE.with_borrow(|state| {
+        (*ret).user_data = state.generic_error_context.clone();
+    });
     ret
 }
 
@@ -2240,7 +2246,7 @@ pub unsafe fn xml_relaxng_set_parser_errors(
     ctxt: XmlRelaxNGParserCtxtPtr,
     err: Option<GenericError>,
     warn: Option<GenericError>,
-    ctx: *mut c_void,
+    ctx: Option<GenericErrorContext>,
 ) {
     if ctxt.is_null() {
         return;
@@ -2248,7 +2254,7 @@ pub unsafe fn xml_relaxng_set_parser_errors(
     (*ctxt).error = err;
     (*ctxt).warning = warn;
     (*ctxt).serror = None;
-    (*ctxt).user_data = ctx as _;
+    (*ctxt).user_data = ctx;
 }
 
 /**
@@ -2266,7 +2272,7 @@ pub unsafe fn xml_relaxng_get_parser_errors(
     ctxt: XmlRelaxNGParserCtxtPtr,
     err: *mut Option<GenericError>,
     warn: *mut Option<GenericError>,
-    ctx: *mut *mut c_void,
+    ctx: *mut Option<GenericErrorContext>,
 ) -> c_int {
     if ctxt.is_null() {
         return -1;
@@ -2278,7 +2284,7 @@ pub unsafe fn xml_relaxng_get_parser_errors(
         *warn = (*ctxt).warning;
     }
     if !ctx.is_null() {
-        *ctx = (*ctxt).user_data;
+        *ctx = (*ctxt).user_data.clone();
     }
     0
 }
@@ -2294,7 +2300,7 @@ pub unsafe fn xml_relaxng_get_parser_errors(
 pub unsafe fn xml_relaxng_set_parser_structured_errors(
     ctxt: XmlRelaxNGParserCtxtPtr,
     serror: Option<StructuredError>,
-    ctx: *mut c_void,
+    ctx: Option<GenericErrorContext>,
 ) {
     if ctxt.is_null() {
         return;
@@ -2771,7 +2777,7 @@ unsafe extern "C" fn xml_rng_perr(
 ) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         if (*ctxt).serror.is_some() {
@@ -2779,7 +2785,7 @@ unsafe extern "C" fn xml_rng_perr(
         } else {
             channel = (*ctxt).error;
         }
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         (*ctxt).nb_errors += 1;
     }
     __xml_raise_error!(
@@ -9132,14 +9138,14 @@ pub unsafe fn xml_relaxng_set_valid_errors(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: Option<GenericError>,
     warn: Option<GenericError>,
-    ctx: *mut c_void,
+    ctx: Option<GenericErrorContext>,
 ) {
     if ctxt.is_null() {
         return;
     }
     (*ctxt).error = err;
     (*ctxt).warning = warn;
-    (*ctxt).user_data = ctx as _;
+    (*ctxt).user_data = ctx;
     (*ctxt).serror = None;
 }
 
@@ -9158,7 +9164,7 @@ pub unsafe extern "C" fn xml_relaxng_get_valid_errors(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: *mut Option<GenericError>,
     warn: *mut Option<GenericError>,
-    ctx: *mut *mut c_void,
+    ctx: *mut Option<GenericErrorContext>,
 ) -> c_int {
     if ctxt.is_null() {
         return -1;
@@ -9170,7 +9176,7 @@ pub unsafe extern "C" fn xml_relaxng_get_valid_errors(
         *warn = (*ctxt).warning;
     }
     if !ctx.is_null() {
-        *ctx = (*ctxt).user_data as _;
+        *ctx = (*ctxt).user_data.clone();
     }
     0
 }
@@ -9186,7 +9192,7 @@ pub unsafe extern "C" fn xml_relaxng_get_valid_errors(
 pub unsafe fn xml_relaxng_set_valid_structured_errors(
     ctxt: XmlRelaxNGValidCtxtPtr,
     serror: Option<StructuredError>,
-    ctx: *mut c_void,
+    ctx: Option<GenericErrorContext>,
 ) {
     if ctxt.is_null() {
         return;
@@ -9194,7 +9200,7 @@ pub unsafe fn xml_relaxng_set_valid_structured_errors(
     (*ctxt).serror = serror;
     (*ctxt).error = None;
     (*ctxt).warning = None;
-    (*ctxt).user_data = ctx as _;
+    (*ctxt).user_data = ctx;
 }
 
 /**
@@ -9260,8 +9266,10 @@ pub unsafe extern "C" fn xml_relaxng_new_valid_ctxt(
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGValidCtxt>());
     (*ret).schema = schema;
-    (*ret).error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
-    (*ret).user_data = xml_generic_error_context();
+    GLOBAL_STATE.with_borrow(|state| {
+        (*ret).error = Some(state.generic_error);
+        (*ret).user_data = state.generic_error_context.clone();
+    });
     (*ret).err_nr = 0;
     (*ret).err_max = 0;
     (*ret).err = null_mut();
@@ -12165,13 +12173,18 @@ unsafe extern "C" fn xml_relaxng_validate_document(
     }
     #[cfg(feature = "valid")]
     if (*ctxt).idref == 1 {
-        let mut vctxt: XmlValidCtxt = unsafe { zeroed() };
-
-        memset(addr_of_mut!(vctxt) as _, 0, size_of::<XmlValidCtxt>());
+        let mut vctxt = XmlValidCtxt {
+            user_data: (*ctxt).user_data.clone(),
+            error: (*ctxt).error,
+            warning: (*ctxt).warning,
+            valid: 1,
+            ..Default::default()
+        };
+        // memset(addr_of_mut!(vctxt) as _, 0, size_of::<XmlValidCtxt>());
         vctxt.valid = 1;
         vctxt.error = (*ctxt).error;
         vctxt.warning = (*ctxt).warning;
-        vctxt.user_data = (*ctxt).user_data;
+        vctxt.user_data = (*ctxt).user_data.clone();
 
         if xml_validate_document_final(addr_of_mut!(vctxt), doc) != 1 {
             ret = -1;

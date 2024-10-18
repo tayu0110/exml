@@ -258,7 +258,7 @@ unsafe extern "C" fn xml_xinclude_err(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         ctxt as _,
         node as _,
         XmlErrorDomain::XmlFromXInclude,
@@ -432,7 +432,7 @@ unsafe extern "C" fn xml_xinclude_err_memory(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         ctxt as _,
         node as _,
         XmlErrorDomain::XmlFromXInclude,

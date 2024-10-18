@@ -325,7 +325,7 @@ unsafe extern "C" fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: *co
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromRegexp,
@@ -589,7 +589,7 @@ unsafe extern "C" fn xml_regexp_err_compile(ctxt: XmlRegParserCtxtPtr, extra: *c
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromRegexp,

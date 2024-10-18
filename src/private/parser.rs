@@ -65,7 +65,7 @@ pub unsafe extern "C" fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: *const ch
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             ctxt as _,
             null_mut(),
             XmlErrorDomain::XmlFromParser,
@@ -85,7 +85,7 @@ pub unsafe extern "C" fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: *const ch
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             ctxt as _,
             null_mut(),
             XmlErrorDomain::XmlFromParser,
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn __xml_err_encoding(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         ctxt as _,
         null_mut(),
         XmlErrorDomain::XmlFromParser,

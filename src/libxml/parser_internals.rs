@@ -5,7 +5,6 @@
 
 use std::ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, CStr, CString};
 use std::mem::{size_of, size_of_val, zeroed};
-use std::os::raw::c_void;
 use std::ptr::{addr_of_mut, null, null_mut};
 use std::slice::from_raw_parts;
 use std::str::from_utf8_mut;
@@ -19,6 +18,7 @@ use crate::buf::XmlBufRef;
 use crate::encoding::{
     detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncodingHandler,
 };
+use crate::globals::GenericErrorContext;
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::libxml::dict::xml_dict_owns;
@@ -543,7 +543,7 @@ pub(crate) unsafe extern "C" fn xml_err_internal(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         ctxt as _,
         null_mut(),
         XmlErrorDomain::XmlFromParser,
@@ -848,9 +848,9 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
  *
  * Returns the new parser context or NULL
  */
-pub(crate) unsafe extern "C" fn xml_create_entity_parser_ctxt_internal(
+pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     sax: XmlSAXHandlerPtr,
-    user_data: *mut c_void,
+    user_data: Option<GenericErrorContext>,
     mut url: *const XmlChar,
     id: *const XmlChar,
     base: *const XmlChar,
@@ -930,7 +930,7 @@ pub unsafe extern "C" fn xml_create_entity_parser_ctxt(
     id: *const XmlChar,
     base: *const XmlChar,
 ) -> XmlParserCtxtPtr {
-    xml_create_entity_parser_ctxt_internal(null_mut(), null_mut(), url, id, base, null_mut())
+    xml_create_entity_parser_ctxt_internal(null_mut(), None, url, id, base, null_mut())
 }
 
 unsafe fn xml_detect_ebcdic(input: XmlParserInputPtr) -> Option<XmlCharEncodingHandler> {
@@ -1607,7 +1607,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             ctxt as _,
             null_mut(),
             XmlErrorDomain::XmlFromParser,
@@ -1627,7 +1627,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             ctxt as _,
             null_mut(),
             XmlErrorDomain::XmlFromParser,
@@ -2920,7 +2920,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
                 && (*(*ctxt).sax).comment.is_some()
                 && (*ctxt).disable_sax == 0
             {
-                ((*(*ctxt).sax).comment.unwrap())((*ctxt).user_data, buf);
+                ((*(*ctxt).sax).comment.unwrap())((*ctxt).user_data.clone(), buf);
             }
         }
         xml_free(buf as _);
@@ -3116,10 +3116,10 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
                             && (*ctxt).disable_sax == 0
                         {
                             if !buf.is_null() {
-                                ((*(*ctxt).sax).comment.unwrap())((*ctxt).user_data, buf);
+                                ((*(*ctxt).sax).comment.unwrap())((*ctxt).user_data.clone(), buf);
                             } else {
                                 ((*(*ctxt).sax).comment.unwrap())(
-                                    (*ctxt).user_data,
+                                    (*ctxt).user_data.clone(),
                                     c"".as_ptr() as _,
                                 );
                             }
@@ -3378,7 +3378,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                     && (*(*ctxt).sax).processing_instruction.is_some()
                 {
                     ((*(*ctxt).sax).processing_instruction.unwrap())(
-                        (*ctxt).user_data,
+                        (*ctxt).user_data.clone(),
                         target,
                         null(),
                     );
@@ -3470,7 +3470,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                  */
                 if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                     if let Some(pi) = (*(*ctxt).sax).processing_instruction {
-                        pi((*ctxt).user_data, target, buf);
+                        pi((*ctxt).user_data.clone(), target, buf);
                     }
                 }
             }
@@ -4395,7 +4395,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
      */
     if !(*ctxt).sax.is_null() {
         if let Some(f) = (*(*ctxt).sax).get_entity {
-            ent = f((*ctxt).user_data, name);
+            ent = f((*ctxt).user_data.clone(), name);
         }
         if (*ctxt).well_formed == 1
             && ent.is_null()
@@ -4403,8 +4403,15 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
         {
             ent = xml_get_predefined_entity(name);
         }
-        if (*ctxt).well_formed == 1 && ent.is_null() && (*ctxt).user_data == ctxt as _ {
-            ent = xml_sax2_get_entity(ctxt as _, name);
+        if (*ctxt).well_formed == 1
+            && ent.is_null()
+            && (*ctxt)
+                .user_data
+                .as_ref()
+                .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
+                == Some(ctxt)
+        {
+            ent = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)), name);
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -4449,7 +4456,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
             );
             if (*ctxt).in_subset == 0 && !(*ctxt).sax.is_null() {
                 if let Some(refe) = (*(*ctxt).sax).reference {
-                    refe((*ctxt).user_data, name);
+                    refe((*ctxt).user_data.clone(), name);
                 }
             }
         }
@@ -4568,10 +4575,10 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
  * In case recover is set to 1, the nodelist will not be empty even if
  * the parsed chunk is not well balanced.
  */
-unsafe extern "C" fn xml_parse_balanced_chunk_memory_internal(
+unsafe fn xml_parse_balanced_chunk_memory_internal(
     oldctxt: XmlParserCtxtPtr,
     string: *const XmlChar,
-    user_data: *mut c_void,
+    user_data: Option<GenericErrorContext>,
     lst: *mut XmlNodePtr,
 ) -> XmlParserErrors {
     let mut new_doc: XmlDocPtr = null_mut();
@@ -4605,10 +4612,10 @@ unsafe extern "C" fn xml_parse_balanced_chunk_memory_internal(
     }
     (*ctxt).nb_errors = (*oldctxt).nb_errors;
     (*ctxt).nb_warnings = (*oldctxt).nb_warnings;
-    if !user_data.is_null() {
+    if user_data.is_some() {
         (*ctxt).user_data = user_data;
     } else {
-        (*ctxt).user_data = ctxt as _;
+        (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
     }
     if !(*ctxt).dict.is_null() {
         xml_dict_free((*ctxt).dict);
@@ -4832,7 +4839,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 out[1] = 0;
                 if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                     if let Some(characters) = (*(*ctxt).sax).characters {
-                        characters((*ctxt).user_data, out.as_ptr() as _, 1);
+                        characters((*ctxt).user_data.clone(), out.as_ptr() as _, 1);
                     }
                 }
             } else {
@@ -4853,7 +4860,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 }
                 if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                     if let Some(refe) = (*(*ctxt).sax).reference {
-                        refe((*ctxt).user_data, out.as_ptr() as _);
+                        refe((*ctxt).user_data.clone(), out.as_ptr() as _);
                     }
                 }
             }
@@ -4865,7 +4872,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             out[i as usize] = 0;
             if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                 if let Some(characters) = (*(*ctxt).sax).characters {
-                    characters((*ctxt).user_data, out.as_ptr() as _, i);
+                    characters((*ctxt).user_data.clone(), out.as_ptr() as _, i);
                 }
             }
         }
@@ -4900,7 +4907,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
          */
         if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
             if let Some(characters) = (*(*ctxt).sax).characters {
-                characters((*ctxt).user_data, val, xml_strlen(val));
+                characters((*ctxt).user_data.clone(), val, xml_strlen(val));
             }
         }
         return;
@@ -4931,10 +4938,15 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
          * way to make sure both SAX and DOM entity support
          * behaves okay.
          */
-        let user_data: *mut c_void = if (*ctxt).user_data == ctxt as _ {
-            null_mut()
+        let user_data = if (*ctxt)
+            .user_data
+            .as_ref()
+            .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
+            == Some(ctxt)
+        {
+            None
         } else {
-            (*ctxt).user_data
+            (*ctxt).user_data.clone()
         };
 
         /* Avoid overflow as much as possible */
@@ -5083,10 +5095,15 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
              * way to make sure both SAX and DOM entity support
              * behaves okay.
              */
-            let user_data = if (*ctxt).user_data == ctxt as _ {
-                null_mut()
+            let user_data = if (*ctxt)
+                .user_data
+                .as_ref()
+                .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
+                == Some(ctxt)
+            {
+                None
             } else {
-                (*ctxt).user_data
+                (*ctxt).user_data.clone()
             };
 
             if matches!((*ent).etype, Some(XmlEntityType::XmlInternalGeneralEntity)) {
@@ -5142,7 +5159,10 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                  * Entity reference callback comes second, it's somewhat
                  * superfluous but a compatibility to historical behaviour
                  */
-                refe((*ctxt).user_data, (*ent).name.load(Ordering::Relaxed) as _);
+                refe(
+                    (*ctxt).user_data.clone(),
+                    (*ent).name.load(Ordering::Relaxed) as _,
+                );
             }
         }
         return;
@@ -5164,7 +5184,10 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             /*
              * Create a node.
              */
-            refe((*ctxt).user_data, (*ent).name.load(Ordering::Relaxed) as _);
+            refe(
+                (*ctxt).user_data.clone(),
+                (*ent).name.load(Ordering::Relaxed) as _,
+            );
             return;
         }
     }
@@ -5387,7 +5410,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
      */
     if !(*ctxt).sax.is_null() {
         if let Some(param) = (*(*ctxt).sax).get_parameter_entity {
-            entity = param((*ctxt).user_data, name);
+            entity = param((*ctxt).user_data.clone(), name);
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -5599,7 +5622,7 @@ pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) 
      */
     if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
         if let Some(internal_subset) = (*(*ctxt).sax).internal_subset {
-            internal_subset((*ctxt).user_data, name, external_id, uri);
+            internal_subset((*ctxt).user_data.clone(), name, external_id, uri);
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -5904,9 +5927,9 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
     if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
         if let Some(elem) = (*(*ctxt).sax).start_element {
             if nbatts > 0 {
-                elem((*ctxt).user_data, name, atts);
+                elem((*ctxt).user_data.clone(), name, atts);
             } else {
-                elem((*ctxt).user_data, name, null_mut());
+                elem((*ctxt).user_data.clone(), name, null_mut());
             }
         }
     }
@@ -6043,7 +6066,12 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
                 && (*(*ctxt).sax).end_element_ns.is_some()
                 && (*ctxt).disable_sax == 0
             {
-                ((*(*ctxt).sax).end_element_ns.unwrap())((*ctxt).user_data, name, prefix, uri);
+                ((*(*ctxt).sax).end_element_ns.unwrap())(
+                    (*ctxt).user_data.clone(),
+                    name,
+                    prefix,
+                    uri,
+                );
             }
         } else {
             #[cfg(feature = "sax1")]
@@ -6051,7 +6079,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
                 && (*(*ctxt).sax).end_element.is_some()
                 && (*ctxt).disable_sax == 0
             {
-                ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data, name);
+                ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
             }
         }
         name_pop(ctxt);
@@ -6961,7 +6989,7 @@ unsafe extern "C" fn xml_err_encoding_int(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         ctxt as _,
         null_mut(),
         XmlErrorDomain::XmlFromParser,

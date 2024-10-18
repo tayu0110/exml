@@ -3,14 +3,13 @@
 
 use std::{
     ffi::{c_char, c_int, c_uchar},
-    os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
 };
 
 use exml::{
     encoding::XmlCharEncoding,
     error::XmlError,
-    globals::set_structured_error,
+    globals::{set_structured_error, GenericErrorContext},
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::{
@@ -39,9 +38,9 @@ use libc::{fflush, fprintf, memset, printf, strlen, FILE};
 
 static mut LAST_ERROR: c_int = 0;
 
-fn error_handler(unused: *mut c_void, err: &XmlError) {
+fn error_handler(unused: Option<GenericErrorContext>, err: &XmlError) {
     unsafe {
-        if unused.is_null() && LAST_ERROR == 0 {
+        if unused.is_none() && LAST_ERROR == 0 {
             LAST_ERROR = err.code() as i32;
         }
     }
@@ -876,7 +875,7 @@ fn main() {
      */
 
     unsafe {
-        set_structured_error(Some(error_handler), null_mut());
+        set_structured_error(Some(error_handler), None);
 
         /*
          * Run the tests

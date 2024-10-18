@@ -18,7 +18,7 @@ use crate::{
     buf::libxml_api::XmlBufPtr,
     error::XmlErrorDomain,
     generic_error,
-    globals::{GenericError, StructuredError},
+    globals::{GenericError, GenericErrorContext, StructuredError},
     libxml::{tree::XmlElementType, xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
     private::error::__xml_simple_error,
 };
@@ -206,10 +206,10 @@ pub struct XmlSchematronValidCtxt {
     ioctx: *mut c_void,
 
     /* error reporting data */
-    user_data: *mut c_void,      /* user specific data block */
-    error: Option<GenericError>, /* the callback in case of errors */
+    user_data: Option<GenericErrorContext>, /* user specific data block */
+    error: Option<GenericError>,            /* the callback in case of errors */
     warning: Option<XmlSchematronValidityWarningFunc>, /* callback in case of warning */
-    serror: Option<StructuredError>, /* the structured function */
+    serror: Option<StructuredError>,        /* the structured function */
 }
 
 /**
@@ -242,10 +242,10 @@ pub struct XmlSchematronParserCtxt {
     includes: *mut XmlNodePtr, /* the array of includes */
 
     /* error reporting data */
-    user_data: *mut c_void,      /* user specific data block */
-    error: Option<GenericError>, /* the callback in case of errors */
+    user_data: Option<GenericErrorContext>, /* user specific data block */
+    error: Option<GenericError>,            /* the callback in case of errors */
     warning: Option<XmlSchematronValidityWarningFunc>, /* callback in case of warning */
-    serror: Option<StructuredError>, /* the structured function */
+    serror: Option<StructuredError>,        /* the structured function */
 }
 
 const XML_STRON_CTXT_PARSER: i32 = 1;
@@ -513,12 +513,12 @@ unsafe extern "C" fn xml_schematron_perr(
 ) {
     let mut channel: Option<GenericError> = None;
     let mut schannel: Option<StructuredError> = None;
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
         channel = (*ctxt).error;
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         schannel = (*ctxt).serror;
     }
     __xml_raise_error!(
@@ -1527,7 +1527,7 @@ pub unsafe extern "C" fn xml_schematron_free(schema: XmlSchematronPtr) {
 pub unsafe fn xml_schematron_set_valid_structured_errors(
     ctxt: XmlSchematronValidCtxtPtr,
     serror: Option<StructuredError>,
-    ctx: *mut c_void,
+    ctx: Option<GenericErrorContext>,
 ) {
     if ctxt.is_null() {
         return;
@@ -1932,7 +1932,7 @@ unsafe extern "C" fn xml_schematron_report_success(
         if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutError as i32 != 0 {
             let mut schannel: Option<StructuredError> = None;
             let mut channel: Option<GenericError> = None;
-            let mut data: *mut c_void = null_mut();
+            let mut data = None;
 
             if !ctxt.is_null() {
                 if (*ctxt).serror.is_some() {
@@ -1940,7 +1940,7 @@ unsafe extern "C" fn xml_schematron_report_success(
                 } else {
                     channel = (*ctxt).error;
                 }
-                data = (*ctxt).user_data;
+                data = (*ctxt).user_data.clone();
             }
 
             __xml_raise_error!(

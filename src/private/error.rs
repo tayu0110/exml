@@ -51,7 +51,6 @@ macro_rules! __xml_raise_error {
                 parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel,
             },
             libxml::{
-                globals::xml_get_warnings_default_value,
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
                 tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
                 xmlerror::{XmlParserErrors, XML_MAX_ERRORS},
@@ -59,7 +58,7 @@ macro_rules! __xml_raise_error {
         };
         (|mut schannel: Option<StructuredError>,
             mut channel: Option<GenericError>,
-            mut data: *mut c_void,
+            mut data: Option<GenericErrorContext>,
             ctx: *mut c_void,
             nod: *mut c_void,
             domain: XmlErrorDomain,
@@ -78,14 +77,13 @@ macro_rules! __xml_raise_error {
                     let mut node: XmlNodePtr = nod as XmlNodePtr;
                     let mut str: *mut c_char;
                     let mut input: XmlParserInputPtr;
-                    // let mut to: XmlErrorPtr = xml_last_error();
                     let mut to = &mut state.last_error;
                     let mut baseptr: XmlNodePtr = null_mut();
 
                     if code == XmlParserErrors::XmlErrOK {
                         return None;
                     }
-                    if *xml_get_warnings_default_value() == 0 && matches!(level, XmlErrorLevel::XmlErrWarning) {
+                    if state.get_warnings_default_value == 0 && matches!(level, XmlErrorLevel::XmlErrWarning) {
                         return None;
                     }
                     if domain == XmlErrorDomain::XmlFromParser
@@ -114,7 +112,7 @@ macro_rules! __xml_raise_error {
                                 && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32
                                 && (*(*ctxt).sax).serror.is_some() {
                                 schannel = (*(*ctxt).sax).serror;
-                                data = (*ctxt).user_data;
+                                data = (*ctxt).user_data.clone();
                             }
                         }
                     }
@@ -127,7 +125,7 @@ macro_rules! __xml_raise_error {
                          * if user has defined handler, change data ptr to user's choice
                          */
                         if schannel.is_some() {
-                            data = state.structured_error_context;
+                            data = state.structured_error_context.clone();
                         }
                     }
                     /*
@@ -285,8 +283,7 @@ macro_rules! __xml_raise_error {
                         }
                         // TODO:
                         // data = (*ctxt).user_data;
-                        let context = GenericErrorContext::new(Box::new((*ctxt).user_data));
-                        channel.map(|c| (c, error, str, Some(context)))
+                        channel.map(|c| (c, error, str, (*ctxt).user_data.clone()))
                     } else if channel.is_none() {
                         channel = Some(state.generic_error);
                         if !ctxt.is_null() {
@@ -342,7 +339,7 @@ pub(crate) unsafe fn __xml_simple_error(
             __xml_raise_error!(
                 None,
                 None,
-                null_mut(),
+                None,
                 null_mut(),
                 node as _,
                 domain,
@@ -362,7 +359,7 @@ pub(crate) unsafe fn __xml_simple_error(
             __xml_raise_error!(
                 None,
                 None,
-                null_mut(),
+                None,
                 null_mut(),
                 node as _,
                 domain,
@@ -382,7 +379,7 @@ pub(crate) unsafe fn __xml_simple_error(
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             node as _,
             domain,

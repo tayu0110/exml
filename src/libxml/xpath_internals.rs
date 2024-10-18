@@ -1082,7 +1082,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromXPath,
@@ -1112,7 +1112,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromXPath,
@@ -1151,7 +1151,10 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
     (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
     (*(*ctxt).context).last_error.node = NonNull::new((*(*ctxt).context).debug_node as _);
     if let Some(error) = (*(*ctxt).context).error {
-        error((*(*ctxt).context).user_data, &(*(*ctxt).context).last_error);
+        error(
+            (*(*ctxt).context).user_data.clone(),
+            &(*(*ctxt).context).last_error,
+        );
     } else {
         let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32;
@@ -1159,7 +1162,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             (*(*ctxt).context).debug_node as _,
             XmlErrorDomain::XmlFromXPath,
@@ -2669,13 +2672,13 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
         (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
         (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
         if let Some(error) = (*ctxt).error {
-            error((*ctxt).user_data, &(*ctxt).last_error);
+            error((*ctxt).user_data.clone(), &(*ctxt).last_error);
         }
     } else if !extra.is_null() {
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromXPath,
@@ -2695,7 +2698,7 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
         __xml_raise_error!(
             None,
             None,
-            null_mut(),
+            None,
             null_mut(),
             null_mut(),
             XmlErrorDomain::XmlFromXPath,

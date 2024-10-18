@@ -278,7 +278,7 @@ unsafe extern "C" fn xml_entities_warn(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromTree,

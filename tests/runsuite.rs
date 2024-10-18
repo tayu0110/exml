@@ -344,18 +344,17 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         eprintln!("out of memory !");
         fatal_error();
     }
-    // xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    // xml_node_dump(buf, (*test).doc, test, 0, 0);
     xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
-    let pctxt: XmlRelaxNGParserCtxtPtr =
-        // xml_relaxng_new_mem_parser_ctxt((*buf).content as *const c_char, (*buf).using as _);
-        xml_relaxng_new_mem_parser_ctxt(xml_buf_content(buf) as *const c_char, xml_buf_use(buf) as _);
+    let pctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_mem_parser_ctxt(
+        xml_buf_content(buf) as *const c_char,
+        xml_buf_use(buf) as _,
+    );
     xml_relaxng_set_parser_errors(
         pctxt,
         Some(test_error_handler),
         Some(test_error_handler),
-        pctxt as _,
+        Some(GenericErrorContext::new(pctxt)) as _,
     );
     let rng: XmlRelaxNGPtr = xml_relaxng_parse(pctxt);
     xml_relaxng_free_parser_ctxt(pctxt);
@@ -521,7 +520,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         pctxt,
         Some(test_error_handler),
         Some(test_error_handler),
-        pctxt as _,
+        Some(GenericErrorContext::new(pctxt)) as _,
     );
     let rng: XmlRelaxNGPtr = xml_relaxng_parse(pctxt);
     xml_relaxng_free_parser_ctxt(pctxt);
@@ -611,7 +610,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                     ctxt,
                     Some(test_error_handler),
                     Some(test_error_handler),
-                    ctxt as _,
+                    Some(GenericErrorContext::new(ctxt)),
                 );
                 ret = xml_relaxng_validate_doc(ctxt, doc);
                 xml_relaxng_free_valid_ctxt(ctxt);
@@ -703,7 +702,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                     ctxt,
                     Some(test_error_handler),
                     Some(test_error_handler),
-                    ctxt as _,
+                    Some(GenericErrorContext::new(ctxt)) as _,
                 );
                 ret = xml_relaxng_validate_doc(ctxt, doc);
                 xml_relaxng_free_valid_ctxt(ctxt);
@@ -1024,7 +1023,7 @@ unsafe extern "C" fn xstc_test_instance(
                         ctxt,
                         Some(test_error_handler),
                         Some(test_error_handler),
-                        ctxt as _,
+                        Some(GenericErrorContext::new(ctxt)) as _,
                     );
                     ret = xml_schema_validate_doc(ctxt, doc);
 
@@ -1175,7 +1174,7 @@ unsafe extern "C" fn xstc_test_group(
                         ctxt,
                         Some(test_error_handler),
                         Some(test_error_handler),
-                        ctxt as _,
+                        Some(GenericErrorContext::new(ctxt)),
                     );
                     schemas = xml_schema_parse(ctxt);
                     xml_schema_free_parser_ctxt(ctxt);
@@ -1223,7 +1222,7 @@ unsafe extern "C" fn xstc_test_group(
                         ctxt,
                         Some(test_error_handler),
                         Some(test_error_handler),
-                        ctxt as _,
+                        Some(GenericErrorContext::new(ctxt)),
                     );
                     schemas = xml_schema_parse(ctxt);
                     xml_schema_free_parser_ctxt(ctxt);

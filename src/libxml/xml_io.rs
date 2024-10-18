@@ -2833,7 +2833,7 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
     let mut level: XmlErrorLevel = XmlErrorLevel::XmlErrError;
 
     if !ctxt.is_null()
@@ -2853,7 +2853,7 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
         if (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
             schannel = (*(*ctxt).sax).serror;
         }
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
     }
     __xml_raise_error!(
         schannel,

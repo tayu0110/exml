@@ -268,7 +268,7 @@ fn channel(_ctx: *mut c_void, msg: &str) {
 //     xml_error_with_format!(chanl, data, c"%s\n".as_ptr(), content.as_ptr());
 // }
 
-fn test_structured_error_handler(_ctx: *mut c_void, err: &XmlError) {
+fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
     let data: *mut c_void = null_mut();
     let mut name: *const XmlChar = null_mut();
     let mut input: XmlParserInputPtr = null_mut();
@@ -424,7 +424,7 @@ unsafe extern "C" fn initialize_libxml2() {
     );
     xml_pedantic_parser_default(0);
     xml_set_external_entity_loader(test_external_entity_loader);
-    set_structured_error(Some(test_structured_error_handler), null_mut());
+    set_structured_error(Some(test_structured_error_handler), None);
     #[cfg(feature = "schema")]
     {
         xml_schema_init_types();
@@ -767,7 +767,7 @@ static mut QUIET: c_int = 0;
  *
  * Returns 1 if true
  */
-unsafe extern "C" fn is_standalone_debug(_ctx: *mut c_void) -> c_int {
+unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
     CALLBACKS += 1;
     if QUIET != 0 {
         return 0;
@@ -784,7 +784,7 @@ unsafe extern "C" fn is_standalone_debug(_ctx: *mut c_void) -> c_int {
  *
  * Returns 1 if true
  */
-unsafe extern "C" fn has_internal_subset_debug(_ctx: *mut c_void) -> c_int {
+unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
     CALLBACKS += 1;
     if QUIET != 0 {
         return 0;
@@ -801,7 +801,7 @@ unsafe extern "C" fn has_internal_subset_debug(_ctx: *mut c_void) -> c_int {
  *
  * Returns 1 if true
  */
-unsafe extern "C" fn has_external_subset_debug(_ctx: *mut c_void) -> c_int {
+unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
     CALLBACKS += 1;
     if QUIET != 0 {
         return 0;
@@ -816,8 +816,8 @@ unsafe extern "C" fn has_external_subset_debug(_ctx: *mut c_void) -> c_int {
  *
  * Does this document has an internal subset
  */
-unsafe extern "C" fn internal_subset_debug(
-    _ctx: *mut c_void,
+unsafe fn internal_subset_debug(
+    _ctx: Option<GenericErrorContext>,
     mut name: *const XmlChar,
     external_id: *const XmlChar,
     system_id: *const XmlChar,
@@ -851,8 +851,8 @@ unsafe extern "C" fn internal_subset_debug(
  *
  * Does this document has an external subset
  */
-unsafe extern "C" fn external_subset_debug(
-    _ctx: *mut c_void,
+unsafe fn external_subset_debug(
+    _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
     external_id: *const XmlChar,
     system_id: *const XmlChar,
@@ -891,8 +891,8 @@ unsafe extern "C" fn external_subset_debug(
  *
  * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
  */
-unsafe extern "C" fn resolve_entity_debug(
-    _ctx: *mut c_void,
+unsafe fn resolve_entity_debug(
+    _ctx: Option<GenericErrorContext>,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
 ) -> XmlParserInputPtr {
@@ -936,7 +936,10 @@ unsafe extern "C" fn resolve_entity_debug(
  *
  * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
  */
-unsafe extern "C" fn get_entity_debug(_ctx: *mut c_void, name: *const XmlChar) -> XmlEntityPtr {
+unsafe fn get_entity_debug(
+    _ctx: Option<GenericErrorContext>,
+    name: *const XmlChar,
+) -> XmlEntityPtr {
     CALLBACKS += 1;
     if QUIET != 0 {
         return null_mut();
@@ -957,8 +960,8 @@ unsafe extern "C" fn get_entity_debug(_ctx: *mut c_void, name: *const XmlChar) -
  *
  * Returns the xmlParserInputPtr
  */
-unsafe extern "C" fn get_parameter_entity_debug(
-    _ctx: *mut c_void,
+unsafe fn get_parameter_entity_debug(
+    _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
 ) -> XmlEntityPtr {
     CALLBACKS += 1;
@@ -983,8 +986,8 @@ unsafe extern "C" fn get_parameter_entity_debug(
  *
  * An entity definition has been parsed
  */
-unsafe extern "C" fn entity_decl_debug(
-    _ctx: *mut c_void,
+unsafe fn entity_decl_debug(
+    _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
     typ: c_int,
     mut public_id: *const XmlChar,
@@ -1024,8 +1027,8 @@ unsafe extern "C" fn entity_decl_debug(
  *
  * An attribute definition has been parsed
  */
-unsafe extern "C" fn attribute_decl_debug(
-    _ctx: *mut c_void,
+unsafe fn attribute_decl_debug(
+    _ctx: Option<GenericErrorContext>,
     elem: *const XmlChar,
     name: *const XmlChar,
     typ: c_int,
@@ -1067,8 +1070,8 @@ unsafe extern "C" fn attribute_decl_debug(
  *
  * An element definition has been parsed
  */
-unsafe extern "C" fn element_decl_debug(
-    _ctx: *mut c_void,
+unsafe fn element_decl_debug(
+    _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
     typ: c_int,
     _content: XmlElementContentPtr,
@@ -1093,8 +1096,8 @@ unsafe extern "C" fn element_decl_debug(
  *
  * What to do when a notation declaration has been parsed.
  */
-unsafe extern "C" fn notation_decl_debug(
-    _ctx: *mut c_void,
+unsafe fn notation_decl_debug(
+    _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
@@ -1121,8 +1124,8 @@ unsafe extern "C" fn notation_decl_debug(
  *
  * What to do when an unparsed entity declaration is parsed
  */
-unsafe extern "C" fn unparsed_entity_decl_debug(
-    _ctx: *mut c_void,
+unsafe fn unparsed_entity_decl_debug(
+    _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
     mut public_id: *const XmlChar,
     mut system_id: *const XmlChar,
@@ -1160,7 +1163,7 @@ unsafe extern "C" fn unparsed_entity_decl_debug(
  * Receive the document locator at startup, actually xmlDefaultSAXLocator
  * Everything is available on the context, so this is useless in our case.
  */
-unsafe extern "C" fn set_document_locator_debug(_ctx: *mut c_void, _loc: XmlSaxlocatorPtr) {
+unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSaxlocatorPtr) {
     CALLBACKS += 1;
     if QUIET != 0 {
         return;
@@ -1174,7 +1177,7 @@ unsafe extern "C" fn set_document_locator_debug(_ctx: *mut c_void, _loc: XmlSaxl
  *
  * called when the document start being processed.
  */
-unsafe extern "C" fn start_document_debug(_ctx: *mut c_void) {
+unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
     CALLBACKS += 1;
     if QUIET != 0 {
         return;
@@ -1188,7 +1191,7 @@ unsafe extern "C" fn start_document_debug(_ctx: *mut c_void) {
  *
  * called when the document end has been detected.
  */
-unsafe extern "C" fn end_document_debug(_ctx: *mut c_void) {
+unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
     CALLBACKS += 1;
     if QUIET != 0 {
         return;
@@ -1203,8 +1206,8 @@ unsafe extern "C" fn end_document_debug(_ctx: *mut c_void) {
  *
  * called when an opening tag has been processed.
  */
-unsafe extern "C" fn start_element_debug(
-    _ctx: *mut c_void,
+unsafe fn start_element_debug(
+    _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
     atts: *mut *const XmlChar,
 ) {
@@ -1240,7 +1243,7 @@ unsafe extern "C" fn start_element_debug(
  *
  * called when the end of an element has been detected.
  */
-unsafe extern "C" fn end_element_debug(_ctx: *mut c_void, name: *const XmlChar) {
+unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
     CALLBACKS += 1;
     if QUIET != 0 {
         return;
@@ -1260,7 +1263,7 @@ unsafe extern "C" fn end_element_debug(_ctx: *mut c_void, name: *const XmlChar) 
  * receiving some chars from the parser.
  * Question: how much at a time ???
  */
-unsafe extern "C" fn characters_debug(_ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
     let mut output: [u8; 40] = [0; 40];
 
     CALLBACKS += 1;
@@ -1290,7 +1293,7 @@ unsafe extern "C" fn characters_debug(_ctx: *mut c_void, ch: *const XmlChar, len
  *
  * called when an entity reference is detected.
  */
-unsafe extern "C" fn reference_debug(_ctx: *mut c_void, name: *const XmlChar) {
+unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
     CALLBACKS += 1;
     if QUIET != 0 {
         return;
@@ -1311,7 +1314,11 @@ unsafe extern "C" fn reference_debug(_ctx: *mut c_void, name: *const XmlChar) {
  * receiving some ignorable whitespaces from the parser.
  * Question: how much at a time ???
  */
-unsafe extern "C" fn ignorable_whitespace_debug(_ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+unsafe fn ignorable_whitespace_debug(
+    _ctx: Option<GenericErrorContext>,
+    ch: *const XmlChar,
+    len: c_int,
+) {
     let mut output: [u8; 40] = [0; 40];
 
     CALLBACKS += 1;
@@ -1342,8 +1349,8 @@ unsafe extern "C" fn ignorable_whitespace_debug(_ctx: *mut c_void, ch: *const Xm
  *
  * A processing instruction has been parsed.
  */
-unsafe extern "C" fn processing_instruction_debug(
-    _ctx: *mut c_void,
+unsafe fn processing_instruction_debug(
+    _ctx: Option<GenericErrorContext>,
     target: *const XmlChar,
     data: *const XmlChar,
 ) {
@@ -1373,7 +1380,7 @@ unsafe extern "C" fn processing_instruction_debug(
  *
  * called when a pcdata block has been parsed
  */
-unsafe extern "C" fn cdata_block_debug(_ctx: *mut c_void, value: *const XmlChar, len: c_int) {
+unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar, len: c_int) {
     CALLBACKS += 1;
     if QUIET != 0 {
         return;
@@ -1398,7 +1405,7 @@ unsafe extern "C" fn cdata_block_debug(_ctx: *mut c_void, value: *const XmlChar,
  *
  * A comment has been parsed.
  */
-unsafe extern "C" fn comment_debug(_ctx: *mut c_void, value: *const XmlChar) {
+unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar) {
     CALLBACKS += 1;
     if QUIET != 0 {
         return;
@@ -1513,8 +1520,9 @@ static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
  *
  * called when an opening tag has been processed.
  */
-unsafe extern "C" fn start_element_ns_debug(
-    _ctx: *mut c_void,
+#[allow(clippy::too_many_arguments)]
+unsafe fn start_element_ns_debug(
+    _ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
     prefix: *const XmlChar,
     uri: *const XmlChar,
@@ -1608,8 +1616,8 @@ unsafe extern "C" fn start_element_ns_debug(
  *
  * called when the end of an element has been detected.
  */
-unsafe extern "C" fn end_element_ns_debug(
-    _ctx: *mut c_void,
+unsafe fn end_element_ns_debug(
+    _ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
     prefix: *const XmlChar,
     uri: *const XmlChar,
@@ -1683,8 +1691,8 @@ static mut DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
  * called when an opening tag has been processed.
  */
 #[cfg(feature = "html")]
-unsafe extern "C" fn htmlstart_element_debug(
-    _ctx: *mut c_void,
+unsafe fn htmlstart_element_debug(
+    _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
     atts: *mut *const XmlChar,
 ) {
@@ -1741,7 +1749,7 @@ unsafe extern "C" fn htmlstart_element_debug(
  * Question: how much at a time ???
  */
 #[cfg(feature = "html")]
-unsafe extern "C" fn htmlcharacters_debug(_ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
@@ -1776,7 +1784,7 @@ unsafe extern "C" fn htmlcharacters_debug(_ctx: *mut c_void, ch: *const XmlChar,
  * Question: how much at a time ???
  */
 #[cfg(feature = "html")]
-unsafe extern "C" fn htmlcdata_debug(_ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
@@ -1884,13 +1892,13 @@ unsafe extern "C" fn sax_parse_test(
     *SAX_DEBUG.lock().unwrap() = Some(out);
 
     /* for SAX we really want the callbacks though the context handlers */
-    set_structured_error(None, null_mut());
+    set_structured_error(None, None);
     set_generic_error(Some(test_error_handler), None);
 
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         let ctxt: HtmlParserCtxtPtr =
-            html_new_sax_parser_ctxt(addr_of_mut!(EMPTY_SAXHANDLER_STRUCT), null_mut());
+            html_new_sax_parser_ctxt(addr_of_mut!(EMPTY_SAXHANDLER_STRUCT), None);
         html_ctxt_read_file(ctxt, filename, null_mut(), options);
         html_free_parser_ctxt(ctxt);
         ret = 0;
@@ -1943,7 +1951,7 @@ unsafe extern "C" fn sax_parse_test(
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
             let ctxt: HtmlParserCtxtPtr =
-                html_new_sax_parser_ctxt(addr_of_mut!(DEBUG_HTMLSAXHANDLER_STRUCT), null_mut());
+                html_new_sax_parser_ctxt(addr_of_mut!(DEBUG_HTMLSAXHANDLER_STRUCT), None);
             html_ctxt_read_file(ctxt, filename, null_mut(), options);
             html_free_parser_ctxt(ctxt);
             ret = 0;
@@ -2021,7 +2029,7 @@ unsafe extern "C" fn sax_parse_test(
 
     /* switch back to structured error handling */
     set_generic_error(None, None);
-    set_structured_error(Some(test_structured_error_handler), null_mut());
+    set_structured_error(Some(test_structured_error_handler), None);
 
     ret
 }
@@ -2154,20 +2162,14 @@ unsafe extern "C" fn push_parse_test(
     let ctxt = if options & XML_PARSE_HTML != 0 {
         html_create_push_parser_ctxt(
             null_mut(),
-            null_mut(),
+            None,
             base.add(cur as _),
             chunk_size,
             filename,
             XmlCharEncoding::None,
         )
     } else {
-        xml_create_push_parser_ctxt(
-            null_mut(),
-            null_mut(),
-            base.add(cur as _),
-            chunk_size,
-            filename,
-        )
+        xml_create_push_parser_ctxt(null_mut(), None, base.add(cur as _), chunk_size, filename)
     };
     #[cfg(not(feature = "html"))]
     let ctxt = xml_create_push_parser_ctxt(
@@ -2288,8 +2290,8 @@ static mut PUSH_BOUNDARY_CHARS_COUNT: c_int = 0;
 static mut PUSH_BOUNDARY_CDATA_COUNT: c_int = 0;
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn internal_subset_bnd(
-    ctx: *mut c_void,
+unsafe fn internal_subset_bnd(
+    ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
     external_id: *const XmlChar,
     system_id: *const XmlChar,
@@ -2301,7 +2303,7 @@ unsafe extern "C" fn internal_subset_bnd(
 }
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn reference_bnd(ctx: *mut c_void, name: *const XmlChar) {
+unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
     use exml::libxml::sax2::xml_sax2_reference;
 
     PUSH_BOUNDARY_REF_COUNT += 1;
@@ -2309,7 +2311,7 @@ unsafe extern "C" fn reference_bnd(ctx: *mut c_void, name: *const XmlChar) {
 }
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn characters_bnd(ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
     use exml::libxml::sax2::xml_sax2_characters;
 
     PUSH_BOUNDARY_COUNT += 1;
@@ -2318,7 +2320,7 @@ unsafe extern "C" fn characters_bnd(ctx: *mut c_void, ch: *const XmlChar, len: c
 }
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn cdata_block_bnd(ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
     use exml::libxml::sax2::xml_sax2_cdata_block;
 
     PUSH_BOUNDARY_COUNT += 1;
@@ -2327,8 +2329,8 @@ unsafe extern "C" fn cdata_block_bnd(ctx: *mut c_void, ch: *const XmlChar, len: 
 }
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn processing_instruction_bnd(
-    ctx: *mut c_void,
+unsafe fn processing_instruction_bnd(
+    ctx: Option<GenericErrorContext>,
     target: *const XmlChar,
     data: *const XmlChar,
 ) {
@@ -2339,10 +2341,14 @@ unsafe extern "C" fn processing_instruction_bnd(
 }
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn comment_bnd(ctx: *mut c_void, value: *const XmlChar) {
+unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
     use exml::libxml::sax2::xml_sax2_comment;
 
-    let ctxt: XmlParserCtxtPtr = ctx as _;
+    let ctxt = {
+        let ctx = ctx.as_ref().unwrap();
+        let lock = ctx.lock();
+        *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
+    };
     if (*ctxt).in_subset == 0 {
         PUSH_BOUNDARY_COUNT += 1;
     }
@@ -2350,8 +2356,8 @@ unsafe extern "C" fn comment_bnd(ctx: *mut c_void, value: *const XmlChar) {
 }
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn start_element_bnd(
-    ctx: *mut c_void,
+unsafe fn start_element_bnd(
+    ctx: Option<GenericErrorContext>,
     xname: *const XmlChar,
     atts: *mut *const XmlChar,
 ) {
@@ -2371,16 +2377,17 @@ unsafe extern "C" fn start_element_bnd(
 }
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn end_element_bnd(ctx: *mut c_void, name: *const XmlChar) {
+unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
     /*pushBoundaryCount++;*/
 
     use exml::libxml::sax2::xml_sax2_end_element;
     xml_sax2_end_element(ctx, name);
 }
 
+#[allow(clippy::too_many_arguments)]
 #[cfg(feature = "push")]
-unsafe extern "C" fn start_element_ns_bnd(
-    ctx: *mut c_void,
+unsafe fn start_element_ns_bnd(
+    ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
     prefix: *const XmlChar,
     uri: *const XmlChar,
@@ -2407,8 +2414,8 @@ unsafe extern "C" fn start_element_ns_bnd(
 }
 
 #[cfg(feature = "push")]
-unsafe extern "C" fn end_element_ns_bnd(
-    ctx: *mut c_void,
+unsafe fn end_element_ns_bnd(
+    ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
     prefix: *const XmlChar,
     uri: *const XmlChar,
@@ -2508,14 +2515,14 @@ unsafe extern "C" fn push_boundary_test(
     let ctxt = if options & XML_PARSE_HTML != 0 {
         html_create_push_parser_ctxt(
             addr_of_mut!(bnd_sax) as _,
-            null_mut(),
+            None,
             base,
             1,
             filename,
             XmlCharEncoding::None,
         )
     } else {
-        xml_create_push_parser_ctxt(addr_of_mut!(bnd_sax) as _, null_mut(), base, 1, filename)
+        xml_create_push_parser_ctxt(addr_of_mut!(bnd_sax) as _, None, base, 1, filename)
     };
     #[cfg(not(feature = "html"))]
     let ctxt =
@@ -4236,7 +4243,7 @@ unsafe extern "C" fn schemas_one_test(
         ctxt,
         Some(test_error_handler),
         Some(test_error_handler),
-        ctxt as _,
+        Some(GenericErrorContext::new(ctxt)),
     );
     let valid_result: c_int = xml_schema_validate_doc(ctxt, doc);
     match valid_result.cmp(&0) {
@@ -4327,7 +4334,7 @@ unsafe extern "C" fn schemas_test(
         ctxt,
         Some(test_error_handler),
         Some(test_error_handler),
-        ctxt as _,
+        Some(GenericErrorContext::new(ctxt)),
     );
     let schemas: XmlSchemaPtr = xml_schema_parse(ctxt);
     xml_schema_free_parser_ctxt(ctxt);
@@ -4488,40 +4495,22 @@ unsafe extern "C" fn rng_one_test(
         ctxt,
         Some(test_error_handler),
         Some(test_error_handler),
-        ctxt as _,
+        Some(GenericErrorContext::new(ctxt)),
     );
     ret = xml_relaxng_validate_doc(ctxt, doc);
     let filename = CStr::from_ptr(filename).to_string_lossy();
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {
             test_error_handler(None, format!("{filename} validates\n").as_str());
-            // xml_error_with_format!(
-            //     test_error_handler,
-            //     null_mut(),
-            //     c"%s validates\n".as_ptr(),
-            //     filename
-            // )
         }
         std::cmp::Ordering::Greater => {
             test_error_handler(None, format!("{filename} fails to validate\n").as_str());
-            // xml_error_with_format!(
-            //     test_error_handler,
-            //     null_mut(),
-            //     c"%s fails to validate\n".as_ptr(),
-            //     filename
-            // )
         }
         std::cmp::Ordering::Less => {
             test_error_handler(
                 None,
                 format!("{filename} validation generated an internal error\n").as_str(),
             );
-            // xml_error_with_format!(
-            //     test_error_handler,
-            //     null_mut(),
-            //     c"%s validation generated an internal error\n".as_ptr(),
-            //     filename
-            // )
         }
     }
 
@@ -4588,7 +4577,7 @@ unsafe extern "C" fn rng_test(
         ctxt,
         Some(test_error_handler),
         Some(test_error_handler),
-        ctxt as _,
+        Some(GenericErrorContext::new(ctxt)),
     );
     let schemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
     xml_relaxng_free_parser_ctxt(ctxt);
@@ -4598,12 +4587,6 @@ unsafe extern "C" fn rng_test(
             None,
             format!("Relax-NG schema {filename} failed to compile\n").as_str(),
         );
-        // xml_error_with_format!(
-        //     test_error_handler,
-        //     null_mut(),
-        //     c"Relax-NG schema %s failed to compile\n".as_ptr(),
-        //     filename
-        // );
     }
     let parse_errors_size: usize = TEST_ERRORS_SIZE;
 

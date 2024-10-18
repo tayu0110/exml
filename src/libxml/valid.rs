@@ -131,9 +131,9 @@ pub type XmlValidityWarningFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *c
 pub type XmlValidCtxtPtr = *mut XmlValidCtxt;
 #[repr(C)]
 pub struct XmlValidCtxt {
-    pub(crate) user_data: *mut c_void, /* user specific data block */
-    pub error: Option<GenericError>,   /* the callback in case of errors */
-    pub warning: Option<GenericError>, /* the callback in case of warning */
+    pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
+    pub error: Option<GenericError>,                   /* the callback in case of errors */
+    pub warning: Option<GenericError>,                 /* the callback in case of warning */
 
     /* Node analysis stack used when validating within entities */
     pub(crate) node: XmlNodePtr,          /* Current parsed Node */
@@ -159,6 +159,29 @@ pub struct XmlValidCtxt {
     pub(crate) am: *mut c_void,
     #[cfg(not(feature = "regexp"))]
     pub(crate) state: *mut c_void,
+}
+
+impl Default for XmlValidCtxt {
+    fn default() -> Self {
+        Self {
+            user_data: None,
+            error: None,
+            warning: None,
+            node: null_mut(),
+            node_nr: 0,
+            node_max: 0,
+            node_tab: null_mut(),
+            flags: 0,
+            doc: null_mut(),
+            valid: 0,
+            vstate: null_mut(),
+            vstate_nr: 0,
+            vstate_max: 0,
+            vstate_tab: null_mut(),
+            am: null_mut(),
+            state: null_mut(),
+        }
+    }
 }
 
 /*
@@ -217,15 +240,22 @@ unsafe extern "C" fn xml_err_valid(
 ) {
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         channel = (*ctxt).error;
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         /* Look up flag to detect if it is part of a parsing
         context */
         if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = (*ctxt).user_data as _;
+            pctxt = (*ctxt)
+                .user_data
+                .as_ref()
+                .and_then(|d| {
+                    let lock = d.lock();
+                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+                })
+                .unwrap_or(null_mut());
         }
     }
     if !extra.is_null() {
@@ -281,15 +311,22 @@ unsafe extern "C" fn xml_err_valid(
 unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char) {
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         channel = (*ctxt).error;
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         /* Look up flag to detect if it is part of a parsing
         context */
         if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = (*ctxt).user_data as _;
+            pctxt = (*ctxt)
+                .user_data
+                .as_ref()
+                .and_then(|d| {
+                    let lock = d.lock();
+                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+                })
+                .unwrap_or(null_mut());
         }
     }
     if !extra.is_null() {
@@ -1095,15 +1132,22 @@ unsafe extern "C" fn xml_err_valid_node(
     let schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         channel = (*ctxt).error;
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         /* Look up flag to detect if it is part of a parsing
         context */
         if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = (*ctxt).user_data as _;
+            pctxt = (*ctxt)
+                .user_data
+                .as_ref()
+                .and_then(|d| {
+                    let lock = d.lock();
+                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+                })
+                .unwrap_or(null_mut());
         }
     }
     __xml_raise_error!(
@@ -2118,15 +2162,22 @@ unsafe extern "C" fn xml_err_valid_warning(
     let schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         channel = (*ctxt).warning;
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         /* Look up flag to detect if it is part of a parsing
         context */
         if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = (*ctxt).user_data as _;
+            pctxt = (*ctxt)
+                .user_data
+                .as_ref()
+                .and_then(|d| {
+                    let lock = d.lock();
+                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+                })
+                .unwrap_or(null_mut());
         }
     }
     __xml_raise_error!(
@@ -2824,7 +2875,14 @@ unsafe extern "C" fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> c_int {
     if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 == 0 {
         return 0;
     }
-    let pctxt: XmlParserCtxtPtr = (*ctxt).user_data as _;
+    let pctxt = (*ctxt)
+        .user_data
+        .as_ref()
+        .and_then(|d| {
+            let lock = d.lock();
+            lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+        })
+        .unwrap_or(null_mut());
     matches!((*pctxt).parse_mode, XmlParserMode::XmlParseReader) as i32
 }
 
@@ -4081,15 +4139,22 @@ unsafe extern "C" fn xml_err_valid_node_nr(
     let schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
-    let mut data: *mut c_void = null_mut();
+    let mut data = None;
 
     if !ctxt.is_null() {
         channel = (*ctxt).error;
-        data = (*ctxt).user_data;
+        data = (*ctxt).user_data.clone();
         /* Look up flag to detect if it is part of a parsing
         context */
         if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = (*ctxt).user_data as _;
+            pctxt = (*ctxt)
+                .user_data
+                .as_ref()
+                .and_then(|d| {
+                    let lock = d.lock();
+                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+                })
+                .unwrap_or(null_mut());
         }
     }
     __xml_raise_error!(

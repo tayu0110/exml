@@ -2,8 +2,6 @@ use std::{
     any::Any,
     borrow::Cow,
     cell::RefCell,
-    ffi::c_void,
-    ptr::null_mut,
     rc::Rc,
     sync::{Mutex, MutexGuard},
 };
@@ -29,7 +27,7 @@ use crate::{
 };
 
 pub type GenericError = for<'a> fn(Option<GenericErrorContext>, &str);
-pub type StructuredError = fn(*mut c_void, &XmlError);
+pub type StructuredError = fn(Option<GenericErrorContext>, &XmlError);
 type ParserInputBufferCreateFilename =
     fn(uri: &str, enc: XmlCharEncoding) -> *mut XmlParserInputBuffer;
 type OutputBufferCreateFilename = fn(
@@ -43,7 +41,7 @@ pub struct GenericErrorContext {
 }
 
 impl GenericErrorContext {
-    pub fn new<T: ?Sized + 'static>(context: Box<T>) -> Self {
+    pub fn new<T: 'static>(context: T) -> Self {
         Self {
             context: Rc::new(Mutex::new(context)),
         }
@@ -75,13 +73,13 @@ pub struct XmlGlobalState {
     pub generic_error: GenericError,
     pub generic_error_context: Option<GenericErrorContext>,
     pub(crate) structured_error: Option<StructuredError>,
-    pub(crate) structured_error_context: *mut c_void,
+    pub(crate) structured_error_context: Option<GenericErrorContext>,
     old_xml_wd_compatibility: bool,
     pub(crate) buffer_alloc_scheme: XmlBufferAllocationScheme,
     pub(crate) default_buffer_size: usize,
     substitute_entities_default_value: i32,
     do_validity_checking_default_value: i32,
-    get_warnings_default_value: i32,
+    pub(crate) get_warnings_default_value: i32,
     keep_blanks_default_value: i32,
     line_numbers_default_value: i32,
     load_ext_dtd_default_value: i32,
@@ -123,7 +121,7 @@ impl XmlGlobalState {
             generic_error: generic_error_default,
             generic_error_context: None,
             structured_error: None,
-            structured_error_context: null_mut(),
+            structured_error_context: None,
             old_xml_wd_compatibility: false,
             buffer_alloc_scheme: XmlBufferAllocationScheme::XmlBufferAllocExact,
             default_buffer_size: BASE_BUFFER_SIZE,
@@ -165,10 +163,10 @@ pub fn set_generic_error(func: Option<GenericError>, context: Option<Box<dyn Any
 /// Set new structured error function and structured error context.
 ///
 /// Even if `func` and `context` are `None`, replacements are not set.
-pub fn set_structured_error(func: Option<StructuredError>, context: *mut c_void) {
+pub fn set_structured_error(func: Option<StructuredError>, context: Option<Box<dyn Any>>) {
     GLOBAL_STATE.with_borrow_mut(|state| {
         state.structured_error = func;
-        state.structured_error_context = context;
+        state.structured_error_context = context.map(GenericErrorContext::new);
     });
 }
 

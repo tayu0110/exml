@@ -163,7 +163,7 @@ unsafe extern "C" fn xml_debug_err(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         (*ctxt).node as _,
         XmlErrorDomain::XmlFromCheck,
@@ -190,7 +190,7 @@ unsafe extern "C" fn xml_debug_err2(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         (*ctxt).node as _,
         XmlErrorDomain::XmlFromCheck,
@@ -217,7 +217,7 @@ unsafe extern "C" fn xml_debug_err3(
     __xml_raise_error!(
         None,
         None,
-        null_mut(),
+        None,
         null_mut(),
         (*ctxt).node as _,
         XmlErrorDomain::XmlFromCheck,
@@ -3039,7 +3039,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
 
     let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(schemas);
     let generic_error = GLOBAL_STATE.with_borrow(|state| state.generic_error);
-    xml_relaxng_set_parser_errors(ctxt, Some(generic_error), Some(generic_error), null_mut());
+    xml_relaxng_set_parser_errors(ctxt, Some(generic_error), Some(generic_error), None);
     let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
     xml_relaxng_free_parser_ctxt(ctxt);
     if relaxngschemas.is_null() {
@@ -3050,7 +3050,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
         return -1;
     }
     let vctxt: XmlRelaxNGValidCtxtPtr = xml_relaxng_new_valid_ctxt(relaxngschemas);
-    xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), null_mut());
+    xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
     let ret: c_int = xml_relaxng_validate_doc(vctxt, (*sctxt).doc);
 
     extern "C" {

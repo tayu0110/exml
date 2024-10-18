@@ -23,7 +23,7 @@ use crate::libxml::xpointer::{
 use crate::{
     error::XmlError,
     generic_error,
-    globals::StructuredError,
+    globals::{GenericErrorContext, StructuredError},
     libxml::{
         dict::{xml_dict_free, XmlDictPtr},
         globals::{xml_free, xml_malloc},
@@ -464,10 +464,10 @@ pub struct XmlXPathContext {
     pub(crate) tmp_ns_nr: c_int,           /* number of namespaces in scope */
 
     /* error reporting mechanism */
-    pub(crate) user_data: *mut c_void, /* user specific data block */
-    pub(crate) error: Option<StructuredError>, /* the callback in case of errors */
-    pub(crate) last_error: XmlError,   /* the last error */
-    pub(crate) debug_node: XmlNodePtr, /* the source node XSLT */
+    pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
+    pub(crate) error: Option<StructuredError>,         /* the callback in case of errors */
+    pub(crate) last_error: XmlError,                   /* the last error */
+    pub(crate) debug_node: XmlNodePtr,                 /* the source node XSLT */
 
     /* dictionary */
     pub(crate) dict: XmlDictPtr, /* dictionary if any */
@@ -1997,7 +1997,7 @@ macro_rules! CHECK_CTXT {
             $crate::__xml_raise_error!(
                 None,
                 None,
-                std::ptr::null_mut(),
+                None,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 $crate::error::XmlErrorDomain::XmlFromXPath,
@@ -2238,7 +2238,7 @@ macro_rules! CHECK_CTXT_NEG {
             $crate::__xml_raise_error!(
                 None,
                 None,
-                null_mut(),
+                None,
                 null_mut(),
                 null_mut(),
                 $crate::error::XmlErrorDomain::XmlFromXPath,
