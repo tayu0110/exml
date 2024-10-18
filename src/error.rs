@@ -166,24 +166,6 @@ macro_rules! generic_error {
     }
 }
 
-/// A dummy wrapper that allows all types to be treated as GenericError contexts.
-///
-/// This is a temporary workaround.  
-/// The original C library treats contexts as void pointer.  
-/// The closest thing to that in Rust would be std::any::Any,
-/// but it cannot be treated in the same way because it is not easy to convert between trait objects.
-pub(crate) struct ErrorContextWrap<T>(pub(crate) T);
-
-impl<T> Write for ErrorContextWrap<T> {
-    fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
-        Ok(0)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
 #[doc(hidden)]
 pub unsafe fn parser_print_file_context_internal(
     input: XmlParserInputPtr,
