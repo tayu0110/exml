@@ -102,3 +102,6 @@ required-features = ["catalog", "thread"]
 [[bin]]
 name = "xmllint"
 path = "src/bin/xmllint.rs"
+
+[dev-dependencies]
+glob = "0.3.1"

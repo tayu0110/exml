@@ -8,6 +8,7 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     mem::zeroed,
     os::{fd::AsRawFd, raw::c_void},
+    path::Path,
     process::exit,
     ptr::{addr_of_mut, null, null_mut},
     sync::{
@@ -70,8 +71,8 @@ use exml::{
     SYSCONFDIR,
 };
 use libc::{
-    close, fdopen, fflush, free, glob, glob_t, globfree, malloc, memcmp, memcpy, open, pthread_t,
-    size_t, snprintf, strcmp, strdup, strlen, strncpy, strstr, unlink, FILE, GLOB_DOOFFS, O_RDONLY,
+    close, fdopen, fflush, free, malloc, memcmp, memcpy, open, pthread_t, size_t, snprintf, strcmp,
+    strdup, strlen, strncpy, unlink, FILE, O_RDONLY,
 };
 
 /*
@@ -123,7 +124,7 @@ unsafe extern "C" fn test_external_entity_loader(
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;
 
-    if check_test_file(url) != 0 {
+    if check_test_file(CStr::from_ptr(url).to_string_lossy().as_ref()) {
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
         let memused: c_int = xml_mem_used();
@@ -393,11 +394,8 @@ unsafe extern "C" fn result_filename(
     strdup(res.as_ptr())
 }
 
-unsafe extern "C" fn check_test_file(filename: *const c_char) -> c_int {
-    match metadata(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
-        Ok(meta) => meta.is_file() as i32,
-        _ => 0,
-    }
+unsafe extern "C" fn check_test_file(filename: impl AsRef<Path>) -> bool {
+    metadata(filename.as_ref()).map_or(false, |meta| meta.is_file())
 }
 
 unsafe extern "C" fn compare_files(
@@ -4868,7 +4866,9 @@ unsafe extern "C" fn pattern_test(
     }
     memcpy(xml.as_mut_ptr().add(len) as _, c".xml".as_ptr() as _, 5);
 
-    if check_test_file(xml.as_ptr()) == 0 && UPDATE_RESULTS == 0 {
+    if !check_test_file(CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref())
+        && UPDATE_RESULTS == 0
+    {
         eprintln!(
             "Missing xml file {}",
             CStr::from_ptr(xml.as_ptr()).to_string_lossy()
@@ -5407,7 +5407,7 @@ unsafe extern "C" fn c14n_common_test(
     {
         buf[499] = 0;
     }
-    if check_test_file(buf.as_ptr()) != 0 {
+    if check_test_file(CStr::from_ptr(buf.as_ptr()).to_string_lossy().as_ref()) {
         xpath = strdup(buf.as_ptr());
     }
     if snprintf(
@@ -5420,7 +5420,7 @@ unsafe extern "C" fn c14n_common_test(
     {
         buf[499] = 0;
     }
-    if check_test_file(buf.as_ptr()) != 0 {
+    if check_test_file(CStr::from_ptr(buf.as_ptr()).to_string_lossy().as_ref()) {
         ns = strdup(buf.as_ptr());
     }
 
@@ -6692,24 +6692,31 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
         xml_get_char_encoding_handler(XmlCharEncoding::EUCJP);
 
     if let Some(input) = tst.input {
-        let mut globbuf: glob_t = unsafe { zeroed() };
-
-        globbuf.gl_offs = 0;
-        glob(input.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-        for i in 0..globbuf.gl_pathc {
-            if check_test_file(*globbuf.gl_pathv.add(i)) == 0 {
+        for entry in
+            glob::glob(input.to_string_lossy().as_ref()).expect("Failed to read glob pattern")
+        {
+            let path = match entry {
+                Ok(path) => Path::new("./").join(path),
+                Err(e) => {
+                    println!("{e:?}");
+                    continue;
+                }
+            };
+            if !check_test_file(&path) {
                 continue;
             }
-            if (ebcdic_handler.is_null()
-                && !strstr(*globbuf.gl_pathv.add(i), c"ebcdic".as_ptr()).is_null())
-                || (euc_jp_handler.is_null()
-                    && !strstr(*globbuf.gl_pathv.add(i), c"icu_parse_test".as_ptr()).is_null())
+
+            let path = path.to_string_lossy();
+            if (ebcdic_handler.is_null() && path.contains("ebcdic"))
+                || (euc_jp_handler.is_null() && path.contains("icu_parse_test"))
             {
                 continue;
             }
+
+            let cpath = CString::new(path.as_ref()).unwrap();
             if let Some(suffix) = tst.suffix {
                 result = result_filename(
-                    *globbuf.gl_pathv.add(i),
+                    cpath.as_ptr(),
                     tst.out.map(|o| o.as_ptr()).unwrap_or(null_mut()),
                     suffix.as_ptr(),
                 );
@@ -6722,7 +6729,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
             }
             if let Some(err) = tst.err {
                 error = result_filename(
-                    *globbuf.gl_pathv.add(i),
+                    cpath.as_ptr(),
                     tst.out.map(|o| o.as_ptr()).unwrap_or(null_mut()),
                     err.as_ptr(),
                 );
@@ -6738,28 +6745,21 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
             TEST_ERRORS_SIZE = 0;
             TEST_ERRORS[0] = 0;
             res = (tst.func)(
-                *globbuf.gl_pathv.add(i),
+                cpath.as_ptr(),
                 result,
                 error,
                 tst.options | XmlParserOption::XmlParseCompact as i32,
             );
             reset_last_error();
             if res != 0 {
-                eprintln!(
-                    "File {} generated an error",
-                    CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy(),
-                );
+                eprintln!("File {} generated an error", path,);
                 NB_ERRORS += 1;
                 err += 1;
             } else if xml_mem_used() != mem
                 && xml_mem_used() != mem
                 && EXTRA_MEMORY_FROM_RESOLVER == 0
             {
-                eprintln!(
-                    "File {} leaked {} bytes",
-                    CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy(),
-                    xml_mem_used() - mem,
-                );
+                eprintln!("File {} leaked {} bytes", path, xml_mem_used() - mem,);
                 NB_LEAKS += 1;
                 err += 1;
             }
@@ -6771,7 +6771,6 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                 free(error as _);
             }
         }
-        globfree(addr_of_mut!(globbuf));
     } else {
         TEST_ERRORS_SIZE = 0;
         TEST_ERRORS[0] = 0;
