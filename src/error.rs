@@ -1,7 +1,6 @@
 use std::{
     borrow::Cow,
     ffi::{c_void, CStr},
-    fmt::Write as _,
     io::{stderr, Write},
     ptr::{null_mut, NonNull},
     sync::atomic::{AtomicBool, Ordering},
@@ -185,7 +184,11 @@ impl<T> Write for ErrorContextWrap<T> {
 }
 
 #[doc(hidden)]
-pub unsafe fn parser_print_file_context_internal(input: XmlParserInputPtr, buf: &mut String) {
+pub unsafe fn parser_print_file_context_internal(
+    input: XmlParserInputPtr,
+    channel: GenericError,
+    data: Option<GenericErrorContext>,
+) {
     let mut cur: *const u8;
     const SIZE: usize = 80;
     let mut content = String::with_capacity(SIZE);
@@ -202,7 +205,7 @@ pub unsafe fn parser_print_file_context_internal(input: XmlParserInputPtr, buf: 
     }
     let mut n = 0;
     /* search backwards for beginning-of-line (to max buff size) */
-    while n < SIZE - 1 && cur > base && *cur != b'\n' && *cur != b'\r' {
+    while n < SIZE && cur > base && *cur != b'\n' && *cur != b'\r' {
         cur = cur.sub(1);
         n += 1;
     }
@@ -214,6 +217,7 @@ pub unsafe fn parser_print_file_context_internal(input: XmlParserInputPtr, buf: 
             cur = cur.add(1);
         }
     }
+    let col = (*input).cur.offset_from(cur) as usize;
     /* search forward for end-of-line (to max buff size) */
     let mut n = 0;
     let s = CStr::from_ptr(cur as *const i8).to_string_lossy();
@@ -225,21 +229,24 @@ pub unsafe fn parser_print_file_context_internal(input: XmlParserInputPtr, buf: 
         content.push(c);
     }
     /* print out the selected text */
-    buf.push_str(format!("{content}\n").as_str());
+    channel(data.clone(), format!("{content}\n").as_str());
     /* create blank line with problem pointer */
     let mut ptr = content
-        .chars()
-        .map(|c| if c == '\t' { c } else { ' ' })
+        .bytes()
+        .take(col)
+        .map(|c| if c == b'\t' { '\t' } else { ' ' })
         .collect::<String>();
-    ptr.pop();
-    ptr.push('^');
-    buf.push_str(format!("{ptr}\n").as_str());
+    if ptr.len() == SIZE {
+        ptr.pop();
+    }
+    ptr.push_str("^\n");
+    channel(data.clone(), ptr.as_str());
 }
 
 pub unsafe fn parser_print_file_context(input: XmlParserInputPtr) {
-    let mut buf = String::new();
-    parser_print_file_context_internal(input, &mut buf);
-    generic_error!("{buf}");
+    let (channel, data) = GLOBAL_STATE
+        .with_borrow(|state| (state.generic_error, state.generic_error_context.clone()));
+    parser_print_file_context_internal(input, channel, data);
 }
 
 pub unsafe fn parser_print_file_info(input: XmlParserInputPtr) {
@@ -289,7 +296,6 @@ pub unsafe fn report_error(
         name = (*node).name;
     }
 
-    let mut output = String::new();
     /*
      * Maintain the compatibility with the legacy error handling
      */
@@ -301,18 +307,24 @@ pub unsafe fn report_error(
         }
         if !input.is_null() {
             if !(*input).filename.is_null() {
-                write!(
-                    output,
-                    "{}:{}: ",
-                    CStr::from_ptr((*input).filename).to_string_lossy(),
-                    (*input).line
+                channel(
+                    data.clone(),
+                    format!(
+                        "{}:{}: ",
+                        CStr::from_ptr((*input).filename).to_string_lossy(),
+                        (*input).line
+                    )
+                    .as_str(),
                 );
             } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                write!(output, "Entity: line {}: ", (*input).line);
+                channel(
+                    data.clone(),
+                    format!("Entity: line {}: ", (*input).line).as_str(),
+                );
             }
         }
     } else if let Some(file) = file {
-        write!(output, "{file}:{line}: ");
+        channel(data.clone(), format!("{file}:{line}: ").as_str());
     } else if line != 0
         && (domain == XmlErrorDomain::XmlFromParser
             || domain == XmlErrorDomain::XmlFromSchemasv
@@ -321,85 +333,93 @@ pub unsafe fn report_error(
             || domain == XmlErrorDomain::XmlFromRelaxngp
             || domain == XmlErrorDomain::XmlFromRelaxngv)
     {
-        write!(output, "Entity: line {line}: ");
+        channel(data.clone(), format!("Entity: line {line}: ").as_str());
     }
     if !name.is_null() {
-        write!(
-            output,
-            "element {}: ",
-            CStr::from_ptr(name as *const i8).to_string_lossy()
+        channel(
+            data.clone(),
+            format!(
+                "element {}: ",
+                CStr::from_ptr(name as *const i8).to_string_lossy()
+            )
+            .as_str(),
         );
     }
     match domain {
-        XmlErrorDomain::XmlFromParser => write!(output, "parser "),
-        XmlErrorDomain::XmlFromNamespace => write!(output, "namespace "),
+        XmlErrorDomain::XmlFromParser => channel(data.clone(), "parser "),
+        XmlErrorDomain::XmlFromNamespace => channel(data.clone(), "namespace "),
         XmlErrorDomain::XmlFromDTD | XmlErrorDomain::XmlFromValid => {
-            write!(output, "validity ")
+            channel(data.clone(), "validity ")
         }
-        XmlErrorDomain::XmlFromHTML => write!(output, "HTML parser "),
-        XmlErrorDomain::XmlFromMemory => write!(output, "memory "),
-        XmlErrorDomain::XmlFromOutput => write!(output, "output "),
-        XmlErrorDomain::XmlFromIO => write!(output, "I/O "),
-        XmlErrorDomain::XmlFromXInclude => write!(output, "XInclude "),
-        XmlErrorDomain::XmlFromXPath => write!(output, "XPath "),
-        XmlErrorDomain::XmlFromXPointer => write!(output, "parser "),
-        XmlErrorDomain::XmlFromRegexp => write!(output, "regexp "),
-        XmlErrorDomain::XmlFromModule => write!(output, "module "),
-        XmlErrorDomain::XmlFromSchemasv => write!(output, "Schemas validity "),
-        XmlErrorDomain::XmlFromSchemasp => write!(output, "Schemas parser "),
-        XmlErrorDomain::XmlFromRelaxngp => write!(output, "Relax-NG parser "),
-        XmlErrorDomain::XmlFromRelaxngv => write!(output, "Relax-NG validity "),
-        XmlErrorDomain::XmlFromCatalog => write!(output, "Catalog "),
-        XmlErrorDomain::XmlFromC14N => write!(output, "C14N "),
-        XmlErrorDomain::XmlFromXSLT => write!(output, "XSLT "),
-        XmlErrorDomain::XmlFromI18N => write!(output, "encoding "),
-        XmlErrorDomain::XmlFromSchematronv => write!(output, "schematron "),
-        XmlErrorDomain::XmlFromBuffer => write!(output, "internal buffer "),
-        XmlErrorDomain::XmlFromURI => write!(output, "URI "),
-        _ => Ok(()),
+        XmlErrorDomain::XmlFromHTML => channel(data.clone(), "HTML parser "),
+        XmlErrorDomain::XmlFromMemory => channel(data.clone(), "memory "),
+        XmlErrorDomain::XmlFromOutput => channel(data.clone(), "output "),
+        XmlErrorDomain::XmlFromIO => channel(data.clone(), "I/O "),
+        XmlErrorDomain::XmlFromXInclude => channel(data.clone(), "XInclude "),
+        XmlErrorDomain::XmlFromXPath => channel(data.clone(), "XPath "),
+        XmlErrorDomain::XmlFromXPointer => channel(data.clone(), "parser "),
+        XmlErrorDomain::XmlFromRegexp => channel(data.clone(), "regexp "),
+        XmlErrorDomain::XmlFromModule => channel(data.clone(), "module "),
+        XmlErrorDomain::XmlFromSchemasv => channel(data.clone(), "Schemas validity "),
+        XmlErrorDomain::XmlFromSchemasp => channel(data.clone(), "Schemas parser "),
+        XmlErrorDomain::XmlFromRelaxngp => channel(data.clone(), "Relax-NG parser "),
+        XmlErrorDomain::XmlFromRelaxngv => channel(data.clone(), "Relax-NG validity "),
+        XmlErrorDomain::XmlFromCatalog => channel(data.clone(), "Catalog "),
+        XmlErrorDomain::XmlFromC14N => channel(data.clone(), "C14N "),
+        XmlErrorDomain::XmlFromXSLT => channel(data.clone(), "XSLT "),
+        XmlErrorDomain::XmlFromI18N => channel(data.clone(), "encoding "),
+        XmlErrorDomain::XmlFromSchematronv => channel(data.clone(), "schematron "),
+        XmlErrorDomain::XmlFromBuffer => channel(data.clone(), "internal buffer "),
+        XmlErrorDomain::XmlFromURI => channel(data.clone(), "URI "),
+        _ => {}
     };
     match level {
-        XmlErrorLevel::XmlErrNone => write!(output, ": "),
-        XmlErrorLevel::XmlErrWarning => write!(output, "warning : "),
-        XmlErrorLevel::XmlErrError => write!(output, "error : "),
-        XmlErrorLevel::XmlErrFatal => write!(output, "error : "),
+        XmlErrorLevel::XmlErrNone => channel(data.clone(), ": "),
+        XmlErrorLevel::XmlErrWarning => channel(data.clone(), "warning : "),
+        XmlErrorLevel::XmlErrError => channel(data.clone(), "error : "),
+        XmlErrorLevel::XmlErrFatal => channel(data.clone(), "error : "),
     };
     if let Some(msg) = msg {
         if !msg.is_empty() && !msg.ends_with('\n') {
-            writeln!(output, "{msg}").ok();
+            channel(data.clone(), format!("{msg}\n").as_str());
         } else {
-            write!(output, "{msg}");
+            channel(data.clone(), msg);
         }
     } else {
-        writeln!(output, "out of memory error").ok();
+        channel(data.clone(), "out of memory error\n");
     }
 
     if !ctxt.is_null() {
-        parser_print_file_context_internal(input, &mut output);
+        parser_print_file_context_internal(input, channel, data.clone());
         if !cur.is_null() {
             if !(*cur).filename.is_null() {
-                writeln!(
-                    output,
-                    "{}:{}: ",
-                    CStr::from_ptr((*cur).filename).to_string_lossy(),
-                    (*cur).line
+                channel(
+                    data.clone(),
+                    format!(
+                        "{}:{}: \n",
+                        CStr::from_ptr((*cur).filename).to_string_lossy(),
+                        (*cur).line
+                    )
+                    .as_str(),
                 )
-                .ok();
             } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                writeln!(output, "Entity: line {}: ", (*cur).line).ok();
+                channel(
+                    data.clone(),
+                    format!("Entity: line {}: \n", (*cur).line).as_str(),
+                );
             }
-            parser_print_file_context_internal(cur, &mut output);
+            parser_print_file_context_internal(cur, channel, data.clone());
         }
     }
     if let Some(str1) = err.str1.as_ref() {
         if domain == XmlErrorDomain::XmlFromXPath && err.int1 < 100 && err.int1 < str1.len() as i32
         {
-            writeln!(output, "{str1}").ok();
-            output.push_str(" ".repeat(err.int1 as usize).as_str());
-            output.push_str("^\n");
+            channel(data.clone(), format!("{str1}\n").as_str());
+            let mut buf = " ".repeat(err.int1 as usize);
+            buf.push_str("^\n");
+            channel(data.clone(), buf.as_str());
         }
     }
-    channel(data, &output);
 }
 
 pub(crate) fn parser_error(ctx: Option<GenericErrorContext>, msg: &str) {

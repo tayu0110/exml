@@ -436,7 +436,7 @@ unsafe extern "C" fn test_external_entity_loader(
 static mut TEST_ERRORS: [u8; 32769] = [0; 32769];
 static mut TEST_ERRORS_SIZE: usize = 0;
 
-fn channel(_ctx: *mut c_void, msg: &str) {
+fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         if TEST_ERRORS_SIZE >= 32768 {
             return;
@@ -455,7 +455,6 @@ fn channel(_ctx: *mut c_void, msg: &str) {
 }
 
 fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
-    let data: *mut c_void = null_mut();
     let mut name: *const XmlChar = null_mut();
     let mut input: XmlParserInputPtr = null_mut();
     let mut cur: XmlParserInputPtr = null_mut();
@@ -499,84 +498,80 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
             if !input.is_null() {
                 if !(*input).filename.is_null() {
                     let file = CStr::from_ptr((*input).filename).to_string_lossy();
-                    channel(data, format!("{file}:{}: ", (*input).line).as_str());
+                    channel(None, format!("{file}:{}: ", (*input).line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                    channel(data, format!("Entity: line {}: ", (*input).line).as_str());
+                    channel(None, format!("Entity: line {}: ", (*input).line).as_str());
                 }
             }
         } else if let Some(file) = file {
-            channel(data, format!("{file}:{line}: ").as_str());
+            channel(None, format!("{file}:{line}: ").as_str());
         } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-            channel(data, format!("Entity: line {line}: ").as_str());
+            channel(None, format!("Entity: line {line}: ").as_str());
         }
         if !name.is_null() {
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-            channel(data, format!("element {name}: ").as_str());
+            channel(None, format!("element {name}: ").as_str());
         }
         if code.is_ok() {
             return;
         }
         match domain {
-            XmlErrorDomain::XmlFromParser => channel(data, "parser "),
-            XmlErrorDomain::XmlFromNamespace => channel(data, "namespace "),
-            XmlErrorDomain::XmlFromDTD | XmlErrorDomain::XmlFromValid => channel(data, "validity "),
-            XmlErrorDomain::XmlFromHTML => channel(data, "HTML parser "),
-            XmlErrorDomain::XmlFromMemory => channel(data, "memory "),
-            XmlErrorDomain::XmlFromOutput => channel(data, "output "),
-            XmlErrorDomain::XmlFromIO => channel(data, "I/O "),
-            XmlErrorDomain::XmlFromXInclude => channel(data, "XInclude "),
-            XmlErrorDomain::XmlFromXPath => channel(data, "XPath "),
-            XmlErrorDomain::XmlFromXPointer => channel(data, "parser "),
-            XmlErrorDomain::XmlFromRegexp => channel(data, "regexp "),
-            XmlErrorDomain::XmlFromModule => channel(data, "module "),
-            XmlErrorDomain::XmlFromSchemasv => channel(data, "Schemas validity "),
-            XmlErrorDomain::XmlFromSchemasp => channel(data, "Schemas parser "),
-            XmlErrorDomain::XmlFromRelaxngp => channel(data, "Relax-NG parser "),
-            XmlErrorDomain::XmlFromRelaxngv => channel(data, "Relax-NG validity "),
-            XmlErrorDomain::XmlFromCatalog => channel(data, "Catalog "),
-            XmlErrorDomain::XmlFromC14N => channel(data, "C14N "),
-            XmlErrorDomain::XmlFromXSLT => channel(data, "XSLT "),
+            XmlErrorDomain::XmlFromParser => channel(None, "parser "),
+            XmlErrorDomain::XmlFromNamespace => channel(None, "namespace "),
+            XmlErrorDomain::XmlFromDTD | XmlErrorDomain::XmlFromValid => channel(None, "validity "),
+            XmlErrorDomain::XmlFromHTML => channel(None, "HTML parser "),
+            XmlErrorDomain::XmlFromMemory => channel(None, "memory "),
+            XmlErrorDomain::XmlFromOutput => channel(None, "output "),
+            XmlErrorDomain::XmlFromIO => channel(None, "I/O "),
+            XmlErrorDomain::XmlFromXInclude => channel(None, "XInclude "),
+            XmlErrorDomain::XmlFromXPath => channel(None, "XPath "),
+            XmlErrorDomain::XmlFromXPointer => channel(None, "parser "),
+            XmlErrorDomain::XmlFromRegexp => channel(None, "regexp "),
+            XmlErrorDomain::XmlFromModule => channel(None, "module "),
+            XmlErrorDomain::XmlFromSchemasv => channel(None, "Schemas validity "),
+            XmlErrorDomain::XmlFromSchemasp => channel(None, "Schemas parser "),
+            XmlErrorDomain::XmlFromRelaxngp => channel(None, "Relax-NG parser "),
+            XmlErrorDomain::XmlFromRelaxngv => channel(None, "Relax-NG validity "),
+            XmlErrorDomain::XmlFromCatalog => channel(None, "Catalog "),
+            XmlErrorDomain::XmlFromC14N => channel(None, "C14N "),
+            XmlErrorDomain::XmlFromXSLT => channel(None, "XSLT "),
             _ => {}
         }
         if code.is_ok() {
             return;
         }
         match level {
-            XmlErrorLevel::XmlErrNone => channel(data, ": "),
-            XmlErrorLevel::XmlErrWarning => channel(data, "warning : "),
-            XmlErrorLevel::XmlErrError => channel(data, "error : "),
-            XmlErrorLevel::XmlErrFatal => channel(data, "error : "),
+            XmlErrorLevel::XmlErrNone => channel(None, ": "),
+            XmlErrorLevel::XmlErrWarning => channel(None, "warning : "),
+            XmlErrorLevel::XmlErrError => channel(None, "error : "),
+            XmlErrorLevel::XmlErrFatal => channel(None, "error : "),
         }
         if code.is_ok() {
             return;
         }
         if let Some(str) = str {
             if str.as_bytes().last() != Some(&b'\n') {
-                channel(data, format!("{str}\n").as_str());
+                channel(None, format!("{str}\n").as_str());
             } else {
-                channel(data, str);
+                channel(None, str);
             }
         } else {
-            channel(data, "out of memory error\n");
+            channel(None, "out of memory error\n");
         }
         if code.is_ok() {
             return;
         }
 
         if !ctxt.is_null() {
-            let mut buf = String::new();
-            parser_print_file_context_internal(input, &mut buf);
-            channel(data, buf.as_str());
+            parser_print_file_context_internal(input, channel, None);
             if !cur.is_null() {
                 if !(*cur).filename.is_null() {
                     let file = CStr::from_ptr((*cur).filename).to_string_lossy();
-                    channel(data, format!("{file}:{}: \n", (*cur).line).as_str());
+                    channel(None, format!("{file}:{}: \n", (*cur).line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                    channel(data, format!("Entity: line {}: \n", (*cur).line).as_str());
+                    channel(None, format!("Entity: line {}: \n", (*cur).line).as_str());
                 }
-                buf.clear();
-                parser_print_file_context_internal(cur, &mut buf);
-                channel(data, buf.as_str());
+                parser_print_file_context_internal(cur, channel, None);
             }
         }
         if let Some(str1) = err.str1().filter(|s| {
@@ -584,10 +579,10 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
                 && err.int1() < s.len() as i32
                 && domain == XmlErrorDomain::XmlFromXPath
         }) {
-            channel(data, format!("{str1}\n").as_str());
+            channel(None, format!("{str1}\n").as_str());
             let mut buf = " ".repeat(err.int1() as usize);
             buf.push('^');
-            channel(data, format!("{buf}\n").as_str());
+            channel(None, format!("{buf}\n").as_str());
         }
     }
 }
