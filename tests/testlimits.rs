@@ -444,7 +444,7 @@ fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
         if TEST_ERRORS_SIZE + msg.len() >= TEST_ERRORS.len() {
             TEST_ERRORS[TEST_ERRORS_SIZE..]
                 .copy_from_slice(&msg.as_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-            TEST_ERRORS_SIZE = TEST_ERRORS.len();
+            TEST_ERRORS_SIZE = TEST_ERRORS.len() - 1;
         } else {
             TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + msg.len()]
                 .copy_from_slice(msg.as_bytes());

@@ -3,6 +3,7 @@ use std::{
     ffi::{c_void, CStr},
     io::{stderr, Write},
     ptr::{null_mut, NonNull},
+    slice::from_raw_parts,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -191,7 +192,6 @@ pub unsafe fn parser_print_file_context_internal(
 ) {
     let mut cur: *const u8;
     const SIZE: usize = 80;
-    let mut content = String::with_capacity(SIZE);
 
     if input.is_null() || (*input).cur.is_null() {
         return;
@@ -218,15 +218,31 @@ pub unsafe fn parser_print_file_context_internal(
         }
     }
     let col = (*input).cur.offset_from(cur) as usize;
+    let mut content = String::with_capacity(SIZE);
+
     /* search forward for end-of-line (to max buff size) */
     let mut n = 0;
-    let s = CStr::from_ptr(cur as *const i8).to_string_lossy();
-    for c in s.chars().take_while(|&c| c != '\n' && c != '\r') {
-        n += c.len_utf8();
-        if n > SIZE {
-            break;
+    let chunk = {
+        let mut i = 0;
+        let mut now = *cur;
+        while now != 0 && now != b'\n' && now != b'\r' && i < SIZE {
+            i += 1;
+            now = *cur.add(i);
         }
-        content.push(c);
+        from_raw_parts(cur, i)
+    };
+    if let Some(chunk) = chunk.utf8_chunks().next() {
+        for c in chunk
+            .valid()
+            .chars()
+            .take_while(|&c| c != '\n' && c != '\r')
+        {
+            n += c.len_utf8();
+            if n > SIZE {
+                break;
+            }
+            content.push(c);
+        }
     }
     /* print out the selected text */
     channel(data.clone(), format!("{content}\n").as_str());
