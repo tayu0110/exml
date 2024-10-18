@@ -57,7 +57,7 @@ use crate::{
             XmlOutputBufferPtr, XmlParserInputBufferPtr,
         },
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
-        xmlerror::{XmlErrorPtr, XmlGenericErrorFunc, XmlParserErrors},
+        xmlerror::XmlParserErrors,
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderErrorFunc, XmlTextReaderLocatorPtr, XmlTextReaderPtr},
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
@@ -699,22 +699,22 @@ pub(crate) fn gen_xml_module_ptr(_no: i32, _nr: i32) -> XmlModulePtr {
 #[cfg(feature = "libxml_modules")]
 pub(crate) fn des_xml_module_ptr(_no: i32, _val: XmlModulePtr, _nr: i32) {}
 
-pub(crate) fn gen_xml_generic_error_func_ptr(_no: i32, _nr: i32) -> Option<XmlGenericErrorFunc> {
-    None
-}
+// pub(crate) fn gen_xml_generic_error_func_ptr(_no: i32, _nr: i32) -> Option<XmlGenericErrorFunc> {
+//     None
+// }
 
-pub(crate) fn des_xml_generic_error_func_ptr(
-    _no: i32,
-    _val: Option<XmlGenericErrorFunc>,
-    _nr: i32,
-) {
-}
+// pub(crate) fn des_xml_generic_error_func_ptr(
+//     _no: i32,
+//     _val: Option<XmlGenericErrorFunc>,
+//     _nr: i32,
+// ) {
+// }
 
-pub(crate) fn gen_xml_error_ptr(_no: i32, _nr: i32) -> XmlErrorPtr {
-    null_mut()
-}
+// pub(crate) fn gen_xml_error_ptr(_no: i32, _nr: i32) -> XmlErrorPtr {
+//     null_mut()
+// }
 
-pub(crate) fn des_xml_error_ptr(_no: i32, _val: XmlErrorPtr, _nr: i32) {}
+// pub(crate) fn des_xml_error_ptr(_no: i32, _val: XmlErrorPtr, _nr: i32) {}
 
 #[cfg(feature = "libxml_automata")]
 pub(crate) fn gen_xml_automata_ptr(_no: i32, _nr: i32) -> XmlAutomataPtr {

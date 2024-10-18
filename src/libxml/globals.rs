@@ -25,7 +25,6 @@ use crate::{
         xml_io::{
             XmlOutputBufferPtr, XmlParserInputBufferPtr, __xml_output_buffer_create_filename,
         },
-        xmlerror::{XmlGenericErrorFunc, XmlStructuredErrorFunc},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
     private::threads::{__xml_global_init_mutex_destroy, xml_cleanup_mutex, xml_init_mutex},
@@ -173,8 +172,8 @@ pub struct XmlGlobalState {
     pub(crate) xml_mem_strdup: Option<XmlStrdupFunc>,
     pub(crate) xml_realloc: Option<XmlReallocFunc>,
 
-    pub(crate) xml_generic_error: Option<XmlGenericErrorFunc>,
-    pub(crate) xml_structured_error: Option<XmlStructuredErrorFunc>,
+    // pub(crate) xml_generic_error: Option<XmlGenericErrorFunc>,
+    // pub(crate) xml_structured_error: Option<XmlStructuredErrorFunc>,
     pub(crate) xml_generic_error_context: AtomicPtr<c_void>,
 
     pub(crate) old_xml_wd_compatibility: c_int,
@@ -380,8 +379,8 @@ static mut XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF: c_int = 0;
  *
  * Global setting: function used for structured error callbacks
  */
-pub(crate) static mut _XML_STRUCTURED_ERROR: Option<XmlStructuredErrorFunc> = None;
-static mut XML_STRUCTURED_ERROR_THR_DEF: Option<XmlStructuredErrorFunc> = None;
+// pub(crate) static mut _XML_STRUCTURED_ERROR: Option<XmlStructuredErrorFunc> = None;
+// static mut XML_STRUCTURED_ERROR_THR_DEF: Option<XmlStructuredErrorFunc> = None;
 
 /**
  * xmlGenericErrorContext:
@@ -494,7 +493,7 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).xml_substitute_entities_default_value = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
 
     // (*gs).xml_generic_error = XML_GENERIC_ERROR_THR_DEF;
-    (*gs).xml_structured_error = XML_STRUCTURED_ERROR_THR_DEF;
+    // (*gs).xml_structured_error = XML_STRUCTURED_ERROR_THR_DEF;
     (*gs).xml_generic_error_context.store(
         XML_GENERIC_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
         Ordering::Relaxed,
