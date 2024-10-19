@@ -34,9 +34,8 @@ use exml::{
         encoding::xml_add_encoding_alias,
         entities::{xml_encode_entities_reentrant, XmlEntityPtr},
         globals::{
-            xml_deregister_node_default, xml_free, xml_generic_error_context,
-            xml_load_ext_dtd_default_value, xml_parser_debug_entities, xml_register_node_default,
-            xml_tree_indent_string,
+            xml_deregister_node_default, xml_free, xml_load_ext_dtd_default_value,
+            xml_parser_debug_entities, xml_register_node_default, xml_tree_indent_string,
         },
         htmlparser::{
             html_create_push_parser_ctxt, html_ctxt_use_options, html_free_parser_ctxt,

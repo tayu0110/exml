@@ -174,8 +174,7 @@ pub struct XmlGlobalState {
 
     // pub(crate) xml_generic_error: Option<XmlGenericErrorFunc>,
     // pub(crate) xml_structured_error: Option<XmlStructuredErrorFunc>,
-    pub(crate) xml_generic_error_context: AtomicPtr<c_void>,
-
+    // pub(crate) xml_generic_error_context: AtomicPtr<c_void>,
     pub(crate) old_xml_wd_compatibility: c_int,
 
     pub(crate) xml_buffer_alloc_scheme: XmlBufferAllocationScheme,
@@ -494,10 +493,10 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
 
     // (*gs).xml_generic_error = XML_GENERIC_ERROR_THR_DEF;
     // (*gs).xml_structured_error = XML_STRUCTURED_ERROR_THR_DEF;
-    (*gs).xml_generic_error_context.store(
-        XML_GENERIC_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
-        Ordering::Relaxed,
-    );
+    // (*gs).xml_generic_error_context.store(
+    //     XML_GENERIC_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
+    //     Ordering::Relaxed,
+    // );
     (*gs).xml_structured_error_context.store(
         XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
         Ordering::Relaxed,
@@ -1100,23 +1099,6 @@ pub unsafe extern "C" fn xml_thr_def_do_validity_checking_default_value(v: c_int
     XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF = v;
     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
-}
-
-pub unsafe extern "C" fn __xml_generic_error_context() -> *mut *mut c_void {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_GENERIC_ERROR_CONTEXT.as_ptr()
-    } else {
-        (*xml_get_global_state()).xml_generic_error_context.as_ptr()
-    }
-}
-
-#[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_generic_error_context() -> *mut c_void {
-    *__xml_generic_error_context()
-}
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_generic_error_context() -> *mut c_void {
-    *_XML_GENERIC_ERROR_CONTEXT.as_ptr()
 }
 
 pub unsafe extern "C" fn __xml_get_warnings_default_value() -> *mut c_int {

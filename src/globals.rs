@@ -153,20 +153,20 @@ thread_local! {
 ///
 /// If `func` is `None`, set `generic_error_default`.  
 /// If `context` is `None`, current context is clear and no context is set.  
-pub fn set_generic_error(func: Option<GenericError>, context: Option<Box<dyn Any>>) {
+pub fn set_generic_error(func: Option<GenericError>, context: Option<GenericErrorContext>) {
     GLOBAL_STATE.with_borrow_mut(|state| {
         state.generic_error = func.unwrap_or(generic_error_default);
-        state.generic_error_context = context.map(GenericErrorContext::new);
+        state.generic_error_context = context;
     });
 }
 
 /// Set new structured error function and structured error context.
 ///
 /// Even if `func` and `context` are `None`, replacements are not set.
-pub fn set_structured_error(func: Option<StructuredError>, context: Option<Box<dyn Any>>) {
+pub fn set_structured_error(func: Option<StructuredError>, context: Option<GenericErrorContext>) {
     GLOBAL_STATE.with_borrow_mut(|state| {
         state.structured_error = func;
-        state.structured_error_context = context.map(GenericErrorContext::new);
+        state.structured_error_context = context;
     });
 }
 
