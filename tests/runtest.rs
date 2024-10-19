@@ -85,14 +85,14 @@ struct TestDesc<'a> {
     desc: &'a str,            /* description of the test */
     func: Functest,           /* function implementing the test */
     input: Option<&'a str>,   /* glob to path for input files */
-    out: Option<&'a CStr>,    /* output directory */
+    out: Option<&'a str>,     /* output directory */
     suffix: Option<&'a CStr>, /* suffix for output files */
     err: Option<&'a CStr>,    /* suffix for error output files */
     options: c_int,           /* parser options for the test */
 }
 
 static mut UPDATE_RESULTS: c_int = 0;
-static TEMP_DIRECTORY: OnceLock<CString> = OnceLock::new();
+static TEMP_DIRECTORY: OnceLock<String> = OnceLock::new();
 
 static mut NB_TESTS: c_int = 0;
 static mut NB_ERRORS: c_int = 0;
@@ -343,7 +343,7 @@ fn base_filename(filename: impl AsRef<Path>) -> String {
 
 unsafe fn result_filename(
     filename: &str,
-    mut out: *const c_char,
+    out: Option<&str>,
     mut suffix: *const c_char,
 ) -> *mut c_char {
     let mut res: [c_char; 500] = [0; 500];
@@ -361,9 +361,8 @@ unsafe fn result_filename(
     if suffix.is_null() {
         suffix = c".tmp".as_ptr();
     }
-    if out.is_null() {
-        out = c"".as_ptr();
-    }
+    let out = out.unwrap_or("");
+    let cout = CString::new(out).unwrap();
 
     strncpy(suffixbuff.as_mut_ptr(), suffix, 499);
 
@@ -371,7 +370,7 @@ unsafe fn result_filename(
         res.as_mut_ptr() as _,
         499,
         c"%s%s%s".as_ptr(),
-        out,
+        cout.as_ptr(),
         cbase.as_ptr(),
         suffixbuff.as_ptr(),
     ) >= 499
@@ -1759,10 +1758,7 @@ unsafe fn sax_parse_test(
     NB_TESTS += 1;
     let temp: *mut c_char = result_filename(
         filename,
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -1955,10 +1951,7 @@ unsafe fn old_parse_test(
     }
     let temp: *mut c_char = result_filename(
         filename,
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -2697,10 +2690,7 @@ unsafe fn noent_parse_test(
     }
     let temp: *mut c_char = result_filename(
         filename,
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -2980,10 +2970,7 @@ unsafe fn stream_process_test(
     if !result.is_null() {
         temp = result_filename(
             filename,
-            TEMP_DIRECTORY
-                .get()
-                .map(|t| t.as_ptr())
-                .unwrap_or(null_mut()),
+            TEMP_DIRECTORY.get().cloned().as_deref(),
             c".res".as_ptr(),
         );
         if temp.is_null() {
@@ -3264,10 +3251,7 @@ unsafe fn xpath_common_test(
 
     let temp: *mut c_char = result_filename(
         filename,
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -3571,10 +3555,7 @@ unsafe fn xmlid_doc_test(
 
     let temp: *mut c_char = result_filename(
         filename,
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -3691,10 +3672,7 @@ unsafe fn uri_common_test(
 
     let temp: *mut c_char = result_filename(
         filename,
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -4040,10 +4018,7 @@ unsafe fn schemas_one_test(
 
     let temp: *mut c_char = result_filename(
         CStr::from_ptr(result).to_string_lossy().as_ref(),
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -4302,10 +4277,7 @@ unsafe fn rng_one_test(
 
     let temp: *mut c_char = result_filename(
         CStr::from_ptr(result).to_string_lossy().as_ref(),
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -4830,10 +4802,7 @@ unsafe fn pattern_test(
     };
     let temp: *mut c_char = result_filename(
         filename,
-        TEMP_DIRECTORY
-            .get()
-            .map(|t| t.as_ptr())
-            .unwrap_or(null_mut()),
+        TEMP_DIRECTORY.get().cloned().as_deref(),
         c".res".as_ptr(),
     );
     if temp.is_null() {
@@ -5678,7 +5647,7 @@ unsafe fn regexp_test(
             return -1;
         }
     };
-    let temp: *mut c_char = result_filename(filename, c"".as_ptr(), c".res".as_ptr());
+    let temp: *mut c_char = result_filename(filename, Some(""), c".res".as_ptr());
     if temp.is_null() {
         eprintln!("Out of memory");
         fatal_error();
@@ -5842,7 +5811,7 @@ unsafe fn automata_test(
             return -1;
         }
     };
-    let temp: *mut c_char = result_filename(filename, c"".as_ptr(), c".res".as_ptr());
+    let temp: *mut c_char = result_filename(filename, Some(""), c".res".as_ptr());
     if temp.is_null() {
         eprintln!("Out of memory");
         fatal_error();
@@ -6072,7 +6041,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "for debug",
         func: err_parse_test,
         input: Some("./test/HTML/doc3.htm"),
-        out: Some(c"./result/HTML/"),
+        out: Some("./result/HTML/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XML_PARSE_HTML,
@@ -6081,7 +6050,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XML regression tests",
         func: old_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6090,7 +6059,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XML regression tests on memory",
         func: mem_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6099,7 +6068,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XML entity subst regression tests",
         func: noent_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/noent/"),
+        out: Some("./result/noent/"),
         suffix: Some(c""),
         err: None,
         options: XmlParserOption::XmlParseNoent as i32,
@@ -6108,7 +6077,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XML Namespaces regression tests",
         func: err_parse_test,
         input: Some("./test/namespaces/*"),
-        out: Some(c"./result/namespaces/"),
+        out: Some("./result/namespaces/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: 0,
@@ -6118,7 +6087,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Error cases regression tests",
         func: err_parse_test,
         input: Some("./test/errors/*.xml"),
-        out: Some(c"./result/errors/"),
+        out: Some("./result/errors/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: 0,
@@ -6128,7 +6097,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Error cases regression tests from file descriptor",
         func: fd_parse_test,
         input: Some("./test/errors/*.xml"),
-        out: Some(c"./result/errors/"),
+        out: Some("./result/errors/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: 0,
@@ -6138,7 +6107,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Error cases regression tests with entity substitution",
         func: err_parse_test,
         input: Some("./test/errors/*.xml"),
-        out: Some(c"./result/errors/"),
+        out: Some("./result/errors/"),
         suffix: None,
         err: Some(c".ent"),
         options: XmlParserOption::XmlParseNoent as i32,
@@ -6148,7 +6117,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Error cases regression tests (old 1.0)",
         func: err_parse_test,
         input: Some("./test/errors10/*.xml"),
-        out: Some(c"./result/errors10/"),
+        out: Some("./result/errors10/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XmlParserOption::XmlParseOld10 as i32,
@@ -6158,7 +6127,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Error cases stream regression tests",
         func: stream_parse_test,
         input: Some("./test/errors/*.xml"),
-        out: Some(c"./result/errors/"),
+        out: Some("./result/errors/"),
         suffix: None,
         err: Some(c".str"),
         options: 0,
@@ -6168,7 +6137,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Reader regression tests",
         func: stream_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c".rdr"),
         err: None,
         options: 0,
@@ -6178,7 +6147,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Reader entities substitution regression tests",
         func: stream_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c".rde"),
         err: None,
         options: XmlParserOption::XmlParseNoent as i32,
@@ -6188,7 +6157,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Reader on memory regression tests",
         func: stream_mem_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c".rdr"),
         err: None,
         options: 0,
@@ -6198,7 +6167,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Walker regression tests",
         func: walker_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c".rdr"),
         err: None,
         options: 0,
@@ -6208,7 +6177,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "SAX1 callbacks regression tests",
         func: sax_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c".sax"),
         err: None,
         options: XmlParserOption::XmlParseSax1 as i32,
@@ -6217,7 +6186,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "SAX2 callbacks regression tests",
         func: sax_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c".sax2"),
         err: None,
         options: 0,
@@ -6226,7 +6195,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "SAX2 callbacks regression tests with entity substitution",
         func: sax_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/noent/"),
+        out: Some("./result/noent/"),
         suffix: Some(c".sax2"),
         err: None,
         options: XmlParserOption::XmlParseNoent as i32,
@@ -6236,7 +6205,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XML push regression tests",
         func: push_parse_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6246,7 +6215,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XML push boundary tests",
         func: push_boundary_test,
         input: Some("./test/*"),
-        out: Some(c"./result/"),
+        out: Some("./result/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6256,7 +6225,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "HTML regression tests",
         func: err_parse_test,
         input: Some("./test/HTML/*"),
-        out: Some(c"./result/HTML/"),
+        out: Some("./result/HTML/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XML_PARSE_HTML,
@@ -6266,7 +6235,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "HTML regression tests from file descriptor",
         func: fd_parse_test,
         input: Some("./test/HTML/*"),
-        out: Some(c"./result/HTML/"),
+        out: Some("./result/HTML/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XML_PARSE_HTML,
@@ -6276,7 +6245,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Push HTML regression tests",
         func: push_parse_test,
         input: Some("./test/HTML/*"),
-        out: Some(c"./result/HTML/"),
+        out: Some("./result/HTML/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XML_PARSE_HTML,
@@ -6286,7 +6255,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Push HTML boundary tests",
         func: push_boundary_test,
         input: Some("./test/HTML/*"),
-        out: Some(c"./result/HTML/"),
+        out: Some("./result/HTML/"),
         suffix: Some(c""),
         err: None,
         options: XML_PARSE_HTML,
@@ -6296,7 +6265,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "HTML SAX regression tests",
         func: sax_parse_test,
         input: Some("./test/HTML/*"),
-        out: Some(c"./result/HTML/"),
+        out: Some("./result/HTML/"),
         suffix: Some(c".sax"),
         err: None,
         options: XML_PARSE_HTML,
@@ -6316,7 +6285,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Validity checking regression tests",
         func: err_parse_test,
         input: Some("./test/VC/*"),
-        out: Some(c"./result/VC/"),
+        out: Some("./result/VC/"),
         suffix: None,
         err: Some(c""),
         options: XmlParserOption::XmlParseDtdvalid as i32,
@@ -6326,7 +6295,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Streaming validity checking regression tests",
         func: stream_parse_test,
         input: Some("./test/valid/*.xml"),
-        out: Some(c"./result/valid/"),
+        out: Some("./result/valid/"),
         suffix: None,
         err: Some(c".err.rdr"),
         options: XmlParserOption::XmlParseDtdvalid as i32,
@@ -6336,7 +6305,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Streaming validity error checking regression tests",
         func: stream_parse_test,
         input: Some("./test/VC/*"),
-        out: Some(c"./result/VC/"),
+        out: Some("./result/VC/"),
         suffix: None,
         err: Some(c".rdr"),
         options: XmlParserOption::XmlParseDtdvalid as i32,
@@ -6346,7 +6315,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "General documents valid regression tests",
         func: err_parse_test,
         input: Some("./test/valid/*"),
-        out: Some(c"./result/valid/"),
+        out: Some("./result/valid/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XmlParserOption::XmlParseDtdvalid as i32,
@@ -6356,7 +6325,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XInclude regression tests",
         func: err_parse_test,
         input: Some("./test/XInclude/docs/*"),
-        out: Some(c"./result/XInclude/"),
+        out: Some("./result/XInclude/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XmlParserOption::XmlParseXinclude as i32,
@@ -6366,7 +6335,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XInclude xmlReader regression tests",
         func: stream_parse_test,
         input: Some("./test/XInclude/docs/*"),
-        out: Some(c"./result/XInclude/"),
+        out: Some("./result/XInclude/"),
         suffix: Some(c".rdr"),
         err: Some(c".err"),
         options: XmlParserOption::XmlParseXinclude as i32,
@@ -6376,7 +6345,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XInclude regression tests stripping include nodes",
         func: err_parse_test,
         input: Some("./test/XInclude/docs/*"),
-        out: Some(c"./result/XInclude/"),
+        out: Some("./result/XInclude/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XmlParserOption::XmlParseXinclude as i32
@@ -6387,7 +6356,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XInclude xmlReader regression tests stripping include nodes",
         func: stream_parse_test,
         input: Some("./test/XInclude/docs/*"),
-        out: Some(c"./result/XInclude/"),
+        out: Some("./result/XInclude/"),
         suffix: Some(c".rdr"),
         err: Some(c".err"),
         options: XmlParserOption::XmlParseXinclude as i32
@@ -6398,7 +6367,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XInclude regression tests without reader",
         func: err_parse_test,
         input: Some("./test/XInclude/without-reader/*"),
-        out: Some(c"./result/XInclude/"),
+        out: Some("./result/XInclude/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: XmlParserOption::XmlParseXinclude as i32,
@@ -6408,7 +6377,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "XPath expressions regression tests",
         func: xpath_expr_test,
         input: Some("./test/XPath/expr/*"),
-        out: Some(c"./result/XPath/expr/"),
+        out: Some("./result/XPath/expr/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6452,7 +6421,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "xml:id regression tests",
         func: xmlid_doc_test,
         input: Some("./test/xmlid/*"),
-        out: Some(c"./result/xmlid/"),
+        out: Some("./result/xmlid/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: 0,
@@ -6461,7 +6430,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "URI parsing tests",
         func: uri_parse_test,
         input: Some("./test/URI/*.uri"),
-        out: Some(c"./result/URI/"),
+        out: Some("./result/URI/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6470,7 +6439,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "URI base composition tests",
         func: uri_base_test,
         input: Some("./test/URI/*.data"),
-        out: Some(c"./result/URI/"),
+        out: Some("./result/URI/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6519,7 +6488,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Pattern regression tests",
         func: pattern_test,
         input: Some("./test/pattern/*.pat"),
-        out: Some(c"./result/pattern/"),
+        out: Some("./result/pattern/"),
         suffix: None,
         err: None,
         options: 0,
@@ -6578,7 +6547,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "SVG parsing regression tests",
         func: old_parse_test,
         input: Some("./test/SVG/*.xml"),
-        out: Some(c"./result/SVG/"),
+        out: Some("./result/SVG/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6588,7 +6557,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Regexp regression tests",
         func: regexp_test,
         input: Some("./test/regexp/*"),
-        out: Some(c"./result/regexp/"),
+        out: Some("./result/regexp/"),
         suffix: Some(c""),
         err: Some(c".err"),
         options: 0,
@@ -6598,7 +6567,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: "Automata regression tests",
         func: automata_test,
         input: Some("./test/automata/*"),
-        out: Some(c"./result/automata/"),
+        out: Some("./result/automata/"),
         suffix: Some(c""),
         err: None,
         options: 0,
@@ -6641,11 +6610,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
             }
 
             if let Some(suffix) = tst.suffix {
-                result = result_filename(
-                    &path,
-                    tst.out.map(|o| o.as_ptr()).unwrap_or(null_mut()),
-                    suffix.as_ptr(),
-                );
+                result = result_filename(&path, tst.out, suffix.as_ptr());
                 if result.is_null() {
                     eprintln!("Out of memory !");
                     fatal_error();
@@ -6654,11 +6619,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                 result = null_mut();
             }
             if let Some(err) = tst.err {
-                error = result_filename(
-                    &path,
-                    tst.out.map(|o| o.as_ptr()).unwrap_or(null_mut()),
-                    err.as_ptr(),
-                );
+                error = result_filename(&path, tst.out, err.as_ptr());
                 if error.is_null() {
                     eprintln!("Out of memory !");
                     fatal_error();
@@ -6759,7 +6720,7 @@ fn main() {
             } else if arg == "-quiet" {
                 TESTS_QUIET = 1;
             } else if arg == "--out" {
-                if let Ok(s) = CString::new(args.next().unwrap()) {
+                if let Some(s) = args.next() {
                     TEMP_DIRECTORY.set(s).unwrap();
                 }
             } else {
