@@ -10,6 +10,7 @@ use std::{
     os::{fd::AsRawFd, raw::c_void},
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
+    slice::from_raw_parts,
     sync::{
         atomic::{AtomicPtr, Ordering},
         Mutex, OnceLock,
@@ -66,8 +67,8 @@ use exml::{
     SYSCONFDIR,
 };
 use libc::{
-    close, fdopen, fflush, free, malloc, memcmp, memcpy, open, pthread_t, size_t, snprintf, strcmp,
-    strlen, unlink, FILE, O_RDONLY,
+    close, fdopen, fflush, free, malloc, memcpy, open, pthread_t, size_t, snprintf, strcmp, strlen,
+    FILE, O_RDONLY,
 };
 
 /*
@@ -413,7 +414,7 @@ fn compare_files(
             if res1 == 0 {
                 break;
             }
-            if bytes1[..res1] == bytes2[..res1] {
+            if bytes1[..res1] != bytes2[..res1] {
                 return 1;
             }
         }
@@ -423,91 +424,86 @@ fn compare_files(
 }
 
 unsafe extern "C" fn compare_file_mem(
-    filename: *const c_char,
+    filename: impl AsRef<Path>,
     mem: *const c_char,
     size: c_int,
 ) -> c_int {
-    let mut bytes: [u8; 4096] = [0; 4096];
+    let mem = from_raw_parts(mem as *const u8, size as usize);
+    fn _compare_file_mem(filename: &Path, mem: &[u8]) -> i32 {
+        let mut bytes: [u8; 4096] = [0; 4096];
+        let size = mem.len();
 
-    if UPDATE_RESULTS != 0 {
-        if size == 0 {
-            unlink(filename);
-            return 0;
-        }
-        let mut file = match File::options()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(CStr::from_ptr(filename).to_string_lossy().as_ref())
-        {
-            Ok(file) => file,
-            _ => {
-                eprint!(
-                    "failed to open {} for writing",
-                    CStr::from_ptr(filename).to_string_lossy()
-                );
-                return -1;
-            }
-        };
-        let res = file
-            .write(std::slice::from_raw_parts(mem as *const u8, size as usize))
-            .unwrap();
-        return (res != size as usize) as i32;
-    }
-
-    match metadata(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
-        Ok(meta) => {
-            if meta.len() != size as u64 {
-                eprintln!(
-                    "file {} is {} bytes, result is {} bytes",
-                    CStr::from_ptr(filename).to_string_lossy(),
-                    meta.len(),
-                    size,
-                );
-                return -1;
-            }
-        }
-        Err(_) => {
+        if unsafe { UPDATE_RESULTS } != 0 {
             if size == 0 {
+                remove_file(filename).ok();
                 return 0;
             }
-            eprintln!(
-                "failed to stat {}",
-                CStr::from_ptr(filename).to_string_lossy()
-            );
-            return -1;
+            let mut file = match File::options()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(filename)
+            {
+                Ok(file) => file,
+                _ => {
+                    eprint!("failed to open {} for writing", filename.display());
+                    return -1;
+                }
+            };
+            let res = file.write(mem).unwrap();
+            return (res != size) as i32;
         }
-    }
-    let Ok(mut file) = File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()) else {
-        eprint!(
-            "failed to open {} for reading",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
-        return -1;
-    };
-    let mut idx = 0;
-    while idx < size as usize {
-        let res = match file.read(&mut bytes) {
-            Ok(size) => size,
-            _ => break,
-        };
-        if res + idx > size as usize {
-            break;
-        }
-        if memcmp(bytes.as_mut_ptr() as _, mem.add(idx) as _, res) != 0 {
-            for (ix, &byte) in bytes.iter().enumerate().take(res + 1) {
-                if idx == res || byte != *mem.add(idx + ix) as u8 {
-                    eprintln!("Compare error at position {}", idx + ix);
-                    return 1;
+
+        match metadata(filename) {
+            Ok(meta) => {
+                if meta.len() != size as u64 {
+                    eprintln!(
+                        "file {} is {} bytes, result is {} bytes",
+                        filename.display(),
+                        meta.len(),
+                        size,
+                    );
+                    return -1;
                 }
             }
+            Err(_) => {
+                if size == 0 {
+                    return 0;
+                }
+                eprintln!("failed to stat {}", filename.display());
+                return -1;
+            }
         }
-        idx += res;
+        let Ok(mut file) = File::open(filename) else {
+            eprint!("failed to open {} for reading", filename.display());
+            return -1;
+        };
+        let mut idx = 0;
+        while idx < size {
+            let res = match file.read(&mut bytes) {
+                Ok(size) => size,
+                _ => break,
+            };
+            if res + idx > size {
+                break;
+            }
+            if bytes[..res] != mem[idx..idx + res] {
+                for (ix, &byte) in bytes.iter().enumerate().take(res + 1) {
+                    if idx == res || byte != mem[idx + ix] {
+                        eprintln!("Compare error at position {}", idx + ix);
+                        return 1;
+                    }
+                }
+            }
+            idx += res;
+        }
+        if idx != size {
+            eprintln!("Compare error index {}, size {}", idx, size);
+        }
+        (idx != size) as i32
     }
-    if idx != size as usize {
-        eprintln!("Compare error index {}, size {}", idx, size);
-    }
-    (idx != size as usize) as i32
+
+    _compare_file_mem(filename.as_ref(), mem)
 }
 
 unsafe fn load_mem(filename: &str, mem: *mut *const c_char, size: *mut c_int) -> c_int {
@@ -1979,7 +1975,6 @@ unsafe fn push_parse_test(
     let mut cur: c_int = 0;
     let mut chunk_size: c_int = 4;
     let cfilename = CString::new(filename).unwrap();
-    let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
 
     NB_TESTS += 1;
     /*
@@ -2093,11 +2088,7 @@ unsafe fn push_parse_test(
         );
     }
     xml_free_doc(doc);
-    res = compare_file_mem(
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-        base,
-        size,
-    );
+    res = compare_file_mem(result.as_deref().unwrap(), base, size);
     if base.is_null() || res != 0 {
         if !base.is_null() {
             xml_free(base as _);
@@ -2106,12 +2097,8 @@ unsafe fn push_parse_test(
         return -1;
     }
     xml_free(base as _);
-    if let Some(err) = err.map(|e| CString::new(e).unwrap()) {
-        res = compare_file_mem(
-            err.as_ptr(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
-        );
+    if let Some(err) = err {
+        res = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2541,12 +2528,7 @@ unsafe fn push_boundary_test(
         );
     }
     xml_free_doc(doc);
-    let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-    res = compare_file_mem(
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-        base,
-        size,
-    );
+    res = compare_file_mem(result.as_deref().unwrap(), base, size);
     if base.is_null() || res != 0 {
         if !base.is_null() {
             xml_free(base as _);
@@ -2555,12 +2537,8 @@ unsafe fn push_boundary_test(
         return -1;
     }
     xml_free(base as _);
-    if let Some(err) = err.map(|e| CString::new(e).unwrap()) {
-        res = compare_file_mem(
-            err.as_ptr(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
-        );
+    if let Some(err) = err {
+        res = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2611,12 +2589,7 @@ unsafe fn mem_parse_test(
         addr_of_mut!(size),
     );
     xml_free_doc(doc);
-    let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-    let res: c_int = compare_file_mem(
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-        base,
-        size,
-    );
+    let res: c_int = compare_file_mem(result.as_deref().unwrap(), base, size);
     if base.is_null() || res != 0 {
         if !base.is_null() {
             xml_free(base as _);
@@ -2709,7 +2682,6 @@ unsafe fn err_parse_test(
     let mut res: c_int = 0;
     let cfilename = CString::new(filename).unwrap();
     let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-    let cerr = err.as_deref().map(|s| CString::new(s).unwrap());
 
     NB_TESTS += 1;
     if cfg!(feature = "html") && options & XML_PARSE_HTML != 0 {
@@ -2758,7 +2730,11 @@ unsafe fn err_parse_test(
                 );
             }
         }
-        res = compare_file_mem(result.as_ptr(), base, size);
+        res = compare_file_mem(
+            CStr::from_ptr(result.as_ptr()).to_string_lossy().as_ref(),
+            base,
+            size,
+        );
     }
     if !doc.is_null() {
         if !base.is_null() {
@@ -2770,12 +2746,8 @@ unsafe fn err_parse_test(
         eprintln!("Result for {filename} failed in {}", result.unwrap());
         return -1;
     }
-    if let Some(err) = cerr {
-        res = compare_file_mem(
-            err.as_ptr(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
-        );
+    if let Some(err) = err {
+        res = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2808,7 +2780,6 @@ unsafe fn fd_parse_test(
     let mut res: c_int = 0;
     let cfilename = CString::new(filename).unwrap();
     let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-    let cerr = err.as_deref().map(|s| CString::new(s).unwrap());
 
     NB_TESTS += 1;
     let fd: c_int = open(cfilename.as_ptr(), RD_FLAGS);
@@ -2850,7 +2821,11 @@ unsafe fn fd_parse_test(
                 );
             }
         }
-        res = compare_file_mem(result.as_ptr(), base, size);
+        res = compare_file_mem(
+            CStr::from_ptr(result.as_ptr()).to_string_lossy().as_ref(),
+            base,
+            size,
+        );
     }
     if !doc.is_null() {
         if !base.is_null() {
@@ -2862,12 +2837,8 @@ unsafe fn fd_parse_test(
         eprintln!("Result for {filename} failed in {}", result.unwrap(),);
         return -1;
     }
-    if let Some(err) = cerr {
-        res = compare_file_mem(
-            err.as_ptr(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
-        );
+    if let Some(err) = err {
+        res = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -3000,12 +2971,8 @@ unsafe fn stream_process_test(
             return -1;
         }
     }
-    if let Some(err) = err.map(|e| CString::new(e).unwrap()) {
-        ret = compare_file_mem(
-            err.as_ptr(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
-        );
+    if let Some(err) = err {
+        ret = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if ret != 0 {
             eprintln!("Error for {filename} failed",);
             print!(
@@ -3533,12 +3500,8 @@ unsafe fn xmlid_doc_test(
     remove_file(temp).ok();
     xml_free_doc(XPATH_DOCUMENT.load(Ordering::Relaxed));
 
-    if let Some(err) = err.map(|e| CString::new(e).unwrap()) {
-        ret = compare_file_mem(
-            err.as_ptr(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
-        );
+    if let Some(err) = err {
+        ret = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if ret != 0 {
             eprintln!("Error for {filename} failed",);
             res = 1;
@@ -3670,12 +3633,8 @@ unsafe fn uri_common_test(
             res = 1;
         }
     }
-    if let Some(err) = err.map(|e| CString::new(e).unwrap()) {
-        ret = compare_file_mem(
-            err.as_ptr(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
-        );
+    if let Some(err) = err {
+        ret = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if ret != 0 {
             eprintln!("Error for {filename} failed",);
             res = 1;
@@ -4152,7 +4111,7 @@ unsafe fn schemas_test(
             }
         }
         if compare_file_mem(
-            err.as_ptr(),
+            CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
             TEST_ERRORS.as_ptr() as _,
             TEST_ERRORS_SIZE as _,
         ) != 0
@@ -4388,7 +4347,7 @@ unsafe fn rng_test(
             }
         }
         if compare_file_mem(
-            err.as_ptr(),
+            CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
             TEST_ERRORS.as_ptr() as _,
             TEST_ERRORS_SIZE as _,
         ) != 0
@@ -5137,7 +5096,13 @@ unsafe extern "C" fn c14n_run_test(
         addr_of_mut!(result),
     );
     if ret >= 0 {
-        if !result.is_null() && compare_file_mem(result_file, result as *const c_char, ret) != 0 {
+        if !result.is_null()
+            && compare_file_mem(
+                CStr::from_ptr(result_file).to_string_lossy().as_ref(),
+                result as *const c_char,
+                ret,
+            ) != 0
+        {
             eprintln!(
                 "Result mismatch for {}",
                 CStr::from_ptr(xml_filename).to_string_lossy()
@@ -5645,9 +5610,8 @@ unsafe fn regexp_test(
     }
     remove_file(temp).ok();
 
-    let cerr = err.as_deref().map(|s| CString::new(s).unwrap());
     ret = compare_file_mem(
-        cerr.as_ref().map_or(null_mut(), |s| s.as_ptr()),
+        err.as_deref().unwrap(),
         TEST_ERRORS.as_ptr() as _,
         TEST_ERRORS_SIZE as _,
     );
