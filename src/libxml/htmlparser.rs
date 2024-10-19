@@ -5766,7 +5766,7 @@ unsafe extern "C" fn html_parse_err_int(
         null_mut(),
         0,
         null_mut(),
-        null_mut(),
+        None,
         None,
         val,
         0,
@@ -5883,7 +5883,10 @@ unsafe extern "C" fn html_parse_err(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,
@@ -6468,7 +6471,7 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
             null_mut(),
             0,
             extra,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -6488,7 +6491,7 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
             null_mut(),
             0,
             null_mut(),
-            null_mut(),
+            None,
             None,
             0,
             0,

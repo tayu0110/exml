@@ -98,7 +98,7 @@ unsafe extern "C" fn xml_xptr_err_memory(extra: *const c_char) {
         null_mut(),
         0,
         extra,
-        null(),
+        None,
         None,
         0,
         0,
@@ -2402,7 +2402,7 @@ unsafe extern "C" fn xml_xptr_err(
             null_mut(),
             0,
             extra as _,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -2445,7 +2445,10 @@ unsafe extern "C" fn xml_xptr_err(
             null_mut(),
             0,
             extra as _,
-            (*ctxt).base as _,
+            (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
             0,

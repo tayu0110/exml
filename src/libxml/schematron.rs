@@ -533,7 +533,10 @@ unsafe extern "C" fn xml_schematron_perr(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,
@@ -1963,7 +1966,10 @@ unsafe extern "C" fn xml_schematron_report_success(
                 } else {
                     (*pattern).name as _
                 },
-                path as _,
+                (!path.is_null()).then(|| CStr::from_ptr(path as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into()),
                 (!report.is_null()).then(|| CStr::from_ptr(report as *const i8)
                     .to_string_lossy()
                     .into_owned()

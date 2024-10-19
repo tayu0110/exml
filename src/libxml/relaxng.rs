@@ -969,7 +969,10 @@ unsafe extern "C" fn xml_rng_verr(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,
@@ -1237,7 +1240,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
             null_mut(),
             0,
             extra,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -1257,7 +1260,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
             null_mut(),
             0,
             null_mut(),
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -1854,7 +1857,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             null_mut(),
             0,
             extra,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -1874,7 +1877,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             null_mut(),
             0,
             null_mut(),
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -2800,7 +2803,10 @@ unsafe extern "C" fn xml_rng_perr(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,

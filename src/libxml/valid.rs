@@ -271,7 +271,7 @@ unsafe extern "C" fn xml_err_valid(
             null_mut(),
             0,
             extra,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -291,7 +291,7 @@ unsafe extern "C" fn xml_err_valid(
             null_mut(),
             0,
             null_mut(),
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -342,7 +342,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             null_mut(),
             0,
             extra,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -362,7 +362,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             null_mut(),
             0,
             null_mut(),
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -1162,7 +1162,10 @@ unsafe extern "C" fn xml_err_valid_node(
         null_mut(),
         0,
         str1 as *const c_char,
-        str2 as *const c_char,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -2195,7 +2198,10 @@ unsafe extern "C" fn xml_err_valid_warning(
         null_mut(),
         0,
         str1 as *const c_char,
-        str2 as *const c_char,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -4175,7 +4181,10 @@ unsafe extern "C" fn xml_err_valid_node_nr(
         null_mut(),
         0,
         str1 as *const c_char,
-        str3 as *const c_char,
+        (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         int2,
         0,

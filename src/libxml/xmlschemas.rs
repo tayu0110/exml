@@ -1550,7 +1550,10 @@ unsafe fn xml_schema_err4_line(
                 file,
                 line,
                 str1 as _,
-                str2 as _,
+                (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into()),
                 (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
                     .to_string_lossy()
                     .into_owned()
@@ -1586,7 +1589,10 @@ unsafe fn xml_schema_err4_line(
                 null_mut(),
                 0,
                 str1 as _,
-                str2 as _,
+                (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into()),
                 (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
                     .to_string_lossy()
                     .into_owned()
@@ -4956,7 +4962,10 @@ unsafe extern "C" fn xml_schema_perr(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,
@@ -6169,7 +6178,10 @@ unsafe extern "C" fn xml_schema_perr_ext(
         null_mut(),
         0,
         str_data1 as _,
-        str_data2 as _,
+        (!str_data2.is_null()).then(|| CStr::from_ptr(str_data2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!str_data3.is_null()).then(|| CStr::from_ptr(str_data3 as *const i8)
             .to_string_lossy()
             .into_owned()

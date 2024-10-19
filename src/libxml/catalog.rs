@@ -190,7 +190,7 @@ unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
         null_mut(),
         0,
         extra,
-        null_mut(),
+        None,
         None,
         0,
         0,
@@ -1243,7 +1243,10 @@ unsafe extern "C" fn xml_catalog_err(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
             .to_string_lossy()
             .into_owned()

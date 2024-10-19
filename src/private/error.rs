@@ -67,7 +67,7 @@ macro_rules! __xml_raise_error {
             mut file: *const c_char,
             mut line: c_int,
             str1: *const c_char,
-            str2: *const c_char,
+            str2: Option<Cow<'static, str>>,
             str3: Option<Cow<'static, str>>,
             int1: c_int,
             mut col: c_int,
@@ -252,9 +252,7 @@ macro_rules! __xml_raise_error {
                     if !str1.is_null() {
                         to.str1 = Some(CStr::from_ptr(str1 as *const i8).to_string_lossy().into());
                     }
-                    if !str2.is_null() {
-                        to.str2 = Some(CStr::from_ptr(str2 as *const i8).to_string_lossy().into());
-                    }
+                    to.str2 = str2;
                     to.str3 = str3;
                     to.int1 = int1;
                     to.int2 = col;
@@ -346,7 +344,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 null(),
                 0,
                 extra as _,
-                null(),
+                None,
                 None,
                 0,
                 0,
@@ -366,7 +364,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 null(),
                 0,
                 null(),
-                null(),
+                None,
                 None,
                 0,
                 0,
@@ -386,7 +384,7 @@ pub(crate) unsafe fn __xml_simple_error(
             null(),
             0,
             extra as _,
-            null(),
+            None,
             None,
             0,
             0,

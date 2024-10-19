@@ -215,7 +215,7 @@ pub(crate) unsafe extern "C" fn xml_encoding_err(
         null_mut(),
         0,
         val,
-        null_mut(),
+        None,
         None,
         0,
         0,

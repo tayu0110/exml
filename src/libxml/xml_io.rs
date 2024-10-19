@@ -2867,7 +2867,7 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
         null_mut(),
         0,
         filename,
-        null_mut(),
+        None,
         None,
         0,
         0,

@@ -1252,7 +1252,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg(
         null_mut(),
         0,
         null_mut(),
-        null_mut(),
+        None,
         None,
         0,
         0,
@@ -1303,7 +1303,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str(
         null_mut(),
         0,
         val as _,
-        null_mut(),
+        None,
         None,
         0,
         0,
@@ -1354,7 +1354,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_int(
         null_mut(),
         0,
         null_mut(),
-        null_mut(),
+        None,
         None,
         val,
         0,
@@ -1417,7 +1417,10 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
             null_mut(),
             0,
             str1 as _,
-            str2 as _,
+            (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             0,
             0,
@@ -1438,7 +1441,10 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
             null_mut(),
             0,
             str1 as _,
-            str2 as _,
+            (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             0,
             0,
@@ -1485,7 +1491,7 @@ pub(crate) unsafe extern "C" fn xml_err_msg_str(
         null_mut(),
         0,
         val as _,
-        null_mut(),
+        None,
         None,
         0,
         0,
@@ -1537,7 +1543,10 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
             null_mut(),
             0,
             str1 as _,
-            str2 as _,
+            (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             0,
             0,
@@ -1559,7 +1568,10 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
             null_mut(),
             0,
             str1 as _,
-            str2 as _,
+            (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             0,
             0,
@@ -1610,7 +1622,10 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str_int_str(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         val,
         0,
@@ -1666,7 +1681,10 @@ pub(crate) unsafe extern "C" fn xml_ns_err(
         null_mut(),
         0,
         info1 as _,
-        info2 as _,
+        (!info2.is_null()).then(|| CStr::from_ptr(info2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!info3.is_null()).then(|| CStr::from_ptr(info3 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -7840,7 +7858,10 @@ unsafe extern "C" fn xml_ns_warn(
         null_mut(),
         0,
         info1 as _,
-        info2 as _,
+        (!info2.is_null()).then(|| CStr::from_ptr(info2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!info3.is_null()).then(|| CStr::from_ptr(info3 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -7890,7 +7911,7 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             null_mut(),
             0,
             localname as _,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -7910,7 +7931,10 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             null_mut(),
             0,
             prefix as _,
-            localname as _,
+            (!localname.is_null()).then(|| CStr::from_ptr(localname as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             0,
             0,

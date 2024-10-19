@@ -249,7 +249,7 @@ unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_c
             null_mut(),
             0,
             str1,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -273,7 +273,7 @@ unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_c
             null_mut(),
             0,
             str1,
-            null_mut(),
+            None,
             None,
             0,
             0,
@@ -511,7 +511,10 @@ unsafe extern "C" fn xml_fatal_err_msg(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,
@@ -693,7 +696,7 @@ unsafe extern "C" fn xml_warn_msg(
         null_mut(),
         0,
         str1 as _,
-        null_mut(),
+        None,
         None,
         0,
         0,
@@ -836,7 +839,7 @@ unsafe extern "C" fn xml_err_valid(
             null_mut(),
             0,
             str1,
-            str2,
+            (!str2.is_null()).then(|| CStr::from_ptr(str2).to_string_lossy().into_owned().into()),
             None,
             0,
             0,
@@ -858,7 +861,7 @@ unsafe extern "C" fn xml_err_valid(
             null_mut(),
             0,
             str1,
-            str2,
+            (!str2.is_null()).then(|| CStr::from_ptr(str2).to_string_lossy().into_owned().into()),
             None,
             0,
             0,
@@ -1412,7 +1415,10 @@ unsafe extern "C" fn xml_ns_warn_msg(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,
@@ -1466,7 +1472,10 @@ unsafe extern "C" fn xml_ns_err_msg(
         null_mut(),
         0,
         str1 as _,
-        str2 as _,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,

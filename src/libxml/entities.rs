@@ -287,7 +287,7 @@ unsafe extern "C" fn xml_entities_warn(
         null_mut(),
         0,
         str1 as _,
-        null_mut(),
+        None,
         None,
         0,
         0,

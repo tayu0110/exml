@@ -74,7 +74,7 @@ pub unsafe extern "C" fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: *const ch
             null_mut(),
             0,
             extra as _,
-            null(),
+            None,
             None,
             0,
             0,
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: *const ch
             null_mut(),
             0,
             null(),
-            null(),
+            None,
             None,
             0,
             0,
@@ -142,7 +142,10 @@ pub unsafe extern "C" fn __xml_err_encoding(
         null(),
         0,
         str1 as *const c_char,
-        str2 as *const c_char,
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         0,
         0,
