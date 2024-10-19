@@ -3,12 +3,13 @@
 
 use std::{
     ffi::{c_char, c_int, c_void, CStr},
+    io::{stderr, stdout, Write},
     mem::zeroed,
     ptr::{addr_of_mut, null_mut},
 };
 
 use exml::{
-    globals::set_generic_error,
+    globals::{set_generic_error, GenericErrorContext},
     libxml::{
         catalog::{xml_catalog_cleanup, xml_load_catalog},
         globals::xml_do_validity_checking_default_value,
@@ -70,10 +71,12 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
 
         if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
             *xml_do_validity_checking_default_value() = 0;
-            set_generic_error(None, Some(Box::new(std::io::stdout())));
+            let stdout: Box<dyn Write> = Box::new(stdout());
+            set_generic_error(None, Some(GenericErrorContext::new(stdout)));
         } else {
             *xml_do_validity_checking_default_value() = 1;
-            set_generic_error(None, Some(Box::new(std::io::stderr())));
+            let stderr: Box<dyn Write> = Box::new(stderr());
+            set_generic_error(None, Some(GenericErrorContext::new(stderr)));
         }
         #[cfg(feature = "sax1")]
         {
