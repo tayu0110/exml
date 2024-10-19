@@ -358,65 +358,68 @@ fn check_test_file(filename: impl AsRef<Path>) -> bool {
     metadata(filename.as_ref()).map_or(false, |meta| meta.is_file())
 }
 
-unsafe extern "C" fn compare_files(
-    r1: *const c_char, /* temp */
-    r2: *const c_char, /* result */
+fn compare_files(
+    r1: impl AsRef<Path>, /* temp */
+    r2: impl AsRef<Path>, /* result */
 ) -> c_int {
-    let mut bytes1: [u8; 4096] = [0; 4096];
-    let mut bytes2: [u8; 4096] = [0; 4096];
+    fn _compare_files(r1: &Path, r2: &Path) -> i32 {
+        let mut bytes1: [u8; 4096] = [0; 4096];
+        let mut bytes2: [u8; 4096] = [0; 4096];
 
-    if UPDATE_RESULTS != 0 {
-        let Ok(mut fd1) = File::open(CStr::from_ptr(r1).to_string_lossy().as_ref()) else {
-            return -1;
-        };
-        let Ok(mut fd2) = File::options()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(CStr::from_ptr(r2).to_string_lossy().as_ref())
-        else {
-            return -1;
-        };
-        let mut total = 0;
-        while let Ok(res1) = fd1.read(&mut bytes1) {
-            if res1 == 0 {
-                if total == 0 {
-                    unlink(r2);
+        if unsafe { UPDATE_RESULTS } != 0 {
+            let Ok(mut fd1) = File::open(r1) else {
+                return -1;
+            };
+            let Ok(mut fd2) = File::options()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(r2)
+            else {
+                return -1;
+            };
+            let mut total = 0;
+            while let Ok(res1) = fd1.read(&mut bytes1) {
+                if res1 == 0 {
+                    if total == 0 {
+                        remove_file(r2).ok();
+                    }
+                    return 1;
                 }
+                total += res1;
+                if fd2
+                    .write(&bytes1)
+                    .ok()
+                    .filter(|&size| size == res1)
+                    .is_none()
+                {
+                    if total == 0 {
+                        remove_file(r2).ok();
+                    }
+                    return (res1 != 0) as i32;
+                }
+            }
+            return 0;
+        }
+
+        let Ok(mut fd1) = File::open(r1) else {
+            return -1;
+        };
+        let mut fd2 = File::open(r2);
+        while let Ok(res1) = fd1.read(&mut bytes1) {
+            if fd2.as_mut().map_or(0, |f| f.read(&mut bytes2).unwrap_or(0)) != res1 {
                 return 1;
             }
-            total += res1;
-            if fd2
-                .write(&bytes1)
-                .ok()
-                .filter(|&size| size == res1)
-                .is_none()
-            {
-                if total == 0 {
-                    unlink(r2);
-                }
-                return (res1 != 0) as i32;
+            if res1 == 0 {
+                break;
+            }
+            if bytes1[..res1] == bytes2[..res1] {
+                return 1;
             }
         }
-        return 0;
+        0
     }
-
-    let Ok(mut fd1) = File::open(CStr::from_ptr(r1).to_string_lossy().as_ref()) else {
-        return -1;
-    };
-    let mut fd2 = File::open(CStr::from_ptr(r2).to_string_lossy().as_ref());
-    while let Ok(res1) = fd1.read(&mut bytes1) {
-        if fd2.as_mut().map_or(0, |f| f.read(&mut bytes2).unwrap_or(0)) != res1 {
-            return 1;
-        }
-        if res1 == 0 {
-            break;
-        }
-        if memcmp(bytes1.as_ptr() as _, bytes2.as_ptr() as _, res1) != 0 {
-            return 1;
-        }
-    }
-    0
+    _compare_files(r1.as_ref(), r2.as_ref())
 }
 
 unsafe extern "C" fn compare_file_mem(
@@ -1861,13 +1864,7 @@ unsafe fn sax_parse_test(
             ret = 0;
         }
 
-        let ctemp = CString::new(temp.as_str()).unwrap();
-        let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-        if compare_files(
-            ctemp.as_ptr(),
-            cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-        ) != 0
-        {
+        if compare_files(temp.as_str(), result.unwrap()) != 0 {
             eprintln!("Got a difference for {filename}",);
             ret = 1;
         }
@@ -1902,7 +1899,6 @@ unsafe fn old_parse_test(
 ) -> c_int {
     let mut res: c_int = 0;
     let cfilename = CString::new(filename).unwrap();
-    let cresult = result.map(|s| CString::new(s).unwrap());
 
     NB_TESTS += 1;
     /*
@@ -1922,11 +1918,7 @@ unsafe fn old_parse_test(
     );
     let ctemp = CString::new(temp.as_str()).unwrap();
     xml_save_file(ctemp.as_ptr(), doc);
-    if compare_files(
-        ctemp.as_ptr(),
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-    ) != 0
-    {
+    if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
     xml_free_doc(doc);
@@ -1946,11 +1938,7 @@ unsafe fn old_parse_test(
         return 1;
     }
     xml_save_file(ctemp.as_ptr(), doc);
-    if compare_files(
-        ctemp.as_ptr(),
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-    ) != 0
-    {
+    if compare_files(temp.as_str(), result.unwrap()) != 0 {
         res = 1;
     }
     xml_free_doc(doc);
@@ -2661,7 +2649,6 @@ unsafe fn noent_parse_test(
     let mut doc: XmlDocPtr;
     let mut res: c_int = 0;
     let cfilename = CString::new(filename).unwrap();
-    let cresult = result.map(|s| CString::new(s).unwrap());
 
     NB_TESTS += 1;
     /*
@@ -2678,11 +2665,7 @@ unsafe fn noent_parse_test(
     );
     let ctemp = CString::new(temp.as_str()).unwrap();
     xml_save_file(ctemp.as_ptr(), doc);
-    if compare_files(
-        ctemp.as_ptr(),
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-    ) != 0
-    {
+    if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
     xml_free_doc(doc);
@@ -2695,11 +2678,7 @@ unsafe fn noent_parse_test(
         return 1;
     }
     xml_save_file(ctemp.as_ptr(), doc);
-    if compare_files(
-        ctemp.as_ptr(),
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-    ) != 0
-    {
+    if compare_files(temp.as_str(), result.unwrap()) != 0 {
         res = 1;
     }
     xml_free_doc(doc);
@@ -3012,12 +2991,7 @@ unsafe fn stream_process_test(
         }
     }
     if t.is_some() {
-        let ctemp = temp.as_deref().map(|s| CString::new(s).unwrap());
-        let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-        ret = compare_files(
-            ctemp.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-            cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-        );
+        ret = compare_files(temp.as_deref().unwrap(), result.as_deref().unwrap());
         if let Some(temp) = temp {
             remove_file(temp).ok();
         }
@@ -3290,11 +3264,10 @@ unsafe fn xpath_common_test(
         expression.clear();
     }
 
-    if let Some(cresult) = result.as_deref().map(|s| CString::new(s).unwrap()) {
-        let ctemp = CString::new(temp.as_str()).unwrap();
-        ret = compare_files(ctemp.as_ptr(), cresult.as_ptr());
+    if let Some(result) = result {
+        ret = compare_files(temp.as_str(), result.as_str());
         if ret != 0 {
-            eprintln!("Result for {filename} failed in {}", result.unwrap());
+            eprintln!("Result for {filename} failed in {}", result);
         }
     }
 
@@ -3549,11 +3522,10 @@ unsafe fn xmlid_doc_test(
 
     test_xpath(c"id('bar')".as_ptr() as _, 0, 0);
 
-    if let Some(cresult) = result.as_deref().map(|s| CString::new(s).unwrap()) {
-        let ctemp = CString::new(temp.as_str()).unwrap();
-        ret = compare_files(ctemp.as_ptr(), cresult.as_ptr());
+    if let Some(result) = result {
+        ret = compare_files(temp.as_str(), result.as_str());
         if ret != 0 {
-            eprintln!("Result for {filename} failed in {}", result.unwrap());
+            eprintln!("Result for {filename} failed in {}", result);
             res = 1;
         }
     }
@@ -3691,11 +3663,10 @@ unsafe fn uri_common_test(
         str.clear();
     }
 
-    if let Some(cresult) = result.as_deref().map(|s| CString::new(s).unwrap()) {
-        let ctemp = CString::new(temp.as_str()).unwrap();
-        ret = compare_files(ctemp.as_ptr(), cresult.as_ptr());
+    if let Some(result) = result {
+        ret = compare_files(temp.as_str(), result.as_str());
         if ret != 0 {
-            eprintln!("Result for {filename} failed in {}", result.unwrap());
+            eprintln!("Result for {filename} failed in {result}");
             res = 1;
         }
     }
@@ -4021,8 +3992,12 @@ unsafe fn schemas_one_test(
             .ok();
         }
     }
-    let ctemp = CString::new(temp.as_str()).unwrap();
-    if !result.is_null() && compare_files(ctemp.as_ptr(), result) != 0 {
+    if !result.is_null()
+        && compare_files(
+            temp.as_str(),
+            CStr::from_ptr(result).to_string_lossy().as_ref(),
+        ) != 0
+    {
         eprintln!(
             "Result for {} on {} failed",
             CStr::from_ptr(filename).to_string_lossy(),
@@ -4261,8 +4236,12 @@ unsafe fn rng_one_test(
     }
 
     ret = 0;
-    let ctemp = CString::new(temp.as_str()).unwrap();
-    if !result.is_null() && compare_files(ctemp.as_ptr(), result) != 0 {
+    if !result.is_null()
+        && compare_files(
+            temp.as_str(),
+            CStr::from_ptr(result).to_string_lossy().as_ref(),
+        ) != 0
+    {
         eprintln!(
             "Result for {filename} on {} failed",
             CStr::from_ptr(sch).to_string_lossy()
@@ -4845,13 +4824,10 @@ unsafe fn pattern_test(
         str.clear();
     }
 
-    let ctemp = CString::new(temp.as_str()).unwrap();
-    ret = compare_files(ctemp.as_ptr(), result.as_ptr());
+    let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
+    ret = compare_files(temp.as_str(), result.as_ref());
     if ret != 0 {
-        eprintln!(
-            "Result for {filename} failed in {}",
-            CStr::from_ptr(result.as_ptr()).to_string_lossy()
-        );
+        eprintln!("Result for {filename} failed in {result}");
         ret = 1;
     }
     remove_file(temp).ok();
@@ -4993,7 +4969,7 @@ unsafe extern "C" fn load_xpath_expr(
  * Macro used to grow the current buffer.
  */
 #[cfg(feature = "libxml_c14n")]
-macro_rules! xxx_growBufferReentrant {
+macro_rules! xxx_grow_buffer_reentrant {
     ($buffer_size:expr, $buffer:expr) => {
         $buffer_size *= 2;
         $buffer = exml::libxml::globals::xml_realloc(
@@ -5040,7 +5016,7 @@ unsafe extern "C" fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
         if out.offset_from(buffer) as usize > buffer_size - 10 {
             let indx = out.offset_from(buffer) as usize;
 
-            xxx_growBufferReentrant!(buffer_size, buffer);
+            xxx_grow_buffer_reentrant!(buffer_size, buffer);
             out = buffer.add(indx);
         }
         *out = str;
@@ -5662,12 +5638,7 @@ unsafe fn regexp_test(
         xml_reg_free_regexp(comp);
     }
 
-    let ctemp = CString::new(temp.as_str()).unwrap();
-    let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-    ret = compare_files(
-        ctemp.as_ptr(),
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-    );
+    ret = compare_files(temp.as_str(), result.as_deref().unwrap());
     if ret != 0 {
         eprintln!("Result for {filename} failed in {}", result.unwrap());
         res = 1;
@@ -5943,12 +5914,7 @@ unsafe fn automata_test(
         xml_free_automata(am);
     }
 
-    let ctemp = CString::new(temp.as_str()).unwrap();
-    let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-    ret = compare_files(
-        ctemp.as_ptr(),
-        cresult.as_ref().map_or(null_mut(), |s| s.as_ptr()),
-    );
+    ret = compare_files(temp.as_str(), result.as_deref().unwrap());
     if ret != 0 {
         eprintln!("Result for {filename} failed in {}", result.unwrap());
         res = 1;
