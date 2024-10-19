@@ -341,8 +341,8 @@ fn base_filename(filename: impl AsRef<Path>) -> String {
     _base_filename(filename.as_ref()).unwrap_or_default()
 }
 
-unsafe extern "C" fn result_filename(
-    filename: *const c_char,
+unsafe fn result_filename(
+    filename: &str,
     mut out: *const c_char,
     mut suffix: *const c_char,
 ) -> *mut c_char {
@@ -356,7 +356,7 @@ unsafe extern "C" fn result_filename(
        filename = &filename[5];
     *************/
 
-    let base = base_filename(CStr::from_ptr(filename).to_string_lossy().as_ref());
+    let base = base_filename(filename);
     let cbase = CString::new(base).unwrap();
     if suffix.is_null() {
         suffix = c".tmp".as_ptr();
@@ -1758,7 +1758,7 @@ unsafe fn sax_parse_test(
 
     NB_TESTS += 1;
     let temp: *mut c_char = result_filename(
-        cfilename.as_ptr(),
+        filename,
         TEMP_DIRECTORY
             .get()
             .map(|t| t.as_ptr())
@@ -1954,7 +1954,7 @@ unsafe fn old_parse_test(
         return 1;
     }
     let temp: *mut c_char = result_filename(
-        cfilename.as_ptr(),
+        filename,
         TEMP_DIRECTORY
             .get()
             .map(|t| t.as_ptr())
@@ -2696,7 +2696,7 @@ unsafe fn noent_parse_test(
         return 1;
     }
     let temp: *mut c_char = result_filename(
-        cfilename.as_ptr(),
+        filename,
         TEMP_DIRECTORY
             .get()
             .map(|t| t.as_ptr())
@@ -2957,7 +2957,7 @@ unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
 
 #[cfg(feature = "libxml_reader")]
 unsafe fn stream_process_test(
-    filename: *const c_char,
+    filename: &str,
     result: *const c_char,
     err: *const c_char,
     reader: XmlTextReaderPtr,
@@ -3016,12 +3016,6 @@ unsafe fn stream_process_test(
                 None,
                 format!("Relax-NG schema {rng} failed to compile\n").as_str(),
             );
-            // xml_error_with_format!(
-            //     test_error_handler,
-            //     null_mut(),
-            //     c"Relax-NG schema %s failed to compile\n".as_ptr(),
-            //     rng
-            // );
 
             if !temp.is_null() {
                 unlink(temp);
@@ -3037,33 +3031,14 @@ unsafe fn stream_process_test(
         }
         ret = xml_text_reader_read(reader);
     }
-    let filename = CStr::from_ptr(filename).to_string_lossy();
     if ret != 0 {
         test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
-        // xml_error_with_format!(
-        //     test_error_handler,
-        //     null_mut(),
-        //     c"%s : failed to parse\n".as_ptr(),
-        //     filename
-        // );
     }
     if !rng.is_null() {
         if xml_text_reader_is_valid(reader) != 1 {
             test_error_handler(None, format!("{filename} fails to validate\n").as_str());
-            // xml_error_with_format!(
-            //     test_error_handler,
-            //     null_mut(),
-            //     c"%s fails to validate\n".as_ptr(),
-            //     filename
-            // );
         } else {
             test_error_handler(None, format!("{filename} validates\n").as_str());
-            // xml_error_with_format!(
-            //     test_error_handler,
-            //     null_mut(),
-            //     c"%s validates\n".as_ptr(),
-            //     filename
-            // );
         }
     }
     if t.is_some() {
@@ -3074,9 +3049,7 @@ unsafe fn stream_process_test(
         }
         if ret != 0 {
             eprintln!(
-                "Result for {} failed in {}",
-                // CStr::from_ptr(filename).to_string_lossy(),
-                filename,
+                "Result for {filename} failed in {}",
                 CStr::from_ptr(result).to_string_lossy()
             );
             return -1;
@@ -3085,11 +3058,7 @@ unsafe fn stream_process_test(
     if !err.is_null() {
         ret = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if ret != 0 {
-            eprintln!(
-                "Error for {} failed",
-                // CStr::from_ptr(filename).to_string_lossy()
-                filename,
-            );
+            eprintln!("Error for {filename} failed",);
             print!(
                 "{}",
                 CStr::from_ptr(TEST_ERRORS.as_ptr() as _).to_string_lossy()
@@ -3123,8 +3092,7 @@ unsafe fn stream_parse_test(
     let cfilename = CString::new(filename).unwrap();
 
     let reader: XmlTextReaderPtr = xml_reader_for_file(cfilename.as_ptr(), null_mut(), options);
-    let ret: c_int =
-        stream_process_test(cfilename.as_ptr(), result, err, reader, null_mut(), options);
+    let ret: c_int = stream_process_test(filename, result, err, reader, null_mut(), options);
     xml_free_text_reader(reader);
     ret
 }
@@ -3156,8 +3124,7 @@ unsafe fn walker_parse_test(
         return -1;
     }
     let reader: XmlTextReaderPtr = xml_reader_walker(doc);
-    let ret: c_int =
-        stream_process_test(cfilename.as_ptr(), result, err, reader, null_mut(), options);
+    let ret: c_int = stream_process_test(filename, result, err, reader, null_mut(), options);
     xml_free_text_reader(reader);
     xml_free_doc(doc);
     ret
@@ -3195,8 +3162,7 @@ unsafe fn stream_mem_parse_test(
     }
     let reader: XmlTextReaderPtr =
         xml_reader_for_memory(base, size, cfilename.as_ptr(), null_mut(), options);
-    let ret: c_int =
-        stream_process_test(cfilename.as_ptr(), result, err, reader, null_mut(), options);
+    let ret: c_int = stream_process_test(filename, result, err, reader, null_mut(), options);
     free(base as _);
     xml_free_text_reader(reader);
     ret
@@ -3285,7 +3251,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
  */
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe fn xpath_common_test(
-    filename: *const c_char,
+    filename: &str,
     result: *const c_char,
     xptr: c_int,
     expr: c_int,
@@ -3324,10 +3290,9 @@ unsafe fn xpath_common_test(
     };
     *XPATH_OUTPUT.lock().unwrap() = Some(out);
 
-    let mut input = match File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
+    let mut input = match File::open(filename) {
         Ok(file) => BufReader::new(file),
         _ => {
-            let filename = CStr::from_ptr(filename).to_string_lossy();
             generic_error!("Cannot open {filename} for reading\n");
             free(temp as _);
             return -1;
@@ -3366,8 +3331,7 @@ unsafe fn xpath_common_test(
         ret = compare_files(temp, result);
         if ret != 0 {
             eprintln!(
-                "Result for {} failed in {}",
-                CStr::from_ptr(filename).to_string_lossy(),
+                "Result for {filename} failed in {}",
                 CStr::from_ptr(result).to_string_lossy()
             );
         }
@@ -3397,8 +3361,7 @@ unsafe fn xpath_expr_test(
     _err: *const c_char,
     _options: c_int,
 ) -> c_int {
-    let cfilename = CString::new(filename).unwrap();
-    xpath_common_test(cfilename.as_ptr(), result, 0, 1)
+    xpath_common_test(filename, result, 0, 1)
 }
 
 /**
@@ -3470,7 +3433,8 @@ unsafe fn xpath_doc_test(
         if res >= 499 {
             result[499] = 0;
         }
-        res = xpath_common_test(*globbuf.gl_pathv.add(i), addr_of_mut!(result[0]), 0, 0);
+        let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+        res = xpath_common_test(&filename, addr_of_mut!(result[0]), 0, 0);
         if res != 0 {
             ret = res;
         }
@@ -3557,7 +3521,8 @@ unsafe fn xptr_doc_test(
         if res >= 499 {
             result[499] = 0;
         }
-        res = xpath_common_test(*globbuf.gl_pathv.add(i), addr_of_mut!(result[0]), 1, 0);
+        let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+        res = xpath_common_test(&filename, addr_of_mut!(result[0]), 1, 0);
         if res != 0 {
             ret = res;
         }
@@ -3605,7 +3570,7 @@ unsafe fn xmlid_doc_test(
     }
 
     let temp: *mut c_char = result_filename(
-        cfilename.as_ptr(),
+        filename,
         TEMP_DIRECTORY
             .get()
             .map(|t| t.as_ptr())
@@ -3716,7 +3681,7 @@ unsafe extern "C" fn handle_uri(str: *const c_char, base: *const c_char, o: &mut
  * Returns 0 in case of success, an error code otherwise
  */
 unsafe fn uri_common_test(
-    filename: *const c_char,
+    filename: &str,
     result: *const c_char,
     err: *const c_char,
     base: *const c_char,
@@ -3749,13 +3714,8 @@ unsafe fn uri_common_test(
         free(temp as _);
         return -1;
     };
-    let Ok(mut f) =
-        File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()).map(BufReader::new)
-    else {
-        eprintln!(
-            "failed to open input file {}",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+    let Ok(mut f) = File::open(filename).map(BufReader::new) else {
+        eprintln!("failed to open input file {filename}",);
         if !temp.is_null() {
             unlink(temp);
             free(temp as _);
@@ -3801,8 +3761,7 @@ unsafe fn uri_common_test(
         ret = compare_files(temp, result);
         if ret != 0 {
             eprintln!(
-                "Result for {} failed in {}",
-                CStr::from_ptr(filename).to_string_lossy(),
+                "Result for {filename} failed in {}",
                 CStr::from_ptr(result).to_string_lossy()
             );
             res = 1;
@@ -3811,10 +3770,7 @@ unsafe fn uri_common_test(
     if !err.is_null() {
         ret = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
         if ret != 0 {
-            eprintln!(
-                "Error for {} failed",
-                CStr::from_ptr(filename).to_string_lossy()
-            );
+            eprintln!("Error for {filename} failed",);
             res = 1;
         }
     }
@@ -3842,8 +3798,7 @@ unsafe fn uri_parse_test(
     err: *const c_char,
     _options: c_int,
 ) -> c_int {
-    let cfilename = CString::new(filename).unwrap();
-    uri_common_test(cfilename.as_ptr(), result, err, null_mut())
+    uri_common_test(filename, result, err, null_mut())
 }
 
 /**
@@ -3863,9 +3818,8 @@ unsafe fn uri_base_test(
     err: *const c_char,
     _options: c_int,
 ) -> c_int {
-    let cfilename = CString::new(filename).unwrap();
     uri_common_test(
-        cfilename.as_ptr(),
+        filename,
         result,
         err,
         c"http://foo.com/path/to/index.html?orig#help".as_ptr(),
@@ -4085,7 +4039,7 @@ unsafe fn schemas_one_test(
     }
 
     let temp: *mut c_char = result_filename(
-        result,
+        CStr::from_ptr(result).to_string_lossy().as_ref(),
         TEMP_DIRECTORY
             .get()
             .map(|t| t.as_ptr())
@@ -4347,7 +4301,7 @@ unsafe fn rng_one_test(
     }
 
     let temp: *mut c_char = result_filename(
-        result,
+        CStr::from_ptr(result).to_string_lossy().as_ref(),
         TEMP_DIRECTORY
             .get()
             .map(|t| t.as_ptr())
@@ -4689,9 +4643,10 @@ unsafe fn rng_stream_test(
                 CStr::from_ptr(instance).to_string_lossy()
             );
         }
+        let instance = CStr::from_ptr(instance).to_string_lossy();
         if disable_err == 1 {
             ret = stream_process_test(
-                instance,
+                &instance,
                 result.as_ptr(),
                 null_mut(),
                 reader,
@@ -4700,7 +4655,7 @@ unsafe fn rng_stream_test(
             );
         } else {
             ret = stream_process_test(
-                instance,
+                &instance,
                 result.as_ptr(),
                 err.as_ptr(),
                 reader,
@@ -4710,10 +4665,7 @@ unsafe fn rng_stream_test(
         }
         xml_free_text_reader(reader);
         if ret != 0 {
-            eprintln!(
-                "instance {} failed",
-                CStr::from_ptr(instance).to_string_lossy()
-            );
+            eprintln!("instance {instance} failed",);
             res = ret;
         }
     }
@@ -4877,7 +4829,7 @@ unsafe fn pattern_test(
         return -1;
     };
     let temp: *mut c_char = result_filename(
-        cfilename.as_ptr(),
+        filename,
         TEMP_DIRECTORY
             .get()
             .map(|t| t.as_ptr())
@@ -5714,7 +5666,6 @@ unsafe fn regexp_test(
     };
 
     let mut comp: XmlRegexpPtr = null_mut();
-    let cfilename = CString::new(filename).unwrap();
     let mut ret: c_int;
     let mut res: c_int = 0;
 
@@ -5727,7 +5678,7 @@ unsafe fn regexp_test(
             return -1;
         }
     };
-    let temp: *mut c_char = result_filename(cfilename.as_ptr(), c"".as_ptr(), c".res".as_ptr());
+    let temp: *mut c_char = result_filename(filename, c"".as_ptr(), c".res".as_ptr());
     if temp.is_null() {
         eprintln!("Out of memory");
         fatal_error();
@@ -5881,7 +5832,6 @@ unsafe fn automata_test(
     let mut states: [XmlAutomataStatePtr; 1000] = [null_mut(); 1000];
     let mut regexp: XmlRegexpPtr = null_mut();
     let mut exec: XmlRegExecCtxtPtr = null_mut();
-    let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS += 1;
 
@@ -5892,7 +5842,7 @@ unsafe fn automata_test(
             return -1;
         }
     };
-    let temp: *mut c_char = result_filename(cfilename.as_ptr(), c"".as_ptr(), c".res".as_ptr());
+    let temp: *mut c_char = result_filename(filename, c"".as_ptr(), c".res".as_ptr());
     if temp.is_null() {
         eprintln!("Out of memory");
         fatal_error();
@@ -6690,10 +6640,9 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                 continue;
             }
 
-            let cpath = CString::new(path.as_ref()).unwrap();
             if let Some(suffix) = tst.suffix {
                 result = result_filename(
-                    cpath.as_ptr(),
+                    &path,
                     tst.out.map(|o| o.as_ptr()).unwrap_or(null_mut()),
                     suffix.as_ptr(),
                 );
@@ -6706,7 +6655,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
             }
             if let Some(err) = tst.err {
                 error = result_filename(
-                    cpath.as_ptr(),
+                    &path,
                     tst.out.map(|o| o.as_ptr()).unwrap_or(null_mut()),
                     err.as_ptr(),
                 );
