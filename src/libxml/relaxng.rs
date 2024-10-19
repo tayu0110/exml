@@ -968,7 +968,10 @@ unsafe extern "C" fn xml_rng_verr(
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
-        str1 as _,
+        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -1239,7 +1242,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
-            extra,
+            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
             None,
             0,
@@ -1259,7 +1262,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
-            null_mut(),
+            None,
             None,
             None,
             0,
@@ -1856,7 +1859,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
-            extra,
+            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
             None,
             0,
@@ -1876,7 +1879,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
-            null_mut(),
+            None,
             None,
             None,
             0,
@@ -2802,7 +2805,10 @@ unsafe extern "C" fn xml_rng_perr(
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
-        str1 as _,
+        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
             .to_string_lossy()
             .into_owned()

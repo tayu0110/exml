@@ -214,7 +214,7 @@ pub(crate) unsafe extern "C" fn xml_encoding_err(
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
-        val,
+        (!val.is_null()).then(|| CStr::from_ptr(val).to_string_lossy().into_owned().into()),
         None,
         None,
         0,

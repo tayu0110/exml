@@ -532,7 +532,10 @@ unsafe extern "C" fn xml_schematron_perr(
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
-        str1 as _,
+        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -1962,9 +1965,14 @@ unsafe extern "C" fn xml_schematron_report_success(
                 null_mut(),
                 line as _,
                 if pattern.is_null() {
-                    null_mut()
+                    None
                 } else {
-                    (*pattern).name as _
+                    Some(
+                        CStr::from_ptr((*pattern).name as _)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into(),
+                    )
                 },
                 (!path.is_null()).then(|| CStr::from_ptr(path as *const i8)
                     .to_string_lossy()

@@ -286,7 +286,10 @@ unsafe extern "C" fn xml_entities_warn(
         XmlErrorLevel::XmlErrWarning,
         null_mut(),
         0,
-        str1 as _,
+        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         None,
         0,

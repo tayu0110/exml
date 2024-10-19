@@ -1090,7 +1090,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             XmlErrorLevel::XmlErrError,
             null(),
             0,
-            null(),
+            None,
             None,
             None,
             0,
@@ -1120,7 +1120,10 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             XmlErrorLevel::XmlErrError,
             null(),
             0,
-            (*ctxt).base as *const c_char,
+            (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
@@ -1170,7 +1173,10 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             XmlErrorLevel::XmlErrError,
             null(),
             0,
-            (*ctxt).base as *const c_char,
+            (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
@@ -2686,7 +2692,7 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
             XmlErrorLevel::XmlErrFatal,
             null(),
             0,
-            extra,
+            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
             None,
             0,
@@ -2706,7 +2712,7 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
             XmlErrorLevel::XmlErrFatal,
             null(),
             0,
-            null(),
+            None,
             None,
             None,
             0,

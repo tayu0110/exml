@@ -66,7 +66,7 @@ macro_rules! __xml_raise_error {
             level: XmlErrorLevel,
             mut file: *const c_char,
             mut line: c_int,
-            str1: *const c_char,
+            str1: Option<Cow<'static, str>>,
             str2: Option<Cow<'static, str>>,
             str3: Option<Cow<'static, str>>,
             int1: c_int,
@@ -158,7 +158,6 @@ macro_rules! __xml_raise_error {
                                 col = (*input).col;
                             }
                         }
-                        // to = addr_of_mut!((*ctxt).last_error);
                         to = &mut (*ctxt).last_error;
                     } else if !node.is_null() && file.is_null() {
                         if !(*node).doc.is_null() && !(*(*node).doc).url.is_null() {
@@ -249,9 +248,7 @@ macro_rules! __xml_raise_error {
                         }
                     }
                     to.line = line as usize;
-                    if !str1.is_null() {
-                        to.str1 = Some(CStr::from_ptr(str1 as *const i8).to_string_lossy().into());
-                    }
+                    to.str1 = str1;
                     to.str2 = str2;
                     to.str3 = str3;
                     to.int1 = int1;
@@ -277,19 +274,13 @@ macro_rules! __xml_raise_error {
                         } else {
                             channel = (*(*ctxt).sax).error;
                         }
-                        // TODO:
-                        // data = (*ctxt).user_data;
                         channel.map(|c| (c, error, str, (*ctxt).user_data.clone()))
                     } else if channel.is_none() {
                         channel = Some(state.generic_error);
                         if !ctxt.is_null() {
-                            // TODO:
-                            // data = ctxt as _;
                             let context = GenericErrorContext::new(Box::new(ctxt));
                             channel.map(|c| (c, error, str, Some(context)))
                         } else {
-                            // TODO:
-                            // state.generic_error_context.as_deref_mut()
                             channel.map(|c| (c, error, str, state.generic_error_context.clone()))
                         }
                     } else {
@@ -343,7 +334,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 XmlErrorLevel::XmlErrFatal,
                 null(),
                 0,
-                extra as _,
+                Some(CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
                 None,
                 None,
                 0,
@@ -363,7 +354,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 XmlErrorLevel::XmlErrFatal,
                 null(),
                 0,
-                null(),
+                None,
                 None,
                 None,
                 0,
@@ -383,7 +374,7 @@ pub(crate) unsafe fn __xml_simple_error(
             XmlErrorLevel::XmlErrError,
             null(),
             0,
-            extra as _,
+            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
             None,
             0,

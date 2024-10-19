@@ -97,7 +97,7 @@ unsafe extern "C" fn xml_xptr_err_memory(extra: *const c_char) {
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
-        extra,
+        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
         None,
         None,
         0,
@@ -2401,7 +2401,10 @@ unsafe extern "C" fn xml_xptr_err(
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
-            extra as _,
+            (!extra.is_null()).then(|| CStr::from_ptr(extra as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             None,
             0,
@@ -2444,7 +2447,10 @@ unsafe extern "C" fn xml_xptr_err(
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
-            extra as _,
+            (!extra.is_null()).then(|| CStr::from_ptr(extra as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
                 .to_string_lossy()
                 .into_owned()

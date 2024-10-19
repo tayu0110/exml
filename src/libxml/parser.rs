@@ -1251,7 +1251,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg(
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
-        null_mut(),
+        None,
         None,
         None,
         0,
@@ -1302,7 +1302,10 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str(
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
-        val as _,
+        (!val.is_null()).then(|| CStr::from_ptr(val as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         None,
         0,
@@ -1353,7 +1356,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_int(
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
-        null_mut(),
+        None,
         None,
         None,
         val,
@@ -1416,7 +1419,10 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
             XmlErrorLevel::XmlErrWarning,
             null_mut(),
             0,
-            str1 as _,
+            (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
                 .to_string_lossy()
                 .into_owned()
@@ -1440,7 +1446,10 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
             XmlErrorLevel::XmlErrWarning,
             null_mut(),
             0,
-            str1 as _,
+            (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
                 .to_string_lossy()
                 .into_owned()
@@ -1490,7 +1499,10 @@ pub(crate) unsafe extern "C" fn xml_err_msg_str(
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
-        val as _,
+        (!val.is_null()).then(|| CStr::from_ptr(val as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         None,
         0,
@@ -1542,7 +1554,10 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
-            str1 as _,
+            (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
                 .to_string_lossy()
                 .into_owned()
@@ -1567,7 +1582,10 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
             XmlErrorLevel::XmlErrError,
             null_mut(),
             0,
-            str1 as _,
+            (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
                 .to_string_lossy()
                 .into_owned()
@@ -1621,7 +1639,10 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str_int_str(
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
-        str1 as _,
+        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -1680,7 +1701,10 @@ pub(crate) unsafe extern "C" fn xml_ns_err(
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
-        info1 as _,
+        (!info1.is_null()).then(|| CStr::from_ptr(info1 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!info2.is_null()).then(|| CStr::from_ptr(info2 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -7857,7 +7881,10 @@ unsafe extern "C" fn xml_ns_warn(
         XmlErrorLevel::XmlErrWarning,
         null_mut(),
         0,
-        info1 as _,
+        (!info1.is_null()).then(|| CStr::from_ptr(info1 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         (!info2.is_null()).then(|| CStr::from_ptr(info2 as *const i8)
             .to_string_lossy()
             .into_owned()
@@ -7910,7 +7937,10 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
-            localname as _,
+            (!localname.is_null()).then(|| CStr::from_ptr(localname as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             None,
             None,
             0,
@@ -7930,7 +7960,10 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
-            prefix as _,
+            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
             (!localname.is_null()).then(|| CStr::from_ptr(localname as *const i8)
                 .to_string_lossy()
                 .into_owned()

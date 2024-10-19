@@ -551,7 +551,10 @@ pub(crate) unsafe extern "C" fn xml_err_internal(
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
-        str as *const c_char,
+        (!str.is_null()).then(|| CStr::from_ptr(str as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         None,
         0,
@@ -1615,7 +1618,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
-            info,
+            (!info.is_null()).then(|| CStr::from_ptr(info).to_string_lossy().into_owned().into()),
             None,
             None,
             0,
@@ -1635,7 +1638,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
             XmlErrorLevel::XmlErrFatal,
             null_mut(),
             0,
-            info,
+            (!info.is_null()).then(|| CStr::from_ptr(info).to_string_lossy().into_owned().into()),
             None,
             None,
             0,
@@ -6997,7 +7000,7 @@ unsafe extern "C" fn xml_err_encoding_int(
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
-        null_mut(),
+        None,
         None,
         None,
         val,

@@ -8,7 +8,7 @@ use std::{
     ffi::{c_char, c_int, c_long, c_ulong},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     sync::atomic::Ordering,
 };
 
@@ -2005,7 +2005,7 @@ macro_rules! CHECK_CTXT {
                 $crate::error::XmlErrorLevel::XmlErrFatal,
                 file!().as_ptr() as _,
                 line!() as i32,
-                std::ptr::null(),
+                None,
                 None,
                 None,
                 0,
@@ -2246,7 +2246,7 @@ macro_rules! CHECK_CTXT_NEG {
                 $crate::error::XmlErrorLevel::XmlErrFatal,
                 file.as_ptr() as _,
                 line!() as i32,
-                null(),
+                None,
                 None,
                 None,
                 0,

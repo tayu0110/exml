@@ -2866,7 +2866,10 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
         level,
         null_mut(),
         0,
-        filename,
+        (!filename.is_null()).then(|| CStr::from_ptr(filename)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         None,
         None,
         0,
