@@ -332,19 +332,13 @@ unsafe extern "C" fn initialize_libxml2() {
     }
 }
 
-unsafe extern "C" fn base_filename(filename: *const c_char) -> *const c_char {
-    let mut cur: *const c_char;
-    if filename.is_null() {
-        return null_mut();
+fn base_filename(filename: impl AsRef<Path>) -> String {
+    fn _base_filename(filename: &Path) -> Option<String> {
+        filename
+            .file_name()
+            .and_then(|s| s.to_str().map(|s| s.to_owned()))
     }
-    cur = filename.add(strlen(filename) as usize);
-    while cur > filename && *cur != b'/' as _ {
-        cur = cur.sub(1);
-    }
-    if *cur == b'/' as _ {
-        return cur.add(1);
-    }
-    cur
+    _base_filename(filename.as_ref()).unwrap_or_default()
 }
 
 unsafe extern "C" fn result_filename(
@@ -362,7 +356,8 @@ unsafe extern "C" fn result_filename(
        filename = &filename[5];
     *************/
 
-    let base: *const c_char = base_filename(filename);
+    let base = base_filename(CStr::from_ptr(filename).to_string_lossy().as_ref());
+    let cbase = CString::new(base).unwrap();
     if suffix.is_null() {
         suffix = c".tmp".as_ptr();
     }
@@ -377,7 +372,7 @@ unsafe extern "C" fn result_filename(
         499,
         c"%s%s%s".as_ptr(),
         out,
-        base,
+        cbase.as_ptr(),
         suffixbuff.as_ptr(),
     ) >= 499
     {
@@ -3447,11 +3442,12 @@ unsafe fn xpath_doc_test(
         XPATH_DOCUMENT.store(xpath_document, Ordering::Relaxed);
     }
 
+    let cbase = CString::new(base_filename(filename)).unwrap();
     res = snprintf(
         pattern.as_mut_ptr() as _,
         499,
         c"./test/XPath/tests/%s*".as_ptr(),
-        base_filename(cfilename.as_ptr()),
+        cbase.as_ptr(),
     );
     if res >= 499 {
         pattern[499] = 0;
@@ -3459,11 +3455,17 @@ unsafe fn xpath_doc_test(
     globbuf.gl_offs = 0;
     glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
     for i in 0..globbuf.gl_pathc {
+        let cbase = CString::new(base_filename(
+            CStr::from_ptr(*globbuf.gl_pathv.add(i))
+                .to_string_lossy()
+                .as_ref(),
+        ))
+        .unwrap();
         res = snprintf(
             result.as_mut_ptr() as _,
             499,
             c"./result/XPath/tests/%s".as_ptr(),
-            base_filename(*globbuf.gl_pathv.add(i)),
+            cbase.as_ptr(),
         );
         if res >= 499 {
             result[499] = 0;
@@ -3525,12 +3527,13 @@ unsafe fn xptr_doc_test(
         XPATH_DOCUMENT.store(xpath_document, Ordering::Relaxed)
     }
 
+    let cbase = CString::new(base_filename(filename)).unwrap();
     res = snprintf(
         pattern.as_mut_ptr() as _,
         499,
         c"./test/XPath/%s/%s*".as_ptr(),
         subdir,
-        base_filename(cfilename.as_ptr()),
+        cbase.as_ptr(),
     );
     if res >= 499 {
         pattern[499] = 0;
@@ -3538,12 +3541,18 @@ unsafe fn xptr_doc_test(
     globbuf.gl_offs = 0;
     glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
     for i in 0..globbuf.gl_pathc {
+        let cbase = CString::new(base_filename(
+            CStr::from_ptr(*globbuf.gl_pathv.add(i))
+                .to_string_lossy()
+                .as_ref(),
+        ))
+        .unwrap();
         res = snprintf(
             result.as_mut_ptr(),
             499,
             c"./result/XPath/%s/%s".as_ptr(),
             subdir,
-            base_filename(*globbuf.gl_pathv.add(i)),
+            cbase.as_ptr(),
         );
         if res >= 499 {
             result[499] = 0;
@@ -4180,8 +4189,8 @@ unsafe fn schemas_test(
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
     let cfilename = CString::new(filename).unwrap();
-    let base: *const c_char = base_filename(cfilename.as_ptr());
-    let mut base2: *const c_char;
+    let base = CString::new(base_filename(filename)).unwrap();
+    let base = base.as_ptr();
     let mut instance: *const c_char;
     let mut res: c_int = 0;
     let mut len: usize;
@@ -4245,7 +4254,11 @@ unsafe fn schemas_test(
         TEST_ERRORS_SIZE = parse_errors_size;
         TEST_ERRORS[parse_errors_size] = 0;
         instance = *globbuf.gl_pathv.add(i);
-        base2 = base_filename(instance);
+        let base2 = CString::new(base_filename(
+            CStr::from_ptr(instance).to_string_lossy().as_ref(),
+        ))
+        .unwrap();
+        let base2 = base2.as_ptr();
         len = strlen(base2);
         if len > 6 && *base2.add(len - 6) == b'_' as _ {
             count = *base2.add(len - 5);
@@ -4429,8 +4442,8 @@ unsafe fn rng_test(
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
     let cfilename = CString::new(filename).unwrap();
-    let base: *const c_char = base_filename(cfilename.as_ptr());
-    let mut base2: *const c_char;
+    let base = CString::new(base_filename(filename)).unwrap();
+    let base = base.as_ptr();
     let mut instance: *const c_char;
     let mut res: c_int;
     let mut len: usize;
@@ -4488,7 +4501,11 @@ unsafe fn rng_test(
         TEST_ERRORS_SIZE = parse_errors_size;
         TEST_ERRORS[parse_errors_size] = 0;
         instance = *globbuf.gl_pathv.add(i);
-        base2 = base_filename(instance);
+        let base2 = CString::new(base_filename(
+            CStr::from_ptr(instance).to_string_lossy().as_ref(),
+        ))
+        .unwrap();
+        let base2 = base2.as_ptr();
         len = strlen(base2);
         if len > 6 && *base2.add(len - 6) == b'_' as i8 {
             count = *base2.add(len - 5);
@@ -4574,8 +4591,8 @@ unsafe fn rng_stream_test(
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
     let cfilename = CString::new(filename).unwrap();
-    let base: *const c_char = base_filename(cfilename.as_ptr());
-    let mut base2: *const c_char;
+    let base = CString::new(base_filename(filename)).unwrap();
+    let base = base.as_ptr();
     let mut instance: *const c_char;
     let mut res: c_int = 0;
     let mut len: usize;
@@ -4630,7 +4647,11 @@ unsafe fn rng_stream_test(
         TEST_ERRORS_SIZE = 0;
         TEST_ERRORS[0] = 0;
         instance = *globbuf.gl_pathv.add(i);
-        base2 = base_filename(instance);
+        let base2 = CString::new(base_filename(
+            CStr::from_ptr(instance).to_string_lossy().as_ref(),
+        ))
+        .unwrap();
+        let base2 = base2.as_ptr();
         len = strlen(base2);
         if len > 6 && *base2.add(len - 6) == b'_' as i8 {
             count = *base2.add(len - 5);
@@ -4827,11 +4848,15 @@ unsafe fn pattern_test(
     len -= 4;
     memcpy(xml.as_mut_ptr() as _, cfilename.as_ptr() as _, len);
     xml[len] = 0;
+    let cbase = CString::new(base_filename(
+        CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref(),
+    ))
+    .unwrap();
     if snprintf(
         result.as_mut_ptr(),
         499,
         c"./result/pattern/%s".as_ptr(),
-        base_filename(xml.as_ptr()),
+        cbase.as_ptr(),
     ) >= 499
     {
         result[499] = 0;
@@ -5320,8 +5345,8 @@ unsafe extern "C" fn c14n_run_test(
 }
 
 #[cfg(feature = "libxml_c14n")]
-unsafe extern "C" fn c14n_common_test(
-    filename: *const c_char,
+unsafe fn c14n_common_test(
+    filename: &str,
     with_comments: c_int,
     mode: c_int,
     subdir: *const c_char,
@@ -5334,8 +5359,10 @@ unsafe extern "C" fn c14n_common_test(
     let mut xpath: *mut c_char = null_mut();
     let mut ns: *mut c_char = null_mut();
     let mut ret: c_int = 0;
+    let cfilename = CString::new(filename).unwrap();
 
-    let base: *const c_char = base_filename(filename);
+    let base = CString::new(base_filename(filename)).unwrap();
+    let base = base.as_ptr();
     len = strlen(base);
     len -= 4;
     memcpy(prefix.as_mut_ptr() as _, base as _, len);
@@ -5380,7 +5407,7 @@ unsafe extern "C" fn c14n_common_test(
     }
 
     NB_TESTS += 1;
-    if c14n_run_test(filename, with_comments, mode, xpath, ns, result) < 0 {
+    if c14n_run_test(cfilename.as_ptr(), with_comments, mode, xpath, ns, result) < 0 {
         ret = 1;
     }
 
@@ -5405,10 +5432,8 @@ unsafe fn c14n_with_comment_test(
 ) -> c_int {
     use exml::libxml::c14n::XmlC14NMode;
 
-    let cfilename = CString::new(filename).unwrap();
-
     c14n_common_test(
-        cfilename.as_ptr(),
+        filename,
         1,
         XmlC14NMode::XmlC14N1_0 as i32,
         c"with-comments".as_ptr(),
@@ -5424,10 +5449,8 @@ unsafe fn c14n_without_comment_test(
 ) -> c_int {
     use exml::libxml::c14n::XmlC14NMode;
 
-    let cfilename = CString::new(filename).unwrap();
-
     c14n_common_test(
-        cfilename.as_ptr(),
+        filename,
         0,
         XmlC14NMode::XmlC14N1_0 as i32,
         c"without-comments".as_ptr(),
@@ -5443,10 +5466,8 @@ unsafe fn c14n_exc_without_comment_test(
 ) -> c_int {
     use exml::libxml::c14n::XmlC14NMode;
 
-    let cfilename = CString::new(filename).unwrap();
-
     c14n_common_test(
-        cfilename.as_ptr(),
+        filename,
         0,
         XmlC14NMode::XmlC14NExclusive1_0 as i32,
         c"exc-without-comments".as_ptr(),
@@ -5462,10 +5483,8 @@ unsafe fn c14n11_without_comment_test(
 ) -> c_int {
     use exml::libxml::c14n::XmlC14NMode;
 
-    let cfilename = CString::new(filename).unwrap();
-
     c14n_common_test(
-        cfilename.as_ptr(),
+        filename,
         0,
         XmlC14NMode::XmlC14N1_1 as i32,
         c"1-1-without-comments".as_ptr(),
