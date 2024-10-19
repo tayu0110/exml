@@ -272,7 +272,7 @@ unsafe extern "C" fn xml_err_valid(
             0,
             extra,
             null_mut(),
-            null_mut(),
+            None,
             0,
             0,
             msg,
@@ -292,7 +292,7 @@ unsafe extern "C" fn xml_err_valid(
             0,
             null_mut(),
             null_mut(),
-            null_mut(),
+            None,
             0,
             0,
             c"%s".as_ptr() as _,
@@ -343,7 +343,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             0,
             extra,
             null_mut(),
-            null_mut(),
+            None,
             0,
             0,
             c"Memory allocation failed : %s\n".as_ptr() as _,
@@ -363,7 +363,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             0,
             null_mut(),
             null_mut(),
-            null_mut(),
+            None,
             0,
             0,
             c"Memory allocation failed\n".as_ptr() as _,
@@ -1163,7 +1163,10 @@ unsafe extern "C" fn xml_err_valid_node(
         0,
         str1 as *const c_char,
         str2 as *const c_char,
-        str3 as *const c_char,
+        (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         0,
         0,
         msg,
@@ -2193,7 +2196,10 @@ unsafe extern "C" fn xml_err_valid_warning(
         0,
         str1 as *const c_char,
         str2 as *const c_char,
-        str3 as *const c_char,
+        (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         0,
         0,
         msg,
@@ -4170,7 +4176,7 @@ unsafe extern "C" fn xml_err_valid_node_nr(
         0,
         str1 as *const c_char,
         str3 as *const c_char,
-        null_mut(),
+        None,
         int2,
         0,
         msg,

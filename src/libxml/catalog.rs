@@ -191,7 +191,7 @@ unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
         0,
         extra,
         null_mut(),
-        null_mut(),
+        None,
         0,
         0,
         c"Memory allocation failed : %s\n".as_ptr(),
@@ -1244,7 +1244,10 @@ unsafe extern "C" fn xml_catalog_err(
         0,
         str1 as _,
         str2 as _,
-        str3 as _,
+        (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
         0,
         0,
         msg,

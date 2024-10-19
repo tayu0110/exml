@@ -68,7 +68,7 @@ macro_rules! __xml_raise_error {
             mut line: c_int,
             str1: *const c_char,
             str2: *const c_char,
-            str3: *const c_char,
+            str3: Option<Cow<'static, str>>,
             int1: c_int,
             mut col: c_int,
             msg: *const c_char| {
@@ -255,9 +255,7 @@ macro_rules! __xml_raise_error {
                     if !str2.is_null() {
                         to.str2 = Some(CStr::from_ptr(str2 as *const i8).to_string_lossy().into());
                     }
-                    if !str3.is_null() {
-                        to.str3 = Some(CStr::from_ptr(str3 as *const i8).to_string_lossy().into());
-                    }
+                    to.str3 = str3;
                     to.int1 = int1;
                     to.int2 = col;
                     to.node = NonNull::new(node as _);
@@ -349,7 +347,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 0,
                 extra as _,
                 null(),
-                null(),
+                None,
                 0,
                 0,
                 c"Memory allocation failed : %s\n".as_ptr(),
@@ -369,7 +367,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 0,
                 null(),
                 null(),
-                null(),
+                None,
                 0,
                 0,
                 c"Memory allocation failed\n".as_ptr(),
@@ -389,7 +387,7 @@ pub(crate) unsafe fn __xml_simple_error(
             0,
             extra as _,
             null(),
-            null(),
+            None,
             0,
             0,
             msg as _,

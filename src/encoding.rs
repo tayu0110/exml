@@ -389,7 +389,7 @@ pub(crate) unsafe extern "C" fn xml_encoding_err(
         0,
         val,
         null_mut(),
-        null_mut(),
+        None,
         0,
         0,
         msg,
