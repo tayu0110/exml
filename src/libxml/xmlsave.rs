@@ -20,13 +20,11 @@ use crate::{
     encoding::{find_encoding_handler, XmlCharEncodingHandler},
     error::XmlErrorDomain,
     generic_error,
+    globals::GLOBAL_STATE,
     libxml::{
         encoding::{xml_parse_char_encoding, XmlCharEncoding, XmlCharEncodingOutputFunc},
         entities::{xml_dump_entity_decl, XmlEntityPtr},
-        globals::{
-            xml_free, xml_indent_tree_output, xml_malloc, xml_save_no_empty_tags,
-            xml_tree_indent_string,
-        },
+        globals::{xml_free, xml_indent_tree_output, xml_malloc, xml_save_no_empty_tags},
         htmltree::{
             html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
         },
@@ -49,7 +47,7 @@ use crate::{
             XmlOutputWriteCallback,
         },
         xmlerror::XmlParserErrors,
-        xmlstring::{xml_str_equal, xml_strdup, xml_strlen, XmlChar},
+        xmlstring::{xml_str_equal, xml_strdup, XmlChar},
     },
     private::{
         buf::xml_buf_set_allocation_scheme, enc::xml_char_enc_output, error::__xml_simple_error,
@@ -427,28 +425,30 @@ pub(crate) unsafe extern "C" fn xml_save_ctxt_init(ctxt: XmlSaveCtxtPtr) {
     if (*ctxt).encoding.is_null() && (*ctxt).escape.is_none() {
         (*ctxt).escape = Some(xml_escape_entities);
     }
-    let len: c_int = xml_strlen(*xml_tree_indent_string() as _) as _;
-    if xml_tree_indent_string().is_null() || len == 0 {
-        memset(addr_of_mut!((*ctxt).indent[0]) as _, 0, MAX_INDENT + 1);
-    } else {
-        (*ctxt).indent_size = len;
-        (*ctxt).indent_nr = MAX_INDENT as i32 / (*ctxt).indent_size;
-        for i in 0..(*ctxt).indent_nr {
-            memcpy(
-                (*ctxt)
-                    .indent
-                    .as_mut_ptr()
-                    .add(i as usize * (*ctxt).indent_size as usize) as _,
-                *xml_tree_indent_string() as _,
-                (*ctxt).indent_size as _,
-            );
+    GLOBAL_STATE.with_borrow(|state| {
+        let len = state.tree_indent_string.len();
+        if len == 0 {
+            memset(addr_of_mut!((*ctxt).indent[0]) as _, 0, MAX_INDENT + 1);
+        } else {
+            (*ctxt).indent_size = len as i32;
+            (*ctxt).indent_nr = MAX_INDENT as i32 / (*ctxt).indent_size;
+            for i in 0..(*ctxt).indent_nr {
+                memcpy(
+                    (*ctxt)
+                        .indent
+                        .as_mut_ptr()
+                        .add(i as usize * (*ctxt).indent_size as usize) as _,
+                    state.tree_indent_string.as_ptr() as _,
+                    (*ctxt).indent_size as _,
+                );
+            }
+            (*ctxt).indent[(*ctxt).indent_nr as usize * (*ctxt).indent_size as usize] = 0;
         }
-        (*ctxt).indent[(*ctxt).indent_nr as usize * (*ctxt).indent_size as usize] = 0;
-    }
 
-    if *xml_save_no_empty_tags() != 0 {
-        (*ctxt).options |= XmlSaveOption::XmlSaveNoEmpty as i32;
-    }
+        if *xml_save_no_empty_tags() != 0 {
+            (*ctxt).options |= XmlSaveOption::XmlSaveNoEmpty as i32;
+        }
+    })
 }
 
 unsafe extern "C" fn xml_save_switch_encoding(

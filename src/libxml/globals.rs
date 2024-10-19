@@ -192,8 +192,7 @@ pub struct XmlGlobalState {
 
     pub(crate) xml_save_no_empty_tags: c_int,
     pub(crate) xml_indent_tree_output: c_int,
-    pub(crate) xml_tree_indent_string: *const c_char,
-
+    // pub(crate) xml_tree_indent_string: *const c_char,
     pub(crate) xml_register_node_default_value: Option<XmlRegisterNodeFunc>,
     pub(crate) xml_deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
 
@@ -274,8 +273,8 @@ static mut XML_INDENT_TREE_OUTPUT_THR_DEF: c_int = 1;
  *
  * The string used to do one-level indent. By default is equal to "  " (two spaces)
  */
-pub(crate) static _XML_TREE_INDENT_STRING: AtomicPtr<c_char> = AtomicPtr::new(c"  ".as_ptr() as _);
-static XML_TREE_INDENT_STRING_THR_DEF: AtomicPtr<c_char> = AtomicPtr::new(c"  ".as_ptr() as _);
+// pub(crate) static _XML_TREE_INDENT_STRING: AtomicPtr<c_char> = AtomicPtr::new(c"  ".as_ptr() as _);
+// static XML_TREE_INDENT_STRING_THR_DEF: AtomicPtr<c_char> = AtomicPtr::new(c"  ".as_ptr() as _);
 
 /**
  * xmlKeepBlanksDefaultValue:
@@ -482,7 +481,7 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     // #endif
     (*gs).xml_get_warnings_default_value = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_indent_tree_output = XML_INDENT_TREE_OUTPUT_THR_DEF;
-    (*gs).xml_tree_indent_string = XML_TREE_INDENT_STRING_THR_DEF.load(Ordering::Relaxed) as _;
+    // (*gs).xml_tree_indent_string = XML_TREE_INDENT_STRING_THR_DEF.load(Ordering::Relaxed) as _;
     (*gs).xml_keep_blanks_default_value = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_line_numbers_default_value = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_load_ext_dtd_default_value = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
@@ -1163,30 +1162,6 @@ pub unsafe extern "C" fn xml_thr_def_indent_tree_output(v: c_int) -> c_int {
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_INDENT_TREE_OUTPUT_THR_DEF;
     XML_INDENT_TREE_OUTPUT_THR_DEF = v;
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    ret
-}
-
-pub unsafe extern "C" fn __xml_tree_indent_string() -> *mut *const c_char {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_TREE_INDENT_STRING.as_ptr() as _
-    } else {
-        addr_of_mut!((*xml_get_global_state()).xml_tree_indent_string)
-    }
-}
-#[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_tree_indent_string() -> *mut *const c_char {
-    __xml_tree_indent_string()
-}
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_tree_indent_string() -> *mut *const c_char {
-    _XML_TREE_INDENT_STRING.as_ptr() as _
-}
-
-pub unsafe extern "C" fn xml_thr_def_tree_indent_string(v: *const c_char) -> *const c_char {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    let ret: *const c_char = XML_TREE_INDENT_STRING_THR_DEF.load(Ordering::Relaxed);
-    XML_TREE_INDENT_STRING_THR_DEF.store(v as _, Ordering::Relaxed);
     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }

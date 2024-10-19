@@ -26,7 +26,7 @@ use exml::{
     encoding::XmlCharEncoding,
     error::generic_error_default,
     generic_error,
-    globals::{GenericError, GenericErrorContext},
+    globals::{set_tree_indent_string, GenericError, GenericErrorContext},
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
@@ -36,7 +36,6 @@ use exml::{
         globals::{
             xml_deregister_node_default, xml_free, xml_generic_error_context,
             xml_load_ext_dtd_default_value, xml_parser_debug_entities, xml_register_node_default,
-            xml_tree_indent_string,
         },
         htmlparser::{
             html_create_push_parser_ctxt, html_ctxt_use_options, html_free_parser_ctxt,
@@ -4039,8 +4038,7 @@ fn main() {
         }
 
         if let Some(indent) = option_env!("XMLLINT_INDENT") {
-            let indent = CString::new(indent).expect("Failed to construct Indent string");
-            *xml_tree_indent_string() = indent.as_ptr();
+            set_tree_indent_string(indent.into());
         }
 
         DEFAULT_ENTITY_LOADER = Some(xml_get_external_entity_loader());

@@ -87,7 +87,7 @@ pub struct XmlGlobalState {
     pedantic_parser_default_value: i32,
     save_no_empty_tags: i32,
     indent_tree_output: i32,
-    tree_indent_string: Cow<'static, str>,
+    pub(crate) tree_indent_string: Cow<'static, str>,
     register_node_default_value: Option<XmlRegisterNodeFunc>,
     deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
     pub(crate) last_error: XmlError,
@@ -208,4 +208,12 @@ pub fn reset_last_error() {
 /// Get last global error.
 pub fn get_last_error() -> XmlError {
     GLOBAL_STATE.with_borrow(|state| state.last_error.clone())
+}
+
+pub fn get_tree_indent_string() -> Cow<'static, str> {
+    GLOBAL_STATE.with_borrow(|state| state.tree_indent_string.clone())
+}
+
+pub fn set_tree_indent_string(indent: Cow<'static, str>) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.tree_indent_string = indent);
 }
