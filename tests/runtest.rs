@@ -339,7 +339,7 @@ fn base_filename(filename: impl AsRef<Path>) -> String {
     _base_filename(filename.as_ref()).unwrap_or_default()
 }
 
-unsafe fn result_filename(filename: &str, out: Option<&str>, suffix: Option<&str>) -> String {
+fn result_filename(filename: &str, out: Option<&str>, suffix: Option<&str>) -> String {
     /*************
        if ((filename[0] == 't') && (filename[1] == 'e') &&
            (filename[2] == 's') && (filename[3] == 't') &&
@@ -354,7 +354,7 @@ unsafe fn result_filename(filename: &str, out: Option<&str>, suffix: Option<&str
     format!("{out}{base}{suffix}")
 }
 
-unsafe extern "C" fn check_test_file(filename: impl AsRef<Path>) -> bool {
+fn check_test_file(filename: impl AsRef<Path>) -> bool {
     metadata(filename.as_ref()).map_or(false, |meta| meta.is_file())
 }
 
@@ -507,19 +507,14 @@ unsafe extern "C" fn compare_file_mem(
     (idx != size as usize) as i32
 }
 
-unsafe extern "C" fn load_mem(
-    filename: *const c_char,
-    mem: *mut *const c_char,
-    size: *mut c_int,
-) -> c_int {
-    let filename = CStr::from_ptr(filename).to_string_lossy();
-    match metadata(filename.as_ref()) {
+unsafe fn load_mem(filename: &str, mem: *mut *const c_char, size: *mut c_int) -> c_int {
+    match metadata(filename) {
         Ok(meta) => {
             let base: *mut c_char = malloc(meta.len() as usize + 1) as _;
             if base.is_null() {
                 return -1;
             }
-            match File::open(filename.as_ref()) {
+            match File::open(filename) {
                 Ok(mut file) => {
                     let mut siz = 0;
                     while let Some(res) = file
@@ -2002,7 +1997,7 @@ unsafe fn push_parse_test(
     /*
      * load the document in memory and work from there.
      */
-    if load_mem(cfilename.as_ptr(), addr_of_mut!(base), addr_of_mut!(size)) != 0 {
+    if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;
     }
@@ -2361,7 +2356,7 @@ unsafe fn push_boundary_test(
     /*
      * load the document in memory and work from there.
      */
-    if load_mem(cfilename.as_ptr(), addr_of_mut!(base), addr_of_mut!(size)) != 0 {
+    if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;
     }
@@ -2612,7 +2607,7 @@ unsafe fn mem_parse_test(
     /*
      * load and parse the memory
      */
-    if load_mem(cfilename.as_ptr(), &raw mut base, &raw mut size) != 0 {
+    if load_mem(filename, &raw mut base, &raw mut size) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;
     }
@@ -3136,7 +3131,7 @@ unsafe fn stream_mem_parse_test(
     /*
      * load and parse the memory
      */
-    if load_mem(cfilename.as_ptr(), addr_of_mut!(base), addr_of_mut!(size)) != 0 {
+    if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;
     }
@@ -5133,7 +5128,12 @@ unsafe extern "C" fn c14n_run_test(
     }
 
     if !ns_filename.is_null() {
-        if load_mem(ns_filename, addr_of_mut!(nslist), addr_of_mut!(nssize)) != 0 {
+        if load_mem(
+            CStr::from_ptr(ns_filename).to_string_lossy().as_ref(),
+            addr_of_mut!(nslist),
+            addr_of_mut!(nssize),
+        ) != 0
+        {
             eprintln!("Error: unable to evaluate xpath expression");
             if !xpath.is_null() {
                 xml_xpath_free_object(xpath);
