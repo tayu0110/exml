@@ -423,12 +423,7 @@ fn compare_files(
     _compare_files(r1.as_ref(), r2.as_ref())
 }
 
-unsafe extern "C" fn compare_file_mem(
-    filename: impl AsRef<Path>,
-    mem: *const c_char,
-    size: c_int,
-) -> c_int {
-    let mem = from_raw_parts(mem as *const u8, size as usize);
+fn compare_file_mem(filename: impl AsRef<Path>, mem: &[u8]) -> c_int {
     fn _compare_file_mem(filename: &Path, mem: &[u8]) -> i32 {
         let mut bytes: [u8; 4096] = [0; 4096];
         let size = mem.len();
@@ -2088,7 +2083,10 @@ unsafe fn push_parse_test(
         );
     }
     xml_free_doc(doc);
-    res = compare_file_mem(result.as_deref().unwrap(), base, size);
+    res = compare_file_mem(
+        result.as_deref().unwrap(),
+        from_raw_parts(base as _, size as usize),
+    );
     if base.is_null() || res != 0 {
         if !base.is_null() {
             xml_free(base as _);
@@ -2098,7 +2096,7 @@ unsafe fn push_parse_test(
     }
     xml_free(base as _);
     if let Some(err) = err {
-        res = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
+        res = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2528,7 +2526,10 @@ unsafe fn push_boundary_test(
         );
     }
     xml_free_doc(doc);
-    res = compare_file_mem(result.as_deref().unwrap(), base, size);
+    res = compare_file_mem(
+        result.as_deref().unwrap(),
+        from_raw_parts(base as _, size as usize),
+    );
     if base.is_null() || res != 0 {
         if !base.is_null() {
             xml_free(base as _);
@@ -2538,7 +2539,7 @@ unsafe fn push_boundary_test(
     }
     xml_free(base as _);
     if let Some(err) = err {
-        res = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
+        res = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2589,7 +2590,10 @@ unsafe fn mem_parse_test(
         addr_of_mut!(size),
     );
     xml_free_doc(doc);
-    let res: c_int = compare_file_mem(result.as_deref().unwrap(), base, size);
+    let res: c_int = compare_file_mem(
+        result.as_deref().unwrap(),
+        from_raw_parts(base as _, size as _),
+    );
     if base.is_null() || res != 0 {
         if !base.is_null() {
             xml_free(base as _);
@@ -2732,8 +2736,7 @@ unsafe fn err_parse_test(
         }
         res = compare_file_mem(
             CStr::from_ptr(result.as_ptr()).to_string_lossy().as_ref(),
-            base,
-            size,
+            from_raw_parts(base as _, size as _),
         );
     }
     if !doc.is_null() {
@@ -2747,7 +2750,7 @@ unsafe fn err_parse_test(
         return -1;
     }
     if let Some(err) = err {
-        res = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
+        res = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2823,8 +2826,7 @@ unsafe fn fd_parse_test(
         }
         res = compare_file_mem(
             CStr::from_ptr(result.as_ptr()).to_string_lossy().as_ref(),
-            base,
-            size,
+            from_raw_parts(base as _, size as _),
         );
     }
     if !doc.is_null() {
@@ -2838,7 +2840,7 @@ unsafe fn fd_parse_test(
         return -1;
     }
     if let Some(err) = err {
-        res = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
+        res = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2972,7 +2974,7 @@ unsafe fn stream_process_test(
         }
     }
     if let Some(err) = err {
-        ret = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
+        ret = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
         if ret != 0 {
             eprintln!("Error for {filename} failed",);
             print!(
@@ -3501,7 +3503,7 @@ unsafe fn xmlid_doc_test(
     xml_free_doc(XPATH_DOCUMENT.load(Ordering::Relaxed));
 
     if let Some(err) = err {
-        ret = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
+        ret = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
         if ret != 0 {
             eprintln!("Error for {filename} failed",);
             res = 1;
@@ -3634,7 +3636,7 @@ unsafe fn uri_common_test(
         }
     }
     if let Some(err) = err {
-        ret = compare_file_mem(err, TEST_ERRORS.as_ptr() as _, TEST_ERRORS_SIZE as _);
+        ret = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
         if ret != 0 {
             eprintln!("Error for {filename} failed",);
             res = 1;
@@ -4112,8 +4114,7 @@ unsafe fn schemas_test(
         }
         if compare_file_mem(
             CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
+            &TEST_ERRORS[..TEST_ERRORS_SIZE],
         ) != 0
         {
             eprintln!(
@@ -4348,8 +4349,7 @@ unsafe fn rng_test(
         }
         if compare_file_mem(
             CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
-            TEST_ERRORS.as_ptr() as _,
-            TEST_ERRORS_SIZE as _,
+            &TEST_ERRORS[..TEST_ERRORS_SIZE],
         ) != 0
         {
             eprintln!(
@@ -5099,8 +5099,7 @@ unsafe extern "C" fn c14n_run_test(
         if !result.is_null()
             && compare_file_mem(
                 CStr::from_ptr(result_file).to_string_lossy().as_ref(),
-                result as *const c_char,
-                ret,
+                from_raw_parts(result, ret as _),
             ) != 0
         {
             eprintln!(
@@ -5610,11 +5609,7 @@ unsafe fn regexp_test(
     }
     remove_file(temp).ok();
 
-    ret = compare_file_mem(
-        err.as_deref().unwrap(),
-        TEST_ERRORS.as_ptr() as _,
-        TEST_ERRORS_SIZE as _,
-    );
+    ret = compare_file_mem(err.as_deref().unwrap(), &TEST_ERRORS[..TEST_ERRORS_SIZE]);
     if ret != 0 {
         eprintln!("Error for {filename} failed",);
         res = 1;
