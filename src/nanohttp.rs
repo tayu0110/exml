@@ -56,7 +56,7 @@ pub struct XmlNanoHTTPCtxt {
     protocol: Option<Cow<'static, str>>, /* the protocol name */
     hostname: Option<Cow<'static, str>>, /* the host name */
     port: i32,                           /* the port */
-    path: *mut c_char,                   /* the path within the URL */
+    path: Option<Cow<'static, str>>,     /* the path within the URL */
     query: *mut c_char,                  /* the query string */
     fd: Socket,                          /* the file descriptor for the socket */
     state: i32,                          /* WRITE / READ / CLOSED */
@@ -438,10 +438,7 @@ unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: *const
      */
     (*ctxt).protocol = None;
     (*ctxt).hostname = None;
-    if !(*ctxt).path.is_null() {
-        xml_free((*ctxt).path as _);
-        (*ctxt).path = null_mut();
-    }
+    (*ctxt).path = None;
     if !(*ctxt).query.is_null() {
         xml_free((*ctxt).query as _);
         (*ctxt).query = null_mut();
@@ -491,9 +488,14 @@ unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: *const
         });
     }
     if !(*uri).path.is_null() {
-        (*ctxt).path = xml_mem_strdup((*uri).path as _) as _;
+        (*ctxt).path = Some(
+            CStr::from_ptr((*uri).path as _)
+                .to_string_lossy()
+                .into_owned()
+                .into(),
+        );
     } else {
-        (*ctxt).path = xml_mem_strdup(c"/".as_ptr() as _) as _;
+        (*ctxt).path = Some(Cow::Borrowed("/"));
     }
     if !(*uri).query.is_null() {
         (*ctxt).query = xml_mem_strdup((*uri).query as _) as _;
@@ -543,9 +545,7 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
     }
     (*ctxt).hostname = None;
     (*ctxt).protocol = None;
-    if !(*ctxt).path.is_null() {
-        xml_free((*ctxt).path as _);
-    }
+    (*ctxt).path = None;
     if !(*ctxt).query.is_null() {
         xml_free((*ctxt).query as _);
     }
@@ -1323,7 +1323,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             /* 1 for '?' */
             blen += strlen((*ctxt).query) + 1;
         }
-        blen += strlen(method) + strlen((*ctxt).path) + 24;
+        blen += strlen(method) + (*ctxt).path.as_ref().map_or(0, |s| s.len()) + 24;
         // #ifdef LIBXML_ZLIB_ENABLED
         //     /* reserve for possible 'Accept-Encoding: gzip' string */
         //     blen += 23;
@@ -1347,6 +1347,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
 
         if use_proxy != 0 {
             let hostname = CString::new(hostname.as_ref()).unwrap();
+            let path = CString::new((*ctxt).path.as_ref().unwrap().as_ref()).unwrap();
             if (*ctxt).port != 80 {
                 p = p.add(snprintf(
                     p as _,
@@ -1355,7 +1356,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
                     method,
                     hostname.as_ptr(),
                     (*ctxt).port,
-                    (*ctxt).path,
+                    path.as_ptr(),
                 ) as usize);
             } else {
                 p = p.add(snprintf(
@@ -1364,16 +1365,17 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
                     c"%s http://%s%s".as_ptr() as _,
                     method,
                     hostname.as_ptr(),
-                    (*ctxt).path,
+                    path.as_ptr(),
                 ) as usize);
             }
         } else {
+            let path = CString::new((*ctxt).path.as_ref().unwrap().as_ref()).unwrap();
             p = p.add(snprintf(
                 p,
                 blen - p.offset_from(bp) as usize,
                 c"%s %s".as_ptr() as _,
                 method,
-                (*ctxt).path,
+                path.as_ptr(),
             ) as usize);
         }
 
