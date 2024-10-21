@@ -6,7 +6,7 @@
 use std::{
     borrow::Cow,
     ffi::{c_char, c_int, c_uint, CStr, CString},
-    mem::{size_of, size_of_val, zeroed},
+    mem::{forget, size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
@@ -429,14 +429,14 @@ pub unsafe extern "C" fn xml_nanohttp_method(
  * (Re)Initialize an HTTP context by parsing the URL and finding
  * the protocol host port and path it indicates.
  */
-unsafe fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: &str) {
+fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
     /*
      * Clear any existing data from the context
      */
-    (*ctxt).protocol = None;
-    (*ctxt).hostname = None;
-    (*ctxt).path = None;
-    (*ctxt).query = None;
+    ctxt.protocol = None;
+    ctxt.hostname = None;
+    ctxt.path = None;
+    ctxt.query = None;
 
     let Ok(uri) = Url::parse(url) else {
         return;
@@ -446,19 +446,19 @@ unsafe fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: &str) {
         return;
     };
 
-    (*ctxt).protocol = Some(uri.scheme().to_owned().into());
+    ctxt.protocol = Some(uri.scheme().to_owned().into());
 
     /* special case of IPv6 addresses, the [] need to be removed */
     if let Host::Ipv6(host) = host {
-        (*ctxt).hostname = Some(host.to_string().into());
+        ctxt.hostname = Some(host.to_string().into());
     } else {
         let host = uri.host_str().unwrap();
-        (*ctxt).hostname = Some(host.to_owned().into());
+        ctxt.hostname = Some(host.to_owned().into());
     }
-    (*ctxt).path = Some(uri.path().to_owned().into());
-    (*ctxt).query = uri.query().map(|q| q.to_owned().into());
+    ctxt.path = Some(uri.path().to_owned().into());
+    ctxt.query = uri.query().map(|q| q.to_owned().into());
     if let Some(port) = uri.port() {
-        (*ctxt).port = port as i32;
+        ctxt.port = port as i32;
     }
 }
 
@@ -477,14 +477,45 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
         return null_mut();
     }
 
-    memset(ret as _, 0, size_of::<XmlNanoHTTPCtxt>());
-    (*ret).port = 80;
-    (*ret).return_value = 0;
-    (*ret).fd = INVALID_SOCKET;
-    (*ret).content_length = -1;
+    let mut tmp = XmlNanoHTTPCtxt {
+        protocol: None,
+        hostname: None,
+        port: 0,
+        path: None,
+        query: None,
+        fd: 0,
+        state: 0,
+        out: null_mut(),
+        outptr: null_mut(),
+        input: null_mut(),
+        content: null_mut(),
+        inptr: null_mut(),
+        inrptr: null_mut(),
+        inlen: 0,
+        last: 0,
+        return_value: 0,
+        version: 0,
+        content_length: 0,
+        content_type: null_mut(),
+        location: None,
+        auth_header: null_mut(),
+        encoding: null_mut(),
+        mime_type: null_mut(),
+    };
+    tmp.port = 80;
+    tmp.return_value = 0;
+    tmp.fd = INVALID_SOCKET;
+    tmp.content_length = -1;
 
     let url = CStr::from_ptr(url).to_string_lossy();
-    xml_nanohttp_scan_url(ret, url.as_ref());
+    xml_nanohttp_scan_url(&mut tmp, url.as_ref());
+
+    memcpy(
+        ret as _,
+        &tmp as *const XmlNanoHTTPCtxt as _,
+        size_of::<XmlNanoHTTPCtxt>(),
+    );
+    forget(tmp);
 
     ret
 }
