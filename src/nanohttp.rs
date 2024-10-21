@@ -57,7 +57,7 @@ pub struct XmlNanoHTTPCtxt {
     hostname: Option<Cow<'static, str>>, /* the host name */
     port: i32,                           /* the port */
     path: Option<Cow<'static, str>>,     /* the path within the URL */
-    query: *mut c_char,                  /* the query string */
+    query: Option<Cow<'static, str>>,    /* the query string */
     fd: Socket,                          /* the file descriptor for the socket */
     state: i32,                          /* WRITE / READ / CLOSED */
     out: *mut c_char,                    /* buffer sent (zero terminated) */
@@ -439,10 +439,7 @@ unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: *const
     (*ctxt).protocol = None;
     (*ctxt).hostname = None;
     (*ctxt).path = None;
-    if !(*ctxt).query.is_null() {
-        xml_free((*ctxt).query as _);
-        (*ctxt).query = null_mut();
-    }
+    (*ctxt).query = None;
     if url.is_null() {
         return;
     }
@@ -498,7 +495,12 @@ unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: *const
         (*ctxt).path = Some(Cow::Borrowed("/"));
     }
     if !(*uri).query.is_null() {
-        (*ctxt).query = xml_mem_strdup((*uri).query as _) as _;
+        (*ctxt).query = Some(
+            CStr::from_ptr((*uri).query as _)
+                .to_string_lossy()
+                .into_owned()
+                .into(),
+        );
     }
     if (*uri).port != 0 {
         (*ctxt).port = (*uri).port;
@@ -546,9 +548,7 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
     (*ctxt).hostname = None;
     (*ctxt).protocol = None;
     (*ctxt).path = None;
-    if !(*ctxt).query.is_null() {
-        xml_free((*ctxt).query as _);
-    }
+    (*ctxt).query = None;
     if !(*ctxt).out.is_null() {
         xml_free((*ctxt).out as _);
     }
@@ -1319,9 +1319,9 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             /* reserve for string plus 'Content-Type: \r\n" */
             blen += strlen(*content_type) + 16;
         }
-        if !(*ctxt).query.is_null() {
+        if let Some(query) = (*ctxt).query.as_deref() {
             /* 1 for '?' */
-            blen += strlen((*ctxt).query) + 1;
+            blen += query.len() + 1;
         }
         blen += strlen(method) + (*ctxt).path.as_ref().map_or(0, |s| s.len()) + 24;
         // #ifdef LIBXML_ZLIB_ENABLED
@@ -1379,12 +1379,13 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             ) as usize);
         }
 
-        if !(*ctxt).query.is_null() {
+        if let Some(query) = (*ctxt).query.as_deref() {
+            let query = CString::new(query).unwrap();
             p = p.add(snprintf(
                 p,
                 blen - p.offset_from(bp) as usize,
                 c"?%s".as_ptr() as _,
-                (*ctxt).query,
+                query.as_ptr(),
             ) as usize);
         }
 
