@@ -20,6 +20,7 @@ pub mod globals;
 pub mod hash;
 pub mod libxml;
 pub mod list;
+pub mod nanohttp;
 pub mod private;
 #[cfg(test)]
 pub(crate) mod test_util;
