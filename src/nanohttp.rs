@@ -14,17 +14,17 @@ use std::{
 
 use libc::{
     __errno_location, addrinfo, close, connect, fcntl, freeaddrinfo, getaddrinfo, getsockopt,
-    memcpy, memmove, memset, open, poll, pollfd, recv, send, snprintf, sockaddr, sockaddr_in,
-    sockaddr_in6, socket, strcmp, strlen, strncmp, strtol, write, AF_INET, AF_INET6, EAGAIN,
-    ECONNRESET, EINPROGRESS, EINTR, ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT,
-    O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6, POLLIN, POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
+    memcpy, memset, open, poll, pollfd, recv, send, snprintf, sockaddr, sockaddr_in, sockaddr_in6,
+    socket, strcmp, strlen, strncmp, strtol, write, AF_INET, AF_INET6, EAGAIN, ECONNRESET,
+    EINPROGRESS, EINTR, ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT, O_NONBLOCK,
+    O_WRONLY, PF_INET, PF_INET6, POLLIN, POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
 };
 use url::{Host, Url};
 
 use crate::{
     error::XmlErrorDomain,
     libxml::{
-        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc},
+        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup},
         xml_io::__xml_ioerr,
         xmlerror::XmlParserErrors,
         xmlstring::{xml_strncasecmp, xml_strndup, xml_strstr, XmlChar},
@@ -61,11 +61,11 @@ pub struct XmlNanoHTTPCtxt {
     state: i32,                          /* WRITE / READ / CLOSED */
     out: *mut c_char,                    /* buffer sent (zero terminated) */
     outptr: *mut c_char,                 /* index within the buffer sent */
-    input: *mut c_char,                  /* the receiving buffer */
-    content: *mut c_char,                /* the start of the content */
-    inptr: *mut c_char,                  /* the next byte to read from network */
-    inrptr: *mut c_char,                 /* the next byte to give back to the client */
-    inlen: i32,                          /* len of the input buffer */
+    input: Vec<u8>,                      /* the receiving buffer */
+    content: *mut u8,                    /* the start of the content */
+    inptr: usize,                        /* the next byte to read from network */
+    inrptr: usize,                       /* the next byte to give back to the client */
+    inlen: usize,                        /* len of the input buffer */
     last: i32,                           /* return code for last operation */
     return_value: i32,                   /* the protocol return value */
     version: i32,                        /* the protocol version */
@@ -196,52 +196,39 @@ unsafe extern "C" fn xml_http_err_memory(extra: *const c_char) {
  * Returns the number of byte read or -1 in case of error.
  */
 
-unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHTTPCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHTTPCtxtPtr) -> i32 {
     let mut p: pollfd = unsafe { zeroed() };
 
     while (*ctxt).state & XML_NANO_HTTP_READ as i32 != 0 {
-        if (*ctxt).input.is_null() {
-            (*ctxt).input = xml_malloc_atomic(65000) as _;
-            if (*ctxt).input.is_null() {
-                xml_http_err_memory(c"allocating input".as_ptr() as _);
-                (*ctxt).last = -1;
-                return -1;
-            }
+        if (*ctxt).input.is_empty() {
+            (*ctxt).input = vec![0; 65000];
             (*ctxt).inlen = 65000;
-            (*ctxt).inptr = (*ctxt).input;
-            (*ctxt).content = (*ctxt).input;
-            (*ctxt).inrptr = (*ctxt).input;
+            (*ctxt).inptr = 0;
+            (*ctxt).content = (*ctxt).input.as_mut_ptr();
+            (*ctxt).inrptr = 0;
         }
-        if (*ctxt).inrptr > (*ctxt).input.add(XML_NANO_HTTP_CHUNK) {
-            let delta: c_int = (*ctxt).inrptr.offset_from((*ctxt).input) as _;
-            let len: c_int = (*ctxt).inptr.offset_from((*ctxt).inrptr) as _;
+        if (*ctxt).inrptr > XML_NANO_HTTP_CHUNK {
+            let delta = (*ctxt).inrptr;
+            assert!((*ctxt).inptr >= (*ctxt).inrptr);
+            let len = (*ctxt).inptr - (*ctxt).inrptr;
 
-            memmove((*ctxt).input as _, (*ctxt).inrptr as _, len as _);
-            (*ctxt).inrptr = (*ctxt).inrptr.sub(delta as usize);
-            (*ctxt).content = (*ctxt).content.sub(delta as usize);
-            (*ctxt).inptr = (*ctxt).inptr.sub(delta as usize);
+            (*ctxt)
+                .input
+                .copy_within((*ctxt).inrptr..(*ctxt).inrptr + len, 0);
+            (*ctxt).inrptr -= delta;
+            (*ctxt).content = (*ctxt).content.sub(delta);
+            (*ctxt).inptr -= delta;
         }
-        if (*ctxt).input.add((*ctxt).inlen as usize) < (*ctxt).inptr.add(XML_NANO_HTTP_CHUNK) {
-            let d_inptr: c_int = (*ctxt).inptr.offset_from((*ctxt).input) as _;
-            let d_content: c_int = (*ctxt).content.offset_from((*ctxt).input) as _;
-            let d_inrptr: c_int = (*ctxt).inrptr.offset_from((*ctxt).input) as _;
-            let tmp_ptr: *mut c_char = (*ctxt).input;
+        if (*ctxt).inlen < (*ctxt).inptr + XML_NANO_HTTP_CHUNK {
+            let d_content = (*ctxt).content.offset_from((*ctxt).input.as_ptr()) as usize;
 
             (*ctxt).inlen *= 2;
-            (*ctxt).input = xml_realloc(tmp_ptr as _, (*ctxt).inlen as usize) as _;
-            if (*ctxt).input.is_null() {
-                xml_http_err_memory(c"allocating input buffer".as_ptr() as _);
-                xml_free(tmp_ptr as _);
-                (*ctxt).last = -1;
-                return -1;
-            }
-            (*ctxt).inptr = (*ctxt).input.add(d_inptr as usize);
-            (*ctxt).content = (*ctxt).input.add(d_content as usize);
-            (*ctxt).inrptr = (*ctxt).input.add(d_inrptr as usize);
+            (*ctxt).input.resize((*ctxt).inlen, 0);
+            (*ctxt).content = (*ctxt).input.as_mut_ptr().add(d_content);
         }
         (*ctxt).last = recv((*ctxt).fd, (*ctxt).inptr as _, XML_NANO_HTTP_CHUNK, 0) as _;
         if (*ctxt).last > 0 {
-            (*ctxt).inptr = (*ctxt).inptr.add((*ctxt).last as _);
+            (*ctxt).inptr += (*ctxt).last as usize;
             return (*ctxt).last;
         }
         if (*ctxt).last == 0 {
@@ -295,7 +282,6 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
 
     let mut rc: c_int = 0;
     let mut cur_lgth: c_int;
-    let mut rcvd_lgth: c_int;
     let mut dummy_int: c_int = 0;
     let mut dummy_ptr: *mut c_char = null_mut();
 
@@ -311,28 +297,30 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
 
     /*  But can't work without the context pointer  */
 
-    if (ctxt.is_null()) || ((*ctxt).content.is_null()) {
+    if ctxt.is_null() || (*ctxt).content.is_null() {
         *len = 0;
         *ptr = null_mut();
         return -1;
     }
 
-    rcvd_lgth = (*ctxt).inptr.offset_from((*ctxt).content) as _;
+    let mut rcvd_lgth =
+        (*ctxt).inptr - (*ctxt).content.offset_from((*ctxt).input.as_ptr()) as usize;
 
     while {
         cur_lgth = xml_nanohttp_recv(ctxt);
         cur_lgth > 0
     } {
-        rcvd_lgth += cur_lgth;
-        if (*ctxt).content_length > 0 && rcvd_lgth >= (*ctxt).content_length {
+        rcvd_lgth += cur_lgth as usize;
+        if (*ctxt).content_length > 0 && rcvd_lgth >= (*ctxt).content_length as usize {
             break;
         }
     }
 
-    *ptr = (*ctxt).content;
-    *len = rcvd_lgth;
+    *ptr = (*ctxt).content as _;
+    *len = rcvd_lgth as i32;
 
-    if ((*ctxt).content_length > 0 && rcvd_lgth < (*ctxt).content_length) || rcvd_lgth == 0 {
+    if ((*ctxt).content_length > 0 && rcvd_lgth < (*ctxt).content_length as usize) || rcvd_lgth == 0
+    {
         rc = -1;
     }
 
@@ -490,10 +478,10 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
         state: 0,
         out: null_mut(),
         outptr: null_mut(),
-        input: null_mut(),
+        input: vec![],
         content: null_mut(),
-        inptr: null_mut(),
-        inrptr: null_mut(),
+        inptr: 0,
+        inrptr: 0,
         inlen: 0,
         last: 0,
         return_value: 0,
@@ -539,9 +527,6 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
     (*ctxt).query = None;
     if !(*ctxt).out.is_null() {
         xml_free((*ctxt).out as _);
-    }
-    if !(*ctxt).input.is_null() {
-        xml_free((*ctxt).input as _);
     }
     if !(*ctxt).content_type.is_null() {
         xml_free((*ctxt).content_type as _);
@@ -943,8 +928,8 @@ unsafe extern "C" fn xml_nanohttp_read_line(ctxt: XmlNanoHTTPCtxtPtr) -> *mut c_
                 return null_mut();
             }
         }
-        *bp = *(*ctxt).inrptr;
-        (*ctxt).inptr = (*ctxt).inptr.add(1);
+        *bp = *(*ctxt).input.as_mut_ptr().add((*ctxt).inrptr) as _;
+        (*ctxt).inptr += 1;
         if *bp == b'\n' as i8 {
             *bp = 0;
             return xml_mem_strdup(buf.as_mut_ptr() as _) as _;
@@ -1372,7 +1357,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             !p.is_null()
         } {
             if *p == 0 {
-                (*ctxt).content = (*ctxt).inrptr;
+                (*ctxt).content = (*ctxt).input.as_mut_ptr().add((*ctxt).inrptr);
                 xml_free(p as _);
                 break;
             }
@@ -1626,16 +1611,17 @@ pub unsafe extern "C" fn xml_nanohttp_read(
         return 0;
     }
 
-    while (*ctxt).inptr.offset_from((*ctxt).inrptr) < len as isize {
+    #[allow(clippy::while_immutable_condition)]
+    while (*ctxt).inptr - (*ctxt).inrptr < len as usize {
         if xml_nanohttp_recv(ctxt) <= 0 {
             break;
         }
     }
-    if (*ctxt).inptr.offset_from((*ctxt).inrptr) < len as isize {
-        len = (*ctxt).inptr.offset_from((*ctxt).inrptr) as i32;
+    if (*ctxt).inptr - (*ctxt).inrptr < len as usize {
+        len = (*ctxt).inptr as i32 - (*ctxt).inrptr as i32;
     }
     memcpy(dest as _, (*ctxt).inrptr as _, len as usize);
-    (*ctxt).inrptr = (*ctxt).inrptr.add(len as usize);
+    (*ctxt).inrptr += len as usize;
     len
 }
 
