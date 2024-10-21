@@ -20,16 +20,15 @@ use libc::{
     IPPROTO_TCP, O_CREAT, O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6, POLLIN, POLLOUT, SOCK_STREAM,
     SOL_SOCKET, SO_ERROR,
 };
-use url::Url;
+use url::{Host, Url};
 
 use crate::{
     error::XmlErrorDomain,
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc},
-        uri::{xml_free_uri, xml_parse_uri_raw, XmlURIPtr},
         xml_io::__xml_ioerr,
         xmlerror::XmlParserErrors,
-        xmlstring::{xml_char_strndup, xml_strncasecmp, xml_strndup, xml_strstr, XmlChar},
+        xmlstring::{xml_strncasecmp, xml_strndup, xml_strstr, XmlChar},
     },
     private::error::__xml_simple_error,
 };
@@ -430,9 +429,7 @@ pub unsafe extern "C" fn xml_nanohttp_method(
  * (Re)Initialize an HTTP context by parsing the URL and finding
  * the protocol host port and path it indicates.
  */
-unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: *const c_char) {
-    let len: usize;
-
+unsafe fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: &str) {
     /*
      * Clear any existing data from the context
      */
@@ -440,73 +437,29 @@ unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHTTPCtxtPtr, url: *const
     (*ctxt).hostname = None;
     (*ctxt).path = None;
     (*ctxt).query = None;
-    if url.is_null() {
-        return;
-    }
 
-    let uri: XmlURIPtr = xml_parse_uri_raw(url, 1);
-    if uri.is_null() {
+    let Ok(uri) = Url::parse(url) else {
         return;
-    }
+    };
 
-    if (*uri).scheme.is_null() || (*uri).server.is_null() {
-        xml_free_uri(uri);
+    let Some(host) = uri.host() else {
         return;
-    }
+    };
 
-    if !(*uri).scheme.is_null() {
-        (*ctxt).protocol = Some(
-            CStr::from_ptr((*uri).scheme as _)
-                .to_string_lossy()
-                .into_owned()
-                .into(),
-        );
-    }
+    (*ctxt).protocol = Some(uri.scheme().to_owned().into());
+
     /* special case of IPv6 addresses, the [] need to be removed */
-    if !(*uri).server.is_null() && *(*uri).server == b'[' as i8 {
-        len = strlen((*uri).server);
-        let hostname = if len > 2 && *(*uri).server.add(len - 1) == b']' as i8 {
-            xml_char_strndup((*uri).server.add(1) as _, len as i32 - 2) as _
-        } else {
-            xml_mem_strdup((*uri).server as _) as _
-        };
-        (*ctxt).hostname = Some(
-            CStr::from_ptr(hostname)
-                .to_string_lossy()
-                .into_owned()
-                .into(),
-        );
+    if let Host::Ipv6(host) = host {
+        (*ctxt).hostname = Some(host.to_string().into());
     } else {
-        (*ctxt).hostname = (!(*uri).server.is_null()).then(|| {
-            CStr::from_ptr((*uri).server)
-                .to_string_lossy()
-                .into_owned()
-                .into()
-        });
+        let host = uri.host_str().unwrap();
+        (*ctxt).hostname = Some(host.to_owned().into());
     }
-    if !(*uri).path.is_null() {
-        (*ctxt).path = Some(
-            CStr::from_ptr((*uri).path as _)
-                .to_string_lossy()
-                .into_owned()
-                .into(),
-        );
-    } else {
-        (*ctxt).path = Some(Cow::Borrowed("/"));
+    (*ctxt).path = Some(uri.path().to_owned().into());
+    (*ctxt).query = uri.query().map(|q| q.to_owned().into());
+    if let Some(port) = uri.port() {
+        (*ctxt).port = port as i32;
     }
-    if !(*uri).query.is_null() {
-        (*ctxt).query = Some(
-            CStr::from_ptr((*uri).query as _)
-                .to_string_lossy()
-                .into_owned()
-                .into(),
-        );
-    }
-    if (*uri).port != 0 {
-        (*ctxt).port = (*uri).port;
-    }
-
-    xml_free_uri(uri);
 }
 
 /**
@@ -530,7 +483,8 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
     (*ret).fd = INVALID_SOCKET;
     (*ret).content_length = -1;
 
-    xml_nanohttp_scan_url(ret, url);
+    let url = CStr::from_ptr(url).to_string_lossy();
+    xml_nanohttp_scan_url(ret, url.as_ref());
 
     ret
 }
