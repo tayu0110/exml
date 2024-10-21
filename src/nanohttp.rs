@@ -62,7 +62,7 @@ pub struct XmlNanoHTTPCtxt {
     out: *mut c_char,                    /* buffer sent (zero terminated) */
     outptr: *mut c_char,                 /* index within the buffer sent */
     input: Vec<u8>,                      /* the receiving buffer */
-    content: *mut u8,                    /* the start of the content */
+    content: usize,                      /* the start of the content */
     inptr: usize,                        /* the next byte to read from network */
     inrptr: usize,                       /* the next byte to give back to the client */
     inlen: usize,                        /* len of the input buffer */
@@ -204,7 +204,7 @@ unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHTTPCtxtPtr) -> i32 {
             (*ctxt).input = vec![0; 65000];
             (*ctxt).inlen = 65000;
             (*ctxt).inptr = 0;
-            (*ctxt).content = (*ctxt).input.as_mut_ptr();
+            (*ctxt).content = 0;
             (*ctxt).inrptr = 0;
         }
         if (*ctxt).inrptr > XML_NANO_HTTP_CHUNK {
@@ -216,15 +216,12 @@ unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHTTPCtxtPtr) -> i32 {
                 .input
                 .copy_within((*ctxt).inrptr..(*ctxt).inrptr + len, 0);
             (*ctxt).inrptr -= delta;
-            (*ctxt).content = (*ctxt).content.sub(delta);
+            (*ctxt).content -= delta;
             (*ctxt).inptr -= delta;
         }
         if (*ctxt).inlen < (*ctxt).inptr + XML_NANO_HTTP_CHUNK {
-            let d_content = (*ctxt).content.offset_from((*ctxt).input.as_ptr()) as usize;
-
             (*ctxt).inlen *= 2;
             (*ctxt).input.resize((*ctxt).inlen, 0);
-            (*ctxt).content = (*ctxt).input.as_mut_ptr().add(d_content);
         }
         (*ctxt).last = recv((*ctxt).fd, (*ctxt).inptr as _, XML_NANO_HTTP_CHUNK, 0) as _;
         if (*ctxt).last > 0 {
@@ -297,14 +294,13 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
 
     /*  But can't work without the context pointer  */
 
-    if ctxt.is_null() || (*ctxt).content.is_null() {
+    if ctxt.is_null() {
         *len = 0;
         *ptr = null_mut();
         return -1;
     }
 
-    let mut rcvd_lgth =
-        (*ctxt).inptr - (*ctxt).content.offset_from((*ctxt).input.as_ptr()) as usize;
+    let mut rcvd_lgth = (*ctxt).inptr - (*ctxt).content;
 
     while {
         cur_lgth = xml_nanohttp_recv(ctxt);
@@ -479,7 +475,7 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
         out: null_mut(),
         outptr: null_mut(),
         input: vec![],
-        content: null_mut(),
+        content: 0,
         inptr: 0,
         inrptr: 0,
         inlen: 0,
@@ -1357,7 +1353,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             !p.is_null()
         } {
             if *p == 0 {
-                (*ctxt).content = (*ctxt).input.as_mut_ptr().add((*ctxt).inrptr);
+                (*ctxt).content = (*ctxt).inrptr;
                 xml_free(p as _);
                 break;
             }
