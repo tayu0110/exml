@@ -53,27 +53,27 @@ pub struct XmlNanoHTTPCtxt {
     protocol: Option<Cow<'static, str>>, /* the protocol name */
     hostname: Option<Cow<'static, str>>, /* the host name */
     raw_hostname: Option<Host<String>>,
-    port: i32,                              /* the port */
-    path: Option<Cow<'static, str>>,        /* the path within the URL */
-    query: Option<Cow<'static, str>>,       /* the query string */
-    fd: Socket,                             /* the file descriptor for the socket */
-    state: i32,                             /* WRITE / READ / CLOSED */
-    out: *mut c_char,                       /* buffer sent (zero terminated) */
-    outptr: *mut c_char,                    /* index within the buffer sent */
-    input: Vec<u8>,                         /* the receiving buffer */
-    content: usize,                         /* the start of the content */
-    inptr: usize,                           /* the next byte to read from network */
-    inrptr: usize,                          /* the next byte to give back to the client */
-    inlen: usize,                           /* len of the input buffer */
-    last: i32,                              /* return code for last operation */
-    return_value: i32,                      /* the protocol return value */
-    version: i32,                           /* the protocol version */
-    content_length: i32,                    /* specified content length from HTTP header */
-    content_type: *mut c_char,              /* the MIME type for the input */
-    location: Option<Cow<'static, str>>,    /* the new URL in case of redirect */
-    auth_header: Option<Cow<'static, str>>, /* contents of {WWW,Proxy}-Authenticate header */
-    encoding: Option<Cow<'static, str>>,    /* encoding extracted from the contentType */
-    mime_type: Option<Cow<'static, str>>,   /* Mime-Type extracted from the contentType */
+    port: i32,                               /* the port */
+    path: Option<Cow<'static, str>>,         /* the path within the URL */
+    query: Option<Cow<'static, str>>,        /* the query string */
+    fd: Socket,                              /* the file descriptor for the socket */
+    state: i32,                              /* WRITE / READ / CLOSED */
+    out: *mut c_char,                        /* buffer sent (zero terminated) */
+    outptr: *mut c_char,                     /* index within the buffer sent */
+    input: Vec<u8>,                          /* the receiving buffer */
+    content: usize,                          /* the start of the content */
+    inptr: usize,                            /* the next byte to read from network */
+    inrptr: usize,                           /* the next byte to give back to the client */
+    inlen: usize,                            /* len of the input buffer */
+    last: i32,                               /* return code for last operation */
+    return_value: i32,                       /* the protocol return value */
+    version: i32,                            /* the protocol version */
+    content_length: i32,                     /* specified content length from HTTP header */
+    content_type: Option<Cow<'static, str>>, /* the MIME type for the input */
+    location: Option<Cow<'static, str>>,     /* the new URL in case of redirect */
+    auth_header: Option<Cow<'static, str>>,  /* contents of {WWW,Proxy}-Authenticate header */
+    encoding: Option<Cow<'static, str>>,     /* encoding extracted from the contentType */
+    mime_type: Option<Cow<'static, str>>,    /* Mime-Type extracted from the contentType */
 }
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -478,7 +478,7 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
         return_value: 0,
         version: 0,
         content_length: 0,
-        content_type: null_mut(),
+        content_type: None,
         location: None,
         auth_header: None,
         encoding: None,
@@ -519,9 +519,7 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
     if !(*ctxt).out.is_null() {
         xml_free((*ctxt).out as _);
     }
-    if !(*ctxt).content_type.is_null() {
-        xml_free((*ctxt).content_type as _);
-    }
+    (*ctxt).content_type = None;
     (*ctxt).encoding = None;
     (*ctxt).mime_type = None;
     (*ctxt).location = None;
@@ -980,12 +978,8 @@ unsafe fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: &str) {
         let mut cur = base.by_ref().peekable();
 
         while cur.next_if(|&c| c == ' ' || c == '\t').is_some() {}
-        if !(*ctxt).content_type.is_null() {
-            xml_free((*ctxt).content_type as _);
-        }
         let base = base.as_str();
-        let content_type = CString::new(base).unwrap();
-        (*ctxt).content_type = xml_mem_strdup(content_type.as_ptr() as _) as _;
+        (*ctxt).content_type = Some(base.to_owned().into());
         if let Some((mime, _)) = base.split_once(['\0', ' ', '\t', ';', ',']) {
             (*ctxt).mime_type = Some(mime.to_owned().into());
         } else {
@@ -1004,12 +998,8 @@ unsafe fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: &str) {
         let mut cur = base.by_ref().peekable();
 
         while cur.next_if(|&c| c == ' ' || c == '\t').is_some() {}
-        if !(*ctxt).content_type.is_null() {
-            xml_free((*ctxt).content_type as _);
-        }
         let base = base.as_str();
-        let content_type = CString::new(base).unwrap();
-        (*ctxt).content_type = xml_mem_strdup(content_type.as_ptr() as _) as _;
+        (*ctxt).content_type = Some(base.to_owned().into());
         if let Some((mime, _)) = base.split_once(['\0', ' ', '\t', ';', ',']) {
             (*ctxt).mime_type = Some(mime.to_owned().into());
         } else {
@@ -1329,8 +1319,9 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
     }
 
     if !content_type.is_null() {
-        if !(*ctxt).content_type.is_null() {
-            *content_type = xml_mem_strdup((*ctxt).content_type as _) as _;
+        if let Some(c) = (*ctxt).content_type.as_deref() {
+            let c = CString::new(c).unwrap();
+            *content_type = xml_mem_strdup(c.as_ptr() as _) as _;
         } else {
             *content_type = null_mut();
         }
