@@ -54,31 +54,31 @@ pub struct XmlNanoHTTPCtxt {
     protocol: Option<Cow<'static, str>>, /* the protocol name */
     hostname: Option<Cow<'static, str>>, /* the host name */
     raw_hostname: Option<Host<String>>,
-    port: i32,                           /* the port */
-    path: Option<Cow<'static, str>>,     /* the path within the URL */
-    query: Option<Cow<'static, str>>,    /* the query string */
-    fd: Socket,                          /* the file descriptor for the socket */
-    state: i32,                          /* WRITE / READ / CLOSED */
-    out: *mut c_char,                    /* buffer sent (zero terminated) */
-    outptr: *mut c_char,                 /* index within the buffer sent */
-    input: Vec<u8>,                      /* the receiving buffer */
-    content: usize,                      /* the start of the content */
-    inptr: usize,                        /* the next byte to read from network */
-    inrptr: usize,                       /* the next byte to give back to the client */
-    inlen: usize,                        /* len of the input buffer */
-    last: i32,                           /* return code for last operation */
-    return_value: i32,                   /* the protocol return value */
-    version: i32,                        /* the protocol version */
-    content_length: i32,                 /* specified content length from HTTP header */
-    content_type: *mut c_char,           /* the MIME type for the input */
-    location: Option<Cow<'static, str>>, /* the new URL in case of redirect */
-    auth_header: *mut c_char,            /* contents of {WWW,Proxy}-Authenticate header */
-    encoding: Option<Cow<'static, str>>, /* encoding extracted from the contentType */
-    mime_type: *mut c_char,              /* Mime-Type extracted from the contentType */
-                                         // #ifdef LIBXML_ZLIB_ENABLED
-                                         //     z_stream *strm;	/* Zlib stream object */
-                                         //     int usesGzip;	/* "Content-Encoding: gzip" was detected */
-                                         // #endif
+    port: i32,                              /* the port */
+    path: Option<Cow<'static, str>>,        /* the path within the URL */
+    query: Option<Cow<'static, str>>,       /* the query string */
+    fd: Socket,                             /* the file descriptor for the socket */
+    state: i32,                             /* WRITE / READ / CLOSED */
+    out: *mut c_char,                       /* buffer sent (zero terminated) */
+    outptr: *mut c_char,                    /* index within the buffer sent */
+    input: Vec<u8>,                         /* the receiving buffer */
+    content: usize,                         /* the start of the content */
+    inptr: usize,                           /* the next byte to read from network */
+    inrptr: usize,                          /* the next byte to give back to the client */
+    inlen: usize,                           /* len of the input buffer */
+    last: i32,                              /* return code for last operation */
+    return_value: i32,                      /* the protocol return value */
+    version: i32,                           /* the protocol version */
+    content_length: i32,                    /* specified content length from HTTP header */
+    content_type: *mut c_char,              /* the MIME type for the input */
+    location: Option<Cow<'static, str>>,    /* the new URL in case of redirect */
+    auth_header: Option<Cow<'static, str>>, /* contents of {WWW,Proxy}-Authenticate header */
+    encoding: Option<Cow<'static, str>>,    /* encoding extracted from the contentType */
+    mime_type: *mut c_char,                 /* Mime-Type extracted from the contentType */
+                                            // #ifdef LIBXML_ZLIB_ENABLED
+                                            //     z_stream *strm;	/* Zlib stream object */
+                                            //     int usesGzip;	/* "Content-Encoding: gzip" was detected */
+                                            // #endif
 }
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -485,7 +485,7 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
         content_length: 0,
         content_type: null_mut(),
         location: None,
-        auth_header: null_mut(),
+        auth_header: None,
         encoding: None,
         mime_type: null_mut(),
     };
@@ -532,9 +532,7 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
         xml_free((*ctxt).mime_type as _);
     }
     (*ctxt).location = None;
-    if !(*ctxt).auth_header.is_null() {
-        xml_free((*ctxt).auth_header as _);
-    }
+    (*ctxt).auth_header = None;
 
     (*ctxt).state = XML_NANO_HTTP_NONE as _;
     if (*ctxt).fd != INVALID_SOCKET {
@@ -1052,18 +1050,10 @@ unsafe fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: &str) {
         }
     } else if let Some(mut line) = line.strip_prefix("WWW-Authenticate:") {
         line = line.trim_start_matches([' ', '\t']);
-        if !(*ctxt).auth_header.is_null() {
-            xml_free((*ctxt).auth_header as _);
-        }
-        let header = CString::new(line).unwrap();
-        (*ctxt).auth_header = xml_mem_strdup(header.as_ptr() as _) as _;
+        (*ctxt).auth_header = Some(line.to_owned().into());
     } else if let Some(mut line) = line.strip_prefix("Proxy-Authenticate:") {
         line = line.trim_start_matches([' ', '\t']);
-        if !(*ctxt).auth_header.is_null() {
-            xml_free((*ctxt).auth_header as _);
-        }
-        let header = CString::new(line).unwrap();
-        (*ctxt).auth_header = xml_mem_strdup(header.as_ptr() as _) as _;
+        (*ctxt).auth_header = Some(line.to_owned().into());
     } else if let Some(mut line) = line.strip_prefix("Content-Length:") {
         line = line.trim();
         (*ctxt).content_length = line.parse().unwrap_or(0);
@@ -1461,14 +1451,14 @@ pub unsafe extern "C" fn xml_nanohttp_return_code(ctx: *mut c_void) -> c_int {
  * Returns the stashed value of the WWW-Authenticate or Proxy-Authenticate
  * header.
  */
-pub unsafe extern "C" fn xml_nanohttp_auth_header(ctx: *mut c_void) -> *const c_char {
+pub unsafe fn xml_nanohttp_auth_header(ctx: *mut c_void) -> Option<String> {
     let ctxt: XmlNanoHTTPCtxtPtr = ctx as XmlNanoHTTPCtxtPtr;
 
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
 
-    (*ctxt).auth_header
+    (*ctxt).auth_header.as_deref().map(|s| s.to_owned())
 }
 
 /**
@@ -1652,35 +1642,35 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_xml_nano_httpauth_header() {
-        #[cfg(feature = "http")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_nano_httpauth_header() {
+    //     #[cfg(feature = "http")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
+    //         for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
 
-                let ret_val = xml_nanohttp_auth_header(ctx);
-                desret_const_char_ptr(ret_val);
-                des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNanoHTTPAuthHeader",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctx);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlNanoHTTPAuthHeader()"
-            );
-        }
-    }
+    //             let ret_val = xml_nanohttp_auth_header(ctx);
+    //             desret_const_char_ptr(ret_val);
+    //             des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
+    //             reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlNanoHTTPAuthHeader",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 eprintln!(" {}", n_ctx);
+    //             }
+    //         }
+    //         assert!(
+    //             leaks == 0,
+    //             "{leaks} Leaks are found in xmlNanoHTTPAuthHeader()"
+    //         );
+    //     }
+    // }
 
     #[test]
     fn test_xml_nano_httpcleanup() {
