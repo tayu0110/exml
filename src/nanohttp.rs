@@ -15,9 +15,9 @@ use std::{
 use libc::{
     __errno_location, addrinfo, close, connect, fcntl, freeaddrinfo, getaddrinfo, getsockopt,
     memcpy, memset, open, poll, pollfd, recv, send, snprintf, sockaddr, sockaddr_in, sockaddr_in6,
-    socket, strcmp, strlen, strncmp, strtol, write, AF_INET, AF_INET6, EAGAIN, ECONNRESET,
-    EINPROGRESS, EINTR, ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT, O_NONBLOCK,
-    O_WRONLY, PF_INET, PF_INET6, POLLIN, POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
+    socket, strcmp, strlen, write, AF_INET, AF_INET6, EAGAIN, ECONNRESET, EINPROGRESS, EINTR,
+    ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT, O_NONBLOCK, O_WRONLY, PF_INET,
+    PF_INET6, POLLIN, POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
 };
 use url::{Host, Url};
 
@@ -27,7 +27,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup},
         xml_io::__xml_ioerr,
         xmlerror::XmlParserErrors,
-        xmlstring::{xml_strncasecmp, xml_strndup, xml_strstr, XmlChar},
+        xmlstring::xml_strndup,
     },
     private::error::__xml_simple_error,
 };
@@ -951,155 +951,138 @@ unsafe extern "C" fn xml_nanohttp_read_line(ctxt: XmlNanoHTTPCtxtPtr) -> *mut c_
  *
  * Returns -1 in case of failure, the file descriptor number otherwise
  */
-unsafe extern "C" fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: *const c_char) {
-    let mut cur: *const c_char = line;
+unsafe fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: &str) {
+    if let Some(line) = line.strip_prefix("HTTP/") {
+        let mut version = 0;
+        let mut ret = 0;
+        let mut cur = line.chars().peekable();
 
-    if line.is_null() {
-        return;
-    }
-
-    if strncmp(line, c"HTTP/".as_ptr() as _, 5) == 0 {
-        let mut version: c_int = 0;
-        let mut ret: c_int = 0;
-
-        cur = cur.add(5);
-        while *cur >= b'0' as i8 && *cur <= b'9' as i8 {
+        while let Some(c) = cur.next_if(char::is_ascii_digit) {
             version *= 10;
-            version += (*cur - b'0' as i8) as i32;
-            cur = cur.add(1);
+            version += c as i32 - b'0' as i32;
         }
-        if *cur == b'.' as i8 {
-            cur = cur.add(1);
-            if *cur >= b'0' as i8 && *cur <= b'9' as i8 {
+        if cur.next_if(|&c| c == '.').is_some() {
+            if let Some(c) = cur.next_if(char::is_ascii_digit) {
                 version *= 10;
-                version += (*cur - b'0' as i8) as i32;
-                cur = cur.add(1);
+                version += c as i32 - b'0' as i32;
             }
-            while *cur >= b'0' as i8 && *cur <= b'9' as i8 {
-                cur = cur.add(1);
-            }
+            while cur.next_if(char::is_ascii_digit).is_some() {}
         } else {
             version *= 10;
         }
-        if *cur != b' ' as i8 && *cur != b'\t' as i8 {
+        if !matches!(cur.peek(), Some(&' ') | Some(&'\t')) {
             return;
         }
-        while *cur == b' ' as i8 || *cur == b'\t' as i8 {
-            cur = cur.add(1);
-        }
-        if *cur < b'0' as i8 || *cur > b'9' as i8 {
+        while cur.next_if(|&c| c == ' ' || c == '\t').is_some() {}
+        if cur.peek().filter(|c| !c.is_ascii_digit()).is_none() {
             return;
         }
-        while *cur >= b'0' as i8 && *cur <= b'9' as i8 {
+        while let Some(c) = cur.next_if(|c| c.is_ascii_digit()) {
             ret *= 10;
-            ret += (*cur - b'0' as i8) as i32;
-            cur = cur.add(1);
+            ret += c as i32 - b'0' as i32;
         }
-        if (*cur != 0) && *cur != b' ' as i8 && *cur != b'\t' as i8 {
+        if !matches!(cur.peek(), Some(&'\0' | &' ' | &'\t')) {
             return;
         }
         (*ctxt).return_value = ret;
         (*ctxt).version = version;
-    } else if xml_strncasecmp(line as _, c"Content-Type:".as_ptr() as _, 13) == 0 {
-        let mut charset: *const XmlChar;
-        let mut last: *const XmlChar;
+    } else if let Some(line) = line.strip_prefix("Content-Type:") {
+        let mut base = line.chars();
+        let mut cur = base.by_ref().peekable();
 
-        cur = cur.add(13);
-        while *cur == b' ' as i8 || *cur == b'\t' as i8 {
-            cur = cur.add(1);
-        }
+        while cur.next_if(|&c| c == ' ' || c == '\t').is_some() {}
         if !(*ctxt).content_type.is_null() {
             xml_free((*ctxt).content_type as _);
         }
-        (*ctxt).content_type = xml_mem_strdup(cur as _) as _;
-        let mime: *const XmlChar = cur as _;
-        last = mime;
-        while *last != 0 && *last != b' ' && *last != b'\t' && *last != b';' && *last != b',' {
-            last = last.add(1);
-        }
-        if !(*ctxt).mime_type.is_null() {
-            xml_free((*ctxt).mime_type as _);
-        }
-        (*ctxt).mime_type = xml_strndup(mime, last.offset_from(mime) as _) as _;
-        charset = xml_strstr((*ctxt).content_type as _, c"charset=".as_ptr() as _);
-        if !charset.is_null() {
-            charset = charset.add(8);
-            last = charset;
-            while *last != 0 && *last != b' ' && *last != b'\t' && *last != b';' && *last != b',' {
-                last = last.add(1);
+        let base = base.as_str();
+        let content_type = CString::new(base).unwrap();
+        (*ctxt).content_type = xml_mem_strdup(content_type.as_ptr() as _) as _;
+        if let Some((mime, _)) = base.split_once(['\0', ' ', '\t', ';', ',']) {
+            if !(*ctxt).mime_type.is_null() {
+                xml_free((*ctxt).mime_type as _);
             }
+            let mime = CString::new(mime).unwrap();
+            (*ctxt).mime_type = xml_strndup(mime.as_ptr() as _, mime.to_bytes().len() as _) as _;
+        } else {
+            let mime = CString::new(base).unwrap();
+            (*ctxt).mime_type = xml_strndup(mime.as_ptr() as _, mime.to_bytes().len() as _) as _;
+        }
+        if let Some(index) = base.find("charset=") {
+            let charset = base[index..].strip_prefix("charset=").unwrap();
             if !(*ctxt).encoding.is_null() {
                 xml_free((*ctxt).encoding as _);
             }
-            (*ctxt).encoding = xml_strndup(charset, last.offset_from(charset) as _) as _;
+            if let Some((charset, _)) = charset.split_once(['\0', ' ', '\t', ';', ',']) {
+                let charset = CString::new(charset).unwrap();
+                (*ctxt).encoding =
+                    xml_strndup(charset.as_ptr() as _, charset.to_bytes().len() as _) as _;
+            } else {
+                let charset = CString::new(charset).unwrap();
+                (*ctxt).encoding =
+                    xml_strndup(charset.as_ptr() as _, charset.to_bytes().len() as _) as _;
+            }
         }
-    } else if xml_strncasecmp(line as _, c"ContentType:".as_ptr() as _, 12) == 0 {
-        let mut charset: *const XmlChar;
-        let mut last: *const XmlChar;
+    } else if let Some(line) = line.strip_prefix("ContentType:") {
+        let mut base = line.chars();
+        let mut cur = base.by_ref().peekable();
 
-        cur = cur.add(12);
+        while cur.next_if(|&c| c == ' ' || c == '\t').is_some() {}
         if !(*ctxt).content_type.is_null() {
-            return;
+            xml_free((*ctxt).content_type as _);
         }
-        while *cur == b' ' as i8 || *cur == b'\t' as i8 {
-            cur = cur.add(1);
-        }
-        (*ctxt).content_type = xml_mem_strdup(cur as _) as _;
-        let mime: *const XmlChar = cur as _;
-        last = mime;
-        while *last != 0 && *last != b' ' && *last != b'\t' && *last != b';' && *last != b',' {
-            last = last.add(1);
-        }
-        if !(*ctxt).mime_type.is_null() {
-            xml_free((*ctxt).mime_type as _);
-        }
-        (*ctxt).mime_type = xml_strndup(mime, last.offset_from(mime) as _) as _;
-        charset = xml_strstr((*ctxt).content_type as _, c"charset=".as_ptr() as _);
-        if !charset.is_null() {
-            charset = charset.add(8);
-            last = charset;
-            while *last != 0 && *last != b' ' && *last != b'\t' && *last != b';' && *last != b',' {
-                last = last.add(1);
+        let base = base.as_str();
+        let content_type = CString::new(base).unwrap();
+        (*ctxt).content_type = xml_mem_strdup(content_type.as_ptr() as _) as _;
+        if let Some((mime, _)) = base.split_once(['\0', ' ', '\t', ';', ',']) {
+            if !(*ctxt).mime_type.is_null() {
+                xml_free((*ctxt).mime_type as _);
             }
+            let mime = CString::new(mime).unwrap();
+            (*ctxt).mime_type = xml_strndup(mime.as_ptr() as _, mime.to_bytes().len() as _) as _;
+        } else {
+            let mime = CString::new(base).unwrap();
+            (*ctxt).mime_type = xml_strndup(mime.as_ptr() as _, mime.to_bytes().len() as _) as _;
+        }
+        if let Some(index) = base.find("charset=") {
+            let charset = base[index..].strip_prefix("charset=").unwrap();
             if !(*ctxt).encoding.is_null() {
                 xml_free((*ctxt).encoding as _);
             }
-            (*ctxt).encoding = xml_strndup(charset, last.offset_from(charset) as _) as _;
+            if let Some((charset, _)) = charset.split_once(['\0', ' ', '\t', ';', ',']) {
+                let charset = CString::new(charset).unwrap();
+                (*ctxt).encoding =
+                    xml_strndup(charset.as_ptr() as _, charset.to_bytes().len() as _) as _;
+            } else {
+                let charset = CString::new(charset).unwrap();
+                (*ctxt).encoding =
+                    xml_strndup(charset.as_ptr() as _, charset.to_bytes().len() as _) as _;
+            }
         }
-    } else if xml_strncasecmp(line as _, c"Location:".as_ptr() as _, 9) == 0 {
-        cur = cur.add(9);
-        while *cur == b' ' as i8 || *cur == b'\t' as i8 {
-            cur = cur.add(1);
-        }
-        (*ctxt).location = None;
-        if *cur == b'/' as i8 {
-            let loc = format!("http://{}", (*ctxt).hostname.as_deref().unwrap_or(""));
+    } else if let Some(mut line) = line.strip_prefix("Location:") {
+        line = line.trim_start_matches([' ', '\t']);
+        if line.starts_with('/') {
+            let loc = format!("http://{}{line}", (*ctxt).hostname.as_deref().unwrap_or(""));
             (*ctxt).location = Some(loc.into());
         } else {
-            let loc = CStr::from_ptr(cur).to_string_lossy().into_owned();
-            (*ctxt).location = Some(loc.into());
+            (*ctxt).location = Some(line.to_owned().into());
         }
-    } else if xml_strncasecmp(line as _, c"WWW-Authenticate:".as_ptr() as _, 17) == 0 {
-        cur = cur.add(17);
-        while *cur == b' ' as i8 || *cur == b'\t' as i8 {
-            cur = cur.add(1);
-        }
+    } else if let Some(mut line) = line.strip_prefix("WWW-Authenticate:") {
+        line = line.trim_start_matches([' ', '\t']);
         if !(*ctxt).auth_header.is_null() {
             xml_free((*ctxt).auth_header as _);
         }
-        (*ctxt).auth_header = xml_mem_strdup(cur as _) as _;
-    } else if xml_strncasecmp(line as _, c"Proxy-Authenticate:".as_ptr() as _, 19) == 0 {
-        cur = cur.add(19);
-        while *cur == b' ' as i8 || *cur == b'\t' as i8 {
-            cur = cur.add(1);
-        }
+        let header = CString::new(line).unwrap();
+        (*ctxt).auth_header = xml_mem_strdup(header.as_ptr() as _) as _;
+    } else if let Some(mut line) = line.strip_prefix("Proxy-Authenticate:") {
+        line = line.trim_start_matches([' ', '\t']);
         if !(*ctxt).auth_header.is_null() {
             xml_free((*ctxt).auth_header as _);
         }
-        (*ctxt).auth_header = xml_mem_strdup(cur as _) as _;
-    } else if xml_strncasecmp(line as _, c"Content-Length:".as_ptr() as _, 15) == 0 {
-        cur = cur.add(15);
-        (*ctxt).content_length = strtol(cur, null_mut(), 10) as _;
+        let header = CString::new(line).unwrap();
+        (*ctxt).auth_header = xml_mem_strdup(header.as_ptr() as _) as _;
+    } else if let Some(mut line) = line.strip_prefix("Content-Length:") {
+        line = line.trim();
+        (*ctxt).content_length = line.parse().unwrap_or(0);
     }
 }
 
@@ -1357,7 +1340,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
                 xml_free(p as _);
                 break;
             }
-            xml_nanohttp_scan_answer(ctxt, p);
+            xml_nanohttp_scan_answer(ctxt, CStr::from_ptr(p).to_string_lossy().as_ref());
 
             xml_free(p as _);
         }
