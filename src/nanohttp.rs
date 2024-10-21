@@ -552,12 +552,6 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
     if !(*ctxt).auth_header.is_null() {
         xml_free((*ctxt).auth_header as _);
     }
-    //  #ifdef LIBXML_ZLIB_ENABLED
-    //      if !(*ctxt).strm.is_null() {
-    //          inflateEnd((*ctxt).strm);
-    //          xmlFree((*ctxt).strm as _);
-    //      }
-    //  #endif
 
     (*ctxt).state = XML_NANO_HTTP_NONE as _;
     if (*ctxt).fd != INVALID_SOCKET {
@@ -1118,25 +1112,6 @@ unsafe extern "C" fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: *c
             xml_free((*ctxt).auth_header as _);
         }
         (*ctxt).auth_header = xml_mem_strdup(cur as _) as _;
-    //  #ifdef LIBXML_ZLIB_ENABLED
-    //      } else if ( !xmlStrncasecmp(  line, c"Content-Encoding:".as_ptr() as _, 17) ) {
-    //      cur = cur.add(17);
-    //      while *cur == b' ' || *cur == b'\t' {
-    //          cur = cur.add(1);
-    //      }
-    //      if ( !xmlStrncasecmp(  cur, c"gzip".as_ptr() as _, 4) ) {
-    //          (*ctxt).usesGzip = 1;
-    //          (*ctxt).strm = xmlMalloc(sizeof(z_stream));
-    //          if !(*ctxt).strm.is_null() {
-    //          (*(*ctxt).strm).zalloc = Z_NULL;
-    //          (*(*ctxt).strm).zfree = Z_NULL;
-    //          (*(*ctxt).strm).opaque = Z_NULL;
-    //          (*(*ctxt).strm).avail_in = 0;
-    //          (*(*ctxt).strm).next_in = Z_NULL;
-    //          inflateInit2( (*ctxt).strm, 31 );
-    //          }
-    //      }
-    //  #endif
     } else if xml_strncasecmp(line as _, c"Content-Length:".as_ptr() as _, 15) == 0 {
         cur = cur.add(15);
         (*ctxt).content_length = strtol(cur, null_mut(), 10) as _;
@@ -1267,10 +1242,6 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             blen += query.len() + 1;
         }
         blen += strlen(method) + (*ctxt).path.as_ref().map_or(0, |s| s.len()) + 24;
-        // #ifdef LIBXML_ZLIB_ENABLED
-        //     /* reserve for possible 'Accept-Encoding: gzip' string */
-        //     blen += 23;
-        // #endif
         if (*ctxt).port != 80 {
             /* reserve space for ':xxxxx', incl. potential proxy */
             if use_proxy != 0 {
@@ -1350,10 +1321,6 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
                 (*ctxt).port,
             ) as usize);
         }
-
-        // #ifdef LIBXML_ZLIB_ENABLED
-        //     p = p.add(snprintf(p, blen - p.offset_from(bp) as usize, c"Accept-Encoding: gzip\r\n");
-        // #endif
 
         if !content_type.is_null() && !(*content_type).is_null() {
             p = p.add(snprintf(
@@ -1644,11 +1611,6 @@ pub unsafe extern "C" fn xml_nanohttp_read(
     mut len: c_int,
 ) -> c_int {
     let ctxt: XmlNanoHTTPCtxtPtr = ctx as XmlNanoHTTPCtxtPtr;
-    // #ifdef LIBXML_ZLIB_ENABLED
-    //     c_int bytes_read = 0;
-    //     c_int orig_avail_in;
-    //     c_int z_ret;
-    // #endif
 
     if ctx.is_null() {
         return -1;
@@ -1659,30 +1621,6 @@ pub unsafe extern "C" fn xml_nanohttp_read(
     if len <= 0 {
         return 0;
     }
-
-    // #ifdef LIBXML_ZLIB_ENABLED
-    //     if ((*ctxt).usesGzip == 1) {
-    //         if (*ctxt).strm.is_null() {
-    //             return 0;
-    //         }
-    //         (*(*ctxt).strm).next_out = dest;
-    //         (*(*ctxt).strm).avail_out = len;
-    // 	(*(*ctxt).strm).avail_in = (*ctxt).inptr.offset_from((*ctxt).inrptr);
-    //         while ((*(*ctxt).strm).avail_out > 0 &&
-    // 	       ((*(*ctxt).strm).avail_in > 0 || xmlNanoHTTPRecv(ctxt) > 0)) {
-    //             orig_avail_in = (*(*ctxt).strm).avail_in =
-    // 			    (*ctxt).inptr.offset_from((*ctxt).inrptr) - bytes_read;
-    //             (*(*ctxt).strm).next_in =  ((*ctxt).inrptr + bytes_read);
-    //             z_ret = inflate((*ctxt).strm, Z_NO_FLUSH);
-    //             bytes_read += orig_avail_in - (*(*ctxt).strm).avail_in;
-    //             if (z_ret != Z_OK) {
-    //                 break;
-    //             }
-    // 	}
-    //         (*ctxt).inrptr += bytes_read;
-    //         return(len - (*(*ctxt).strm).avail_out);
-    //     }
-    // #endif
 
     while (*ctxt).inptr.offset_from((*ctxt).inrptr) < len as isize {
         if xml_nanohttp_recv(ctxt) <= 0 {
