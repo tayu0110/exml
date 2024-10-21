@@ -53,6 +53,7 @@ pub type XmlNanoHTTPCtxtPtr = *mut XmlNanoHTTPCtxt;
 pub struct XmlNanoHTTPCtxt {
     protocol: Option<Cow<'static, str>>, /* the protocol name */
     hostname: Option<Cow<'static, str>>, /* the host name */
+    raw_hostname: Option<Host<String>>,
     port: i32,                           /* the port */
     path: Option<Cow<'static, str>>,     /* the path within the URL */
     query: Option<Cow<'static, str>>,    /* the query string */
@@ -434,6 +435,7 @@ fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
      */
     ctxt.protocol = None;
     ctxt.hostname = None;
+    ctxt.raw_hostname = None;
     ctxt.path = None;
     ctxt.query = None;
 
@@ -454,6 +456,7 @@ fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
         let host = uri.host_str().unwrap();
         ctxt.hostname = Some(host.to_owned().into());
     }
+    ctxt.raw_hostname = Some(host.to_owned());
     ctxt.path = Some(uri.path().to_owned().into());
     ctxt.query = uri.query().map(|q| q.to_owned().into());
     if let Some(port) = uri.port() {
@@ -479,6 +482,7 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
     let mut tmp = XmlNanoHTTPCtxt {
         protocol: None,
         hostname: None,
+        raw_hostname: None,
         port: 0,
         path: None,
         query: None,
