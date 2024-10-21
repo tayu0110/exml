@@ -13,12 +13,11 @@ use std::{
 };
 
 use libc::{
-    __errno_location, addrinfo, close, connect, fcntl, freeaddrinfo, getaddrinfo, getenv,
-    getsockopt, isspace, memcpy, memmove, memset, open, poll, pollfd, recv, send, size_t, snprintf,
-    sockaddr, sockaddr_in, sockaddr_in6, socket, strcmp, strlen, strncmp, strtol, write, AF_INET,
-    AF_INET6, EAGAIN, ECONNRESET, EINPROGRESS, EINTR, ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL,
-    IPPROTO_TCP, O_CREAT, O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6, POLLIN, POLLOUT, SOCK_STREAM,
-    SOL_SOCKET, SO_ERROR,
+    __errno_location, addrinfo, close, connect, fcntl, freeaddrinfo, getaddrinfo, getsockopt,
+    memcpy, memmove, memset, open, poll, pollfd, recv, send, snprintf, sockaddr, sockaddr_in,
+    sockaddr_in6, socket, strcmp, strlen, strncmp, strtol, write, AF_INET, AF_INET6, EAGAIN,
+    ECONNRESET, EINPROGRESS, EINTR, ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT,
+    O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6, POLLIN, POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
 };
 use url::{Host, Url};
 
@@ -611,55 +610,14 @@ fn xml_nanohttp_hostname_match(pattern: &str, hostname: &str) -> bool {
  *
  * Returns true, iff a proxy server should be bypassed for the given hostname.
  */
-unsafe fn xml_nanohttp_bypass_proxy(hostname: &str) -> c_int {
-    let mut env: *mut c_char = getenv(c"no_proxy".as_ptr() as _);
-    let mut p: *mut c_char;
-
-    if env.is_null() {
-        return 0;
+fn xml_nanohttp_bypass_proxy(hostname: &str) -> bool {
+    if let Ok(env) = std::env::var("no_proxy") {
+        return env
+            .split(',')
+            .map(|e| e.trim())
+            .any(|e| xml_nanohttp_hostname_match(e, hostname));
     }
-
-    /* (Avoid strdup because it's not portable.) */
-    let envlen: size_t = strlen(env) + 1;
-    let cpy: *mut c_char = xml_malloc(envlen) as _;
-    memcpy(cpy as _, env as _, envlen);
-    env = cpy;
-
-    /* The remainder of the function is basically a tokenizing: */
-    while isspace(*env as i32) != 0 {
-        env = env.add(1);
-    }
-    if *env == b'\0' as i8 {
-        xml_free(cpy as _);
-        return 0;
-    }
-
-    p = env;
-    while *env != 0 {
-        if *env != b',' as i8 {
-            env = env.add(1);
-            continue;
-        }
-
-        *(env) = b'\0' as i8;
-        env = env.add(1);
-        if xml_nanohttp_hostname_match(CStr::from_ptr(p).to_string_lossy().as_ref(), hostname) {
-            xml_free(cpy as _);
-            return 1;
-        }
-
-        while isspace(*env as i32) != 0 {
-            env = env.add(1);
-        }
-        p = env;
-    }
-    if xml_nanohttp_hostname_match(CStr::from_ptr(p).to_string_lossy().as_ref(), hostname) {
-        xml_free(cpy as _);
-        return 1;
-    }
-
-    xml_free(cpy as _);
-    0
+    false
 }
 
 pub type XmlSocklenT = c_uint;
@@ -1269,7 +1227,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             return null_mut();
         };
         use_proxy = (!PROXY.load(Ordering::Relaxed).is_null()
-            && xml_nanohttp_bypass_proxy(hostname.as_ref()) == 0) as i32;
+            && !xml_nanohttp_bypass_proxy(hostname.as_ref())) as i32;
         if use_proxy != 0 {
             blen = (*ctxt).hostname.as_ref().map_or(0, |h| h.len()) * 2 + 16;
             ret = xml_nanohttp_connect_host(
