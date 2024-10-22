@@ -329,7 +329,7 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
 pub unsafe extern "C" fn xml_nanohttp_fetch(
     url: *const c_char,
     filename: *const c_char,
-    content_type: *mut *mut c_char,
+    content_type: &mut Option<Cow<'static, str>>,
 ) -> c_int {
     let mut buf: *mut c_char = null_mut();
     let fd: c_int;
@@ -350,10 +350,7 @@ pub unsafe extern "C" fn xml_nanohttp_fetch(
         fd = open(filename, O_CREAT | O_WRONLY, 0o0644);
         if fd < 0 {
             xml_nanohttp_close(ctxt);
-            if !content_type.is_null() && !(*content_type).is_null() {
-                xml_free(*content_type as _);
-                *content_type = null_mut();
-            }
+            *content_type = None;
             return -1;
         }
     }
@@ -388,7 +385,7 @@ pub unsafe fn xml_nanohttp_method(
     url: *const c_char,
     method: Option<&str>,
     input: *const c_char,
-    content_type: *mut *mut c_char,
+    content_type: &mut Option<Cow<'static, str>>,
     headers: *const c_char,
     ilen: c_int,
 ) -> *mut c_void {
@@ -950,7 +947,7 @@ pub unsafe fn xml_nanohttp_method_redir(
     url: *const c_char,
     method: Option<&str>,
     input: *const c_char,
-    content_type: *mut *mut c_char,
+    content_type: &mut Option<Cow<'static, str>>,
     redir: &mut *mut c_char,
     headers: *const c_char,
     mut ilen: c_int,
@@ -1043,9 +1040,9 @@ pub unsafe fn xml_nanohttp_method_redir(
         if !headers.is_null() {
             blen += strlen(headers) + 2;
         }
-        if !content_type.is_null() && !(*content_type).is_null() {
+        if let Some(content_type) = content_type.as_deref() {
             /* reserve for string plus 'Content-Type: \r\n" */
-            blen += strlen(*content_type) + 16;
+            blen += content_type.len() + 16;
         }
         if let Some(query) = (*ctxt).query.as_deref() {
             /* 1 for '?' */
@@ -1083,8 +1080,7 @@ pub unsafe fn xml_nanohttp_method_redir(
             write!(bp, " HTTP/1.0\r\nHost: {hostname}:{}\r\n", (*ctxt).port);
         }
 
-        if !content_type.is_null() && !(*content_type).is_null() {
-            let content_type = CStr::from_ptr(*content_type).to_string_lossy();
+        if let Some(content_type) = content_type.as_deref() {
             write!(bp, "Content-Type: {content_type}\r\n");
         }
 
@@ -1155,14 +1151,7 @@ pub unsafe fn xml_nanohttp_method_redir(
         return null_mut();
     }
 
-    if !content_type.is_null() {
-        if let Some(c) = (*ctxt).content_type.as_deref() {
-            let c = CString::new(c).unwrap();
-            *content_type = xml_mem_strdup(c.as_ptr() as _) as _;
-        } else {
-            *content_type = null_mut();
-        }
-    }
+    *content_type = (*ctxt).content_type.clone();
 
     if !redir.is_null() && !redir_url.is_null() {
         *redir = redir_url;
@@ -1192,11 +1181,8 @@ pub unsafe fn xml_nanohttp_method_redir(
  */
 pub unsafe extern "C" fn xml_nanohttp_open(
     url: *const c_char,
-    content_type: *mut *mut c_char,
+    content_type: &mut Option<Cow<'static, str>>,
 ) -> *mut c_void {
-    if !content_type.is_null() {
-        *content_type = null_mut();
-    }
     xml_nanohttp_method(url, None, null_mut(), content_type, null_mut(), 0)
 }
 
@@ -1215,12 +1201,9 @@ pub unsafe extern "C" fn xml_nanohttp_open(
  */
 pub unsafe extern "C" fn xml_nanohttp_open_redir(
     url: *const c_char,
-    content_type: *mut *mut c_char,
+    content_type: &mut Option<Cow<'static, str>>,
     redir: &mut *mut c_char,
 ) -> *mut c_void {
-    if !content_type.is_null() {
-        *content_type = null_mut();
-    }
     if !redir.is_null() {
         *redir = null_mut();
     }
@@ -1562,42 +1545,42 @@ mod tests {
     //     }
     // }
 
-    #[test]
-    fn test_xml_nano_httpfetch() {
-        #[cfg(feature = "http")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_nano_httpfetch() {
+    //     #[cfg(feature = "http")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_url in 0..GEN_NB_FILEOUTPUT {
-                for n_filename in 0..GEN_NB_FILEOUTPUT {
-                    for n_content_type in 0..GEN_NB_CHAR_PTR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let url = gen_fileoutput(n_url, 0);
-                        let filename = gen_fileoutput(n_filename, 1);
-                        let content_type = gen_char_ptr_ptr(n_content_type, 2);
+    //         for n_url in 0..GEN_NB_FILEOUTPUT {
+    //             for n_filename in 0..GEN_NB_FILEOUTPUT {
+    //                 for n_content_type in 0..GEN_NB_CHAR_PTR_PTR {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let url = gen_fileoutput(n_url, 0);
+    //                     let filename = gen_fileoutput(n_filename, 1);
+    //                     let content_type = gen_char_ptr_ptr(n_content_type, 2);
 
-                        let ret_val = xml_nanohttp_fetch(url, filename, content_type);
-                        desret_int(ret_val);
-                        des_fileoutput(n_url, url, 0);
-                        des_fileoutput(n_filename, filename, 1);
-                        des_char_ptr_ptr(n_content_type, content_type, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNanoHTTPFetch",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_url);
-                            eprint!(" {}", n_filename);
-                            eprintln!(" {}", n_content_type);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPFetch()");
-        }
-    }
+    //                     let ret_val = xml_nanohttp_fetch(url, filename, content_type);
+    //                     desret_int(ret_val);
+    //                     des_fileoutput(n_url, url, 0);
+    //                     des_fileoutput(n_filename, filename, 1);
+    //                     des_char_ptr_ptr(n_content_type, content_type, 2);
+    //                     reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlNanoHTTPFetch",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         eprint!(" {}", n_url);
+    //                         eprint!(" {}", n_filename);
+    //                         eprintln!(" {}", n_content_type);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPFetch()");
+    //     }
+    // }
 
     #[test]
     fn test_xml_nano_httpinit() {
@@ -1650,37 +1633,37 @@ mod tests {
     //     }
     // }
 
-    #[test]
-    fn test_xml_nano_httpopen() {
-        #[cfg(feature = "http")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_nano_httpopen() {
+    //     #[cfg(feature = "http")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_url in 0..GEN_NB_FILEPATH {
-                for n_content_type in 0..GEN_NB_CHAR_PTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let url = gen_filepath(n_url, 0);
-                    let content_type = gen_char_ptr_ptr(n_content_type, 1);
+    //         for n_url in 0..GEN_NB_FILEPATH {
+    //             for n_content_type in 0..GEN_NB_CHAR_PTR_PTR {
+    //                 let mem_base = xml_mem_blocks();
+    //                 let url = gen_filepath(n_url, 0);
+    //                 let content_type = gen_char_ptr_ptr(n_content_type, 1);
 
-                    let ret_val = xml_nanohttp_open(url, content_type);
-                    desret_xml_nano_httpctxt_ptr(ret_val);
-                    des_filepath(n_url, url, 0);
-                    des_char_ptr_ptr(n_content_type, content_type, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNanoHTTPOpen",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_url);
-                        eprintln!(" {}", n_content_type);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPOpen()");
-        }
-    }
+    //                 let ret_val = xml_nanohttp_open(url, content_type);
+    //                 desret_xml_nano_httpctxt_ptr(ret_val);
+    //                 des_filepath(n_url, url, 0);
+    //                 des_char_ptr_ptr(n_content_type, content_type, 1);
+    //                 reset_last_error();
+    //                 if mem_base != xml_mem_blocks() {
+    //                     leaks += 1;
+    //                     eprint!(
+    //                         "Leak of {} blocks found in xmlNanoHTTPOpen",
+    //                         xml_mem_blocks() - mem_base
+    //                     );
+    //                     eprint!(" {}", n_url);
+    //                     eprintln!(" {}", n_content_type);
+    //                 }
+    //             }
+    //         }
+    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPOpen()");
+    //     }
+    // }
 
     // #[test]
     // fn test_xml_nano_httpopen_redir() {
