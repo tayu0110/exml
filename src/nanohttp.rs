@@ -2,18 +2,11 @@
 //! This module is based on `libxml/nanohttp.h`, `nanohttp.c`, and so on in `libxml2-v2.11.8`.
 //!
 //! Please refer to original libxml2 documents also.
-#![warn(clippy::missing_safety_doc)]
-#![warn(clippy::blocks_in_conditions)]
-#![warn(clippy::needless_range_loop)]
-#![warn(unused_assignments)]
-#![warn(deprecated)]
-#![warn(unused)]
 
 use std::{
     borrow::Cow,
-    ffi::{c_int, c_uint},
     fs::File,
-    io::{stdout, ErrorKind, Read, Write},
+    io::{self, stdout, ErrorKind, Read, Write},
     net::{TcpStream, ToSocketAddrs},
     str::from_utf8,
     sync::{
@@ -156,9 +149,9 @@ pub fn xml_nanohttp_scan_proxy(url: &str) {
  *
  * Returns the number of byte read or -1 in case of error.
  */
-fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> std::io::Result<usize> {
+fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> io::Result<usize> {
     let Some(stream) = ctxt.socket.as_mut() else {
-        return Err(std::io::Error::new(ErrorKind::Other, "Socket is invalid."));
+        return Err(io::Error::new(ErrorKind::Other, "Socket is invalid."));
     };
 
     while ctxt.state & XML_NANO_HTTP_READ as i32 != 0 {
@@ -227,12 +220,8 @@ fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> std::io::Result<usize> {
  * -1 if received content length was less than specified or an error
  * occurred.
  */
-fn xml_nanohttp_fetch_content(
-    ctxt: &mut XmlNanoHTTPCtxt,
-    ptr: &mut usize,
-    len: &mut usize,
-) -> c_int {
-    let mut rc: c_int = 0;
+fn xml_nanohttp_fetch_content(ctxt: &mut XmlNanoHTTPCtxt, ptr: &mut usize, len: &mut usize) -> i32 {
+    let mut rc = 0;
     let mut rcvd_lgth = ctxt.inptr - ctxt.content;
 
     while let Some(cur_lgth) = xml_nanohttp_recv(ctxt).ok().filter(|&len| len > 0) {
@@ -461,8 +450,6 @@ fn xml_nanohttp_bypass_proxy(hostname: &str) -> bool {
     false
 }
 
-pub type XmlSocklenT = c_uint;
-
 /**
  * xmlNanoHTTPConnectHost:
  * @host:  the host name
@@ -473,7 +460,6 @@ pub type XmlSocklenT = c_uint;
  *
  * Returns -1 in case of failure, the file descriptor number otherwise
  */
-
 fn xml_nanohttp_connect_host(host: &str, port: i32) -> Option<TcpStream> {
     let host = format!("{host}:{port}");
     for addr in host.to_socket_addrs().ok()? {
@@ -492,7 +478,7 @@ fn xml_nanohttp_connect_host(host: &str, port: i32) -> Option<TcpStream> {
  * Send the input needed to initiate the processing on the server side
  * Returns number of bytes sent or -1 on error.
  */
-fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> c_int {
+fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> i32 {
     let mut total_sent = 0;
 
     if ctxt.state & XML_NANO_HTTP_WRITE as i32 != 0 {
@@ -711,7 +697,7 @@ pub fn xml_nanohttp_method_redir(
     headers: Option<&str>,
 ) -> Option<XmlNanoHTTPCtxt> {
     let mut ctxt;
-    let mut nb_redirects: c_int = 0;
+    let mut nb_redirects = 0;
     let mut use_proxy: bool;
     let mut redir_url = None::<String>;
     let method = method.unwrap_or("GET");
@@ -1032,11 +1018,11 @@ pub fn xml_nanohttp_read(ctxt: &mut XmlNanoHTTPCtxt, dest: &mut [u8]) -> usize {
  * Returns -1 in case of failure, 0 in case of success.
  */
 #[cfg(feature = "output")]
-pub fn xml_nanohttp_save(ctxt: &mut XmlNanoHTTPCtxt, filename: &str) -> c_int {
+pub fn xml_nanohttp_save(ctxt: &mut XmlNanoHTTPCtxt, filename: &str) -> i32 {
     use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
     let mut len = 0;
-    let mut ret: c_int = 0;
+    let mut ret = 0;
 
     let mut writer: Box<dyn Write> = if filename == "-" {
         Box::new(stdout())
