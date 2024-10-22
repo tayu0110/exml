@@ -260,33 +260,25 @@ fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> std::io::Result<usize> {
  * -1 if received content length was less than specified or an error
  * occurred.
  */
-unsafe fn xml_nanohttp_fetch_content(ctx: *mut c_void, ptr: &mut usize, len: &mut c_int) -> c_int {
-    let ctxt: XmlNanoHTTPCtxtPtr = ctx as XmlNanoHTTPCtxtPtr;
-
+fn xml_nanohttp_fetch_content(
+    ctxt: &mut XmlNanoHTTPCtxt,
+    ptr: &mut usize,
+    len: &mut usize,
+) -> c_int {
     let mut rc: c_int = 0;
+    let mut rcvd_lgth = ctxt.inptr - ctxt.content;
 
-    /*  But can't work without the context pointer  */
-
-    if ctxt.is_null() {
-        *len = 0;
-        *ptr = 0;
-        return -1;
-    }
-
-    let mut rcvd_lgth = (*ctxt).inptr - (*ctxt).content;
-
-    while let Some(cur_lgth) = xml_nanohttp_recv(&mut *ctxt).ok().filter(|&len| len > 0) {
+    while let Some(cur_lgth) = xml_nanohttp_recv(ctxt).ok().filter(|&len| len > 0) {
         rcvd_lgth += cur_lgth;
-        if (*ctxt).content_length > 0 && rcvd_lgth >= (*ctxt).content_length as usize {
+        if ctxt.content_length > 0 && rcvd_lgth >= ctxt.content_length as usize {
             break;
         }
     }
 
-    *ptr = (*ctxt).content;
-    *len = rcvd_lgth as i32;
+    *ptr = ctxt.content;
+    *len = rcvd_lgth;
 
-    if ((*ctxt).content_length > 0 && rcvd_lgth < (*ctxt).content_length as usize) || rcvd_lgth == 0
-    {
+    if (ctxt.content_length > 0 && rcvd_lgth < ctxt.content_length as usize) || rcvd_lgth == 0 {
         rc = -1;
     }
 
@@ -312,7 +304,7 @@ pub unsafe fn xml_nanohttp_fetch(
     content_type: &mut Option<Cow<'static, str>>,
 ) -> c_int {
     let fd: c_int;
-    let mut len: c_int = 0;
+    let mut len = 0;
     let mut ret: c_int = 0;
 
     if filename.is_null() {
@@ -335,8 +327,8 @@ pub unsafe fn xml_nanohttp_fetch(
     }
 
     let mut buf = 0;
-    xml_nanohttp_fetch_content(ctxt, &mut buf, &mut len);
     let ctxt = ctxt as XmlNanoHTTPCtxtPtr;
+    xml_nanohttp_fetch_content(&mut *ctxt, &mut buf, &mut len);
     if len > 0 && write(fd, (*ctxt).input[buf..].as_ptr() as _, len as _) == -1 {
         ret = -1;
     }
@@ -1182,7 +1174,7 @@ pub unsafe extern "C" fn xml_nanohttp_read(
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: *const c_char) -> c_int {
     let fd: c_int;
-    let mut len: c_int = 0;
+    let mut len = 0;
     let mut ret: c_int = 0;
 
     if ctxt.is_null() || filename.is_null() {
@@ -1200,8 +1192,8 @@ pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: *const c
     }
 
     let mut buf = 0;
-    xml_nanohttp_fetch_content(ctxt, &mut buf, &mut len);
     let ctxt = ctxt as XmlNanoHTTPCtxtPtr;
+    xml_nanohttp_fetch_content(&mut *ctxt, &mut buf, &mut len);
     if len > 0 && write(fd, (*ctxt).input[buf..].as_ptr() as _, len as _) == -1 {
         ret = -1;
     }
