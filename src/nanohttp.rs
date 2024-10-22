@@ -15,7 +15,6 @@ use std::{
     fs::File,
     io::{stdout, ErrorKind, Read, Write},
     net::{TcpStream, ToSocketAddrs},
-    os::raw::c_void,
     str::from_utf8,
     sync::{
         atomic::{AtomicBool, AtomicI32, Ordering},
@@ -27,14 +26,13 @@ use url::Url;
 
 use crate::{
     error::XmlErrorDomain,
-    libxml::{globals::xml_free, xml_io::__xml_ioerr, xmlerror::XmlParserErrors},
+    libxml::{xml_io::__xml_ioerr, xmlerror::XmlParserErrors},
 };
 
 const XML_NANO_HTTP_MAX_REDIR: usize = 10;
 const XML_NANO_HTTP_CHUNK: usize = 4096;
 const XML_NANO_HTTP_WRITE: usize = 1;
 const XML_NANO_HTTP_READ: usize = 2;
-const XML_NANO_HTTP_NONE: usize = 4;
 
 pub type XmlNanoHTTPCtxtPtr = *mut XmlNanoHTTPCtxt;
 #[repr(C)]
@@ -410,31 +408,6 @@ fn xml_nanohttp_new_ctxt(url: &str) -> XmlNanoHTTPCtxt {
     xml_nanohttp_scan_url(&mut ret, url);
 
     ret
-}
-
-/**
- * xmlNanoHTTPFreeCtxt:
- * @ctxt:  an HTTP context
- *
- * Frees the context after closing the connection.
- */
-unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).hostname = None;
-    (*ctxt).protocol = None;
-    (*ctxt).path = None;
-    (*ctxt).query = None;
-    (*ctxt).content_type = None;
-    (*ctxt).encoding = None;
-    (*ctxt).mime_type = None;
-    (*ctxt).location = None;
-    (*ctxt).auth_header = None;
-
-    (*ctxt).state = XML_NANO_HTTP_NONE as _;
-    (*ctxt).socket = None;
-    xml_free(ctxt as _);
 }
 
 /**
@@ -1061,15 +1034,11 @@ pub fn xml_nanohttp_read(ctxt: &mut XmlNanoHTTPCtxt, dest: &mut [u8]) -> usize {
  * Returns -1 in case of failure, 0 in case of success.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: &str) -> c_int {
+pub fn xml_nanohttp_save(ctxt: &mut XmlNanoHTTPCtxt, filename: &str) -> c_int {
     use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
     let mut len = 0;
     let mut ret: c_int = 0;
-
-    if ctxt.is_null() {
-        return -1;
-    }
 
     let mut writer: Box<dyn Write> = if filename == "-" {
         Box::new(stdout())
@@ -1081,7 +1050,6 @@ pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: &str) ->
             .truncate(true)
             .open(filename)
         else {
-            xml_nanohttp_close(ctxt);
             return -1;
         };
         file.set_permissions(Permissions::from_mode(0o666)).ok();
@@ -1089,87 +1057,10 @@ pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: &str) ->
     };
 
     let mut buf = 0;
-    let ctxt = ctxt as XmlNanoHTTPCtxtPtr;
-    xml_nanohttp_fetch_content(&mut *ctxt, &mut buf, &mut len);
-    if len > 0 && writer.write_all(&(*ctxt).input[buf..]).is_err() {
+    xml_nanohttp_fetch_content(ctxt, &mut buf, &mut len);
+    if len > 0 && writer.write_all(&ctxt.input[buf..]).is_err() {
         ret = -1;
     }
 
-    xml_nanohttp_close(ctxt as _);
     ret
-}
-
-/**
- * xmlNanoHTTPClose:
- * @ctx:  the HTTP context
- *
- * This function closes an HTTP context, it ends up the connection and
- * free all data related to it.
- */
-pub unsafe extern "C" fn xml_nanohttp_close(ctx: *mut c_void) {
-    let ctxt: XmlNanoHTTPCtxtPtr = ctx as XmlNanoHTTPCtxtPtr;
-
-    if ctx.is_null() {
-        return;
-    }
-
-    xml_nanohttp_free_ctxt(ctxt);
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_nano_httpcleanup() {
-        #[cfg(feature = "http")]
-        unsafe {
-            let mut leaks = 0;
-
-            let mem_base = xml_mem_blocks();
-
-            xml_nanohttp_cleanup();
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlNanoHTTPCleanup",
-                    xml_mem_blocks() - mem_base
-                );
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlNanoHTTPCleanup()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_nano_httpinit() {
-        #[cfg(feature = "http")]
-        unsafe {
-            let mut leaks = 0;
-
-            let mem_base = xml_mem_blocks();
-
-            xml_nanohttp_init();
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlNanoHTTPInit",
-                    xml_mem_blocks() - mem_base
-                );
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPInit()");
-        }
-    }
-
-    #[test]
-    fn test_xml_nano_httpredir() {
-
-        /* missing type support */
-    }
 }
