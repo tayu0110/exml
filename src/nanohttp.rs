@@ -87,7 +87,7 @@ static TIMEOUT: c_uint = 60; /* the select() timeout in seconds */
  * Initialize the HTTP protocol layer.
  * Currently it just checks for proxy information
  */
-pub unsafe extern "C" fn xml_nanohttp_init() {
+pub fn xml_nanohttp_init() {
     if INITIALIZED.load(Ordering::Acquire) {
         return;
     }
