@@ -6,18 +6,20 @@
 use std::{
     borrow::Cow,
     ffi::{c_char, c_int, c_uint, CStr, CString},
+    io::{ErrorKind, Read, Write},
     mem::{forget, size_of, size_of_val, zeroed},
     net::{TcpStream, ToSocketAddrs},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
+    slice::from_raw_parts,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
 use libc::{
-    __errno_location, close, connect, fcntl, getsockopt, memcpy, open, poll, pollfd, recv, send,
-    snprintf, sockaddr, sockaddr_in, sockaddr_in6, socket, strcmp, strlen, write, AF_INET6, EAGAIN,
-    ECONNRESET, EINPROGRESS, EINTR, ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT,
-    O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6, POLLIN, POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
+    __errno_location, close, connect, fcntl, getsockopt, memcpy, open, poll, pollfd, snprintf,
+    sockaddr, sockaddr_in, sockaddr_in6, socket, strcmp, strlen, write, AF_INET6, EINPROGRESS,
+    EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT, O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6,
+    POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
 };
 use url::Url;
 
@@ -56,7 +58,6 @@ pub struct XmlNanoHTTPCtxt {
     path: Option<Cow<'static, str>>,     /* the path within the URL */
     query: Option<Cow<'static, str>>,    /* the query string */
     socket: Option<TcpStream>,
-    fd: Socket,                              /* the file descriptor for the socket */
     state: i32,                              /* WRITE / READ / CLOSED */
     out: *mut c_char,                        /* buffer sent (zero terminated) */
     outptr: *mut c_char,                     /* index within the buffer sent */
@@ -192,7 +193,9 @@ unsafe extern "C" fn xml_http_err_memory(extra: *const c_char) {
  */
 
 unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHTTPCtxtPtr) -> i32 {
-    let mut p: pollfd = unsafe { zeroed() };
+    let Some(stream) = (*ctxt).socket.as_mut() else {
+        return -1;
+    };
 
     while (*ctxt).state & XML_NANO_HTTP_READ as i32 != 0 {
         if (*ctxt).input.is_empty() {
@@ -218,36 +221,35 @@ unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHTTPCtxtPtr) -> i32 {
             (*ctxt).inlen *= 2;
             (*ctxt).input.resize((*ctxt).inlen, 0);
         }
-        (*ctxt).last = recv((*ctxt).fd, (*ctxt).inptr as _, XML_NANO_HTTP_CHUNK, 0) as _;
-        if (*ctxt).last > 0 {
-            (*ctxt).inptr += (*ctxt).last as usize;
-            return (*ctxt).last;
-        }
-        if (*ctxt).last == 0 {
-            return 0;
-        }
-        if (*ctxt).last == -1 {
-            match *__errno_location() {
-                EINPROGRESS | EWOULDBLOCK => {
-                    // This pattern covers `EAGAIN`.
-                }
-                ECONNRESET | ESHUTDOWN => {
-                    return 0;
-                }
-                _ => {
-                    __xml_ioerr(
-                        XmlErrorDomain::XmlFromHTTP,
-                        XmlParserErrors::default(),
-                        c"recv failed\n".as_ptr() as _,
-                    );
-                    return -1;
+        match stream.read(&mut (*ctxt).input[(*ctxt).inptr..(*ctxt).inptr + XML_NANO_HTTP_CHUNK]) {
+            Ok(len) => {
+                if len > 0 {
+                    (*ctxt).inptr += len;
+                    (*ctxt).last = len as i32;
+                    return len as i32;
                 }
             }
-        }
-        p.fd = (*ctxt).fd;
-        p.events = POLLIN;
-        if poll(addr_of_mut!(p), 1, TIMEOUT as i32 * 1000) < 1 && *__errno_location() != EINTR {
-            return 0;
+            Ok(0) => {
+                return 0;
+            }
+            Err(e) => {
+                match e.kind() {
+                    ErrorKind::WouldBlock | ErrorKind::TimedOut => {
+                        // This pattern covers `EAGAIN`
+                    }
+                    ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted => {
+                        return 0;
+                    }
+                    _ => {
+                        __xml_ioerr(
+                            XmlErrorDomain::XmlFromHTTP,
+                            XmlParserErrors::default(),
+                            c"recv failed\n".as_ptr() as _,
+                        );
+                        return -1;
+                    }
+                }
+            }
         }
     }
     0
@@ -459,7 +461,6 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
         path: None,
         query: None,
         socket: None,
-        fd: 0,
         state: 0,
         out: null_mut(),
         outptr: null_mut(),
@@ -480,7 +481,6 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
     };
     tmp.port = 80;
     tmp.return_value = 0;
-    tmp.fd = INVALID_SOCKET;
     tmp.content_length = -1;
 
     let url = CStr::from_ptr(url).to_string_lossy();
@@ -520,10 +520,7 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
     (*ctxt).auth_header = None;
 
     (*ctxt).state = XML_NANO_HTTP_NONE as _;
-    if (*ctxt).fd != INVALID_SOCKET {
-        closesocket((*ctxt).fd);
-    }
-    (*ctxt).fd = INVALID_SOCKET;
+    (*ctxt).socket = None;
     xml_free(ctxt as _);
 }
 
@@ -730,6 +727,7 @@ fn xml_nanohttp_connect_host(host: &str, port: i32) -> Option<TcpStream> {
     let host = format!("{host}:{port}");
     for addr in host.to_socket_addrs().ok()? {
         if let Ok(stream) = TcpStream::connect(addr) {
+            stream.set_nonblocking(true).ok()?;
             return Some(stream);
         }
     }
@@ -748,43 +746,43 @@ unsafe extern "C" fn xml_nanohttp_send(
     xmt_ptr: *const c_char,
     outlen: c_int,
 ) -> c_int {
-    let mut total_sent: c_int = 0;
-    let mut p: pollfd = unsafe { zeroed() };
+    let mut total_sent = 0;
 
     if (*ctxt).state & XML_NANO_HTTP_WRITE as i32 != 0 && !xmt_ptr.is_null() {
-        while total_sent < outlen {
-            let nsent: c_int = send(
-                (*ctxt).fd,
-                xmt_ptr.add(total_sent as usize) as _,
-                (outlen - total_sent) as usize,
-                0,
-            ) as _;
-
-            if nsent > 0 {
-                total_sent += nsent;
-            } else if nsent == -1
-                && *__errno_location() != EAGAIN
-                && *__errno_location() != EWOULDBLOCK
-            {
-                __xml_ioerr(
-                    XmlErrorDomain::XmlFromHTTP,
-                    XmlParserErrors::default(),
-                    c"send failed\n".as_ptr() as _,
-                );
-                if total_sent == 0 {
-                    total_sent = -1;
+        let Some(socket) = (*ctxt).socket.as_mut() else {
+            __xml_ioerr(
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::default(),
+                c"send failed\n".as_ptr() as _,
+            );
+            if total_sent == 0 {
+                total_sent = -1;
+            }
+            return total_sent;
+        };
+        let mut buf = from_raw_parts(xmt_ptr as *const u8, outlen as usize);
+        while !buf.is_empty() {
+            match socket.write(buf) {
+                Ok(len) => {
+                    total_sent += len as i32;
+                    buf = &buf[len..];
                 }
-                break;
-            } else {
-                /*
-                 * No data sent
-                 * Since non-blocking sockets are used, wait for
-                 * socket to be writable or default timeout prior
-                 * to retrying.
-                 */
-                p.fd = (*ctxt).fd;
-                p.events = POLLOUT;
-                poll(addr_of_mut!(p), 1, TIMEOUT as i32 * 1000);
+                Err(e) => match e.kind() {
+                    ErrorKind::WouldBlock | ErrorKind::TimedOut => {
+                        continue;
+                    }
+                    _ => {
+                        __xml_ioerr(
+                            XmlErrorDomain::XmlFromHTTP,
+                            XmlParserErrors::default(),
+                            c"send failed\n".as_ptr() as _,
+                        );
+                        if total_sent == 0 {
+                            total_sent = -1;
+                        }
+                        break;
+                    }
+                },
             }
         }
     }
