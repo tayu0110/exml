@@ -7,19 +7,19 @@ use std::{
     borrow::Cow,
     ffi::{c_char, c_int, c_uint, CStr, CString},
     mem::{forget, size_of, size_of_val, zeroed},
+    net::{TcpStream, ToSocketAddrs},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
 use libc::{
-    __errno_location, addrinfo, close, connect, fcntl, freeaddrinfo, getaddrinfo, getsockopt,
-    memcpy, memset, open, poll, pollfd, recv, send, snprintf, sockaddr, sockaddr_in, sockaddr_in6,
-    socket, strcmp, strlen, write, AF_INET, AF_INET6, EAGAIN, ECONNRESET, EINPROGRESS, EINTR,
-    ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT, O_NONBLOCK, O_WRONLY, PF_INET,
-    PF_INET6, POLLIN, POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
+    __errno_location, close, connect, fcntl, getsockopt, memcpy, open, poll, pollfd, recv, send,
+    snprintf, sockaddr, sockaddr_in, sockaddr_in6, socket, strcmp, strlen, write, AF_INET6, EAGAIN,
+    ECONNRESET, EINPROGRESS, EINTR, ESHUTDOWN, EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT,
+    O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6, POLLIN, POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
 };
-use url::{Host, Url};
+use url::Url;
 
 use crate::{
     error::XmlErrorDomain,
@@ -52,10 +52,10 @@ pub type XmlNanoHTTPCtxtPtr = *mut XmlNanoHTTPCtxt;
 pub struct XmlNanoHTTPCtxt {
     protocol: Option<Cow<'static, str>>, /* the protocol name */
     hostname: Option<Cow<'static, str>>, /* the host name */
-    raw_hostname: Option<Host<String>>,
-    port: i32,                               /* the port */
-    path: Option<Cow<'static, str>>,         /* the path within the URL */
-    query: Option<Cow<'static, str>>,        /* the query string */
+    port: i32,                           /* the port */
+    path: Option<Cow<'static, str>>,     /* the path within the URL */
+    query: Option<Cow<'static, str>>,    /* the query string */
+    socket: Option<TcpStream>,
     fd: Socket,                              /* the file descriptor for the socket */
     state: i32,                              /* WRITE / READ / CLOSED */
     out: *mut c_char,                        /* buffer sent (zero terminated) */
@@ -414,7 +414,6 @@ fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
      */
     ctxt.protocol = None;
     ctxt.hostname = None;
-    ctxt.raw_hostname = None;
     ctxt.path = None;
     ctxt.query = None;
 
@@ -422,20 +421,15 @@ fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
         return;
     };
 
-    let Some(host) = uri.host() else {
+    if uri.host().is_none() {
         return;
     };
 
     ctxt.protocol = Some(uri.scheme().to_owned().into());
 
     /* special case of IPv6 addresses, the [] need to be removed */
-    if let Host::Ipv6(host) = host {
-        ctxt.hostname = Some(host.to_string().into());
-    } else {
-        let host = uri.host_str().unwrap();
-        ctxt.hostname = Some(host.to_owned().into());
-    }
-    ctxt.raw_hostname = Some(host.to_owned());
+    let host = uri.host_str().unwrap();
+    ctxt.hostname = Some(host.to_owned().into());
     ctxt.path = Some(uri.path().to_owned().into());
     ctxt.query = uri.query().map(|q| q.to_owned().into());
     if let Some(port) = uri.port() {
@@ -461,10 +455,10 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
     let mut tmp = XmlNanoHTTPCtxt {
         protocol: None,
         hostname: None,
-        raw_hostname: None,
         port: 0,
         path: None,
         query: None,
+        socket: None,
         fd: 0,
         state: 0,
         out: null_mut(),
@@ -732,98 +726,14 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
  * Returns -1 in case of failure, the file descriptor number otherwise
  */
 
-unsafe fn xml_nanohttp_connect_host(host: &str, port: c_int) -> Socket {
-    let mut addr: *mut sockaddr;
-    let mut sockin: sockaddr_in = unsafe { zeroed() };
-    let mut sockin6: sockaddr_in6 = unsafe { zeroed() };
-    let mut s: Socket;
-    let host = CString::new(host).unwrap();
-
-    memset(addr_of_mut!(sockin) as _, 0, size_of_val(&sockin));
-
-    {
-        let mut hints: addrinfo = unsafe { zeroed() };
-        let mut res: *mut addrinfo;
-        let mut result: *mut addrinfo;
-
-        memset(addr_of_mut!(sockin6) as _, 0, size_of_val(&sockin6));
-
-        result = null_mut();
-        memset(addr_of_mut!(hints) as _, 0, size_of_val(&hints));
-        hints.ai_socktype = SOCK_STREAM;
-
-        let status: c_int = getaddrinfo(
-            host.as_ptr(),
-            null_mut(),
-            addr_of_mut!(hints) as _,
-            addr_of_mut!(result),
-        );
-        if status != 0 {
-            __xml_ioerr(
-                XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::default(),
-                c"getaddrinfo failed\n".as_ptr() as _,
-            );
-            return INVALID_SOCKET;
-        }
-
-        res = result;
-        while !res.is_null() {
-            if (*res).ai_family == AF_INET {
-                if (*res).ai_addrlen as usize > size_of_val(&sockin) {
-                    __xml_ioerr(
-                        XmlErrorDomain::XmlFromHTTP,
-                        XmlParserErrors::default(),
-                        c"address size mismatch\n".as_ptr() as _,
-                    );
-                    freeaddrinfo(result);
-                    return INVALID_SOCKET;
-                }
-                memcpy(
-                    addr_of_mut!(sockin) as _,
-                    (*res).ai_addr as _,
-                    (*res).ai_addrlen as _,
-                );
-                // sockin.sin_port = htons(port);
-                sockin.sin_port = port.to_be() as u16;
-                addr = addr_of_mut!(sockin) as _;
-            } else if (*res).ai_family == AF_INET6 {
-                if (*res).ai_addrlen as usize > size_of_val(&sockin6) {
-                    __xml_ioerr(
-                        XmlErrorDomain::XmlFromHTTP,
-                        XmlParserErrors::default(),
-                        c"address size mismatch\n".as_ptr() as _,
-                    );
-                    freeaddrinfo(result);
-                    return INVALID_SOCKET;
-                }
-                memcpy(
-                    addr_of_mut!(sockin6) as _,
-                    (*res).ai_addr as _,
-                    (*res).ai_addrlen as _,
-                );
-                // sockin6.sin6_port = htons(port);
-                sockin6.sin6_port = port.to_be() as u16;
-                addr = addr_of_mut!(sockin6) as _;
-            } else {
-                res = (*res).ai_next;
-                continue; /* for */
-            }
-
-            s = xml_nanohttp_connect_attempt(addr);
-            if s != INVALID_SOCKET {
-                freeaddrinfo(result);
-                return s;
-            }
-            res = (*res).ai_next;
-        }
-
-        if !result.is_null() {
-            freeaddrinfo(result);
+fn xml_nanohttp_connect_host(host: &str, port: i32) -> Option<TcpStream> {
+    let host = format!("{host}:{port}");
+    for addr in host.to_socket_addrs().ok()? {
+        if let Ok(stream) = TcpStream::connect(addr) {
+            return Some(stream);
         }
     }
-
-    INVALID_SOCKET
+    None
 }
 
 /**
@@ -1062,8 +972,6 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
     let mut ctxt: XmlNanoHTTPCtxtPtr;
     let mut bp: *mut c_char;
     let mut p: *mut c_char;
-    let mut blen: usize;
-    let mut ret: Socket;
     let mut nb_redirects: c_int = 0;
     let mut use_proxy: c_int;
     let mut redir_url: *mut c_char = null_mut();
@@ -1118,26 +1026,30 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
         };
         use_proxy = (!PROXY.load(Ordering::Relaxed).is_null()
             && !xml_nanohttp_bypass_proxy(hostname.as_ref())) as i32;
-        if use_proxy != 0 {
-            blen = (*ctxt).hostname.as_ref().map_or(0, |h| h.len()) * 2 + 16;
-            ret = xml_nanohttp_connect_host(
-                CStr::from_ptr(PROXY.load(Ordering::Relaxed) as _)
-                    .to_string_lossy()
-                    .as_ref(),
-                PROXY_PORT.load(Ordering::Relaxed) as _,
-            );
+        let (mut blen, ret) = if use_proxy != 0 {
+            (
+                (*ctxt).hostname.as_ref().map_or(0, |h| h.len()) * 2 + 16,
+                xml_nanohttp_connect_host(
+                    CStr::from_ptr(PROXY.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                    PROXY_PORT.load(Ordering::Relaxed) as _,
+                ),
+            )
         } else {
-            blen = (*ctxt).hostname.as_ref().map_or(0, |h| h.len());
-            ret = xml_nanohttp_connect_host(hostname.as_ref(), (*ctxt).port);
-        }
-        if ret == INVALID_SOCKET {
+            (
+                (*ctxt).hostname.as_ref().map_or(0, |h| h.len()),
+                xml_nanohttp_connect_host(hostname.as_ref(), (*ctxt).port),
+            )
+        };
+        let Some(ret) = ret else {
             xml_nanohttp_free_ctxt(ctxt);
             if !redir_url.is_null() {
                 xml_free(redir_url as _);
             }
             return null_mut();
-        }
-        (*ctxt).fd = ret;
+        };
+        (*ctxt).socket = Some(ret);
 
         if input.is_null() {
             ilen = 0;
