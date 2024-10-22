@@ -327,8 +327,8 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
  * Returns -1 in case of failure, 0 in case of success. The contentType,
  *     if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xml_nanohttp_fetch(
-    url: *const c_char,
+pub unsafe fn xml_nanohttp_fetch(
+    url: &str,
     filename: *const c_char,
     content_type: &mut Option<Cow<'static, str>>,
 ) -> c_int {
@@ -383,22 +383,14 @@ pub unsafe extern "C" fn xml_nanohttp_fetch(
  *     The contentType, if provided must be freed by the caller
  */
 pub unsafe fn xml_nanohttp_method(
-    url: *const c_char,
+    url: &str,
     method: Option<&str>,
     input: *const c_char,
     content_type: &mut Option<Cow<'static, str>>,
     headers: *const c_char,
     ilen: c_int,
 ) -> *mut c_void {
-    xml_nanohttp_method_redir(
-        url,
-        method,
-        input,
-        content_type,
-        &mut null_mut(),
-        headers,
-        ilen,
-    )
+    xml_nanohttp_method_redir(url, method, input, content_type, &mut None, headers, ilen)
 }
 
 /**
@@ -446,7 +438,7 @@ fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
  *
  * Returns an HTTP context or NULL in case of error.
  */
-unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtxtPtr {
+unsafe fn xml_nanohttp_new_ctxt(url: &str) -> XmlNanoHTTPCtxtPtr {
     let ret: XmlNanoHTTPCtxtPtr = xml_malloc(size_of::<XmlNanoHTTPCtxt>()) as XmlNanoHTTPCtxtPtr;
     if ret.is_null() {
         xml_http_err_memory(c"allocating context".as_ptr() as _);
@@ -482,8 +474,7 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
     tmp.return_value = 0;
     tmp.content_length = -1;
 
-    let url = CStr::from_ptr(url).to_string_lossy();
-    xml_nanohttp_scan_url(&mut tmp, url.as_ref());
+    xml_nanohttp_scan_url(&mut tmp, url);
 
     memcpy(
         ret as _,
@@ -941,39 +932,35 @@ fn xml_nanohttp_scan_answer(ctxt: &mut XmlNanoHTTPCtxt, line: &str) {
  *     The contentType, or redir, if provided must be freed by the caller
  */
 pub unsafe fn xml_nanohttp_method_redir(
-    url: *const c_char,
+    url: &str,
     method: Option<&str>,
     input: *const c_char,
     content_type: &mut Option<Cow<'static, str>>,
-    redir: &mut *mut c_char,
+    redir: &mut Option<String>,
     headers: *const c_char,
     mut ilen: c_int,
 ) -> *mut c_void {
     let mut ctxt: XmlNanoHTTPCtxtPtr;
     let mut nb_redirects: c_int = 0;
     let mut use_proxy: bool;
-    let mut redir_url: *mut c_char = null_mut();
+    let mut redir_url = None::<String>;
 
-    if url.is_null() {
-        return null_mut();
-    }
     let method = method.unwrap_or("GET");
     xml_nanohttp_init();
 
     // retry:
     'retry: loop {
-        if redir_url.is_null() {
-            ctxt = xml_nanohttp_new_ctxt(url);
-            if ctxt.is_null() {
-                return null_mut();
-            }
-        } else {
+        if let Some(redir_url) = redir_url.as_deref() {
             ctxt = xml_nanohttp_new_ctxt(redir_url);
             if ctxt.is_null() {
                 return null_mut();
             }
-            let redir_url = CStr::from_ptr(redir_url).to_string_lossy().into_owned();
-            (*ctxt).location = Some(redir_url.into());
+            (*ctxt).location = Some(redir_url.to_owned().into());
+        } else {
+            ctxt = xml_nanohttp_new_ctxt(url);
+            if ctxt.is_null() {
+                return null_mut();
+            }
         }
 
         if (*ctxt).protocol != Some("http".into()) {
@@ -983,9 +970,6 @@ pub unsafe fn xml_nanohttp_method_redir(
                 c"Not a valid HTTP URI".as_ptr() as _,
             );
             xml_nanohttp_free_ctxt(ctxt);
-            if !redir_url.is_null() {
-                xml_free(redir_url as _);
-            }
             return null_mut();
         }
         let Some(hostname) = (*ctxt).hostname.as_ref() else {
@@ -995,9 +979,6 @@ pub unsafe fn xml_nanohttp_method_redir(
                 c"Failed to identify host in URI".as_ptr() as _,
             );
             xml_nanohttp_free_ctxt(ctxt);
-            if !redir_url.is_null() {
-                xml_free(redir_url as _);
-            }
             return null_mut();
         };
         use_proxy = !PROXY.load(Ordering::Relaxed).is_null()
@@ -1020,9 +1001,6 @@ pub unsafe fn xml_nanohttp_method_redir(
         };
         let Some(ret) = ret else {
             xml_nanohttp_free_ctxt(ctxt);
-            if !redir_url.is_null() {
-                xml_free(redir_url as _);
-            }
             return null_mut();
         };
         (*ctxt).socket = Some(ret);
@@ -1123,11 +1101,7 @@ pub unsafe fn xml_nanohttp_method_redir(
             {}
             if nb_redirects < XML_NANO_HTTP_MAX_REDIR as i32 {
                 nb_redirects += 1;
-                if !redir_url.is_null() {
-                    xml_free(redir_url as _);
-                }
-                let url = CString::new(location).unwrap();
-                redir_url = xml_mem_strdup(url.as_ptr() as _) as _;
+                redir_url = Some(location.to_owned());
                 xml_nanohttp_free_ctxt(ctxt);
                 continue 'retry;
             }
@@ -1135,24 +1109,11 @@ pub unsafe fn xml_nanohttp_method_redir(
             break;
         }
         xml_nanohttp_free_ctxt(ctxt);
-        if !redir_url.is_null() {
-            xml_free(redir_url as _);
-        }
         return null_mut();
     }
 
     *content_type = (*ctxt).content_type.clone();
-
-    if !redir.is_null() && !redir_url.is_null() {
-        *redir = redir_url;
-    } else {
-        if !redir_url.is_null() {
-            xml_free(redir_url as _);
-        }
-        if !redir.is_null() {
-            *redir = null_mut();
-        }
-    }
+    *redir = redir_url;
 
     ctxt as _
 }
@@ -1169,8 +1130,8 @@ pub unsafe fn xml_nanohttp_method_redir(
  * Returns NULL in case of failure, otherwise a request handler.
  *     The contentType, if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xml_nanohttp_open(
-    url: *const c_char,
+pub unsafe fn xml_nanohttp_open(
+    url: &str,
     content_type: &mut Option<Cow<'static, str>>,
 ) -> *mut c_void {
     xml_nanohttp_method(url, None, null_mut(), content_type, null_mut(), 0)
@@ -1189,14 +1150,11 @@ pub unsafe extern "C" fn xml_nanohttp_open(
  * Returns NULL in case of failure, otherwise a request handler.
  *     The contentType, if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xml_nanohttp_open_redir(
-    url: *const c_char,
+pub unsafe fn xml_nanohttp_open_redir(
+    url: &str,
     content_type: &mut Option<Cow<'static, str>>,
-    redir: &mut *mut c_char,
+    redir: &mut Option<String>,
 ) -> *mut c_void {
-    if !redir.is_null() {
-        *redir = null_mut();
-    }
     xml_nanohttp_method_redir(url, None, null_mut(), content_type, redir, null_mut(), 0)
 }
 
