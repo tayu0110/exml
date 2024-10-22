@@ -6,7 +6,8 @@
 use std::{
     borrow::Cow,
     ffi::{c_char, c_int, c_uint, CStr, CString},
-    io::{ErrorKind, Read, Write},
+    fs::File,
+    io::{stdout, ErrorKind, Read, Write},
     mem::{forget, size_of},
     net::{TcpStream, ToSocketAddrs},
     os::raw::c_void,
@@ -303,7 +304,6 @@ pub unsafe fn xml_nanohttp_fetch(
     filename: &str,
     content_type: &mut Option<Cow<'static, str>>,
 ) -> c_int {
-    let fd: c_int;
     let mut len = 0;
     let mut ret: c_int = 0;
 
@@ -312,27 +312,31 @@ pub unsafe fn xml_nanohttp_fetch(
         return -1;
     }
 
-    if filename == "-" {
-        fd = 0;
+    let mut writer: Box<dyn Write> = if filename == "-" {
+        Box::new(stdout())
     } else {
-        let filename = CString::new(filename).unwrap();
-        fd = open(filename.as_ptr(), O_CREAT | O_WRONLY, 0o0644);
-        if fd < 0 {
+        let Ok(file) = File::options()
+            .create(true)
+            .truncate(true)
+            .read(true)
+            .write(true)
+            .open(filename)
+        else {
             xml_nanohttp_close(ctxt);
             *content_type = None;
             return -1;
-        }
-    }
+        };
+        Box::new(file)
+    };
 
     let mut buf = 0;
     let ctxt = ctxt as XmlNanoHTTPCtxtPtr;
     xml_nanohttp_fetch_content(&mut *ctxt, &mut buf, &mut len);
-    if len > 0 && write(fd, (*ctxt).input[buf..].as_ptr() as _, len as _) == -1 {
+    if len > 0 && writer.write(&(*ctxt).input[buf..buf + len]).is_err() {
         ret = -1;
     }
 
     xml_nanohttp_close(ctxt as _);
-    close(fd);
     ret
 }
 
