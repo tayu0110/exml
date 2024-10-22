@@ -191,7 +191,6 @@ unsafe extern "C" fn xml_http_err_memory(extra: *const c_char) {
  *
  * Returns the number of byte read or -1 in case of error.
  */
-
 fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> std::io::Result<usize> {
     let Some(stream) = ctxt.socket.as_mut() else {
         return Err(std::io::Error::new(ErrorKind::Other, "Socket is invalid."));
@@ -385,9 +384,9 @@ pub unsafe extern "C" fn xml_nanohttp_fetch(
  * Returns NULL in case of failure, otherwise a request handler.
  *     The contentType, if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xml_nanohttp_method(
+pub unsafe fn xml_nanohttp_method(
     url: *const c_char,
-    method: *const c_char,
+    method: Option<&str>,
     input: *const c_char,
     content_type: *mut *mut c_char,
     headers: *const c_char,
@@ -952,9 +951,9 @@ unsafe fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: &str) {
  * Returns NULL in case of failure, otherwise a request handler.
  *     The contentType, or redir, if provided must be freed by the caller
  */
-pub unsafe extern "C" fn xml_nanohttp_method_redir(
+pub unsafe fn xml_nanohttp_method_redir(
     url: *const c_char,
-    mut method: *const c_char,
+    method: Option<&str>,
     input: *const c_char,
     content_type: *mut *mut c_char,
     redir: *mut *mut c_char,
@@ -971,9 +970,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
     if url.is_null() {
         return null_mut();
     }
-    if method.is_null() {
-        method = c"GET".as_ptr() as _;
-    }
+    let method = method.unwrap_or("GET");
     xml_nanohttp_init();
 
     // retry:
@@ -1060,7 +1057,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             /* 1 for '?' */
             blen += query.len() + 1;
         }
-        blen += strlen(method) + (*ctxt).path.as_ref().map_or(0, |s| s.len()) + 24;
+        blen += method.len() + (*ctxt).path.as_ref().map_or(0, |s| s.len()) + 24;
         if (*ctxt).port != 80 {
             /* reserve space for ':xxxxx', incl. potential proxy */
             if use_proxy != 0 {
@@ -1268,7 +1265,7 @@ pub unsafe extern "C" fn xml_nanohttp_open(
     if !content_type.is_null() {
         *content_type = null_mut();
     }
-    xml_nanohttp_method(url, null_mut(), null_mut(), content_type, null_mut(), 0)
+    xml_nanohttp_method(url, None, null_mut(), content_type, null_mut(), 0)
 }
 
 /**
@@ -1295,15 +1292,7 @@ pub unsafe extern "C" fn xml_nanohttp_open_redir(
     if !redir.is_null() {
         *redir = null_mut();
     }
-    xml_nanohttp_method_redir(
-        url,
-        null_mut(),
-        null_mut(),
-        content_type,
-        redir,
-        null_mut(),
-        0,
-    )
+    xml_nanohttp_method_redir(url, None, null_mut(), content_type, redir, null_mut(), 0)
 }
 
 /**
