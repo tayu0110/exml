@@ -732,16 +732,18 @@ fn xml_nanohttp_connect_host(host: &str, port: i32) -> Option<TcpStream> {
  * Send the input needed to initiate the processing on the server side
  * Returns number of bytes sent or -1 on error.
  */
-unsafe fn xml_nanohttp_send(ctxt: XmlNanoHTTPCtxtPtr, mut buf: &[u8]) -> c_int {
+fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> c_int {
     let mut total_sent = 0;
 
-    if (*ctxt).state & XML_NANO_HTTP_WRITE as i32 != 0 {
-        let Some(socket) = (*ctxt).socket.as_mut() else {
-            __xml_ioerr(
-                XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::default(),
-                c"send failed\n".as_ptr() as _,
-            );
+    if ctxt.state & XML_NANO_HTTP_WRITE as i32 != 0 {
+        let Some(socket) = ctxt.socket.as_mut() else {
+            unsafe {
+                __xml_ioerr(
+                    XmlErrorDomain::XmlFromHTTP,
+                    XmlParserErrors::default(),
+                    c"send failed\n".as_ptr() as _,
+                );
+            }
             if total_sent == 0 {
                 total_sent = -1;
             }
@@ -757,7 +759,7 @@ unsafe fn xml_nanohttp_send(ctxt: XmlNanoHTTPCtxtPtr, mut buf: &[u8]) -> c_int {
                     ErrorKind::WouldBlock | ErrorKind::TimedOut => {
                         continue;
                     }
-                    _ => {
+                    _ => unsafe {
                         __xml_ioerr(
                             XmlErrorDomain::XmlFromHTTP,
                             XmlParserErrors::default(),
@@ -767,7 +769,7 @@ unsafe fn xml_nanohttp_send(ctxt: XmlNanoHTTPCtxtPtr, mut buf: &[u8]) -> c_int {
                             total_sent = -1;
                         }
                         break;
-                    }
+                    },
                 },
             }
         }
@@ -1100,11 +1102,11 @@ pub unsafe fn xml_nanohttp_method_redir(
         (*ctxt).outptr = 0;
         (*ctxt).out = bp;
         (*ctxt).state = XML_NANO_HTTP_WRITE as _;
-        xml_nanohttp_send(ctxt, &(*ctxt).out);
+        xml_nanohttp_send(&mut *ctxt, &(*ctxt).out);
 
         if !input.is_null() {
             let input = from_raw_parts(input as *const u8, ilen as usize);
-            xml_nanohttp_send(ctxt, input);
+            xml_nanohttp_send(&mut *ctxt, input);
         }
 
         (*ctxt).state = XML_NANO_HTTP_READ as _;
