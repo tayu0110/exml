@@ -12,7 +12,6 @@ use std::{
     net::{TcpStream, ToSocketAddrs},
     os::raw::c_void,
     ptr::{null, null_mut},
-    slice::from_raw_parts,
     str::from_utf8,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
@@ -359,12 +358,11 @@ pub unsafe fn xml_nanohttp_fetch(
 pub unsafe fn xml_nanohttp_method(
     url: &str,
     method: Option<&str>,
-    input: *const c_char,
+    input: Option<&str>,
     content_type: &mut Option<Cow<'static, str>>,
     headers: *const c_char,
-    ilen: c_int,
 ) -> *mut c_void {
-    xml_nanohttp_method_redir(url, method, input, content_type, &mut None, headers, ilen)
+    xml_nanohttp_method_redir(url, method, input, content_type, &mut None, headers)
 }
 
 /**
@@ -782,18 +780,17 @@ fn xml_nanohttp_scan_answer(ctxt: &mut XmlNanoHTTPCtxt, line: &str) {
 pub unsafe fn xml_nanohttp_method_redir(
     url: &str,
     method: Option<&str>,
-    input: *const c_char,
+    input: Option<&str>,
     content_type: &mut Option<Cow<'static, str>>,
     redir: &mut Option<String>,
     headers: *const c_char,
-    mut ilen: c_int,
 ) -> *mut c_void {
     let mut ctxt: XmlNanoHTTPCtxtPtr;
     let mut nb_redirects: c_int = 0;
     let mut use_proxy: bool;
     let mut redir_url = None::<String>;
-
     let method = method.unwrap_or("GET");
+
     xml_nanohttp_init();
 
     // retry:
@@ -853,9 +850,7 @@ pub unsafe fn xml_nanohttp_method_redir(
         };
         (*ctxt).socket = Some(ret);
 
-        if input.is_null() {
-            ilen = 0;
-        } else {
+        if input.is_some() {
             blen += 36;
         }
 
@@ -911,8 +906,8 @@ pub unsafe fn xml_nanohttp_method_redir(
             write!(bp, "{headers}");
         }
 
-        if !input.is_null() {
-            write!(bp, "Content-Length: {ilen}\r\n\r\n");
+        if let Some(input) = input.as_ref() {
+            write!(bp, "Content-Length: {}\r\n\r\n", input.len());
         } else {
             write!(bp, "\r\n");
         }
@@ -922,9 +917,8 @@ pub unsafe fn xml_nanohttp_method_redir(
         (*ctxt).state = XML_NANO_HTTP_WRITE as _;
         xml_nanohttp_send(&mut *ctxt, &(*ctxt).out);
 
-        if !input.is_null() {
-            let input = from_raw_parts(input as *const u8, ilen as usize);
-            xml_nanohttp_send(&mut *ctxt, input);
+        if let Some(input) = input {
+            xml_nanohttp_send(&mut *ctxt, input.as_bytes());
         }
 
         (*ctxt).state = XML_NANO_HTTP_READ as _;
@@ -982,7 +976,7 @@ pub unsafe fn xml_nanohttp_open(
     url: &str,
     content_type: &mut Option<Cow<'static, str>>,
 ) -> *mut c_void {
-    xml_nanohttp_method(url, None, null_mut(), content_type, null_mut(), 0)
+    xml_nanohttp_method(url, None, None, content_type, null_mut())
 }
 
 /**
@@ -1003,7 +997,7 @@ pub unsafe fn xml_nanohttp_open_redir(
     content_type: &mut Option<Cow<'static, str>>,
     redir: &mut Option<String>,
 ) -> *mut c_void {
-    xml_nanohttp_method_redir(url, None, null_mut(), content_type, redir, null_mut(), 0)
+    xml_nanohttp_method_redir(url, None, None, content_type, redir, null_mut())
 }
 
 /**
