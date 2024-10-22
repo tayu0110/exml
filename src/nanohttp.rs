@@ -5,7 +5,7 @@
 
 use std::{
     borrow::Cow,
-    ffi::{c_char, c_int, c_uint, CStr},
+    ffi::{c_char, c_int, c_uint},
     fs::File,
     io::{stdout, ErrorKind, Read, Write},
     mem::{forget, size_of},
@@ -19,7 +19,7 @@ use std::{
     },
 };
 
-use libc::{close, memcpy, open, strcmp, strlen, write, O_CREAT, O_WRONLY};
+use libc::{close, memcpy, open, strcmp, write, O_CREAT, O_WRONLY};
 use url::Url;
 
 use crate::{
@@ -362,7 +362,7 @@ pub unsafe fn xml_nanohttp_method(
     method: Option<&str>,
     input: Option<&str>,
     content_type: &mut Option<Cow<'static, str>>,
-    headers: *const c_char,
+    headers: Option<&str>,
 ) -> *mut c_void {
     xml_nanohttp_method_redir(url, method, input, content_type, &mut None, headers)
 }
@@ -785,7 +785,7 @@ pub unsafe fn xml_nanohttp_method_redir(
     input: Option<&str>,
     content_type: &mut Option<Cow<'static, str>>,
     redir: &mut Option<String>,
-    headers: *const c_char,
+    headers: Option<&str>,
 ) -> *mut c_void {
     let mut ctxt: XmlNanoHTTPCtxtPtr;
     let mut nb_redirects: c_int = 0;
@@ -851,8 +851,8 @@ pub unsafe fn xml_nanohttp_method_redir(
             blen += 36;
         }
 
-        if !headers.is_null() {
-            blen += strlen(headers) + 2;
+        if let Some(headers) = headers.as_ref() {
+            blen += headers.len() + 2;
         }
         if let Some(content_type) = content_type.as_deref() {
             /* reserve for string plus 'Content-Type: \r\n" */
@@ -898,8 +898,7 @@ pub unsafe fn xml_nanohttp_method_redir(
             write!(bp, "Content-Type: {content_type}\r\n");
         }
 
-        if !headers.is_null() {
-            let headers = CStr::from_ptr(headers).to_string_lossy();
+        if let Some(headers) = headers.as_ref() {
             write!(bp, "{headers}");
         }
 
@@ -973,7 +972,7 @@ pub unsafe fn xml_nanohttp_open(
     url: &str,
     content_type: &mut Option<Cow<'static, str>>,
 ) -> *mut c_void {
-    xml_nanohttp_method(url, None, None, content_type, null_mut())
+    xml_nanohttp_method(url, None, None, content_type, None)
 }
 
 /**
@@ -994,7 +993,7 @@ pub unsafe fn xml_nanohttp_open_redir(
     content_type: &mut Option<Cow<'static, str>>,
     redir: &mut Option<String>,
 ) -> *mut c_void {
-    xml_nanohttp_method_redir(url, None, None, content_type, redir, null_mut())
+    xml_nanohttp_method_redir(url, None, None, content_type, redir, None)
 }
 
 /**
