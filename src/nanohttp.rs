@@ -34,8 +34,6 @@ const XML_NANO_HTTP_CHUNK: usize = 4096;
 const XML_NANO_HTTP_WRITE: usize = 1;
 const XML_NANO_HTTP_READ: usize = 2;
 
-pub type XmlNanoHTTPCtxtPtr = *mut XmlNanoHTTPCtxt;
-#[repr(C)]
 pub struct XmlNanoHTTPCtxt {
     protocol: Option<Cow<'static, str>>, /* the protocol name */
     hostname: Option<Cow<'static, str>>, /* the host name */
