@@ -11,7 +11,7 @@
 
 use std::{
     borrow::Cow,
-    ffi::{c_char, c_int, c_uint},
+    ffi::{c_int, c_uint},
     fs::File,
     io::{stdout, ErrorKind, Read, Write},
     net::{TcpStream, ToSocketAddrs},
@@ -23,7 +23,6 @@ use std::{
     },
 };
 
-use libc::{close, open, strcmp, write, O_CREAT, O_WRONLY};
 use url::Url;
 
 use crate::{
@@ -1062,34 +1061,41 @@ pub fn xml_nanohttp_read(ctxt: &mut XmlNanoHTTPCtxt, dest: &mut [u8]) -> usize {
  * Returns -1 in case of failure, 0 in case of success.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: *const c_char) -> c_int {
-    let fd: c_int;
+pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: &str) -> c_int {
+    use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+
     let mut len = 0;
     let mut ret: c_int = 0;
 
-    if ctxt.is_null() || filename.is_null() {
+    if ctxt.is_null() {
         return -1;
     }
 
-    if strcmp(filename, c"-".as_ptr() as _) == 0 {
-        fd = 0;
+    let mut writer: Box<dyn Write> = if filename == "-" {
+        Box::new(stdout())
     } else {
-        fd = open(filename, O_CREAT | O_WRONLY, 0o666);
-        if fd < 0 {
+        let Ok(file) = File::options()
+            .write(true)
+            .read(true)
+            .create(true)
+            .truncate(true)
+            .open(filename)
+        else {
             xml_nanohttp_close(ctxt);
             return -1;
-        }
-    }
+        };
+        file.set_permissions(Permissions::from_mode(0o666)).ok();
+        Box::new(file)
+    };
 
     let mut buf = 0;
     let ctxt = ctxt as XmlNanoHTTPCtxtPtr;
     xml_nanohttp_fetch_content(&mut *ctxt, &mut buf, &mut len);
-    if len > 0 && write(fd, (*ctxt).input[buf..].as_ptr() as _, len as _) == -1 {
+    if len > 0 && writer.write_all(&(*ctxt).input[buf..]).is_err() {
         ret = -1;
     }
 
     xml_nanohttp_close(ctxt as _);
-    close(fd);
     ret
 }
 
@@ -1112,39 +1118,9 @@ pub unsafe extern "C" fn xml_nanohttp_close(ctx: *mut c_void) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks};
 
     use super::*;
-
-    // #[test]
-    // fn test_xml_nano_httpauth_header() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
-
-    //             let ret_val = xml_nanohttp_auth_header(ctx);
-    //             desret_const_char_ptr(ret_val);
-    //             des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlNanoHTTPAuthHeader",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlNanoHTTPAuthHeader()"
-    //         );
-    //     }
-    // }
 
     #[test]
     fn test_xml_nano_httpcleanup() {
@@ -1170,103 +1146,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_nano_httpcontent_length() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
-
-    //             let ret_val = xml_nanohttp_content_length(ctx);
-    //             desret_int(ret_val);
-    //             des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlNanoHTTPContentLength",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlNanoHTTPContentLength()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_nano_httpencoding() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
-
-    //             let ret_val = xml_nanohttp_encoding(ctx);
-    //             desret_const_char_ptr(ret_val);
-    //             des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlNanoHTTPEncoding",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlNanoHTTPEncoding()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_nano_httpfetch() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_url in 0..GEN_NB_FILEOUTPUT {
-    //             for n_filename in 0..GEN_NB_FILEOUTPUT {
-    //                 for n_content_type in 0..GEN_NB_CHAR_PTR_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let url = gen_fileoutput(n_url, 0);
-    //                     let filename = gen_fileoutput(n_filename, 1);
-    //                     let content_type = gen_char_ptr_ptr(n_content_type, 2);
-
-    //                     let ret_val = xml_nanohttp_fetch(url, filename, content_type);
-    //                     desret_int(ret_val);
-    //                     des_fileoutput(n_url, url, 0);
-    //                     des_fileoutput(n_filename, filename, 1);
-    //                     des_char_ptr_ptr(n_content_type, content_type, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlNanoHTTPFetch",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_url);
-    //                         eprint!(" {}", n_filename);
-    //                         eprintln!(" {}", n_content_type);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPFetch()");
-    //     }
-    // }
-
     #[test]
     fn test_xml_nano_httpinit() {
         #[cfg(feature = "http")]
@@ -1288,224 +1167,9 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_nano_httpmime_type() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
-
-    //             let ret_val = xml_nanohttp_mime_type(ctx);
-    //             desret_const_char_ptr(ret_val);
-    //             des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlNanoHTTPMimeType",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlNanoHTTPMimeType()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_nano_httpopen() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_url in 0..GEN_NB_FILEPATH {
-    //             for n_content_type in 0..GEN_NB_CHAR_PTR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let url = gen_filepath(n_url, 0);
-    //                 let content_type = gen_char_ptr_ptr(n_content_type, 1);
-
-    //                 let ret_val = xml_nanohttp_open(url, content_type);
-    //                 desret_xml_nano_httpctxt_ptr(ret_val);
-    //                 des_filepath(n_url, url, 0);
-    //                 des_char_ptr_ptr(n_content_type, content_type, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlNanoHTTPOpen",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     eprint!(" {}", n_url);
-    //                     eprintln!(" {}", n_content_type);
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPOpen()");
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_nano_httpopen_redir() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_url in 0..GEN_NB_FILEPATH {
-    //             for n_content_type in 0..GEN_NB_CHAR_PTR_PTR {
-    //                 for n_redir in 0..GEN_NB_CHAR_PTR_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let url = gen_filepath(n_url, 0);
-    //                     let content_type = gen_char_ptr_ptr(n_content_type, 1);
-    //                     let redir = gen_char_ptr_ptr(n_redir, 2);
-
-    //                     let ret_val = xml_nanohttp_open_redir(url, content_type, redir);
-    //                     desret_xml_nano_httpctxt_ptr(ret_val);
-    //                     des_filepath(n_url, url, 0);
-    //                     des_char_ptr_ptr(n_content_type, content_type, 1);
-    //                     des_char_ptr_ptr(n_redir, redir, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlNanoHTTPOpenRedir",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_url);
-    //                         eprint!(" {}", n_content_type);
-    //                         eprintln!(" {}", n_redir);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlNanoHTTPOpenRedir()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_nano_httpread() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
-    //             for n_dest in 0..GEN_NB_VOID_PTR {
-    //                 for n_len in 0..GEN_NB_INT {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
-    //                     let dest = gen_void_ptr(n_dest, 1);
-    //                     let len = gen_int(n_len, 2);
-
-    //                     let ret_val = xml_nanohttp_read(ctx, dest, len);
-    //                     desret_int(ret_val);
-    //                     des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-    //                     des_void_ptr(n_dest, dest, 1);
-    //                     des_int(n_len, len, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlNanoHTTPRead",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_ctx);
-    //                         eprint!(" {}", n_dest);
-    //                         eprintln!(" {}", n_len);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPRead()");
-    //     }
-    // }
-
     #[test]
     fn test_xml_nano_httpredir() {
 
         /* missing type support */
     }
-
-    // #[test]
-    // fn test_xml_nano_httpreturn_code() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
-
-    //             let ret_val = xml_nanohttp_return_code(ctx);
-    //             desret_int(ret_val);
-    //             des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlNanoHTTPReturnCode",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlNanoHTTPReturnCode()"
-    //         );
-    //     }
-    // }
-
-    #[test]
-    fn test_xml_nano_httpsave() {
-        #[cfg(all(feature = "http", feature = "output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_VOID_PTR {
-                for n_filename in 0..GEN_NB_FILEOUTPUT {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_void_ptr(n_ctxt, 0);
-                    let filename = gen_fileoutput(n_filename, 1);
-
-                    let ret_val = xml_nanohttp_save(ctxt, filename);
-                    desret_int(ret_val);
-                    des_void_ptr(n_ctxt, ctxt, 0);
-                    des_fileoutput(n_filename, filename, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNanoHTTPSave",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_filename);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPSave()");
-        }
-    }
-
-    // #[test]
-    // fn test_xml_nano_httpscan_proxy() {
-    //     #[cfg(feature = "http")]
-    //     unsafe {
-    //         for n_url in 0..GEN_NB_FILEPATH {
-    //             let url = gen_filepath(n_url, 0);
-
-    //             xml_nanohttp_scan_proxy(url);
-    //             des_filepath(n_url, url, 0);
-    //             reset_last_error();
-    //         }
-    //     }
-    // }
 }
