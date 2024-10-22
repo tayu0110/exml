@@ -23,7 +23,7 @@ use std::{
     },
 };
 
-use libc::{close, memcpy, open, strcmp, write, O_CREAT, O_WRONLY};
+use libc::{close, open, strcmp, write, O_CREAT, O_WRONLY};
 use url::Url;
 
 use crate::{
@@ -1028,25 +1028,14 @@ pub fn xml_nanohttp_mime_type(ctxt: &mut XmlNanoHTTPCtxt) -> Option<String> {
  * Returns the number of byte read. 0 is an indication of an end of connection.
  *         -1 indicates a parameter error.
  */
-pub unsafe extern "C" fn xml_nanohttp_read(
-    ctx: *mut c_void,
-    dest: *mut c_void,
-    mut len: c_int,
-) -> c_int {
-    let ctxt: XmlNanoHTTPCtxtPtr = ctx as XmlNanoHTTPCtxtPtr;
-
-    if ctx.is_null() {
-        return -1;
-    }
-    if dest.is_null() {
-        return -1;
-    }
-    if len <= 0 {
+pub fn xml_nanohttp_read(ctxt: &mut XmlNanoHTTPCtxt, dest: &mut [u8]) -> usize {
+    if dest.is_empty() {
         return 0;
     }
 
-    while (*ctxt).inptr - (*ctxt).inrptr < len as usize {
-        if xml_nanohttp_recv(&mut *ctxt)
+    let mut len = dest.len();
+    while ctxt.inptr - ctxt.inrptr < len {
+        if xml_nanohttp_recv(ctxt)
             .ok()
             .filter(|&len| len > 0)
             .is_none()
@@ -1054,11 +1043,11 @@ pub unsafe extern "C" fn xml_nanohttp_read(
             break;
         }
     }
-    if (*ctxt).inptr - (*ctxt).inrptr < len as usize {
-        len = (*ctxt).inptr as i32 - (*ctxt).inrptr as i32;
+    if ctxt.inptr - ctxt.inrptr < len {
+        len = ctxt.inptr - ctxt.inrptr;
     }
-    memcpy(dest as _, (*ctxt).inrptr as _, len as usize);
-    (*ctxt).inrptr += len as usize;
+    dest[..len].copy_from_slice(&ctxt.input[ctxt.inrptr..ctxt.inrptr + len]);
+    ctxt.inrptr += len;
     len
 }
 
@@ -1401,42 +1390,42 @@ mod tests {
     //     }
     // }
 
-    #[test]
-    fn test_xml_nano_httpread() {
-        #[cfg(feature = "http")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_nano_httpread() {
+    //     #[cfg(feature = "http")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
-                for n_dest in 0..GEN_NB_VOID_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
-                        let dest = gen_void_ptr(n_dest, 1);
-                        let len = gen_int(n_len, 2);
+    //         for n_ctx in 0..GEN_NB_XML_NANO_HTTPCTXT_PTR {
+    //             for n_dest in 0..GEN_NB_VOID_PTR {
+    //                 for n_len in 0..GEN_NB_INT {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let ctx = gen_xml_nano_httpctxt_ptr(n_ctx, 0);
+    //                     let dest = gen_void_ptr(n_dest, 1);
+    //                     let len = gen_int(n_len, 2);
 
-                        let ret_val = xml_nanohttp_read(ctx, dest, len);
-                        desret_int(ret_val);
-                        des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
-                        des_void_ptr(n_dest, dest, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNanoHTTPRead",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_ctx);
-                            eprint!(" {}", n_dest);
-                            eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPRead()");
-        }
-    }
+    //                     let ret_val = xml_nanohttp_read(ctx, dest, len);
+    //                     desret_int(ret_val);
+    //                     des_xml_nano_httpctxt_ptr(n_ctx, ctx, 0);
+    //                     des_void_ptr(n_dest, dest, 1);
+    //                     des_int(n_len, len, 2);
+    //                     reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlNanoHTTPRead",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         eprint!(" {}", n_ctx);
+    //                         eprint!(" {}", n_dest);
+    //                         eprintln!(" {}", n_len);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlNanoHTTPRead()");
+    //     }
+    // }
 
     #[test]
     fn test_xml_nano_httpredir() {
