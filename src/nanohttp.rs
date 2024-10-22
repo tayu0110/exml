@@ -300,25 +300,23 @@ fn xml_nanohttp_fetch_content(
  */
 pub unsafe fn xml_nanohttp_fetch(
     url: &str,
-    filename: *const c_char,
+    filename: &str,
     content_type: &mut Option<Cow<'static, str>>,
 ) -> c_int {
     let fd: c_int;
     let mut len = 0;
     let mut ret: c_int = 0;
 
-    if filename.is_null() {
-        return -1;
-    }
     let ctxt: *mut c_void = xml_nanohttp_open(url, content_type);
     if ctxt.is_null() {
         return -1;
     }
 
-    if strcmp(filename, c"-".as_ptr() as _) == 0 {
+    if filename == "-" {
         fd = 0;
     } else {
-        fd = open(filename, O_CREAT | O_WRONLY, 0o0644);
+        let filename = CString::new(filename).unwrap();
+        fd = open(filename.as_ptr(), O_CREAT | O_WRONLY, 0o0644);
         if fd < 0 {
             xml_nanohttp_close(ctxt);
             *content_type = None;
