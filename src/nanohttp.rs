@@ -12,6 +12,7 @@ use std::{
     os::raw::c_void,
     ptr::{null, null_mut},
     slice::from_raw_parts,
+    str::from_utf8,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
@@ -785,37 +786,33 @@ fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> c_int {
  * Returns a newly allocated string with a copy of the line, or NULL
  *         which indicate the end of the input.
  */
-unsafe extern "C" fn xml_nanohttp_read_line(ctxt: XmlNanoHTTPCtxtPtr) -> *mut c_char {
-    let mut buf: [c_char; 4096] = [0; 4096];
-    let mut bp: *mut c_char = buf.as_mut_ptr();
+fn xml_nanohttp_read_line(ctxt: &mut XmlNanoHTTPCtxt) -> Option<Vec<u8>> {
+    let mut buf: [u8; 4096] = [0; 4096];
+    let mut bp = 0;
 
-    while bp.offset_from(buf.as_mut_ptr()) < 4095 {
-        if (*ctxt).inrptr == (*ctxt).inptr {
+    while bp < buf.len() {
+        if ctxt.inrptr == ctxt.inptr {
             match xml_nanohttp_recv(&mut *ctxt) {
                 Ok(0) => {
-                    if bp == buf.as_mut_ptr() {
-                        return null_mut();
-                    } else {
-                        *bp = 0;
+                    if bp == 0 {
+                        return None;
                     }
-                    return xml_mem_strdup(buf.as_mut_ptr() as _) as _;
+                    return Some(buf[..bp].to_vec());
                 }
-                Err(_) => return null_mut(),
+                Err(_) => return None,
                 _ => {}
             }
         }
-        *bp = *(*ctxt).input.as_mut_ptr().add((*ctxt).inrptr) as _;
-        (*ctxt).inptr += 1;
-        if *bp == b'\n' as i8 {
-            *bp = 0;
-            return xml_mem_strdup(buf.as_mut_ptr() as _) as _;
+        buf[bp] = ctxt.input[ctxt.inptr];
+        ctxt.inptr += 1;
+        if buf[bp] == b'\n' {
+            return Some(buf[..bp].to_vec());
         }
-        if *bp != b'\r' as _ {
-            bp = bp.add(1);
+        if buf[bp] != b'\r' {
+            bp += 1;
         }
     }
-    buf[4095] = 0;
-    xml_mem_strdup(buf.as_mut_ptr() as _) as _
+    Some(buf.to_vec())
 }
 
 /**
@@ -953,7 +950,6 @@ pub unsafe fn xml_nanohttp_method_redir(
     mut ilen: c_int,
 ) -> *mut c_void {
     let mut ctxt: XmlNanoHTTPCtxtPtr;
-    let mut p: *mut c_char;
     let mut nb_redirects: c_int = 0;
     let mut use_proxy: bool;
     let mut redir_url: *mut c_char = null_mut();
@@ -1107,18 +1103,12 @@ pub unsafe fn xml_nanohttp_method_redir(
 
         (*ctxt).state = XML_NANO_HTTP_READ as _;
 
-        while {
-            p = xml_nanohttp_read_line(ctxt);
-            !p.is_null()
-        } {
-            if *p == 0 {
+        while let Some(p) = xml_nanohttp_read_line(&mut *ctxt) {
+            if p.is_empty() {
                 (*ctxt).content = (*ctxt).inrptr;
-                xml_free(p as _);
                 break;
             }
-            xml_nanohttp_scan_answer(&mut *ctxt, CStr::from_ptr(p).to_string_lossy().as_ref());
-
-            xml_free(p as _);
+            xml_nanohttp_scan_answer(&mut *ctxt, from_utf8(&p).unwrap());
         }
 
         if let Some(location) = (*ctxt)
