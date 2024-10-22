@@ -834,7 +834,7 @@ unsafe extern "C" fn xml_nanohttp_read_line(ctxt: XmlNanoHTTPCtxtPtr) -> *mut c_
  *
  * Returns -1 in case of failure, the file descriptor number otherwise
  */
-unsafe fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: &str) {
+fn xml_nanohttp_scan_answer(ctxt: &mut XmlNanoHTTPCtxt, line: &str) {
     if let Some(line) = line.strip_prefix("HTTP/") {
         let mut version = 0;
         let mut ret = 0;
@@ -867,26 +867,26 @@ unsafe fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: &str) {
         if !matches!(cur.peek(), Some(&'\0' | &' ' | &'\t')) {
             return;
         }
-        (*ctxt).return_value = ret;
-        (*ctxt).version = version;
+        ctxt.return_value = ret;
+        ctxt.version = version;
     } else if let Some(line) = line.strip_prefix("Content-Type:") {
         let mut base = line.chars();
         let mut cur = base.by_ref().peekable();
 
         while cur.next_if(|&c| c == ' ' || c == '\t').is_some() {}
         let base = base.as_str();
-        (*ctxt).content_type = Some(base.to_owned().into());
+        ctxt.content_type = Some(base.to_owned().into());
         if let Some((mime, _)) = base.split_once(['\0', ' ', '\t', ';', ',']) {
-            (*ctxt).mime_type = Some(mime.to_owned().into());
+            ctxt.mime_type = Some(mime.to_owned().into());
         } else {
-            (*ctxt).mime_type = Some(base.to_owned().into());
+            ctxt.mime_type = Some(base.to_owned().into());
         }
         if let Some(index) = base.find("charset=") {
             let charset = base[index..].strip_prefix("charset=").unwrap();
             if let Some((charset, _)) = charset.split_once(['\0', ' ', '\t', ';', ',']) {
-                (*ctxt).encoding = Some(charset.to_owned().into());
+                ctxt.encoding = Some(charset.to_owned().into());
             } else {
-                (*ctxt).encoding = Some(charset.to_owned().into());
+                ctxt.encoding = Some(charset.to_owned().into());
             }
         }
     } else if let Some(line) = line.strip_prefix("ContentType:") {
@@ -895,37 +895,37 @@ unsafe fn xml_nanohttp_scan_answer(ctxt: XmlNanoHTTPCtxtPtr, line: &str) {
 
         while cur.next_if(|&c| c == ' ' || c == '\t').is_some() {}
         let base = base.as_str();
-        (*ctxt).content_type = Some(base.to_owned().into());
+        ctxt.content_type = Some(base.to_owned().into());
         if let Some((mime, _)) = base.split_once(['\0', ' ', '\t', ';', ',']) {
-            (*ctxt).mime_type = Some(mime.to_owned().into());
+            ctxt.mime_type = Some(mime.to_owned().into());
         } else {
-            (*ctxt).mime_type = Some(base.to_owned().into());
+            ctxt.mime_type = Some(base.to_owned().into());
         }
         if let Some(index) = base.find("charset=") {
             let charset = base[index..].strip_prefix("charset=").unwrap();
             if let Some((charset, _)) = charset.split_once(['\0', ' ', '\t', ';', ',']) {
-                (*ctxt).encoding = Some(charset.to_owned().into());
+                ctxt.encoding = Some(charset.to_owned().into());
             } else {
-                (*ctxt).encoding = Some(charset.to_owned().into());
+                ctxt.encoding = Some(charset.to_owned().into());
             }
         }
     } else if let Some(mut line) = line.strip_prefix("Location:") {
         line = line.trim_start_matches([' ', '\t']);
         if line.starts_with('/') {
-            let loc = format!("http://{}{line}", (*ctxt).hostname.as_deref().unwrap_or(""));
-            (*ctxt).location = Some(loc.into());
+            let loc = format!("http://{}{line}", ctxt.hostname.as_deref().unwrap_or(""));
+            ctxt.location = Some(loc.into());
         } else {
-            (*ctxt).location = Some(line.to_owned().into());
+            ctxt.location = Some(line.to_owned().into());
         }
     } else if let Some(mut line) = line.strip_prefix("WWW-Authenticate:") {
         line = line.trim_start_matches([' ', '\t']);
-        (*ctxt).auth_header = Some(line.to_owned().into());
+        ctxt.auth_header = Some(line.to_owned().into());
     } else if let Some(mut line) = line.strip_prefix("Proxy-Authenticate:") {
         line = line.trim_start_matches([' ', '\t']);
-        (*ctxt).auth_header = Some(line.to_owned().into());
+        ctxt.auth_header = Some(line.to_owned().into());
     } else if let Some(mut line) = line.strip_prefix("Content-Length:") {
         line = line.trim();
-        (*ctxt).content_length = line.parse().unwrap_or(0);
+        ctxt.content_length = line.parse().unwrap_or(0);
     }
 }
 
@@ -1120,7 +1120,7 @@ pub unsafe fn xml_nanohttp_method_redir(
                 xml_free(p as _);
                 break;
             }
-            xml_nanohttp_scan_answer(ctxt, CStr::from_ptr(p).to_string_lossy().as_ref());
+            xml_nanohttp_scan_answer(&mut *ctxt, CStr::from_ptr(p).to_string_lossy().as_ref());
 
             xml_free(p as _);
         }
