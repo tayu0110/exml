@@ -10,23 +10,23 @@ use std::{
     mem::{forget, size_of, size_of_val, zeroed},
     net::{TcpStream, ToSocketAddrs},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{null, null_mut},
     slice::from_raw_parts,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
 use libc::{
-    __errno_location, close, connect, fcntl, getsockopt, memcpy, open, poll, pollfd, snprintf,
-    sockaddr, sockaddr_in, sockaddr_in6, socket, strcmp, strlen, write, AF_INET6, EINPROGRESS,
-    EWOULDBLOCK, F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT, O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6,
-    POLLOUT, SOCK_STREAM, SOL_SOCKET, SO_ERROR,
+    __errno_location, close, connect, fcntl, getsockopt, memcpy, open, poll, pollfd, sockaddr,
+    sockaddr_in, sockaddr_in6, socket, strcmp, strlen, write, AF_INET6, EINPROGRESS, EWOULDBLOCK,
+    F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT, O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6, POLLOUT,
+    SOCK_STREAM, SOL_SOCKET, SO_ERROR,
 };
 use url::Url;
 
 use crate::{
     error::XmlErrorDomain,
     libxml::{
-        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup},
+        globals::{xml_free, xml_malloc, xml_mem_strdup},
         xml_io::__xml_ioerr,
         xmlerror::XmlParserErrors,
     },
@@ -59,8 +59,8 @@ pub struct XmlNanoHTTPCtxt {
     query: Option<Cow<'static, str>>,    /* the query string */
     socket: Option<TcpStream>,
     state: i32,                              /* WRITE / READ / CLOSED */
-    out: *mut c_char,                        /* buffer sent (zero terminated) */
-    outptr: *mut c_char,                     /* index within the buffer sent */
+    out: Vec<u8>,                            /* buffer sent (zero terminated) */
+    outptr: usize,                           /* index within the buffer sent */
     input: Vec<u8>,                          /* the receiving buffer */
     content: usize,                          /* the start of the content */
     inptr: usize,                            /* the next byte to read from network */
@@ -278,11 +278,11 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
     /*  Dummy up return input parameters if not provided  */
 
     if len.is_null() {
-        len = addr_of_mut!(dummy_int);
+        len = &raw mut dummy_int;
     }
 
     if ptr.is_null() {
-        ptr = addr_of_mut!(dummy_ptr);
+        ptr = &raw mut dummy_ptr;
     }
 
     /*  But can't work without the context pointer  */
@@ -358,7 +358,7 @@ pub unsafe extern "C" fn xml_nanohttp_fetch(
         }
     }
 
-    xml_nanohttp_fetch_content(ctxt, addr_of_mut!(buf), addr_of_mut!(len));
+    xml_nanohttp_fetch_content(ctxt, &raw mut buf, &raw mut len);
     if len > 0 && write(fd, buf as _, len as _) == -1 {
         ret = -1;
     }
@@ -463,8 +463,8 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHTTPCtx
         query: None,
         socket: None,
         state: 0,
-        out: null_mut(),
-        outptr: null_mut(),
+        out: vec![],
+        outptr: 0,
         input: vec![],
         content: 0,
         inptr: 0,
@@ -511,9 +511,6 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHTTPCtxtPtr) {
     (*ctxt).protocol = None;
     (*ctxt).path = None;
     (*ctxt).query = None;
-    if !(*ctxt).out.is_null() {
-        xml_free((*ctxt).out as _);
-    }
     (*ctxt).content_type = None;
     (*ctxt).encoding = None;
     (*ctxt).mime_type = None;
@@ -644,7 +641,7 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
     }
     p.fd = s;
     p.events = POLLOUT;
-    match poll(addr_of_mut!(p), 1, TIMEOUT as i32 * 1000) {
+    match poll(&raw mut p, 1, TIMEOUT as i32 * 1000) {
         0 => {
             /* Time out */
             __xml_ioerr(
@@ -672,14 +669,7 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         let mut len: XmlSocklenT;
 
         len = size_of_val(&status) as _;
-        if getsockopt(
-            s,
-            SOL_SOCKET,
-            SO_ERROR,
-            addr_of_mut!(status) as _,
-            addr_of_mut!(len),
-        ) < 0
-        {
+        if getsockopt(s, SOL_SOCKET, SO_ERROR, &raw mut status as _, &raw mut len) < 0 {
             /* Solaris error code */
             __xml_ioerr(
                 XmlErrorDomain::XmlFromHTTP,
@@ -742,14 +732,10 @@ fn xml_nanohttp_connect_host(host: &str, port: i32) -> Option<TcpStream> {
  * Send the input needed to initiate the processing on the server side
  * Returns number of bytes sent or -1 on error.
  */
-unsafe extern "C" fn xml_nanohttp_send(
-    ctxt: XmlNanoHTTPCtxtPtr,
-    xmt_ptr: *const c_char,
-    outlen: c_int,
-) -> c_int {
+unsafe fn xml_nanohttp_send(ctxt: XmlNanoHTTPCtxtPtr, mut buf: &[u8]) -> c_int {
     let mut total_sent = 0;
 
-    if (*ctxt).state & XML_NANO_HTTP_WRITE as i32 != 0 && !xmt_ptr.is_null() {
+    if (*ctxt).state & XML_NANO_HTTP_WRITE as i32 != 0 {
         let Some(socket) = (*ctxt).socket.as_mut() else {
             __xml_ioerr(
                 XmlErrorDomain::XmlFromHTTP,
@@ -761,7 +747,6 @@ unsafe extern "C" fn xml_nanohttp_send(
             }
             return total_sent;
         };
-        let mut buf = from_raw_parts(xmt_ptr as *const u8, outlen as usize);
         while !buf.is_empty() {
             match socket.write(buf) {
                 Ok(len) => {
@@ -969,10 +954,9 @@ pub unsafe fn xml_nanohttp_method_redir(
     mut ilen: c_int,
 ) -> *mut c_void {
     let mut ctxt: XmlNanoHTTPCtxtPtr;
-    let mut bp: *mut c_char;
     let mut p: *mut c_char;
     let mut nb_redirects: c_int = 0;
-    let mut use_proxy: c_int;
+    let mut use_proxy: bool;
     let mut redir_url: *mut c_char = null_mut();
 
     if url.is_null() {
@@ -1021,9 +1005,9 @@ pub unsafe fn xml_nanohttp_method_redir(
             }
             return null_mut();
         };
-        use_proxy = (!PROXY.load(Ordering::Relaxed).is_null()
-            && !xml_nanohttp_bypass_proxy(hostname.as_ref())) as i32;
-        let (mut blen, ret) = if use_proxy != 0 {
+        use_proxy = !PROXY.load(Ordering::Relaxed).is_null()
+            && !xml_nanohttp_bypass_proxy(hostname.as_ref());
+        let (mut blen, ret) = if use_proxy {
             (
                 (*ctxt).hostname.as_ref().map_or(0, |h| h.len()) * 2 + 16,
                 xml_nanohttp_connect_host(
@@ -1068,121 +1052,59 @@ pub unsafe fn xml_nanohttp_method_redir(
         blen += method.len() + (*ctxt).path.as_ref().map_or(0, |s| s.len()) + 24;
         if (*ctxt).port != 80 {
             /* reserve space for ':xxxxx', incl. potential proxy */
-            if use_proxy != 0 {
+            if use_proxy {
                 blen += 17;
             } else {
                 blen += 11;
             }
         }
-        bp = xml_malloc_atomic(blen) as _;
-        if bp.is_null() {
-            xml_nanohttp_free_ctxt(ctxt);
-            xml_http_err_memory(c"allocating header buffer".as_ptr() as _);
-            return null_mut();
-        }
-
-        p = bp;
-
-        if use_proxy != 0 {
-            let hostname = CString::new(hostname.as_ref()).unwrap();
-            let path = CString::new((*ctxt).path.as_ref().unwrap().as_ref()).unwrap();
+        let mut bp = Vec::with_capacity(blen);
+        if use_proxy {
+            let path = (*ctxt).path.as_ref().unwrap();
             if (*ctxt).port != 80 {
-                p = p.add(snprintf(
-                    p as _,
-                    blen - p.offset_from(bp) as usize,
-                    c"%s http://%s:%d%s".as_ptr() as _,
-                    method,
-                    hostname.as_ptr(),
-                    (*ctxt).port,
-                    path.as_ptr(),
-                ) as usize);
+                write!(bp, "{method} http://{hostname}:{}{path}", (*ctxt).port);
             } else {
-                p = p.add(snprintf(
-                    p as _,
-                    blen - p.offset_from(bp) as usize,
-                    c"%s http://%s%s".as_ptr() as _,
-                    method,
-                    hostname.as_ptr(),
-                    path.as_ptr(),
-                ) as usize);
+                write!(bp, "{method} http://{hostname}{path}");
             }
         } else {
-            let path = CString::new((*ctxt).path.as_ref().unwrap().as_ref()).unwrap();
-            p = p.add(snprintf(
-                p,
-                blen - p.offset_from(bp) as usize,
-                c"%s %s".as_ptr() as _,
-                method,
-                path.as_ptr(),
-            ) as usize);
+            let path = (*ctxt).path.as_ref().unwrap();
+            write!(bp, "{method} {path}");
         }
 
         if let Some(query) = (*ctxt).query.as_deref() {
-            let query = CString::new(query).unwrap();
-            p = p.add(snprintf(
-                p,
-                blen - p.offset_from(bp) as usize,
-                c"?%s".as_ptr() as _,
-                query.as_ptr(),
-            ) as usize);
+            write!(bp, "?{query}");
         }
 
         if (*ctxt).port == 80 {
-            let hostname = CString::new(hostname.as_ref()).unwrap();
-            p = p.add(snprintf(
-                p,
-                blen - p.offset_from(bp) as usize,
-                c" HTTP/1.0\r\nHost: %s\r\n".as_ptr() as _,
-                hostname.as_ptr(),
-            ) as usize);
+            write!(bp, " HTTP/1.0\r\nHost: {hostname}\r\n");
         } else {
-            let hostname = CString::new(hostname.as_ref()).unwrap();
-            p = p.add(snprintf(
-                p,
-                blen - p.offset_from(bp) as usize,
-                c" HTTP/1.0\r\nHost: %s:%d\r\n".as_ptr() as _,
-                hostname.as_ptr(),
-                (*ctxt).port,
-            ) as usize);
+            write!(bp, " HTTP/1.0\r\nHost: {hostname}:{}\r\n", (*ctxt).port);
         }
 
         if !content_type.is_null() && !(*content_type).is_null() {
-            p = p.add(snprintf(
-                p,
-                blen - p.offset_from(bp) as usize,
-                c"Content-Type: %s\r\n".as_ptr() as _,
-                *content_type,
-            ) as usize);
+            let content_type = CStr::from_ptr(*content_type).to_string_lossy();
+            write!(bp, "Content-Type: {content_type}\r\n");
         }
 
         if !headers.is_null() {
-            p = p.add(snprintf(
-                p,
-                blen - p.offset_from(bp) as usize,
-                c"%s".as_ptr() as _,
-                headers,
-            ) as usize);
+            let headers = CStr::from_ptr(headers).to_string_lossy();
+            write!(bp, "{headers}");
         }
 
         if !input.is_null() {
-            snprintf(
-                p,
-                blen - p.offset_from(bp) as usize,
-                c"Content-Length: %d\r\n\r\n".as_ptr() as _,
-                ilen,
-            );
+            write!(bp, "Content-Length: {ilen}\r\n\r\n");
         } else {
-            snprintf(p, blen - p.offset_from(bp) as usize, c"\r\n".as_ptr() as _);
+            write!(bp, "\r\n");
         }
 
-        (*ctxt).outptr = bp;
+        (*ctxt).outptr = 0;
         (*ctxt).out = bp;
         (*ctxt).state = XML_NANO_HTTP_WRITE as _;
-        blen = strlen((*ctxt).out);
-        xml_nanohttp_send(ctxt, (*ctxt).out, blen as _);
+        xml_nanohttp_send(ctxt, &(*ctxt).out);
 
         if !input.is_null() {
-            xml_nanohttp_send(ctxt, input, ilen);
+            let input = from_raw_parts(input as *const u8, ilen as usize);
+            xml_nanohttp_send(ctxt, input);
         }
 
         (*ctxt).state = XML_NANO_HTTP_READ as _;
@@ -1491,7 +1413,7 @@ pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: *const c
         }
     }
 
-    xml_nanohttp_fetch_content(ctxt, addr_of_mut!(buf) as _, addr_of_mut!(len));
+    xml_nanohttp_fetch_content(ctxt, &raw mut buf as _, &raw mut len);
     if len > 0 && write(fd, buf as _, len as _) == -1 {
         ret = -1;
     }
