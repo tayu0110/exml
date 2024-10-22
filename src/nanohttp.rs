@@ -192,9 +192,9 @@ unsafe extern "C" fn xml_http_err_memory(extra: *const c_char) {
  * Returns the number of byte read or -1 in case of error.
  */
 
-fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> i32 {
+fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> std::io::Result<usize> {
     let Some(stream) = ctxt.socket.as_mut() else {
-        return -1;
+        return Err(std::io::Error::new(ErrorKind::Other, "Socket is invalid."));
     };
 
     while ctxt.state & XML_NANO_HTTP_READ as i32 != 0 {
@@ -224,11 +224,11 @@ fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> i32 {
                 if len > 0 {
                     ctxt.inptr += len;
                     ctxt.last = len as i32;
-                    return len as i32;
+                    return Ok(len);
                 }
             }
             Ok(0) => {
-                return 0;
+                return Ok(0);
             }
             Err(e) => {
                 match e.kind() {
@@ -236,7 +236,7 @@ fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> i32 {
                         // This pattern covers `EAGAIN`
                     }
                     ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted => {
-                        return 0;
+                        return Ok(0);
                     }
                     _ => unsafe {
                         __xml_ioerr(
@@ -244,13 +244,13 @@ fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> i32 {
                             XmlParserErrors::default(),
                             c"recv failed\n".as_ptr() as _,
                         );
-                        return -1;
+                        return Err(e);
                     },
                 }
             }
         }
     }
-    0
+    Ok(0)
 }
 
 /**
@@ -273,7 +273,6 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
     let ctxt: XmlNanoHTTPCtxtPtr = ctx as XmlNanoHTTPCtxtPtr;
 
     let mut rc: c_int = 0;
-    let mut cur_lgth: c_int;
     let mut dummy_int: c_int = 0;
     let mut dummy_ptr: *mut c_char = null_mut();
 
@@ -297,11 +296,8 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
 
     let mut rcvd_lgth = (*ctxt).inptr - (*ctxt).content;
 
-    while {
-        cur_lgth = xml_nanohttp_recv(&mut *ctxt);
-        cur_lgth > 0
-    } {
-        rcvd_lgth += cur_lgth as usize;
+    while let Some(cur_lgth) = xml_nanohttp_recv(&mut *ctxt).ok().filter(|&len| len > 0) {
+        rcvd_lgth += cur_lgth;
         if (*ctxt).content_length > 0 && rcvd_lgth >= (*ctxt).content_length as usize {
             break;
         }
@@ -801,20 +797,20 @@ unsafe extern "C" fn xml_nanohttp_send(
 unsafe extern "C" fn xml_nanohttp_read_line(ctxt: XmlNanoHTTPCtxtPtr) -> *mut c_char {
     let mut buf: [c_char; 4096] = [0; 4096];
     let mut bp: *mut c_char = buf.as_mut_ptr();
-    let mut rc: c_int;
 
     while bp.offset_from(buf.as_mut_ptr()) < 4095 {
         if (*ctxt).inrptr == (*ctxt).inptr {
-            rc = xml_nanohttp_recv(&mut *ctxt);
-            if rc == 0 {
-                if bp == buf.as_mut_ptr() {
-                    return null_mut();
-                } else {
-                    *bp = 0;
+            match xml_nanohttp_recv(&mut *ctxt) {
+                Ok(0) => {
+                    if bp == buf.as_mut_ptr() {
+                        return null_mut();
+                    } else {
+                        *bp = 0;
+                    }
+                    return xml_mem_strdup(buf.as_mut_ptr() as _) as _;
                 }
-                return xml_mem_strdup(buf.as_mut_ptr() as _) as _;
-            } else if rc == -1 {
-                return null_mut();
+                Err(_) => return null_mut(),
+                _ => {}
             }
         }
         *bp = *(*ctxt).input.as_mut_ptr().add((*ctxt).inrptr) as _;
@@ -1205,7 +1201,11 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
             .as_deref()
             .filter(|_| (*ctxt).return_value >= 300 && (*ctxt).return_value < 400)
         {
-            while xml_nanohttp_recv(&mut *ctxt) > 0 {}
+            while xml_nanohttp_recv(&mut *ctxt)
+                .ok()
+                .filter(|&len| len > 0)
+                .is_some()
+            {}
             if nb_redirects < XML_NANO_HTTP_MAX_REDIR as i32 {
                 nb_redirects += 1;
                 if !redir_url.is_null() {
@@ -1446,9 +1446,12 @@ pub unsafe extern "C" fn xml_nanohttp_read(
         return 0;
     }
 
-    #[allow(clippy::while_immutable_condition)]
     while (*ctxt).inptr - (*ctxt).inrptr < len as usize {
-        if xml_nanohttp_recv(&mut *ctxt) <= 0 {
+        if xml_nanohttp_recv(&mut *ctxt)
+            .ok()
+            .filter(|&len| len > 0)
+            .is_none()
+        {
             break;
         }
     }
