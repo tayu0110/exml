@@ -5,7 +5,7 @@
 
 use std::{
     borrow::Cow,
-    ffi::{c_char, c_int, c_uint, CStr, CString},
+    ffi::{c_char, c_int, c_uint, CStr},
     fs::File,
     io::{stdout, ErrorKind, Read, Write},
     mem::{forget, size_of},
@@ -13,7 +13,10 @@ use std::{
     os::raw::c_void,
     ptr::{null, null_mut},
     str::from_utf8,
-    sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
+    sync::{
+        atomic::{AtomicBool, AtomicI32, Ordering},
+        Mutex,
+    },
 };
 
 use libc::{close, memcpy, open, strcmp, strlen, write, O_CREAT, O_WRONLY};
@@ -22,7 +25,7 @@ use url::Url;
 use crate::{
     error::XmlErrorDomain,
     libxml::{
-        globals::{xml_free, xml_malloc, xml_mem_strdup},
+        globals::{xml_free, xml_malloc},
         xml_io::__xml_ioerr,
         xmlerror::XmlParserErrors,
     },
@@ -74,7 +77,7 @@ pub struct XmlNanoHTTPCtxt {
 }
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
-static PROXY: AtomicPtr<c_char> = AtomicPtr::new(null_mut()); /* the proxy name if any */
+static PROXY: Mutex<String> = Mutex::new(String::new()); /* the proxy name if any */
 static PROXY_PORT: AtomicI32 = AtomicI32::new(0); /* the proxy port if any */
 static TIMEOUT: c_uint = 60; /* the select() timeout in seconds */
 
@@ -89,7 +92,11 @@ pub unsafe extern "C" fn xml_nanohttp_init() {
         return;
     }
 
-    if PROXY.load(Ordering::Relaxed).is_null() {
+    let lock = PROXY.lock().unwrap();
+    if lock.is_empty() {
+        // PROXY is locked in xml_nanohttp_scan_proxy,
+        // so lock should be dropped at here.
+        drop(lock);
         PROXY_PORT.store(80, Ordering::Relaxed);
         if std::env::var("no_proxy")
             .ok()
@@ -117,11 +124,8 @@ pub unsafe extern "C" fn xml_nanohttp_init() {
  * Cleanup the HTTP protocol layer.
  */
 pub unsafe extern "C" fn xml_nanohttp_cleanup() {
-    let p = PROXY.load(Ordering::Acquire);
-    if !p.is_null() {
-        xml_free(p as _);
-        PROXY.store(null_mut(), Ordering::Release);
-    }
+    let mut p = PROXY.lock().unwrap();
+    p.clear();
     INITIALIZED.store(false, Ordering::Relaxed);
 }
 
@@ -134,29 +138,27 @@ pub unsafe extern "C" fn xml_nanohttp_cleanup() {
  * Should be like http://myproxy/ or http://myproxy:3128/
  * A NULL URL cleans up proxy information.
  */
-pub unsafe fn xml_nanohttp_scan_proxy(url: &str) {
-    let p = PROXY.load(Ordering::Acquire);
-    if !p.is_null() {
-        xml_free(p as _);
-        PROXY.store(null_mut(), Ordering::Release);
-    }
+pub fn xml_nanohttp_scan_proxy(url: &str) {
+    let mut p = PROXY.lock().unwrap();
+    p.clear();
     PROXY_PORT.store(0, Ordering::Relaxed);
 
     let Some(uri) = Url::parse(url)
         .ok()
         .filter(|uri| uri.scheme() == "http" && uri.host_str().is_some())
     else {
-        __xml_ioerr(
-            XmlErrorDomain::XmlFromHTTP,
-            XmlParserErrors::XmlHttpUrlSyntax,
-            c"Syntax Error\n".as_ptr() as _,
-        );
+        unsafe {
+            __xml_ioerr(
+                XmlErrorDomain::XmlFromHTTP,
+                XmlParserErrors::XmlHttpUrlSyntax,
+                c"Syntax Error\n".as_ptr() as _,
+            );
+        }
         return;
     };
 
     let host = uri.host_str().unwrap();
-    let host = CString::new(host).unwrap();
-    PROXY.store(xml_mem_strdup(host.as_ptr() as _) as _, Ordering::Release);
+    p.push_str(host);
     if let Some(port) = uri.port() {
         PROXY_PORT.store(port as i32, Ordering::Release);
     }
@@ -826,17 +828,12 @@ pub unsafe fn xml_nanohttp_method_redir(
             xml_nanohttp_free_ctxt(ctxt);
             return null_mut();
         };
-        use_proxy = !PROXY.load(Ordering::Relaxed).is_null()
-            && !xml_nanohttp_bypass_proxy(hostname.as_ref());
+        let proxy = PROXY.lock().unwrap();
+        use_proxy = !proxy.is_empty() && !xml_nanohttp_bypass_proxy(hostname.as_ref());
         let (mut blen, ret) = if use_proxy {
             (
                 (*ctxt).hostname.as_ref().map_or(0, |h| h.len()) * 2 + 16,
-                xml_nanohttp_connect_host(
-                    CStr::from_ptr(PROXY.load(Ordering::Relaxed) as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                    PROXY_PORT.load(Ordering::Relaxed) as _,
-                ),
+                xml_nanohttp_connect_host(&proxy, PROXY_PORT.load(Ordering::Relaxed) as _),
             )
         } else {
             (
