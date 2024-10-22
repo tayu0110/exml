@@ -7,7 +7,7 @@ use std::{
     borrow::Cow,
     ffi::{c_char, c_int, c_uint, CStr, CString},
     io::{ErrorKind, Read, Write},
-    mem::{forget, size_of, size_of_val, zeroed},
+    mem::{forget, size_of},
     net::{TcpStream, ToSocketAddrs},
     os::raw::c_void,
     ptr::{null, null_mut},
@@ -16,12 +16,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
-use libc::{
-    __errno_location, close, connect, fcntl, getsockopt, memcpy, open, poll, pollfd, sockaddr,
-    sockaddr_in, sockaddr_in6, socket, strcmp, strlen, write, AF_INET6, EINPROGRESS, EWOULDBLOCK,
-    F_GETFL, F_SETFL, IPPROTO_TCP, O_CREAT, O_NONBLOCK, O_WRONLY, PF_INET, PF_INET6, POLLOUT,
-    SOCK_STREAM, SOL_SOCKET, SO_ERROR,
-};
+use libc::{close, memcpy, open, strcmp, strlen, write, O_CREAT, O_WRONLY};
 use url::Url;
 
 use crate::{
@@ -565,132 +560,6 @@ fn xml_nanohttp_bypass_proxy(hostname: &str) -> bool {
 }
 
 pub type XmlSocklenT = c_uint;
-
-/**
- * xmlNanoHTTPConnectAttempt:
- * @addr:  a socket address structure
- *
- * Attempt a connection to the given IP:port endpoint. It forces
- * non-blocking semantic on the socket, and allow 60 seconds for
- * the host to answer.
- *
- * Returns -1 in case of failure, the file descriptor number otherwise
- */
-
-unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket {
-    let mut p: pollfd = unsafe { zeroed() };
-    let mut status: c_int;
-
-    let addrlen: c_int;
-
-    let s: Socket;
-
-    if (*addr).sa_family == AF_INET6 as u16 {
-        s = socket(PF_INET6, SOCK_STREAM, IPPROTO_TCP);
-        addrlen = size_of::<sockaddr_in6>() as _;
-    } else {
-        s = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-        addrlen = size_of::<sockaddr_in>() as _;
-    }
-    if s == INVALID_SOCKET {
-        __xml_ioerr(
-            XmlErrorDomain::XmlFromHTTP,
-            XmlParserErrors::default(),
-            c"socket failed\n".as_ptr() as _,
-        );
-        return INVALID_SOCKET;
-    }
-    status = fcntl(s, F_GETFL, 0);
-    if status != -1 {
-        status |= O_NONBLOCK;
-        status = fcntl(s, F_SETFL, status);
-    }
-    if status < 0 {
-        __xml_ioerr(
-            XmlErrorDomain::XmlFromHTTP,
-            XmlParserErrors::default(),
-            c"error setting non-blocking IO\n".as_ptr() as _,
-        );
-        closesocket(s);
-        return INVALID_SOCKET;
-    }
-    if connect(s, addr, addrlen as _) == -1 {
-        match *__errno_location() {
-            EINPROGRESS | EWOULDBLOCK => {}
-            _ => {
-                __xml_ioerr(
-                    XmlErrorDomain::XmlFromHTTP,
-                    XmlParserErrors::default(),
-                    c"error connecting to HTTP server".as_ptr() as _,
-                );
-                closesocket(s);
-                return INVALID_SOCKET;
-            }
-        }
-    }
-    p.fd = s;
-    p.events = POLLOUT;
-    match poll(&raw mut p, 1, TIMEOUT as i32 * 1000) {
-        0 => {
-            /* Time out */
-            __xml_ioerr(
-                XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::default(),
-                c"Connect attempt timed out".as_ptr() as _,
-            );
-            closesocket(s);
-            return INVALID_SOCKET;
-        }
-        -1 => {
-            /* Ermm.. ?? */
-            __xml_ioerr(
-                XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::default(),
-                c"Connect failed".as_ptr() as _,
-            );
-            closesocket(s);
-            return INVALID_SOCKET;
-        }
-        _ => {}
-    }
-
-    if p.revents == POLLOUT {
-        let mut len: XmlSocklenT;
-
-        len = size_of_val(&status) as _;
-        if getsockopt(s, SOL_SOCKET, SO_ERROR, &raw mut status as _, &raw mut len) < 0 {
-            /* Solaris error code */
-            __xml_ioerr(
-                XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::default(),
-                c"getsockopt failed\n".as_ptr() as _,
-            );
-            closesocket(s);
-            return INVALID_SOCKET;
-        }
-        if status != 0 {
-            __xml_ioerr(
-                XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::default(),
-                c"Error connecting to remote host".as_ptr() as _,
-            );
-            closesocket(s);
-            *__errno_location() = status;
-            return INVALID_SOCKET;
-        }
-    } else {
-        /* pbm */
-        __xml_ioerr(
-            XmlErrorDomain::XmlFromHTTP,
-            XmlParserErrors::default(),
-            c"select failed\n".as_ptr() as _,
-        );
-        closesocket(s);
-        return INVALID_SOCKET;
-    }
-
-    s
-}
 
 /**
  * xmlNanoHTTPConnectHost:
