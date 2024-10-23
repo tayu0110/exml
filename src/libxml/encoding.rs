@@ -13,7 +13,7 @@ use libc::memcpy;
 
 use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simple_error};
 
-use super::{globals::xml_free, htmlparser::utf8_to_html, xmlerror::XmlParserErrors};
+use super::{htmlparser::utf8_to_html, xmlerror::XmlParserErrors};
 
 /*
  * xmlCharEncoding:
@@ -1118,49 +1118,6 @@ pub(crate) unsafe extern "C" fn xml_enc_output_chunk(
         *outlen = 0;
         *inlen = 0;
         ret = -4;
-    }
-
-    ret
-}
-
-/**
- * xmlCharEncCloseFunc:
- * @handler:    char encoding transformation data structure
- *
- * Generic front-end for encoding handler close function
- *
- * Returns 0 if success, or -1 in case of error
- */
-pub unsafe extern "C" fn xml_char_enc_close_func(handler: *mut XmlCharEncodingHandler) -> c_int {
-    let ret: c_int = 0;
-    let tofree: c_int = 0;
-
-    if handler.is_null() {
-        return -1;
-    }
-
-    for i in 0..NUM_DEFAULT_HANDLERS {
-        if handler == DEFAULT_HANDLERS.as_mut_ptr().add(i) {
-            return 0;
-        }
-    }
-
-    let handlers = HANDLERS.load(Ordering::Acquire);
-    if !handlers.is_null() {
-        let num_handlers = NB_CHAR_ENCODING_HANDLER.load(Ordering::Acquire);
-        for i in 0..num_handlers {
-            if handler == *handlers.add(i) {
-                return 0;
-            }
-        }
-    }
-    if tofree != 0 {
-        /* free up only dynamic HANDLERS iconv/uconv */
-        if !(*handler).name.load(Ordering::Relaxed).is_null() {
-            xml_free((*handler).name.load(Ordering::Relaxed) as _);
-        }
-        (*handler).name = AtomicPtr::new(null_mut());
-        xml_free(handler as _);
     }
 
     ret
@@ -2578,35 +2535,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in isolat1ToUTF8()");
-        }
-    }
-
-    #[test]
-    fn test_xml_char_enc_close_func() {
-        let mut leaks = 0;
-
-        unsafe {
-            for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                let mem_base = xml_mem_blocks();
-                let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
-
-                let ret_val = xml_char_enc_close_func(handler);
-                desret_int(ret_val);
-                des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCharEncCloseFunc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_handler);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlCharEncCloseFunc()"
-            );
         }
     }
 
