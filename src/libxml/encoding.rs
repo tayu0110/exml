@@ -13,7 +13,7 @@ use libc::memcpy;
 
 use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simple_error};
 
-use super::{htmlparser::utf8_to_html, xmlerror::XmlParserErrors};
+use super::xmlerror::XmlParserErrors;
 
 /*
  * xmlCharEncoding:
@@ -931,139 +931,139 @@ unsafe extern "C" fn utf8_to_ascii(
     *outlen
 }
 
-static mut DEFAULT_HANDLERS: &mut [XmlCharEncodingHandler] = &mut [
-    MAKE_HANDLER!(c"UTF-8".as_ptr(), Some(utf8_to_utf8), Some(utf8_to_utf8)),
-    #[cfg(feature = "output")]
-    MAKE_HANDLER!(
-        c"UTF-16LE".as_ptr(),
-        Some(utf16le_to_utf8),
-        Some(utf8_to_utf16le)
-    ),
-    #[cfg(feature = "output")]
-    MAKE_HANDLER!(
-        c"UTF-16BE".as_ptr(),
-        Some(utf16be_to_utf8),
-        Some(utf8_to_utf16be)
-    ),
-    #[cfg(feature = "output")]
-    MAKE_HANDLER!(
-        c"UTF-16".as_ptr(),
-        Some(utf16le_to_utf8),
-        Some(utf8_to_utf16)
-    ),
-    #[cfg(feature = "output")]
-    MAKE_HANDLER!(
-        c"ISO-8859-1".as_ptr(),
-        Some(iso_lat1_to_utf8),
-        Some(utf8_to_iso_lat1)
-    ),
-    #[cfg(feature = "output")]
-    MAKE_HANDLER!(c"ASCII".as_ptr(), Some(ascii_to_utf8), Some(utf8_to_ascii)),
-    #[cfg(feature = "output")]
-    MAKE_HANDLER!(
-        c"US-ASCII".as_ptr(),
-        Some(ascii_to_utf8),
-        Some(utf8_to_ascii)
-    ),
-    #[cfg(all(feature = "output", feature = "html"))]
-    MAKE_HANDLER!(c"HTML".as_ptr(), None, Some(utf8_to_html)),
-    #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"UTF-16LE".as_ptr(), Some(utf16le_to_utf8), None),
-    #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"UTF-16BE".as_ptr(), Some(utf16be_to_utf8), None),
-    #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"UTF-16".as_ptr(), Some(utf16le_to_utf8), None),
-    #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"ISO-8859-1".as_ptr(), Some(iso_lat1_to_utf8), None),
-    #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"ASCII".as_ptr(), Some(ascii_to_utf8), None),
-    #[cfg(not(feature = "output"))]
-    MAKE_HANDLER!(c"US-ASCII".as_ptr(), Some(ascii_to_utf8), None),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-2".as_ptr(),
-        Some(iso8859_2_to_utf8),
-        Some(utf8_to_iso8859_2)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-3".as_ptr(),
-        Some(iso8859_3_to_utf8),
-        Some(utf8_to_iso8859_3)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-4".as_ptr(),
-        Some(iso8859_4_to_utf8),
-        Some(utf8_to_iso8859_4)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-5".as_ptr(),
-        Some(iso8859_5_to_utf8),
-        Some(utf8_to_iso8859_5)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-6".as_ptr(),
-        Some(iso8859_6_to_utf8),
-        Some(utf8_to_iso8859_6)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-7".as_ptr(),
-        Some(iso8859_7_to_utf8),
-        Some(utf8_to_iso8859_7)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-8".as_ptr(),
-        Some(iso8859_8_to_utf8),
-        Some(utf8_to_iso8859_8)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-9".as_ptr(),
-        Some(iso8859_9_to_utf8),
-        Some(utf8_to_iso8859_9)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-10".as_ptr(),
-        Some(iso8859_10_to_utf8),
-        Some(utf8_to_iso8859_10)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-11".as_ptr(),
-        Some(iso8859_11_to_utf8),
-        Some(utf8_to_iso8859_11)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-13".as_ptr(),
-        Some(iso8859_13_to_utf8),
-        Some(utf8_to_iso8859_13)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-14".as_ptr(),
-        Some(iso8859_14_to_utf8),
-        Some(utf8_to_iso8859_14)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-15".as_ptr(),
-        Some(iso8859_15_to_utf8),
-        Some(utf8_to_iso8859_15)
-    ),
-    #[cfg(feature = "libxml_iso8859x")]
-    MAKE_HANDLER!(
-        c"ISO-8859-16".as_ptr(),
-        Some(iso8859_16_to_utf8),
-        Some(utf8_to_iso8859_16)
-    ),
-];
+// static mut DEFAULT_HANDLERS: &mut [XmlCharEncodingHandler] = &mut [
+//     MAKE_HANDLER!(c"UTF-8".as_ptr(), Some(utf8_to_utf8), Some(utf8_to_utf8)),
+//     #[cfg(feature = "output")]
+//     MAKE_HANDLER!(
+//         c"UTF-16LE".as_ptr(),
+//         Some(utf16le_to_utf8),
+//         Some(utf8_to_utf16le)
+//     ),
+//     #[cfg(feature = "output")]
+//     MAKE_HANDLER!(
+//         c"UTF-16BE".as_ptr(),
+//         Some(utf16be_to_utf8),
+//         Some(utf8_to_utf16be)
+//     ),
+//     #[cfg(feature = "output")]
+//     MAKE_HANDLER!(
+//         c"UTF-16".as_ptr(),
+//         Some(utf16le_to_utf8),
+//         Some(utf8_to_utf16)
+//     ),
+//     #[cfg(feature = "output")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-1".as_ptr(),
+//         Some(iso_lat1_to_utf8),
+//         Some(utf8_to_iso_lat1)
+//     ),
+//     #[cfg(feature = "output")]
+//     MAKE_HANDLER!(c"ASCII".as_ptr(), Some(ascii_to_utf8), Some(utf8_to_ascii)),
+//     #[cfg(feature = "output")]
+//     MAKE_HANDLER!(
+//         c"US-ASCII".as_ptr(),
+//         Some(ascii_to_utf8),
+//         Some(utf8_to_ascii)
+//     ),
+//     #[cfg(all(feature = "output", feature = "html"))]
+//     MAKE_HANDLER!(c"HTML".as_ptr(), None, Some(utf8_to_html)),
+//     #[cfg(not(feature = "output"))]
+//     MAKE_HANDLER!(c"UTF-16LE".as_ptr(), Some(utf16le_to_utf8), None),
+//     #[cfg(not(feature = "output"))]
+//     MAKE_HANDLER!(c"UTF-16BE".as_ptr(), Some(utf16be_to_utf8), None),
+//     #[cfg(not(feature = "output"))]
+//     MAKE_HANDLER!(c"UTF-16".as_ptr(), Some(utf16le_to_utf8), None),
+//     #[cfg(not(feature = "output"))]
+//     MAKE_HANDLER!(c"ISO-8859-1".as_ptr(), Some(iso_lat1_to_utf8), None),
+//     #[cfg(not(feature = "output"))]
+//     MAKE_HANDLER!(c"ASCII".as_ptr(), Some(ascii_to_utf8), None),
+//     #[cfg(not(feature = "output"))]
+//     MAKE_HANDLER!(c"US-ASCII".as_ptr(), Some(ascii_to_utf8), None),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-2".as_ptr(),
+//         Some(iso8859_2_to_utf8),
+//         Some(utf8_to_iso8859_2)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-3".as_ptr(),
+//         Some(iso8859_3_to_utf8),
+//         Some(utf8_to_iso8859_3)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-4".as_ptr(),
+//         Some(iso8859_4_to_utf8),
+//         Some(utf8_to_iso8859_4)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-5".as_ptr(),
+//         Some(iso8859_5_to_utf8),
+//         Some(utf8_to_iso8859_5)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-6".as_ptr(),
+//         Some(iso8859_6_to_utf8),
+//         Some(utf8_to_iso8859_6)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-7".as_ptr(),
+//         Some(iso8859_7_to_utf8),
+//         Some(utf8_to_iso8859_7)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-8".as_ptr(),
+//         Some(iso8859_8_to_utf8),
+//         Some(utf8_to_iso8859_8)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-9".as_ptr(),
+//         Some(iso8859_9_to_utf8),
+//         Some(utf8_to_iso8859_9)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-10".as_ptr(),
+//         Some(iso8859_10_to_utf8),
+//         Some(utf8_to_iso8859_10)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-11".as_ptr(),
+//         Some(iso8859_11_to_utf8),
+//         Some(utf8_to_iso8859_11)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-13".as_ptr(),
+//         Some(iso8859_13_to_utf8),
+//         Some(utf8_to_iso8859_13)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-14".as_ptr(),
+//         Some(iso8859_14_to_utf8),
+//         Some(utf8_to_iso8859_14)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-15".as_ptr(),
+//         Some(iso8859_15_to_utf8),
+//         Some(utf8_to_iso8859_15)
+//     ),
+//     #[cfg(feature = "libxml_iso8859x")]
+//     MAKE_HANDLER!(
+//         c"ISO-8859-16".as_ptr(),
+//         Some(iso8859_16_to_utf8),
+//         Some(utf8_to_iso8859_16)
+//     ),
+// ];
 
 /**
  * xmlEncOutputChunk:
