@@ -128,48 +128,6 @@ pub struct XmlCharEncodingHandler {
 static HANDLERS: AtomicPtr<XmlCharEncodingHandlerPtr> = AtomicPtr::new(null_mut());
 static NB_CHAR_ENCODING_HANDLER: AtomicUsize = AtomicUsize::new(0);
 
-// /**
-//  * xmlCleanupCharEncodingHandlers:
-//  *
-//  * DEPRECATED: This function will be made private. Call xmlCleanupParser
-//  * to free global state but see the warnings there. xmlCleanupParser
-//  * should be only called once at program exit. In most cases, you don't
-//  * have call cleanup functions at all.
-//  *
-//  * Cleanup the memory allocated for the c_char encoding support, it
-//  * unregisters all the encoding handlers and the aliases.
-//  */
-// pub(crate) unsafe extern "C" fn xml_cleanup_char_encoding_handlers() {
-//     xml_cleanup_encoding_aliases();
-
-//     let handlers = HANDLERS.load(Ordering::Acquire);
-//     if handlers.is_null() {
-//         return;
-//     }
-
-//     let mut num_handlers = NB_CHAR_ENCODING_HANDLER.load(Ordering::Acquire);
-//     while num_handlers > 0 {
-//         num_handlers -= 1;
-//         if !(*handlers.add(num_handlers)).is_null() {
-//             if !(*(*handlers.add(num_handlers)))
-//                 .name
-//                 .load(Ordering::Relaxed)
-//                 .is_null()
-//             {
-//                 xml_free(
-//                     (*(*handlers.add(num_handlers)))
-//                         .name
-//                         .load(Ordering::Relaxed) as _,
-//                 );
-//             }
-//             xml_free(*handlers.add(num_handlers) as _);
-//         }
-//     }
-//     xml_free(handlers as _);
-//     HANDLERS.store(null_mut(), Ordering::Release);
-//     NB_CHAR_ENCODING_HANDLER.store(0, Ordering::Release);
-// }
-
 const MAX_ENCODING_HANDLERS: usize = 50;
 
 /**
@@ -1122,71 +1080,6 @@ pub struct XmlCharEncodingAlias {
 static XML_CHAR_ENCODING_ALIASES: AtomicPtr<XmlCharEncodingAlias> = AtomicPtr::new(null_mut());
 static XML_CHAR_ENCODING_ALIASES_NB: AtomicUsize = AtomicUsize::new(0);
 static XML_CHAR_ENCODING_ALIASES_MAX: AtomicUsize = AtomicUsize::new(0);
-
-// /**
-//  * xmlGetEncodingAlias:
-//  * @alias:  the alias name as parsed, in UTF-8 format (ASCII actually)
-//  *
-//  * Lookup an encoding name for the given alias.
-//  *
-//  * Returns NULL if not found, otherwise the original name
-//  */
-// pub unsafe extern "C" fn xml_get_encoding_alias(alias: *const c_char) -> *const c_char {
-//     let mut upper: [c_char; 100] = [0; 100];
-
-//     if alias.is_null() {
-//         return null();
-//     }
-
-//     let aliases = XML_CHAR_ENCODING_ALIASES.load(Ordering::Acquire);
-//     if aliases.is_null() {
-//         return null();
-//     }
-
-//     for i in 0..upper.len() - 1 {
-//         upper[i] = (*alias.add(i) as c_uchar).to_ascii_uppercase() as c_char;
-//         if upper[i] == 0 {
-//             break;
-//         }
-//     }
-//     *upper.last_mut().unwrap() = 0;
-
-//     /*
-//      * Walk down the list looking for a definition of the alias
-//      */
-//     for i in 0..XML_CHAR_ENCODING_ALIASES_NB.load(Ordering::Acquire) {
-//         if strcmp((*aliases.add(i)).alias as _, upper.as_ptr() as _) == 0 {
-//             return (*aliases.add(i)).name;
-//         }
-//     }
-//     null()
-// }
-
-/**
- * xmlCleanupEncodingAliases:
- *
- * Unregisters all aliases
- */
-pub unsafe extern "C" fn xml_cleanup_encoding_aliases() {
-    let aliases = XML_CHAR_ENCODING_ALIASES.load(Ordering::Acquire);
-    if aliases.is_null() {
-        return;
-    }
-
-    let num_aliases = XML_CHAR_ENCODING_ALIASES_NB.load(Ordering::Acquire);
-    for i in 0..num_aliases {
-        if !(*aliases.add(i)).name.is_null() {
-            xml_free((*aliases.add(i)).name as _);
-        }
-        if !(*aliases.add(i)).alias.is_null() {
-            xml_free((*aliases.add(i)).alias as _);
-        }
-    }
-    XML_CHAR_ENCODING_ALIASES_NB.store(0, Ordering::Release);
-    XML_CHAR_ENCODING_ALIASES_MAX.store(0, Ordering::Release);
-    xml_free(aliases as _);
-    XML_CHAR_ENCODING_ALIASES.store(null_mut(), Ordering::Release);
-}
 
 /**
  * xmlEncOutputChunk:
@@ -2714,28 +2607,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlCharEncCloseFunc()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_cleanup_encoding_aliases() {
-        unsafe {
-            let mut leaks = 0;
-            let mem_base = xml_mem_blocks();
-
-            xml_cleanup_encoding_aliases();
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlCleanupEncodingAliases",
-                    xml_mem_blocks() - mem_base
-                );
-                assert!(
-                    leaks == 0,
-                    "{leaks} Leaks are found in xmlCleanupEncodingAliases()"
-                );
-            }
         }
     }
 
