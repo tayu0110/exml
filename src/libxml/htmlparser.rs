@@ -17,12 +17,11 @@ use libc::{
 
 use crate::{
     __xml_raise_error,
-    encoding::{detect_encoding, find_encoding_handler},
+    encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
     globals::GenericErrorContext,
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
-        encoding::XmlCharEncoding,
         globals::{
             xml_default_sax_locator, xml_free, xml_keep_blanks_default_value,
             xml_line_numbers_default_value, xml_malloc, xml_malloc_atomic, xml_realloc,
