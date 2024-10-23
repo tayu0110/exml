@@ -17,12 +17,12 @@ use libc::{memcpy, memset};
 
 use crate::{
     buf::XmlBufRef,
-    encoding::{find_encoding_handler, XmlCharEncodingHandler},
+    encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::XmlErrorDomain,
     generic_error,
     globals::GLOBAL_STATE,
     libxml::{
-        encoding::{xml_parse_char_encoding, XmlCharEncoding, XmlCharEncodingOutputFunc},
+        encoding::XmlCharEncodingOutputFunc,
         entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{xml_free, xml_indent_tree_output, xml_malloc, xml_save_no_empty_tags},
         htmltree::{
@@ -1704,7 +1704,6 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     let oldescape: Option<XmlCharEncodingOutputFunc> = (*ctxt).escape;
     let oldescape_attr: Option<XmlCharEncodingOutputFunc> = (*ctxt).escape_attr;
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
-    let enc: XmlCharEncoding;
     let mut switched_encoding: c_int = 0;
 
     xml_init_parser();
@@ -1765,7 +1764,14 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         || (*ctxt).options & XmlSaveOption::XmlSaveAsXml as i32 != 0
         || (*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32 != 0
     {
-        enc = xml_parse_char_encoding(encoding as _);
+        let enc = if encoding.is_null() {
+            XmlCharEncoding::None
+        } else {
+            let encoding = CStr::from_ptr(encoding as *const i8).to_string_lossy();
+            encoding
+                .parse::<XmlCharEncoding>()
+                .unwrap_or(XmlCharEncoding::Error)
+        };
         if !encoding.is_null()
             && oldctxtenc.is_null()
             && (*buf).encoder.is_none()

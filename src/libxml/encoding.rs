@@ -1188,139 +1188,139 @@ pub unsafe extern "C" fn xml_cleanup_encoding_aliases() {
     XML_CHAR_ENCODING_ALIASES.store(null_mut(), Ordering::Release);
 }
 
-/**
- * xmlParseCharEncoding:
- * @name:  the encoding name as parsed, in UTF-8 format (ASCII actually)
- *
- * Compare the string to the encoding schemes already known. Note
- * that the comparison is case insensitive accordingly to the section
- * [XML] 4.3.3 Character Encoding in Entities.
- *
- * Returns one of the XML_CHAR_ENCODING_... values or XML_CHAR_ENCODING_NONE
- * if not recognized.
- */
-pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> XmlCharEncoding {
-    let mut upper: [c_char; 500] = [0; 500];
+// /**
+//  * xmlParseCharEncoding:
+//  * @name:  the encoding name as parsed, in UTF-8 format (ASCII actually)
+//  *
+//  * Compare the string to the encoding schemes already known. Note
+//  * that the comparison is case insensitive accordingly to the section
+//  * [XML] 4.3.3 Character Encoding in Entities.
+//  *
+//  * Returns one of the XML_CHAR_ENCODING_... values or XML_CHAR_ENCODING_NONE
+//  * if not recognized.
+//  */
+// pub unsafe extern "C" fn xml_parse_char_encoding(mut name: *const c_char) -> XmlCharEncoding {
+//     let mut upper: [c_char; 500] = [0; 500];
 
-    if name.is_null() {
-        return XmlCharEncoding::None;
-    }
+//     if name.is_null() {
+//         return XmlCharEncoding::None;
+//     }
 
-    /*
-     * Do the alias resolution
-     */
-    let alias: *const c_char = xml_get_encoding_alias(name);
-    if !alias.is_null() {
-        name = alias;
-    }
+//     /*
+//      * Do the alias resolution
+//      */
+//     let alias: *const c_char = xml_get_encoding_alias(name);
+//     if !alias.is_null() {
+//         name = alias;
+//     }
 
-    for i in 0..upper.len() - 1 {
-        upper[i] = (*name.add(i) as c_uchar).to_ascii_uppercase() as c_char;
-        if upper[i] == 0 {
-            break;
-        }
-    }
-    *upper.last_mut().unwrap() = 0;
+//     for i in 0..upper.len() - 1 {
+//         upper[i] = (*name.add(i) as c_uchar).to_ascii_uppercase() as c_char;
+//         if upper[i] == 0 {
+//             break;
+//         }
+//     }
+//     *upper.last_mut().unwrap() = 0;
 
-    if strcmp(upper.as_ptr() as _, c"".as_ptr() as _) == 0 {
-        return XmlCharEncoding::None;
-    }
-    if strcmp(upper.as_ptr() as _, c"UTF-8".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UTF8;
-    }
-    if strcmp(upper.as_ptr() as _, c"UTF8".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UTF8;
-    }
+//     if strcmp(upper.as_ptr() as _, c"".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::None;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"UTF-8".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UTF8;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"UTF8".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UTF8;
+//     }
 
-    /*
-     * NOTE: if we were able to parse this, the endianness of UTF16 is
-     *       already found and in use
-     */
-    if strcmp(upper.as_ptr() as _, c"UTF-16".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UTF16LE;
-    }
-    if strcmp(upper.as_ptr() as _, c"UTF16".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UTF16LE;
-    }
+//     /*
+//      * NOTE: if we were able to parse this, the endianness of UTF16 is
+//      *       already found and in use
+//      */
+//     if strcmp(upper.as_ptr() as _, c"UTF-16".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UTF16LE;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"UTF16".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UTF16LE;
+//     }
 
-    if strcmp(upper.as_ptr() as _, c"ISO-10646-UCS-2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UCS2;
-    }
-    if strcmp(upper.as_ptr() as _, c"UCS-2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UCS2;
-    }
-    if strcmp(upper.as_ptr() as _, c"UCS2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UCS2;
-    }
+//     if strcmp(upper.as_ptr() as _, c"ISO-10646-UCS-2".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UCS2;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"UCS-2".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UCS2;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"UCS2".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UCS2;
+//     }
 
-    /*
-     * NOTE: if we were able to parse this, the endianness of UCS4 is
-     *       already found and in use
-     */
-    if strcmp(upper.as_ptr() as _, c"ISO-10646-UCS-4".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UCS4LE;
-    }
-    if strcmp(upper.as_ptr() as _, c"UCS-4".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UCS4LE;
-    }
-    if strcmp(upper.as_ptr() as _, c"UCS4".as_ptr() as _) == 0 {
-        return XmlCharEncoding::UCS4LE;
-    }
+//     /*
+//      * NOTE: if we were able to parse this, the endianness of UCS4 is
+//      *       already found and in use
+//      */
+//     if strcmp(upper.as_ptr() as _, c"ISO-10646-UCS-4".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UCS4LE;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"UCS-4".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UCS4LE;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"UCS4".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::UCS4LE;
+//     }
 
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-1".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_1;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO-LATIN-1".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_1;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO LATIN 1".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_1;
-    }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-1".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_1;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO-LATIN-1".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_1;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO LATIN 1".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_1;
+//     }
 
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_2;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO-LATIN-2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_2;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO LATIN 2".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_2;
-    }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-2".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_2;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO-LATIN-2".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_2;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO LATIN 2".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_2;
+//     }
 
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-3".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_3;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-4".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_4;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-5".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_5;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-6".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_6;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-7".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_7;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-8".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_8;
-    }
-    if strcmp(upper.as_ptr() as _, c"ISO-8859-9".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO8859_9;
-    }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-3".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_3;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-4".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_4;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-5".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_5;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-6".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_6;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-7".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_7;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-8".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_8;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"ISO-8859-9".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO8859_9;
+//     }
 
-    if strcmp(upper.as_ptr() as _, c"ISO-2022-JP".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ISO2022JP;
-    }
-    if strcmp(upper.as_ptr() as _, c"SHIFT_JIS".as_ptr() as _) == 0 {
-        return XmlCharEncoding::ShiftJIS;
-    }
-    if strcmp(upper.as_ptr() as _, c"EUC-JP".as_ptr() as _) == 0 {
-        return XmlCharEncoding::EUCJP;
-    }
+//     if strcmp(upper.as_ptr() as _, c"ISO-2022-JP".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ISO2022JP;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"SHIFT_JIS".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::ShiftJIS;
+//     }
+//     if strcmp(upper.as_ptr() as _, c"EUC-JP".as_ptr() as _) == 0 {
+//         return XmlCharEncoding::EUCJP;
+//     }
 
-    XmlCharEncoding::Error
-}
+//     XmlCharEncoding::Error
+// }
 
 /**
  * xmlGetCharEncodingName:
