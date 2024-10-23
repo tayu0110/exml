@@ -3,6 +3,7 @@
 
 use std::{
     ffi::{c_char, c_int, c_uchar},
+    io::{stdout, Write},
     ptr::{addr_of_mut, null_mut},
 };
 
@@ -27,7 +28,7 @@ use exml::{
         xmlstring::XmlChar,
     },
 };
-use libc::{fflush, fprintf, memset, printf, strlen, FILE};
+use libc::{memset, strlen};
 
 /**
  * Test the UTF-8 decoding routines
@@ -205,17 +206,13 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
      */
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
-        fprintf(stderr, c"Failed to allocate parser context\n".as_ptr());
+        eprintln!("Failed to allocate parser context");
         return 1;
     }
 
-    extern "C" {
-        static stdout: *mut FILE;
-        static stderr: *mut FILE;
-    }
-
-    printf(c"testing 1 byte char in document: 1".as_ptr());
-    fflush(stdout);
+    let mut stdout = stdout();
+    print!("testing 1 byte char in document: 1");
+    stdout.flush().ok();
     data = addr_of_mut!(DOCUMENT1[5]);
     *data.add(0) = b' ' as _;
     *data.add(1) = b' ' as _;
@@ -234,8 +231,8 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
         0,
         "Failed to pass 'test_document_range_byte1' - 1"
     );
-    printf(c" 2".as_ptr());
-    fflush(stdout);
+    print!(" 2");
+    stdout.flush().ok();
     *data.add(0) = b' ' as _;
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
@@ -254,8 +251,8 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
         "Failed to pass 'test_document_range_byte1' - 2"
     );
 
-    printf(c" 3".as_ptr());
-    fflush(stdout);
+    print!(" 3");
+    stdout.flush().ok();
     data = addr_of_mut!(DOCUMENT2[10]);
     *data.add(0) = b' ' as _;
     *data.add(1) = b' ' as _;
@@ -274,8 +271,8 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
         0,
         "Failed to pass 'test_document_range_byte1' - 3"
     );
-    printf(c" 4".as_ptr());
-    fflush(stdout);
+    print!(" 4");
+    stdout.flush().ok();
     *data.add(0) = b' ' as _;
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
@@ -293,10 +290,10 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
         0,
         "Failed to pass 'test_document_range_byte1' - 4"
     );
-    printf(c" done\n".as_ptr());
+    println!(" done");
 
-    printf(c"testing 2 byte char in document: 1".as_ptr());
-    fflush(stdout);
+    print!("testing 2 byte char in document: 1");
+    stdout.flush().ok();
     data = addr_of_mut!(DOCUMENT1[5]);
     *data.add(0) = b' ' as _;
     *data.add(1) = b' ' as _;
@@ -313,8 +310,8 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
         0,
         "Failed to pass 'test_document_range_byte2' - 1"
     );
-    printf(c" 2".as_ptr());
-    fflush(stdout);
+    print!(" 2");
+    stdout.flush().ok();
     *data.add(0) = b' ' as _;
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
@@ -331,8 +328,8 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
         "Failed to pass 'test_document_range_byte2' - 2"
     );
 
-    printf(c" 3".as_ptr());
-    fflush(stdout);
+    print!(" 3");
+    stdout.flush().ok();
     data = addr_of_mut!(DOCUMENT2[10]);
     *data.add(0) = b' ' as _;
     *data.add(1) = b' ' as _;
@@ -349,8 +346,8 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
         0,
         "Failed to pass 'test_document_range_byte2' - 3"
     );
-    printf(c" 4".as_ptr());
-    fflush(stdout);
+    print!(" 4");
+    stdout.flush().ok();
     *data.add(0) = b' ' as _;
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
@@ -366,7 +363,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
         0,
         "Failed to pass 'test_document_range_byte2' - 4"
     );
-    printf(c" done\n".as_ptr());
+    println!(" done");
 
     xml_free_parser_ctxt(ctxt);
     test_ret
@@ -375,10 +372,6 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
 unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
     let mut c: c_int;
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
-
-    extern "C" {
-        static stderr: *mut FILE;
-    }
 
     *data.add(1) = 0;
     *data.add(2) = 0;
@@ -394,28 +387,16 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
         if i == 0 || i >= 0x80 {
             /* we must see an error there */
             if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                fprintf(
-                    stderr,
-                    c"Failed to detect invalid char for Byte 0x%02X\n".as_ptr(),
-                    i,
-                );
+                eprintln!("Failed to detect invalid char for Byte 0x{i:02X}");
                 return 1;
             }
         } else if i == 0xD {
             if c != 0xA || len != 1 {
-                fprintf(
-                    stderr,
-                    c"Failed to convert char for Byte 0x%02X\n".as_ptr(),
-                    i,
-                );
+                eprintln!("Failed to convert char for Byte 0x{i:02X}");
                 return 1;
             }
         } else if c != i || len != 1 {
-            fprintf(
-                stderr,
-                c"Failed to parse char for Byte 0x%02X\n".as_ptr(),
-                i,
-            );
+            eprintln!("Failed to parse char for Byte 0x{i:02X}");
             return 1;
         }
     }
@@ -424,10 +405,6 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
 
 unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
-
-    extern "C" {
-        static stderr: *mut FILE;
-    }
 
     *data.add(2) = 0;
     *data.add(3) = 0;
@@ -446,12 +423,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
             /* if first bit of first c_char is set, then second bit must too */
             if i & 0x80 != 0 && i & 0x40 == 0 {
                 if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                    fprintf(
-                        stderr,
-                        c"Failed to detect invalid char for Bytes 0x%02X 0x%02X\n".as_ptr(),
-                        i,
-                        j,
-                    );
+                    eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}");
                     return 1;
                 }
             }
@@ -461,13 +433,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
              */
             else if i & 0x80 != 0 && j & 0xC0 != 0x80 {
                 if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                    fprintf(
-                        stderr,
-                        c"Failed to detect invalid char for Bytes 0x%02X 0x%02X: %d\n".as_ptr(),
-                        i,
-                        j,
-                        c,
-                    );
+                    eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}: {c}");
                     return 1;
                 }
             }
@@ -477,13 +443,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
              */
             else if i & 0x80 != 0 && i & 0x1E == 0 {
                 if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                    fprintf(
-                        stderr,
-                        c"Failed to detect invalid char for Bytes 0x%02X 0x%02X: %d\n".as_ptr(),
-                        i,
-                        j,
-                        c,
-                    );
+                    eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}: {c}");
                     return 1;
                 }
             }
@@ -493,12 +453,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
              */
             else if i & 0xE0 == 0xE0 {
                 if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                    fprintf(
-                        stderr,
-                        c"Failed to detect invalid char for Bytes 0x%02X 0x%02X 0x00\n".as_ptr(),
-                        i,
-                        j,
-                    );
+                    eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x00");
                     return 1;
                 }
             }
@@ -506,25 +461,16 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
              * We should see no error in remaining cases
              */
             else if LAST_ERROR != 0 || len != 2 {
-                fprintf(
-                    stderr,
-                    c"Failed to parse char for Bytes 0x%02X 0x%02X\n".as_ptr(),
-                    i,
-                    j,
-                );
+                eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X}",);
                 return 1;
             }
             /*
              * Finally check the value is right
              */
             else if c != (j & 0x3F) + ((i & 0x1F) << 6) {
-                fprintf(
-                    stderr,
-                    c"Failed to parse char for Bytes 0x%02X 0x%02X: expect %d got %d\n".as_ptr(),
-                    i,
-                    j,
+                eprintln!(
+                    "Failed to parse char for Bytes 0x{i:02X} 0x{j:02X}: expect {} got {c}",
                     (j & 0x3F) + ((i & 0x1F) << 6),
-                    c,
                 );
                 return 1;
             }
@@ -536,10 +482,6 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
 unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
     let lows: [c_uchar; 6] = [0, 0x80, 0x81, 0xC1, 0xFF, 0xBF];
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
-
-    extern "C" {
-        static stderr: *mut FILE;
-    }
 
     *data.add(3) = 0;
     for i in 0xE0..=0xFF {
@@ -564,7 +506,10 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                  */
                 if i & 0xF0 == 0xF0 {
                     if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                        fprintf(stderr, c"Failed to detect invalid char for Bytes 0x%02X 0x%02X 0x%02X 0x%02X\n".as_ptr(), i, j, nk, *data.add(3) as i32);
+                        eprintln!(
+                            "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{:02X}",
+                            *data.add(3) as i32
+                        );
                         return 1;
                     }
                 }
@@ -573,13 +518,8 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                  */
                 else if j & 0xC0 != 0x80 || nk & 0xC0 != 0x80 {
                     if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                        fprintf(
-                            stderr,
-                            c"Failed to detect invalid char for Bytes 0x%02X 0x%02X 0x%02X\n"
-                                .as_ptr(),
-                            i,
-                            j,
-                            nk,
+                        eprintln!(
+                            "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}"
                         );
                         return 1;
                     }
@@ -591,13 +531,8 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                  */
                 else if i & 0xF == 0 && j & 0x20 == 0 {
                     if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                        fprintf(
-                            stderr,
-                            c"Failed to detect invalid char for Bytes 0x%02X 0x%02X 0x%02X\n"
-                                .as_ptr(),
-                            i,
-                            j,
-                            nk,
+                        eprintln!(
+                            "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}"
                         );
                         return 1;
                     }
@@ -609,7 +544,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                     || ((value > 0xFFFD) && (value < 0x10000))
                 {
                     if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
-                        fprintf(stderr, c"Failed to detect invalid char 0x%04X for Bytes 0x%02X 0x%02X 0x%02X\n".as_ptr(), value, i, j, nk);
+                        eprintln!("Failed to detect invalid char 0x{value:04X} for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}");
                         return 1;
                     }
                 } else {
@@ -637,10 +572,6 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
 unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
     let lows: [c_uchar; 6] = [0, 0x80, 0x81, 0xC1, 0xFF, 0xBF];
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
-
-    extern "C" {
-        static stderr: *mut FILE;
-    }
 
     *data.add(4) = 0;
     for i in 0xF0..=0xFF {
@@ -699,20 +630,14 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                      * We should see no error in remaining cases
                      */
                     else if LAST_ERROR != 0 || len != 4 {
-                        fprintf(
-                            stderr,
-                            c"Failed to parse char for Bytes 0x%02X 0x%02X 0x%02X\n".as_ptr(),
-                            i,
-                            j,
-                            nk,
-                        );
+                        eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}");
                         return 1;
                     }
                     /*
                      * Finally check the value is right
                      */
                     else if c != value {
-                        fprintf(stderr, c"Failed to parse char for Bytes 0x%02X 0x%02X 0x%02X: expect %d got %d\n".as_ptr(), i, j, *data.add(2) as i32, value, c);
+                        eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{:02X}: expect {value} got {c}", *data.add(2) as i32);
                         return 1;
                     }
                 }
@@ -735,10 +660,6 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
     let mut test_ret: c_int = 0;
 
     memset(data.as_mut_ptr() as _, 0, 5);
-
-    extern "C" {
-        static stdout: *mut FILE;
-    }
 
     /*
      * Set up a parsing context using the above data buffer as
@@ -772,20 +693,21 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
     (*input).end = (*input).base.add(4);
     input_push(ctxt, input);
 
-    printf(c"testing char range: 1".as_ptr());
-    fflush(stdout);
+    let mut stdout = stdout();
+    print!("testing char range: 1");
+    stdout.flush().ok();
     assert_eq!(test_char_range_byte1(ctxt), 0);
-    printf(c" 2".as_ptr());
-    fflush(stdout);
+    print!(" 2");
+    stdout.flush().ok();
     assert_eq!(test_char_range_byte2(ctxt), 0);
-    printf(c" 3".as_ptr());
-    fflush(stdout);
+    print!(" 3");
+    stdout.flush().ok();
     assert_eq!(test_char_range_byte3(ctxt), 0);
-    printf(c" 4".as_ptr());
-    fflush(stdout);
+    print!(" 4");
+    stdout.flush().ok();
     assert_eq!(test_char_range_byte4(ctxt), 0);
-    printf(c" done\n".as_ptr());
-    fflush(stdout);
+    println!(" done");
+    stdout.flush().ok();
 
     // error:
     xml_free_parser_ctxt(ctxt);
