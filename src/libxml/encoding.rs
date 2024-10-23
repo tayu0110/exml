@@ -10,29 +10,6 @@ use crate::__xml_raise_error;
 use super::xmlerror::XmlParserErrors;
 
 /**
- * xmlCharEncodingInputFunc:
- * @out:  a pointer to an array of bytes to store the UTF-8 result
- * @outlen:  the length of @out
- * @input:  a pointer to an array of chars in the original encoding
- * @inlen:  the length of @in
- *
- * Take a block of chars in the original encoding and try to convert
- * it to an UTF-8 block of chars out.
- *
- * Returns the number of bytes written, -1 if lack of space, or -2
- *     if the transcoding failed.
- * The value of @inlen after return is the number of octets consumed
- *     if the return value is positive, else unpredictiable.
- * The value of @outlen after return is the number of octets consumed.
- */
-pub type XmlCharEncodingInputFunc = unsafe extern "C" fn(
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int;
-
-/**
  * xmlCharEncodingOutputFunc:
  * @out:  a pointer to an array of bytes to store the result
  * @outlen:  the length of @out
