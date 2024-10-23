@@ -17,7 +17,6 @@ use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simp
 use super::{
     globals::{xml_free, xml_malloc},
     htmlparser::utf8_to_html,
-    parser::xml_init_parser,
     xmlerror::XmlParserErrors,
 };
 
@@ -129,19 +128,6 @@ pub struct XmlCharEncodingHandler {
     pub(crate) name: AtomicPtr<c_char>,
     pub(crate) input: Option<XmlCharEncodingInputFunc>,
     pub(crate) output: Option<XmlCharEncodingOutputFunc>,
-}
-
-/*
- * Interfaces for encoding handlers.
- */
-/**
- * xmlInitCharEncodingHandlers:
- *
- * DEPRECATED: Alias for xmlInitParser.
- */
-#[deprecated]
-pub unsafe extern "C" fn xml_init_char_encoding_handlers() {
-    xml_init_parser();
 }
 
 static HANDLERS: AtomicPtr<XmlCharEncodingHandlerPtr> = AtomicPtr::new(null_mut());
@@ -3020,14 +3006,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlGetEncodingAlias()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_init_char_encoding_handlers() {
-        unsafe {
-            xml_init_char_encoding_handlers();
-            reset_last_error();
         }
     }
 
