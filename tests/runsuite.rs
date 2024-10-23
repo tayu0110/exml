@@ -61,10 +61,10 @@ use libc::{snprintf, strcmp, strstr};
 
 static mut VERBOSE: c_int = 0;
 
-unsafe extern "C" fn check_test_file(filename: *const c_char) -> c_int {
-    match metadata(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
-        Ok(meta) => meta.is_file() as i32,
-        _ => 0,
+fn check_test_file(filename: &str) -> bool {
+    match metadata(filename) {
+        Ok(meta) => meta.is_file(),
+        _ => false,
     }
 }
 
@@ -148,7 +148,7 @@ unsafe extern "C" fn test_external_entity_loader(
             return ret;
         }
     }
-    if check_test_file(url) != 0 {
+    if check_test_file(CStr::from_ptr(url).to_string_lossy().as_ref()) {
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
         let memused: c_int = xml_mem_used();
@@ -984,7 +984,11 @@ unsafe extern "C" fn xstc_test_instance(
             );
             ret = -1;
             // goto done;
-        } else if check_test_file(path as *const c_char) <= 0 {
+        } else if !check_test_file(
+            CStr::from_ptr(path as *const c_char)
+                .to_string_lossy()
+                .as_ref(),
+        ) {
             test_log!(
                 logfile,
                 "schemas for testGroup line {} is missing: {}\n",
@@ -1143,7 +1147,11 @@ unsafe extern "C" fn xstc_test_group(
             );
             ret = -1;
             // goto done;
-        } else if check_test_file(path as *const c_char) <= 0 {
+        } else if !check_test_file(
+            CStr::from_ptr(path as *const c_char)
+                .to_string_lossy()
+                .as_ref(),
+        ) {
             test_log!(
                 logfile,
                 "schemas for testGroup line {} is missing: {}\n",

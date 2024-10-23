@@ -157,7 +157,7 @@ unsafe extern "C" fn test_document_range_byte2(
              */
             else if i & 0x80 != 0 && i & 0x1E == 0 {
                 assert!(
-                    !LAST_ERROR != 0 && res.is_null(),
+                    LAST_ERROR != 0 && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 )
             }
@@ -167,7 +167,7 @@ unsafe extern "C" fn test_document_range_byte2(
              */
             else if i & 0xE0 == 0xE0 {
                 assert!(
-                    !LAST_ERROR != 0 && res.is_null(),
+                    LAST_ERROR != 0 && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             } else {
@@ -796,9 +796,8 @@ fn main() {
      * Catch errors separately
      */
 
+    set_structured_error(Some(error_handler), None);
     unsafe {
-        set_structured_error(Some(error_handler), None);
-
         /*
          * Run the tests
          */
