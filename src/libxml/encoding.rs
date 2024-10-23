@@ -6,7 +6,7 @@
 use std::{
     ffi::{c_char, c_int, c_uchar, c_uint, c_ushort},
     mem::{size_of, size_of_val},
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{null, null_mut},
     sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
 };
 
@@ -1194,84 +1194,84 @@ static XML_UTF16_BEHANDLER: &XmlCharEncodingHandler = unsafe { &DEFAULT_HANDLERS
 
 static NUM_DEFAULT_HANDLERS: usize = unsafe { DEFAULT_HANDLERS.len() };
 
-/**
- * xmlFindCharEncodingHandler:
- * @name:  a string describing the c_char encoding.
- *
- * Search in the registered set the handler able to read/write that encoding
- * or create a new one.
- *
- * Returns the handler or NULL if not found
- */
-pub unsafe extern "C" fn xml_find_char_encoding_handler(
-    mut name: *const c_char,
-) -> XmlCharEncodingHandlerPtr {
-    let mut upper: [c_char; 100] = [0; 100];
+// /**
+//  * xmlFindCharEncodingHandler:
+//  * @name:  a string describing the c_char encoding.
+//  *
+//  * Search in the registered set the handler able to read/write that encoding
+//  * or create a new one.
+//  *
+//  * Returns the handler or NULL if not found
+//  */
+// pub unsafe extern "C" fn xml_find_char_encoding_handler(
+//     mut name: *const c_char,
+// ) -> XmlCharEncodingHandlerPtr {
+//     let mut upper: [c_char; 100] = [0; 100];
 
-    if name.is_null() {
-        return null_mut();
-    }
-    if *name.add(0) == 0 {
-        return null_mut();
-    }
+//     if name.is_null() {
+//         return null_mut();
+//     }
+//     if *name.add(0) == 0 {
+//         return null_mut();
+//     }
 
-    /*
-     * Do the alias resolution
-     */
-    let norig: *const c_char = name;
-    let nalias: *const c_char = xml_get_encoding_alias(name);
-    if !nalias.is_null() {
-        name = nalias;
-    }
+//     /*
+//      * Do the alias resolution
+//      */
+//     let norig: *const c_char = name;
+//     let nalias: *const c_char = xml_get_encoding_alias(name);
+//     if !nalias.is_null() {
+//         name = nalias;
+//     }
 
-    /*
-     * Check first for directly registered encoding names
-     */
-    for i in 0..upper.len() - 1 {
-        upper[i] = (*name.add(i) as c_uchar).to_ascii_uppercase() as c_char;
-        if upper[i] == 0 {
-            break;
-        }
-    }
-    *upper.last_mut().unwrap() = 0;
+//     /*
+//      * Check first for directly registered encoding names
+//      */
+//     for i in 0..upper.len() - 1 {
+//         upper[i] = (*name.add(i) as c_uchar).to_ascii_uppercase() as c_char;
+//         if upper[i] == 0 {
+//             break;
+//         }
+//     }
+//     *upper.last_mut().unwrap() = 0;
 
-    for i in 0..NUM_DEFAULT_HANDLERS {
-        if strcmp(
-            upper.as_ptr() as _,
-            DEFAULT_HANDLERS[i].name.load(Ordering::Relaxed) as _,
-        ) == 0
-        {
-            return addr_of_mut!(DEFAULT_HANDLERS[i]) as XmlCharEncodingHandlerPtr;
-        }
-    }
+//     for i in 0..NUM_DEFAULT_HANDLERS {
+//         if strcmp(
+//             upper.as_ptr() as _,
+//             DEFAULT_HANDLERS[i].name.load(Ordering::Relaxed) as _,
+//         ) == 0
+//         {
+//             return addr_of_mut!(DEFAULT_HANDLERS[i]) as XmlCharEncodingHandlerPtr;
+//         }
+//     }
 
-    let handlers = HANDLERS.load(Ordering::Relaxed);
-    if !handlers.is_null() {
-        for i in 0..NB_CHAR_ENCODING_HANDLER.load(Ordering::Relaxed) {
-            if strcmp(
-                upper.as_ptr() as _,
-                (*(*handlers.add(i))).name.load(Ordering::Relaxed) as _,
-            ) == 0
-            {
-                return *handlers.add(i);
-            }
-        }
-    }
+//     let handlers = HANDLERS.load(Ordering::Relaxed);
+//     if !handlers.is_null() {
+//         for i in 0..NB_CHAR_ENCODING_HANDLER.load(Ordering::Relaxed) {
+//             if strcmp(
+//                 upper.as_ptr() as _,
+//                 (*(*handlers.add(i))).name.load(Ordering::Relaxed) as _,
+//             ) == 0
+//             {
+//                 return *handlers.add(i);
+//             }
+//         }
+//     }
 
-    /*
-     * Fallback using the canonical names
-     */
-    let alias: XmlCharEncoding = xml_parse_char_encoding(norig);
-    if !matches!(alias, XmlCharEncoding::Error) {
-        let canon: *const c_char = xml_get_char_encoding_name(alias);
-        if !canon.is_null() && strcmp(name, canon) != 0 {
-            return xml_find_char_encoding_handler(canon);
-        }
-    }
+//     /*
+//      * Fallback using the canonical names
+//      */
+//     let alias: XmlCharEncoding = xml_parse_char_encoding(norig);
+//     if !matches!(alias, XmlCharEncoding::Error) {
+//         let canon: *const c_char = xml_get_char_encoding_name(alias);
+//         if !canon.is_null() && strcmp(name, canon) != 0 {
+//             return xml_find_char_encoding_handler(canon);
+//         }
+//     }
 
-    /* If "none of the above", give up */
-    null_mut()
-}
+//     /* If "none of the above", give up */
+//     null_mut()
+// }
 
 /**
  * xmlNewCharEncodingHandler:
