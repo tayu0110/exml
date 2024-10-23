@@ -3,63 +3,16 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{
-    ffi::{c_int, c_uchar},
-    fmt::Write,
-    str::from_utf8_mut,
-};
+use std::{ffi::c_int, fmt::Write, str::from_utf8_mut};
 
 use crate::{
     encoding::EncodingError,
     libxml::{
-        encoding::{xml_encoding_err, XmlCharEncodingHandler},
+        encoding::xml_encoding_err,
         xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr},
         xmlerror::XmlParserErrors,
     },
 };
-
-/**
- * xmlEncInputChunk:
- * @handler:  encoding handler
- * @out:  a pointer to an array of bytes to store the result
- * @outlen:  the length of @out
- * @in:  a pointer to an array of input bytes
- * @inlen:  the length of @in
- * @flush:  flush (ICU-related)
- *
- * Returns 0 if success, or
- *     -1 by lack of space, or
- *     -2 if the transcoding fails (for *in is not valid utf8 string or
- *        the result of transformation can't fit into the encoding we want), or
- *     -3 if there the last byte can't form a single output char.
- *
- * The value of @inlen after return is the number of octets consumed
- *     as the return value is 0, else unpredictable.
- * The value of @outlen after return is the number of octets produced.
- */
-pub(crate) unsafe extern "C" fn xml_enc_input_chunk(
-    handler: *mut XmlCharEncodingHandler,
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-    _flush: c_int,
-) -> c_int {
-    let mut ret: c_int;
-
-    if let Some(finput) = (*handler).input {
-        ret = finput(out, outlen, input, inlen);
-        if ret > 0 {
-            ret = 0;
-        }
-    } else {
-        *outlen = 0;
-        *inlen = 0;
-        ret = -2;
-    }
-
-    ret
-}
 
 /**
  * xmlCharEncInput:

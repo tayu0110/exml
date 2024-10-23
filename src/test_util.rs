@@ -15,7 +15,6 @@ use crate::{
         chvalid::XmlChRangeGroup,
         debug_xml::XmlShellCtxtPtr,
         dict::{xml_dict_create, xml_dict_free, XmlDictPtr},
-        encoding::XmlCharEncodingHandlerPtr,
         entities::{XmlEntitiesTablePtr, XmlEntityPtr},
         globals::xml_free,
         hash::{xml_hash_create, xml_hash_free, XmlHashDeallocator, XmlHashTablePtr},
@@ -1536,17 +1535,6 @@ pub(crate) fn gen_const_xml_doc_ptr(_no: i32, _nr: i32) -> *const XmlDoc {
 pub(crate) fn des_const_xml_doc_ptr(_no: i32, _val: *const XmlDoc, _nr: i32) {}
 
 pub(crate) fn desret_xml_char_encoding(_val: XmlCharEncoding) {}
-
-pub(crate) fn gen_xml_char_encoding_handler_ptr(_no: i32, _nr: i32) -> XmlCharEncodingHandlerPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_char_encoding_handler_ptr(
-    _no: i32,
-    _val: XmlCharEncodingHandlerPtr,
-    _nr: i32,
-) {
-}
 
 pub(crate) unsafe extern "C" fn gen_xml_dict_ptr(no: c_int, _nr: c_int) -> XmlDictPtr {
     if no == 0 {

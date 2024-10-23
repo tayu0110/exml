@@ -3,65 +3,11 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{
-    ffi::{c_char, c_int, c_uchar},
-    ptr::null_mut,
-    sync::atomic::{AtomicPtr, AtomicUsize},
-};
+use std::ffi::{c_char, c_int, c_uchar};
 
 use crate::__xml_raise_error;
 
 use super::xmlerror::XmlParserErrors;
-
-// /*
-//  * xmlCharEncoding:
-//  *
-//  * Predefined values for some standard encodings.
-//  * Libxml does not do beforehand translation on UTF8 and ISOLatinX.
-//  * It also supports ASCII, ISO-8859-1, and UTF16 (LE and BE) by default.
-//  *
-//  * Anything else would have to be translated to UTF8 before being
-//  * given to the parser itself. The BOM for UTF16 and the encoding
-//  * declaration are looked at and a converter is looked for at that
-//  * point. If not found the parser stops here as asked by the XML REC. A
-//  * converter can be registered by the user using xmlRegisterCharEncodingHandler
-//  * but the current form doesn't allow stateful transcoding (a serious
-//  * problem agreed !). If iconv has been found it will be used
-//  * automatically and allow stateful transcoding, the simplest is then
-//  * to be sure to enable iconv and to provide iconv libs for the encoding
-//  * support needed.
-//  *
-//  * Note that the generic "UTF-16" is not a predefined value.  Instead, only
-//  * the specific UTF-16LE and UTF-16BE are present.
-//  */
-// #[repr(C)]
-// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// pub enum XmlCharEncoding {
-//     Error = -1,     /* No char encoding detected */
-//     None = 0,       /* No char encoding detected */
-//     UTF8 = 1,       /* UTF-8 */
-//     UTF16LE = 2,    /* UTF-16 little endian */
-//     UTF16BE = 3,    /* UTF-16 big endian */
-//     UCS4LE = 4,     /* UCS-4 little endian */
-//     UCS4BE = 5,     /* UCS-4 big endian */
-//     EBCDIC = 6,     /* EBCDIC uh! */
-//     UCS4_2143 = 7,  /* UCS-4 unusual ordering */
-//     UCS4_3412 = 8,  /* UCS-4 unusual ordering */
-//     UCS2 = 9,       /* UCS-2 */
-//     ISO8859_1 = 10, /* ISO-8859-1 ISO Latin 1 */
-//     ISO8859_2 = 11, /* ISO-8859-2 ISO Latin 2 */
-//     ISO8859_3 = 12, /* ISO-8859-3 */
-//     ISO8859_4 = 13, /* ISO-8859-4 */
-//     ISO8859_5 = 14, /* ISO-8859-5 */
-//     ISO8859_6 = 15, /* ISO-8859-6 */
-//     ISO8859_7 = 16, /* ISO-8859-7 */
-//     ISO8859_8 = 17, /* ISO-8859-8 */
-//     ISO8859_9 = 18, /* ISO-8859-9 */
-//     ISO2022JP = 19, /* ISO-2022-JP */
-//     ShiftJIS = 20,  /* Shift_JIS */
-//     EUCJP = 21,     /* EUC-JP */
-//     ASCII = 22,     /* pure ASCII */
-// }
 
 /**
  * xmlCharEncodingInputFunc:
@@ -111,23 +57,6 @@ pub type XmlCharEncodingOutputFunc = unsafe extern "C" fn(
     inlen: *mut c_int,
 ) -> c_int;
 
-/*
- * Block defining the handlers for non UTF-8 encodings.
- * If iconv is supported, there are two extra fields.
- */
-pub type XmlCharEncodingHandlerPtr = *mut XmlCharEncodingHandler;
-#[repr(C)]
-pub struct XmlCharEncodingHandler {
-    pub(crate) name: AtomicPtr<c_char>,
-    pub(crate) input: Option<XmlCharEncodingInputFunc>,
-    pub(crate) output: Option<XmlCharEncodingOutputFunc>,
-}
-
-static HANDLERS: AtomicPtr<XmlCharEncodingHandlerPtr> = AtomicPtr::new(null_mut());
-static NB_CHAR_ENCODING_HANDLER: AtomicUsize = AtomicUsize::new(0);
-
-const MAX_ENCODING_HANDLERS: usize = 50;
-
 /**
  * xmlErrEncoding:
  * @error:  the error number
@@ -159,62 +88,4 @@ pub(crate) unsafe extern "C" fn xml_encoding_err(
         msg,
         val
     );
-}
-
-// /**
-//  * xmlEncodingErrMemory:
-//  * @extra:  extra information
-//  *
-//  * Handle an out of memory condition
-//  */
-// unsafe extern "C" fn xml_encoding_err_memory(extra: *const c_char) {
-//     __xml_simple_error(
-//         XmlErrorDomain::XmlFromI18N,
-//         XmlParserErrors::XmlErrNoMemory,
-//         null_mut(),
-//         null(),
-//         extra as _,
-//     );
-// }
-
-/**
- * xmlEncOutputChunk:
- * @handler:  encoding handler
- * @out:  a pointer to an array of bytes to store the result
- * @outlen:  the length of @out
- * @in:  a pointer to an array of input bytes
- * @inlen:  the length of @in
- *
- * Returns 0 if success, or
- *     -1 by lack of space, or
- *     -2 if the transcoding fails (for *in is not valid utf8 string or
- *        the result of transformation can't fit into the encoding we want), or
- *     -3 if there the last byte can't form a single output c_char.
- *     -4 if no output function was found.
- *
- * The value of @inlen after return is the number of octets consumed
- *     as the return value is 0, else unpredictable.
- * The value of @outlen after return is the number of octets produced.
- */
-pub(crate) unsafe extern "C" fn xml_enc_output_chunk(
-    handler: *mut XmlCharEncodingHandler,
-    out: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    let mut ret: c_int;
-
-    if let Some(output) = (*handler).output {
-        ret = output(out, outlen, input, inlen);
-        if ret > 0 {
-            ret = 0;
-        }
-    } else {
-        *outlen = 0;
-        *inlen = 0;
-        ret = -4;
-    }
-
-    ret
 }
