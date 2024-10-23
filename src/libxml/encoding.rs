@@ -573,43 +573,6 @@ unsafe extern "C" fn utf8_to_utf16be(
 }
 
 /**
- * UTF8ToUTF16:
- * @outb:  a pointer to an array of bytes to store the result
- * @outlen:  the length of @outb
- * @in:  a pointer to an array of UTF-8 chars
- * @inlen:  the length of @in
- *
- * Take a block of UTF-8 chars in and try to convert it to an UTF-16
- * block of chars out.
- *
- * Returns the number of bytes written, or -1 if lack of space, or -2
- *     if the transcoding failed.
- */
-unsafe extern "C" fn utf8_to_utf16(
-    outb: *mut c_uchar,
-    outlen: *mut c_int,
-    input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    if input.is_null() {
-        /*
-         * initialization, add the Byte Order Mark for UTF-16LE
-         */
-        if *outlen >= 2 {
-            *outb.add(0) = 0xFF;
-            *outb.add(1) = 0xFE;
-            *outlen = 2;
-            *inlen = 0;
-            return 2;
-        }
-        *outlen = 0;
-        *inlen = 0;
-        return 0;
-    }
-    utf8_to_utf16le(outb, outlen, input, inlen)
-}
-
-/**
  * xmlEncOutputChunk:
  * @handler:  encoding handler
  * @out:  a pointer to an array of bytes to store the result
