@@ -5,7 +5,6 @@
 
 use std::{
     ffi::{c_char, c_int, c_uchar, c_uint, c_ushort},
-    mem::size_of_val,
     ptr::{null, null_mut},
     sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
 };
@@ -14,11 +13,7 @@ use libc::{memcpy, strcmp};
 
 use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simple_error};
 
-use super::{
-    globals::{xml_free, xml_malloc},
-    htmlparser::utf8_to_html,
-    xmlerror::XmlParserErrors,
-};
+use super::{globals::xml_free, htmlparser::utf8_to_html, xmlerror::XmlParserErrors};
 
 /*
  * xmlCharEncoding:
@@ -224,69 +219,6 @@ unsafe extern "C" fn xml_encoding_err_memory(extra: *const c_char) {
         null(),
         extra as _,
     );
-}
-
-/**
- * xmlRegisterCharEncodingHandler:
- * @handler:  the xmlCharEncodingHandlerPtr handler block
- *
- * Register the c_char encoding handler, surprising, isn't it ?
- */
-pub unsafe extern "C" fn xml_register_char_encoding_handler(handler: XmlCharEncodingHandlerPtr) {
-    if handler.is_null() {
-        xml_encoding_err(
-            XmlParserErrors::XmlI18nNoHandler,
-            c"xmlRegisterCharEncodingHandler: NULL handler\n".as_ptr() as _,
-            null_mut(),
-        );
-        return;
-    }
-
-    let mut handlers = HANDLERS.load(Ordering::Acquire);
-    if handlers.is_null() {
-        handlers = xml_malloc(MAX_ENCODING_HANDLERS * size_of_val(&*handlers.add(0))) as _;
-        if handlers.is_null() {
-            xml_encoding_err_memory(c"allocating handler table".as_ptr() as _);
-            // goto free_handler;
-            if !handler.is_null() {
-                if !(*handler).name.load(Ordering::Relaxed).is_null() {
-                    xml_free((*handler).name.load(Ordering::Relaxed) as _);
-                }
-                xml_free(handler as _);
-            }
-            return;
-        }
-    }
-
-    let mut num_handlers = NB_CHAR_ENCODING_HANDLER.load(Ordering::Acquire);
-    if num_handlers >= MAX_ENCODING_HANDLERS {
-        xml_encoding_err(
-            XmlParserErrors::XmlI18nExcessHandler,
-            c"xmlRegisterCharEncodingHandler: Too many handler registered, see %s\n".as_ptr(),
-            c"MAX_ENCODING_HANDLERS".as_ptr() as _,
-        );
-        // goto free_handler;
-        if !handler.is_null() {
-            if !(*handler).name.load(Ordering::Relaxed).is_null() {
-                xml_free((*handler).name.load(Ordering::Relaxed) as _);
-            }
-            xml_free(handler as _);
-        }
-        return;
-    }
-
-    *handlers.add(num_handlers) = handler;
-    num_handlers += 1;
-    NB_CHAR_ENCODING_HANDLER.store(num_handlers, Ordering::Release);
-    HANDLERS.store(handlers, Ordering::Release);
-
-    // free_handler:
-    // if !handler.is_null() {
-    //     if !(*handler).name.is_null() {
-    //         xmlFree((*handler).name as _);
-    //     }
-    //     xmlFree(handler as _);
-    // }
 }
 
 macro_rules! MAKE_HANDLER {
@@ -3013,33 +2945,5 @@ mod tests {
     fn test_xml_new_char_encoding_handler() {
 
         /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_register_char_encoding_handler() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-                let mem_base = xml_mem_blocks();
-                let handler = gen_xml_char_encoding_handler_ptr(n_handler, 0);
-
-                xml_register_char_encoding_handler(handler);
-                des_xml_char_encoding_handler_ptr(n_handler, handler, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlRegisterCharEncodingHandler",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_handler);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlRegisterCharEncodingHandler()"
-            );
-        }
     }
 }
