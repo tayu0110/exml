@@ -106,7 +106,7 @@ use crate::{
             xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_get_input_base, xml_buf_reset_input,
             xml_buf_set_allocation_scheme, xml_buf_set_input_base_cur,
         },
-        enc::{xml_char_enc_input, xml_init_encoding_internal},
+        enc::xml_char_enc_input,
         entities::{
             XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
             XML_ENT_PARSED,
@@ -1801,7 +1801,6 @@ pub unsafe extern "C" fn xml_init_parser() {
         xml_init_globals_internal();
         xml_init_memory_internal();
         __xml_initialize_dict();
-        xml_init_encoding_internal();
         xml_register_default_input_callbacks();
         #[cfg(feature = "output")]
         {

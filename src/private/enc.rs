@@ -4,43 +4,19 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_int, c_uchar, c_ushort},
+    ffi::{c_int, c_uchar},
     fmt::Write,
-    ptr::{addr_of_mut, null},
     str::from_utf8_mut,
-    sync::atomic::Ordering,
 };
 
 use crate::{
     encoding::EncodingError,
     libxml::{
-        encoding::{xml_encoding_err, XmlCharEncodingHandler, XML_LITTLE_ENDIAN},
+        encoding::{xml_encoding_err, XmlCharEncodingHandler},
         xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr},
         xmlerror::XmlParserErrors,
     },
 };
-
-/**
- * xmlInitEncodingInternal:
- *
- * Initialize the c_char encoding support.
- */
-pub(crate) unsafe extern "C" fn xml_init_encoding_internal() {
-    let mut tst: c_ushort = 0x1234;
-    let ptr: *mut c_uchar = addr_of_mut!(tst) as _;
-
-    if *ptr == 0x12 {
-        XML_LITTLE_ENDIAN.store(0, Ordering::Relaxed);
-    } else if *ptr == 0x34 {
-        XML_LITTLE_ENDIAN.store(1, Ordering::Relaxed);
-    } else {
-        xml_encoding_err(
-            XmlParserErrors::XmlErrInternalError,
-            c"Odd problem at endianness detection\n".as_ptr() as _,
-            null(),
-        );
-    }
-}
 
 /**
  * xmlEncInputChunk:
