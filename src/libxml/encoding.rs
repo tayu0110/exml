@@ -15,7 +15,7 @@ use libc::{memcpy, memmove, strcmp};
 use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simple_error};
 
 use super::{
-    globals::{xml_free, xml_malloc, xml_mem_strdup, xml_realloc},
+    globals::{xml_free, xml_malloc},
     htmlparser::utf8_to_html,
     parser::xml_init_parser,
     xmlerror::XmlParserErrors,
@@ -1204,80 +1204,6 @@ pub struct XmlCharEncodingAlias {
 static XML_CHAR_ENCODING_ALIASES: AtomicPtr<XmlCharEncodingAlias> = AtomicPtr::new(null_mut());
 static XML_CHAR_ENCODING_ALIASES_NB: AtomicUsize = AtomicUsize::new(0);
 static XML_CHAR_ENCODING_ALIASES_MAX: AtomicUsize = AtomicUsize::new(0);
-
-/*
- * Interfaces for encoding names and aliases.
- */
-/**
- * xmlAddEncodingAlias:
- * @name:  the encoding name as parsed, in UTF-8 format (ASCII actually)
- * @alias:  the alias name as parsed, in UTF-8 format (ASCII actually)
- *
- * Registers an alias @alias for an encoding named @name. Existing alias
- * will be overwritten.
- *
- * Returns 0 in case of success, -1 in case of error
- */
-pub unsafe extern "C" fn xml_add_encoding_alias(
-    name: *const c_char,
-    alias: *const c_char,
-) -> c_int {
-    let mut upper: [c_char; 100] = [0; 100];
-
-    if name.is_null() || alias.is_null() {
-        return -1;
-    }
-
-    for i in 0..upper.len() - 1 {
-        upper[i] = (*alias.add(i) as c_uchar).to_ascii_uppercase() as c_char;
-        if upper[i] == 0 {
-            break;
-        }
-    }
-    *upper.last_mut().unwrap() = 0;
-
-    let mut aliases = XML_CHAR_ENCODING_ALIASES.load(Ordering::Acquire);
-    let mut num_aliases = XML_CHAR_ENCODING_ALIASES_NB.load(Ordering::Relaxed);
-    let mut max_aliases = XML_CHAR_ENCODING_ALIASES_MAX.load(Ordering::Relaxed);
-    if aliases.is_null() {
-        num_aliases = 0;
-        max_aliases = 20;
-        aliases =
-            xml_malloc(max_aliases * size_of::<XmlCharEncodingAlias>()) as XmlCharEncodingAliasPtr;
-        if aliases.is_null() {
-            return -1;
-        }
-    } else if num_aliases >= max_aliases {
-        max_aliases *= 2;
-        aliases = xml_realloc(
-            aliases as _,
-            max_aliases * size_of::<XmlCharEncodingAlias>(),
-        ) as XmlCharEncodingAliasPtr;
-    }
-    /*
-     * Walk down the list looking for a definition of the alias
-     */
-    for i in 0..num_aliases {
-        if strcmp((*aliases.add(i)).alias as _, upper.as_ptr() as _) == 0 {
-            /*
-             * Replace the definition.
-             */
-            xml_free((*aliases.add(i)).name as _);
-            (*aliases.add(i)).name = xml_mem_strdup(name as _) as _;
-            return 0;
-        }
-    }
-    /*
-     * Add the definition
-     */
-    (*aliases.add(num_aliases)).name = xml_mem_strdup(name as _) as _;
-    (*aliases.add(num_aliases)).alias = xml_mem_strdup(upper.as_ptr() as _) as _;
-    num_aliases += 1;
-    XML_CHAR_ENCODING_ALIASES_MAX.store(max_aliases, Ordering::Release);
-    XML_CHAR_ENCODING_ALIASES_NB.store(num_aliases, Ordering::Release);
-    XML_CHAR_ENCODING_ALIASES.store(aliases, Ordering::Release);
-    0
-}
 
 /**
  * xmlDelEncodingAlias:
@@ -3052,24 +2978,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in isolat1ToUTF8()");
-        }
-    }
-
-    #[test]
-    fn test_xml_add_encoding_alias() {
-        unsafe {
-            for n_name in 0..GEN_NB_CONST_CHAR_PTR {
-                for n_alias in 0..GEN_NB_CONST_CHAR_PTR {
-                    let name = gen_const_char_ptr(n_name, 0);
-                    let alias = gen_const_char_ptr(n_alias, 1);
-
-                    let ret_val = xml_add_encoding_alias(name, alias);
-                    desret_int(ret_val);
-                    des_const_char_ptr(n_name, name, 0);
-                    des_const_char_ptr(n_alias, alias, 1);
-                    reset_last_error();
-                }
-            }
         }
     }
 
