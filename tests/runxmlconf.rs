@@ -55,10 +55,10 @@ const SKIPPED_TESTS: &[*const c_char] = &[
  *									*
  ************************************************************************/
 
-unsafe extern "C" fn check_test_file(filename: *const c_char) -> c_int {
-    match metadata(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
-        Ok(meta) => meta.is_file() as i32,
-        _ => 0,
+fn check_test_file(filename: &str) -> bool {
+    match metadata(filename) {
+        Ok(meta) => meta.is_file(),
+        _ => false,
     }
 }
 
@@ -441,7 +441,11 @@ unsafe extern "C" fn xmlconf_test_item(
             } else {
                 base = xml_node_get_base(doc, cur);
                 filename = compose_dir(base, uri);
-                if check_test_file(filename as *mut c_char) == 0 {
+                if !check_test_file(
+                    CStr::from_ptr(filename as *const c_char)
+                        .to_string_lossy()
+                        .as_ref(),
+                ) {
                     test_log!(
                         logfile,
                         "test {} missing file {} \n",
@@ -816,7 +820,7 @@ unsafe extern "C" fn xmlconf_test_suite(
     ret
 }
 
-unsafe extern "C" fn xmlconf_info() {
+fn xmlconf_info() {
     eprintln!("  you need to fetch and extract the");
     eprintln!("  latest XML Conformance Test Suites");
     eprintln!("  https://www.w3.org/XML/Test/xmlts20130923.tar.gz");
@@ -826,7 +830,7 @@ unsafe extern "C" fn xmlconf_info() {
 unsafe extern "C" fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
     let confxml: &CStr = c"xmlconf/xmlconf.xml";
 
-    if check_test_file(confxml.as_ptr()) == 0 {
+    if !check_test_file(confxml.to_string_lossy().as_ref()) {
         eprintln!("{} is missing ", confxml.to_string_lossy());
         xmlconf_info();
         return -1;
