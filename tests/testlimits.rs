@@ -6,7 +6,7 @@ use std::{
     ffi::{c_char, c_int, c_uint, c_ulong, CStr},
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null_mut},
-    sync::atomic::{AtomicPtr, Ordering},
+    sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -40,24 +40,27 @@ static mut TESTS_QUIET: c_int = 0;
 /* maximum time for one parsing before declaring a timeout */
 const MAX_TIME: u64 = 2; /* seconds */
 
-static mut T0: u64 = 0;
-static mut TIMEOUT: c_int = 0;
+static T0: AtomicU64 = AtomicU64::new(0);
+static TIMEOUT: AtomicBool = AtomicBool::new(false);
 
-unsafe extern "C" fn reset_timout() {
-    TIMEOUT = 0;
-    T0 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+fn reset_timout() {
+    TIMEOUT.store(false, Ordering::Release);
+    T0.store(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        Ordering::Release,
+    );
 }
 
-unsafe extern "C" fn check_time() -> c_int {
+fn check_time() -> c_int {
     let tnow = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    if tnow - T0 > MAX_TIME {
-        TIMEOUT = 1;
+    if tnow - T0.load(Ordering::Acquire) > MAX_TIME {
+        TIMEOUT.store(true, Ordering::Release);
         return 0;
     }
     1
@@ -1221,7 +1224,7 @@ unsafe extern "C" fn reader_test(
     } else {
         res = 0;
     }
-    if TIMEOUT != 0 {
+    if TIMEOUT.load(Ordering::Acquire) {
         res = 1;
     }
     xml_free_text_reader(reader);
