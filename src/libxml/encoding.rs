@@ -1065,22 +1065,6 @@ static mut DEFAULT_HANDLERS: &mut [XmlCharEncodingHandler] = &mut [
     ),
 ];
 
-static XML_UTF16_LEHANDLER: &XmlCharEncodingHandler = unsafe { &DEFAULT_HANDLERS[1] };
-static XML_UTF16_BEHANDLER: &XmlCharEncodingHandler = unsafe { &DEFAULT_HANDLERS[2] };
-
-static NUM_DEFAULT_HANDLERS: usize = unsafe { DEFAULT_HANDLERS.len() };
-
-pub type XmlCharEncodingAliasPtr = *mut XmlCharEncodingAlias;
-#[repr(C)]
-pub struct XmlCharEncodingAlias {
-    name: *const c_char,
-    alias: *const c_char,
-}
-
-static XML_CHAR_ENCODING_ALIASES: AtomicPtr<XmlCharEncodingAlias> = AtomicPtr::new(null_mut());
-static XML_CHAR_ENCODING_ALIASES_NB: AtomicUsize = AtomicUsize::new(0);
-static XML_CHAR_ENCODING_ALIASES_MAX: AtomicUsize = AtomicUsize::new(0);
-
 /**
  * xmlEncOutputChunk:
  * @handler:  encoding handler
