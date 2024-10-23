@@ -6,7 +6,7 @@
 use std::{
     ffi::{c_char, c_int, c_uchar, c_uint, c_ushort},
     ptr::{null, null_mut},
-    sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
+    sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize},
 };
 
 use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simple_error};
@@ -188,139 +188,6 @@ macro_rules! MAKE_HANDLER {
 }
 
 pub(crate) static XML_LITTLE_ENDIAN: AtomicI32 = AtomicI32::new(1);
-
-/**
- * UTF8ToUTF16LE:
- * @outb:  a pointer to an array of bytes to store the result
- * @outlen:  the length of @outb
- * @in:  a pointer to an array of UTF-8 chars
- * @inlen:  the length of @in
- *
- * Take a block of UTF-8 chars in and try to convert it to an UTF-16LE
- * block of chars out.
- *
- * Returns the number of bytes written, or -1 if lack of space, or -2
- *     if the transcoding failed.
- */
-unsafe extern "C" fn utf8_to_utf16le(
-    outb: *mut c_uchar,
-    outlen: *mut c_int,
-    mut input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    let mut out: *mut c_ushort = outb as *mut c_ushort;
-    let mut processed: *const c_uchar = input;
-    let instart: *const c_uchar = input;
-    let outstart: *mut c_ushort = out;
-
-    let mut c: c_uint;
-    let mut d: c_uint;
-    let mut trailing: c_int;
-    let mut tmp: *mut c_uchar;
-    let mut tmp1: c_ushort;
-    let mut tmp2: c_ushort;
-
-    /* UTF16LE encoding has no BOM */
-    if out.is_null() || outlen.is_null() || inlen.is_null() {
-        return -1;
-    }
-    if input.is_null() {
-        *outlen = 0;
-        *inlen = 0;
-        return 0;
-    }
-    let inend: *const c_uchar = input.add(*inlen as usize);
-    let outend: *mut c_ushort = out.add(*outlen as usize / 2);
-    while input < inend {
-        d = *input as _;
-        input = input.add(1);
-        if d < 0x80 {
-            c = d;
-            trailing = 0;
-        } else if d < 0xC0 {
-            /* trailing byte in leading position */
-            *outlen = out.offset_from(outstart) as i32 * 2;
-            *inlen = processed.offset_from(instart) as _;
-            return -2;
-        } else if d < 0xE0 {
-            c = d & 0x1F;
-            trailing = 1;
-        } else if d < 0xF0 {
-            c = d & 0x0F;
-            trailing = 2;
-        } else if d < 0xF8 {
-            c = d & 0x07;
-            trailing = 3;
-        } else {
-            /* no chance for this in UTF-16 */
-            *outlen = out.offset_from(outstart) as i32 * 2;
-            *inlen = processed.offset_from(instart) as _;
-            return -2;
-        }
-
-        if inend.offset_from(input) < trailing as isize {
-            break;
-        }
-
-        while trailing != 0 {
-            if input >= inend || {
-                d = *input as _;
-                input = input.add(1);
-                d & 0xC0 != 0x80
-            } {
-                break;
-            }
-            c <<= 6;
-            c |= d & 0x3F;
-            trailing -= 1;
-        }
-
-        /* assertion: c is a single UTF-4 value */
-        if c < 0x10000 {
-            if out >= outend {
-                break;
-            }
-            if XML_LITTLE_ENDIAN.load(Ordering::Relaxed) != 0 {
-                *out = c as _;
-                out = out.add(1);
-            } else {
-                tmp = out as *mut c_uchar;
-                *tmp = c as c_uchar; /* Explicit truncation */
-                *tmp.add(1) = (c >> 8) as u8;
-                out = out.add(1);
-            }
-        } else if c < 0x110000 {
-            if out.add(1) >= outend {
-                break;
-            }
-            c -= 0x10000;
-            if XML_LITTLE_ENDIAN.load(Ordering::Relaxed) != 0 {
-                *out = 0xD800 | (c >> 10) as u16;
-                out = out.add(1);
-                *out = 0xDC00 | (c & 0x03FF) as u16;
-                out = out.add(1);
-            } else {
-                tmp1 = 0xD800 | (c >> 10) as u16;
-                tmp = out as *mut c_uchar;
-                *tmp = tmp1 as c_uchar; /* Explicit truncation */
-                *tmp.add(1) = (tmp1 >> 8) as u8;
-                out = out.add(1);
-
-                tmp2 = 0xDC00 | (c & 0x03FF) as u16;
-                tmp = out as *mut c_uchar;
-                *tmp = tmp2 as c_uchar; /* Explicit truncation */
-                *tmp.add(1) = (tmp2 >> 8) as u8;
-                out = out.add(1);
-            }
-        } else {
-            break;
-        }
-        processed = input;
-    }
-    *outlen = out.offset_from(outstart) as i32 * 2;
-    *inlen = processed.offset_from(instart) as _;
-    *outlen
-}
 
 /**
  * xmlEncOutputChunk:
