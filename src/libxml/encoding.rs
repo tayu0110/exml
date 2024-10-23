@@ -9,7 +9,7 @@ use std::{
     sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
 };
 
-use libc::{memcpy, strcmp};
+use libc::memcpy;
 
 use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simple_error};
 
@@ -1123,44 +1123,44 @@ static XML_CHAR_ENCODING_ALIASES: AtomicPtr<XmlCharEncodingAlias> = AtomicPtr::n
 static XML_CHAR_ENCODING_ALIASES_NB: AtomicUsize = AtomicUsize::new(0);
 static XML_CHAR_ENCODING_ALIASES_MAX: AtomicUsize = AtomicUsize::new(0);
 
-/**
- * xmlGetEncodingAlias:
- * @alias:  the alias name as parsed, in UTF-8 format (ASCII actually)
- *
- * Lookup an encoding name for the given alias.
- *
- * Returns NULL if not found, otherwise the original name
- */
-pub unsafe extern "C" fn xml_get_encoding_alias(alias: *const c_char) -> *const c_char {
-    let mut upper: [c_char; 100] = [0; 100];
+// /**
+//  * xmlGetEncodingAlias:
+//  * @alias:  the alias name as parsed, in UTF-8 format (ASCII actually)
+//  *
+//  * Lookup an encoding name for the given alias.
+//  *
+//  * Returns NULL if not found, otherwise the original name
+//  */
+// pub unsafe extern "C" fn xml_get_encoding_alias(alias: *const c_char) -> *const c_char {
+//     let mut upper: [c_char; 100] = [0; 100];
 
-    if alias.is_null() {
-        return null();
-    }
+//     if alias.is_null() {
+//         return null();
+//     }
 
-    let aliases = XML_CHAR_ENCODING_ALIASES.load(Ordering::Acquire);
-    if aliases.is_null() {
-        return null();
-    }
+//     let aliases = XML_CHAR_ENCODING_ALIASES.load(Ordering::Acquire);
+//     if aliases.is_null() {
+//         return null();
+//     }
 
-    for i in 0..upper.len() - 1 {
-        upper[i] = (*alias.add(i) as c_uchar).to_ascii_uppercase() as c_char;
-        if upper[i] == 0 {
-            break;
-        }
-    }
-    *upper.last_mut().unwrap() = 0;
+//     for i in 0..upper.len() - 1 {
+//         upper[i] = (*alias.add(i) as c_uchar).to_ascii_uppercase() as c_char;
+//         if upper[i] == 0 {
+//             break;
+//         }
+//     }
+//     *upper.last_mut().unwrap() = 0;
 
-    /*
-     * Walk down the list looking for a definition of the alias
-     */
-    for i in 0..XML_CHAR_ENCODING_ALIASES_NB.load(Ordering::Acquire) {
-        if strcmp((*aliases.add(i)).alias as _, upper.as_ptr() as _) == 0 {
-            return (*aliases.add(i)).name;
-        }
-    }
-    null()
-}
+//     /*
+//      * Walk down the list looking for a definition of the alias
+//      */
+//     for i in 0..XML_CHAR_ENCODING_ALIASES_NB.load(Ordering::Acquire) {
+//         if strcmp((*aliases.add(i)).alias as _, upper.as_ptr() as _) == 0 {
+//             return (*aliases.add(i)).name;
+//         }
+//     }
+//     null()
+// }
 
 /**
  * xmlCleanupEncodingAliases:
@@ -2736,35 +2736,6 @@ mod tests {
                     "{leaks} Leaks are found in xmlCleanupEncodingAliases()"
                 );
             }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_encoding_alias() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_alias in 0..GEN_NB_CONST_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let alias = gen_const_char_ptr(n_alias, 0);
-
-                let ret_val = xml_get_encoding_alias(alias);
-                desret_const_char_ptr(ret_val);
-                des_const_char_ptr(n_alias, alias, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlGetEncodingAlias",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_alias);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlGetEncodingAlias()"
-            );
         }
     }
 
