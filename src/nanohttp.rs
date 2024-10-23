@@ -27,6 +27,7 @@ const XML_NANO_HTTP_CHUNK: usize = 4096;
 const XML_NANO_HTTP_WRITE: usize = 1;
 const XML_NANO_HTTP_READ: usize = 2;
 
+#[derive(Debug)]
 pub struct XmlNanoHTTPCtxt {
     protocol: Option<Cow<'static, str>>, /* the protocol name */
     hostname: Option<Cow<'static, str>>, /* the host name */
@@ -535,7 +536,7 @@ fn xml_nanohttp_read_line(ctxt: &mut XmlNanoHTTPCtxt) -> Option<Vec<u8>> {
 
     while bp < buf.len() {
         if ctxt.inrptr == ctxt.inptr {
-            match xml_nanohttp_recv(&mut *ctxt) {
+            match xml_nanohttp_recv(ctxt) {
                 Ok(0) => {
                     if bp == 0 {
                         return None;
@@ -546,8 +547,8 @@ fn xml_nanohttp_read_line(ctxt: &mut XmlNanoHTTPCtxt) -> Option<Vec<u8>> {
                 _ => {}
             }
         }
-        buf[bp] = ctxt.input[ctxt.inptr];
-        ctxt.inptr += 1;
+        buf[bp] = ctxt.input[ctxt.inrptr];
+        ctxt.inrptr += 1;
         if buf[bp] == b'\n' {
             return Some(buf[..bp].to_vec());
         }
@@ -837,9 +838,9 @@ pub fn xml_nanohttp_method_redir(
                 continue 'retry;
             }
 
-            break;
+            return Err(io::Error::new(ErrorKind::NotFound, "Too many redirects"));
         }
-        return Err(io::Error::new(ErrorKind::NotFound, "Not found"));
+        break;
     }
 
     *content_type = ctxt.content_type.clone();
