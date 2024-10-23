@@ -23,7 +23,7 @@ use std::{
 
 use const_format::concatcp;
 use exml::{
-    encoding::XmlCharEncoding,
+    encoding::{add_encoding_alias, XmlCharEncoding},
     error::generic_error_default,
     generic_error,
     globals::{set_tree_indent_string, GenericError, GenericErrorContext},
@@ -31,7 +31,6 @@ use exml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
-        encoding::xml_add_encoding_alias,
         entities::{xml_encode_entities_reentrant, XmlEntityPtr},
         globals::{
             xml_deregister_node_default, xml_free, xml_load_ext_dtd_default_value,
@@ -3941,7 +3940,7 @@ fn main() {
                 /*
                  * OK it's for testing purposes
                  */
-                xml_add_encoding_alias(c"UTF-8".as_ptr(), c"DVEnc".as_ptr());
+                add_encoding_alias("UTF-8", "DVEnc");
             } else if arg == "-noblanks" || arg == "--noblanks" {
                 NOBLANKS = 1;
             } else if arg == "-format" || arg == "--format" {

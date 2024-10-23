@@ -5,12 +5,12 @@
 
 use std::{
     ffi::{c_char, c_int, c_uchar, c_uint, c_ushort},
-    mem::{size_of, size_of_val},
+    mem::size_of_val,
     ptr::{null, null_mut},
     sync::atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
 };
 
-use libc::{memcpy, memmove, strcmp};
+use libc::{memcpy, strcmp};
 
 use crate::{__xml_raise_error, error::XmlErrorDomain, private::error::__xml_simple_error};
 
@@ -1204,44 +1204,6 @@ pub struct XmlCharEncodingAlias {
 static XML_CHAR_ENCODING_ALIASES: AtomicPtr<XmlCharEncodingAlias> = AtomicPtr::new(null_mut());
 static XML_CHAR_ENCODING_ALIASES_NB: AtomicUsize = AtomicUsize::new(0);
 static XML_CHAR_ENCODING_ALIASES_MAX: AtomicUsize = AtomicUsize::new(0);
-
-/**
- * xmlDelEncodingAlias:
- * @alias:  the alias name as parsed, in UTF-8 format (ASCII actually)
- *
- * Unregisters an encoding alias @alias
- *
- * Returns 0 in case of success, -1 in case of error
- */
-pub unsafe extern "C" fn xml_del_encoding_alias(alias: *const c_char) -> c_int {
-    if alias.is_null() {
-        return -1;
-    }
-
-    let aliases = XML_CHAR_ENCODING_ALIASES.load(Ordering::Acquire);
-    if aliases.is_null() {
-        return -1;
-    }
-    /*
-     * Walk down the list looking for a definition of the alias
-     */
-    let mut num_aliases = XML_CHAR_ENCODING_ALIASES_NB.load(Ordering::Acquire);
-    for i in 0..XML_CHAR_ENCODING_ALIASES_NB.load(Ordering::Relaxed) {
-        if strcmp((*aliases.add(i)).alias, alias) == 0 {
-            xml_free((*aliases.add(i)).name as _);
-            xml_free((*aliases.add(i)).alias as _);
-            num_aliases -= 1;
-            XML_CHAR_ENCODING_ALIASES_NB.store(num_aliases, Ordering::Release);
-            memmove(
-                aliases.add(i) as _,
-                aliases.add(i + 1) as _,
-                size_of::<XmlCharEncodingAlias>() * (num_aliases - i),
-            );
-            return 0;
-        }
-    }
-    -1
-}
 
 /**
  * xmlGetEncodingAlias:
@@ -3029,35 +2991,6 @@ mod tests {
                     "{leaks} Leaks are found in xmlCleanupEncodingAliases()"
                 );
             }
-        }
-    }
-
-    #[test]
-    fn test_xml_del_encoding_alias() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_alias in 0..GEN_NB_CONST_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let alias = gen_const_char_ptr(n_alias, 0);
-
-                let ret_val = xml_del_encoding_alias(alias);
-                desret_int(ret_val);
-                des_const_char_ptr(n_alias, alias, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlDelEncodingAlias",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_alias);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlDelEncodingAlias()"
-            );
         }
     }
 
