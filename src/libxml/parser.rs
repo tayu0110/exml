@@ -31,7 +31,6 @@ use crate::{
             __xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_create, xml_dict_free,
             xml_dict_lookup, xml_dict_reference, xml_dict_set_limit, XmlDictPtr,
         },
-        encoding::xml_cleanup_char_encoding_handlers,
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_handler, xml_default_sax_locator,
@@ -1847,7 +1846,6 @@ pub unsafe extern "C" fn xml_cleanup_parser() {
         return;
     }
 
-    xml_cleanup_char_encoding_handlers();
     #[cfg(feature = "catalog")]
     {
         xml_catalog_cleanup();
