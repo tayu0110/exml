@@ -15,6 +15,7 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
+    str::from_utf8_mut,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
@@ -31,7 +32,10 @@ use libc::{
 use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
-    encoding::{find_encoding_handler, get_encoding_handler, XmlCharEncodingHandler},
+    encoding::{
+        find_encoding_handler, get_encoding_handler, xml_encoding_err, EncodingError,
+        XmlCharEncodingHandler,
+    },
     error::{XmlErrorDomain, XmlErrorLevel},
     globals::{GenericError, StructuredError, GLOBAL_STATE},
     libxml::{
@@ -40,11 +44,7 @@ use crate::{
         parser_internals::{xml_free_input_stream, xml_switch_input_encoding},
         xmlstring::{xml_strdup, xml_strstr},
     },
-    private::{
-        enc::{xml_char_enc_input, xml_char_enc_output},
-        error::__xml_simple_error,
-        parser::__xml_err_encoding,
-    },
+    private::{enc::xml_char_enc_output, error::__xml_simple_error, parser::__xml_err_encoding},
     xml_str_printf,
 };
 
@@ -173,6 +173,98 @@ pub struct XmlParserInputBuffer {
     pub(crate) compressed: c_int,  /* -1=unknown, 0=not compressed, 1=compressed */
     pub(crate) error: c_int,
     pub(crate) rawconsumed: c_ulong, /* amount consumed from raw */
+}
+
+impl XmlParserInputBuffer {
+    /// Generic front-end for the encoding handler on parser input.  
+    /// If you try to flush all the raw buffer, set `flush` to `true`.
+    ///
+    /// If successfully encoded, return the number of written bytes.
+    /// If not, return the following `EncodingError`.
+    /// - general error (`EncodingError::Other`)
+    /// - encoding failure (`EncodingError::Malformed`)
+    pub(crate) fn decode(&mut self, flush: bool) -> Result<usize, EncodingError> {
+        if self.encoder.is_none() || self.buffer.is_none() || self.raw.is_none() {
+            return Err(EncodingError::Other {
+                msg: "Encoder or Buffer is not set.".into(),
+            });
+        }
+        let mut out = self.buffer.expect("Internal Error");
+        let mut bufin = self.raw.expect("Internal Error");
+
+        let mut toconv = bufin.len();
+        if toconv == 0 {
+            return Ok(0);
+        }
+        if !flush {
+            toconv = toconv.min(64 * 1024);
+        }
+        let mut written = out.avail();
+        if toconv * 2 >= written {
+            if out.grow(toconv * 2).is_err() {
+                return Err(EncodingError::Other {
+                    msg: "Failed to grow output buffer.".into(),
+                });
+            }
+            written = out.avail();
+        }
+        if !flush {
+            written = written.min(128 * 1024);
+        }
+
+        let c_in = toconv;
+        let c_out = written;
+        let src = &bufin.as_ref()[..c_in];
+        let mut outstr = vec![0; c_out];
+        let dst = from_utf8_mut(&mut outstr).unwrap();
+        let ret = match self.encoder.as_mut().unwrap().decode(src, dst) {
+            Ok((read, write)) => {
+                bufin.trim_head(read);
+                out.push_bytes(&outstr[..write]);
+                // no-op
+                Ok(0)
+            }
+            Err(EncodingError::BufferTooShort) => {
+                // no-op
+                Ok(0)
+            }
+            Err(
+                e @ EncodingError::Malformed {
+                    read,
+                    write,
+                    length,
+                    offset,
+                },
+            ) => {
+                bufin.trim_head(read - length - offset);
+                out.push_bytes(&outstr[..write]);
+                let content = bufin.as_ref();
+                let buf = format!(
+                    "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
+                    content.first().unwrap_or(&0),
+                    content.get(1).unwrap_or(&0),
+                    content.get(2).unwrap_or(&0),
+                    content.get(3).unwrap_or(&0)
+                );
+
+                unsafe {
+                    xml_encoding_err(
+                        XmlParserErrors::XmlI18nConvFailed,
+                        format!("input conversion failed due to input error, bytes {buf}\n")
+                            .as_str(),
+                        &buf,
+                    );
+                }
+                Err(e)
+            }
+            _ => Ok(0),
+        };
+        if c_out != 0 {
+            Ok(c_out)
+        } else {
+            ret
+        }
+    }
 }
 
 pub type XmlOutputBufferPtr = *mut XmlOutputBuffer;
@@ -930,7 +1022,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
          * convert as much as possible to the parser reading buffer.
          */
         let using: size_t = buf.map_or(0, |buf| buf.len());
-        let Ok(written) = xml_char_enc_input(&mut *input, true) else {
+        let Ok(written) = (*input).decode(true) else {
             xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
@@ -992,7 +1084,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
          * convert as much as possible to the parser reading buffer.
          */
         let using: size_t = (*input).raw.map_or(0, |raw| raw.len());
-        let Ok(written) = xml_char_enc_input(&mut *input, true) else {
+        let Ok(written) = (*input).decode(true) else {
             xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;

@@ -59,7 +59,6 @@ use crate::{
     },
     private::{
         buf::{xml_buf_get_input_base, xml_buf_reset_input, xml_buf_set_input_base_cur},
-        enc::xml_char_enc_input,
         parser::{xml_parser_grow, XML_VCTXT_USE_PCTXT},
     },
     IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH, IS_COMBINING,
@@ -7182,7 +7181,7 @@ unsafe extern "C" fn html_check_encoding_direct(
              */
             let processed: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
             (*(*(*ctxt).input).buf).buffer.unwrap().trim_head(processed);
-            let res = xml_char_enc_input(&mut *(*(*ctxt).input).buf, true);
+            let res = (*(*(*ctxt).input).buf).decode(true);
             xml_buf_reset_input(
                 (*(*(*ctxt).input).buf).buffer.unwrap().as_ptr(),
                 (*ctxt).input,
@@ -11763,7 +11762,7 @@ pub unsafe extern "C" fn html_parse_chunk(
                 xml_buf_get_input_base((*input).buffer.unwrap().as_ptr(), (*ctxt).input);
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-            let res = xml_char_enc_input(&mut *input, terminate != 0);
+            let res = (*input).decode(terminate != 0);
             xml_buf_set_input_base_cur(
                 (*input).buffer.map_or(null_mut(), |ptr| ptr.as_ptr()),
                 (*ctxt).input,

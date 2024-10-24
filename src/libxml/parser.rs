@@ -106,7 +106,6 @@ use crate::{
             xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_get_input_base, xml_buf_reset_input,
             xml_buf_set_allocation_scheme, xml_buf_set_input_base_cur,
         },
-        enc::xml_char_enc_input,
         entities::{
             XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
             XML_ENT_PARSED,
@@ -10527,7 +10526,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
                 xml_buf_get_input_base((*input).buffer.unwrap().as_ptr(), (*ctxt).input);
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-            let res = xml_char_enc_input(&mut *input, terminate != 0);
+            let res = (*input).decode(terminate != 0);
             xml_buf_set_input_base_cur(
                 (*input).buffer.unwrap().as_ptr(),
                 (*ctxt).input,

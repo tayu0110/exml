@@ -3,107 +3,10 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::str::from_utf8_mut;
-
 use crate::{
     encoding::{xml_encoding_err, EncodingError},
-    libxml::{
-        xml_io::{XmlOutputBuffer, XmlParserInputBuffer},
-        xmlerror::XmlParserErrors,
-    },
+    libxml::{xml_io::XmlOutputBuffer, xmlerror::XmlParserErrors},
 };
-
-/// Generic front-end for the encoding handler on parser input.  
-/// If you try to flush all the raw buffer, set `flush` to `true`.
-///
-/// If successfully encoded, return the number of written bytes.
-/// If not, return the following `EncodingError`.
-/// - general error (`EncodingError::Other`)
-/// - encoding failure (`EncodingError::Malformed`)
-pub(crate) fn xml_char_enc_input(
-    input: &mut XmlParserInputBuffer,
-    flush: bool,
-) -> Result<usize, EncodingError> {
-    if input.encoder.is_none() || input.buffer.is_none() || input.raw.is_none() {
-        return Err(EncodingError::Other {
-            msg: "Encoder or Buffer is not set.".into(),
-        });
-    }
-    let mut out = input.buffer.expect("Internal Error");
-    let mut bufin = input.raw.expect("Internal Error");
-
-    let mut toconv = bufin.len();
-    if toconv == 0 {
-        return Ok(0);
-    }
-    if !flush {
-        toconv = toconv.min(64 * 1024);
-    }
-    let mut written = out.avail();
-    if toconv * 2 >= written {
-        if out.grow(toconv * 2).is_err() {
-            return Err(EncodingError::Other {
-                msg: "Failed to grow output buffer.".into(),
-            });
-        }
-        written = out.avail();
-    }
-    if !flush {
-        written = written.min(128 * 1024);
-    }
-
-    let c_in = toconv;
-    let c_out = written;
-    let src = &bufin.as_ref()[..c_in];
-    let mut outstr = vec![0; c_out];
-    let dst = from_utf8_mut(&mut outstr).unwrap();
-    let ret = match input.encoder.as_mut().unwrap().decode(src, dst) {
-        Ok((read, write)) => {
-            bufin.trim_head(read);
-            out.push_bytes(&outstr[..write]);
-            // no-op
-            Ok(0)
-        }
-        Err(EncodingError::BufferTooShort) => {
-            // no-op
-            Ok(0)
-        }
-        Err(
-            e @ EncodingError::Malformed {
-                read,
-                write,
-                length,
-                offset,
-            },
-        ) => {
-            bufin.trim_head(read - length - offset);
-            out.push_bytes(&outstr[..write]);
-            let content = bufin.as_ref();
-            let buf = format!(
-                "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
-                content.first().unwrap_or(&0),
-                content.get(1).unwrap_or(&0),
-                content.get(2).unwrap_or(&0),
-                content.get(3).unwrap_or(&0)
-            );
-
-            unsafe {
-                xml_encoding_err(
-                    XmlParserErrors::XmlI18nConvFailed,
-                    format!("input conversion failed due to input error, bytes {buf}\n").as_str(),
-                    &buf,
-                );
-            }
-            Err(e)
-        }
-        _ => Ok(0),
-    };
-    if c_out != 0 {
-        Ok(c_out)
-    } else {
-        ret
-    }
-}
 
 /**
  * xmlCharEncOutput:

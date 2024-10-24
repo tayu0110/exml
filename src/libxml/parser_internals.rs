@@ -44,7 +44,6 @@ use crate::libxml::xmlerror::XmlParserErrors;
 use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
 
 use crate::private::buf::xml_buf_reset_input;
-use crate::private::enc::xml_char_enc_input;
 use crate::private::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
@@ -1267,7 +1266,7 @@ pub(crate) unsafe fn xml_switch_input_encoding(
          * It's probably even possible to remove this whole if-block
          * completely.
          */
-        let res = xml_char_enc_input(&mut *input_buf, true);
+        let res = (*input_buf).decode(true);
         xml_buf_reset_input(
             (*input_buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
             input,
