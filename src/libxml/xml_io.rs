@@ -1954,6 +1954,8 @@ pub unsafe extern "C" fn xml_output_buffer_write(
     mut len: c_int,
     mut buf: *const c_char,
 ) -> c_int {
+    use crate::encoding::EncodingError;
+
     let mut nbchars: c_int; /* number of chars to output to I/O */
     let mut ret: c_int; /* return from function call */
     let mut written: c_int = 0; /* number of c_char written to I/O so far */
@@ -2003,16 +2005,19 @@ pub unsafe extern "C" fn xml_output_buffer_write(
             /*
              * convert as much as possible to the parser reading buffer.
              */
-            ret = xml_char_enc_output(&mut *out, false);
-            if ret < 0 && ret != -3 {
-                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                (*out).error = XmlParserErrors::XmlIoEncoder as i32;
-                return -1;
-            }
+            let res = match xml_char_enc_output(&mut *out, false) {
+                Ok(len) => Ok(len),
+                Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
+                _ => {
+                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                    (*out).error = XmlParserErrors::XmlIoEncoder as i32;
+                    return -1;
+                }
+            };
             if (*out).writecallback.is_some() {
                 nbchars = (*out).conv.map_or(0, |buf| buf.len() as i32);
             } else {
-                nbchars = if ret >= 0 { ret } else { 0 };
+                nbchars = if let Ok(len) = res { len as i32 } else { 0 };
             }
         } else {
             if buf.is_null()
@@ -2232,6 +2237,8 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
     mut str: *const XmlChar,
     escaping: Option<XmlCharEncodingOutputFunc>,
 ) -> c_int {
+    use crate::encoding::EncodingError;
+
     let mut nbchars: c_int; /* number of chars to output to I/O */
     let mut ret: c_int; /* return from function call */
     let mut written: c_int = 0; /* number of c_char written to I/O so far */
@@ -2313,16 +2320,19 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
             /*
              * convert as much as possible to the output buffer.
              */
-            ret = xml_char_enc_output(&mut *out, false);
-            if ret < 0 && ret != -3 {
-                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                (*out).error = XmlParserErrors::XmlIoEncoder as i32;
-                return -1;
-            }
+            let ret = match xml_char_enc_output(&mut *out, false) {
+                Ok(len) => Ok(len),
+                Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
+                _ => {
+                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                    (*out).error = XmlParserErrors::XmlIoEncoder as i32;
+                    return -1;
+                }
+            };
             if (*out).writecallback.is_some() {
                 nbchars = (*out).conv.map_or(0, |conv| conv.len() as i32);
             } else {
-                nbchars = if ret >= 0 { ret } else { 0 };
+                nbchars = if let Ok(len) = ret { len as i32 } else { 0 };
             }
         } else {
             ret = escaping(
@@ -2431,7 +2441,6 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_int {
-    let mut nbchars: c_int;
     let mut ret: c_int = 0;
 
     if out.is_null() || (*out).error != 0 {
@@ -2445,12 +2454,11 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
          * convert as much as possible to the parser output buffer.
          */
         while {
-            nbchars = xml_char_enc_output(&mut *out, false);
-            if nbchars < 0 {
+            let Ok(nbchars) = xml_char_enc_output(&mut *out, false) else {
                 xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 (*out).error = XmlParserErrors::XmlIoEncoder as i32;
                 return -1;
-            }
+            };
 
             nbchars != 0
         } {}

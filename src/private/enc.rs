@@ -3,7 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{ffi::c_int, str::from_utf8_mut};
+use std::str::from_utf8_mut;
 
 use crate::{
     encoding::{xml_encoding_err, EncodingError},
@@ -13,19 +13,8 @@ use crate::{
     },
 };
 
-/**
- * xmlCharEncInput:
- * @input: a parser input buffer
- * @flush: try to flush all the raw buffer
- *
- * Generic front-end for the encoding handler on parser input
- *
- * Returns the number of byte written if success, or
- *     -1 general error
- *     -2 if the transcoding fails (for *in is not valid utf8 string or
- *        the result of transformation can't fit into the encoding we want), or
- */
-/// Generic front-end for the encoding handler on parser input
+/// Generic front-end for the encoding handler on parser input.  
+/// If you try to flush all the raw buffer, set `flush` to `true`.
 ///
 /// If successfully encoded, return the number of written bytes.
 /// If not, return the following `EncodingError`.
@@ -133,24 +122,38 @@ pub(crate) fn xml_char_enc_input(
  *     -2 if the transcoding fails (for *in is not valid utf8 string or
  *        the result of transformation can't fit into the encoding we want), or
  */
+/// Generic front-end for the encoding handler on parser input.  
+///
+/// On the first call, `init` should be set to `true`.  
+/// This is utilized in stateless encoding schemes.
+///
+/// If successfully encoded, return the number of written bytes.
+/// If not, return the following `EncodingError`.
+/// - general error (`EncodingError::Other`)
+/// - buffer too short (`EncodingError::BufferTooShort`)
+/// - encoding failure (`EncodingError::Unmappable`)
 #[cfg(feature = "output")]
-pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i32 {
+pub(crate) fn xml_char_enc_output(
+    output: &mut XmlOutputBuffer,
+    init: bool,
+) -> Result<usize, EncodingError> {
     use std::str::from_utf8;
 
     use crate::encoding::floor_char_boundary;
 
-    let ret: c_int;
     let mut writtentot: usize = 0;
 
     if output.encoder.is_none() || output.buffer.is_none() || output.conv.is_none() {
-        return -1;
+        return Err(EncodingError::Other {
+            msg: "Encoder or Buffer is not set.".into(),
+        });
     }
     let mut out = output.conv.unwrap();
     let mut bufin = output.buffer.unwrap();
     let mut encoder = output.encoder.as_mut().unwrap().borrow_mut();
 
     // retry:
-    loop {
+    let ret = loop {
         let mut written = out.avail();
 
         /*
@@ -163,7 +166,7 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i
             return match encoder.encode("", &mut dst) {
                 Ok((_, write)) => {
                     out.push_bytes(&dst[..write]);
-                    write as i32
+                    Ok(write)
                 }
                 Err(EncodingError::Unmappable {
                     read: _,
@@ -171,9 +174,9 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i
                     c: _,
                 }) => {
                     out.push_bytes(&dst[..write]);
-                    write as i32
+                    Ok(write)
                 }
-                _ => 0,
+                _ => Ok(0),
             };
         }
 
@@ -182,7 +185,7 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i
          */
         let mut toconv = bufin.len();
         if toconv == 0 {
-            return writtentot as i32;
+            return Ok(writtentot);
         }
         toconv = toconv.min(64 * 1024);
         if toconv * 4 >= written {
@@ -196,15 +199,13 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i
         let mut dst = vec![0; c_out];
         match encoder.encode(from_utf8(&bufin.as_ref()[..c_in]).unwrap(), &mut dst) {
             Ok((read, write)) => {
-                ret = 0;
                 bufin.trim_head(read);
                 out.push_bytes(&dst[..write]);
                 writtentot += write;
-                break;
+                break Ok(0);
             }
-            Err(EncodingError::BufferTooShort) => {
-                ret = -3;
-                break;
+            Err(e @ EncodingError::BufferTooShort) => {
+                break Err(e);
             }
             Err(EncodingError::Unmappable { read, write, c }) => {
                 // `ret` should be set -2, but it is overwritten in next loop.
@@ -228,15 +229,6 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i
                         writtentot += write;
                     }
                     e => {
-                        ret = match e {
-                            Ok(_) => 0,
-                            Err(EncodingError::Unmappable {
-                                read: _,
-                                write: _,
-                                c: _,
-                            }) => -2,
-                            Err(_) => -1,
-                        };
                         let content = bufin.as_ref();
                         let msg = format!(
                             "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
@@ -257,24 +249,23 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i
                             );
                         }
                         out.push_bytes(b" ");
-                        break;
+                        break e.map(|_| 0);
                     }
                 }
                 // goto retry;
             }
-            Err(EncodingError::Other { msg: _ }) => {
-                ret = -1;
+            Err(e @ EncodingError::Other { msg: _ }) => {
                 // unreachable!(msg);
-                break;
+                break Err(e);
             }
             _ => {
                 // ret = -1;
                 unreachable!()
             }
         }
-    }
+    };
     if writtentot != 0 {
-        writtentot as i32
+        Ok(writtentot)
     } else {
         ret
     }
