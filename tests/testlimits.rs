@@ -3,7 +3,7 @@
 
 use std::{
     env::args,
-    ffi::{c_char, c_int, c_uint, c_ulong, CStr},
+    ffi::CStr,
     os::raw::c_void,
     ptr::{addr_of, null_mut},
     sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering},
@@ -32,10 +32,10 @@ use exml::{
         xmlstring::XmlChar,
     },
 };
-use libc::{memcpy, size_t, strcmp, strlen, strncmp};
+use libc::{memcpy, strcmp, strlen, strncmp};
 
-static mut VERBOSE: c_int = 0;
-static mut TESTS_QUIET: c_int = 0;
+static mut VERBOSE: i32 = 0;
+static mut TESTS_QUIET: i32 = 0;
 
 /* maximum time for one parsing before declaring a timeout */
 const MAX_TIME: u64 = 2; /* seconds */
@@ -54,7 +54,7 @@ fn reset_timout() {
     );
 }
 
-fn check_time() -> c_int {
+fn check_time() -> i32 {
     let tnow = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -68,11 +68,11 @@ fn check_time() -> c_int {
 
 /*
  * Huge documents are built using fixed start and end chunks
- * and filling between the two an unconventional amount of c_char data
+ * and filling between the two an unconventional amount of char data
  */
 
 struct HugeTest<'a> {
-    _description: &'a CStr,
+    _description: &'a str,
     name: &'a CStr,
     start: &'a CStr,
     end: &'a CStr,
@@ -80,35 +80,35 @@ struct HugeTest<'a> {
 
 static HUGE_TESTS: &[HugeTest] = &[
     HugeTest {
-        _description: c"Huge text node",
+        _description: "Huge text node",
         name: c"huge:textNode",
         start: c"<foo>",
         end: c"</foo>",
     },
     HugeTest {
-        _description: c"Huge attribute node",
+        _description: "Huge attribute node",
         name: c"huge:attrNode",
         start: c"<foo bar='",
         end: c"'/>",
     },
     HugeTest {
-        _description: c"Huge comment node",
+        _description: "Huge comment node",
         name: c"huge:commentNode",
         start: c"<foo><!--",
         end: c"--></foo>",
     },
     HugeTest {
-        _description: c"Huge PI node",
+        _description: "Huge PI node",
         name: c"huge:piNode",
         start: c"<foo><?bar ",
         end: c"?></foo>",
     },
 ];
 
-static mut CURRENT: AtomicPtr<c_char> = AtomicPtr::new(null_mut());
+static mut CURRENT: AtomicPtr<i8> = AtomicPtr::new(null_mut());
 static mut RLEN: usize = 0;
 static mut CURRENT_TEST: usize = 0;
-static mut INSTATE: c_int = 0;
+static mut INSTATE: i32 = 0;
 
 /**
  * hugeMatch:
@@ -118,7 +118,7 @@ static mut INSTATE: c_int = 0;
  *
  * Returns 1 if yes and 0 if another Input module should be used
  */
-unsafe extern "C" fn huge_match(uri: *const c_char) -> c_int {
+unsafe extern "C" fn huge_match(uri: *const i8) -> i32 {
     if !uri.is_null() && strncmp(uri, c"huge:".as_ptr(), 5) == 0 {
         return 1;
     }
@@ -134,7 +134,7 @@ unsafe extern "C" fn huge_match(uri: *const c_char) -> c_int {
  *
  * Returns an Input context or NULL in case or error
  */
-unsafe extern "C" fn huge_open(uri: *const c_char) -> *mut c_void {
+unsafe extern "C" fn huge_open(uri: *const i8) -> *mut c_void {
     if uri.is_null() || strncmp(uri, c"huge:".as_ptr(), 5) != 0 {
         return null_mut();
     }
@@ -164,7 +164,7 @@ unsafe extern "C" fn huge_open(uri: *const c_char) -> *mut c_void {
  *
  * Returns 0 or -1 in case of error
  */
-unsafe extern "C" fn huge_close(context: *mut c_void) -> c_int {
+unsafe extern "C" fn huge_close(context: *mut c_void) -> i32 {
     if context.is_null() {
         return -1;
     }
@@ -174,7 +174,7 @@ unsafe extern "C" fn huge_close(context: *mut c_void) -> c_int {
 
 const CHUNK: usize = 4096;
 
-static mut FILLING: [c_char; CHUNK + 1] = [0; CHUNK + 1];
+static mut FILLING: [i8; CHUNK + 1] = [0; CHUNK + 1];
 
 unsafe extern "C" fn fill_filling() {
     for f in FILLING.iter_mut().take(CHUNK) {
@@ -183,9 +183,9 @@ unsafe extern "C" fn fill_filling() {
     FILLING[CHUNK] = 0;
 }
 
-static mut MAXLEN: size_t = 64 * 1024 * 1024;
-static mut CURLEN: size_t = 0;
-static mut DOTLEN: size_t = 0;
+static mut MAXLEN: usize = 64 * 1024 * 1024;
+static mut CURLEN: usize = 0;
+static mut DOTLEN: usize = 0;
 
 /**
  * hugeRead:
@@ -197,7 +197,7 @@ static mut DOTLEN: size_t = 0;
  *
  * Returns the number of bytes read or -1 in case of error
  */
-unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut c_char, mut len: c_int) -> c_int {
+unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
     if context.is_null() || buffer.is_null() || len < 0 {
         return -1;
     }
@@ -288,7 +288,7 @@ const CRAZY: &CStr = c"<?xml version='1.0' encoding='UTF-8'?><?tst ?><!-- tst --
  *
  * Returns 1 if yes and 0 if another Input module should be used
  */
-unsafe extern "C" fn crazy_match(uri: *const c_char) -> c_int {
+unsafe extern "C" fn crazy_match(uri: *const i8) -> i32 {
     if !uri.is_null() && strncmp(uri, c"crazy:".as_ptr(), 6) == 0 {
         return 1;
     }
@@ -304,7 +304,7 @@ unsafe extern "C" fn crazy_match(uri: *const c_char) -> c_int {
  *
  * Returns an Input context or NULL in case or error
  */
-unsafe extern "C" fn crazy_open(uri: *const c_char) -> *mut c_void {
+unsafe extern "C" fn crazy_open(uri: *const i8) -> *mut c_void {
     if uri.is_null() || strncmp(uri, c"crazy:".as_ptr(), 6) != 0 {
         return null_mut();
     }
@@ -327,7 +327,7 @@ unsafe extern "C" fn crazy_open(uri: *const c_char) -> *mut c_void {
  *
  * Returns 0 or -1 in case of error
  */
-unsafe extern "C" fn crazy_close(context: *mut c_void) -> c_int {
+unsafe extern "C" fn crazy_close(context: *mut c_void) -> i32 {
     if context.is_null() {
         return -1;
     }
@@ -344,11 +344,7 @@ unsafe extern "C" fn crazy_close(context: *mut c_void) -> c_int {
  *
  * Returns the number of bytes read or -1 in case of error
  */
-unsafe extern "C" fn crazy_read(
-    context: *mut c_void,
-    buffer: *mut c_char,
-    mut len: c_int,
-) -> c_int {
+unsafe extern "C" fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
     if context.is_null() || buffer.is_null() || len < 0 {
         return -1;
     }
@@ -409,10 +405,10 @@ unsafe extern "C" fn crazy_read(
  *									*
  ************************************************************************/
 
-static mut NB_TESTS: c_int = 0;
-static mut NB_ERRORS: c_int = 0;
-static mut NB_LEAKS: c_int = 0;
-static mut EXTRA_MEMORY_FROM_RESOLVER: c_int = 0;
+static mut NB_TESTS: i32 = 0;
+static mut NB_ERRORS: i32 = 0;
+static mut NB_LEAKS: i32 = 0;
+static mut EXTRA_MEMORY_FROM_RESOLVER: i32 = 0;
 
 /*
  * We need to trap calls to the resolver to not account memory for the catalog
@@ -420,11 +416,11 @@ static mut EXTRA_MEMORY_FROM_RESOLVER: c_int = 0;
  * network downloads modifying tests.
  */
 unsafe extern "C" fn test_external_entity_loader(
-    url: *const c_char,
-    id: *const c_char,
+    url: *const i8,
+    id: *const i8,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    let memused: c_int = xml_mem_used();
+    let memused: i32 = xml_mem_used();
 
     let ret: XmlParserInputPtr = xml_no_net_external_entity_loader(url, id, ctxt);
     EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
@@ -632,7 +628,7 @@ unsafe extern "C" fn initialize_libxml2() {
  *									*
  ************************************************************************/
 
-static mut CALLBACKS: c_ulong = 0;
+static CALLBACKS: AtomicU64 = AtomicU64::new(0);
 
 /**
  * isStandaloneCallback:
@@ -642,8 +638,8 @@ static mut CALLBACKS: c_ulong = 0;
  *
  * Returns 1 if true
  */
-unsafe fn is_standalone_callback(_ctx: Option<GenericErrorContext>) -> c_int {
-    CALLBACKS += 1;
+fn is_standalone_callback(_ctx: Option<GenericErrorContext>) -> i32 {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     0
 }
 
@@ -655,8 +651,8 @@ unsafe fn is_standalone_callback(_ctx: Option<GenericErrorContext>) -> c_int {
  *
  * Returns 1 if true
  */
-unsafe fn has_internal_subset_callback(_ctx: Option<GenericErrorContext>) -> c_int {
-    CALLBACKS += 1;
+fn has_internal_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     0
 }
 
@@ -668,8 +664,8 @@ unsafe fn has_internal_subset_callback(_ctx: Option<GenericErrorContext>) -> c_i
  *
  * Returns 1 if true
  */
-unsafe fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> c_int {
-    CALLBACKS += 1;
+fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     0
 }
 
@@ -679,13 +675,13 @@ unsafe fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> c_i
  *
  * Does this document has an internal subset
  */
-unsafe fn internal_subset_callback(
+fn internal_subset_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
     _external_id: *const XmlChar,
     _system_id: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -694,13 +690,13 @@ unsafe fn internal_subset_callback(
  *
  * Does this document has an external subset
  */
-unsafe fn external_subset_callback(
+fn external_subset_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
     _external_id: *const XmlChar,
     _system_id: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -717,12 +713,12 @@ unsafe fn external_subset_callback(
  *
  * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
  */
-unsafe fn resolve_entity_callback(
+fn resolve_entity_callback(
     _ctx: Option<GenericErrorContext>,
     _public_id: *const XmlChar,
     _system_id: *const XmlChar,
 ) -> XmlParserInputPtr {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     null_mut()
 }
 
@@ -735,11 +731,8 @@ unsafe fn resolve_entity_callback(
  *
  * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
  */
-unsafe fn get_entity_callback(
-    _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-) -> XmlEntityPtr {
-    CALLBACKS += 1;
+fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) -> XmlEntityPtr {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     null_mut()
 }
 
@@ -752,11 +745,11 @@ unsafe fn get_entity_callback(
  *
  * Returns the xmlParserInputPtr
  */
-unsafe fn get_parameter_entity_callback(
+fn get_parameter_entity_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
 ) -> XmlEntityPtr {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     null_mut()
 }
 
@@ -771,15 +764,15 @@ unsafe fn get_parameter_entity_callback(
  *
  * An entity definition has been parsed
  */
-unsafe fn entity_decl_callback(
+fn entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
-    _typ: c_int,
+    _typ: i32,
     _public_id: *const XmlChar,
     _system_id: *const XmlChar,
     _content: *mut XmlChar,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -790,16 +783,16 @@ unsafe fn entity_decl_callback(
  *
  * An attribute definition has been parsed
  */
-unsafe fn attribute_decl_callback(
+fn attribute_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _elem: *const XmlChar,
     _name: *const XmlChar,
-    _typ: c_int,
-    _def: c_int,
+    _typ: i32,
+    _def: i32,
     _default_value: *const XmlChar,
     _tree: XmlEnumerationPtr,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -811,13 +804,13 @@ unsafe fn attribute_decl_callback(
  *
  * An element definition has been parsed
  */
-unsafe fn element_decl_callback(
+fn element_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
-    _typ: c_int,
+    _typ: i32,
     _content: XmlElementContentPtr,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -829,13 +822,13 @@ unsafe fn element_decl_callback(
  *
  * What to do when a notation declaration has been parsed.
  */
-unsafe fn notation_decl_callback(
+fn notation_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
     _public_id: *const XmlChar,
     _system_id: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -848,14 +841,14 @@ unsafe fn notation_decl_callback(
  *
  * What to do when an unparsed entity declaration is parsed
  */
-unsafe fn unparsed_entity_decl_callback(
+fn unparsed_entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
     _public_id: *const XmlChar,
     _system_id: *const XmlChar,
     _notation_name: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -866,8 +859,8 @@ unsafe fn unparsed_entity_decl_callback(
  * Receive the document locator at startup, actually xmlDefaultSAXLocator
  * Everything is available on the context, so this is useless in our case.
  */
-unsafe fn set_document_locator_callback(_ctx: Option<GenericErrorContext>, _loc: XmlSaxlocatorPtr) {
-    CALLBACKS += 1;
+fn set_document_locator_callback(_ctx: Option<GenericErrorContext>, _loc: XmlSaxlocatorPtr) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -876,8 +869,8 @@ unsafe fn set_document_locator_callback(_ctx: Option<GenericErrorContext>, _loc:
  *
  * called when the document start being processed.
  */
-unsafe fn start_document_callback(_ctx: Option<GenericErrorContext>) {
-    CALLBACKS += 1;
+fn start_document_callback(_ctx: Option<GenericErrorContext>) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -886,8 +879,8 @@ unsafe fn start_document_callback(_ctx: Option<GenericErrorContext>) {
  *
  * called when the document end has been detected.
  */
-unsafe fn end_document_callback(_ctx: Option<GenericErrorContext>) {
-    CALLBACKS += 1;
+fn end_document_callback(_ctx: Option<GenericErrorContext>) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -899,8 +892,8 @@ unsafe fn end_document_callback(_ctx: Option<GenericErrorContext>) {
  * receiving some chars from the parser.
  * Question: how much at a time ???
  */
-unsafe fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: *const XmlChar, _len: c_int) {
-    CALLBACKS += 1;
+fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: *const XmlChar, _len: i32) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -910,26 +903,26 @@ unsafe fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: *const Xml
  *
  * called when an entity reference is detected.
  */
-unsafe fn reference_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
-    CALLBACKS += 1;
+fn reference_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
  * ignorableWhitespaceCallback:
  * @ctxt:  An XML parser context
  * @ch:  a xmlChar string
- * @start: the first c_char in the string
+ * @start: the first char in the string
  * @len: the number of xmlChar
  *
  * receiving some ignorable whitespaces from the parser.
  * Question: how much at a time ???
  */
-unsafe fn ignorable_whitespace_callback(
+fn ignorable_whitespace_callback(
     _ctx: Option<GenericErrorContext>,
     _ch: *const XmlChar,
-    _len: c_int,
+    _len: i32,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -941,12 +934,12 @@ unsafe fn ignorable_whitespace_callback(
  *
  * A processing instruction has been parsed.
  */
-unsafe fn processing_instruction_callback(
+fn processing_instruction_callback(
     _ctx: Option<GenericErrorContext>,
     _target: *const XmlChar,
     _data: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -957,12 +950,8 @@ unsafe fn processing_instruction_callback(
  *
  * called when a pcdata block has been parsed
  */
-unsafe fn cdata_block_callback(
-    _ctx: Option<GenericErrorContext>,
-    _value: *const XmlChar,
-    _len: c_int,
-) {
-    CALLBACKS += 1;
+fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar, _len: i32) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -972,8 +961,8 @@ unsafe fn cdata_block_callback(
  *
  * A comment has been parsed.
  */
-unsafe fn comment_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar) {
-    CALLBACKS += 1;
+fn comment_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -986,9 +975,7 @@ unsafe fn comment_callback(_ctx: Option<GenericErrorContext>, _value: *const Xml
  * extra parameters.
  */
 fn warning_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
-    unsafe {
-        CALLBACKS += 1;
-    }
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -1001,9 +988,7 @@ fn warning_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
  * extra parameters.
  */
 fn error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
-    unsafe {
-        CALLBACKS += 1;
-    }
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -1029,18 +1014,18 @@ fn fatal_error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {}
  * called when an opening tag has been processed.
  */
 #[allow(clippy::too_many_arguments)]
-unsafe fn start_element_ns_callback(
+fn start_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
     _localname: *const XmlChar,
     _prefix: *const XmlChar,
     _uri: *const XmlChar,
-    _nb_namespaces: c_int,
+    _nb_namespaces: i32,
     _namespaces: *mut *const XmlChar,
-    _nb_attributes: c_int,
-    _nb_defaulted: c_int,
+    _nb_attributes: i32,
+    _nb_defaulted: i32,
     _attributes: *mut *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 /**
@@ -1050,13 +1035,13 @@ unsafe fn start_element_ns_callback(
  *
  * called when the end of an element has been detected.
  */
-unsafe fn end_element_ns_callback(
+fn end_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
     _localname: *const XmlChar,
     _prefix: *const XmlChar,
     _uri: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
 static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
@@ -1105,13 +1090,8 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
  *
  * Returns 0 in case of success, an error code otherwise
  */
-unsafe extern "C" fn sax_test(
-    filename: *const c_char,
-    limit: size_t,
-    options: c_int,
-    fail: c_int,
-) -> c_int {
-    let res: c_int;
+unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
+    let res: i32;
 
     NB_TESTS += 1;
 
@@ -1165,16 +1145,16 @@ unsafe extern "C" fn sax_test(
  */
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn reader_test(
-    filename: *const c_char,
-    limit: size_t,
-    options: c_int,
-    fail: c_int,
-) -> c_int {
+    filename: *const i8,
+    limit: usize,
+    options: i32,
+    fail: i32,
+) -> i32 {
     use exml::libxml::xmlreader::{
         xml_free_text_reader, xml_reader_for_file, xml_text_reader_read, XmlTextReaderPtr,
     };
 
-    let mut res: c_int;
+    let mut res: i32;
 
     NB_TESTS += 1;
 
@@ -1238,18 +1218,14 @@ unsafe extern "C" fn reader_test(
  *									*
  ************************************************************************/
 
-type Functest = unsafe extern "C" fn(
-    filename: *const c_char,
-    limit: size_t,
-    options: c_int,
-    fail: c_int,
-) -> c_int;
+type Functest =
+    unsafe extern "C" fn(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32;
 
 struct LimitDesc<'a> {
-    name: &'a str,  /* the huge generator name */
-    limit: size_t,  /* the limit to test */
-    options: c_int, /* extra parser options */
-    fail: c_int,    /* whether the test should fail */
+    name: &'a str, /* the huge generator name */
+    limit: usize,  /* the limit to test */
+    options: i32,  /* extra parser options */
+    fail: i32,     /* whether the test should fail */
 }
 
 static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
@@ -1355,10 +1331,10 @@ static TEST_DESCRIPTIONS: &[TestDesc] = &[
 ];
 
 struct TestException {
-    test: c_uint,  /* the parser test number */
-    limit: c_uint, /* the limit test number */
-    fail: c_int,   /* new fail value or -1*/
-    size: size_t,  /* new limit value or 0 */
+    test: u32,   /* the parser test number */
+    limit: u32,  /* the limit test number */
+    fail: i32,   /* new fail value or -1*/
+    size: usize, /* new limit value or 0 */
 }
 
 static TEST_EXCEPTIONS: &[TestException] = &[
@@ -1371,11 +1347,11 @@ static TEST_EXCEPTIONS: &[TestException] = &[
     },
 ];
 
-unsafe extern "C" fn launch_tests(tst: &TestDesc, test: c_uint) -> c_int {
-    let mut res: c_int;
-    let mut err: c_int = 0;
-    let mut limit: size_t;
-    let mut fail: c_int;
+unsafe extern "C" fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
+    let mut res: i32;
+    let mut err: i32 = 0;
+    let mut limit: usize;
+    let mut fail: i32;
 
     for (i, descr) in LIMIT_DESCRIPTIONS.iter().enumerate() {
         limit = descr.limit;
@@ -1403,17 +1379,17 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc, test: c_uint) -> c_int {
     err
 }
 
-unsafe extern "C" fn runtest(i: c_uint) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn runtest(i: u32) -> i32 {
+    let mut ret: i32 = 0;
 
-    let old_errors: c_int = NB_ERRORS;
-    let old_tests: c_int = NB_TESTS;
-    let old_leaks: c_int = NB_LEAKS;
+    let old_errors: i32 = NB_ERRORS;
+    let old_tests: i32 = NB_TESTS;
+    let old_leaks: i32 = NB_LEAKS;
     if TESTS_QUIET == 0 && TEST_DESCRIPTIONS[i as usize].desc.is_some() {
         println!("## {}", TEST_DESCRIPTIONS[i as usize].desc.unwrap());
     }
     let tmp = TEST_DESCRIPTIONS[i as usize];
-    let res: c_int = launch_tests(&tmp, i);
+    let res: i32 = launch_tests(&tmp, i);
     if res != 0 {
         ret += 1;
     }
@@ -1432,8 +1408,8 @@ unsafe extern "C" fn runtest(i: c_uint) -> c_int {
     ret
 }
 
-unsafe extern "C" fn launch_crazy_sax(test: c_uint, fail: c_int) -> c_int {
-    let mut err: c_int = 0;
+unsafe extern "C" fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
+    let mut err: i32 = 0;
 
     CRAZY_INDX = test as _;
 
@@ -1455,8 +1431,8 @@ unsafe extern "C" fn launch_crazy_sax(test: c_uint, fail: c_int) -> c_int {
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn launch_crazy(test: c_uint, fail: c_int) -> c_int {
-    let mut err: c_int = 0;
+unsafe extern "C" fn launch_crazy(test: u32, fail: i32) -> i32 {
+    let mut err: i32 = 0;
 
     CRAZY_INDX = test as _;
 
@@ -1477,7 +1453,7 @@ unsafe extern "C" fn launch_crazy(test: c_uint, fail: c_int) -> c_int {
     err
 }
 
-unsafe extern "C" fn get_crazy_fail(test: c_int) -> c_int {
+unsafe extern "C" fn get_crazy_fail(test: i32) -> i32 {
     /*
      * adding 1000000 of character 'a' leads to parser failure mostly
      * everywhere except in those special spots. Need to be updated
@@ -1501,13 +1477,13 @@ unsafe extern "C" fn get_crazy_fail(test: c_int) -> c_int {
         (237..=242).contains(&test)/* Comment in Misc */) as i32
 }
 
-unsafe extern "C" fn runcrazy() -> c_int {
-    let mut ret: c_int = 0;
-    let mut res: c_int = 0;
+unsafe extern "C" fn runcrazy() -> i32 {
+    let mut ret: i32 = 0;
+    let mut res: i32 = 0;
 
-    let old_errors: c_int = NB_ERRORS;
-    let old_tests: c_int = NB_TESTS;
-    let old_leaks: c_int = NB_LEAKS;
+    let old_errors: i32 = NB_ERRORS;
+    let old_tests: i32 = NB_TESTS;
+    let old_leaks: i32 = NB_LEAKS;
 
     #[cfg(feature = "libxml_reader")]
     {
@@ -1551,8 +1527,8 @@ unsafe extern "C" fn runcrazy() -> c_int {
 
 #[test]
 fn main() {
-    let ret: c_int;
-    let mut subset: c_int = 0;
+    let ret: i32;
+    let mut subset: i32 = 0;
 
     unsafe {
         fill_filling();
