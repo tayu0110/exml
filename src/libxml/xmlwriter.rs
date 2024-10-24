@@ -49,7 +49,7 @@ use crate::{
         xmlerror::XmlParserErrors,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
-    private::{enc::xml_char_enc_output, save::xml_buf_attr_serialize_txt_content},
+    private::save::xml_buf_attr_serialize_txt_content,
 };
 
 /*
@@ -949,7 +949,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
         if (*(*writer).out).conv.is_none() {
             (*(*writer).out).conv = XmlBufRef::with_capacity(4000);
         }
-        xml_char_enc_output(&mut *(*writer).out, true);
+        (*(*writer).out).encode(true);
         if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_null() {
             let name =
                 CString::new((*(*writer).out).encoder.as_ref().unwrap().borrow().name()).unwrap();

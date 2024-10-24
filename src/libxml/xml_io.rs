@@ -15,7 +15,7 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
-    str::from_utf8_mut,
+    str::{from_utf8, from_utf8_mut},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
@@ -33,8 +33,8 @@ use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
     encoding::{
-        find_encoding_handler, get_encoding_handler, xml_encoding_err, EncodingError,
-        XmlCharEncodingHandler,
+        find_encoding_handler, floor_char_boundary, get_encoding_handler, xml_encoding_err,
+        EncodingError, XmlCharEncodingHandler,
     },
     error::{XmlErrorDomain, XmlErrorLevel},
     globals::{GenericError, StructuredError, GLOBAL_STATE},
@@ -44,7 +44,7 @@ use crate::{
         parser_internals::{xml_free_input_stream, xml_switch_input_encoding},
         xmlstring::{xml_strdup, xml_strstr},
     },
-    private::{enc::xml_char_enc_output, error::__xml_simple_error, parser::__xml_err_encoding},
+    private::{error::__xml_simple_error, parser::__xml_err_encoding},
     xml_str_printf,
 };
 
@@ -281,6 +281,149 @@ pub struct XmlOutputBuffer {
     pub(crate) conv: Option<XmlBufRef>,   /* if encoder != NULL buffer for output */
     pub(crate) written: c_int,            /* total number of byte written */
     pub(crate) error: c_int,
+}
+
+impl XmlOutputBuffer {
+    /// Generic front-end for the encoding handler on parser input.  
+    ///
+    /// On the first call, `init` should be set to `true`.  
+    /// This is utilized in stateless encoding schemes.
+    ///
+    /// If successfully encoded, return the number of written bytes.
+    /// If not, return the following `EncodingError`.
+    /// - general error (`EncodingError::Other`)
+    /// - buffer too short (`EncodingError::BufferTooShort`)
+    /// - encoding failure (`EncodingError::Unmappable`)
+    pub(crate) fn encode(&mut self, init: bool) -> Result<usize, EncodingError> {
+        let mut writtentot: usize = 0;
+
+        if self.encoder.is_none() || self.buffer.is_none() || self.conv.is_none() {
+            return Err(EncodingError::Other {
+                msg: "Encoder or Buffer is not set.".into(),
+            });
+        }
+        let mut out = self.conv.unwrap();
+        let mut bufin = self.buffer.unwrap();
+        let mut encoder = self.encoder.as_mut().unwrap().borrow_mut();
+
+        // retry:
+        let ret = loop {
+            let mut written = out.avail();
+
+            /*
+             * First specific handling of the initialization call
+             */
+            if init {
+                let c_out = written;
+                /* TODO: Check return value. */
+                let mut dst = vec![0; c_out];
+                return match encoder.encode("", &mut dst) {
+                    Ok((_, write)) => {
+                        out.push_bytes(&dst[..write]);
+                        Ok(write)
+                    }
+                    Err(EncodingError::Unmappable {
+                        read: _,
+                        write,
+                        c: _,
+                    }) => {
+                        out.push_bytes(&dst[..write]);
+                        Ok(write)
+                    }
+                    _ => Ok(0),
+                };
+            }
+
+            /*
+             * Conversion itself.
+             */
+            let mut toconv = bufin.len();
+            if toconv == 0 {
+                return Ok(writtentot);
+            }
+            toconv = toconv.min(64 * 1024);
+            if toconv * 4 >= written {
+                out.grow(toconv * 4);
+                written = out.avail();
+            }
+            written = written.min(256 * 1024);
+
+            let c_in = floor_char_boundary(bufin.as_ref(), toconv);
+            let c_out = written;
+            let mut dst = vec![0; c_out];
+            match encoder.encode(from_utf8(&bufin.as_ref()[..c_in]).unwrap(), &mut dst) {
+                Ok((read, write)) => {
+                    bufin.trim_head(read);
+                    out.push_bytes(&dst[..write]);
+                    writtentot += write;
+                    break Ok(0);
+                }
+                Err(e @ EncodingError::BufferTooShort) => {
+                    break Err(e);
+                }
+                Err(EncodingError::Unmappable { read, write, c }) => {
+                    // `ret` should be set -2, but it is overwritten in next loop.
+                    // Therefore, ommit it.
+                    // ret = -2;
+                    bufin.trim_head(read);
+                    out.push_bytes(&dst[..write]);
+                    writtentot += write;
+
+                    let charref = format!("&#{};", c as u32);
+                    let charref_len = charref.len();
+
+                    out.grow(charref_len * 4);
+                    let c_out = out.avail();
+                    let mut dst = vec![0; c_out];
+                    let result = encoder.encode(&charref, &mut dst);
+
+                    match result {
+                        Ok((read, write)) if read == charref_len => {
+                            out.push_bytes(&dst[..write]);
+                            writtentot += write;
+                        }
+                        e => {
+                            let content = bufin.as_ref();
+                            let msg = format!(
+                                "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
+                                content.first().unwrap_or(&0),
+                                content.get(1).unwrap_or(&0),
+                                content.get(2).unwrap_or(&0),
+                                content.get(3).unwrap_or(&0)
+                            );
+
+                            unsafe {
+                                xml_encoding_err(
+                                    XmlParserErrors::XmlI18nConvFailed,
+                                    format!(
+                                        "output conversion failed due to conv error, bytes {msg}\n"
+                                    )
+                                    .as_str(),
+                                    &msg,
+                                );
+                            }
+                            out.push_bytes(b" ");
+                            break e.map(|_| 0);
+                        }
+                    }
+                    // goto retry;
+                }
+                Err(e @ EncodingError::Other { msg: _ }) => {
+                    // unreachable!(msg);
+                    break Err(e);
+                }
+                _ => {
+                    // ret = -1;
+                    unreachable!()
+                }
+            }
+        };
+        if writtentot != 0 {
+            Ok(writtentot)
+        } else {
+            ret
+        }
+    }
 }
 
 pub(crate) const MAX_INPUT_CALLBACK: usize = 15;
@@ -1777,7 +1920,7 @@ pub unsafe fn xml_alloc_output_buffer(
         /*
          * This call is designed to initiate the encoder state
          */
-        xml_char_enc_output(&mut *ret, true);
+        (*ret).encode(true);
     } else {
         (*ret).conv = None;
     }
@@ -2097,7 +2240,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
             /*
              * convert as much as possible to the parser reading buffer.
              */
-            let res = match xml_char_enc_output(&mut *out, false) {
+            let res = match (*out).encode(false) {
                 Ok(len) => Ok(len),
                 Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                 _ => {
@@ -2412,7 +2555,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
             /*
              * convert as much as possible to the output buffer.
              */
-            let ret = match xml_char_enc_output(&mut *out, false) {
+            let ret = match (*out).encode(false) {
                 Ok(len) => Ok(len),
                 Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                 _ => {
@@ -2546,7 +2689,7 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
          * convert as much as possible to the parser output buffer.
          */
         while {
-            let Ok(nbchars) = xml_char_enc_output(&mut *out, false) else {
+            let Ok(nbchars) = (*out).encode(false) else {
                 xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 (*out).error = XmlParserErrors::XmlIoEncoder as i32;
                 return -1;
@@ -2718,7 +2861,7 @@ pub(crate) unsafe fn xml_alloc_output_buffer_internal(
         /*
          * This call is designed to initiate the encoder state
          */
-        xml_char_enc_output(&mut *ret, true);
+        (*ret).encode(true);
     } else {
         (*ret).conv = None;
     }

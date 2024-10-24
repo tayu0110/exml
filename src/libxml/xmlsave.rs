@@ -50,7 +50,7 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strdup, XmlChar},
     },
     private::{
-        buf::xml_buf_set_allocation_scheme, enc::xml_char_enc_output, error::__xml_simple_error,
+        buf::xml_buf_set_allocation_scheme, error::__xml_simple_error,
         save::xml_buf_attr_serialize_txt_content,
     },
     IS_BYTE_CHAR, IS_CHAR,
@@ -476,7 +476,7 @@ unsafe extern "C" fn xml_save_switch_encoding(
         /*
          * initialize the state, e.g. if outputting a BOM
          */
-        xml_char_enc_output(&mut *buf, true);
+        (*buf).encode(true);
     }
     0
 }
