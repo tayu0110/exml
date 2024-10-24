@@ -1177,8 +1177,6 @@ pub(crate) unsafe fn xml_switch_input_encoding(
     input: XmlParserInputPtr,
     handler: crate::encoding::XmlCharEncodingHandler,
 ) -> c_int {
-    let nbchars: c_int;
-
     if input.is_null() {
         return -1;
     }
@@ -1269,12 +1267,12 @@ pub(crate) unsafe fn xml_switch_input_encoding(
          * It's probably even possible to remove this whole if-block
          * completely.
          */
-        nbchars = xml_char_enc_input(&mut *input_buf, true);
+        let res = xml_char_enc_input(&mut *input_buf, true);
         xml_buf_reset_input(
             (*input_buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
             input,
         );
-        if nbchars < 0 {
+        if res.is_err() {
             /* TODO: This could be an out of memory or an encoding error. */
             xml_err_internal(
                 ctxt,

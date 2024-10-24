@@ -930,12 +930,12 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
          * convert as much as possible to the parser reading buffer.
          */
         let using: size_t = buf.map_or(0, |buf| buf.len());
-        res = xml_char_enc_input(&mut *input, true);
-        if res < 0 {
+        let Ok(written) = xml_char_enc_input(&mut *input, true) else {
             xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
-        }
+        };
+        res = written as i32;
         let consumed: size_t = using - buf.map_or(0, |buf| buf.len());
         if consumed as u64 > u64::MAX || (*input).rawconsumed > u64::MAX - consumed as c_ulong {
             (*input).rawconsumed = u64::MAX;
@@ -992,12 +992,12 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
          * convert as much as possible to the parser reading buffer.
          */
         let using: size_t = (*input).raw.map_or(0, |raw| raw.len());
-        nbchars = xml_char_enc_input(&mut *input, true);
-        if nbchars < 0 {
+        let Ok(written) = xml_char_enc_input(&mut *input, true) else {
             xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
-        }
+        };
+        nbchars = written as i32;
         let consumed: size_t = using - (*input).raw.map_or(0, |raw| raw.len());
         if consumed as u64 > u64::MAX || ((*input).rawconsumed > u64::MAX - consumed as c_ulong) {
             (*input).rawconsumed = u64::MAX;

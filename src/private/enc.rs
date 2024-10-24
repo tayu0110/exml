@@ -25,16 +25,27 @@ use crate::{
  *     -2 if the transcoding fails (for *in is not valid utf8 string or
  *        the result of transformation can't fit into the encoding we want), or
  */
-pub(crate) fn xml_char_enc_input(input: &mut XmlParserInputBuffer, flush: bool) -> c_int {
+/// Generic front-end for the encoding handler on parser input
+///
+/// If successfully encoded, return the number of written bytes.
+/// If not, return the following `EncodingError`.
+/// - general error (`EncodingError::Other`)
+/// - encoding failure (`EncodingError::Malformed`)
+pub(crate) fn xml_char_enc_input(
+    input: &mut XmlParserInputBuffer,
+    flush: bool,
+) -> Result<usize, EncodingError> {
     if input.encoder.is_none() || input.buffer.is_none() || input.raw.is_none() {
-        return -1;
+        return Err(EncodingError::Other {
+            msg: "Encoder or Buffer is not set.".into(),
+        });
     }
     let mut out = input.buffer.expect("Internal Error");
     let mut bufin = input.raw.expect("Internal Error");
 
     let mut toconv = bufin.len();
     if toconv == 0 {
-        return 0;
+        return Ok(0);
     }
     if !flush {
         toconv = toconv.min(64 * 1024);
@@ -42,7 +53,9 @@ pub(crate) fn xml_char_enc_input(input: &mut XmlParserInputBuffer, flush: bool) 
     let mut written = out.avail();
     if toconv * 2 >= written {
         if out.grow(toconv * 2).is_err() {
-            return -1;
+            return Err(EncodingError::Other {
+                msg: "Failed to grow output buffer.".into(),
+            });
         }
         written = out.avail();
     }
@@ -60,18 +73,20 @@ pub(crate) fn xml_char_enc_input(input: &mut XmlParserInputBuffer, flush: bool) 
             bufin.trim_head(read);
             out.push_bytes(&outstr[..write]);
             // no-op
-            0
+            Ok(0)
         }
         Err(EncodingError::BufferTooShort) => {
             // no-op
-            0
+            Ok(0)
         }
-        Err(EncodingError::Malformed {
-            read,
-            write,
-            length,
-            offset,
-        }) => {
+        Err(
+            e @ EncodingError::Malformed {
+                read,
+                write,
+                length,
+                offset,
+            },
+        ) => {
             bufin.trim_head(read - length - offset);
             out.push_bytes(&outstr[..write]);
             let content = bufin.as_ref();
@@ -90,12 +105,12 @@ pub(crate) fn xml_char_enc_input(input: &mut XmlParserInputBuffer, flush: bool) 
                     &buf,
                 );
             }
-            -2
+            Err(e)
         }
-        _ => 0,
+        _ => Ok(0),
     };
     if c_out != 0 {
-        c_out as i32
+        Ok(c_out)
     } else {
         ret
     }
