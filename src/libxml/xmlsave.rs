@@ -476,7 +476,7 @@ unsafe extern "C" fn xml_save_switch_encoding(
         /*
          * initialize the state, e.g. if outputting a BOM
          */
-        xml_char_enc_output(&mut *buf, 1);
+        xml_char_enc_output(&mut *buf, true);
     }
     0
 }

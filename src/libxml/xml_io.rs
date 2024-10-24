@@ -930,7 +930,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_grow(
          * convert as much as possible to the parser reading buffer.
          */
         let using: size_t = buf.map_or(0, |buf| buf.len());
-        res = xml_char_enc_input(input, 1);
+        res = xml_char_enc_input(&mut *input, true);
         if res < 0 {
             xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
@@ -992,7 +992,7 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
          * convert as much as possible to the parser reading buffer.
          */
         let using: size_t = (*input).raw.map_or(0, |raw| raw.len());
-        nbchars = xml_char_enc_input(input, 1);
+        nbchars = xml_char_enc_input(&mut *input, true);
         if nbchars < 0 {
             xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
             (*input).error = XmlParserErrors::XmlIoEncoder as i32;
@@ -1685,7 +1685,7 @@ pub unsafe fn xml_alloc_output_buffer(
         /*
          * This call is designed to initiate the encoder state
          */
-        xml_char_enc_output(&mut *ret, 1);
+        xml_char_enc_output(&mut *ret, true);
     } else {
         (*ret).conv = None;
     }
@@ -2003,7 +2003,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
             /*
              * convert as much as possible to the parser reading buffer.
              */
-            ret = xml_char_enc_output(&mut *out, 0);
+            ret = xml_char_enc_output(&mut *out, false);
             if ret < 0 && ret != -3 {
                 xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 (*out).error = XmlParserErrors::XmlIoEncoder as i32;
@@ -2313,7 +2313,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
             /*
              * convert as much as possible to the output buffer.
              */
-            ret = xml_char_enc_output(&mut *out, 0);
+            ret = xml_char_enc_output(&mut *out, false);
             if ret < 0 && ret != -3 {
                 xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 (*out).error = XmlParserErrors::XmlIoEncoder as i32;
@@ -2445,7 +2445,7 @@ pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_i
          * convert as much as possible to the parser output buffer.
          */
         while {
-            nbchars = xml_char_enc_output(&mut *out, 0);
+            nbchars = xml_char_enc_output(&mut *out, false);
             if nbchars < 0 {
                 xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 (*out).error = XmlParserErrors::XmlIoEncoder as i32;
@@ -2618,7 +2618,7 @@ pub(crate) unsafe fn xml_alloc_output_buffer_internal(
         /*
          * This call is designed to initiate the encoder state
          */
-        xml_char_enc_output(&mut *ret, 1);
+        xml_char_enc_output(&mut *ret, true);
     } else {
         (*ret).conv = None;
     }

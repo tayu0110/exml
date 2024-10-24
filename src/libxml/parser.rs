@@ -10527,7 +10527,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
                 xml_buf_get_input_base((*input).buffer.unwrap().as_ptr(), (*ctxt).input);
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-            let nbchars: c_int = xml_char_enc_input(input, terminate);
+            let nbchars: c_int = xml_char_enc_input(&mut *input, terminate != 0);
             xml_buf_set_input_base_cur(
                 (*input).buffer.unwrap().as_ptr(),
                 (*ctxt).input,

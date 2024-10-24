@@ -1269,7 +1269,7 @@ pub(crate) unsafe fn xml_switch_input_encoding(
          * It's probably even possible to remove this whole if-block
          * completely.
          */
-        nbchars = xml_char_enc_input(input_buf, 1);
+        nbchars = xml_char_enc_input(&mut *input_buf, true);
         xml_buf_reset_input(
             (*input_buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
             input,

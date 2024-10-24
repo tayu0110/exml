@@ -949,7 +949,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
         if (*(*writer).out).conv.is_none() {
             (*(*writer).out).conv = XmlBufRef::with_capacity(4000);
         }
-        xml_char_enc_output(&mut *(*writer).out, 1);
+        xml_char_enc_output(&mut *(*writer).out, true);
         if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_null() {
             let name =
                 CString::new((*(*writer).out).encoder.as_ref().unwrap().borrow().name()).unwrap();

@@ -3,13 +3,13 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{ffi::c_int, fmt::Write, str::from_utf8_mut};
+use std::{ffi::c_int, str::from_utf8_mut};
 
 use crate::{
     encoding::EncodingError,
     libxml::{
         encoding::xml_encoding_err,
-        xml_io::{XmlOutputBuffer, XmlParserInputBufferPtr},
+        xml_io::{XmlOutputBuffer, XmlParserInputBuffer},
         xmlerror::XmlParserErrors,
     },
 };
@@ -26,26 +26,19 @@ use crate::{
  *     -2 if the transcoding fails (for *in is not valid utf8 string or
  *        the result of transformation can't fit into the encoding we want), or
  */
-pub(crate) unsafe extern "C" fn xml_char_enc_input(
-    input: XmlParserInputBufferPtr,
-    flush: c_int,
-) -> c_int {
-    if input.is_null()
-        || (*input).encoder.is_none()
-        || (*input).buffer.is_none()
-        || (*input).raw.is_none()
-    {
+pub(crate) fn xml_char_enc_input(input: &mut XmlParserInputBuffer, flush: bool) -> c_int {
+    if input.encoder.is_none() || input.buffer.is_none() || input.raw.is_none() {
         return -1;
     }
-    let mut out = (*input).buffer.expect("Internal Error");
-    let mut bufin = (*input).raw.expect("Internal Error");
+    let mut out = input.buffer.expect("Internal Error");
+    let mut bufin = input.raw.expect("Internal Error");
 
     let mut toconv = bufin.len();
     if toconv == 0 {
         return 0;
     }
-    if toconv > 64 * 1024 && flush == 0 {
-        toconv = 64 * 1024;
+    if !flush {
+        toconv = toconv.min(64 * 1024);
     }
     let mut written = out.avail();
     if toconv * 2 >= written {
@@ -54,8 +47,8 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
         }
         written = out.avail();
     }
-    if written > 128 * 1024 && flush == 0 {
-        written = 128 * 1024;
+    if !flush {
+        written = written.min(128 * 1024);
     }
 
     let c_in = toconv;
@@ -63,7 +56,7 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
     let src = &bufin.as_ref()[..c_in];
     let mut outstr = vec![0; c_out];
     let dst = from_utf8_mut(&mut outstr).unwrap();
-    let ret = match (*input).encoder.as_mut().unwrap().decode(src, dst) {
+    let ret = match input.encoder.as_mut().unwrap().decode(src, dst) {
         Ok((read, write)) => {
             bufin.trim_head(read);
             out.push_bytes(&outstr[..write]);
@@ -83,9 +76,7 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
             bufin.trim_head(read - length - offset);
             out.push_bytes(&outstr[..write]);
             let content = bufin.as_ref();
-            let mut buf = String::new();
-            write!(
-                buf,
+            let buf = format!(
                 "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\0",
                 content.first().unwrap_or(&0),
                 content.get(1).unwrap_or(&0),
@@ -93,11 +84,13 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
                 content.get(3).unwrap_or(&0)
             );
 
-            xml_encoding_err(
-                XmlParserErrors::XmlI18nConvFailed,
-                c"input conversion failed due to input error, bytes %s\n".as_ptr() as _,
-                buf.as_ptr() as _,
-            );
+            unsafe {
+                xml_encoding_err(
+                    XmlParserErrors::XmlI18nConvFailed,
+                    c"input conversion failed due to input error, bytes %s\n".as_ptr() as _,
+                    buf.as_ptr() as _,
+                );
+            }
             -2
         }
         _ => 0,
@@ -127,7 +120,7 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
  *        the result of transformation can't fit into the encoding we want), or
  */
 #[cfg(feature = "output")]
-pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: i32) -> i32 {
+pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i32 {
     use std::str::from_utf8;
 
     use crate::encoding::floor_char_boundary;
@@ -149,7 +142,7 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: i32) -> i3
         /*
          * First specific handling of the initialization call
          */
-        if init != 0 {
+        if init {
             let c_out = written;
             /* TODO: Check return value. */
             let mut dst = vec![0; c_out];
@@ -177,16 +170,12 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: i32) -> i3
         if toconv == 0 {
             return writtentot as i32;
         }
-        if toconv > 64 * 1024 {
-            toconv = 64 * 1024;
-        }
+        toconv = toconv.min(64 * 1024);
         if toconv * 4 >= written {
             out.grow(toconv * 4);
             written = out.avail();
         }
-        if written > 256 * 1024 {
-            written = 256 * 1024;
-        }
+        written = written.min(256 * 1024);
 
         let c_in = floor_char_boundary(bufin.as_ref(), toconv);
         let c_out = written;
