@@ -284,7 +284,7 @@ pub struct XmlOutputBuffer {
 }
 
 impl XmlOutputBuffer {
-    /// Generic front-end for the encoding handler on parser input.  
+    /// Generic front-end for the encoding handler on parser output.  
     ///
     /// On the first call, `init` should be set to `true`.  
     /// This is utilized in stateless encoding schemes.
