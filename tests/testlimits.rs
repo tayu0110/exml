@@ -3,7 +3,7 @@
 
 use std::{
     env::args,
-    ffi::CStr,
+    ffi::{CStr, CString},
     os::raw::c_void,
     ptr::{addr_of, null_mut},
     sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering},
@@ -1370,7 +1370,8 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
                 break;
             }
         }
-        res = tst.func.unwrap()(descr.name.as_ptr() as _, limit, descr.options, fail);
+        let name = CString::new(descr.name).unwrap();
+        res = tst.func.unwrap()(name.as_ptr() as _, limit, descr.options, fail);
         if res != 0 {
             NB_ERRORS += 1;
             err += 1;
