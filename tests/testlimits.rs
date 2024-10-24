@@ -5,7 +5,7 @@ use std::{
     env::args,
     ffi::{c_char, c_int, c_uint, c_ulong, CStr},
     os::raw::c_void,
-    ptr::{addr_of, addr_of_mut, null_mut},
+    ptr::{addr_of, null_mut},
     sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -1331,22 +1331,21 @@ static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
     },
 ];
 
-type TestDescPtr<'a> = *mut TestDesc<'a>;
 #[derive(Debug, Clone, Copy)]
 struct TestDesc<'a> {
-    desc: Option<&'a CStr>, /* description of the test */
+    desc: Option<&'a str>,  /* description of the test */
     func: Option<Functest>, /* function implementing the test */
 }
 
 static TEST_DESCRIPTIONS: &[TestDesc] = &[
     TestDesc {
-        desc: Some(c"Parsing of huge files with the sax parser"),
+        desc: Some("Parsing of huge files with the sax parser"),
         func: Some(sax_test),
     },
     /*    { "Parsing of huge files with the tree parser", treeTest}, */
     #[cfg(feature = "libxml_reader")]
     TestDesc {
-        desc: Some(c"Parsing of huge files with the reader"),
+        desc: Some("Parsing of huge files with the reader"),
         func: Some(reader_test),
     },
     TestDesc {
@@ -1372,15 +1371,11 @@ static TEST_EXCEPTIONS: &[TestException] = &[
     },
 ];
 
-unsafe extern "C" fn launch_tests(tst: TestDescPtr, test: c_uint) -> c_int {
+unsafe extern "C" fn launch_tests(tst: &TestDesc, test: c_uint) -> c_int {
     let mut res: c_int;
     let mut err: c_int = 0;
     let mut limit: size_t;
     let mut fail: c_int;
-
-    if tst.is_null() {
-        return -1;
-    }
 
     for (i, descr) in LIMIT_DESCRIPTIONS.iter().enumerate() {
         limit = descr.limit;
@@ -1399,7 +1394,7 @@ unsafe extern "C" fn launch_tests(tst: TestDescPtr, test: c_uint) -> c_int {
                 break;
             }
         }
-        res = (*tst).func.unwrap()(descr.name.as_ptr() as _, limit, descr.options, fail);
+        res = tst.func.unwrap()(descr.name.as_ptr() as _, limit, descr.options, fail);
         if res != 0 {
             NB_ERRORS += 1;
             err += 1;
@@ -1415,16 +1410,10 @@ unsafe extern "C" fn runtest(i: c_uint) -> c_int {
     let old_tests: c_int = NB_TESTS;
     let old_leaks: c_int = NB_LEAKS;
     if TESTS_QUIET == 0 && TEST_DESCRIPTIONS[i as usize].desc.is_some() {
-        println!(
-            "## {}",
-            TEST_DESCRIPTIONS[i as usize]
-                .desc
-                .unwrap()
-                .to_string_lossy()
-        );
+        println!("## {}", TEST_DESCRIPTIONS[i as usize].desc.unwrap());
     }
-    let mut tmp = TEST_DESCRIPTIONS[i as usize];
-    let res: c_int = launch_tests(addr_of_mut!(tmp), i);
+    let tmp = TEST_DESCRIPTIONS[i as usize];
+    let res: c_int = launch_tests(&tmp, i);
     if res != 0 {
         ret += 1;
     }
