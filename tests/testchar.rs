@@ -5,6 +5,7 @@ use std::{
     ffi::{c_char, c_int, c_uchar},
     io::{stdout, Write},
     ptr::{addr_of_mut, null_mut},
+    sync::RwLock,
 };
 
 use exml::{
@@ -37,13 +38,12 @@ use libc::{memset, strlen};
  * copy: see Copyright for the status of this software.
  */
 
-static mut LAST_ERROR: c_int = 0;
+static LAST_ERROR: RwLock<XmlParserErrors> = RwLock::new(XmlParserErrors::XmlErrOK);
 
 fn error_handler(unused: Option<GenericErrorContext>, err: &XmlError) {
-    unsafe {
-        if unused.is_none() && LAST_ERROR == 0 {
-            LAST_ERROR = err.code() as i32;
-        }
+    let mut last_error = LAST_ERROR.write().unwrap();
+    if unused.is_none() && last_error.is_ok() {
+        *last_error = err.code();
     }
 }
 
@@ -79,28 +79,29 @@ unsafe extern "C" fn test_document_range_byte1(
     forbid2: c_int,
 ) -> c_int {
     for i in 0u8..=0xFF {
-        LAST_ERROR = 0;
+        *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
         xml_ctxt_reset(ctxt);
 
         *data.add(0) = i as c_char;
 
         let res = xml_read_memory(document, len, c"test".as_ptr() as _, null_mut(), 0);
+        let last_error = LAST_ERROR.read().unwrap();
 
         if i as i32 == forbid1 || i as i32 == forbid2 {
             assert!(
-                LAST_ERROR != 0 && res.is_null(),
+                !last_error.is_ok() && res.is_null(),
                 "Failed to detect invalid char for Byte 0x{i:02X}: {}",
                 i as char
             );
         } else if i == b'<' || i == b'&' {
             assert!(
-                LAST_ERROR != 0 && res.is_null(),
+                !last_error.is_ok() && res.is_null(),
                 "Failed to detect illegal char {} for Byte 0x{i:02X}",
                 i as char
             );
         } else if !(0x20..0x80).contains(&i) && i != 0x9 && i != 0xA && i != 0xD {
             assert!(
-                LAST_ERROR == XmlParserErrors::XmlErrInvalidChar as i32 || res.is_null(),
+                *last_error == XmlParserErrors::XmlErrInvalidChar || res.is_null(),
                 "Failed to detect invalid char for Byte 0x{i:02X}"
             );
         } else {
@@ -125,19 +126,20 @@ unsafe extern "C" fn test_document_range_byte2(
 ) -> c_int {
     for i in 0x80..=0xFF {
         for j in 0..=0xFF {
-            LAST_ERROR = 0;
+            *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
             xml_ctxt_reset(ctxt);
 
             *data.add(0) = i as c_char;
             *data.add(1) = j as c_char;
 
             let res = xml_read_memory(document, len, c"test".as_ptr() as _, null_mut(), 0);
+            let last_error = *LAST_ERROR.read().unwrap();
 
             #[allow(clippy::if_same_then_else)]
             /* if first bit of first c_char is set, then second bit must too */
             if i & 0x80 != 0 && i & 0x40 == 0 {
                 assert!(
-                    LAST_ERROR != 0 && res.is_null(),
+                    !last_error.is_ok() && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             }
@@ -147,7 +149,7 @@ unsafe extern "C" fn test_document_range_byte2(
              */
             else if i & 0x80 != 0 && j & 0xC0 != 0x80 {
                 assert!(
-                    LAST_ERROR != 0 && res.is_null(),
+                    !last_error.is_ok() && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             }
@@ -157,7 +159,7 @@ unsafe extern "C" fn test_document_range_byte2(
              */
             else if i & 0x80 != 0 && i & 0x1E == 0 {
                 assert!(
-                    LAST_ERROR != 0 && res.is_null(),
+                    !last_error.is_ok() && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 )
             }
@@ -167,7 +169,7 @@ unsafe extern "C" fn test_document_range_byte2(
              */
             else if i & 0xE0 == 0xE0 {
                 assert!(
-                    LAST_ERROR != 0 && res.is_null(),
+                    !last_error.is_ok() && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             } else {
@@ -175,7 +177,7 @@ unsafe extern "C" fn test_document_range_byte2(
                  * We should see no error in remaining cases
                  */
                 assert!(
-                    LAST_ERROR == 0 && !res.is_null(),
+                    last_error.is_ok() && !res.is_null(),
                     "Failed to parse document for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             }
@@ -381,12 +383,12 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
         (*ctxt).charset = XmlCharEncoding::UTF8;
         (*ctxt).nb_errors = 0;
 
-        LAST_ERROR = 0;
+        *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
         let mut len = 0;
         c = xml_current_char(ctxt, addr_of_mut!(len));
         if i == 0 || i >= 0x80 {
             /* we must see an error there */
-            if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+            if *LAST_ERROR.read().unwrap() != XmlParserErrors::XmlErrInvalidChar {
                 eprintln!("Failed to detect invalid char for Byte 0x{i:02X}");
                 return 1;
             }
@@ -415,14 +417,15 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
             (*ctxt).charset = XmlCharEncoding::UTF8;
             (*ctxt).nb_errors = 0;
 
-            LAST_ERROR = 0;
+            *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
             let mut len = 0;
             let c = xml_current_char(ctxt, addr_of_mut!(len));
+            let last_error = *LAST_ERROR.read().unwrap();
 
             #[allow(clippy::if_same_then_else)]
             /* if first bit of first c_char is set, then second bit must too */
             if i & 0x80 != 0 && i & 0x40 == 0 {
-                if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+                if last_error != XmlParserErrors::XmlErrInvalidChar {
                     eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}");
                     return 1;
                 }
@@ -432,7 +435,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
              * bits must be 10
              */
             else if i & 0x80 != 0 && j & 0xC0 != 0x80 {
-                if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+                if last_error != XmlParserErrors::XmlErrInvalidChar {
                     eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}: {c}");
                     return 1;
                 }
@@ -442,7 +445,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
              * than 0x80, i.e. one of bits 5 to 1 of i must be set
              */
             else if i & 0x80 != 0 && i & 0x1E == 0 {
-                if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+                if last_error != XmlParserErrors::XmlErrInvalidChar {
                     eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}: {c}");
                     return 1;
                 }
@@ -452,7 +455,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
              * at least 3 bytes, but we give only 2 !
              */
             else if i & 0xE0 == 0xE0 {
-                if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+                if last_error != XmlParserErrors::XmlErrInvalidChar {
                     eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x00");
                     return 1;
                 }
@@ -460,7 +463,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
             /*
              * We should see no error in remaining cases
              */
-            else if LAST_ERROR != 0 || len != 2 {
+            else if !last_error.is_ok() || len != 2 {
                 eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X}",);
                 return 1;
             }
@@ -495,9 +498,10 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                 (*ctxt).charset = XmlCharEncoding::UTF8;
                 (*ctxt).nb_errors = 0;
 
-                LAST_ERROR = 0;
+                *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
                 let mut len = 0;
                 let c = xml_current_char(ctxt, addr_of_mut!(len));
+                let last_error = *LAST_ERROR.read().unwrap();
 
                 #[allow(clippy::if_same_then_else)]
                 /*
@@ -505,7 +509,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                  * at least 4 bytes, but we give only 3 !
                  */
                 if i & 0xF0 == 0xF0 {
-                    if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+                    if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!(
                             "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{:02X}",
                             *data.add(3) as i32
@@ -517,7 +521,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                  * The second and the third bytes must start with 10
                  */
                 else if j & 0xC0 != 0x80 || nk & 0xC0 != 0x80 {
-                    if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+                    if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!(
                             "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}"
                         );
@@ -530,7 +534,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                  * the 6th byte of data[1] must be set
                  */
                 else if i & 0xF == 0 && j & 0x20 == 0 {
-                    if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+                    if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!(
                             "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}"
                         );
@@ -543,7 +547,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                 else if ((value > 0xD7FF) && (value < 0xE000))
                     || ((value > 0xFFFD) && (value < 0x10000))
                 {
-                    if LAST_ERROR != XmlParserErrors::XmlErrInvalidChar as i32 {
+                    if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!("Failed to detect invalid char 0x{value:04X} for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}");
                         return 1;
                     }
@@ -552,7 +556,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                      * We should see no error in remaining cases
                      */
                     assert!(
-                        LAST_ERROR == 0 && len == 3,
+                        last_error.is_ok() && len == 3,
                         "Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}",
                     );
                     /*
@@ -589,9 +593,10 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                     (*ctxt).charset = XmlCharEncoding::UTF8;
                     (*ctxt).nb_errors = 0;
 
-                    LAST_ERROR = 0;
+                    *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
                     let mut len = 0;
                     let c = xml_current_char(ctxt, addr_of_mut!(len));
+                    let last_error = *LAST_ERROR.read().unwrap();
 
                     #[allow(clippy::if_same_then_else)]
                     /*
@@ -599,7 +604,7 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                      * at least 5 bytes, but we give only 4 !
                      */
                     if i & 0xF8 == 0xF8 {
-                        assert_eq!(LAST_ERROR, XmlParserErrors::XmlErrInvalidChar as i32,
+                        assert_eq!(last_error, XmlParserErrors::XmlErrInvalidChar,
                             "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{:02X}", *data.add(3)
                         );
                     }
@@ -607,7 +612,7 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                      * The second, third and fourth bytes must start with 10
                      */
                     else if j & 0xC0 != 0x80 || nk & 0xC0 != 0x80 || nl & 0xC0 != 0x80 {
-                        assert_eq!(LAST_ERROR, XmlParserErrors::XmlErrInvalidChar as i32, "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
+                        assert_eq!(last_error, XmlParserErrors::XmlErrInvalidChar, "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
                     }
                     /*
                      * if using a 3 byte encoding then the value must be greater
@@ -615,7 +620,7 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                      * the 6 or 5th byte of j must be set
                      */
                     else if i & 0x7 == 0 && j & 0x30 == 0 {
-                        assert_eq!(LAST_ERROR, XmlParserErrors::XmlErrInvalidChar as i32, "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
+                        assert_eq!(last_error, XmlParserErrors::XmlErrInvalidChar, "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
                     }
                     /*
                      * There are values in that range that are not allowed in XML-1.0
@@ -624,12 +629,12 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                         || (value > 0xFFFD && value < 0x10000)
                         || value > 0x10FFFF
                     {
-                        assert_eq!(LAST_ERROR, XmlParserErrors::XmlErrInvalidChar as i32, "Failed to detect invalid char 0x{value:04X} for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
+                        assert_eq!(last_error, XmlParserErrors::XmlErrInvalidChar, "Failed to detect invalid char 0x{value:04X} for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
                     }
                     /*
                      * We should see no error in remaining cases
                      */
-                    else if LAST_ERROR != 0 || len != 4 {
+                    else if !last_error.is_ok() || len != 4 {
                         eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}");
                         return 1;
                     }
