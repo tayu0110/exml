@@ -9,7 +9,7 @@ use crate::{
     encoding::EncodingError,
     libxml::{
         encoding::xml_encoding_err,
-        xml_io::{XmlOutputBufferPtr, XmlParserInputBufferPtr},
+        xml_io::{XmlOutputBuffer, XmlParserInputBufferPtr},
         xmlerror::XmlParserErrors,
     },
 };
@@ -127,10 +127,7 @@ pub(crate) unsafe extern "C" fn xml_char_enc_input(
  *        the result of transformation can't fit into the encoding we want), or
  */
 #[cfg(feature = "output")]
-pub(crate) unsafe extern "C" fn xml_char_enc_output(
-    output: XmlOutputBufferPtr,
-    init: c_int,
-) -> c_int {
+pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: i32) -> i32 {
     use std::str::from_utf8;
 
     use crate::encoding::floor_char_boundary;
@@ -138,16 +135,12 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
     let ret: c_int;
     let mut writtentot: usize = 0;
 
-    if output.is_null()
-        || (*output).encoder.is_none()
-        || (*output).buffer.is_none()
-        || (*output).conv.is_none()
-    {
+    if output.encoder.is_none() || output.buffer.is_none() || output.conv.is_none() {
         return -1;
     }
-    let mut out = (*output).conv.unwrap();
-    let mut bufin = (*output).buffer.unwrap();
-    let mut encoder = (*output).encoder.as_mut().unwrap().borrow_mut();
+    let mut out = output.conv.unwrap();
+    let mut bufin = output.buffer.unwrap();
+    let mut encoder = output.encoder.as_mut().unwrap().borrow_mut();
 
     // retry:
     loop {
@@ -218,8 +211,7 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
                 out.push_bytes(&dst[..write]);
                 writtentot += write;
 
-                let mut charref = String::new();
-                write!(charref, "&#{};", c as u32);
+                let charref = format!("&#{};", c as u32);
                 let charref_len = charref.len();
 
                 out.grow(charref_len * 4);
@@ -243,22 +235,22 @@ pub(crate) unsafe extern "C" fn xml_char_enc_output(
                             Err(_) => -1,
                         };
                         let content = bufin.as_ref();
-                        let mut msg = String::new();
-                        write!(
-                            msg,
+                        let msg = format!(
                             "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\0",
                             content.first().unwrap_or(&0),
                             content.get(1).unwrap_or(&0),
                             content.get(2).unwrap_or(&0),
                             content.get(3).unwrap_or(&0)
-                        )
-                        .ok();
-
-                        xml_encoding_err(
-                            XmlParserErrors::XmlI18nConvFailed,
-                            c"output conversion failed due to conv error, bytes %s\n".as_ptr() as _,
-                            msg.as_ptr() as _,
                         );
+
+                        unsafe {
+                            xml_encoding_err(
+                                XmlParserErrors::XmlI18nConvFailed,
+                                c"output conversion failed due to conv error, bytes %s\n".as_ptr()
+                                    as _,
+                                msg.as_ptr() as _,
+                            );
+                        }
                         out.push_bytes(b" ");
                         break;
                     }
