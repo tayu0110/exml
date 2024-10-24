@@ -6,9 +6,8 @@
 use std::{ffi::c_int, str::from_utf8_mut};
 
 use crate::{
-    encoding::EncodingError,
+    encoding::{xml_encoding_err, EncodingError},
     libxml::{
-        encoding::xml_encoding_err,
         xml_io::{XmlOutputBuffer, XmlParserInputBuffer},
         xmlerror::XmlParserErrors,
     },
@@ -77,7 +76,7 @@ pub(crate) fn xml_char_enc_input(input: &mut XmlParserInputBuffer, flush: bool) 
             out.push_bytes(&outstr[..write]);
             let content = bufin.as_ref();
             let buf = format!(
-                "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\0",
+                "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
                 content.first().unwrap_or(&0),
                 content.get(1).unwrap_or(&0),
                 content.get(2).unwrap_or(&0),
@@ -87,8 +86,8 @@ pub(crate) fn xml_char_enc_input(input: &mut XmlParserInputBuffer, flush: bool) 
             unsafe {
                 xml_encoding_err(
                     XmlParserErrors::XmlI18nConvFailed,
-                    c"input conversion failed due to input error, bytes %s\n".as_ptr() as _,
-                    buf.as_ptr() as _,
+                    format!("input conversion failed due to input error, bytes {buf}\n").as_str(),
+                    &buf,
                 );
             }
             -2
@@ -225,7 +224,7 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i
                         };
                         let content = bufin.as_ref();
                         let msg = format!(
-                            "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\0",
+                            "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
                             content.first().unwrap_or(&0),
                             content.get(1).unwrap_or(&0),
                             content.get(2).unwrap_or(&0),
@@ -235,9 +234,11 @@ pub(crate) fn xml_char_enc_output(output: &mut XmlOutputBuffer, init: bool) -> i
                         unsafe {
                             xml_encoding_err(
                                 XmlParserErrors::XmlI18nConvFailed,
-                                c"output conversion failed due to conv error, bytes %s\n".as_ptr()
-                                    as _,
-                                msg.as_ptr() as _,
+                                format!(
+                                    "output conversion failed due to conv error, bytes {msg}\n"
+                                )
+                                .as_str(),
+                                &msg,
                             );
                         }
                         out.push_bytes(b" ");

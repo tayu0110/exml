@@ -3,11 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::ffi::{c_char, c_int, c_uchar};
-
-use crate::__xml_raise_error;
-
-use super::xmlerror::XmlParserErrors;
+use std::ffi::{c_int, c_uchar};
 
 /**
  * xmlCharEncodingOutputFunc:
@@ -33,36 +29,3 @@ pub type XmlCharEncodingOutputFunc = unsafe extern "C" fn(
     input: *const c_uchar,
     inlen: *mut c_int,
 ) -> c_int;
-
-/**
- * xmlErrEncoding:
- * @error:  the error number
- * @msg:  the error message
- *
- * n encoding error
- */
-pub(crate) unsafe extern "C" fn xml_encoding_err(
-    error: XmlParserErrors,
-    msg: *const c_char,
-    val: *const c_char,
-) {
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        null_mut(),
-        XmlErrorDomain::XmlFromI18N,
-        error,
-        XmlErrorLevel::XmlErrFatal,
-        null_mut(),
-        0,
-        (!val.is_null()).then(|| CStr::from_ptr(val).to_string_lossy().into_owned().into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        val
-    );
-}

@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
+    ffi::CString,
     fmt::Display,
     str::{from_utf8, FromStr},
     sync::{Mutex, RwLock},
@@ -371,11 +372,8 @@ pub(crate) fn cleanup_encoding_handlers() {
     handlers.clear();
 }
 
-pub(crate) unsafe extern "C" fn xml_encoding_err(
-    error: XmlParserErrors,
-    msg: *const i8,
-    val: *const i8,
-) {
+pub(crate) unsafe fn xml_encoding_err(error: XmlParserErrors, msg: &str, val: &str) {
+    let msg = CString::new(msg).unwrap();
     __xml_raise_error!(
         None,
         None,
@@ -387,12 +385,12 @@ pub(crate) unsafe extern "C" fn xml_encoding_err(
         XmlErrorLevel::XmlErrFatal,
         null_mut(),
         0,
-        (!val.is_null()).then(|| CStr::from_ptr(val).to_string_lossy().into_owned().into()),
+        Some(val.to_owned().into()),
         None,
         None,
         0,
         0,
-        msg,
+        msg.as_ptr(),
         val
     );
 }
@@ -403,8 +401,8 @@ pub fn register_encoding_handler(handler: CustomEncodingHandler) -> Result<(), E
         unsafe {
             xml_encoding_err(
                 XmlParserErrors::XmlI18nExcessHandler,
-                c"xmlRegisterCharEncodingHandler: Too many handler registered, see %s\n".as_ptr(),
-                c"MAX_ENCODING_HANDLERS".as_ptr() as _,
+                "xmlRegisterCharEncodingHandler: Too many handler registered, see MAX_ENCODING_HANDLERS\n",
+                "MAX_ENCODING_HANDLERS",
             );
             return Err(EncodingError::Other {
                 msg: "Too many CustomEncodingHandlers are registerd.".into(),
