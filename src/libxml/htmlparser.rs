@@ -10765,7 +10765,7 @@ pub unsafe fn html_create_push_parser_ctxt(
     chunk: *const c_char,
     size: c_int,
     filename: *const c_char,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> HtmlParserCtxtPtr {
     xml_init_parser();
 

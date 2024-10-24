@@ -16,7 +16,8 @@ use libc::{memcpy, memset, size_t, snprintf, INT_MAX};
 
 use crate::buf::XmlBufRef;
 use crate::encoding::{
-    detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncodingHandler,
+    detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncoding,
+    XmlCharEncodingHandler,
 };
 use crate::globals::GenericErrorContext;
 #[cfg(feature = "catalog")]
@@ -1026,10 +1027,7 @@ unsafe fn xml_detect_ebcdic(input: XmlParserInputPtr) -> Option<XmlCharEncodingH
  *
  * Returns 0 in case of success, -1 otherwise
  */
-pub unsafe fn xml_switch_encoding(
-    ctxt: XmlParserCtxtPtr,
-    enc: crate::encoding::XmlCharEncoding,
-) -> c_int {
+pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) -> c_int {
     if ctxt.is_null() {
         return -1;
     }

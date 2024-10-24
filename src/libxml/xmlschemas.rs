@@ -15,6 +15,7 @@ use libc::{fprintf, memcpy, memset, size_t, snprintf, strchr, FILE};
 
 use crate::{
     __xml_raise_error,
+    encoding::XmlCharEncoding,
     error::{XmlErrorDomain, XmlErrorLevel},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
@@ -1353,7 +1354,7 @@ pub struct XmlSchemaValidCtxt {
     schema: XmlSchemaPtr, /* The schema in use */
     doc: XmlDocPtr,
     input: XmlParserInputBufferPtr,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
     sax: XmlSAXHandlerPtr,
     parser_ctxt: XmlParserCtxtPtr,
     user_data: *mut c_void, /* TODO: What is this for? */
@@ -30887,7 +30888,7 @@ unsafe extern "C" fn xml_schema_validate_stream_locator(
 pub unsafe fn xml_schema_validate_stream(
     ctxt: XmlSchemaValidCtxtPtr,
     input: XmlParserInputBufferPtr,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
 ) -> c_int {

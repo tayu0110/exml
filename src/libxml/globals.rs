@@ -17,7 +17,7 @@ use libc::{free, malloc, memset, realloc};
 #[cfg(feature = "legacy")]
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
-    encoding::XmlCharEncodingHandler,
+    encoding::{XmlCharEncoding, XmlCharEncodingHandler},
     error::{parser_error, parser_warning, XmlError},
     globals::reset_last_error,
     libxml::{
@@ -83,7 +83,7 @@ pub unsafe extern "C" fn xml_cleanup_globals() {}
  *         method was found.
  */
 pub type XmlParserInputBufferCreateFilenameFunc =
-    unsafe fn(URI: *const c_char, enc: crate::encoding::XmlCharEncoding) -> XmlParserInputBufferPtr;
+    unsafe fn(URI: *const c_char, enc: XmlCharEncoding) -> XmlParserInputBufferPtr;
 
 /**
  * xmlOutputBufferCreateFilenameFunc:
@@ -1398,7 +1398,7 @@ pub(crate) unsafe fn __xml_parser_input_buffer_create_filename_value(
 #[cfg(feature = "thread")]
 pub unsafe fn xml_parser_input_buffer_create_filename_value(
     uri: *const c_char,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
         f(uri, enc)

@@ -20,7 +20,7 @@ use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen,
 use crate::{
     __xml_raise_error,
     buf::libxml_api::xml_buf_create,
-    encoding::{detect_encoding, find_encoding_handler},
+    encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
@@ -3447,7 +3447,7 @@ pub unsafe extern "C" fn xml_parse_dtd(
 pub unsafe fn xml_io_parse_dtd(
     sax: XmlSAXHandlerPtr,
     input: XmlParserInputBufferPtr,
-    mut enc: crate::encoding::XmlCharEncoding,
+    mut enc: XmlCharEncoding,
 ) -> XmlDtdPtr {
     let mut ret: XmlDtdPtr = null_mut();
     let mut start: [XmlChar; 4] = [0; 4];
@@ -10637,7 +10637,7 @@ pub unsafe fn xml_create_io_parser_ctxt(
     ioread: Option<XmlInputReadCallback>,
     ioclose: Option<XmlInputCloseCallback>,
     ioctx: *mut c_void,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserCtxtPtr {
     if ioread.is_none() {
         return null_mut();
@@ -10682,7 +10682,7 @@ pub unsafe fn xml_create_io_parser_ctxt(
 pub unsafe fn xml_new_io_input_stream(
     ctxt: XmlParserCtxtPtr,
     input: XmlParserInputBufferPtr,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputPtr {
     if input.is_null() {
         return null_mut();

@@ -34,7 +34,7 @@ use crate::{
     buf::XmlBufRef,
     encoding::{
         find_encoding_handler, floor_char_boundary, get_encoding_handler, xml_encoding_err,
-        EncodingError, XmlCharEncodingHandler,
+        EncodingError, XmlCharEncoding, XmlCharEncodingHandler,
     },
     error::{XmlErrorDomain, XmlErrorLevel},
     globals::{GenericError, StructuredError, GLOBAL_STATE},
@@ -576,9 +576,7 @@ pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
  *
  * Returns the new parser input or NULL
  */
-pub unsafe fn xml_alloc_parser_input_buffer(
-    enc: crate::encoding::XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
+pub unsafe fn xml_alloc_parser_input_buffer(enc: XmlCharEncoding) -> XmlParserInputBufferPtr {
     let ret: XmlParserInputBufferPtr =
         xml_malloc(size_of::<XmlParserInputBuffer>()) as XmlParserInputBufferPtr;
     if ret.is_null() {
@@ -623,7 +621,7 @@ pub unsafe fn xml_alloc_parser_input_buffer(
  */
 pub unsafe fn xml_parser_input_buffer_create_filename(
     uri: *const c_char,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if let Some(f) =
         GLOBAL_STATE.with_borrow(|state| state.parser_input_buffer_create_filename_value)
@@ -871,7 +869,7 @@ unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
  */
 pub unsafe fn xml_parser_input_buffer_create_file(
     file: *mut FILE,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
         xml_register_default_input_callbacks();
@@ -937,7 +935,7 @@ unsafe extern "C" fn xml_fd_close(context: *mut c_void) -> c_int {
  */
 pub unsafe fn xml_parser_input_buffer_create_fd(
     fd: c_int,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if fd < 0 {
         return null_mut();
@@ -967,7 +965,7 @@ pub unsafe fn xml_parser_input_buffer_create_fd(
 pub unsafe fn xml_parser_input_buffer_create_mem(
     mem: *const c_char,
     size: c_int,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if size < 0 {
         return null_mut();
@@ -1009,7 +1007,7 @@ pub unsafe fn xml_parser_input_buffer_create_mem(
 pub unsafe fn xml_parser_input_buffer_create_static(
     mem: *const c_char,
     size: c_int,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     xml_parser_input_buffer_create_mem(mem, size, enc)
 }
@@ -1030,7 +1028,7 @@ pub unsafe fn xml_parser_input_buffer_create_io(
     ioread: Option<XmlInputReadCallback>,
     ioclose: Option<XmlInputCloseCallback>,
     ioctx: *mut c_void,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     if ioread.is_none() {
         return null_mut();
@@ -1364,7 +1362,7 @@ pub unsafe extern "C" fn xml_register_input_callbacks(
 
 pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
     uri: *const c_char,
-    enc: crate::encoding::XmlCharEncoding,
+    enc: XmlCharEncoding,
 ) -> XmlParserInputBufferPtr {
     let ret: XmlParserInputBufferPtr;
     let mut context: *mut c_void = null_mut();
