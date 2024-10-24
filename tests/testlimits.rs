@@ -1246,7 +1246,7 @@ type Functest = unsafe extern "C" fn(
 ) -> c_int;
 
 struct LimitDesc<'a> {
-    name: &'a CStr, /* the huge generator name */
+    name: &'a str,  /* the huge generator name */
     limit: size_t,  /* the limit to test */
     options: c_int, /* extra parser options */
     fail: c_int,    /* whether the test should fail */
@@ -1255,76 +1255,76 @@ struct LimitDesc<'a> {
 static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
     /* max length of a text node in content */
     LimitDesc {
-        name: c"huge:textNode",
+        name: "huge:textNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
         options: 0,
         fail: 0,
     },
     LimitDesc {
-        name: c"huge:textNode",
+        name: "huge:textNode",
         limit: XML_MAX_TEXT_LENGTH + CHUNK,
         options: 0,
         fail: 1,
     },
     LimitDesc {
-        name: c"huge:textNode",
+        name: "huge:textNode",
         limit: XML_MAX_TEXT_LENGTH + CHUNK,
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
     /* max length of a text node in content */
     LimitDesc {
-        name: c"huge:attrNode",
+        name: "huge:attrNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
         options: 0,
         fail: 0,
     },
     LimitDesc {
-        name: c"huge:attrNode",
+        name: "huge:attrNode",
         limit: XML_MAX_TEXT_LENGTH + CHUNK,
         options: 0,
         fail: 1,
     },
     LimitDesc {
-        name: c"huge:attrNode",
+        name: "huge:attrNode",
         limit: XML_MAX_TEXT_LENGTH + CHUNK,
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
     /* max length of a comment node */
     LimitDesc {
-        name: c"huge:commentNode",
+        name: "huge:commentNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
         options: 0,
         fail: 0,
     },
     LimitDesc {
-        name: c"huge:commentNode",
+        name: "huge:commentNode",
         limit: XML_MAX_TEXT_LENGTH + CHUNK,
         options: 0,
         fail: 1,
     },
     LimitDesc {
-        name: c"huge:commentNode",
+        name: "huge:commentNode",
         limit: XML_MAX_TEXT_LENGTH + CHUNK,
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
     /* max length of a PI node */
     LimitDesc {
-        name: c"huge:piNode",
+        name: "huge:piNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
         options: 0,
         fail: 0,
     },
     LimitDesc {
-        name: c"huge:piNode",
+        name: "huge:piNode",
         limit: XML_MAX_TEXT_LENGTH + CHUNK,
         options: 0,
         fail: 1,
     },
     LimitDesc {
-        name: c"huge:piNode",
+        name: "huge:piNode",
         limit: XML_MAX_TEXT_LENGTH + CHUNK,
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,

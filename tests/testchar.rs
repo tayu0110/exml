@@ -544,8 +544,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                 /*
                  * There are values in that range that are not allowed in XML-1.0
                  */
-                else if ((value > 0xD7FF) && (value < 0xE000))
-                    || ((value > 0xFFFD) && (value < 0x10000))
+                else if (value > 0xD7FF && value < 0xE000) || (value > 0xFFFD && value < 0x10000)
                 {
                     if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!("Failed to detect invalid char 0x{value:04X} for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}");
