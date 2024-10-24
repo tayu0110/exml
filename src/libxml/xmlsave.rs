@@ -451,20 +451,17 @@ pub(crate) unsafe extern "C" fn xml_save_ctxt_init(ctxt: XmlSaveCtxtPtr) {
     })
 }
 
-unsafe extern "C" fn xml_save_switch_encoding(
-    ctxt: XmlSaveCtxtPtr,
-    encoding: *const c_char,
-) -> c_int {
-    let buf: XmlOutputBufferPtr = (*ctxt).buf;
+unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> c_int {
+    let buf: XmlOutputBufferPtr = ctxt.buf;
 
-    if !encoding.is_null() && (*buf).encoder.is_none() && (*buf).conv.is_none() {
-        (*buf).encoder = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
-            .map(|e| Rc::new(RefCell::new(e)));
+    if (*buf).encoder.is_none() && (*buf).conv.is_none() {
+        (*buf).encoder = find_encoding_handler(encoding).map(|e| Rc::new(RefCell::new(e)));
         if (*buf).encoder.is_none() {
+            let encoding = CString::new(encoding).unwrap();
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding,
                 null_mut(),
-                encoding,
+                encoding.as_ptr(),
             );
             return -1;
         }
@@ -1741,7 +1738,12 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                 && oldctxtenc.is_null()
                 && (*buf).encoder.is_none()
                 && (*buf).conv.is_none())
-                && xml_save_switch_encoding(ctxt, encoding as _) < 0
+                && xml_save_switch_encoding(
+                    &mut *ctxt,
+                    CStr::from_ptr(encoding as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ) < 0
             {
                 (*cur).encoding = oldenc;
                 return -1;
@@ -1787,7 +1789,13 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                  * document since we output the XMLDecl the conversion
                  * must be done to not generate not well formed documents.
                  */
-                if xml_save_switch_encoding(ctxt, encoding as _) < 0 {
+                if xml_save_switch_encoding(
+                    &mut *ctxt,
+                    CStr::from_ptr(encoding as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ) < 0
+                {
                     (*cur).encoding = oldenc;
                     return -1;
                 }
@@ -2147,7 +2155,13 @@ unsafe extern "C" fn html_node_dump_output_internal(
         && (*buf).encoder.is_none()
         && (*buf).conv.is_none()
     {
-        if xml_save_switch_encoding(ctxt, encoding as _) < 0 {
+        if xml_save_switch_encoding(
+            &mut *ctxt,
+            CStr::from_ptr(encoding as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        ) < 0
+        {
             (*doc).encoding = oldenc;
             return -1;
         }
