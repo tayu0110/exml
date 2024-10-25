@@ -2240,7 +2240,7 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
  */
 #[cfg(feature = "output")]
 pub unsafe fn xml_output_buffer_write_escape(
-    out: XmlOutputBufferPtr,
+    out: &mut XmlOutputBuffer,
     mut str: *const XmlChar,
     escaping: Option<fn(&str, &mut String) -> i32>,
 ) -> c_int {
@@ -2250,18 +2250,20 @@ pub unsafe fn xml_output_buffer_write_escape(
     let mut ret: c_int; /* return from function call */
     let mut written: c_int = 0; /* number of c_char written to I/O so far */
     let mut oldwritten: c_int; /* loop guard */
-    let mut chunk: c_int; /* number of byte currently processed from str */
     let mut len: c_int; /* number of bytes in str */
     let mut cons: c_int; /* byte from str consumed */
 
-    if out.is_null() || (*out).error != 0 || str.is_null() || (*out).buffer.is_none() {
+    if out.error != 0 || str.is_null() {
         return -1;
     }
+    let Some(mut buffer) = out.buffer else {
+        return -1;
+    };
     len = strlen(str as _) as _;
     if len < 0 {
         return 0;
     }
-    if (*out).error != 0 {
+    if out.error != 0 {
         return -1;
     }
 
@@ -2271,17 +2273,11 @@ pub unsafe fn xml_output_buffer_write_escape(
         oldwritten = written;
 
         /*
-         * how many bytes to consume and how many bytes to store.
-         */
-        // cons = len;
-        chunk = (*out).buffer.map_or(0, |buf| buf.avail() as i32);
-
-        /*
          * make sure we have enough room to save first, if this is
          * not the case force a flush, but make sure we stay in the loop
          */
-        if chunk < 40 {
-            if (*out).buffer.map_or(true, |mut buf| buf.grow(100).is_err()) {
+        if buffer.avail() < 40 {
+            if buffer.grow(100).is_err() {
                 return -1;
             }
             oldwritten = -1;
@@ -2294,24 +2290,23 @@ pub unsafe fn xml_output_buffer_write_escape(
         /*
          * first handle encoding stuff.
          */
-        if (*out).encoder.is_some() {
+        nbchars = if out.encoder.is_some() {
             /*
              * Store the data in the incoming raw buffer
              */
-            if (*out).conv.is_none() {
-                (*out).conv = XmlBufRef::new();
+            if out.conv.is_none() {
+                out.conv = XmlBufRef::new();
             }
             let src = CStr::from_ptr(str as *const i8).to_string_lossy();
             cons = src.len() as i32;
             let mut buf = String::new();
             ret = escaping(src.as_ref(), &mut buf);
-            chunk = buf.len() as i32;
-            (*out).buffer.as_mut().unwrap().push_bytes(buf.as_bytes());
-            if ret < 0 || chunk == 0 {
+            buffer.push_bytes(buf.as_bytes());
+            if ret < 0 || buf.is_empty() {
                 /* chunk==0 => nothing done */
                 return -1;
             }
-            if (*out).buffer.map_or(0, |buf| buf.len()) < MINLEN && cons == len {
+            if buffer.len() < MINLEN && cons == len {
                 // goto done;
                 return written;
             }
@@ -2319,41 +2314,40 @@ pub unsafe fn xml_output_buffer_write_escape(
             /*
              * convert as much as possible to the output buffer.
              */
-            let ret = match (*out).encode(false) {
+            let ret = match out.encode(false) {
                 Ok(len) => Ok(len),
                 Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                 _ => {
                     xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                    (*out).error = XmlParserErrors::XmlIoEncoder as i32;
+                    out.error = XmlParserErrors::XmlIoEncoder as i32;
                     return -1;
                 }
             };
-            if (*out).writecallback.is_some() {
-                nbchars = (*out).conv.map_or(0, |conv| conv.len() as i32);
+            if out.writecallback.is_some() {
+                out.conv.map_or(0, |conv| conv.len() as i32)
             } else {
-                nbchars = if let Ok(len) = ret { len as i32 } else { 0 };
+                ret.unwrap_or(0) as i32
             }
         } else {
             let src = CStr::from_ptr(str as *const i8).to_string_lossy();
             cons = src.len() as i32;
             let mut buf = String::new();
             ret = escaping(src.as_ref(), &mut buf);
-            chunk = buf.len() as i32;
-            (*out).buffer.as_mut().unwrap().push_bytes(buf.as_bytes());
-            if ret < 0 || chunk == 0 {
+            buffer.push_bytes(buf.as_bytes());
+            if ret < 0 || buf.is_empty() {
                 /* chunk==0 => nothing done */
                 return -1;
             }
-            if (*out).writecallback.is_some() {
-                nbchars = (*out).buffer.map_or(0, |buf| buf.len() as i32);
+            if out.writecallback.is_some() {
+                buffer.len() as i32
             } else {
-                nbchars = chunk;
+                buf.len() as i32
             }
-        }
+        };
         str = str.add(cons as _);
         len -= cons;
 
-        if let Some(writecallback) = (*out).writecallback {
+        if let Some(writecallback) = out.writecallback {
             if nbchars < MINLEN as i32 && len <= 0 {
                 // goto done;
                 return written;
@@ -2362,10 +2356,10 @@ pub unsafe fn xml_output_buffer_write_escape(
             /*
              * second write the stuff to the I/O channel
              */
-            if (*out).encoder.is_some() {
+            if out.encoder.is_some() {
                 ret = writecallback(
-                    (*out).context,
-                    (*out).conv.map_or(null(), |conv| {
+                    out.context,
+                    out.conv.map_or(null(), |conv| {
                         if conv.is_ok() {
                             conv.as_ref().as_ptr()
                         } else {
@@ -2375,42 +2369,32 @@ pub unsafe fn xml_output_buffer_write_escape(
                     nbchars,
                 );
                 if ret >= 0 {
-                    if let Some(mut conv) = (*out).conv {
+                    if let Some(mut conv) = out.conv {
                         conv.trim_head(ret as usize);
                     }
                 }
             } else {
                 ret = writecallback(
-                    (*out).context,
-                    (*out).buffer.map_or(null(), |buf| {
-                        if buf.is_ok() {
-                            buf.as_ref().as_ptr()
-                        } else {
-                            null()
-                        }
-                    }) as *const c_char,
+                    out.context,
+                    if buffer.is_ok() {
+                        buffer.as_ref().as_ptr() as *const i8
+                    } else {
+                        null()
+                    },
                     nbchars,
                 );
                 if ret >= 0 {
-                    if let Some(mut buf) = (*out).buffer {
-                        buf.trim_head(ret as usize);
-                    }
+                    buffer.trim_head(ret as usize);
                 }
             }
             if ret < 0 {
                 xml_ioerr(XmlParserErrors::XmlIoWrite, null());
-                (*out).error = XmlParserErrors::XmlIoWrite as i32;
+                out.error = XmlParserErrors::XmlIoWrite as i32;
                 return ret;
             }
-            if (*out).written > INT_MAX - ret {
-                (*out).written = INT_MAX;
-            } else {
-                (*out).written += ret;
-            }
-        } else if (*out).buffer.map_or(0, |buf| buf.avail()) < MINLEN {
-            if let Some(mut buf) = (*out).buffer {
-                buf.grow(MINLEN);
-            }
+            out.written = out.written.wrapping_add(ret);
+        } else if buffer.avail() < MINLEN {
+            buffer.grow(MINLEN);
         }
         written += nbchars;
 

@@ -624,7 +624,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
             XmlElementType::XmlTextNode => {
                 if !(*cur).content.is_null() {
                     if (*cur).name != XML_STRING_TEXT_NOENC.as_ptr() as _ {
-                        xml_output_buffer_write_escape(buf, (*cur).content, (*ctxt).escape);
+                        xml_output_buffer_write_escape(&mut *buf, (*cur).content, (*ctxt).escape);
                     } else {
                         /*
                          * Disable escaping, needed for XSLT
@@ -1343,7 +1343,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 if (*cur).name == XML_STRING_TEXT.as_ptr() as _
                     || (*cur).name != XML_STRING_TEXT_NOENC.as_ptr() as _
                 {
-                    xml_output_buffer_write_escape(buf, (*cur).content, (*ctxt).escape);
+                    xml_output_buffer_write_escape(&mut *buf, (*cur).content, (*ctxt).escape);
                 } else {
                     /*
                      * Disable escaping, needed for XSLT
