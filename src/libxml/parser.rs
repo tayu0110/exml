@@ -1926,7 +1926,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_grow(
     if buf.len() > indx + INPUT_CHUNK {
         return 0;
     }
-    let ret: c_int = xml_parser_input_buffer_grow((*input).buf, len);
+    let ret: c_int = xml_parser_input_buffer_grow(&mut *(*input).buf, len);
 
     (*input).base = if buf.is_ok() {
         buf.as_ref().as_ptr()

@@ -240,7 +240,7 @@ pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
         return 0;
     }
 
-    let ret: c_int = xml_parser_input_buffer_grow(buf, INPUT_CHUNK as _);
+    let ret: c_int = xml_parser_input_buffer_grow(&mut *buf, INPUT_CHUNK as _);
     xml_buf_set_input_base_cur(
         (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
         input,

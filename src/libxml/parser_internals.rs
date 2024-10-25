@@ -8036,7 +8036,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     }
 
     if buf.len() <= INPUT_CHUNK {
-        xml_parser_input_buffer_read((*input).buf, 2 * INPUT_CHUNK as i32);
+        xml_parser_input_buffer_read(&mut *(*input).buf, 2 * INPUT_CHUNK as i32);
     }
 
     (*input).base = buf.as_ref().as_ptr();

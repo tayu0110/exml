@@ -2259,7 +2259,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     /*
      * Scan all chars from the resource and add the to the node
      */
-    while xml_parser_input_buffer_read(buf, 4096) > 0 {}
+    while xml_parser_input_buffer_read(&mut *buf, 4096) > 0 {}
 
     let content: *const XmlChar = (*buf).buffer.map_or(null_mut(), |buf| {
         if buf.is_ok() {

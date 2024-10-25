@@ -612,7 +612,7 @@ pub unsafe extern "C" fn xml_new_text_reader(
     (*ret).node = null_mut();
     (*ret).curnode = null_mut();
     if (*(*ret).input).buffer.map_or(0, |buf| buf.len()) < 4 {
-        xml_parser_input_buffer_read(input, 4);
+        xml_parser_input_buffer_read(&mut *input, 4);
     }
     if (*(*ret).input).buffer.map_or(0, |buf| buf.len()) >= 4 {
         (*ret).ctxt = xml_create_push_parser_ctxt(
@@ -889,7 +889,7 @@ pub unsafe extern "C" fn xml_text_reader_setup(
     (*reader).curnode = null_mut();
     if !input.is_null() {
         if (*(*reader).input).buffer.map_or(0, |buf| buf.len()) < 4 {
-            xml_parser_input_buffer_read(input, 4);
+            xml_parser_input_buffer_read(&mut *input, 4);
         }
         if (*reader).ctxt.is_null() {
             if (*(*reader).input).buffer.map_or(0, |buf| buf.len()) >= 4 {
@@ -1153,7 +1153,7 @@ unsafe extern "C" fn xml_text_reader_push_data(reader: XmlTextReaderPtr) -> c_in
              * Refill the buffer unless we are at the end of the stream
              */
             if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeEof as i32 {
-                val = xml_parser_input_buffer_read((*reader).input, 4096);
+                val = xml_parser_input_buffer_read(&mut *(*reader).input, 4096);
                 if val == 0 && (*(*reader).input).readcallback.is_none() {
                     if xml_buf_use(inbuf) == (*reader).cur as _ {
                         (*reader).mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
