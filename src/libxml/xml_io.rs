@@ -2241,28 +2241,24 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
 #[cfg(feature = "output")]
 pub unsafe fn xml_output_buffer_write_escape(
     out: &mut XmlOutputBuffer,
-    mut str: *const XmlChar,
+    str: &str,
     escaping: Option<fn(&str, &mut String) -> i32>,
 ) -> c_int {
     use crate::encoding::EncodingError;
 
-    let mut nbchars: c_int; /* number of chars to output to I/O */
     let mut ret: c_int; /* return from function call */
     let mut written: c_int = 0; /* number of c_char written to I/O so far */
     let mut oldwritten: c_int; /* loop guard */
     let mut len: c_int; /* number of bytes in str */
     let mut cons: c_int; /* byte from str consumed */
 
-    if out.error != 0 || str.is_null() {
+    if out.error != 0 {
         return -1;
     }
     let Some(mut buffer) = out.buffer else {
         return -1;
     };
-    len = strlen(str as _) as _;
-    if len < 0 {
-        return 0;
-    }
+    len = str.len() as i32;
     if out.error != 0 {
         return -1;
     }
@@ -2281,7 +2277,7 @@ pub unsafe fn xml_output_buffer_write_escape(
                 return -1;
             }
             oldwritten = -1;
-            if !(len > 0 && oldwritten != written) {
+            if len <= 0 || oldwritten == written {
                 break;
             }
             continue;
@@ -2290,17 +2286,16 @@ pub unsafe fn xml_output_buffer_write_escape(
         /*
          * first handle encoding stuff.
          */
-        nbchars = if out.encoder.is_some() {
+        let nbchars = if out.encoder.is_some() {
             /*
              * Store the data in the incoming raw buffer
              */
             if out.conv.is_none() {
                 out.conv = XmlBufRef::new();
             }
-            let src = CStr::from_ptr(str as *const i8).to_string_lossy();
-            cons = src.len() as i32;
+            cons = str.len() as i32;
             let mut buf = String::new();
-            ret = escaping(src.as_ref(), &mut buf);
+            ret = escaping(str, &mut buf);
             buffer.push_bytes(buf.as_bytes());
             if ret < 0 || buf.is_empty() {
                 /* chunk==0 => nothing done */
@@ -2329,10 +2324,9 @@ pub unsafe fn xml_output_buffer_write_escape(
                 ret.unwrap_or(0) as i32
             }
         } else {
-            let src = CStr::from_ptr(str as *const i8).to_string_lossy();
-            cons = src.len() as i32;
+            cons = str.len() as i32;
             let mut buf = String::new();
-            ret = escaping(src.as_ref(), &mut buf);
+            ret = escaping(str, &mut buf);
             buffer.push_bytes(buf.as_bytes());
             if ret < 0 || buf.is_empty() {
                 /* chunk==0 => nothing done */
@@ -2344,7 +2338,6 @@ pub unsafe fn xml_output_buffer_write_escape(
                 buf.len() as i32
             }
         };
-        str = str.add(cons as _);
         len -= cons;
 
         if let Some(writecallback) = out.writecallback {
@@ -2398,7 +2391,7 @@ pub unsafe fn xml_output_buffer_write_escape(
         }
         written += nbchars;
 
-        if !(len > 0 && oldwritten != written) {
+        if len <= 0 || oldwritten == written {
             break;
         }
     }
