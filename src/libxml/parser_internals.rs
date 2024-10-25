@@ -84,7 +84,6 @@ use super::uri::{xml_build_uri, xml_canonic_path};
 use super::xml_io::{
     __xml_loader_err, xml_check_http_input, xml_free_parser_input_buffer, xml_parser_get_directory,
     xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_mem,
-    xml_parser_input_buffer_read,
 };
 use super::xmlstring::{
     xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
@@ -8036,7 +8035,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     }
 
     if buf.len() <= INPUT_CHUNK {
-        xml_parser_input_buffer_read(&mut *(*input).buf, 2 * INPUT_CHUNK as i32);
+        (*(*input).buf).read(2 * INPUT_CHUNK as i32);
     }
 
     (*input).base = buf.as_ref().as_ptr();

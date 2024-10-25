@@ -18,9 +18,7 @@ use crate::{
             input_pop, xml_err_internal, xml_free_input_stream, INPUT_CHUNK, LINE_LEN,
             XML_MAX_LOOKUP_LIMIT,
         },
-        xml_io::{
-            xml_free_parser_input_buffer, xml_parser_input_buffer_grow, XmlParserInputBufferPtr,
-        },
+        xml_io::{xml_free_parser_input_buffer, XmlParserInputBufferPtr},
         xmlerror::XmlParserErrors,
         xmlstring::XmlChar,
     },
@@ -240,7 +238,7 @@ pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
         return 0;
     }
 
-    let ret: c_int = xml_parser_input_buffer_grow(&mut *buf, INPUT_CHUNK as _);
+    let ret: c_int = (*buf).grow(INPUT_CHUNK as _);
     xml_buf_set_input_base_cur(
         (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
         input,

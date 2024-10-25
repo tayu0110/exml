@@ -265,6 +265,102 @@ impl XmlParserInputBuffer {
             ret
         }
     }
+
+    /// Refresh the content of the input buffer, the old data are considered consumed.  
+    /// This routine handle the I18N transcoding to internal UTF-8.
+    ///
+    /// Returns the number of chars read and stored in the buffer, or -1 in case of error.
+    #[doc(alias = "xmlParserInputBufferRead")]
+    pub unsafe fn read(&mut self, len: c_int) -> c_int {
+        self.grow(len)
+    }
+
+    /// Grow up the content of the input buffer, the old data are preserved
+    /// This routine handle the I18N transcoding to internal UTF-8
+    /// This routine is used when operating the parser in normal (pull) mode
+    ///
+    /// TODO: one should be able to remove one extra copy by copying directly
+    /// onto (*in).buffer or (*in).raw
+    ///
+    /// Returns the number of chars read and stored in the buffer, or -1 in case of error.
+    #[doc(alias = "xmlParserInputBufferGrow")]
+    pub unsafe fn grow(&mut self, mut len: c_int) -> c_int {
+        let mut res: c_int = 0;
+
+        if self.error != 0 {
+            return -1;
+        }
+        if len <= MINLEN as i32 && len != 4 {
+            len = MINLEN as i32;
+        }
+
+        let buf = if self.encoder.is_none() {
+            if self.readcallback.is_none() {
+                return 0;
+            }
+            self.buffer
+        } else {
+            if self.raw.is_none() {
+                self.raw = XmlBufRef::new();
+            }
+            self.raw
+        };
+
+        /*
+         * Call the read method for this I/O type.
+         */
+        if let Some(callback) = self.readcallback {
+            if buf.map_or(true, |mut buf| buf.grow((len + 1) as usize).is_err()) {
+                xml_ioerr_memory(c"growing input buffer".as_ptr() as _);
+                self.error = XmlParserErrors::XmlErrNoMemory as i32;
+                return -1;
+            }
+
+            res = callback(
+                self.context,
+                buf.map_or(null_mut(), |buf| {
+                    buf.as_ref().as_ptr().add(buf.len()) as *mut i8
+                }),
+                len,
+            );
+            if res <= 0 {
+                self.readcallback = Some(end_of_input);
+            }
+            if res < 0 {
+                return -1;
+            }
+
+            if buf.map_or(true, |mut buf| buf.add_len(res as usize).is_err()) {
+                return -1;
+            }
+        }
+
+        /*
+         * try to establish compressed status of input if not done already
+         */
+        if self.compressed == -1 {
+            // #ifdef LIBXML_LZMA_ENABLED
+            // 	if ((*input).readcallback == xmlXzfileRead)
+            //             (*input).compressed = __libxml2_xzcompressed((*input).context);
+            // #endif
+        }
+
+        if self.encoder.is_some() {
+            /*
+             * convert as much as possible to the parser reading buffer.
+             */
+            let using: size_t = buf.map_or(0, |buf| buf.len());
+            let Ok(written) = self.decode(true) else {
+                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                self.error = XmlParserErrors::XmlIoEncoder as i32;
+                return -1;
+            };
+            res = written as i32;
+            let consumed: size_t = using - buf.map_or(0, |buf| buf.len());
+            self.rawconsumed = self.rawconsumed.saturating_add(consumed as u64);
+        }
+        res
+    }
 }
 
 pub type XmlOutputBufferPtr = *mut XmlOutputBuffer;
@@ -1162,25 +1258,6 @@ pub unsafe fn xml_parser_input_buffer_create_io(
     ret
 }
 
-/**
- * xmlParserInputBufferRead:
- * @in:  a buffered parser input
- * @len:  indicative value of the amount of chars to read
- *
- * Refresh the content of the input buffer, the old data are considered
- * consumed
- * This routine handle the I18N transcoding to c_internal UTF-8
- *
- * Returns the number of chars read and stored in the buffer, or -1
- *         in case of error.
- */
-pub unsafe extern "C" fn xml_parser_input_buffer_read(
-    input: &mut XmlParserInputBuffer,
-    len: c_int,
-) -> c_int {
-    xml_parser_input_buffer_grow(input, len)
-}
-
 const MINLEN: usize = 4000;
 
 /**
@@ -1195,106 +1272,6 @@ unsafe extern "C" fn end_of_input(
     _len: c_int,
 ) -> c_int {
     0
-}
-
-/**
- * xmlParserInputBufferGrow:
- * @in:  a buffered parser input
- * @len:  indicative value of the amount of chars to read
- *
- * Grow up the content of the input buffer, the old data are preserved
- * This routine handle the I18N transcoding to c_internal UTF-8
- * This routine is used when operating the parser in normal (pull) mode
- *
- * TODO: one should be able to remove one extra copy by copying directly
- *       onto (*in).buffer or (*in).raw
- *
- * Returns the number of chars read and stored in the buffer, or -1
- *         in case of error.
- */
-pub unsafe extern "C" fn xml_parser_input_buffer_grow(
-    input: &mut XmlParserInputBuffer,
-    mut len: c_int,
-) -> c_int {
-    let mut res: c_int = 0;
-
-    if input.error != 0 {
-        return -1;
-    }
-    if len <= MINLEN as i32 && len != 4 {
-        len = MINLEN as i32;
-    }
-
-    let buf = if input.encoder.is_none() {
-        if input.readcallback.is_none() {
-            return 0;
-        }
-        input.buffer
-    } else {
-        if input.raw.is_none() {
-            input.raw = XmlBufRef::new();
-        }
-        input.raw
-    };
-
-    /*
-     * Call the read method for this I/O type.
-     */
-    if let Some(callback) = input.readcallback {
-        if buf.map_or(true, |mut buf| buf.grow((len + 1) as usize).is_err()) {
-            xml_ioerr_memory(c"growing input buffer".as_ptr() as _);
-            input.error = XmlParserErrors::XmlErrNoMemory as i32;
-            return -1;
-        }
-
-        res = callback(
-            input.context,
-            buf.map_or(null_mut(), |buf| {
-                buf.as_ref().as_ptr().add(buf.len()) as *mut i8
-            }),
-            len,
-        );
-        if res <= 0 {
-            input.readcallback = Some(end_of_input);
-        }
-        if res < 0 {
-            return -1;
-        }
-
-        if buf.map_or(true, |mut buf| buf.add_len(res as usize).is_err()) {
-            return -1;
-        }
-    }
-
-    /*
-     * try to establish compressed status of input if not done already
-     */
-    if input.compressed == -1 {
-        // #ifdef LIBXML_LZMA_ENABLED
-        // 	if ((*input).readcallback == xmlXzfileRead)
-        //             (*input).compressed = __libxml2_xzcompressed((*input).context);
-        // #endif
-    }
-
-    if input.encoder.is_some() {
-        /*
-         * convert as much as possible to the parser reading buffer.
-         */
-        let using: size_t = buf.map_or(0, |buf| buf.len());
-        let Ok(written) = input.decode(true) else {
-            xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-            input.error = XmlParserErrors::XmlIoEncoder as i32;
-            return -1;
-        };
-        res = written as i32;
-        let consumed: size_t = using - buf.map_or(0, |buf| buf.len());
-        if consumed as u64 > u64::MAX || input.rawconsumed > u64::MAX - consumed as c_ulong {
-            input.rawconsumed = u64::MAX;
-        } else {
-            input.rawconsumed += consumed as u64;
-        }
-    }
-    res
 }
 
 /**

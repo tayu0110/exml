@@ -88,9 +88,9 @@ use crate::{
             xml_free_parser_input_buffer, xml_ioerr_memory, xml_no_net_exists,
             xml_parser_get_directory, xml_parser_input_buffer_create_fd,
             xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
-            xml_parser_input_buffer_grow, xml_parser_input_buffer_push,
-            xml_register_default_input_callbacks, xml_register_default_output_callbacks,
-            XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
+            xml_parser_input_buffer_push, xml_register_default_input_callbacks,
+            xml_register_default_output_callbacks, XmlInputCloseCallback, XmlInputReadCallback,
+            XmlParserInputBufferPtr,
         },
         xmlerror::XmlParserErrors,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
@@ -1926,7 +1926,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_grow(
     if buf.len() > indx + INPUT_CHUNK {
         return 0;
     }
-    let ret: c_int = xml_parser_input_buffer_grow(&mut *(*input).buf, len);
+    let ret: c_int = (*(*input).buf).grow(len);
 
     (*input).base = if buf.is_ok() {
         buf.as_ref().as_ptr()
