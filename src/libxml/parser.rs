@@ -88,9 +88,8 @@ use crate::{
             xml_free_parser_input_buffer, xml_ioerr_memory, xml_no_net_exists,
             xml_parser_get_directory, xml_parser_input_buffer_create_fd,
             xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
-            xml_parser_input_buffer_push, xml_register_default_input_callbacks,
-            xml_register_default_output_callbacks, XmlInputCloseCallback, XmlInputReadCallback,
-            XmlParserInputBufferPtr,
+            xml_register_default_input_callbacks, xml_register_default_output_callbacks,
+            XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
         },
         xmlerror::XmlParserErrors,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
@@ -5381,10 +5380,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xml_parser_input_buffer_push(
-            &mut *(*(*ctxt).input).buf,
-            from_raw_parts(chunk as *const u8, size as usize),
-        );
+        (*(*(*ctxt).input).buf).push_bytes(from_raw_parts(chunk as *const u8, size as usize));
 
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
@@ -9722,7 +9718,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     let current: size_t =
                         (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-                    xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, "".as_bytes());
+                    (*(*(*ctxt).input).buf).push_bytes(b"");
                     xml_buf_set_input_base_cur(
                         (*(*(*ctxt).input).buf)
                             .buffer
@@ -10506,10 +10502,8 @@ pub unsafe extern "C" fn xml_parse_chunk(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        let res: c_int = xml_parser_input_buffer_push(
-            &mut *(*(*ctxt).input).buf,
-            from_raw_parts(chunk as *const u8, size as usize),
-        );
+        let res: c_int =
+            (*(*(*ctxt).input).buf).push_bytes(from_raw_parts(chunk as *const u8, size as usize));
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
                 .buffer
@@ -10579,7 +10573,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
         );
         let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, b"\r");
+        (*(*(*ctxt).input).buf).push_bytes(b"\r");
 
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
@@ -11285,10 +11279,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xml_parser_input_buffer_push(
-            &mut *(*(*ctxt).input).buf,
-            from_raw_parts(chunk as *const u8, size as usize),
-        );
+        (*(*(*ctxt).input).buf).push_bytes(from_raw_parts(chunk as *const u8, size as usize));
 
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)

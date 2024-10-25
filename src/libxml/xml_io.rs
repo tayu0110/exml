@@ -361,6 +361,57 @@ impl XmlParserInputBuffer {
         }
         res
     }
+
+    /// Push the content of the arry in the input buffer.  
+    /// This routine handle the I18N transcoding to internal UTF-8.  
+    /// This is used when operating the parser in progressive (push) mode.
+    ///
+    /// Returns the number of chars read and stored in the buffer, or -1 in case of error.
+    #[doc(alias = "xmlParserInputBufferPush")]
+    pub fn push_bytes(&mut self, buf: &[u8]) -> c_int {
+        if self.error != 0 {
+            return -1;
+        }
+        if self.encoder.is_some() {
+            /*
+             * Store the data in the incoming raw buffer
+             */
+            if self.raw.is_none() {
+                self.raw = XmlBufRef::new();
+            }
+            if self
+                .raw
+                .map_or(true, |mut raw| raw.push_bytes(buf).is_err())
+            {
+                return -1;
+            }
+
+            /*
+             * convert as much as possible to the parser reading buffer.
+             */
+            let using: size_t = self.raw.map_or(0, |raw| raw.len());
+            let Ok(written) = self.decode(true) else {
+                unsafe {
+                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                }
+                self.error = XmlParserErrors::XmlIoEncoder as i32;
+                return -1;
+            };
+            let consumed: size_t = using - self.raw.map_or(0, |raw| raw.len());
+            self.rawconsumed = self.rawconsumed.saturating_add(consumed as u64);
+            written as i32
+        } else {
+            if self
+                .buffer
+                .expect("Internal Error")
+                .push_bytes(buf)
+                .is_err()
+            {
+                return -1;
+            }
+            buf.len() as i32
+        }
+    }
 }
 
 pub type XmlOutputBufferPtr = *mut XmlOutputBuffer;
@@ -1272,64 +1323,6 @@ unsafe extern "C" fn end_of_input(
     _len: c_int,
 ) -> c_int {
     0
-}
-
-/**
- * xmlParserInputBufferPush:
- * @in:  a buffered parser input
- * @len:  the size in bytes of the array.
- * @buf:  an c_char array
- *
- * Push the content of the arry in the input buffer
- * This routine handle the I18N transcoding to c_internal UTF-8
- * This is used when operating the parser in progressive (push) mode.
- *
- * Returns the number of chars read and stored in the buffer, or -1
- *         in case of error.
- */
-pub fn xml_parser_input_buffer_push(input: &mut XmlParserInputBuffer, buf: &[u8]) -> c_int {
-    if input.error != 0 {
-        return -1;
-    }
-    if input.encoder.is_some() {
-        /*
-         * Store the data in the incoming raw buffer
-         */
-        if input.raw.is_none() {
-            input.raw = XmlBufRef::new();
-        }
-        if input
-            .raw
-            .map_or(true, |mut raw| raw.push_bytes(buf).is_err())
-        {
-            return -1;
-        }
-
-        /*
-         * convert as much as possible to the parser reading buffer.
-         */
-        let using: size_t = input.raw.map_or(0, |raw| raw.len());
-        let Ok(written) = input.decode(true) else {
-            unsafe {
-                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-            }
-            input.error = XmlParserErrors::XmlIoEncoder as i32;
-            return -1;
-        };
-        let consumed: size_t = using - input.raw.map_or(0, |raw| raw.len());
-        input.rawconsumed = input.rawconsumed.saturating_add(consumed as u64);
-        written as i32
-    } else {
-        if input
-            .buffer
-            .expect("Internal Error")
-            .push_bytes(buf)
-            .is_err()
-        {
-            return -1;
-        }
-        buf.len() as i32
-    }
 }
 
 /**
