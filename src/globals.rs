@@ -85,7 +85,7 @@ pub struct XmlGlobalState {
     load_ext_dtd_default_value: i32,
     parser_debug_entities: i32,
     pedantic_parser_default_value: i32,
-    save_no_empty_tags: i32,
+    pub(crate) save_no_empty_tags: i32,
     indent_tree_output: i32,
     pub(crate) tree_indent_string: Cow<'static, str>,
     register_node_default_value: Option<XmlRegisterNodeFunc>,

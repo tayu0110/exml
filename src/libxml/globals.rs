@@ -189,7 +189,7 @@ pub struct XmlGlobalState {
     pub(crate) xml_parser_debug_entities: c_int,
     pub(crate) xml_pedantic_parser_default_value: c_int,
 
-    pub(crate) xml_save_no_empty_tags: c_int,
+    // pub(crate) xml_save_no_empty_tags: c_int,
     pub(crate) xml_indent_tree_output: c_int,
     // pub(crate) xml_tree_indent_string: *const c_char,
     pub(crate) xml_register_node_default_value: Option<XmlRegisterNodeFunc>,
@@ -487,7 +487,7 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).xml_parser_debug_entities = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
     (*gs).xml_parser_version = LIBXML_VERSION_STRING.as_ptr();
     (*gs).xml_pedantic_parser_default_value = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_save_no_empty_tags = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
+    // (*gs).xml_save_no_empty_tags = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
     (*gs).xml_substitute_entities_default_value = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
 
     // (*gs).xml_generic_error = XML_GENERIC_ERROR_THR_DEF;
@@ -1291,30 +1291,6 @@ pub unsafe extern "C" fn xml_thr_def_pedantic_parser_default_value(v: c_int) -> 
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
     let ret: c_int = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
     XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF = v;
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    ret
-}
-
-pub unsafe extern "C" fn __xml_save_no_empty_tags() -> *mut c_int {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_SAVE_NO_EMPTY_TAGS.as_ptr()
-    } else {
-        addr_of_mut!((*xml_get_global_state()).xml_save_no_empty_tags)
-    }
-}
-#[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_save_no_empty_tags() -> *mut c_int {
-    __xml_save_no_empty_tags()
-}
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_save_no_empty_tags() -> *mut c_int {
-    _XML_SAVE_NO_EMPTY_TAGS.as_ptr()
-}
-
-pub unsafe extern "C" fn xml_thr_def_save_no_empty_tags(v: c_int) -> c_int {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    let ret: c_int = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
-    XML_SAVE_NO_EMPTY_TAGS_THR_DEF = v;
     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
     ret
 }

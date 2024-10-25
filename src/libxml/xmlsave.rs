@@ -24,7 +24,7 @@ use crate::{
     libxml::{
         encoding::XmlCharEncodingOutputFunc,
         entities::{xml_dump_entity_decl, XmlEntityPtr},
-        globals::{xml_free, xml_indent_tree_output, xml_malloc, xml_save_no_empty_tags},
+        globals::{xml_free, xml_indent_tree_output, xml_malloc},
         htmltree::{
             html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
         },
@@ -441,7 +441,7 @@ pub(crate) unsafe fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
             ctxt.indent[ctxt.indent_nr as usize * ctxt.indent_size as usize] = 0;
         }
 
-        if *xml_save_no_empty_tags() != 0 {
+        if state.save_no_empty_tags != 0 {
             ctxt.options |= XmlSaveOption::XmlSaveNoEmpty as i32;
         }
     })
