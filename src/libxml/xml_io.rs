@@ -441,6 +441,7 @@ impl XmlOutputBuffer {
     /// - general error (`EncodingError::Other`)
     /// - buffer too short (`EncodingError::BufferTooShort`)
     /// - encoding failure (`EncodingError::Unmappable`)
+    #[cfg(feature = "output")]
     pub(crate) fn encode(&mut self, init: bool) -> Result<usize, EncodingError> {
         let mut writtentot: usize = 0;
 
@@ -688,6 +689,27 @@ impl XmlOutputBuffer {
         }
 
         written
+    }
+
+    /// Gives a pointer to the data currently held in the output buffer
+    ///
+    /// Returns a pointer to the data or NULL in case of error
+    #[doc(alias = "xmlOutputBufferGetContent")]
+    #[cfg(feature = "output")]
+    pub fn get_buffer_content(&self) -> Option<&[u8]> {
+        self.buffer
+            .as_ref()
+            .filter(|buf| buf.is_ok())
+            .map(|b| b.as_ref())
+    }
+
+    /// Gives the length of the data currently held in the output buffer
+    ///
+    /// Returns 0 in case or error or no data is held, the size otherwise
+    #[doc(alias = "xmlOutputBufferGetSize")]
+    #[cfg(feature = "output")]
+    pub fn get_buffer_size(&self) -> usize {
+        self.buffer.map_or(0, |buf| buf.len())
     }
 }
 
@@ -2156,43 +2178,6 @@ pub unsafe fn xml_output_buffer_create_io(
 }
 
 /* Couple of APIs to get the output without digging into the buffers */
-/**
- * xmlOutputBufferGetContent:
- * @out:  an xmlOutputBufferPtr
- *
- * Gives a poc_inter to the data currently held in the output buffer
- *
- * Returns a poc_inter to the data or NULL in case of error
- */
-#[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_get_content(out: XmlOutputBufferPtr) -> *const XmlChar {
-    if out.is_null() {
-        return null();
-    }
-    (*out).buffer.map_or(null(), |buf| {
-        if buf.is_ok() {
-            buf.as_ref().as_ptr()
-        } else {
-            null()
-        }
-    })
-}
-
-/**
- * xmlOutputBufferGetSize:
- * @out:  an xmlOutputBufferPtr
- *
- * Gives the length of the data currently held in the output buffer
- *
- * Returns 0 in case or error or no data is held, the size otherwise
- */
-#[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_get_size(out: XmlOutputBufferPtr) -> size_t {
-    if out.is_null() {
-        return 0;
-    }
-    (*out).buffer.map_or(0, |buf| buf.len())
-}
 
 /**
  * xmlOutputBufferWriteString:
@@ -4341,35 +4326,35 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_output_buffer_get_content() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_output_buffer_get_content() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_out in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-                let mem_base = xml_mem_blocks();
-                let out = gen_xml_output_buffer_ptr(n_out, 0);
+    //         for n_out in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let out = gen_xml_output_buffer_ptr(n_out, 0);
 
-                let ret_val = xml_output_buffer_get_content(out);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_output_buffer_ptr(n_out, out, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlOutputBufferGetContent",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlOutputBufferGetContent()"
-                    );
-                    eprintln!(" {}", n_out);
-                }
-            }
-        }
-    }
+    //             let ret_val = xml_output_buffer_get_content(out);
+    //             desret_const_xml_char_ptr(ret_val);
+    //             des_xml_output_buffer_ptr(n_out, out, 0);
+    //             reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlOutputBufferGetContent",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(
+    //                     leaks == 0,
+    //                     "{leaks} Leaks are found in xmlOutputBufferGetContent()"
+    //                 );
+    //                 eprintln!(" {}", n_out);
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_xml_output_buffer_get_size() {
