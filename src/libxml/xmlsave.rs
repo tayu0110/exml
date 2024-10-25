@@ -269,7 +269,7 @@ unsafe extern "C" fn xml_escape_entities(
 
     let inend: *const c_uchar = input.add(*inlen as usize);
 
-    while (input < inend) && (out < outend) {
+    while input < inend && out < outend {
         if *input == b'<' {
             if outend.offset_from(out) < 4 {
                 break;
@@ -475,21 +475,21 @@ unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> c_
  *
  * Write out formatting for non-significant whitespace output.
  */
-unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: XmlSaveCtxtPtr, extra: c_int) {
-    if ctxt.is_null() || (*ctxt).buf.is_null() {
+unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, extra: c_int) {
+    if ctxt.buf.is_null() {
         return;
     }
-    xml_output_buffer_write((*ctxt).buf, 1, c"\n".as_ptr() as _);
-    for i in (0..(*ctxt).level + extra).step_by((*ctxt).indent_nr) {
+    xml_output_buffer_write(ctxt.buf, 1, c"\n".as_ptr() as _);
+    for i in (0..ctxt.level + extra).step_by(ctxt.indent_nr) {
         xml_output_buffer_write(
-            (*ctxt).buf,
-            (*ctxt).indent_size as i32
-                * if (*ctxt).level + extra - i > (*ctxt).indent_nr as i32 {
-                    (*ctxt).indent_nr as i32
+            ctxt.buf,
+            ctxt.indent_size as i32
+                * if ctxt.level + extra - i > ctxt.indent_nr as i32 {
+                    ctxt.indent_nr as i32
                 } else {
-                    (*ctxt).level + extra - i
+                    ctxt.level + extra - i
                 },
-            (*ctxt).indent.as_ptr() as *const i8,
+            ctxt.indent.as_ptr() as *const i8,
         );
     }
 }
@@ -520,7 +520,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
         }
 
         if !ctxt.is_null() && (*ctxt).format == 2 {
-            xml_output_buffer_write_ws_non_sig(ctxt, 2);
+            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 2);
         } else {
             xml_output_buffer_write(buf, 1, c" ".as_ptr() as _);
         }
@@ -657,7 +657,7 @@ unsafe extern "C" fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr)
         return;
     }
     if (*ctxt).format == 2 {
-        xml_output_buffer_write_ws_non_sig(ctxt, 2);
+        xml_output_buffer_write_ws_non_sig(&mut *ctxt, 2);
     } else {
         xml_output_buffer_write(buf, 1, c" ".as_ptr() as _);
     }
@@ -776,12 +776,12 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                     if (*cur).children.is_null() {
                         if (*ctxt).options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0 {
                             if (*ctxt).format == 2 {
-                                xml_output_buffer_write_ws_non_sig(ctxt, 0);
+                                xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                             }
                             xml_output_buffer_write(buf, 2, c"/>".as_ptr() as _);
                         } else {
                             if (*ctxt).format == 2 {
-                                xml_output_buffer_write_ws_non_sig(ctxt, 1);
+                                xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
                             }
                             xml_output_buffer_write(buf, 3, c"></".as_ptr() as _);
                             if !(*cur).ns.is_null()
@@ -795,7 +795,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                             }
                             xml_output_buffer_write_string(buf, (*cur).name as _);
                             if (*ctxt).format == 2 {
-                                xml_output_buffer_write_ws_non_sig(ctxt, 0);
+                                xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                             }
                             xml_output_buffer_write(buf, 1, c">".as_ptr() as _);
                         }
@@ -817,7 +817,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                             }
                         }
                         if (*ctxt).format == 2 {
-                            xml_output_buffer_write_ws_non_sig(ctxt, 1);
+                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
                         }
                         xml_output_buffer_write(buf, 1, c">".as_ptr() as _);
                         if (*ctxt).format == 1 {
@@ -863,7 +863,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if !(*cur).content.is_null() {
                         if (*ctxt).format == 2 {
-                            xml_output_buffer_write_ws_non_sig(ctxt, 0);
+                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                         } else {
                             xml_output_buffer_write(buf, 1, c" ".as_ptr() as _);
                         }
@@ -874,7 +874,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                     xml_output_buffer_write(buf, 2, c"<?".as_ptr() as _);
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if (*ctxt).format == 2 {
-                        xml_output_buffer_write_ws_non_sig(ctxt, 0);
+                        xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                     }
                     xml_output_buffer_write(buf, 2, c"?>".as_ptr() as _);
                 }
@@ -985,7 +985,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
 
                 xml_output_buffer_write_string(buf, (*cur).name as _);
                 if (*ctxt).format == 2 {
-                    xml_output_buffer_write_ws_non_sig(ctxt, 0);
+                    xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                 }
                 xml_output_buffer_write(buf, 1, c">".as_ptr() as _);
 
