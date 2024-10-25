@@ -6,7 +6,6 @@ pub mod chvalid;
 #[cfg(feature = "libxml_debug")]
 pub mod debug_xml;
 pub mod dict;
-pub mod encoding;
 pub mod entities;
 pub mod globals;
 pub mod hash;
