@@ -691,6 +691,24 @@ impl XmlOutputBuffer {
         written
     }
 
+    /// Write the content of the string in the output I/O buffer.  
+    /// This routine handle the I18N transcoding from internal UTF-8.  
+    /// The buffer is lossless, i.e. will store in case of partial or delayed writes.
+    ///
+    /// Returns the number of chars immediately written, or -1 in case of error.
+    #[doc(alias = "xmlOutputBufferWriteString")]
+    #[cfg(feature = "output")]
+    pub unsafe fn write_str(&mut self, s: &str) -> c_int {
+        if self.error != 0 {
+            return -1;
+        }
+
+        if !s.is_empty() {
+            return self.write_bytes(s.as_bytes());
+        }
+        s.len() as i32
+    }
+
     /// Gives a pointer to the data currently held in the output buffer
     ///
     /// Returns a pointer to the data or NULL in case of error
@@ -2178,31 +2196,6 @@ pub unsafe fn xml_output_buffer_create_io(
 }
 
 /* Couple of APIs to get the output without digging into the buffers */
-
-/**
- * xmlOutputBufferWriteString:
- * @out:  a buffered parser output
- * @str:  a zero terminated C string
- *
- * Write the content of the string in the output I/O buffer
- * This routine handle the I18N transcoding from c_internal UTF-8
- * The buffer is lossless, i.e. will store in case of partial
- * or delayed writes.
- *
- * Returns the number of chars immediately written, or -1
- *         in case of error.
- */
-#[cfg(feature = "output")]
-pub unsafe fn xml_output_buffer_write_string(out: &mut XmlOutputBuffer, s: &str) -> c_int {
-    if out.error != 0 {
-        return -1;
-    }
-
-    if !s.is_empty() {
-        return (*out).write_bytes(s.as_bytes());
-    }
-    s.len() as i32
-}
 
 /**
  * xmlEscapeContent:

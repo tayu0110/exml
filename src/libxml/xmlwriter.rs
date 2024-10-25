@@ -44,8 +44,7 @@ use crate::{
         uri::xml_canonic_path,
         xml_io::{
             xml_output_buffer_close, xml_output_buffer_create_filename,
-            xml_output_buffer_create_io, xml_output_buffer_flush, xml_output_buffer_write_string,
-            XmlOutputBufferPtr,
+            xml_output_buffer_create_io, xml_output_buffer_flush, XmlOutputBufferPtr,
         },
         xmlerror::XmlParserErrors,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
@@ -961,7 +960,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
     }
 
     sum = 0;
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<?xml version=");
+    count = (*(*writer).out).write_str("<?xml version=");
     if count < 0 {
         return -1;
     }
@@ -972,12 +971,9 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
     }
     sum += count;
     if !version.is_null() {
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(version).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(version).to_string_lossy().as_ref());
     } else {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "1.0");
+        count = (*(*writer).out).write_str("1.0");
     }
     if count < 0 {
         return -1;
@@ -989,7 +985,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
     }
     sum += count;
     if (*(*writer).out).encoder.is_some() {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, " encoding=");
+        count = (*(*writer).out).write_str(" encoding=");
         if count < 0 {
             return -1;
         }
@@ -999,10 +995,8 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            (*(*writer).out).encoder.as_ref().unwrap().borrow().name(),
-        );
+        count =
+            (*(*writer).out).write_str((*(*writer).out).encoder.as_ref().unwrap().borrow().name());
         if count < 0 {
             return -1;
         }
@@ -1015,7 +1009,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
     }
 
     if !standalone.is_null() {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, " standalone=");
+        count = (*(*writer).out).write_str(" standalone=");
         if count < 0 {
             return -1;
         }
@@ -1025,10 +1019,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(standalone).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(standalone).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -1040,7 +1031,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "?>\n");
+    count = (*(*writer).out).write_str("?>\n");
     if count < 0 {
         return -1;
     }
@@ -1133,7 +1124,7 @@ pub unsafe extern "C" fn xml_text_writer_end_document(writer: XmlTextWriterPtr) 
     }
 
     if (*writer).indent == 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+        count = (*(*writer).out).write_str("\n");
         if count < 0 {
             return -1;
         }
@@ -1204,8 +1195,7 @@ unsafe extern "C" fn xml_text_writer_write_indent(writer: XmlTextWriterPtr) -> c
         return -1; /* list is empty */
     }
     for _ in 0..lksize - 1 {
-        ret = xml_output_buffer_write_string(
-            &mut *(*writer).out,
+        ret = (*(*writer).out).write_str(
             CStr::from_ptr((*writer).ichar as _)
                 .to_string_lossy()
                 .as_ref(),
@@ -1257,13 +1247,13 @@ pub unsafe extern "C" fn xml_text_writer_start_comment(writer: XmlTextWriterPtr)
                         return -1;
                     }
                     sum += count;
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+                    count = (*(*writer).out).write_str(">");
                     if count < 0 {
                         return -1;
                     }
                     sum += count;
                     if (*writer).indent != 0 {
-                        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+                        count = (*(*writer).out).write_str("\n");
                         if count < 0 {
                             return -1;
                         }
@@ -1301,7 +1291,7 @@ pub unsafe extern "C" fn xml_text_writer_start_comment(writer: XmlTextWriterPtr)
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<!--");
+    count = (*(*writer).out).write_str("<!--");
     if count < 0 {
         return -1;
     }
@@ -1349,7 +1339,7 @@ pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -
     sum = 0;
     match (*p).state {
         XmlTextWriterState::XmlTextwriterComment => {
-            count = xml_output_buffer_write_string(&mut *(*writer).out, "-->");
+            count = (*(*writer).out).write_str("-->");
             if count < 0 {
                 return -1;
             }
@@ -1361,7 +1351,7 @@ pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -
     }
 
     if (*writer).indent != 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+        count = (*(*writer).out).write_str("\n");
         if count < 0 {
             return -1;
         }
@@ -1535,14 +1525,14 @@ pub unsafe extern "C" fn xml_text_writer_start_element(
                         return -1;
                     }
                     sum += count;
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+                    count = (*(*writer).out).write_str(">");
                     if count < 0 {
                         return -1;
                     }
                     sum += count;
                     if (*writer).indent != 0 {
                         // count =
-                        xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+                        (*(*writer).out).write_str("\n");
                     }
                     (*p).state = XmlTextWriterState::XmlTextwriterText;
                 }
@@ -1580,15 +1570,12 @@ pub unsafe extern "C" fn xml_text_writer_start_element(
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<");
+    count = (*(*writer).out).write_str("<");
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xml_output_buffer_write_string(
-        &mut *(*writer).out,
-        CStr::from_ptr((*p).name as _).to_string_lossy().as_ref(),
-    );
+    count = (*(*writer).out).write_str(CStr::from_ptr((*p).name as _).to_string_lossy().as_ref());
     if count < 0 {
         return -1;
     }
@@ -1729,7 +1716,7 @@ pub unsafe extern "C" fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -
             {
                 (*writer).doindent = 1;
             }
-            count = xml_output_buffer_write_string(&mut *(*writer).out, "/>");
+            count = (*(*writer).out).write_str("/>");
             if count < 0 {
                 return -1;
             }
@@ -1743,20 +1730,18 @@ pub unsafe extern "C" fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -
             } else {
                 (*writer).doindent = 1;
             }
-            count = xml_output_buffer_write_string(&mut *(*writer).out, "</");
+            count = (*(*writer).out).write_str("</");
             if count < 0 {
                 return -1;
             }
             sum += count;
-            count = xml_output_buffer_write_string(
-                &mut *(*writer).out,
-                CStr::from_ptr((*p).name as _).to_string_lossy().as_ref(),
-            );
+            count = (*(*writer).out)
+                .write_str(CStr::from_ptr((*p).name as _).to_string_lossy().as_ref());
             if count < 0 {
                 return -1;
             }
             sum += count;
-            count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+            count = (*(*writer).out).write_str(">");
             if count < 0 {
                 return -1;
             }
@@ -1768,7 +1753,7 @@ pub unsafe extern "C" fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -
     }
 
     if (*writer).indent != 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+        count = (*(*writer).out).write_str("\n");
         sum += count;
     }
 
@@ -1826,7 +1811,7 @@ pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterP
                 }
                 sum += count;
 
-                count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+                count = (*(*writer).out).write_str(">");
                 if count < 0 {
                     return -1;
                 }
@@ -1843,20 +1828,18 @@ pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterP
             } else {
                 (*writer).doindent = 1;
             }
-            count = xml_output_buffer_write_string(&mut *(*writer).out, "</");
+            count = (*(*writer).out).write_str("</");
             if count < 0 {
                 return -1;
             }
             sum += count;
-            count = xml_output_buffer_write_string(
-                &mut *(*writer).out,
-                CStr::from_ptr((*p).name as _).to_string_lossy().as_ref(),
-            );
+            count = (*(*writer).out)
+                .write_str(CStr::from_ptr((*p).name as _).to_string_lossy().as_ref());
             if count < 0 {
                 return -1;
             }
             sum += count;
-            count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+            count = (*(*writer).out).write_str(">");
             if count < 0 {
                 return -1;
             }
@@ -1868,7 +1851,7 @@ pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterP
     }
 
     if (*writer).indent != 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+        count = (*(*writer).out).write_str("\n");
         sum += count;
     }
 
@@ -2253,10 +2236,8 @@ unsafe extern "C" fn xml_text_writer_handle_state_dependencies(
     }
 
     if extra[0] != b'\0' as i8 {
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(extra.as_ptr()).to_string_lossy().as_ref(),
-        );
+        count =
+            (*(*writer).out).write_str(CStr::from_ptr(extra.as_ptr()).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -2774,20 +2755,18 @@ pub unsafe extern "C" fn xml_text_writer_start_attribute(
                 sum += count;
             }
 
-            count = xml_output_buffer_write_string(&mut *(*writer).out, " ");
+            count = (*(*writer).out).write_str(" ");
             if count < 0 {
                 return -1;
             }
             sum += count;
-            count = xml_output_buffer_write_string(
-                &mut *(*writer).out,
-                CStr::from_ptr(name as _).to_string_lossy().as_ref(),
-            );
+            count =
+                (*(*writer).out).write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref());
             if count < 0 {
                 return -1;
             }
             sum += count;
-            count = xml_output_buffer_write_string(&mut *(*writer).out, "=");
+            count = (*(*writer).out).write_str("=");
             if count < 0 {
                 return -1;
             }
@@ -3239,7 +3218,7 @@ pub unsafe extern "C" fn xml_text_writer_start_pi(
                         return -1;
                     }
                     sum += count;
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+                    count = (*(*writer).out).write_str(">");
                     if count < 0 {
                         return -1;
                     }
@@ -3288,15 +3267,12 @@ pub unsafe extern "C" fn xml_text_writer_start_pi(
 
     xml_list_push_front((*writer).nodes, p as _);
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<?");
+    count = (*(*writer).out).write_str("<?");
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xml_output_buffer_write_string(
-        &mut *(*writer).out,
-        CStr::from_ptr((*p).name as _).to_string_lossy().as_ref(),
-    );
+    count = (*(*writer).out).write_str(CStr::from_ptr((*p).name as _).to_string_lossy().as_ref());
     if count < 0 {
         return -1;
     }
@@ -3334,7 +3310,7 @@ pub unsafe extern "C" fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> c_i
     sum = 0;
     match (*p).state {
         XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
-            count = xml_output_buffer_write_string(&mut *(*writer).out, "?>");
+            count = (*(*writer).out).write_str("?>");
             if count < 0 {
                 return -1;
             }
@@ -3346,7 +3322,7 @@ pub unsafe extern "C" fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> c_i
     }
 
     if (*writer).indent != 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+        count = (*(*writer).out).write_str("\n");
         if count < 0 {
             return -1;
         }
@@ -3525,7 +3501,7 @@ pub unsafe extern "C" fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -
                         return -1;
                     }
                     sum += count;
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+                    count = (*(*writer).out).write_str(">");
                     if count < 0 {
                         return -1;
                     }
@@ -3563,7 +3539,7 @@ pub unsafe extern "C" fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -
 
     xml_list_push_front((*writer).nodes, p as _);
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<![CDATA[");
+    count = (*(*writer).out).write_str("<![CDATA[");
     if count < 0 {
         return -1;
     }
@@ -3601,7 +3577,7 @@ pub unsafe extern "C" fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> 
     sum = 0;
     match (*p).state {
         XmlTextWriterState::XmlTextwriterCdata => {
-            count = xml_output_buffer_write_string(&mut *(*writer).out, "]]>");
+            count = (*(*writer).out).write_str("]]>");
             if count < 0 {
                 return -1;
             }
@@ -3730,15 +3706,12 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
 
     xml_list_push_front((*writer).nodes, p as _);
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<!DOCTYPE ");
+    count = (*(*writer).out).write_str("<!DOCTYPE ");
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xml_output_buffer_write_string(
-        &mut *(*writer).out,
-        CStr::from_ptr(name as _).to_string_lossy().as_ref(),
-    );
+    count = (*(*writer).out).write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref());
     if count < 0 {
         return -1;
     }
@@ -3764,7 +3737,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
         }
         sum += count;
 
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "PUBLIC ");
+        count = (*(*writer).out).write_str("PUBLIC ");
         if count < 0 {
             return -1;
         }
@@ -3776,10 +3749,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
         }
         sum += count;
 
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(pubid as _).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -3803,14 +3773,14 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
                 return -1;
             }
             sum += count;
-            count = xml_output_buffer_write_string(&mut *(*writer).out, "SYSTEM ");
+            count = (*(*writer).out).write_str("SYSTEM ");
             if count < 0 {
                 return -1;
             }
             sum += count;
         } else {
             if (*writer).indent != 0 {
-                count = xml_output_buffer_write_string(&mut *(*writer).out, "\n       ");
+                count = (*(*writer).out).write_str("\n       ");
             } else {
                 count = (*(*writer).out).write_bytes(b" ");
             }
@@ -3826,10 +3796,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
         }
         sum += count;
 
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(sysid as _).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -3879,21 +3846,21 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> c_
             ty @ XmlTextWriterState::XmlTextwriterDtdText
             | ty @ XmlTextWriterState::XmlTextwriterDtd => {
                 if matches!(ty, XmlTextWriterState::XmlTextwriterDtdText) {
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, "]");
+                    count = (*(*writer).out).write_str("]");
                     if count < 0 {
                         return -1;
                     }
                     sum += count;
                 }
 
-                count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+                count = (*(*writer).out).write_str(">");
 
                 if (*writer).indent != 0 {
                     if count < 0 {
                         return -1;
                     }
                     sum += count;
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+                    count = (*(*writer).out).write_str("\n");
                 }
 
                 xml_list_pop_front((*writer).nodes);
@@ -4039,13 +4006,13 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdelement(
     if !p.is_null() {
         match (*p).state {
             XmlTextWriterState::XmlTextwriterDtd => {
-                count = xml_output_buffer_write_string(&mut *(*writer).out, " [");
+                count = (*(*writer).out).write_str(" [");
                 if count < 0 {
                     return -1;
                 }
                 sum += count;
                 if (*writer).indent != 0 {
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+                    count = (*(*writer).out).write_str("\n");
                     if count < 0 {
                         return -1;
                     }
@@ -4092,15 +4059,12 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdelement(
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<!ELEMENT ");
+    count = (*(*writer).out).write_str("<!ELEMENT ");
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xml_output_buffer_write_string(
-        &mut *(*writer).out,
-        CStr::from_ptr(name as _).to_string_lossy().as_ref(),
-    );
+    count = (*(*writer).out).write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref());
     if count < 0 {
         return -1;
     }
@@ -4138,7 +4102,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr
 
     match (*p).state {
         XmlTextWriterState::XmlTextwriterDtdElem | XmlTextWriterState::XmlTextwriterDtdElemText => {
-            count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+            count = (*(*writer).out).write_str(">");
             if count < 0 {
                 return -1;
             }
@@ -4150,7 +4114,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr
     }
 
     if (*writer).indent != 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+        count = (*(*writer).out).write_str("\n");
         if count < 0 {
             return -1;
         }
@@ -4255,13 +4219,13 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdattlist(
     if !p.is_null() {
         match (*p).state {
             XmlTextWriterState::XmlTextwriterDtd => {
-                count = xml_output_buffer_write_string(&mut *(*writer).out, " [");
+                count = (*(*writer).out).write_str(" [");
                 if count < 0 {
                     return -1;
                 }
                 sum += count;
                 if (*writer).indent != 0 {
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+                    count = (*(*writer).out).write_str("\n");
                     if count < 0 {
                         return -1;
                     }
@@ -4308,15 +4272,12 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdattlist(
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<!ATTLIST ");
+    count = (*(*writer).out).write_str("<!ATTLIST ");
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xml_output_buffer_write_string(
-        &mut *(*writer).out,
-        CStr::from_ptr(name as _).to_string_lossy().as_ref(),
-    );
+    count = (*(*writer).out).write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref());
     if count < 0 {
         return -1;
     }
@@ -4354,7 +4315,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPt
 
     match (*p).state {
         XmlTextWriterState::XmlTextwriterDtdAttl | XmlTextWriterState::XmlTextwriterDtdAttlText => {
-            count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+            count = (*(*writer).out).write_str(">");
             if count < 0 {
                 return -1;
             }
@@ -4366,7 +4327,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPt
     }
 
     if (*writer).indent != 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+        count = (*(*writer).out).write_str("\n");
         if count < 0 {
             return -1;
         }
@@ -4469,13 +4430,13 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd_entity(
         if !p.is_null() {
             match (*p).state {
                 XmlTextWriterState::XmlTextwriterDtd => {
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, " [");
+                    count = (*(*writer).out).write_str(" [");
                     if count < 0 {
                         return -1;
                     }
                     sum += count;
                     if (*writer).indent != 0 {
-                        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+                        count = (*(*writer).out).write_str("\n");
                         if count < 0 {
                             return -1;
                         }
@@ -4529,24 +4490,21 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd_entity(
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<!ENTITY ");
+    count = (*(*writer).out).write_str("<!ENTITY ");
     if count < 0 {
         return -1;
     }
     sum += count;
 
     if pe != 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "% ");
+        count = (*(*writer).out).write_str("% ");
         if count < 0 {
             return -1;
         }
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(
-        &mut *(*writer).out,
-        CStr::from_ptr(name as _).to_string_lossy().as_ref(),
-    );
+    count = (*(*writer).out).write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref());
     if count < 0 {
         return -1;
     }
@@ -4593,7 +4551,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr
                 }
                 sum += count;
             }
-            count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+            count = (*(*writer).out).write_str(">");
             if count < 0 {
                 return -1;
             }
@@ -4605,7 +4563,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr
     }
 
     if (*writer).indent != 0 {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+        count = (*(*writer).out).write_str("\n");
         if count < 0 {
             return -1;
         }
@@ -4803,7 +4761,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
             return -1;
         }
 
-        count = xml_output_buffer_write_string(&mut *(*writer).out, " PUBLIC ");
+        count = (*(*writer).out).write_str(" PUBLIC ");
         if count < 0 {
             return -1;
         }
@@ -4815,10 +4773,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
         }
         sum += count;
 
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(pubid as _).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -4833,14 +4788,14 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
 
     if !sysid.is_null() {
         if pubid.is_null() {
-            count = xml_output_buffer_write_string(&mut *(*writer).out, " SYSTEM");
+            count = (*(*writer).out).write_str(" SYSTEM");
             if count < 0 {
                 return -1;
             }
             sum += count;
         }
 
-        count = xml_output_buffer_write_string(&mut *(*writer).out, " ");
+        count = (*(*writer).out).write_str(" ");
         if count < 0 {
             return -1;
         }
@@ -4852,10 +4807,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
         }
         sum += count;
 
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(sysid as _).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -4869,16 +4821,13 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
     }
 
     if !ndataid.is_null() {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, " NDATA ");
+        count = (*(*writer).out).write_str(" NDATA ");
         if count < 0 {
             return -1;
         }
         sum += count;
 
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(ndataid as _).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(ndataid as _).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -4962,13 +4911,13 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
     if !p.is_null() {
         match (*p).state {
             XmlTextWriterState::XmlTextwriterDtd => {
-                count = xml_output_buffer_write_string(&mut *(*writer).out, " [");
+                count = (*(*writer).out).write_str(" [");
                 if count < 0 {
                     return -1;
                 }
                 sum += count;
                 if (*writer).indent != 0 {
-                    count = xml_output_buffer_write_string(&mut *(*writer).out, "\n");
+                    count = (*(*writer).out).write_str("\n");
                     if count < 0 {
                         return -1;
                     }
@@ -4991,22 +4940,19 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, "<!NOTATION ");
+    count = (*(*writer).out).write_str("<!NOTATION ");
     if count < 0 {
         return -1;
     }
     sum += count;
-    count = xml_output_buffer_write_string(
-        &mut *(*writer).out,
-        CStr::from_ptr(name as _).to_string_lossy().as_ref(),
-    );
+    count = (*(*writer).out).write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref());
     if count < 0 {
         return -1;
     }
     sum += count;
 
     if !pubid.is_null() {
-        count = xml_output_buffer_write_string(&mut *(*writer).out, " PUBLIC ");
+        count = (*(*writer).out).write_str(" PUBLIC ");
         if count < 0 {
             return -1;
         }
@@ -5016,10 +4962,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(pubid as _).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -5033,13 +4976,13 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
 
     if !sysid.is_null() {
         if pubid.is_null() {
-            count = xml_output_buffer_write_string(&mut *(*writer).out, " SYSTEM");
+            count = (*(*writer).out).write_str(" SYSTEM");
             if count < 0 {
                 return -1;
             }
             sum += count;
         }
-        count = xml_output_buffer_write_string(&mut *(*writer).out, " ");
+        count = (*(*writer).out).write_str(" ");
         if count < 0 {
             return -1;
         }
@@ -5049,10 +4992,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write_string(
-            &mut *(*writer).out,
-            CStr::from_ptr(sysid as _).to_string_lossy().as_ref(),
-        );
+        count = (*(*writer).out).write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref());
         if count < 0 {
             return -1;
         }
@@ -5064,7 +5004,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
         sum += count;
     }
 
-    count = xml_output_buffer_write_string(&mut *(*writer).out, ">");
+    count = (*(*writer).out).write_str(">");
     if count < 0 {
         return -1;
     }
