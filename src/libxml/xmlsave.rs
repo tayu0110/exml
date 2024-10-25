@@ -526,7 +526,12 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
         /* Within the context of an element attributes */
         if !(*cur).prefix.load(Ordering::Relaxed).is_null() {
             (*buf).write_bytes(b"xmlns:");
-            xml_output_buffer_write_string(&mut *buf, (*cur).prefix.load(Ordering::Relaxed) as _);
+            xml_output_buffer_write_string(
+                &mut *buf,
+                CStr::from_ptr((*cur).prefix.load(Ordering::Relaxed) as _)
+                    .to_string_lossy()
+                    .as_ref(),
+            );
         } else {
             (*buf).write_bytes(b"xmlns");
         }
@@ -660,10 +665,18 @@ unsafe extern "C" fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr)
         (*buf).write_bytes(b" ");
     }
     if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
-        xml_output_buffer_write_string(&mut *buf, (*(*cur).ns).prefix.load(Ordering::Relaxed) as _);
+        xml_output_buffer_write_string(
+            &mut *buf,
+            CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                .to_string_lossy()
+                .as_ref(),
+        );
         (*buf).write_bytes(b":");
     }
-    xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+    xml_output_buffer_write_string(
+        &mut *buf,
+        CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+    );
     (*buf).write_bytes(b"=\"");
     xml_attr_serialize_content(buf, cur);
     (*buf).write_bytes(b"\"");
@@ -754,11 +767,16 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                     {
                         xml_output_buffer_write_string(
                             &mut *buf,
-                            (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
+                            CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                                .to_string_lossy()
+                                .as_ref(),
                         );
                         (*buf).write_bytes(b":");
                     }
-                    xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                    xml_output_buffer_write_string(
+                        &mut *buf,
+                        CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                    );
                     if !(*cur).ns_def.is_null() {
                         xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
                     }
@@ -784,11 +802,14 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                             {
                                 xml_output_buffer_write_string(
                                     &mut *buf,
-                                    (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
+                                    CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _).to_string_lossy().as_ref(),
                                 );
                                 (*buf).write_bytes(b":");
                             }
-                            xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                            xml_output_buffer_write_string(
+                                &mut *buf,
+                                CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                            );
                             if (*ctxt).format == 2 {
                                 xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                             }
@@ -835,7 +856,12 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                         /*
                          * Disable escaping, needed for XSLT
                          */
-                        xml_output_buffer_write_string(&mut *buf, (*cur).content as _);
+                        xml_output_buffer_write_string(
+                            &mut *buf,
+                            CStr::from_ptr((*cur).content as _)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
                     }
                 }
             }
@@ -852,19 +878,30 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
 
                 if !(*cur).content.is_null() {
                     (*buf).write_bytes(b"<?");
-                    xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                    xml_output_buffer_write_string(
+                        &mut *buf,
+                        CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                    );
                     if !(*cur).content.is_null() {
                         if (*ctxt).format == 2 {
                             xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                         } else {
                             (*buf).write_bytes(b" ");
                         }
-                        xml_output_buffer_write_string(&mut *buf, (*cur).content as _);
+                        xml_output_buffer_write_string(
+                            &mut *buf,
+                            CStr::from_ptr((*cur).content as _)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
                     }
                     (*buf).write_bytes(b"?>");
                 } else {
                     (*buf).write_bytes(b"<?");
-                    xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                    xml_output_buffer_write_string(
+                        &mut *buf,
+                        CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                    );
                     if (*ctxt).format == 2 {
                         xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                     }
@@ -884,13 +921,21 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
 
                 if !(*cur).content.is_null() {
                     (*buf).write_bytes(b"<!--");
-                    xml_output_buffer_write_string(&mut *buf, (*cur).content as _);
+                    xml_output_buffer_write_string(
+                        &mut *buf,
+                        CStr::from_ptr((*cur).content as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                     (*buf).write_bytes(b"-->");
                 }
             }
             XmlElementType::XmlEntityRefNode => {
                 (*buf).write_bytes(b"&");
-                xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                xml_output_buffer_write_string(
+                    &mut *buf,
+                    CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                );
                 (*buf).write_bytes(b";");
             }
             XmlElementType::XmlCdataSectionNode => {
@@ -914,7 +959,10 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                     }
                     if start != end {
                         (*buf).write_bytes(b"<![CDATA[");
-                        xml_output_buffer_write_string(&mut *buf, start as _);
+                        xml_output_buffer_write_string(
+                            &mut *buf,
+                            CStr::from_ptr(start as _).to_string_lossy().as_ref(),
+                        );
                         (*buf).write_bytes(b"]]>");
                     }
                 }
@@ -967,12 +1015,17 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
                     xml_output_buffer_write_string(
                         &mut *buf,
-                        (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
+                        CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                            .to_string_lossy()
+                            .as_ref(),
                     );
                     (*buf).write_bytes(b":");
                 }
 
-                xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                xml_output_buffer_write_string(
+                    &mut *buf,
+                    CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                );
                 if (*ctxt).format == 2 {
                     xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                 }
@@ -1005,7 +1058,10 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     }
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     (*buf).write_bytes(b"<!DOCTYPE ");
-    xml_output_buffer_write_string(&mut *buf, (*dtd).name as _);
+    xml_output_buffer_write_string(
+        &mut *buf,
+        CStr::from_ptr((*dtd).name as _).to_string_lossy().as_ref(),
+    );
     if !(*dtd).external_id.is_null() {
         (*buf).write_bytes(b" PUBLIC ");
         if let Some(mut buf) = (*buf).buffer {
@@ -1356,12 +1412,17 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
                     xml_output_buffer_write_string(
                         &mut *buf,
-                        (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
+                        CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                            .to_string_lossy()
+                            .as_ref(),
                     );
                     (*buf).write_bytes(b":");
                 }
 
-                xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                xml_output_buffer_write_string(
+                    &mut *buf,
+                    CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                );
                 if !(*cur).ns_def.is_null() {
                     xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
                 }
@@ -1374,7 +1435,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                      */
                     xml_output_buffer_write_string(
                         &mut *buf,
-                        c" xmlns=\"http://www.w3.org/1999/xhtml\"".as_ptr() as _,
+                        " xmlns=\"http://www.w3.org/1999/xhtml\"",
                     );
                 }
                 if !(*cur).properties.is_null() {
@@ -1432,11 +1493,15 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                             }
                             xml_output_buffer_write_string(
                                 &mut *buf,
-                                c"<meta http-equiv=\"Content-Type\" content=\"text/html; charset="
-                                    .as_ptr() as _,
+                                "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=",
                             );
                             if !(*ctxt).encoding.is_null() {
-                                xml_output_buffer_write_string(&mut *buf, (*ctxt).encoding as _);
+                                xml_output_buffer_write_string(
+                                    &mut *buf,
+                                    CStr::from_ptr((*ctxt).encoding as _)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                );
                             } else {
                                 (*buf).write_bytes(b"UTF-8");
                             }
@@ -1456,11 +1521,16 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         {
                             xml_output_buffer_write_string(
                                 &mut *buf,
-                                (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
+                                CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                                    .to_string_lossy()
+                                    .as_ref(),
                             );
                             (*buf).write_bytes(b":");
                         }
-                        xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                        xml_output_buffer_write_string(
+                            &mut *buf,
+                            CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                        );
                         (*buf).write_bytes(b">");
                     }
                 } else {
@@ -1480,11 +1550,15 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         }
                         xml_output_buffer_write_string(
                             &mut *buf,
-                            c"<meta http-equiv=\"Content-Type\" content=\"text/html; charset="
-                                .as_ptr() as _,
+                            "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=",
                         );
                         if !(*ctxt).encoding.is_null() {
-                            xml_output_buffer_write_string(&mut *buf, (*ctxt).encoding as _);
+                            xml_output_buffer_write_string(
+                                &mut *buf,
+                                CStr::from_ptr((*ctxt).encoding as _)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            );
                         } else {
                             (*buf).write_bytes(b"UTF-8");
                         }
@@ -1528,34 +1602,58 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     /*
                      * Disable escaping, needed for XSLT
                      */
-                    xml_output_buffer_write_string(&mut *buf, (*cur).content as _);
+                    xml_output_buffer_write_string(
+                        &mut *buf,
+                        CStr::from_ptr((*cur).content as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                 }
             }
             XmlElementType::XmlPiNode => {
                 if !(*cur).content.is_null() {
                     (*buf).write_bytes(b"<?");
-                    xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                    xml_output_buffer_write_string(
+                        &mut *buf,
+                        CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                    );
                     if !(*cur).content.is_null() {
                         (*buf).write_bytes(b" ");
-                        xml_output_buffer_write_string(&mut *buf, (*cur).content as _);
+                        xml_output_buffer_write_string(
+                            &mut *buf,
+                            CStr::from_ptr((*cur).content as _)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
                     }
                     (*buf).write_bytes(b"?>");
                 } else {
                     (*buf).write_bytes(b"<?");
-                    xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                    xml_output_buffer_write_string(
+                        &mut *buf,
+                        CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                    );
                     (*buf).write_bytes(b"?>");
                 }
             }
             XmlElementType::XmlCommentNode => {
                 if !(*cur).content.is_null() {
                     (*buf).write_bytes(b"<!--");
-                    xml_output_buffer_write_string(&mut *buf, (*cur).content as _);
+                    xml_output_buffer_write_string(
+                        &mut *buf,
+                        CStr::from_ptr((*cur).content as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                     (*buf).write_bytes(b"-->");
                 }
             }
             XmlElementType::XmlEntityRefNode => {
                 (*buf).write_bytes(b"&");
-                xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                xml_output_buffer_write_string(
+                    &mut *buf,
+                    CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                );
                 (*buf).write_bytes(b";");
             }
             XmlElementType::XmlCdataSectionNode => {
@@ -1580,7 +1678,10 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     }
                     if start != end {
                         (*buf).write_bytes(b"<![CDATA[");
-                        xml_output_buffer_write_string(&mut *buf, start as _);
+                        xml_output_buffer_write_string(
+                            &mut *buf,
+                            CStr::from_ptr(start as _).to_string_lossy().as_ref(),
+                        );
                         (*buf).write_bytes(b"]]>");
                     }
                 }
@@ -1625,12 +1726,17 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
                     xml_output_buffer_write_string(
                         &mut *buf,
-                        (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
+                        CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                            .to_string_lossy()
+                            .as_ref(),
                     );
                     (*buf).write_bytes(b":");
                 }
 
-                xml_output_buffer_write_string(&mut *buf, (*cur).name as _);
+                xml_output_buffer_write_string(
+                    &mut *buf,
+                    CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
+                );
                 (*buf).write_bytes(b">");
 
                 if cur == unformatted_node {

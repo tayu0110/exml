@@ -2193,22 +2193,15 @@ pub unsafe fn xml_output_buffer_create_io(
  *         in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_write_string(
-    out: &mut XmlOutputBuffer,
-    str: *const c_char,
-) -> c_int {
+pub unsafe fn xml_output_buffer_write_string(out: &mut XmlOutputBuffer, s: &str) -> c_int {
     if out.error != 0 {
         return -1;
     }
-    if str.is_null() {
-        return -1;
-    }
-    let len = strlen(str);
 
-    if len > 0 {
-        return (*out).write_bytes(from_raw_parts(str as *const u8, len));
+    if !s.is_empty() {
+        return (*out).write_bytes(s.as_bytes());
     }
-    len as i32
+    s.len() as i32
 }
 
 /**
