@@ -10767,6 +10767,8 @@ pub unsafe fn html_create_push_parser_ctxt(
     filename: *const c_char,
     enc: XmlCharEncoding,
 ) -> HtmlParserCtxtPtr {
+    use std::slice::from_raw_parts;
+
     xml_init_parser();
 
     let buf: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
@@ -10817,7 +10819,10 @@ pub unsafe fn html_create_push_parser_ctxt(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, size, chunk);
+        xml_parser_input_buffer_push(
+            &mut *(*(*ctxt).input).buf,
+            from_raw_parts(chunk as *const u8, size as usize),
+        );
 
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
@@ -11716,6 +11721,8 @@ pub unsafe extern "C" fn html_parse_chunk(
     size: c_int,
     terminate: c_int,
 ) -> c_int {
+    use std::slice::from_raw_parts;
+
     if ctxt.is_null() || (*ctxt).input.is_null() {
         html_parse_err(
             ctxt,
@@ -11740,7 +11747,10 @@ pub unsafe extern "C" fn html_parse_chunk(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        let res: c_int = xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, size, chunk);
+        let res: c_int = xml_parser_input_buffer_push(
+            &mut *(*(*ctxt).input).buf,
+            from_raw_parts(chunk as *const u8, size as usize),
+        );
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
                 .buffer

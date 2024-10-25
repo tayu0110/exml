@@ -1287,16 +1287,7 @@ unsafe extern "C" fn end_of_input(
  * Returns the number of chars read and stored in the buffer, or -1
  *         in case of error.
  */
-pub unsafe extern "C" fn xml_parser_input_buffer_push(
-    input: &mut XmlParserInputBuffer,
-    len: c_int,
-    buf: *const c_char,
-) -> c_int {
-    let nbchars: c_int;
-
-    if len < 0 {
-        return 0;
-    }
+pub fn xml_parser_input_buffer_push(input: &mut XmlParserInputBuffer, buf: &[u8]) -> c_int {
     if input.error != 0 {
         return -1;
     }
@@ -1307,11 +1298,9 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
         if input.raw.is_none() {
             input.raw = XmlBufRef::new();
         }
-        if buf.is_null()
-            || input.raw.map_or(true, |mut raw| {
-                raw.push_bytes(from_raw_parts(buf as *const u8, len as usize))
-                    .is_err()
-            })
+        if input
+            .raw
+            .map_or(true, |mut raw| raw.push_bytes(buf).is_err())
         {
             return -1;
         }
@@ -1321,30 +1310,26 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
          */
         let using: size_t = input.raw.map_or(0, |raw| raw.len());
         let Ok(written) = input.decode(true) else {
-            xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+            unsafe {
+                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+            }
             input.error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
         };
-        nbchars = written as i32;
         let consumed: size_t = using - input.raw.map_or(0, |raw| raw.len());
-        if consumed as u64 > u64::MAX || (input.rawconsumed > u64::MAX - consumed as c_ulong) {
-            input.rawconsumed = u64::MAX;
-        } else {
-            input.rawconsumed += consumed as u64;
-        }
+        input.rawconsumed = input.rawconsumed.saturating_add(consumed as u64);
+        written as i32
     } else {
-        nbchars = len;
-        if buf.is_null()
-            || input
-                .buffer
-                .expect("Internal Error")
-                .push_bytes(from_raw_parts(buf as *const u8, nbchars as usize))
-                .is_err()
+        if input
+            .buffer
+            .expect("Internal Error")
+            .push_bytes(buf)
+            .is_err()
         {
             return -1;
         }
+        buf.len() as i32
     }
-    nbchars
 }
 
 /**

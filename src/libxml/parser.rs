@@ -5381,7 +5381,10 @@ pub unsafe fn xml_create_push_parser_ctxt(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, size, chunk);
+        xml_parser_input_buffer_push(
+            &mut *(*(*ctxt).input).buf,
+            from_raw_parts(chunk as *const u8, size as usize),
+        );
 
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
@@ -9719,7 +9722,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     let current: size_t =
                         (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-                    xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, 0, c"".as_ptr() as _);
+                    xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, "".as_bytes());
                     xml_buf_set_input_base_cur(
                         (*(*(*ctxt).input).buf)
                             .buffer
@@ -10503,7 +10506,10 @@ pub unsafe extern "C" fn xml_parse_chunk(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        let res: c_int = xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, size, chunk);
+        let res: c_int = xml_parser_input_buffer_push(
+            &mut *(*(*ctxt).input).buf,
+            from_raw_parts(chunk as *const u8, size as usize),
+        );
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
                 .buffer
@@ -10573,7 +10579,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
         );
         let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, 1, c"\r".as_ptr() as _);
+        xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, b"\r");
 
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
@@ -11279,7 +11285,10 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, size, chunk);
+        xml_parser_input_buffer_push(
+            &mut *(*(*ctxt).input).buf,
+            from_raw_parts(chunk as *const u8, size as usize),
+        );
 
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
