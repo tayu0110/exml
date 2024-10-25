@@ -89,9 +89,9 @@ pub struct XmlSaveCtxt {
     pub(crate) options: c_int,
     pub(crate) level: c_int,
     pub(crate) format: c_int,
-    pub(crate) indent: [c_char; MAX_INDENT + 1], /* array for indenting output */
-    pub(crate) indent_nr: c_int,
-    pub(crate) indent_size: c_int,
+    pub(crate) indent: [u8; MAX_INDENT + 1], /* array for indenting output */
+    pub(crate) indent_nr: usize,
+    pub(crate) indent_size: usize,
     pub(crate) escape: Option<XmlCharEncodingOutputFunc>, /* used for element content */
     pub(crate) escape_attr: Option<XmlCharEncodingOutputFunc>, /* used for attribute content */
 }
@@ -427,18 +427,16 @@ pub(crate) unsafe fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
         if len == 0 {
             ctxt.indent.fill(0);
         } else {
-            ctxt.indent_size = len as i32;
-            ctxt.indent_nr = MAX_INDENT as i32 / ctxt.indent_size;
+            ctxt.indent_size = len;
+            ctxt.indent_nr = MAX_INDENT / ctxt.indent_size;
             for i in 0..ctxt.indent_nr {
                 memcpy(
-                    ctxt.indent
-                        .as_mut_ptr()
-                        .add(i as usize * ctxt.indent_size as usize) as _,
+                    ctxt.indent.as_mut_ptr().add(i * ctxt.indent_size) as _,
                     state.tree_indent_string.as_ptr() as _,
-                    ctxt.indent_size as _,
+                    ctxt.indent_size,
                 );
             }
-            ctxt.indent[ctxt.indent_nr as usize * ctxt.indent_size as usize] = 0;
+            ctxt.indent[ctxt.indent_nr * ctxt.indent_size] = 0;
         }
 
         if state.save_no_empty_tags != 0 {
@@ -486,16 +484,16 @@ unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: XmlSaveCtxtPtr, ex
         return;
     }
     xml_output_buffer_write((*ctxt).buf, 1, c"\n".as_ptr() as _);
-    for i in (0..(*ctxt).level + extra).step_by((*ctxt).indent_nr as usize) {
+    for i in (0..(*ctxt).level + extra).step_by((*ctxt).indent_nr) {
         xml_output_buffer_write(
             (*ctxt).buf,
-            (*ctxt).indent_size
-                * if (*ctxt).level + extra - i > (*ctxt).indent_nr {
-                    (*ctxt).indent_nr
+            (*ctxt).indent_size as i32
+                * if (*ctxt).level + extra - i > (*ctxt).indent_nr as i32 {
+                    (*ctxt).indent_nr as i32
                 } else {
                     (*ctxt).level + extra - i
                 },
-            (*ctxt).indent.as_ptr(),
+            (*ctxt).indent.as_ptr() as *const i8,
         );
     }
 }
@@ -741,13 +739,13 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
                     xml_output_buffer_write(
                         buf,
-                        (*ctxt).indent_size
-                            * if (*ctxt).level > (*ctxt).indent_nr {
-                                (*ctxt).indent_nr
+                        (*ctxt).indent_size as i32
+                            * if (*ctxt).level > (*ctxt).indent_nr as i32 {
+                                (*ctxt).indent_nr as i32
                             } else {
                                 (*ctxt).level
                             },
-                        (*ctxt).indent.as_ptr(),
+                        (*ctxt).indent.as_ptr() as *const i8,
                     );
                 }
 
@@ -854,13 +852,13 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
                     xml_output_buffer_write(
                         buf,
-                        (*ctxt).indent_size
-                            * if (*ctxt).level > (*ctxt).indent_nr {
-                                (*ctxt).indent_nr
+                        (*ctxt).indent_size as i32
+                            * if (*ctxt).level > (*ctxt).indent_nr as i32 {
+                                (*ctxt).indent_nr as i32
                             } else {
                                 (*ctxt).level
                             },
-                        (*ctxt).indent.as_ptr(),
+                        (*ctxt).indent.as_ptr() as *const i8,
                     );
                 }
 
@@ -889,13 +887,13 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
                     xml_output_buffer_write(
                         buf,
-                        (*ctxt).indent_size
-                            * if (*ctxt).level > (*ctxt).indent_nr {
-                                (*ctxt).indent_nr
+                        (*ctxt).indent_size as i32
+                            * if (*ctxt).level > (*ctxt).indent_nr as i32 {
+                                (*ctxt).indent_nr as i32
                             } else {
                                 (*ctxt).level
                             },
-                        (*ctxt).indent.as_ptr(),
+                        (*ctxt).indent.as_ptr() as *const i8,
                     );
                 }
 
@@ -970,13 +968,13 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 if *xml_indent_tree_output() != 0 && (*ctxt).format == 1 {
                     xml_output_buffer_write(
                         buf,
-                        (*ctxt).indent_size
-                            * if (*ctxt).level > (*ctxt).indent_nr {
-                                (*ctxt).indent_nr
+                        (*ctxt).indent_size as i32
+                            * if (*ctxt).level > (*ctxt).indent_nr as i32 {
+                                (*ctxt).indent_nr as i32
                             } else {
                                 (*ctxt).level
                             },
-                        (*ctxt).indent.as_ptr(),
+                        (*ctxt).indent.as_ptr() as *const i8,
                     );
                 }
 
@@ -1352,13 +1350,13 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
                     xml_output_buffer_write(
                         buf,
-                        (*ctxt).indent_size
-                            * if (*ctxt).level > (*ctxt).indent_nr {
-                                (*ctxt).indent_nr
+                        (*ctxt).indent_size as i32
+                            * if (*ctxt).level > (*ctxt).indent_nr as i32 {
+                                (*ctxt).indent_nr as i32
                             } else {
                                 (*ctxt).level
                             },
-                        (*ctxt).indent.as_ptr(),
+                        (*ctxt).indent.as_ptr() as *const i8,
                     );
                 }
 
@@ -1443,13 +1441,13 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                                 if *xml_indent_tree_output() != 0 {
                                     xml_output_buffer_write(
                                         buf,
-                                        (*ctxt).indent_size
-                                            * if (*ctxt).level + 1 > (*ctxt).indent_nr {
-                                                (*ctxt).indent_nr
+                                        (*ctxt).indent_size as i32
+                                            * if (*ctxt).level + 1 > (*ctxt).indent_nr as i32 {
+                                                (*ctxt).indent_nr as i32
                                             } else {
                                                 (*ctxt).level + 1
                                             },
-                                        (*ctxt).indent.as_ptr(),
+                                        (*ctxt).indent.as_ptr() as *const i8,
                                     );
                                 }
                             }
@@ -1494,13 +1492,13 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                             if *xml_indent_tree_output() != 0 {
                                 xml_output_buffer_write(
                                     buf,
-                                    (*ctxt).indent_size
-                                        * if (*ctxt).level + 1 > (*ctxt).indent_nr {
-                                            (*ctxt).indent_nr
+                                    (*ctxt).indent_size as i32
+                                        * if (*ctxt).level + 1 > (*ctxt).indent_nr as i32 {
+                                            (*ctxt).indent_nr as i32
                                         } else {
                                             (*ctxt).level + 1
                                         },
-                                    (*ctxt).indent.as_ptr(),
+                                    (*ctxt).indent.as_ptr() as *const i8,
                                 );
                             }
                         }
@@ -1636,13 +1634,13 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 if *xml_indent_tree_output() != 0 && (*ctxt).format == 1 {
                     xml_output_buffer_write(
                         buf,
-                        (*ctxt).indent_size
-                            * if (*ctxt).level > (*ctxt).indent_nr {
-                                (*ctxt).indent_nr
+                        (*ctxt).indent_size as i32
+                            * if (*ctxt).level > (*ctxt).indent_nr as i32 {
+                                (*ctxt).indent_nr as i32
                             } else {
                                 (*ctxt).level
                             },
-                        (*ctxt).indent.as_ptr(),
+                        (*ctxt).indent.as_ptr() as *const i8,
                     );
                 }
 
