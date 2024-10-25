@@ -41,9 +41,8 @@ use crate::{
         },
         xml_io::{
             xml_output_buffer_close, xml_output_buffer_create_fd,
-            xml_output_buffer_create_filename, xml_output_buffer_create_io,
-            xml_output_buffer_flush, XmlOutputBufferPtr, XmlOutputCloseCallback,
-            XmlOutputWriteCallback,
+            xml_output_buffer_create_filename, xml_output_buffer_create_io, XmlOutputBufferPtr,
+            XmlOutputCloseCallback, XmlOutputWriteCallback,
         },
         xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strdup, XmlChar},
@@ -1494,7 +1493,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
 
 unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> c_int {
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
-    xml_output_buffer_flush(buf);
+    (*buf).flush();
     let _ = (*buf).encoder.take();
     if let Some(conv) = (*buf).conv.take() {
         conv.free();
@@ -2058,7 +2057,7 @@ pub unsafe extern "C" fn xml_save_flush(ctxt: XmlSaveCtxtPtr) -> c_int {
     if (*ctxt).buf.is_null() {
         return -1;
     }
-    xml_output_buffer_flush((*ctxt).buf)
+    (*(*ctxt).buf).flush()
 }
 
 /**

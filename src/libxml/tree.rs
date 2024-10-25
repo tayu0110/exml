@@ -9457,10 +9457,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     use crate::{
         encoding::find_encoding_handler,
         libxml::{
-            xml_io::{
-                xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_flush,
-                XmlOutputBufferPtr,
-            },
+            xml_io::{xml_alloc_output_buffer, xml_output_buffer_close, XmlOutputBufferPtr},
             xmlsave::{
                 xml_doc_content_dump_output, xml_save_ctxt_init, xml_save_err, xml_save_err_memory,
                 XmlSaveCtxt, XmlSaveOption,
@@ -9526,7 +9523,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt), out_doc);
-    xml_output_buffer_flush(out_buff);
+    (*out_buff).flush();
     if let Some(conv) = (*out_buff).conv {
         *doc_txt_len = conv.len() as i32;
         *doc_txt_ptr = xml_strndup(

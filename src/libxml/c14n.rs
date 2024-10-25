@@ -30,7 +30,7 @@ use super::{
     uri::{xml_build_uri, xml_free_uri, xml_parse_uri, XmlURIPtr},
     xml_io::{
         xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_create_filename,
-        xml_output_buffer_flush, XmlOutputBufferPtr,
+        XmlOutputBufferPtr,
     },
     xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcat, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
@@ -2575,7 +2575,7 @@ pub unsafe extern "C" fn xml_c14n_execute(
     /*
      * Flush buffer to get number of bytes written
      */
-    ret = xml_output_buffer_flush(buf);
+    ret = (*buf).flush();
     if ret < 0 {
         xml_c14n_err_internal(c"flushing output buffer".as_ptr() as _);
         xml_c14n_free_ctx(ctx);

@@ -527,9 +527,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         encoding::find_encoding_handler,
         libxml::{
             parser::xml_init_parser,
-            xml_io::{
-                xml_alloc_output_buffer_internal, xml_output_buffer_close, xml_output_buffer_flush,
-            },
+            xml_io::{xml_alloc_output_buffer_internal, xml_output_buffer_close},
             xmlerror::XmlParserErrors,
             xmlstring::xml_strndup,
         },
@@ -580,7 +578,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
 
     html_doc_content_dump_format_output(buf, cur, null_mut(), format);
 
-    xml_output_buffer_flush(buf);
+    (*buf).flush();
     if let Some(conv) = (*buf).conv {
         *size = conv.len() as i32;
         *mem = xml_strndup(

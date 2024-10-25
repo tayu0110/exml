@@ -26,7 +26,7 @@ use libc::{
     EDEADLK, EDOM, EEXIST, EFAULT, EFBIG, EINPROGRESS, EINTR, EINVAL, EIO, EISCONN, EISDIR, EMFILE,
     EMLINK, EMSGSIZE, ENAMETOOLONG, ENFILE, ENODEV, ENOENT, ENOEXEC, ENOLCK, ENOMEM, ENOSPC,
     ENOSYS, ENOTDIR, ENOTEMPTY, ENOTSOCK, ENOTSUP, ENOTTY, ENXIO, EOF, EPERM, EPIPE, ERANGE, EROFS,
-    ESPIPE, ESRCH, ETIMEDOUT, EXDEV, FILE, INT_MAX,
+    ESPIPE, ESRCH, ETIMEDOUT, EXDEV, FILE,
 };
 
 use crate::{
@@ -863,6 +863,78 @@ impl XmlOutputBuffer {
 
         // done:
         written
+    }
+
+    /// flushes the output I/O channel
+    ///
+    /// Returns the number of byte written or -1 in case of error.
+    #[doc(alias = "xmlOutputBufferFlush")]
+    #[cfg(feature = "output")]
+    pub unsafe extern "C" fn flush(&mut self) -> c_int {
+        let mut ret: c_int = 0;
+
+        if self.error != 0 {
+            return -1;
+        }
+        /*
+         * first handle encoding stuff.
+         */
+        if self.conv.is_some() && self.encoder.is_some() {
+            /*
+             * convert as much as possible to the parser output buffer.
+             */
+            while {
+                let Ok(nbchars) = self.encode(false) else {
+                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                    self.error = XmlParserErrors::XmlIoEncoder as i32;
+                    return -1;
+                };
+
+                nbchars != 0
+            } {}
+        }
+
+        /*
+         * second flush the stuff to the I/O channel
+         */
+        if let Some(mut conv) = self
+            .conv
+            .filter(|_| self.encoder.is_some() && self.writecallback.is_some())
+        {
+            // if !(*out).conv.is_null() && !(*out).encoder.is_null() && (*out).writecallback.is_some() {
+            ret = (self.writecallback.unwrap())(
+                self.context,
+                if conv.is_ok() {
+                    conv.as_ref().as_ptr() as *const i8
+                } else {
+                    null()
+                },
+                conv.len() as i32,
+            );
+            if ret >= 0 {
+                conv.trim_head(ret as usize);
+            }
+        } else if self.writecallback.is_some() {
+            ret = (self.writecallback.unwrap())(
+                self.context,
+                self.buffer
+                    .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
+                self.buffer.map_or(0, |buf| buf.len() as i32),
+            );
+            if ret >= 0 {
+                if let Some(mut buf) = self.buffer {
+                    buf.trim_head(ret as usize);
+                }
+            }
+        }
+        if ret < 0 {
+            xml_ioerr(XmlParserErrors::XmlIoFlush, null());
+            self.error = XmlParserErrors::XmlIoFlush as i32;
+            return ret;
+        }
+        self.written = self.written.saturating_add(ret);
+
+        ret
     }
 
     /// Gives a pointer to the data currently held in the output buffer
@@ -2381,87 +2453,6 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
 }
 
 /**
- * xmlOutputBufferFlush:
- * @out:  a buffered output
- *
- * flushes the output I/O channel
- *
- * Returns the number of byte written or -1 in case of error.
- */
-#[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_flush(out: XmlOutputBufferPtr) -> c_int {
-    let mut ret: c_int = 0;
-
-    if out.is_null() || (*out).error != 0 {
-        return -1;
-    }
-    /*
-     * first handle encoding stuff.
-     */
-    if (*out).conv.is_some() && (*out).encoder.is_some() {
-        /*
-         * convert as much as possible to the parser output buffer.
-         */
-        while {
-            let Ok(nbchars) = (*out).encode(false) else {
-                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                (*out).error = XmlParserErrors::XmlIoEncoder as i32;
-                return -1;
-            };
-
-            nbchars != 0
-        } {}
-    }
-
-    /*
-     * second flush the stuff to the I/O channel
-     */
-    if let Some(mut conv) = (*out)
-        .conv
-        .filter(|_| (*out).encoder.is_some() && (*out).writecallback.is_some())
-    {
-        // if !(*out).conv.is_null() && !(*out).encoder.is_null() && (*out).writecallback.is_some() {
-        ret = ((*out).writecallback.unwrap())(
-            (*out).context,
-            if conv.is_ok() {
-                conv.as_ref().as_ptr() as *const i8
-            } else {
-                null()
-            },
-            conv.len() as i32,
-        );
-        if ret >= 0 {
-            conv.trim_head(ret as usize);
-        }
-    } else if (*out).writecallback.is_some() {
-        ret = ((*out).writecallback.unwrap())(
-            (*out).context,
-            (*out)
-                .buffer
-                .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
-            (*out).buffer.map_or(0, |buf| buf.len() as i32),
-        );
-        if ret >= 0 {
-            if let Some(mut buf) = (*out).buffer {
-                buf.trim_head(ret as usize);
-            }
-        }
-    }
-    if ret < 0 {
-        xml_ioerr(XmlParserErrors::XmlIoFlush, null());
-        (*out).error = XmlParserErrors::XmlIoFlush as i32;
-        return ret;
-    }
-    if (*out).written > INT_MAX - ret {
-        (*out).written = INT_MAX;
-    } else {
-        (*out).written += ret;
-    }
-
-    ret
-}
-
-/**
  * xmlOutputBufferClose:
  * @out:  a buffered output
  *
@@ -2478,7 +2469,7 @@ pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_i
         return -1;
     }
     if (*out).writecallback.is_some() {
-        xml_output_buffer_flush(out);
+        (*out).flush();
     }
     if let Some(closecallback) = (*out).closecallback {
         err_rc = closecallback((*out).context);
@@ -4160,35 +4151,35 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_xml_output_buffer_flush() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_output_buffer_flush() {
+    //     #[cfg(feature = "output")]
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_out in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-                let mem_base = xml_mem_blocks();
-                let out = gen_xml_output_buffer_ptr(n_out, 0);
+    //         for n_out in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
+    //             let mem_base = xml_mem_blocks();
+    //             let out = gen_xml_output_buffer_ptr(n_out, 0);
 
-                let ret_val = xml_output_buffer_flush(out);
-                desret_int(ret_val);
-                des_xml_output_buffer_ptr(n_out, out, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlOutputBufferFlush",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlOutputBufferFlush()"
-                    );
-                    eprintln!(" {}", n_out);
-                }
-            }
-        }
-    }
+    //             let ret_val = xml_output_buffer_flush(out);
+    //             desret_int(ret_val);
+    //             des_xml_output_buffer_ptr(n_out, out, 0);
+    //             reset_last_error();
+    //             if mem_base != xml_mem_blocks() {
+    //                 leaks += 1;
+    //                 eprint!(
+    //                     "Leak of {} blocks found in xmlOutputBufferFlush",
+    //                     xml_mem_blocks() - mem_base
+    //                 );
+    //                 assert!(
+    //                     leaks == 0,
+    //                     "{leaks} Leaks are found in xmlOutputBufferFlush()"
+    //                 );
+    //                 eprintln!(" {}", n_out);
+    //             }
+    //         }
+    //     }
+    // }
 
     // #[test]
     // fn test_xml_output_buffer_get_content() {

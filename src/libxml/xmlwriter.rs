@@ -44,7 +44,7 @@ use crate::{
         uri::xml_canonic_path,
         xml_io::{
             xml_output_buffer_close, xml_output_buffer_create_filename,
-            xml_output_buffer_create_io, xml_output_buffer_flush, XmlOutputBufferPtr,
+            xml_output_buffer_create_io, XmlOutputBufferPtr,
         },
         xmlerror::XmlParserErrors,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
@@ -5109,7 +5109,7 @@ pub unsafe extern "C" fn xml_text_writer_flush(writer: XmlTextWriterPtr) -> c_in
     if (*writer).out.is_null() {
         0
     } else {
-        xml_output_buffer_flush((*writer).out)
+        (*(*writer).out).flush()
     }
 }
 
