@@ -10817,7 +10817,7 @@ pub unsafe fn html_create_push_parser_ctxt(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        xml_parser_input_buffer_push((*(*ctxt).input).buf, size, chunk);
+        xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, size, chunk);
 
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
@@ -11740,7 +11740,7 @@ pub unsafe extern "C" fn html_parse_chunk(
         );
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        let res: c_int = xml_parser_input_buffer_push((*(*ctxt).input).buf, size, chunk);
+        let res: c_int = xml_parser_input_buffer_push(&mut *(*(*ctxt).input).buf, size, chunk);
         xml_buf_set_input_base_cur(
             (*(*(*ctxt).input).buf)
                 .buffer

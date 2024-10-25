@@ -1288,7 +1288,7 @@ unsafe extern "C" fn end_of_input(
  *         in case of error.
  */
 pub unsafe extern "C" fn xml_parser_input_buffer_push(
-    input: XmlParserInputBufferPtr,
+    input: &mut XmlParserInputBuffer,
     len: c_int,
     buf: *const c_char,
 ) -> c_int {
@@ -1297,18 +1297,18 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
     if len < 0 {
         return 0;
     }
-    if input.is_null() || (*input).error != 0 {
+    if input.error != 0 {
         return -1;
     }
-    if (*input).encoder.is_some() {
+    if input.encoder.is_some() {
         /*
          * Store the data in the incoming raw buffer
          */
-        if (*input).raw.is_none() {
-            (*input).raw = XmlBufRef::new();
+        if input.raw.is_none() {
+            input.raw = XmlBufRef::new();
         }
         if buf.is_null()
-            || (*input).raw.map_or(true, |mut raw| {
+            || input.raw.map_or(true, |mut raw| {
                 raw.push_bytes(from_raw_parts(buf as *const u8, len as usize))
                     .is_err()
             })
@@ -1319,23 +1319,23 @@ pub unsafe extern "C" fn xml_parser_input_buffer_push(
         /*
          * convert as much as possible to the parser reading buffer.
          */
-        let using: size_t = (*input).raw.map_or(0, |raw| raw.len());
-        let Ok(written) = (*input).decode(true) else {
+        let using: size_t = input.raw.map_or(0, |raw| raw.len());
+        let Ok(written) = input.decode(true) else {
             xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-            (*input).error = XmlParserErrors::XmlIoEncoder as i32;
+            input.error = XmlParserErrors::XmlIoEncoder as i32;
             return -1;
         };
         nbchars = written as i32;
-        let consumed: size_t = using - (*input).raw.map_or(0, |raw| raw.len());
-        if consumed as u64 > u64::MAX || ((*input).rawconsumed > u64::MAX - consumed as c_ulong) {
-            (*input).rawconsumed = u64::MAX;
+        let consumed: size_t = using - input.raw.map_or(0, |raw| raw.len());
+        if consumed as u64 > u64::MAX || (input.rawconsumed > u64::MAX - consumed as c_ulong) {
+            input.rawconsumed = u64::MAX;
         } else {
-            (*input).rawconsumed += consumed as u64;
+            input.rawconsumed += consumed as u64;
         }
     } else {
         nbchars = len;
         if buf.is_null()
-            || (*input)
+            || input
                 .buffer
                 .expect("Internal Error")
                 .push_bytes(from_raw_parts(buf as *const u8, nbchars as usize))
@@ -3808,11 +3808,7 @@ pub unsafe extern "C" fn xml_io_ftp_close(context: *mut c_void) -> c_int {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        globals::reset_last_error,
-        libxml::{xmlmemory::xml_mem_blocks, xmlstring::xml_strlen},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -4527,47 +4523,47 @@ mod tests {
     //     }
     // }
 
-    #[test]
-    fn test_xml_parser_input_buffer_push() {
-        unsafe {
-            let mut leaks = 0;
+    // #[test]
+    // fn test_xml_parser_input_buffer_push() {
+    //     unsafe {
+    //         let mut leaks = 0;
 
-            for n_in in 0..GEN_NB_XML_PARSER_INPUT_BUFFER_PTR {
-                for n_len in 0..GEN_NB_INT {
-                    for n_buf in 0..GEN_NB_CONST_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let input = gen_xml_parser_input_buffer_ptr(n_in, 0);
-                        let mut len = gen_int(n_len, 1);
-                        let buf = gen_const_char_ptr(n_buf, 2);
-                        if !buf.is_null() && len > xml_strlen(buf as _) {
-                            len = 0;
-                        }
+    //         for n_in in 0..GEN_NB_XML_PARSER_INPUT_BUFFER_PTR {
+    //             for n_len in 0..GEN_NB_INT {
+    //                 for n_buf in 0..GEN_NB_CONST_CHAR_PTR {
+    //                     let mem_base = xml_mem_blocks();
+    //                     let input = gen_xml_parser_input_buffer_ptr(n_in, 0);
+    //                     let mut len = gen_int(n_len, 1);
+    //                     let buf = gen_const_char_ptr(n_buf, 2);
+    //                     if !buf.is_null() && len > xml_strlen(buf as _) {
+    //                         len = 0;
+    //                     }
 
-                        let ret_val = xml_parser_input_buffer_push(input, len, buf);
-                        desret_int(ret_val);
-                        des_xml_parser_input_buffer_ptr(n_in, input, 0);
-                        des_int(n_len, len, 1);
-                        des_const_char_ptr(n_buf, buf, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlParserInputBufferPush",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlParserInputBufferPush()"
-                            );
-                            eprint!(" {}", n_in);
-                            eprint!(" {}", n_len);
-                            eprintln!(" {}", n_buf);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //                     let ret_val = xml_parser_input_buffer_push(input, len, buf);
+    //                     desret_int(ret_val);
+    //                     des_xml_parser_input_buffer_ptr(n_in, input, 0);
+    //                     des_int(n_len, len, 1);
+    //                     des_const_char_ptr(n_buf, buf, 2);
+    //                     reset_last_error();
+    //                     if mem_base != xml_mem_blocks() {
+    //                         leaks += 1;
+    //                         eprint!(
+    //                             "Leak of {} blocks found in xmlParserInputBufferPush",
+    //                             xml_mem_blocks() - mem_base
+    //                         );
+    //                         assert!(
+    //                             leaks == 0,
+    //                             "{leaks} Leaks are found in xmlParserInputBufferPush()"
+    //                         );
+    //                         eprint!(" {}", n_in);
+    //                         eprint!(" {}", n_len);
+    //                         eprintln!(" {}", n_buf);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     // #[test]
     // fn test_xml_parser_input_buffer_read() {
