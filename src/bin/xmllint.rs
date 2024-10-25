@@ -2256,10 +2256,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
 unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     use exml::libxml::{
         tree::{xml_node_dump_output, XmlNodePtr},
-        xml_io::{
-            xml_output_buffer_close, xml_output_buffer_create_file, xml_output_buffer_write,
-            XmlOutputBufferPtr,
-        },
+        xml_io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
         xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
     };
 
@@ -2287,7 +2284,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     for i in 0..(*(*cur).nodesetval).node_nr {
                         node = *(*(*cur).nodesetval).node_tab.add(i as usize);
                         xml_node_dump_output(buf, null_mut(), node, 0, 0, null_mut());
-                        xml_output_buffer_write(&mut *buf, b"\n");
+                        (*buf).write_bytes(b"\n");
                     }
                     xml_output_buffer_close(buf);
                 }

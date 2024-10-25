@@ -424,6 +424,124 @@ impl XmlOutputBuffer {
             ret
         }
     }
+
+    /// Write the content of the array in the output I/O buffer.  
+    /// This routine handle the I18N transcoding from internal UTF-8.  
+    /// The buffer is lossless, i.e. will store in case of partial or delayed writes.
+    ///
+    /// Returns the number of chars immediately written, or -1 in case of error.
+    #[doc(alias = "xmlOutputBufferWrite")]
+    #[cfg(feature = "output")]
+    pub unsafe fn write_bytes(&mut self, buf: &[u8]) -> i32 {
+        use crate::encoding::EncodingError;
+
+        let mut ret: c_int; /* return from function call */
+        let mut written: c_int = 0; /* number of c_char written to I/O so far */
+
+        if self.error != 0 {
+            return -1;
+        }
+
+        let mut len = buf.len();
+        for buf in buf.chunks(4 * MINLEN) {
+            /*
+             * first handle encoding stuff.
+             */
+            let nbchars = if self.encoder.is_some() {
+                /*
+                 * Store the data in the incoming raw buffer
+                 */
+                if self.conv.is_none() {
+                    self.conv = XmlBufRef::new();
+                }
+                if self
+                    .buffer
+                    .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
+                {
+                    return -1;
+                }
+
+                if self.buffer.map_or(0, |buf| buf.len()) < MINLEN && buf.len() == len {
+                    break;
+                }
+
+                /*
+                 * convert as much as possible to the parser reading buffer.
+                 */
+                let res = match self.encode(false) {
+                    Ok(len) => Ok(len),
+                    Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
+                    _ => {
+                        xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                        self.error = XmlParserErrors::XmlIoEncoder as i32;
+                        return -1;
+                    }
+                };
+                if self.writecallback.is_some() {
+                    self.conv.map_or(0, |buf| buf.len())
+                } else {
+                    res.unwrap_or(0)
+                }
+            } else {
+                if self
+                    .buffer
+                    .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
+                {
+                    return -1;
+                }
+                if self.writecallback.is_some() {
+                    self.buffer.map_or(0, |buf| buf.len())
+                } else {
+                    buf.len()
+                }
+            };
+            len -= buf.len();
+
+            if let Some(writecallback) = self.writecallback {
+                if nbchars < MINLEN && len == 0 {
+                    break;
+                }
+
+                /*
+                 * second write the stuff to the I/O channel
+                 */
+                if self.encoder.is_some() {
+                    ret = writecallback(
+                        self.context,
+                        self.conv
+                            .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
+                        nbchars as i32,
+                    );
+                    if ret >= 0 {
+                        if let Some(mut conv) = self.conv {
+                            conv.trim_head(ret as usize);
+                        }
+                    }
+                } else {
+                    ret = writecallback(
+                        self.context,
+                        self.buffer
+                            .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
+                        nbchars as i32,
+                    );
+                    if ret >= 0 {
+                        if let Some(mut buf) = self.buffer {
+                            buf.trim_head(ret as usize);
+                        }
+                    }
+                }
+                if ret < 0 {
+                    xml_ioerr(XmlParserErrors::XmlIoWrite, null());
+                    self.error = XmlParserErrors::XmlIoWrite as i32;
+                    return ret;
+                }
+                self.written = self.written.saturating_add(ret);
+            }
+            written += nbchars as i32;
+        }
+
+        written
+    }
 }
 
 pub(crate) const MAX_INPUT_CALLBACK: usize = 15;
@@ -1669,10 +1787,8 @@ unsafe extern "C" fn xml_io_http_write(
 
         //      else
         //  #endif
-        len = xml_output_buffer_write(
-            &mut *((*ctxt).doc_buff as *mut XmlOutputBuffer),
-            from_raw_parts(buffer as *const u8, len as usize),
-        );
+        len = (*((*ctxt).doc_buff as *mut XmlOutputBuffer))
+            .write_bytes(from_raw_parts(buffer as *const u8, len as usize));
 
         if len < 0 {
             let mut msg: [XmlChar; 500] = [0; 500];
@@ -2124,136 +2240,6 @@ pub unsafe extern "C" fn xml_output_buffer_get_size(out: XmlOutputBufferPtr) -> 
 }
 
 /**
- * xmlOutputBufferWrite:
- * @out:  a buffered parser output
- * @len:  the size in bytes of the array.
- * @buf:  an c_char array
- *
- * Write the content of the array in the output I/O buffer
- * This routine handle the I18N transcoding from c_internal UTF-8
- * The buffer is lossless, i.e. will store in case of partial
- * or delayed writes.
- *
- * Returns the number of chars immediately written, or -1
- *         in case of error.
- */
-#[cfg(feature = "output")]
-pub unsafe fn xml_output_buffer_write(out: &mut XmlOutputBuffer, buf: &[u8]) -> i32 {
-    use crate::encoding::EncodingError;
-
-    let mut nbchars: c_int; /* number of chars to output to I/O */
-    let mut ret: c_int; /* return from function call */
-    let mut written: c_int = 0; /* number of c_char written to I/O so far */
-
-    if out.error != 0 {
-        return -1;
-    }
-    if out.error != 0 {
-        return -1;
-    }
-
-    let mut len = buf.len();
-    for buf in buf.chunks(4 * MINLEN) {
-        /*
-         * first handle encoding stuff.
-         */
-        if out.encoder.is_some() {
-            /*
-             * Store the data in the incoming raw buffer
-             */
-            if out.conv.is_none() {
-                out.conv = XmlBufRef::new();
-            }
-            if out
-                .buffer
-                .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
-            {
-                return -1;
-            }
-
-            if out.buffer.map_or(0, |buf| buf.len()) < MINLEN && buf.len() == len {
-                break;
-            }
-
-            /*
-             * convert as much as possible to the parser reading buffer.
-             */
-            let res = match (*out).encode(false) {
-                Ok(len) => Ok(len),
-                Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
-                _ => {
-                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                    out.error = XmlParserErrors::XmlIoEncoder as i32;
-                    return -1;
-                }
-            };
-            if out.writecallback.is_some() {
-                nbchars = out.conv.map_or(0, |buf| buf.len() as i32);
-            } else {
-                nbchars = res.unwrap_or(0) as i32;
-            }
-        } else {
-            if out
-                .buffer
-                .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
-            {
-                return -1;
-            }
-            if out.writecallback.is_some() {
-                nbchars = out.buffer.map_or(0, |buf| buf.len() as i32);
-            } else {
-                nbchars = buf.len() as i32;
-            }
-        }
-        len -= buf.len();
-
-        if let Some(writecallback) = out.writecallback {
-            if nbchars < MINLEN as i32 && len == 0 {
-                break;
-            }
-
-            /*
-             * second write the stuff to the I/O channel
-             */
-            if out.encoder.is_some() {
-                ret = writecallback(
-                    out.context,
-                    out.conv
-                        .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
-                    nbchars,
-                );
-                if ret >= 0 {
-                    if let Some(mut conv) = out.conv {
-                        conv.trim_head(ret as usize);
-                    }
-                }
-            } else {
-                ret = writecallback(
-                    out.context,
-                    out.buffer
-                        .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
-                    nbchars,
-                );
-                if ret >= 0 {
-                    if let Some(mut buf) = out.buffer {
-                        buf.trim_head(ret as usize);
-                    }
-                }
-            }
-            if ret < 0 {
-                xml_ioerr(XmlParserErrors::XmlIoWrite, null());
-                out.error = XmlParserErrors::XmlIoWrite as i32;
-                return ret;
-            }
-            out.written = out.written.saturating_add(ret);
-        }
-        written += nbchars;
-    }
-
-    written
-}
-
-/**
  * xmlOutputBufferWriteString:
  * @out:  a buffered parser output
  * @str:  a zero terminated C string
@@ -2280,7 +2266,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_string(
     let len = strlen(str);
 
     if len > 0 {
-        return xml_output_buffer_write(&mut *out, from_raw_parts(str as *const u8, len));
+        return (*out).write_bytes(from_raw_parts(str as *const u8, len));
     }
     len as i32
 }

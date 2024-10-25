@@ -43,7 +43,7 @@ use crate::{
         xml_io::{
             xml_output_buffer_close, xml_output_buffer_create_fd,
             xml_output_buffer_create_filename, xml_output_buffer_create_io,
-            xml_output_buffer_flush, xml_output_buffer_write, xml_output_buffer_write_escape,
+            xml_output_buffer_flush, xml_output_buffer_write_escape,
             xml_output_buffer_write_string, XmlOutputBufferPtr, XmlOutputCloseCallback,
             XmlOutputWriteCallback,
         },
@@ -480,7 +480,7 @@ unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, 
     if ctxt.buf.is_null() {
         return;
     }
-    xml_output_buffer_write(&mut *ctxt.buf, b"\n");
+    (*ctxt.buf).write_bytes(b"\n");
     for i in (0..ctxt.level + extra).step_by(ctxt.indent_nr) {
         let len = ctxt.indent_size
             * if ctxt.level + extra - i > ctxt.indent_nr as i32 {
@@ -488,7 +488,7 @@ unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, 
             } else {
                 (ctxt.level + extra - i) as usize
             };
-        xml_output_buffer_write(&mut *ctxt.buf, &ctxt.indent[..len]);
+        (*ctxt.buf).write_bytes(&ctxt.indent[..len]);
     }
 }
 
@@ -520,17 +520,17 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
         if !ctxt.is_null() && (*ctxt).format == 2 {
             xml_output_buffer_write_ws_non_sig(&mut *ctxt, 2);
         } else {
-            xml_output_buffer_write(&mut *buf, b" ");
+            (*buf).write_bytes(b" ");
         }
 
         /* Within the context of an element attributes */
         if !(*cur).prefix.load(Ordering::Relaxed).is_null() {
-            xml_output_buffer_write(&mut *buf, b"xmlns:");
+            (*buf).write_bytes(b"xmlns:");
             xml_output_buffer_write_string(buf, (*cur).prefix.load(Ordering::Relaxed) as _);
         } else {
-            xml_output_buffer_write(&mut *buf, b"xmlns");
+            (*buf).write_bytes(b"xmlns");
         }
-        xml_output_buffer_write(&mut *buf, b"=");
+        (*buf).write_bytes(b"=");
         if let Some(mut buf) = (*buf).buffer {
             buf.push_quoted_cstr(CStr::from_ptr(
                 (*cur).href.load(Ordering::Relaxed) as *const i8
@@ -657,16 +657,16 @@ unsafe extern "C" fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr)
     if (*ctxt).format == 2 {
         xml_output_buffer_write_ws_non_sig(&mut *ctxt, 2);
     } else {
-        xml_output_buffer_write(&mut *buf, b" ");
+        (*buf).write_bytes(b" ");
     }
     if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
         xml_output_buffer_write_string(buf, (*(*cur).ns).prefix.load(Ordering::Relaxed) as _);
-        xml_output_buffer_write(&mut *buf, b":");
+        (*buf).write_bytes(b":");
     }
     xml_output_buffer_write_string(buf, (*cur).name as _);
-    xml_output_buffer_write(&mut *buf, b"=\"");
+    (*buf).write_bytes(b"=\"");
     xml_attr_serialize_content(buf, cur);
-    xml_output_buffer_write(&mut *buf, b"\"");
+    (*buf).write_bytes(b"\"");
 }
 
 /**
@@ -737,7 +737,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                         } else {
                             (*ctxt).level as usize
                         };
-                    xml_output_buffer_write(&mut *buf, &(*ctxt).indent[..len]);
+                    (*buf).write_bytes(&(*ctxt).indent[..len]);
                 }
 
                 /*
@@ -748,7 +748,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 if (*cur).parent != parent && !(*cur).children.is_null() {
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
-                    xml_output_buffer_write(&mut *buf, b"<");
+                    (*buf).write_bytes(b"<");
                     if !(*cur).ns.is_null()
                         && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null()
                     {
@@ -756,7 +756,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                             buf,
                             (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                         );
-                        xml_output_buffer_write(&mut *buf, b":");
+                        (*buf).write_bytes(b":");
                     }
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if !(*cur).ns_def.is_null() {
@@ -773,12 +773,12 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                             if (*ctxt).format == 2 {
                                 xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                             }
-                            xml_output_buffer_write(&mut *buf, b"/>");
+                            (*buf).write_bytes(b"/>");
                         } else {
                             if (*ctxt).format == 2 {
                                 xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
                             }
-                            xml_output_buffer_write(&mut *buf, b"></");
+                            (*buf).write_bytes(b"></");
                             if !(*cur).ns.is_null()
                                 && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null()
                             {
@@ -786,13 +786,13 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                                     buf,
                                     (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                                 );
-                                xml_output_buffer_write(&mut *buf, b":");
+                                (*buf).write_bytes(b":");
                             }
                             xml_output_buffer_write_string(buf, (*cur).name as _);
                             if (*ctxt).format == 2 {
                                 xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                             }
-                            xml_output_buffer_write(&mut *buf, b">");
+                            (*buf).write_bytes(b">");
                         }
                     } else {
                         if (*ctxt).format == 1 {
@@ -814,9 +814,9 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                         if (*ctxt).format == 2 {
                             xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
                         }
-                        xml_output_buffer_write(&mut *buf, b">");
+                        (*buf).write_bytes(b">");
                         if (*ctxt).format == 1 {
-                            xml_output_buffer_write(&mut *buf, b"\n");
+                            (*buf).write_bytes(b"\n");
                         }
                         if (*ctxt).level >= 0 {
                             (*ctxt).level += 1;
@@ -847,28 +847,28 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                         } else {
                             (*ctxt).level as usize
                         };
-                    xml_output_buffer_write(&mut *buf, &(*ctxt).indent[..len]);
+                    (*buf).write_bytes(&(*ctxt).indent[..len]);
                 }
 
                 if !(*cur).content.is_null() {
-                    xml_output_buffer_write(&mut *buf, b"<?");
+                    (*buf).write_bytes(b"<?");
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if !(*cur).content.is_null() {
                         if (*ctxt).format == 2 {
                             xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                         } else {
-                            xml_output_buffer_write(&mut *buf, b" ");
+                            (*buf).write_bytes(b" ");
                         }
                         xml_output_buffer_write_string(buf, (*cur).content as _);
                     }
-                    xml_output_buffer_write(&mut *buf, b"?>");
+                    (*buf).write_bytes(b"?>");
                 } else {
-                    xml_output_buffer_write(&mut *buf, b"<?");
+                    (*buf).write_bytes(b"<?");
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if (*ctxt).format == 2 {
                         xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                     }
-                    xml_output_buffer_write(&mut *buf, b"?>");
+                    (*buf).write_bytes(b"?>");
                 }
             }
             XmlElementType::XmlCommentNode => {
@@ -879,43 +879,43 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                         } else {
                             (*ctxt).level as usize
                         };
-                    xml_output_buffer_write(&mut *buf, &(*ctxt).indent[..len]);
+                    (*buf).write_bytes(&(*ctxt).indent[..len]);
                 }
 
                 if !(*cur).content.is_null() {
-                    xml_output_buffer_write(&mut *buf, b"<!--");
+                    (*buf).write_bytes(b"<!--");
                     xml_output_buffer_write_string(buf, (*cur).content as _);
-                    xml_output_buffer_write(&mut *buf, b"-->");
+                    (*buf).write_bytes(b"-->");
                 }
             }
             XmlElementType::XmlEntityRefNode => {
-                xml_output_buffer_write(&mut *buf, b"&");
+                (*buf).write_bytes(b"&");
                 xml_output_buffer_write_string(buf, (*cur).name as _);
-                xml_output_buffer_write(&mut *buf, b";");
+                (*buf).write_bytes(b";");
             }
             XmlElementType::XmlCdataSectionNode => {
                 if (*cur).content.is_null() || *(*cur).content == b'\0' {
-                    xml_output_buffer_write(&mut *buf, b"<![CDATA[]]>");
+                    (*buf).write_bytes(b"<![CDATA[]]>");
                 } else {
                     start = (*cur).content;
                     end = (*cur).content;
                     while *end != b'\0' {
                         if *end == b']' && *end.add(1) == b']' && *end.add(2) == b'>' {
                             end = end.add(2);
-                            xml_output_buffer_write(&mut *buf, b"<![CDATA[");
-                            xml_output_buffer_write(
-                                &mut *buf,
-                                from_raw_parts(start as _, end.offset_from(start) as _),
-                            );
-                            xml_output_buffer_write(&mut *buf, b"]]>");
+                            (*buf).write_bytes(b"<![CDATA[");
+                            (*buf).write_bytes(from_raw_parts(
+                                start as _,
+                                end.offset_from(start) as _,
+                            ));
+                            (*buf).write_bytes(b"]]>");
                             start = end;
                         }
                         end = end.add(1);
                     }
                     if start != end {
-                        xml_output_buffer_write(&mut *buf, b"<![CDATA[");
+                        (*buf).write_bytes(b"<![CDATA[");
                         xml_output_buffer_write_string(buf, start as _);
-                        xml_output_buffer_write(&mut *buf, b"]]>");
+                        (*buf).write_bytes(b"]]>");
                     }
                 }
             }
@@ -938,7 +938,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                     XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd
                 )
             {
-                xml_output_buffer_write(&mut *buf, b"\n");
+                (*buf).write_bytes(b"\n");
             }
             if !(*cur).next.is_null() {
                 cur = (*cur).next;
@@ -960,23 +960,23 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                         } else {
                             (*ctxt).level as usize
                         };
-                    xml_output_buffer_write(&mut *buf, &(*ctxt).indent[..len]);
+                    (*buf).write_bytes(&(*ctxt).indent[..len]);
                 }
 
-                xml_output_buffer_write(&mut *buf, b"</");
+                (*buf).write_bytes(b"</");
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
                     xml_output_buffer_write_string(
                         buf,
                         (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                     );
-                    xml_output_buffer_write(&mut *buf, b":");
+                    (*buf).write_bytes(b":");
                 }
 
                 xml_output_buffer_write_string(buf, (*cur).name as _);
                 if (*ctxt).format == 2 {
                     xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
                 }
-                xml_output_buffer_write(&mut *buf, b">");
+                (*buf).write_bytes(b">");
 
                 if cur == unformatted_node {
                     (*ctxt).format = format;
@@ -1004,19 +1004,19 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
         return;
     }
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
-    xml_output_buffer_write(&mut *buf, b"<!DOCTYPE ");
+    (*buf).write_bytes(b"<!DOCTYPE ");
     xml_output_buffer_write_string(buf, (*dtd).name as _);
     if !(*dtd).external_id.is_null() {
-        xml_output_buffer_write(&mut *buf, b" PUBLIC ");
+        (*buf).write_bytes(b" PUBLIC ");
         if let Some(mut buf) = (*buf).buffer {
             buf.push_quoted_cstr(CStr::from_ptr((*dtd).external_id as *const i8));
         }
-        xml_output_buffer_write(&mut *buf, b" ");
+        (*buf).write_bytes(b" ");
         if let Some(mut buf) = (*buf).buffer {
             buf.push_quoted_cstr(CStr::from_ptr((*dtd).system_id as *const i8));
         }
     } else if !(*dtd).system_id.is_null() {
-        xml_output_buffer_write(&mut *buf, b" SYSTEM ");
+        (*buf).write_bytes(b" SYSTEM ");
         if let Some(mut buf) = (*buf).buffer {
             buf.push_quoted_cstr(CStr::from_ptr((*dtd).system_id as *const i8));
         }
@@ -1027,10 +1027,10 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
         && (*dtd).notations.is_null()
         && (*dtd).pentities.is_null()
     {
-        xml_output_buffer_write(&mut *buf, b">");
+        (*buf).write_bytes(b">");
         return;
     }
-    xml_output_buffer_write(&mut *buf, b" [\n");
+    (*buf).write_bytes(b" [\n");
     /*
      * Dump the notations first they are not in the DTD children list
      * Do this only on a standalone DTD or on the internal subset though.
@@ -1052,7 +1052,7 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     }
     (*ctxt).format = format;
     (*ctxt).level = level;
-    xml_output_buffer_write(&mut *buf, b"]>");
+    (*buf).write_bytes(b"]>");
 }
 
 /**
@@ -1137,21 +1137,21 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
                 || xml_str_equal((*parent).name, c"frame".as_ptr() as _)
                 || xml_str_equal((*parent).name, c"iframe".as_ptr() as _)))
     {
-        xml_output_buffer_write(&mut *buf, b" id=\"");
+        (*buf).write_bytes(b" id=\"");
         xml_attr_serialize_content(buf, name);
-        xml_output_buffer_write(&mut *buf, b"\"");
+        (*buf).write_bytes(b"\"");
     }
     /*
      * C.7.
      */
     if !lang.is_null() && xml_lang.is_null() {
-        xml_output_buffer_write(&mut *buf, b" xml:lang=\"");
+        (*buf).write_bytes(b" xml:lang=\"");
         xml_attr_serialize_content(buf, lang);
-        xml_output_buffer_write(&mut *buf, b"\"");
+        (*buf).write_bytes(b"\"");
     } else if !xml_lang.is_null() && lang.is_null() {
-        xml_output_buffer_write(&mut *buf, b" lang=\"");
+        (*buf).write_bytes(b" lang=\"");
         xml_attr_serialize_content(buf, xml_lang);
-        xml_output_buffer_write(&mut *buf, b"\"");
+        (*buf).write_bytes(b"\"");
     }
 }
 
@@ -1339,7 +1339,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         } else {
                             (*ctxt).level as usize
                         };
-                    xml_output_buffer_write(&mut *buf, &(*ctxt).indent[..len]);
+                    (*buf).write_bytes(&(*ctxt).indent[..len]);
                 }
 
                 /*
@@ -1352,13 +1352,13 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     break;
                 }
 
-                xml_output_buffer_write(&mut *buf, b"<");
+                (*buf).write_bytes(b"<");
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
                     xml_output_buffer_write_string(
                         buf,
                         (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                     );
-                    xml_output_buffer_write(&mut *buf, b":");
+                    (*buf).write_bytes(b":");
                 }
 
                 xml_output_buffer_write_string(buf, (*cur).name as _);
@@ -1414,12 +1414,12 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         /*
                          * C.2. Empty Elements
                          */
-                        xml_output_buffer_write(&mut *buf, b" />");
+                        (*buf).write_bytes(b" />");
                     } else {
                         if addmeta == 1 {
-                            xml_output_buffer_write(&mut *buf, b">");
+                            (*buf).write_bytes(b">");
                             if (*ctxt).format == 1 {
-                                xml_output_buffer_write(&mut *buf, b"\n");
+                                (*buf).write_bytes(b"\n");
                                 if *xml_indent_tree_output() != 0 {
                                     let len = (*ctxt).indent_size
                                         * if (*ctxt).level + 1 > (*ctxt).indent_nr as i32 {
@@ -1427,7 +1427,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                                         } else {
                                             ((*ctxt).level + 1) as usize
                                         };
-                                    xml_output_buffer_write(&mut *buf, &(*ctxt).indent[..len]);
+                                    (*buf).write_bytes(&(*ctxt).indent[..len]);
                                 }
                             }
                             xml_output_buffer_write_string(
@@ -1438,19 +1438,19 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                             if !(*ctxt).encoding.is_null() {
                                 xml_output_buffer_write_string(buf, (*ctxt).encoding as _);
                             } else {
-                                xml_output_buffer_write(&mut *buf, b"UTF-8");
+                                (*buf).write_bytes(b"UTF-8");
                             }
-                            xml_output_buffer_write(&mut *buf, b"\" />");
+                            (*buf).write_bytes(b"\" />");
                             if (*ctxt).format == 1 {
-                                xml_output_buffer_write(&mut *buf, b"\n");
+                                (*buf).write_bytes(b"\n");
                             }
                         } else {
-                            xml_output_buffer_write(&mut *buf, b">");
+                            (*buf).write_bytes(b">");
                         }
                         /*
                          * C.3. Element Minimization and Empty Element Content
                          */
-                        xml_output_buffer_write(&mut *buf, b"</");
+                        (*buf).write_bytes(b"</");
                         if !(*cur).ns.is_null()
                             && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null()
                         {
@@ -1458,16 +1458,16 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                                 buf,
                                 (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                             );
-                            xml_output_buffer_write(&mut *buf, b":");
+                            (*buf).write_bytes(b":");
                         }
                         xml_output_buffer_write_string(buf, (*cur).name as _);
-                        xml_output_buffer_write(&mut *buf, b">");
+                        (*buf).write_bytes(b">");
                     }
                 } else {
-                    xml_output_buffer_write(&mut *buf, b">");
+                    (*buf).write_bytes(b">");
                     if addmeta == 1 {
                         if (*ctxt).format == 1 {
-                            xml_output_buffer_write(&mut *buf, b"\n");
+                            (*buf).write_bytes(b"\n");
                             if *xml_indent_tree_output() != 0 {
                                 let len = (*ctxt).indent_size
                                     * if (*ctxt).level + 1 > (*ctxt).indent_nr as i32 {
@@ -1475,7 +1475,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                                     } else {
                                         ((*ctxt).level + 1) as usize
                                     };
-                                xml_output_buffer_write(&mut *buf, &(*ctxt).indent[..len]);
+                                (*buf).write_bytes(&(*ctxt).indent[..len]);
                             }
                         }
                         xml_output_buffer_write_string(
@@ -1486,9 +1486,9 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         if !(*ctxt).encoding.is_null() {
                             xml_output_buffer_write_string(buf, (*ctxt).encoding as _);
                         } else {
-                            xml_output_buffer_write(&mut *buf, b"UTF-8");
+                            (*buf).write_bytes(b"UTF-8");
                         }
-                        xml_output_buffer_write(&mut *buf, b"\" />");
+                        (*buf).write_bytes(b"\" />");
                     }
 
                     if (*ctxt).format == 1 {
@@ -1506,7 +1506,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     }
 
                     if (*ctxt).format == 1 {
-                        xml_output_buffer_write(&mut *buf, b"\n");
+                        (*buf).write_bytes(b"\n");
                     }
                     if (*ctxt).level >= 0 {
                         (*ctxt).level += 1;
@@ -1533,54 +1533,55 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
             }
             XmlElementType::XmlPiNode => {
                 if !(*cur).content.is_null() {
-                    xml_output_buffer_write(&mut *buf, b"<?");
+                    (*buf).write_bytes(b"<?");
                     xml_output_buffer_write_string(buf, (*cur).name as _);
                     if !(*cur).content.is_null() {
-                        xml_output_buffer_write(&mut *buf, b" ");
+                        (*buf).write_bytes(b" ");
                         xml_output_buffer_write_string(buf, (*cur).content as _);
                     }
-                    xml_output_buffer_write(&mut *buf, b"?>");
+                    (*buf).write_bytes(b"?>");
                 } else {
-                    xml_output_buffer_write(&mut *buf, b"<?");
+                    (*buf).write_bytes(b"<?");
                     xml_output_buffer_write_string(buf, (*cur).name as _);
-                    xml_output_buffer_write(&mut *buf, b"?>");
+                    (*buf).write_bytes(b"?>");
                 }
             }
             XmlElementType::XmlCommentNode => {
                 if !(*cur).content.is_null() {
-                    xml_output_buffer_write(&mut *buf, b"<!--");
+                    (*buf).write_bytes(b"<!--");
                     xml_output_buffer_write_string(buf, (*cur).content as _);
-                    xml_output_buffer_write(&mut *buf, b"-->");
+                    (*buf).write_bytes(b"-->");
                 }
             }
             XmlElementType::XmlEntityRefNode => {
-                xml_output_buffer_write(&mut *buf, b"&");
+                (*buf).write_bytes(b"&");
                 xml_output_buffer_write_string(buf, (*cur).name as _);
-                xml_output_buffer_write(&mut *buf, b";");
+                (*buf).write_bytes(b";");
             }
             XmlElementType::XmlCdataSectionNode => {
                 if (*cur).content.is_null() || *(*cur).content == b'\0' {
-                    xml_output_buffer_write(&mut *buf, b"<![CDATA[]]>");
+                    (*buf).write_bytes(b"<![CDATA[]]>");
                 } else {
                     start = (*cur).content;
                     end = (*cur).content;
                     while *end != b'\0' {
                         if *end == b']' && *end.add(1) == b']' && *end.add(2) == b'>' {
                             end = end.add(2);
-                            xml_output_buffer_write(&mut *buf, b"<![CDATA[");
-                            xml_output_buffer_write(
-                                &mut *buf,
-                                from_raw_parts(start as _, end.offset_from(start) as _),
-                            );
-                            xml_output_buffer_write(&mut *buf, b"]]>");
+                            (*buf).write_bytes(b"<![CDATA[");
+
+                            (*buf).write_bytes(from_raw_parts(
+                                start as _,
+                                end.offset_from(start) as _,
+                            ));
+                            (*buf).write_bytes(b"]]>");
                             start = end;
                         }
                         end = end.add(1);
                     }
                     if start != end {
-                        xml_output_buffer_write(&mut *buf, b"<![CDATA[");
+                        (*buf).write_bytes(b"<![CDATA[");
                         xml_output_buffer_write_string(buf, start as _);
-                        xml_output_buffer_write(&mut *buf, b"]]>");
+                        (*buf).write_bytes(b"]]>");
                     }
                 }
             }
@@ -1595,7 +1596,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 return;
             }
             if (*ctxt).format == 1 {
-                xml_output_buffer_write(&mut *buf, b"\n");
+                (*buf).write_bytes(b"\n");
             }
             if !(*cur).next.is_null() {
                 cur = (*cur).next;
@@ -1617,20 +1618,20 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         } else {
                             (*ctxt).level as usize
                         };
-                    xml_output_buffer_write(&mut *buf, &(*ctxt).indent[..len]);
+                    (*buf).write_bytes(&(*ctxt).indent[..len]);
                 }
 
-                xml_output_buffer_write(&mut *buf, b"</");
+                (*buf).write_bytes(b"</");
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
                     xml_output_buffer_write_string(
                         buf,
                         (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
                     );
-                    xml_output_buffer_write(&mut *buf, b":");
+                    (*buf).write_bytes(b":");
                 }
 
                 xml_output_buffer_write_string(buf, (*cur).name as _);
-                xml_output_buffer_write(&mut *buf, b">");
+                (*buf).write_bytes(b">");
 
                 if cur == unformatted_node {
                     (*ctxt).format = format;
@@ -1783,30 +1784,30 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
          * Save the XML declaration
          */
         if (*ctxt).options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
-            xml_output_buffer_write(&mut *buf, b"<?xml version=");
+            (*buf).write_bytes(b"<?xml version=");
             if !(*cur).version.is_null() {
                 if let Some(mut buf) = (*buf).buffer {
                     buf.push_quoted_cstr(CStr::from_ptr((*cur).version as *const i8));
                 }
             } else {
-                xml_output_buffer_write(&mut *buf, b"\"1.0\"");
+                (*buf).write_bytes(b"\"1.0\"");
             }
             if !encoding.is_null() {
-                xml_output_buffer_write(&mut *buf, b" encoding=");
+                (*buf).write_bytes(b" encoding=");
                 if let Some(mut buf) = (*buf).buffer {
                     buf.push_quoted_cstr(CStr::from_ptr(encoding as *const i8));
                 }
             }
             match (*cur).standalone {
                 0 => {
-                    xml_output_buffer_write(&mut *buf, b" standalone=\"no\"");
+                    (*buf).write_bytes(b" standalone=\"no\"");
                 }
                 1 => {
-                    xml_output_buffer_write(&mut *buf, b" standalone=\"yes\"");
+                    (*buf).write_bytes(b" standalone=\"yes\"");
                 }
                 _ => {}
             }
-            xml_output_buffer_write(&mut *buf, b"?>\n");
+            (*buf).write_bytes(b"?>\n");
         }
 
         #[cfg(feature = "html")]
@@ -1845,7 +1846,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                     (*child).typ,
                     XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd
                 ) {
-                    xml_output_buffer_write(&mut *buf, b"\n");
+                    (*buf).write_bytes(b"\n");
                 }
                 child = (*child).next;
             }
