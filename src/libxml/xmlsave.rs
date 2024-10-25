@@ -8,7 +8,7 @@ use std::{
     ffi::{c_char, c_int, c_long, c_uchar, CStr, CString},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{null, null_mut},
     rc::Rc,
     sync::atomic::Ordering,
 };
@@ -418,35 +418,31 @@ unsafe extern "C" fn xml_escape_entities(
  *
  * Initialize a saving context
  */
-pub(crate) unsafe extern "C" fn xml_save_ctxt_init(ctxt: XmlSaveCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    if (*ctxt).encoding.is_null() && (*ctxt).escape.is_none() {
-        (*ctxt).escape = Some(xml_escape_entities);
+pub(crate) unsafe fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
+    if ctxt.encoding.is_null() && ctxt.escape.is_none() {
+        ctxt.escape = Some(xml_escape_entities);
     }
     GLOBAL_STATE.with_borrow(|state| {
         let len = state.tree_indent_string.len();
         if len == 0 {
-            memset(addr_of_mut!((*ctxt).indent[0]) as _, 0, MAX_INDENT + 1);
+            ctxt.indent.fill(0);
         } else {
-            (*ctxt).indent_size = len as i32;
-            (*ctxt).indent_nr = MAX_INDENT as i32 / (*ctxt).indent_size;
-            for i in 0..(*ctxt).indent_nr {
+            ctxt.indent_size = len as i32;
+            ctxt.indent_nr = MAX_INDENT as i32 / ctxt.indent_size;
+            for i in 0..ctxt.indent_nr {
                 memcpy(
-                    (*ctxt)
-                        .indent
+                    ctxt.indent
                         .as_mut_ptr()
-                        .add(i as usize * (*ctxt).indent_size as usize) as _,
+                        .add(i as usize * ctxt.indent_size as usize) as _,
                     state.tree_indent_string.as_ptr() as _,
-                    (*ctxt).indent_size as _,
+                    ctxt.indent_size as _,
                 );
             }
-            (*ctxt).indent[(*ctxt).indent_nr as usize * (*ctxt).indent_size as usize] = 0;
+            ctxt.indent[ctxt.indent_nr as usize * ctxt.indent_size as usize] = 0;
         }
 
         if *xml_save_no_empty_tags() != 0 {
-            (*ctxt).options |= XmlSaveOption::XmlSaveNoEmpty as i32;
+            ctxt.options |= XmlSaveOption::XmlSaveNoEmpty as i32;
         }
     })
 }
@@ -1944,7 +1940,7 @@ unsafe extern "C" fn xml_new_save_ctxt(
         (*ret).encoding = xml_strdup(encoding as _) as _;
         (*ret).escape = None;
     }
-    xml_save_ctxt_init(ret);
+    xml_save_ctxt_init(&mut *ret);
 
     /*
      * Use the options

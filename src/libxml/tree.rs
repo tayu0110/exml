@@ -9523,7 +9523,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
     ctxt.level = 0;
     ctxt.format = (format != 0) as i32;
     ctxt.encoding = txt_encoding as _;
-    xml_save_ctxt_init(addr_of_mut!(ctxt));
+    xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt), out_doc);
     xml_output_buffer_flush(out_buff);
@@ -9611,7 +9611,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding as _;
-    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
 
@@ -9858,7 +9858,7 @@ pub unsafe extern "C" fn xml_save_file_to(
     ctxt.level = 0;
     ctxt.format = 0;
     ctxt.encoding = encoding as _;
-    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
     let ret: c_int = xml_output_buffer_close(buf);
@@ -9911,7 +9911,7 @@ pub unsafe extern "C" fn xml_save_format_file_to(
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding as _;
-    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
     let ret: c_int = xml_output_buffer_close(buf);
@@ -9973,7 +9973,7 @@ pub unsafe extern "C" fn xml_node_dump_output(
     ctxt.level = level;
     ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding as _;
-    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
 
     #[cfg(feature = "html")]
@@ -10073,7 +10073,7 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding as _;
-    xml_save_ctxt_init(addr_of_mut!(ctxt) as _);
+    xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
 
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
