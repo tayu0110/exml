@@ -2143,13 +2143,12 @@ pub unsafe extern "C" fn xml_output_buffer_write(
     out: &mut XmlOutputBuffer,
     mut len: c_int,
     mut buf: *const c_char,
-) -> c_int {
+) -> i32 {
     use crate::encoding::EncodingError;
 
     let mut nbchars: c_int; /* number of chars to output to I/O */
     let mut ret: c_int; /* return from function call */
     let mut written: c_int = 0; /* number of c_char written to I/O so far */
-    let mut chunk: c_int; /* number of byte current processed from buf */
 
     if out.error != 0 {
         return -1;
@@ -2162,10 +2161,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
     }
 
     while {
-        chunk = len;
-        if chunk > 4 * MINLEN as i32 {
-            chunk = 4 * MINLEN as i32;
-        }
+        let chunk = len.min(4 * MINLEN as i32);
 
         /*
          * first handle encoding stuff.
@@ -2207,7 +2203,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
             if out.writecallback.is_some() {
                 nbchars = out.conv.map_or(0, |buf| buf.len() as i32);
             } else {
-                nbchars = if let Ok(len) = res { len as i32 } else { 0 };
+                nbchars = res.unwrap_or(0) as i32;
             }
         } else {
             if buf.is_null()
@@ -2267,11 +2263,7 @@ pub unsafe extern "C" fn xml_output_buffer_write(
                 out.error = XmlParserErrors::XmlIoWrite as i32;
                 return ret;
             }
-            if out.written > INT_MAX - ret {
-                out.written = INT_MAX;
-            } else {
-                out.written += ret;
-            }
+            out.written = out.written.saturating_add(ret);
         }
         written += nbchars;
 
