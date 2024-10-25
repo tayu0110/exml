@@ -3,11 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{
-    ffi::{c_int, c_uchar},
-    ptr::null_mut,
-    sync::atomic::Ordering,
-};
+use std::{ffi::c_int, ptr::null_mut, sync::atomic::Ordering};
 
 use crate::{
     libxml::{
@@ -99,7 +95,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
             /*
              * We assume we have UTF-8 content.
              */
-            let mut tmp: [c_uchar; 12] = [0; 12];
+            let mut tmp: [u8; 12] = [0; 12];
             let mut val: c_int = 0;
             let mut l: c_int = 1;
 
@@ -108,7 +104,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
             }
             if *cur < 0xC0 {
                 xml_save_err(XmlParserErrors::XmlSaveNotUtf8 as _, attr as _, null_mut());
-                xml_serialize_hex_char_ref(tmp.as_mut_ptr() as _, *cur as _);
+                xml_serialize_hex_char_ref(&mut tmp, *cur as _);
                 xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);
                 base = cur;
@@ -141,7 +137,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
                     attr as _,
                     null_mut(),
                 );
-                xml_serialize_hex_char_ref(tmp.as_mut_ptr() as _, *cur as _);
+                xml_serialize_hex_char_ref(&mut tmp, *cur as _);
                 xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);
                 base = cur;
@@ -151,7 +147,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
              * We could do multiple things here. Just save
              * as a c_char ref
              */
-            xml_serialize_hex_char_ref(tmp.as_mut_ptr() as _, val);
+            xml_serialize_hex_char_ref(&mut tmp, val as u32);
             xml_buf_add(buf, tmp.as_ptr() as _, -1);
             cur = cur.add(l as usize);
             base = cur;

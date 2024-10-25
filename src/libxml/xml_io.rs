@@ -10,7 +10,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void, CStr},
+    ffi::{c_char, c_int, c_uint, c_ulong, c_void, CStr},
     mem::{size_of, zeroed},
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
@@ -53,7 +53,6 @@ use super::{
         xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
         xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
     },
-    encoding::XmlCharEncodingOutputFunc,
     globals::{xml_free, xml_malloc},
     nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
     nanohttp::{
@@ -2211,79 +2210,16 @@ pub unsafe fn xml_output_buffer_create_io(
  * The value of @outlen after return is the number of octets consumed.
  */
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_escape_content(
-    mut out: *mut c_uchar,
-    outlen: *mut c_int,
-    mut input: *const XmlChar,
-    inlen: *mut c_int,
-) -> c_int {
-    let outstart: *mut c_uchar = out;
-    let base: *const c_uchar = input;
-    let outend: *mut c_uchar = out.add(*outlen as usize);
-
-    let inend: *const c_uchar = input.add(*inlen as usize);
-
-    while input < inend && out < outend {
-        if *input == b'<' {
-            if outend.offset_from(out) < 4 {
-                break;
-            }
-            *out = b'&';
-            out = out.add(1);
-            *out = b'l';
-            out = out.add(1);
-            *out = b't';
-            out = out.add(1);
-            *out = b';';
-            out = out.add(1);
-        } else if *input == b'>' {
-            if outend.offset_from(out) < 4 {
-                break;
-            }
-            *out = b'&';
-            out = out.add(1);
-            *out = b'g';
-            out = out.add(1);
-            *out = b't';
-            out = out.add(1);
-            *out = b';';
-            out = out.add(1);
-        } else if *input == b'&' {
-            if outend.offset_from(out) < 5 {
-                break;
-            }
-            *out = b'&';
-            out = out.add(1);
-            *out = b'a';
-            out = out.add(1);
-            *out = b'm';
-            out = out.add(1);
-            *out = b'p';
-            out = out.add(1);
-            *out = b';';
-            out = out.add(1);
-        } else if *input == b'\r' {
-            if outend.offset_from(out) < 5 {
-                break;
-            }
-            *out = b'&';
-            out = out.add(1);
-            *out = b'#';
-            out = out.add(1);
-            *out = b'1';
-            out = out.add(1);
-            *out = b'3';
-            out = out.add(1);
-            *out = b';';
-            out = out.add(1);
-        } else {
-            *out = *input;
-            out = out.add(1);
+fn xml_escape_content(input: &str, output: &mut String) -> i32 {
+    for input in input.chars() {
+        match input {
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '&' => output.push_str("&amp;"),
+            '\r' => output.push_str("&#13;"),
+            c => output.push(c),
         }
-        input = input.add(1);
     }
-    *outlen = out.offset_from(outstart) as _;
-    *inlen = input.offset_from(base) as _;
     0
 }
 
@@ -2303,10 +2239,10 @@ unsafe extern "C" fn xml_escape_content(
  *         in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_write_escape(
+pub unsafe fn xml_output_buffer_write_escape(
     out: XmlOutputBufferPtr,
     mut str: *const XmlChar,
-    escaping: Option<XmlCharEncodingOutputFunc>,
+    escaping: Option<fn(&str, &mut String) -> i32>,
 ) -> c_int {
     use crate::encoding::EncodingError;
 
@@ -2337,7 +2273,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
         /*
          * how many bytes to consume and how many bytes to store.
          */
-        cons = len;
+        // cons = len;
         chunk = (*out).buffer.map_or(0, |buf| buf.avail() as i32);
 
         /*
@@ -2349,7 +2285,7 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
                 return -1;
             }
             oldwritten = -1;
-            if !(len > 0 && (oldwritten != written)) {
+            if !(len > 0 && oldwritten != written) {
                 break;
             }
             continue;
@@ -2365,24 +2301,16 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
             if (*out).conv.is_none() {
                 (*out).conv = XmlBufRef::new();
             }
-            ret = escaping(
-                (*out).buffer.map_or(null_mut(), |buf| {
-                    buf.as_ref().as_ptr().add(buf.len()) as *mut u8
-                }),
-                addr_of_mut!(chunk),
-                str,
-                addr_of_mut!(cons),
-            );
-            if ret < 0 || chunk == 0
-            /* chunk==0 => nothing done */
-            {
+            let src = CStr::from_ptr(str as *const i8).to_string_lossy();
+            cons = src.len() as i32;
+            let mut buf = String::new();
+            ret = escaping(src.as_ref(), &mut buf);
+            chunk = buf.len() as i32;
+            (*out).buffer.as_mut().unwrap().push_bytes(buf.as_bytes());
+            if ret < 0 || chunk == 0 {
+                /* chunk==0 => nothing done */
                 return -1;
             }
-            (*out)
-                .buffer
-                .expect("Internal Error")
-                .add_len(chunk as usize);
-
             if (*out).buffer.map_or(0, |buf| buf.len()) < MINLEN && cons == len {
                 // goto done;
                 return written;
@@ -2406,23 +2334,16 @@ pub unsafe extern "C" fn xml_output_buffer_write_escape(
                 nbchars = if let Ok(len) = ret { len as i32 } else { 0 };
             }
         } else {
-            ret = escaping(
-                (*out).buffer.map_or(null_mut(), |buf| {
-                    buf.as_ref().as_ptr().add(buf.len()) as *mut u8
-                }),
-                addr_of_mut!(chunk),
-                str,
-                addr_of_mut!(cons),
-            );
-            if ret < 0 || chunk == 0
-            /* chunk==0 => nothing done */
-            {
+            let src = CStr::from_ptr(str as *const i8).to_string_lossy();
+            cons = src.len() as i32;
+            let mut buf = String::new();
+            ret = escaping(src.as_ref(), &mut buf);
+            chunk = buf.len() as i32;
+            (*out).buffer.as_mut().unwrap().push_bytes(buf.as_bytes());
+            if ret < 0 || chunk == 0 {
+                /* chunk==0 => nothing done */
                 return -1;
             }
-            (*out)
-                .buffer
-                .expect("Internal Error")
-                .add_len(chunk as usize);
             if (*out).writecallback.is_some() {
                 nbchars = (*out).buffer.map_or(0, |buf| buf.len() as i32);
             } else {

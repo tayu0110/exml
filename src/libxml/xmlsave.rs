@@ -5,12 +5,13 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_long, c_uchar, CStr, CString},
+    ffi::{c_char, c_int, c_long, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
+    str::from_utf8_unchecked,
     sync::atomic::Ordering,
 };
 
@@ -20,10 +21,8 @@ use crate::{
     buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::XmlErrorDomain,
-    generic_error,
     globals::GLOBAL_STATE,
     libxml::{
-        encoding::XmlCharEncodingOutputFunc,
         entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{xml_free, xml_indent_tree_output, xml_malloc},
         htmltree::{
@@ -53,7 +52,6 @@ use crate::{
         buf::xml_buf_set_allocation_scheme, error::__xml_simple_error,
         save::xml_buf_attr_serialize_txt_content,
     },
-    IS_BYTE_CHAR, IS_CHAR,
 };
 
 const MAX_INDENT: usize = 60;
@@ -92,8 +90,8 @@ pub struct XmlSaveCtxt {
     pub(crate) indent: [u8; MAX_INDENT + 1], /* array for indenting output */
     pub(crate) indent_nr: usize,
     pub(crate) indent_size: usize,
-    pub(crate) escape: Option<XmlCharEncodingOutputFunc>, /* used for element content */
-    pub(crate) escape_attr: Option<XmlCharEncodingOutputFunc>, /* used for attribute content */
+    pub(crate) escape: Option<fn(&str, &mut String) -> i32>, /* used for element content */
+    pub(crate) escape_attr: Option<fn(&str, &mut String) -> i32>, /* used for attribute content */
 }
 
 /**
@@ -135,109 +133,28 @@ pub(crate) unsafe extern "C" fn xml_save_err_memory(extra: *const c_char) {
     );
 }
 
-pub(crate) unsafe extern "C" fn xml_serialize_hex_char_ref(
-    mut out: *mut c_uchar,
-    mut val: c_int,
-) -> *mut c_uchar {
-    let mut ptr: *mut c_uchar;
-
-    *out = b'&';
-    out = out.add(1);
-    *out = b'#';
-    out = out.add(1);
-    *out = b'x';
-    out = out.add(1);
-    if val < 0x10 {
-        ptr = out;
-    } else if val < 0x100 {
-        ptr = out.add(1);
-    } else if val < 0x1000 {
-        ptr = out.add(2);
-    } else if val < 0x10000 {
-        ptr = out.add(3);
-    } else if val < 0x100000 {
-        ptr = out.add(4);
-    } else {
-        ptr = out.add(5);
+/// # Panics
+/// - If c is NULL character, `out.len() >= 5` must be satisfied.
+/// - Otherwise, `out.len() >= 5 + (c as u32).ilog2() / 4` must be satisfied.
+pub(crate) fn xml_serialize_hex_char_ref(out: &mut [u8], mut val: u32) -> &[u8] {
+    out[..3].copy_from_slice(b"&#x");
+    // corner case... if val == 0, ilog2 will panic.
+    if val == 0 {
+        out[3] = b'0';
+        out[4] = b';';
+        return &out[..5];
     }
-    out = ptr.add(1);
-    while val > 0 {
+
+    let len = val.ilog2() as usize / 4 + 1;
+    for i in (3..3 + len).rev() {
         match val & 0xF {
-            0 => {
-                *ptr = b'0';
-                ptr = ptr.sub(1);
-            }
-            1 => {
-                *ptr = b'1';
-                ptr = ptr.sub(1);
-            }
-            2 => {
-                *ptr = b'2';
-                ptr = ptr.sub(1);
-            }
-            3 => {
-                *ptr = b'3';
-                ptr = ptr.sub(1);
-            }
-            4 => {
-                *ptr = b'4';
-                ptr = ptr.sub(1);
-            }
-            5 => {
-                *ptr = b'5';
-                ptr = ptr.sub(1);
-            }
-            6 => {
-                *ptr = b'6';
-                ptr = ptr.sub(1);
-            }
-            7 => {
-                *ptr = b'7';
-                ptr = ptr.sub(1);
-            }
-            8 => {
-                *ptr = b'8';
-                ptr = ptr.sub(1);
-            }
-            9 => {
-                *ptr = b'9';
-                ptr = ptr.sub(1);
-            }
-            0xA => {
-                *ptr = b'A';
-                ptr = ptr.sub(1);
-            }
-            0xB => {
-                *ptr = b'B';
-                ptr = ptr.sub(1);
-            }
-            0xC => {
-                *ptr = b'C';
-                ptr = ptr.sub(1);
-            }
-            0xD => {
-                *ptr = b'D';
-                ptr = ptr.sub(1);
-            }
-            0xE => {
-                *ptr = b'E';
-                ptr = ptr.sub(1);
-            }
-            0xF => {
-                *ptr = b'F';
-                ptr = ptr.sub(1);
-            }
-            _ => {
-                *ptr = b'0';
-                ptr = ptr.sub(1);
-            }
+            c @ 0..=9 => out[i] = b'0' + c as u8,
+            c => out[i] = b'A' + (c as u8 - 10),
         }
         val >>= 4;
     }
-    *out = b';';
-    out = out.add(1);
-    *out = 0;
-    out
+    out[3 + len] = b';';
+    &out[..=3 + len]
 }
 
 /**
@@ -255,161 +172,26 @@ pub(crate) unsafe extern "C" fn xml_serialize_hex_char_ref(
  *     if the return value is positive, else unpredictable.
  * The value of @outlen after return is the number of octets consumed.
  */
-unsafe extern "C" fn xml_escape_entities(
-    mut out: *mut c_uchar,
-    outlen: *mut c_int,
-    mut input: *const XmlChar,
-    inlen: *mut c_int,
-) -> c_int {
-    let outstart: *mut c_uchar = out;
-    let base: *const c_uchar = input;
-    let outend: *mut c_uchar = out.add(*outlen as usize);
-
-    let mut val: c_int;
-
-    let inend: *const c_uchar = input.add(*inlen as usize);
-
-    while input < inend && out < outend {
-        if *input == b'<' {
-            if outend.offset_from(out) < 4 {
-                break;
-            }
-            *out = b'&';
-            out = out.add(1);
-            *out = b'l';
-            out = out.add(1);
-            *out = b't';
-            out = out.add(1);
-            *out = b';';
-            out = out.add(1);
-            input = input.add(1);
-            continue;
-        } else if *input == b'>' {
-            if outend.offset_from(out) < 4 {
-                break;
-            }
-            *out = b'&';
-            out = out.add(1);
-            *out = b'g';
-            out = out.add(1);
-            *out = b't';
-            out = out.add(1);
-            *out = b';';
-            out = out.add(1);
-            input = input.add(1);
-            continue;
-        } else if *input == b'&' {
-            if outend.offset_from(out) < 5 {
-                break;
-            }
-            *out = b'&';
-            out = out.add(1);
-            *out = b'a';
-            out = out.add(1);
-            *out = b'm';
-            out = out.add(1);
-            *out = b'p';
-            out = out.add(1);
-            *out = b';';
-            out = out.add(1);
-            input = input.add(1);
-            continue;
-        } else if (*input >= 0x20 && *input < 0x80) || *input == b'\n' || *input == b'\t' {
-            /*
-             * default case, just copy !
-             */
-            *out = *input;
-            out = out.add(1);
-            input = input.add(1);
-            continue;
-        } else if *input >= 0x80 {
-            /*
-             * We assume we have UTF-8 input.
-             */
-            if outend.offset_from(out) < 11 {
-                break;
-            }
-
-            if *input < 0xC0 {
-                xml_save_err(XmlParserErrors::XmlSaveNotUtf8, null_mut(), null_mut());
-                input = input.add(1);
-                // goto error;
-                *outlen = out.offset_from(outstart) as _;
-                *inlen = input.offset_from(base) as _;
-                return -1;
-            } else if *input < 0xE0 {
-                if inend.offset_from(input) < 2 {
-                    break;
+fn xml_escape_entities(src: &str, dst: &mut String) -> c_int {
+    let mut out = [0; 13];
+    for c in src.chars() {
+        match c {
+            '<' => dst.push_str("&lt;"),
+            '>' => dst.push_str("&gt;"),
+            '&' => dst.push_str("&amp;"),
+            c @ ('\n' | '\t' | '\u{20}'..'\u{80}') => dst.push(c),
+            c => {
+                let out = xml_serialize_hex_char_ref(&mut out, c as u32);
+                // # Safety
+                // character reference includes only '&', '#', 'x', ';' and ascii hex digits,
+                // so `from_utf8_unchecked` won't fail.
+                unsafe {
+                    dst.push_str(from_utf8_unchecked(out));
                 }
-                val = *input.add(0) as i32 & 0x1F;
-                val <<= 6;
-                val |= *input.add(1) as i32 & 0x3F;
-                input = input.add(2);
-            } else if *input < 0xF0 {
-                if inend.offset_from(input) < 3 {
-                    break;
-                }
-                val = *input.add(0) as i32 & 0x0F;
-                val <<= 6;
-                val |= *input.add(1) as i32 & 0x3F;
-                val <<= 6;
-                val |= *input.add(2) as i32 & 0x3F;
-                input = input.add(3);
-            } else if *input < 0xF8 {
-                if inend.offset_from(input) < 4 {
-                    break;
-                }
-                val = *input.add(0) as i32 & 0x07;
-                val <<= 6;
-                val |= *input.add(1) as i32 & 0x3F;
-                val <<= 6;
-                val |= *input.add(2) as i32 & 0x3F;
-                val <<= 6;
-                val |= *input.add(3) as i32;
-                input = input.add(4);
-            } else {
-                xml_save_err(XmlParserErrors::XmlSaveCharInvalid, null_mut(), null_mut());
-                input = input.add(1);
-                // goto error;
-                *outlen = out.offset_from(outstart) as _;
-                *inlen = input.offset_from(base) as _;
-                return -1;
             }
-            if !IS_CHAR!(val) {
-                xml_save_err(XmlParserErrors::XmlSaveCharInvalid, null_mut(), null_mut());
-                input = input.add(1);
-                // goto error;
-                *outlen = out.offset_from(outstart) as _;
-                *inlen = input.offset_from(base) as _;
-                return -1;
-            }
-
-            /*
-             * We could do multiple things here. Just save as a c_char ref
-             */
-            out = xml_serialize_hex_char_ref(out, val);
-        } else if IS_BYTE_CHAR!(*input) {
-            if outend.offset_from(out) < 6 {
-                break;
-            }
-            out = xml_serialize_hex_char_ref(out, *input as _);
-            input = input.add(1);
-        } else {
-            generic_error!("xmlEscapeEntities : char out of range\n");
-            input = input.add(1);
-            // goto error;
-            *outlen = out.offset_from(outstart) as _;
-            *inlen = input.offset_from(base) as _;
-            return -1;
         }
     }
-    *outlen = out.offset_from(outstart) as _;
-    *inlen = input.offset_from(base) as _;
     0
-    // error:
-    //     *outlen = out.offset_from(outstart) as _;
-    //     *inlen = input.offset_from(base) as _;
-    //     return -1;
 }
 
 /**
@@ -1727,8 +1509,8 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     let oldenc: *const XmlChar = (*cur).encoding;
     let oldctxtenc: *const XmlChar = (*ctxt).encoding;
     let mut encoding: *const XmlChar = (*ctxt).encoding;
-    let oldescape: Option<XmlCharEncodingOutputFunc> = (*ctxt).escape;
-    let oldescape_attr: Option<XmlCharEncodingOutputFunc> = (*ctxt).escape_attr;
+    let oldescape = (*ctxt).escape;
+    let oldescape_attr = (*ctxt).escape_attr;
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     let mut switched_encoding: c_int = 0;
 
@@ -2296,9 +2078,9 @@ pub unsafe extern "C" fn xml_save_close(ctxt: XmlSaveCtxtPtr) -> c_int {
  *
  * Returns 0 if successful or -1 in case of error.
  */
-pub unsafe extern "C" fn xml_save_set_escape(
+pub unsafe fn xml_save_set_escape(
     ctxt: XmlSaveCtxtPtr,
-    escape: Option<XmlCharEncodingOutputFunc>,
+    escape: Option<fn(&str, &mut String) -> i32>,
 ) -> c_int {
     if ctxt.is_null() {
         return -1;
@@ -2316,9 +2098,9 @@ pub unsafe extern "C" fn xml_save_set_escape(
  *
  * Returns 0 if successful or -1 in case of error.
  */
-pub unsafe extern "C" fn xml_save_set_attr_escape(
+pub unsafe fn xml_save_set_attr_escape(
     ctxt: XmlSaveCtxtPtr,
-    escape: Option<XmlCharEncodingOutputFunc>,
+    escape: Option<fn(&str, &mut String) -> i32>,
 ) -> c_int {
     if ctxt.is_null() {
         return -1;
