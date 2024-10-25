@@ -16,6 +16,7 @@ use std::{
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
+    slice::from_raw_parts,
 };
 
 use libc::memset;
@@ -965,7 +966,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
         return -1;
     }
     sum += count;
-    count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+    count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
     if count < 0 {
         return -1;
     }
@@ -979,7 +980,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
         return -1;
     }
     sum += count;
-    count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+    count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
     if count < 0 {
         return -1;
     }
@@ -990,7 +991,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -1002,7 +1003,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -1015,7 +1016,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -1025,7 +1026,7 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -2295,7 +2296,10 @@ pub unsafe extern "C" fn xml_text_writer_write_raw_len(
     }
 
     if !content.is_null() {
-        count = xml_output_buffer_write(&mut *(*writer).out, len, content as _);
+        count = xml_output_buffer_write(
+            &mut *(*writer).out,
+            from_raw_parts(content as _, len as usize),
+        );
         if count < 0 {
             return -1;
         }
@@ -2460,7 +2464,7 @@ pub unsafe extern "C" fn xml_text_writer_write_string(
 }
 
 const B64LINELEN: usize = 72;
-const B64CRLF: &CStr = c"\r\n";
+const B64CRLF: &str = "\r\n";
 
 /**
  * xmlOutputBufferWriteBase64:
@@ -2501,7 +2505,7 @@ unsafe extern "C" fn xml_output_buffer_write_base64(
     i = 0;
     loop {
         let mut igroup: [c_uchar; 3] = [0; 3];
-        let mut ogroup: [c_uchar; 4] = [0; 4];
+        let mut ogroup: [u8; 4] = [0; 4];
         let mut c: c_int;
         let mut n: c_int = 3;
 
@@ -2532,14 +2536,14 @@ unsafe extern "C" fn xml_output_buffer_write_base64(
             }
 
             if linelen >= B64LINELEN as i32 {
-                count = xml_output_buffer_write(&mut *out, 2, B64CRLF.as_ptr() as _);
+                count = xml_output_buffer_write(&mut *out, B64CRLF.as_bytes());
                 if count == -1 {
                     return -1;
                 }
                 sum += count;
                 linelen = 0;
             }
-            count = xml_output_buffer_write(&mut *out, 4, ogroup.as_ptr() as _);
+            count = xml_output_buffer_write(&mut *out, &ogroup);
             if count == -1 {
                 return -1;
             }
@@ -2636,20 +2640,14 @@ unsafe extern "C" fn xml_output_buffer_write_bin_hex(
 
     sum = 0;
     for i in 0..len as usize {
-        count = xml_output_buffer_write(
-            &mut *out,
-            1,
-            HEX.as_ptr().add(*data.add(i) as usize >> 4) as _,
-        );
+        let hi = *data.add(i) as usize >> 4;
+        count = xml_output_buffer_write(&mut *out, &HEX[hi..hi + 1]);
         if count == -1 {
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(
-            &mut *out,
-            1,
-            HEX.as_ptr().add(*data.add(i) as usize & 0xF) as _,
-        );
+        let lo = *data.add(i) as usize & 0xF;
+        count = xml_output_buffer_write(&mut *out, &HEX[lo..lo + 1]);
         if count == -1 {
             return -1;
         }
@@ -2770,7 +2768,7 @@ pub unsafe extern "C" fn xml_text_writer_start_attribute(
                 return -1;
             }
             sum += count;
-            count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+            count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
             if count < 0 {
                 return -1;
             }
@@ -2917,7 +2915,7 @@ pub unsafe extern "C" fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr)
         XmlTextWriterState::XmlTextwriterAttribute => {
             (*p).state = XmlTextWriterState::XmlTextwriterName;
 
-            count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+            count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
             if count < 0 {
                 return -1;
             }
@@ -3727,9 +3725,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
         }
 
         if (*writer).indent != 0 {
-            count = xml_output_buffer_write(&mut *(*writer).out, 1, c"\n".as_ptr() as _);
+            count = xml_output_buffer_write(&mut *(*writer).out, b"\n");
         } else {
-            count = xml_output_buffer_write(&mut *(*writer).out, 1, c" ".as_ptr() as _);
+            count = xml_output_buffer_write(&mut *(*writer).out, b" ");
         }
         if count < 0 {
             return -1;
@@ -3742,7 +3740,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
         }
         sum += count;
 
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -3754,7 +3752,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
         }
         sum += count;
 
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -3764,9 +3762,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
     if !sysid.is_null() {
         if pubid.is_null() {
             if (*writer).indent != 0 {
-                count = xml_output_buffer_write(&mut *(*writer).out, 1, c"\n".as_ptr() as _);
+                count = xml_output_buffer_write(&mut *(*writer).out, b"\n");
             } else {
-                count = xml_output_buffer_write(&mut *(*writer).out, 1, c" ".as_ptr() as _);
+                count = xml_output_buffer_write(&mut *(*writer).out, b" ");
             }
             if count < 0 {
                 return -1;
@@ -3781,7 +3779,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
             if (*writer).indent != 0 {
                 count = xml_output_buffer_write_string((*writer).out, c"\n       ".as_ptr() as _);
             } else {
-                count = xml_output_buffer_write(&mut *(*writer).out, 1, c" ".as_ptr() as _);
+                count = xml_output_buffer_write(&mut *(*writer).out, b" ");
             }
             if count < 0 {
                 return -1;
@@ -3789,7 +3787,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
             sum += count;
         }
 
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -3801,7 +3799,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
         }
         sum += count;
 
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -4544,8 +4542,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr
         | ty @ XmlTextWriterState::XmlTextwriterDtdEnty
         | ty @ XmlTextWriterState::XmlTextwriterDtdPEnt => {
             if matches!(ty, XmlTextWriterState::XmlTextwriterDtdEntyText) {
-                count =
-                    xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+                count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
                 if count < 0 {
                     return -1;
                 }
@@ -4767,7 +4764,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
         }
         sum += count;
 
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -4779,7 +4776,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
         }
         sum += count;
 
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -4801,7 +4798,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
         }
         sum += count;
 
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -4813,7 +4810,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
         }
         sum += count;
 
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -4957,7 +4954,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -4967,7 +4964,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -4987,7 +4984,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }
@@ -4997,7 +4994,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
             return -1;
         }
         sum += count;
-        count = xml_output_buffer_write(&mut *(*writer).out, 1, addr_of_mut!((*writer).qchar));
+        count = xml_output_buffer_write(&mut *(*writer).out, &[(*writer).qchar as u8]);
         if count < 0 {
             return -1;
         }

@@ -2287,7 +2287,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     for i in 0..(*(*cur).nodesetval).node_nr {
                         node = *(*(*cur).nodesetval).node_tab.add(i as usize);
                         xml_node_dump_output(buf, null_mut(), node, 0, 0, null_mut());
-                        xml_output_buffer_write(&mut *buf, 1, c"\n".as_ptr());
+                        xml_output_buffer_write(&mut *buf, b"\n");
                     }
                     xml_output_buffer_close(buf);
                 }

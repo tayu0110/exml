@@ -1671,8 +1671,7 @@ unsafe extern "C" fn xml_io_http_write(
         //  #endif
         len = xml_output_buffer_write(
             &mut *((*ctxt).doc_buff as *mut XmlOutputBuffer),
-            len,
-            buffer,
+            from_raw_parts(buffer as *const u8, len as usize),
         );
 
         if len < 0 {
@@ -2139,11 +2138,7 @@ pub unsafe extern "C" fn xml_output_buffer_get_size(out: XmlOutputBufferPtr) -> 
  *         in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_write(
-    out: &mut XmlOutputBuffer,
-    mut len: c_int,
-    mut buf: *const c_char,
-) -> i32 {
+pub unsafe fn xml_output_buffer_write(out: &mut XmlOutputBuffer, buf: &[u8]) -> i32 {
     use crate::encoding::EncodingError;
 
     let mut nbchars: c_int; /* number of chars to output to I/O */
@@ -2153,16 +2148,12 @@ pub unsafe extern "C" fn xml_output_buffer_write(
     if out.error != 0 {
         return -1;
     }
-    if len < 0 {
-        return 0;
-    }
     if out.error != 0 {
         return -1;
     }
 
-    while {
-        let chunk = len.min(4 * MINLEN as i32);
-
+    let mut len = buf.len();
+    for buf in buf.chunks(4 * MINLEN) {
         /*
          * first handle encoding stuff.
          */
@@ -2173,19 +2164,15 @@ pub unsafe extern "C" fn xml_output_buffer_write(
             if out.conv.is_none() {
                 out.conv = XmlBufRef::new();
             }
-            if buf.is_null()
-                || out.buffer.map_or(true, |mut buffer| {
-                    buffer
-                        .push_bytes(from_raw_parts(buf as *const u8, chunk as usize))
-                        .is_err()
-                })
+            if out
+                .buffer
+                .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
             {
                 return -1;
             }
 
-            if out.buffer.map_or(0, |buf| buf.len()) < MINLEN && chunk == len {
-                // goto done;
-                return written;
+            if out.buffer.map_or(0, |buf| buf.len()) < MINLEN && buf.len() == len {
+                break;
             }
 
             /*
@@ -2206,28 +2193,23 @@ pub unsafe extern "C" fn xml_output_buffer_write(
                 nbchars = res.unwrap_or(0) as i32;
             }
         } else {
-            if buf.is_null()
-                || out.buffer.map_or(true, |mut buffer| {
-                    buffer
-                        .push_bytes(from_raw_parts(buf as *const u8, chunk as usize))
-                        .is_err()
-                })
+            if out
+                .buffer
+                .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
             {
                 return -1;
             }
             if out.writecallback.is_some() {
                 nbchars = out.buffer.map_or(0, |buf| buf.len() as i32);
             } else {
-                nbchars = chunk;
+                nbchars = buf.len() as i32;
             }
         }
-        buf = buf.add(chunk as _);
-        len -= chunk;
+        len -= buf.len();
 
         if let Some(writecallback) = out.writecallback {
-            if nbchars < MINLEN as i32 && len <= 0 {
-                // goto done;
-                return written;
+            if nbchars < MINLEN as i32 && len == 0 {
+                break;
             }
 
             /*
@@ -2266,11 +2248,8 @@ pub unsafe extern "C" fn xml_output_buffer_write(
             out.written = out.written.saturating_add(ret);
         }
         written += nbchars;
+    }
 
-        len > 0
-    } {}
-
-    // done:
     written
 }
 
@@ -2298,12 +2277,12 @@ pub unsafe extern "C" fn xml_output_buffer_write_string(
     if str.is_null() {
         return -1;
     }
-    let len: c_int = strlen(str) as _;
+    let len = strlen(str);
 
     if len > 0 {
-        return xml_output_buffer_write(&mut *out, len, str);
+        return xml_output_buffer_write(&mut *out, from_raw_parts(str as *const u8, len));
     }
-    len
+    len as i32
 }
 
 /**
