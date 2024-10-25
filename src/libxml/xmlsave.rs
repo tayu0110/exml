@@ -42,8 +42,8 @@ use crate::{
         xml_io::{
             xml_output_buffer_close, xml_output_buffer_create_fd,
             xml_output_buffer_create_filename, xml_output_buffer_create_io,
-            xml_output_buffer_flush, xml_output_buffer_write_escape, XmlOutputBufferPtr,
-            XmlOutputCloseCallback, XmlOutputWriteCallback,
+            xml_output_buffer_flush, XmlOutputBufferPtr, XmlOutputCloseCallback,
+            XmlOutputWriteCallback,
         },
         xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strdup, XmlChar},
@@ -624,8 +624,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
             XmlElementType::XmlTextNode => {
                 if !(*cur).content.is_null() {
                     if (*cur).name != XML_STRING_TEXT_NOENC.as_ptr() as _ {
-                        xml_output_buffer_write_escape(
-                            &mut *buf,
+                        (*buf).write_str_with_escape(
                             CStr::from_ptr((*cur).content as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
@@ -1349,8 +1348,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 if (*cur).name == XML_STRING_TEXT.as_ptr() as _
                     || (*cur).name != XML_STRING_TEXT_NOENC.as_ptr() as _
                 {
-                    xml_output_buffer_write_escape(
-                        &mut *buf,
+                    (*buf).write_str_with_escape(
                         CStr::from_ptr((*cur).content as *const i8)
                             .to_string_lossy()
                             .as_ref(),
