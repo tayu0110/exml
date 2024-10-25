@@ -170,7 +170,7 @@ pub struct XmlParserInputBuffer {
     pub buffer: Option<XmlBufRef>, /* Local buffer encoded in UTF-8 */
     pub(crate) raw: Option<XmlBufRef>, /* if encoder != NULL buffer for raw input */
     pub(crate) compressed: c_int,  /* -1=unknown, 0=not compressed, 1=compressed */
-    pub(crate) error: c_int,
+    pub(crate) error: XmlParserErrors,
     pub(crate) rawconsumed: c_ulong, /* amount consumed from raw */
 }
 
@@ -286,7 +286,7 @@ impl XmlParserInputBuffer {
     pub unsafe fn grow(&mut self, mut len: c_int) -> c_int {
         let mut res: c_int = 0;
 
-        if self.error != 0 {
+        if !self.error.is_ok() {
             return -1;
         }
         if len <= MINLEN as i32 && len != 4 {
@@ -311,7 +311,7 @@ impl XmlParserInputBuffer {
         if let Some(callback) = self.readcallback {
             if buf.map_or(true, |mut buf| buf.grow((len + 1) as usize).is_err()) {
                 xml_ioerr_memory(c"growing input buffer".as_ptr() as _);
-                self.error = XmlParserErrors::XmlErrNoMemory as i32;
+                self.error = XmlParserErrors::XmlErrNoMemory;
                 return -1;
             }
 
@@ -351,7 +351,7 @@ impl XmlParserInputBuffer {
             let using: size_t = buf.map_or(0, |buf| buf.len());
             let Ok(written) = self.decode(true) else {
                 xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                self.error = XmlParserErrors::XmlIoEncoder as i32;
+                self.error = XmlParserErrors::XmlIoEncoder;
                 return -1;
             };
             res = written as i32;
@@ -368,7 +368,7 @@ impl XmlParserInputBuffer {
     /// Returns the number of chars read and stored in the buffer, or -1 in case of error.
     #[doc(alias = "xmlParserInputBufferPush")]
     pub fn push_bytes(&mut self, buf: &[u8]) -> c_int {
-        if self.error != 0 {
+        if !self.error.is_ok() {
             return -1;
         }
         if self.encoder.is_some() {
@@ -393,7 +393,7 @@ impl XmlParserInputBuffer {
                 unsafe {
                     xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
                 }
-                self.error = XmlParserErrors::XmlIoEncoder as i32;
+                self.error = XmlParserErrors::XmlIoEncoder;
                 return -1;
             };
             let consumed: size_t = using - self.raw.map_or(0, |raw| raw.len());
@@ -426,7 +426,7 @@ pub struct XmlOutputBuffer {
     pub(crate) buffer: Option<XmlBufRef>, /* Local buffer encoded in UTF-8 or ISOLatin */
     pub(crate) conv: Option<XmlBufRef>,   /* if encoder != NULL buffer for output */
     pub(crate) written: c_int,            /* total number of byte written */
-    pub(crate) error: c_int,
+    pub(crate) error: XmlParserErrors,
 }
 
 impl XmlOutputBuffer {
@@ -585,7 +585,7 @@ impl XmlOutputBuffer {
         let mut ret: c_int; /* return from function call */
         let mut written: c_int = 0; /* number of c_char written to I/O so far */
 
-        if self.error != 0 {
+        if !self.error.is_ok() {
             return -1;
         }
 
@@ -620,7 +620,7 @@ impl XmlOutputBuffer {
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                     _ => {
                         xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                        self.error = XmlParserErrors::XmlIoEncoder as i32;
+                        self.error = XmlParserErrors::XmlIoEncoder;
                         return -1;
                     }
                 };
@@ -679,7 +679,7 @@ impl XmlOutputBuffer {
                 }
                 if ret < 0 {
                     xml_ioerr(XmlParserErrors::XmlIoWrite, null());
-                    self.error = XmlParserErrors::XmlIoWrite as i32;
+                    self.error = XmlParserErrors::XmlIoWrite;
                     return ret;
                 }
                 self.written = self.written.saturating_add(ret);
@@ -698,7 +698,7 @@ impl XmlOutputBuffer {
     #[doc(alias = "xmlOutputBufferWriteString")]
     #[cfg(feature = "output")]
     pub unsafe fn write_str(&mut self, s: &str) -> c_int {
-        if self.error != 0 {
+        if !self.error.is_ok() {
             return -1;
         }
 
@@ -727,15 +727,12 @@ impl XmlOutputBuffer {
         let mut written: c_int = 0; /* number of c_char written to I/O so far */
         let mut oldwritten: c_int; /* loop guard */
 
-        if self.error != 0 {
+        if !self.error.is_ok() {
             return -1;
         }
         let Some(mut buffer) = self.buffer else {
             return -1;
         };
-        if self.error != 0 {
-            return -1;
-        }
 
         let escaping = escaping.unwrap_or(xml_escape_content);
 
@@ -783,7 +780,7 @@ impl XmlOutputBuffer {
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                     _ => {
                         xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                        self.error = XmlParserErrors::XmlIoEncoder as i32;
+                        self.error = XmlParserErrors::XmlIoEncoder;
                         return -1;
                     }
                 };
@@ -849,7 +846,7 @@ impl XmlOutputBuffer {
                 }
                 if ret < 0 {
                     xml_ioerr(XmlParserErrors::XmlIoWrite, null());
-                    self.error = XmlParserErrors::XmlIoWrite as i32;
+                    self.error = XmlParserErrors::XmlIoWrite;
                     return ret;
                 }
                 self.written = self.written.wrapping_add(ret);
@@ -873,7 +870,7 @@ impl XmlOutputBuffer {
     pub unsafe extern "C" fn flush(&mut self) -> c_int {
         let mut ret: c_int = 0;
 
-        if self.error != 0 {
+        if !self.error.is_ok() {
             return -1;
         }
         /*
@@ -886,7 +883,7 @@ impl XmlOutputBuffer {
             while {
                 let Ok(nbchars) = self.encode(false) else {
                     xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                    self.error = XmlParserErrors::XmlIoEncoder as i32;
+                    self.error = XmlParserErrors::XmlIoEncoder;
                     return -1;
                 };
 
@@ -929,7 +926,7 @@ impl XmlOutputBuffer {
         }
         if ret < 0 {
             xml_ioerr(XmlParserErrors::XmlIoFlush, null());
-            self.error = XmlParserErrors::XmlIoFlush as i32;
+            self.error = XmlParserErrors::XmlIoFlush;
             return ret;
         }
         self.written = self.written.saturating_add(ret);
@@ -2483,7 +2480,7 @@ pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_i
         buf.free();
     }
 
-    if (*out).error != 0 {
+    if !(*out).error.is_ok() {
         err_rc = -1;
     }
     xml_free(out as _);
