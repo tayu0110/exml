@@ -13,7 +13,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::{memcpy, memset};
+use libc::memset;
 
 use crate::{
     buf::XmlBufRef,
@@ -418,7 +418,7 @@ unsafe extern "C" fn xml_escape_entities(
  *
  * Initialize a saving context
  */
-pub(crate) unsafe fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
+pub(crate) fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
     if ctxt.encoding.is_null() && ctxt.escape.is_none() {
         ctxt.escape = Some(xml_escape_entities);
     }
@@ -429,12 +429,8 @@ pub(crate) unsafe fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
         } else {
             ctxt.indent_size = len;
             ctxt.indent_nr = MAX_INDENT / ctxt.indent_size;
-            for i in 0..ctxt.indent_nr {
-                memcpy(
-                    ctxt.indent.as_mut_ptr().add(i * ctxt.indent_size) as _,
-                    state.tree_indent_string.as_ptr() as _,
-                    ctxt.indent_size,
-                );
+            for chunk in ctxt.indent.chunks_exact_mut(ctxt.indent_size) {
+                chunk.copy_from_slice(state.tree_indent_string.as_bytes());
             }
             ctxt.indent[ctxt.indent_nr * ctxt.indent_size] = 0;
         }
