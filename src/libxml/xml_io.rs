@@ -1721,13 +1721,14 @@ pub(crate) struct XmlOutputCallback {
 const MAX_OUTPUT_CALLBACK: usize = 15;
 
 #[cfg(feature = "output")]
-static mut XML_OUTPUT_CALLBACK_TABLE: [XmlOutputCallback; MAX_OUTPUT_CALLBACK] =
+static XML_OUTPUT_CALLBACK_TABLE: Mutex<[XmlOutputCallback; MAX_OUTPUT_CALLBACK]> = Mutex::new(
     [XmlOutputCallback {
         matchcallback: None,
         opencallback: None,
         writecallback: None,
         closecallback: None,
-    }; MAX_OUTPUT_CALLBACK];
+    }; MAX_OUTPUT_CALLBACK],
+);
 #[cfg(feature = "output")]
 static XML_OUTPUT_CALLBACK_NR: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "output")]
@@ -1740,19 +1741,20 @@ static XML_OUTPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
  * compiled-in I/O callbacks.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_cleanup_output_callbacks() {
+pub fn xml_cleanup_output_callbacks() {
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         return;
     }
 
     let num_callbacks = XML_OUTPUT_CALLBACK_NR.load(Ordering::Acquire);
-    for i in (0..num_callbacks).rev() {
-        XML_OUTPUT_CALLBACK_TABLE[i].matchcallback = None;
-        XML_OUTPUT_CALLBACK_TABLE[i].opencallback = None;
-        XML_OUTPUT_CALLBACK_TABLE[i].writecallback = None;
-        XML_OUTPUT_CALLBACK_TABLE[i].closecallback = None;
-    }
+    let mut callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[..num_callbacks].fill(XmlOutputCallback {
+        matchcallback: None,
+        opencallback: None,
+        writecallback: None,
+        closecallback: None,
+    });
 
     XML_OUTPUT_CALLBACK_NR.store(0, Ordering::Release);
     XML_OUTPUT_CALLBACK_INITIALIZED.store(false, Ordering::Release);
@@ -1767,7 +1769,7 @@ pub unsafe extern "C" fn xml_cleanup_output_callbacks() {
  * Returns the number of output callback registered or -1 in case of error.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_pop_output_callbacks() -> c_int {
+pub fn xml_pop_output_callbacks() -> c_int {
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return -1;
     }
@@ -1778,10 +1780,11 @@ pub unsafe extern "C" fn xml_pop_output_callbacks() -> c_int {
     }
 
     num_callbacks -= 1;
-    XML_OUTPUT_CALLBACK_TABLE[num_callbacks].matchcallback = None;
-    XML_OUTPUT_CALLBACK_TABLE[num_callbacks].opencallback = None;
-    XML_OUTPUT_CALLBACK_TABLE[num_callbacks].writecallback = None;
-    XML_OUTPUT_CALLBACK_TABLE[num_callbacks].closecallback = None;
+    let mut callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[num_callbacks].matchcallback = None;
+    callbacks[num_callbacks].opencallback = None;
+    callbacks[num_callbacks].writecallback = None;
+    callbacks[num_callbacks].closecallback = None;
 
     XML_OUTPUT_CALLBACK_NR.store(num_callbacks, Ordering::Release);
     num_callbacks as _
@@ -2402,7 +2405,7 @@ pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_i
  * Returns the registered handler number or -1 in case of error
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_register_output_callbacks(
+pub fn xml_register_output_callbacks(
     match_func: Option<XmlOutputMatchCallback>,
     open_func: Option<XmlOutputOpenCallback>,
     write_func: Option<XmlOutputWriteCallback>,
@@ -2412,10 +2415,11 @@ pub unsafe extern "C" fn xml_register_output_callbacks(
     if num_callbacks >= MAX_OUTPUT_CALLBACK {
         return -1;
     }
-    XML_OUTPUT_CALLBACK_TABLE[num_callbacks].matchcallback = match_func;
-    XML_OUTPUT_CALLBACK_TABLE[num_callbacks].opencallback = open_func;
-    XML_OUTPUT_CALLBACK_TABLE[num_callbacks].writecallback = write_func;
-    XML_OUTPUT_CALLBACK_TABLE[num_callbacks].closecallback = close_func;
+    let mut callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[num_callbacks].matchcallback = match_func;
+    callbacks[num_callbacks].opencallback = open_func;
+    callbacks[num_callbacks].writecallback = write_func;
+    callbacks[num_callbacks].closecallback = close_func;
     XML_OUTPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
     XML_OUTPUT_CALLBACK_NR.store(num_callbacks + 1, Ordering::Release);
     num_callbacks as _
@@ -2514,6 +2518,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     }
 
     let num_callbacks = XML_OUTPUT_CALLBACK_NR.load(Ordering::Acquire);
+    let callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
 
     /*
      * Try to find one of the output accept method accepting that scheme
@@ -2537,7 +2542,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
         // 	}
         // #endif
         for i in (0..num_callbacks).rev() {
-            if XML_OUTPUT_CALLBACK_TABLE[i]
+            if callbacks[i]
                 .matchcallback
                 .filter(|callback| callback(unescaped) != 0)
                 .is_some()
@@ -2549,7 +2554,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                 //         }
                 // 		else
                 // #endif
-                context = (XML_OUTPUT_CALLBACK_TABLE[i].opencallback.unwrap())(unescaped);
+                context = (callbacks[i].opencallback.unwrap())(unescaped);
                 if !context.is_null() {
                     xml_free(unescaped as _);
                     /*
@@ -2558,8 +2563,8 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                     ret = xml_alloc_output_buffer_internal(encoder);
                     if !ret.is_null() {
                         (*ret).context = context;
-                        (*ret).writecallback = XML_OUTPUT_CALLBACK_TABLE[i].writecallback;
-                        (*ret).closecallback = XML_OUTPUT_CALLBACK_TABLE[i].closecallback;
+                        (*ret).writecallback = callbacks[i].writecallback;
+                        (*ret).closecallback = callbacks[i].closecallback;
                     }
                     return ret;
                 }
@@ -2591,7 +2596,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
         // 	}
         // #endif
         for i in (0..num_callbacks).rev() {
-            if XML_OUTPUT_CALLBACK_TABLE[i]
+            if callbacks[i]
                 .matchcallback
                 .filter(|callback| callback(uri) != 0)
                 .is_some()
@@ -2603,7 +2608,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                 //         }
                 // 		else
                 // #endif
-                context = (XML_OUTPUT_CALLBACK_TABLE[i].opencallback.unwrap())(uri);
+                context = (callbacks[i].opencallback.unwrap())(uri);
                 if !context.is_null() {
                     /*
                      * Allocate the Output buffer front-end.
@@ -2611,8 +2616,8 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                     ret = xml_alloc_output_buffer_internal(encoder);
                     if !ret.is_null() {
                         (*ret).context = context;
-                        (*ret).writecallback = XML_OUTPUT_CALLBACK_TABLE[i].writecallback;
-                        (*ret).closecallback = XML_OUTPUT_CALLBACK_TABLE[i].closecallback;
+                        (*ret).writecallback = callbacks[i].writecallback;
+                        (*ret).closecallback = callbacks[i].closecallback;
                     }
                     return ret;
                 }
