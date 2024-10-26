@@ -24,7 +24,12 @@ use crate::{
     error::{parser_validity_error, parser_validity_warning, XmlError},
     generic_error,
     globals::{
-        get_do_validity_checking_default_value, get_get_warnings_default_value, GenericError,
+        get_do_validity_checking_default_value, get_get_warnings_default_value,
+        get_keep_blanks_default_value, get_line_numbers_default_value,
+        get_load_ext_dtd_default_value, get_parser_debug_entities,
+        get_pedantic_parser_default_value, get_substitute_entities_default_value,
+        set_indent_tree_output, set_keep_blanks_default_value, set_line_numbers_default_value,
+        set_pedantic_parser_default_value, set_substitute_entities_default_value, GenericError,
         GenericErrorContext, StructuredError,
     },
     hash::XmlHashTableRef,
@@ -37,11 +42,7 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_handler, xml_default_sax_locator,
-            xml_free, xml_indent_tree_output, xml_init_globals_internal,
-            xml_keep_blanks_default_value, xml_line_numbers_default_value,
-            xml_load_ext_dtd_default_value, xml_malloc, xml_malloc_atomic,
-            xml_parser_debug_entities, xml_pedantic_parser_default_value, xml_realloc,
-            xml_substitute_entities_default_value,
+            xml_free, xml_init_globals_internal, xml_malloc, xml_malloc_atomic, xml_realloc,
         },
         hash::{
             xml_hash_default_deallocator, xml_hash_free, xml_hash_lookup2, xml_hash_qlookup2,
@@ -2018,9 +2019,9 @@ pub unsafe extern "C" fn xml_parse_memory(buffer: *const c_char, size: c_int) ->
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
 pub unsafe extern "C" fn xml_substitute_entities_default(val: c_int) -> c_int {
-    let old: c_int = *xml_substitute_entities_default_value();
+    let old: c_int = get_substitute_entities_default_value();
 
-    *xml_substitute_entities_default_value() = val;
+    set_substitute_entities_default_value(val);
     old
 }
 
@@ -2050,11 +2051,11 @@ pub unsafe extern "C" fn xml_substitute_entities_default(val: c_int) -> c_int {
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
 pub unsafe extern "C" fn xml_keep_blanks_default(val: c_int) -> c_int {
-    let old: c_int = *xml_keep_blanks_default_value();
+    let old: c_int = get_keep_blanks_default_value();
 
-    *xml_keep_blanks_default_value() = val;
+    set_keep_blanks_default_value(val);
     if val == 0 {
-        *xml_indent_tree_output() = 1;
+        set_indent_tree_output(1);
     }
     old
 }
@@ -2085,9 +2086,9 @@ pub unsafe extern "C" fn xml_stop_parser(ctxt: XmlParserCtxtPtr) {
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
 pub unsafe extern "C" fn xml_pedantic_parser_default(val: c_int) -> c_int {
-    let old: c_int = *xml_pedantic_parser_default_value();
+    let old: c_int = get_pedantic_parser_default_value();
 
-    *xml_pedantic_parser_default_value() = val;
+    set_pedantic_parser_default_value(val);
     old
 }
 
@@ -2103,9 +2104,9 @@ pub unsafe extern "C" fn xml_pedantic_parser_default(val: c_int) -> c_int {
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
 pub unsafe extern "C" fn xml_line_numbers_default(val: c_int) -> c_int {
-    let old: c_int = *xml_line_numbers_default_value();
+    let old: c_int = get_line_numbers_default_value();
 
-    *xml_line_numbers_default_value() = val;
+    set_line_numbers_default_value(val);
     old
 }
 
@@ -4678,17 +4679,17 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).well_formed = 1;
     (*ctxt).ns_well_formed = 1;
     (*ctxt).valid = 1;
-    (*ctxt).loadsubset = *xml_load_ext_dtd_default_value();
+    (*ctxt).loadsubset = get_load_ext_dtd_default_value();
     if (*ctxt).loadsubset != 0 {
         (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
     }
     (*ctxt).validate = get_do_validity_checking_default_value();
-    (*ctxt).pedantic = *xml_pedantic_parser_default_value();
+    (*ctxt).pedantic = get_pedantic_parser_default_value();
     if (*ctxt).pedantic != 0 {
         (*ctxt).options |= XmlParserOption::XmlParsePedantic as i32;
     }
-    (*ctxt).linenumbers = *xml_line_numbers_default_value();
-    (*ctxt).keep_blanks = *xml_keep_blanks_default_value();
+    (*ctxt).linenumbers = get_line_numbers_default_value();
+    (*ctxt).keep_blanks = get_keep_blanks_default_value();
     if (*ctxt).keep_blanks == 0 {
         (*(*ctxt).sax).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
         (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
@@ -4707,7 +4708,7 @@ unsafe fn xml_init_sax_parser_ctxt(
         (*ctxt).vctxt.node_max = 0;
         (*ctxt).options |= XmlParserOption::XmlParseDtdvalid as i32;
     }
-    (*ctxt).replace_entities = *xml_substitute_entities_default_value();
+    (*ctxt).replace_entities = get_substitute_entities_default_value();
     if (*ctxt).replace_entities != 0 {
         (*ctxt).options |= XmlParserOption::XmlParseNoent as i32;
     }
@@ -6504,7 +6505,7 @@ pub unsafe extern "C" fn xml_pop_input(ctxt: XmlParserCtxtPtr) -> XmlChar {
     if ctxt.is_null() || (*ctxt).input_nr <= 1 {
         return 0;
     }
-    if *xml_parser_debug_entities() != 0 {
+    if get_parser_debug_entities() != 0 {
         generic_error!("Popping input {}\n", (*ctxt).input_nr);
     }
     if (*ctxt).input_nr > 1
@@ -6563,7 +6564,7 @@ unsafe extern "C" fn xml_load_entity_content(
         return -1;
     }
 
-    if *xml_parser_debug_entities() != 0 {
+    if get_parser_debug_entities() != 0 {
         generic_error!(
             "Reading {} entity content input\n",
             CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
@@ -6756,7 +6757,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                         grow_buffer!(ctxt, buffer, XML_PARSER_BUFFER_SIZE, buffer_size, rep, 'mem_error);
                     }
                 } else if c == b'&' as i32 && what & XML_SUBSTITUTE_REF as i32 != 0 {
-                    if *xml_parser_debug_entities() != 0 {
+                    if get_parser_debug_entities() != 0 {
                         generic_error!(
                             "String decoding Entity Reference: {}\n",
                             CStr::from_ptr(str as *const i8)
@@ -6872,7 +6873,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                         nbchars += 1;
                     }
                 } else if c == b'%' as i32 && what & XML_SUBSTITUTE_PEREF as i32 != 0 {
-                    if *xml_parser_debug_entities() != 0 {
+                    if get_parser_debug_entities() != 0 {
                         generic_error!(
                             "String decoding PE Reference: {}\n",
                             CStr::from_ptr(str as *const i8)
@@ -10690,7 +10691,7 @@ pub unsafe fn xml_new_io_input_stream(
     if input.is_null() {
         return null_mut();
     }
-    if *xml_parser_debug_entities() != 0 {
+    if get_parser_debug_entities() != 0 {
         generic_error!("new input from I/O\n");
     }
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);

@@ -4705,18 +4705,21 @@ unsafe extern "C" fn load_xpath_expr(
 ) -> XmlXPathObjectPtr {
     use std::sync::atomic::Ordering;
 
-    use exml::libxml::{
-        globals::xml_load_ext_dtd_default_value,
-        parser::{
-            xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
+    use exml::{
+        globals::set_load_ext_dtd_default_value,
+        libxml::{
+            parser::{
+                xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS,
+                XML_DETECT_IDS,
+            },
+            tree::{xml_doc_get_root_element, xml_node_get_content, XmlNsPtr},
+            xmlstring::xml_str_equal,
+            xpath::{
+                xml_xpath_eval_expression, xml_xpath_free_context, xml_xpath_new_context,
+                XmlXPathContextPtr,
+            },
+            xpath_internals::xml_xpath_register_ns,
         },
-        tree::{xml_doc_get_root_element, xml_node_get_content, XmlNsPtr},
-        xmlstring::xml_str_equal,
-        xpath::{
-            xml_xpath_eval_expression, xml_xpath_free_context, xml_xpath_new_context,
-            XmlXPathContextPtr,
-        },
-        xpath_internals::xml_xpath_register_ns,
     };
 
     let mut node: XmlNodePtr;
@@ -4725,7 +4728,7 @@ unsafe extern "C" fn load_xpath_expr(
     /*
      * load XPath expr as a file
      */
-    *xml_load_ext_dtd_default_value() = XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32;
+    set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
     xml_substitute_entities_default(1);
 
     let doc: XmlDocPtr = xml_read_file(
@@ -4906,14 +4909,17 @@ unsafe extern "C" fn c14n_run_test(
     ns_filename: *const c_char,
     result_file: *const c_char,
 ) -> c_int {
-    use exml::libxml::{
-        c14n::xml_c14n_doc_dump_memory,
-        globals::xml_load_ext_dtd_default_value,
-        parser::{
-            xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
+    use exml::{
+        globals::set_load_ext_dtd_default_value,
+        libxml::{
+            c14n::xml_c14n_doc_dump_memory,
+            parser::{
+                xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS,
+                XML_DETECT_IDS,
+            },
+            tree::xml_doc_get_root_element,
+            xpath::xml_xpath_free_object,
         },
-        tree::xml_doc_get_root_element,
-        xpath::xml_xpath_free_object,
     };
 
     let mut xpath: XmlXPathObjectPtr = null_mut();
@@ -4927,7 +4933,7 @@ unsafe extern "C" fn c14n_run_test(
      * build an XML tree from a the file; we need to add default
      * attributes and resolve all character and entities references
      */
-    *xml_load_ext_dtd_default_value() = XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32;
+    set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
     xml_substitute_entities_default(1);
 
     let doc: XmlDocPtr = xml_read_file(

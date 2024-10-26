@@ -19,7 +19,7 @@ use crate::encoding::{
     detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncoding,
     XmlCharEncodingHandler,
 };
-use crate::globals::GenericErrorContext;
+use crate::globals::{get_parser_debug_entities, GenericErrorContext};
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::libxml::dict::xml_dict_owns;
@@ -56,9 +56,7 @@ use crate::{__xml_raise_error, generic_error};
 use super::catalog::xml_catalog_add_local;
 use super::dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, xml_dict_set_limit};
 use super::entities::XmlEntityType;
-use super::globals::{
-    xml_free, xml_malloc, xml_malloc_atomic, xml_parser_debug_entities, xml_realloc,
-};
+use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
 use super::hash::{
     xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
 };
@@ -1311,7 +1309,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
         );
         return null_mut();
     }
-    if *xml_parser_debug_entities() != 0 {
+    if get_parser_debug_entities() != 0 {
         generic_error!(
             "new fixed input: {}\n",
             CStr::from_ptr(buffer as *const i8)
@@ -1374,7 +1372,7 @@ pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
         );
         return null_mut();
     }
-    if *xml_parser_debug_entities() != 0 {
+    if get_parser_debug_entities() != 0 {
         generic_error!(
             "new input from entity: {}\n",
             CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
@@ -1664,7 +1662,7 @@ pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParser
         return -1;
     }
 
-    if *xml_parser_debug_entities() != 0 {
+    if get_parser_debug_entities() != 0 {
         if !(*ctxt).input.is_null() && !(*(*ctxt).input).filename.is_null() {
             generic_error!(
                 "{}({}): ",
@@ -1746,7 +1744,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
 ) -> XmlParserInputPtr {
     let mut input_stream: XmlParserInputPtr;
 
-    if *xml_parser_debug_entities() != 0 {
+    if get_parser_debug_entities() != 0 {
         generic_error!(
             "new input from file: {}\n",
             CStr::from_ptr(filename).to_string_lossy()
@@ -5389,7 +5387,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
         );
         return;
     }
-    if *xml_parser_debug_entities() != 0 {
+    if get_parser_debug_entities() != 0 {
         generic_error!(
             "PEReference: {}\n",
             CStr::from_ptr(name as *const i8).to_string_lossy()

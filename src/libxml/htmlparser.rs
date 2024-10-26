@@ -19,13 +19,10 @@ use crate::{
     __xml_raise_error,
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
-    globals::GenericErrorContext,
+    globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
-        globals::{
-            xml_default_sax_locator, xml_free, xml_keep_blanks_default_value,
-            xml_line_numbers_default_value, xml_malloc, xml_malloc_atomic, xml_realloc,
-        },
+        globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{xml_hash_default_deallocator, xml_hash_free},
         parser::{
             xml_free_parser_ctxt, xml_init_node_info_seq, xml_init_parser,
@@ -9498,8 +9495,8 @@ unsafe fn html_init_parser_ctxt(
     (*ctxt).my_doc = null_mut();
     (*ctxt).well_formed = 1;
     (*ctxt).replace_entities = 0;
-    (*ctxt).linenumbers = *xml_line_numbers_default_value() as _;
-    (*ctxt).keep_blanks = *xml_keep_blanks_default_value() as _;
+    (*ctxt).linenumbers = get_line_numbers_default_value();
+    (*ctxt).keep_blanks = get_keep_blanks_default_value();
     (*ctxt).html = 1;
     (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
     (*ctxt).vctxt.user_data = Some(GenericErrorContext::new(ctxt));

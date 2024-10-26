@@ -26,16 +26,16 @@ use exml::{
     encoding::{add_encoding_alias, XmlCharEncoding},
     error::generic_error_default,
     generic_error,
-    globals::{set_tree_indent_string, GenericError, GenericErrorContext},
+    globals::{
+        get_load_ext_dtd_default_value, set_load_ext_dtd_default_value, set_parser_debug_entities,
+        set_tree_indent_string, GenericError, GenericErrorContext,
+    },
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
         entities::{xml_encode_entities_reentrant, XmlEntityPtr},
-        globals::{
-            xml_deregister_node_default, xml_free, xml_load_ext_dtd_default_value,
-            xml_parser_debug_entities, xml_register_node_default,
-        },
+        globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         htmlparser::{
             html_create_push_parser_ctxt, html_ctxt_use_options, html_free_parser_ctxt,
             html_parse_chunk, html_read_file, html_read_memory, HtmlParserCtxtPtr,
@@ -3927,7 +3927,7 @@ fn main() {
             } else if cfg!(feature = "libxml_debug") && (arg == "-debugent" || arg == "--debugent")
             {
                 DEBUGENT += 1;
-                *xml_parser_debug_entities() = 1;
+                set_parser_debug_entities(1);
             } else if cfg!(feature = "libxml_c14n") && (arg == "-c14n" || arg == "--c14n") {
                 CANONICAL += 1;
                 OPTIONS |= XmlParserOption::XmlParseNoent as i32
@@ -4057,10 +4057,14 @@ fn main() {
         xml_set_external_entity_loader(xmllint_external_entity_loader);
 
         if LOADDTD != 0 {
-            *xml_load_ext_dtd_default_value() |= XML_DETECT_IDS as i32;
+            let mut old = get_load_ext_dtd_default_value();
+            old |= XML_DETECT_IDS as i32;
+            set_load_ext_dtd_default_value(old);
         }
         if DTDATTRS != 0 {
-            *xml_load_ext_dtd_default_value() |= XML_COMPLETE_ATTRS as i32;
+            let mut old = get_load_ext_dtd_default_value();
+            old |= XML_COMPLETE_ATTRS as i32;
+            set_load_ext_dtd_default_value(old);
         }
         if NOENT != 0 {
             OPTIONS |= XmlParserOption::XmlParseNoent as i32;
@@ -4092,7 +4096,8 @@ fn main() {
             let mut schematron = SCHEMATRON.lock().unwrap();
             if let Some(s) = schematron.as_ref() {
                 /* forces loading the DTDs */
-                *xml_load_ext_dtd_default_value() |= 1;
+                let load_ext = get_load_ext_dtd_default_value() | 1;
+                set_load_ext_dtd_default_value(load_ext);
                 OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
                 if TIMING != 0 {
                     start_timer();
@@ -4125,7 +4130,8 @@ fn main() {
             let mut relaxng = RELAXNG.lock().unwrap();
             if let Some(r) = relaxng.as_ref() {
                 /* forces loading the DTDs */
-                *xml_load_ext_dtd_default_value() |= 1;
+                let load_ext = get_load_ext_dtd_default_value() | 1;
+                set_load_ext_dtd_default_value(load_ext);
                 OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
                 if TIMING != 0 {
                     start_timer();

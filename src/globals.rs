@@ -220,6 +220,62 @@ pub fn set_get_warnings_default_value(value: i32) {
     GLOBAL_STATE.with_borrow_mut(|state| state.get_warnings_default_value = value)
 }
 
+pub fn get_indent_tree_output() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.indent_tree_output)
+}
+
+pub fn set_indent_tree_output(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.indent_tree_output = value)
+}
+
+pub fn get_keep_blanks_default_value() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.keep_blanks_default_value)
+}
+
+pub fn set_keep_blanks_default_value(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.keep_blanks_default_value = value)
+}
+
+pub fn get_line_numbers_default_value() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.line_numbers_default_value)
+}
+
+pub fn set_line_numbers_default_value(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.line_numbers_default_value = value)
+}
+
+pub fn get_load_ext_dtd_default_value() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.load_ext_dtd_default_value)
+}
+
+pub fn set_load_ext_dtd_default_value(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.load_ext_dtd_default_value = value)
+}
+
+pub fn get_parser_debug_entities() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.parser_debug_entities)
+}
+
+pub fn set_parser_debug_entities(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.parser_debug_entities = value)
+}
+
+pub fn get_pedantic_parser_default_value() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.pedantic_parser_default_value)
+}
+
+pub fn set_pedantic_parser_default_value(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.pedantic_parser_default_value = value)
+}
+
+pub fn get_substitute_entities_default_value() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.substitute_entities_default_value)
+}
+
+pub fn set_substitute_entities_default_value(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.substitute_entities_default_value = value)
+}
+
 /// Reset last global error.
 pub fn reset_last_error() {
     GLOBAL_STATE.with_borrow_mut(|state| state.last_error.reset());

@@ -21,10 +21,10 @@ use crate::{
     buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::XmlErrorDomain,
-    globals::GLOBAL_STATE,
+    globals::{get_indent_tree_output, GLOBAL_STATE},
     libxml::{
         entities::{xml_dump_entity_decl, XmlEntityPtr},
-        globals::{xml_free, xml_indent_tree_output, xml_malloc},
+        globals::{xml_free, xml_malloc},
         htmltree::{
             html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
         },
@@ -519,7 +519,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 );
             }
             XmlElementType::XmlElementNode => {
-                if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
+                if cur != root && (*ctxt).format == 1 && get_indent_tree_output() != 0 {
                     let len = (*ctxt).indent_size
                         * if (*ctxt).level > (*ctxt).indent_nr as i32 {
                             (*ctxt).indent_nr
@@ -643,7 +643,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 }
             }
             XmlElementType::XmlPiNode => {
-                if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
+                if cur != root && (*ctxt).format == 1 && get_indent_tree_output() != 0 {
                     let len = (*ctxt).indent_size
                         * if (*ctxt).level > (*ctxt).indent_nr as i32 {
                             (*ctxt).indent_nr
@@ -682,7 +682,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 }
             }
             XmlElementType::XmlCommentNode => {
-                if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
+                if cur != root && (*ctxt).format == 1 && get_indent_tree_output() != 0 {
                     let len = (*ctxt).indent_size
                         * if (*ctxt).level > (*ctxt).indent_nr as i32 {
                             (*ctxt).indent_nr
@@ -767,7 +767,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 if (*ctxt).level > 0 {
                     (*ctxt).level -= 1;
                 }
-                if *xml_indent_tree_output() != 0 && (*ctxt).format == 1 {
+                if get_indent_tree_output() != 0 && (*ctxt).format == 1 {
                     let len = (*ctxt).indent_size
                         * if (*ctxt).level > (*ctxt).indent_nr as i32 {
                             (*ctxt).indent_nr
@@ -1148,7 +1148,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
             XmlElementType::XmlElementNode => {
                 addmeta = 0;
 
-                if cur != root && (*ctxt).format == 1 && *xml_indent_tree_output() != 0 {
+                if cur != root && (*ctxt).format == 1 && get_indent_tree_output() != 0 {
                     let len = (*ctxt).indent_size
                         * if (*ctxt).level > (*ctxt).indent_nr as i32 {
                             (*ctxt).indent_nr
@@ -1235,7 +1235,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                             (*buf).write_bytes(b">");
                             if (*ctxt).format == 1 {
                                 (*buf).write_bytes(b"\n");
-                                if *xml_indent_tree_output() != 0 {
+                                if get_indent_tree_output() != 0 {
                                     let len = (*ctxt).indent_size
                                         * if (*ctxt).level + 1 > (*ctxt).indent_nr as i32 {
                                             (*ctxt).indent_nr
@@ -1289,7 +1289,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     if addmeta == 1 {
                         if (*ctxt).format == 1 {
                             (*buf).write_bytes(b"\n");
-                            if *xml_indent_tree_output() != 0 {
+                            if get_indent_tree_output() != 0 {
                                 let len = (*ctxt).indent_size
                                     * if (*ctxt).level + 1 > (*ctxt).indent_nr as i32 {
                                         (*ctxt).indent_nr
@@ -1459,7 +1459,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 if (*ctxt).level > 0 {
                     (*ctxt).level -= 1;
                 }
-                if *xml_indent_tree_output() != 0 && (*ctxt).format == 1 {
+                if get_indent_tree_output() != 0 && (*ctxt).format == 1 {
                     let len = (*ctxt).indent_size
                         * if (*ctxt).level > (*ctxt).indent_nr as i32 {
                             (*ctxt).indent_nr
