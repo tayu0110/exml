@@ -18,7 +18,10 @@ use std::{
     rc::Rc,
     slice::from_raw_parts,
     str::{from_utf8, from_utf8_mut},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Mutex,
+    },
 };
 
 use libc::{
@@ -970,13 +973,14 @@ pub struct XmlInputCallback {
     closecallback: Option<XmlInputCloseCallback>,
 }
 
-static mut XML_INPUT_CALLBACK_TABLE: [XmlInputCallback; MAX_INPUT_CALLBACK] = [XmlInputCallback {
-    matchcallback: None,
-    opencallback: None,
-    readcallback: None,
-    closecallback: None,
-};
-    MAX_INPUT_CALLBACK];
+static XML_INPUT_CALLBACK_TABLE: Mutex<[XmlInputCallback; MAX_INPUT_CALLBACK]> = Mutex::new(
+    [XmlInputCallback {
+        matchcallback: None,
+        opencallback: None,
+        readcallback: None,
+        closecallback: None,
+    }; MAX_INPUT_CALLBACK],
+);
 static XML_INPUT_CALLBACK_NR: AtomicUsize = AtomicUsize::new(0);
 static XML_INPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -989,20 +993,20 @@ static XML_INPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
  * clears the entire input callback table. this includes the
  * compiled-in I/O.
  */
-pub unsafe extern "C" fn xml_cleanup_input_callbacks() {
+pub fn xml_cleanup_input_callbacks() {
     let is_initialized = XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         return;
     }
 
     let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
-
-    for i in (0..num_callbacks).rev() {
-        XML_INPUT_CALLBACK_TABLE[i].matchcallback = None;
-        XML_INPUT_CALLBACK_TABLE[i].opencallback = None;
-        XML_INPUT_CALLBACK_TABLE[i].readcallback = None;
-        XML_INPUT_CALLBACK_TABLE[i].closecallback = None;
-    }
+    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[..num_callbacks].fill(XmlInputCallback {
+        matchcallback: None,
+        opencallback: None,
+        readcallback: None,
+        closecallback: None,
+    });
 
     XML_INPUT_CALLBACK_NR.store(0, Ordering::Release);
     XML_INPUT_CALLBACK_INITIALIZED.store(false, Ordering::Release);
@@ -1016,7 +1020,7 @@ pub unsafe extern "C" fn xml_cleanup_input_callbacks() {
  *
  * Returns the number of input callback registered or -1 in case of error.
  */
-pub unsafe extern "C" fn xml_pop_input_callbacks() -> c_int {
+pub fn xml_pop_input_callbacks() -> c_int {
     let is_initialized = XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         return -1;
@@ -1028,10 +1032,11 @@ pub unsafe extern "C" fn xml_pop_input_callbacks() -> c_int {
     }
 
     num_callbacks -= 1;
-    XML_INPUT_CALLBACK_TABLE[num_callbacks].matchcallback = None;
-    XML_INPUT_CALLBACK_TABLE[num_callbacks].opencallback = None;
-    XML_INPUT_CALLBACK_TABLE[num_callbacks].readcallback = None;
-    XML_INPUT_CALLBACK_TABLE[num_callbacks].closecallback = None;
+    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[num_callbacks].matchcallback = None;
+    callbacks[num_callbacks].opencallback = None;
+    callbacks[num_callbacks].readcallback = None;
+    callbacks[num_callbacks].closecallback = None;
 
     XML_INPUT_CALLBACK_NR.store(num_callbacks, Ordering::Release);
     num_callbacks as _
@@ -1042,7 +1047,7 @@ pub unsafe extern "C" fn xml_pop_input_callbacks() -> c_int {
  *
  * Registers the default compiled-in I/O handlers.
  */
-pub unsafe extern "C" fn xml_register_default_input_callbacks() {
+pub fn xml_register_default_input_callbacks() {
     if XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return;
     }
@@ -1599,7 +1604,7 @@ pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *m
  *
  * Returns the registered handler number or -1 in case of error
  */
-pub unsafe extern "C" fn xml_register_input_callbacks(
+pub fn xml_register_input_callbacks(
     match_func: Option<XmlInputMatchCallback>,
     open_func: Option<XmlInputOpenCallback>,
     read_func: Option<XmlInputReadCallback>,
@@ -1609,10 +1614,11 @@ pub unsafe extern "C" fn xml_register_input_callbacks(
     if num_callbacks >= MAX_INPUT_CALLBACK {
         return -1;
     }
-    XML_INPUT_CALLBACK_TABLE[num_callbacks].matchcallback = match_func;
-    XML_INPUT_CALLBACK_TABLE[num_callbacks].opencallback = open_func;
-    XML_INPUT_CALLBACK_TABLE[num_callbacks].readcallback = read_func;
-    XML_INPUT_CALLBACK_TABLE[num_callbacks].closecallback = close_func;
+    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[num_callbacks].matchcallback = match_func;
+    callbacks[num_callbacks].opencallback = open_func;
+    callbacks[num_callbacks].readcallback = read_func;
+    callbacks[num_callbacks].closecallback = close_func;
     XML_INPUT_CALLBACK_INITIALIZED.store(true, Ordering::Relaxed);
     XML_INPUT_CALLBACK_NR.store(num_callbacks + 1, Ordering::Release);
     num_callbacks as _
@@ -1634,18 +1640,19 @@ pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
     }
 
     let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
+    let callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
     /*
      * Try to find one of the input accept method accepting that scheme
      * Go in reverse to give precedence to user defined handlers.
      */
     if context.is_null() {
         for i in (0..num_callbacks).rev() {
-            if XML_INPUT_CALLBACK_TABLE[i]
+            if callbacks[i]
                 .matchcallback
                 .filter(|callback| callback(uri) != 0)
                 .is_some()
             {
-                context = (XML_INPUT_CALLBACK_TABLE[i].opencallback.unwrap())(uri);
+                context = (callbacks[i].opencallback.unwrap())(uri);
                 if !context.is_null() {
                     /*
                      * Allocate the Input buffer front-end.
@@ -1653,8 +1660,8 @@ pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
                     ret = xml_alloc_parser_input_buffer(enc);
                     if !ret.is_null() {
                         (*ret).context = context;
-                        (*ret).readcallback = XML_INPUT_CALLBACK_TABLE[i].readcallback;
-                        (*ret).closecallback = XML_INPUT_CALLBACK_TABLE[i].closecallback;
+                        (*ret).readcallback = callbacks[i].readcallback;
+                        (*ret).closecallback = callbacks[i].closecallback;
                     // #ifdef LIBXML_ZLIB_ENABLED
                     // 	if ((xmlInputCallbackTable[i].opencallback == xmlGzfileOpen) &&
                     // 		strcmp(URI, "-") != 0) {
@@ -1682,7 +1689,7 @@ pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
                     // 	}
                     // #endif
                     } else {
-                        (XML_INPUT_CALLBACK_TABLE[i].closecallback.unwrap())(context);
+                        (callbacks[i].closecallback.unwrap())(context);
                     }
 
                     return ret;
