@@ -63,9 +63,9 @@ use crate::{
         },
         xml_io::{
             xml_alloc_parser_input_buffer, xml_free_parser_input_buffer, xml_parser_get_directory,
-            xml_parser_input_buffer_create_fd, xml_parser_input_buffer_create_filename,
-            xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
-            XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
+            xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_io,
+            xml_parser_input_buffer_create_mem, XmlInputCloseCallback, XmlInputReadCallback,
+            XmlParserInputBufferPtr,
         },
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
@@ -5988,47 +5988,6 @@ pub unsafe extern "C" fn xml_reader_for_memory(
 }
 
 /**
- * xmlReaderForFd:
- * @fd:  an open file descriptor
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Create an xmltextReader for an XML from a file descriptor.
- * The parsing flags @options are a combination of xmlParserOption.
- * NOTE that the file descriptor will not be closed when the
- *      reader is closed or reset.
- *
- * Returns the new reader or NULL in case of error.
- */
-#[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_for_fd(
-    fd: c_int,
-    url: *const c_char,
-    encoding: *const c_char,
-    options: c_int,
-) -> XmlTextReaderPtr {
-    if fd < 0 {
-        return null_mut();
-    }
-
-    let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_fd(fd, crate::encoding::XmlCharEncoding::None);
-    if input.is_null() {
-        return null_mut();
-    }
-    (*input).closecallback = None;
-    let reader: XmlTextReaderPtr = xml_new_text_reader(input, url);
-    if reader.is_null() {
-        xml_free_parser_input_buffer(input);
-        return null_mut();
-    }
-    (*reader).allocs |= XML_TEXTREADER_INPUT;
-    xml_text_reader_setup(reader, null_mut(), url, encoding, options);
-    reader
-}
-
-/**
  * xmlReaderForIO:
  * @ioread:  an I/O read function
  * @ioclose:  an I/O close function
@@ -6227,46 +6186,6 @@ pub unsafe extern "C" fn xml_reader_new_memory(
     if input.is_null() {
         return -1;
     }
-    xml_text_reader_setup(reader, input, url, encoding, options)
-}
-
-/**
- * xmlReaderNewFd:
- * @reader:  an XML reader
- * @fd:  an open file descriptor
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Setup an xmltextReader to parse an XML from a file descriptor.
- * NOTE that the file descriptor will not be closed when the
- *      reader is closed or reset.
- * The parsing flags @options are a combination of xmlParserOption.
- * This reuses the existing @reader xmlTextReader.
- *
- * Returns 0 in case of success and -1 in case of error
- */
-#[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_new_fd(
-    reader: XmlTextReaderPtr,
-    fd: c_int,
-    url: *const c_char,
-    encoding: *const c_char,
-    options: c_int,
-) -> c_int {
-    if fd < 0 {
-        return -1;
-    }
-    if reader.is_null() {
-        return -1;
-    }
-
-    let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_fd(fd, crate::encoding::XmlCharEncoding::None);
-    if input.is_null() {
-        return -1;
-    }
-    (*input).closecallback = None;
     xml_text_reader_setup(reader, input, url, encoding, options)
 }
 

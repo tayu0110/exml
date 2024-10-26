@@ -20,13 +20,13 @@ use std::{
 };
 
 use libc::{
-    __errno_location, close, fclose, ferror, fflush, fopen, fread, fwrite, getcwd, memset,
-    ptrdiff_t, read, size_t, stat, strcmp, strlen, strncpy, write, EACCES, EADDRINUSE,
-    EAFNOSUPPORT, EAGAIN, EALREADY, EBADF, EBADMSG, EBUSY, ECANCELED, ECHILD, ECONNREFUSED,
-    EDEADLK, EDOM, EEXIST, EFAULT, EFBIG, EINPROGRESS, EINTR, EINVAL, EIO, EISCONN, EISDIR, EMFILE,
-    EMLINK, EMSGSIZE, ENAMETOOLONG, ENFILE, ENODEV, ENOENT, ENOEXEC, ENOLCK, ENOMEM, ENOSPC,
-    ENOSYS, ENOTDIR, ENOTEMPTY, ENOTSOCK, ENOTSUP, ENOTTY, ENXIO, EOF, EPERM, EPIPE, ERANGE, EROFS,
-    ESPIPE, ESRCH, ETIMEDOUT, EXDEV, FILE,
+    __errno_location, fclose, ferror, fflush, fopen, fread, fwrite, getcwd, memset, ptrdiff_t,
+    size_t, stat, strcmp, strlen, strncpy, write, EACCES, EADDRINUSE, EAFNOSUPPORT, EAGAIN,
+    EALREADY, EBADF, EBADMSG, EBUSY, ECANCELED, ECHILD, ECONNREFUSED, EDEADLK, EDOM, EEXIST,
+    EFAULT, EFBIG, EINPROGRESS, EINTR, EINVAL, EIO, EISCONN, EISDIR, EMFILE, EMLINK, EMSGSIZE,
+    ENAMETOOLONG, ENFILE, ENODEV, ENOENT, ENOEXEC, ENOLCK, ENOMEM, ENOSPC, ENOSYS, ENOTDIR,
+    ENOTEMPTY, ENOTSOCK, ENOTSUP, ENOTTY, ENXIO, EOF, EPERM, EPIPE, ERANGE, EROFS, ESPIPE, ESRCH,
+    ETIMEDOUT, EXDEV, FILE,
 };
 
 use crate::{
@@ -420,9 +420,7 @@ pub struct XmlOutputBuffer {
     pub(crate) context: *mut c_void,
     pub(crate) writecallback: Option<XmlOutputWriteCallback>,
     pub(crate) closecallback: Option<XmlOutputCloseCallback>,
-
     pub(crate) encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>, /* I18N conversions to UTF-8 */
-
     pub(crate) buffer: Option<XmlBufRef>, /* Local buffer encoded in UTF-8 or ISOLatin */
     pub(crate) conv: Option<XmlBufRef>,   /* if encoder != NULL buffer for output */
     pub(crate) written: c_int,            /* total number of byte written */
@@ -1415,68 +1413,6 @@ pub unsafe fn xml_parser_input_buffer_create_file(
         (*ret).context = file as _;
         (*ret).readcallback = Some(xml_file_read);
         (*ret).closecallback = Some(xml_file_flush);
-    }
-
-    ret
-}
-
-/**
- * xmlFdRead:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to read
- *
- * Read @len bytes to @buffer from the I/O channel.
- *
- * Returns the number of bytes written
- */
-unsafe extern "C" fn xml_fd_read(context: *mut c_void, buffer: *mut c_char, len: c_int) -> c_int {
-    let ret: c_int = read(context as ptrdiff_t as c_int, buffer.add(0) as _, len as _) as _;
-    if ret < 0 {
-        xml_ioerr(XmlParserErrors::XmlErrOK, c"read()".as_ptr() as _);
-    }
-    ret
-}
-
-/**
- * xmlFdClose:
- * @context:  the I/O context
- *
- * Close an I/O channel
- *
- * Returns 0 in case of success and error code otherwise
- */
-unsafe extern "C" fn xml_fd_close(context: *mut c_void) -> c_int {
-    let ret: c_int = close(context as ptrdiff_t as c_int);
-    if ret < 0 {
-        xml_ioerr(XmlParserErrors::XmlErrOK, c"close()".as_ptr() as _);
-    }
-    ret
-}
-
-/**
- * xmlParserInputBufferCreateFd:
- * @fd:  a file descriptor number
- * @enc:  the charset encoding if known
- *
- * Create a buffered parser input for the progressive parsing for the input
- * from a file descriptor
- *
- * Returns the new parser input or NULL
- */
-pub unsafe fn xml_parser_input_buffer_create_fd(
-    fd: c_int,
-    enc: XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
-    if fd < 0 {
-        return null_mut();
-    }
-
-    let ret: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
-    if !ret.is_null() {
-        (*ret).context = fd as ptrdiff_t as *mut c_void;
-        (*ret).readcallback = Some(xml_fd_read);
-        (*ret).closecallback = Some(xml_fd_close);
     }
 
     ret

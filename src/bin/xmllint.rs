@@ -46,11 +46,11 @@ use exml::{
             xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_read_file, xml_ctxt_read_io,
             xml_ctxt_read_memory, xml_ctxt_use_options, xml_free_parser_ctxt,
             xml_get_external_entity_loader, xml_has_feature, xml_new_parser_ctxt,
-            xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd, xml_read_fd, xml_read_file,
-            xml_read_io, xml_read_memory, xml_set_external_entity_loader, ErrorSAXFunc,
-            WarningSAXFunc, XmlExternalEntityLoader, XmlFeature, XmlParserCtxtPtr,
-            XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr,
-            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
+            xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd, xml_read_file, xml_read_io,
+            xml_read_memory, xml_set_external_entity_loader, ErrorSAXFunc, WarningSAXFunc,
+            XmlExternalEntityLoader, XmlFeature, XmlParserCtxtPtr, XmlParserInputPtr,
+            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr, XML_COMPLETE_ATTRS,
+            XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
@@ -2533,8 +2533,18 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             }
         }
     } else if TEST_IO != 0 {
+        extern "C" {
+            static stdin: *mut FILE;
+        }
         if *filename.add(0) == b'-' as i8 && *filename.add(1) == 0 {
-            doc = xml_read_fd(0, null_mut(), null_mut(), OPTIONS);
+            doc = xml_read_io(
+                Some(my_read),
+                Some(my_close),
+                stdin as _,
+                null_mut(),
+                null_mut(),
+                OPTIONS,
+            );
         } else {
             let f: *mut FILE = fopen(filename, c"rb".as_ptr());
             if !f.is_null() {

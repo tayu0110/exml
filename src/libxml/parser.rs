@@ -86,10 +86,10 @@ use crate::{
             xml_alloc_parser_input_buffer, xml_cleanup_input_callbacks,
             xml_cleanup_output_callbacks, xml_default_external_entity_loader,
             xml_free_parser_input_buffer, xml_ioerr_memory, xml_no_net_exists,
-            xml_parser_get_directory, xml_parser_input_buffer_create_fd,
-            xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
-            xml_register_default_input_callbacks, xml_register_default_output_callbacks,
-            XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBufferPtr,
+            xml_parser_get_directory, xml_parser_input_buffer_create_io,
+            xml_parser_input_buffer_create_mem, xml_register_default_input_callbacks,
+            xml_register_default_output_callbacks, XmlInputCloseCallback, XmlInputReadCallback,
+            XmlParserInputBufferPtr,
         },
         xmlerror::XmlParserErrors,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
@@ -11462,52 +11462,6 @@ pub unsafe extern "C" fn xml_read_memory(
 }
 
 /**
- * xmlReadFd:
- * @fd:  an open file descriptor
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * parse an XML from a file descriptor and build a tree.
- * NOTE that the file descriptor will not be closed when the
- *      reader is closed or reset.
- *
- * Returns the resulting document tree
- */
-pub unsafe extern "C" fn xml_read_fd(
-    fd: c_int,
-    url: *const c_char,
-    encoding: *const c_char,
-    options: c_int,
-) -> XmlDocPtr {
-    if fd < 0 {
-        return null_mut();
-    }
-    xml_init_parser();
-
-    let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_fd(fd, crate::encoding::XmlCharEncoding::None);
-    if input.is_null() {
-        return null_mut();
-    }
-    (*input).closecallback = None;
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-    if ctxt.is_null() {
-        xml_free_parser_input_buffer(input);
-        return null_mut();
-    }
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, crate::encoding::XmlCharEncoding::None);
-    if stream.is_null() {
-        xml_free_parser_input_buffer(input);
-        xml_free_parser_ctxt(ctxt);
-        return null_mut();
-    }
-    input_push(ctxt, stream);
-    xml_do_read(ctxt, url, encoding, options, 0)
-}
-
-/**
  * xmlReadIO:
  * @ioread:  an I/O read function
  * @ioclose:  an I/O close function
@@ -11668,54 +11622,6 @@ pub unsafe extern "C" fn xml_ctxt_read_memory(
         return null_mut();
     }
 
-    input_push(ctxt, stream);
-    xml_do_read(ctxt, url, encoding, options, 1)
-}
-
-/**
- * xmlCtxtReadFd:
- * @ctxt:  an XML parser context
- * @fd:  an open file descriptor
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * parse an XML from a file descriptor and build a tree.
- * This reuses the existing @ctxt parser context
- * NOTE that the file descriptor will not be closed when the
- *      reader is closed or reset.
- *
- * Returns the resulting document tree
- */
-pub unsafe extern "C" fn xml_ctxt_read_fd(
-    ctxt: XmlParserCtxtPtr,
-    fd: c_int,
-    url: *const c_char,
-    encoding: *const c_char,
-    options: c_int,
-) -> XmlDocPtr {
-    if fd < 0 {
-        return null_mut();
-    }
-    if ctxt.is_null() {
-        return null_mut();
-    }
-    xml_init_parser();
-
-    xml_ctxt_reset(ctxt);
-
-    let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_fd(fd, crate::encoding::XmlCharEncoding::None);
-    if input.is_null() {
-        return null_mut();
-    }
-    (*input).closecallback = None;
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, input, crate::encoding::XmlCharEncoding::None);
-    if stream.is_null() {
-        xml_free_parser_input_buffer(input);
-        return null_mut();
-    }
     input_push(ctxt, stream);
     xml_do_read(ctxt, url, encoding, options, 1)
 }

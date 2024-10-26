@@ -25,15 +25,15 @@ use exml::{
         entities::XmlEntityPtr,
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
         htmlparser::{
-            html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_fd,
-            html_read_file, HtmlParserCtxtPtr,
+            html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_file,
+            HtmlParserCtxtPtr,
         },
         htmltree::html_doc_dump_memory,
         parser::{
             xml_cleanup_parser, xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser,
-            xml_parse_document, xml_parse_file, xml_pedantic_parser_default, xml_read_fd,
-            xml_read_file, xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr,
-            XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSaxlocatorPtr, XML_SAX2_MAGIC,
+            xml_parse_document, xml_parse_file, xml_pedantic_parser_default, xml_read_file,
+            xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr,
+            XmlParserOption, XmlSAXHandler, XmlSaxlocatorPtr, XML_SAX2_MAGIC,
         },
         parser_internals::xml_create_file_parser_ctxt,
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
@@ -66,17 +66,12 @@ use exml::{
     },
     SYSCONFDIR,
 };
-use libc::{
-    close, fdopen, fflush, free, malloc, memcpy, open, pthread_t, size_t, snprintf, strcmp, strlen,
-    O_RDONLY,
-};
+use libc::{fdopen, fflush, free, malloc, memcpy, pthread_t, size_t, snprintf, strcmp, strlen};
 
 /*
  * pseudo flag for the unification of HTML and XML tests
  */
 const XML_PARSE_HTML: i32 = 1 << 24;
-
-const RD_FLAGS: i32 = O_RDONLY;
 
 type Functest = unsafe fn(
     filename: &str,
@@ -2747,96 +2742,6 @@ unsafe fn err_parse_test(
     }
     if res != 0 {
         eprintln!("Result for {filename} failed in {}", result.unwrap());
-        return -1;
-    }
-    if let Some(err) = err {
-        res = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
-        if res != 0 {
-            eprintln!("Error for {filename} failed",);
-            return -1;
-        }
-    } else if options & XmlParserOption::XmlParseDtdvalid as i32 != 0 && TEST_ERRORS_SIZE != 0 {
-        eprintln!("Validation for {filename} failed",);
-    }
-
-    0
-}
-
-/**
- * fdParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file using the xmlReadFd API and check for errors.
- *
- * Returns 0 in case of success, an error code otherwise
- */
-unsafe fn fd_parse_test(
-    filename: &str,
-    result: Option<String>,
-    err: Option<String>,
-    options: c_int,
-) -> c_int {
-    let mut base: *const c_char = null_mut();
-    let mut size: c_int = 0;
-    let mut res: c_int = 0;
-    let cfilename = CString::new(filename).unwrap();
-    let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
-
-    NB_TESTS += 1;
-    let fd: c_int = open(cfilename.as_ptr(), RD_FLAGS);
-    #[cfg(feature = "html")]
-    let doc = if options & XML_PARSE_HTML != 0 {
-        html_read_fd(fd, cfilename.as_ptr(), null_mut(), options)
-    } else {
-        xml_read_fd(fd, cfilename.as_ptr(), null_mut(), options)
-    };
-    #[cfg(not(feature = "html"))]
-    let doc = xml_read_fd(fd, cfilename.as_ptr(), null_mut(), options);
-
-    close(fd);
-    if let Some(result) = cresult {
-        if doc.is_null() {
-            base = c"".as_ptr();
-            size = 0;
-        } else {
-            #[cfg(feature = "html")]
-            if options & XML_PARSE_HTML != 0 {
-                html_doc_dump_memory(
-                    doc,
-                    addr_of_mut!(base) as *mut *mut XmlChar,
-                    addr_of_mut!(size),
-                );
-            } else {
-                xml_doc_dump_memory(
-                    doc,
-                    addr_of_mut!(base) as *mut *mut XmlChar,
-                    addr_of_mut!(size),
-                );
-            }
-            #[cfg(not(feature = "html"))]
-            {
-                xml_doc_dump_memory(
-                    doc,
-                    addr_of_mut!(base) as *mut *mut XmlChar,
-                    addr_of_mut!(size),
-                );
-            }
-        }
-        res = compare_file_mem(
-            CStr::from_ptr(result.as_ptr()).to_string_lossy().as_ref(),
-            from_raw_parts(base as _, size as _),
-        );
-    }
-    if !doc.is_null() {
-        if !base.is_null() {
-            xml_free(base as _);
-        }
-        xml_free_doc(doc);
-    }
-    if res != 0 {
-        eprintln!("Result for {filename} failed in {}", result.unwrap(),);
         return -1;
     }
     if let Some(err) = err {
@@ -5937,16 +5842,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
     },
     #[cfg(feature = "valid")]
     TestDesc {
-        desc: "Error cases regression tests from file descriptor",
-        func: fd_parse_test,
-        input: Some("./test/errors/*.xml"),
-        out: Some("./result/errors/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: 0,
-    },
-    #[cfg(feature = "valid")]
-    TestDesc {
         desc: "Error cases regression tests with entity substitution",
         func: err_parse_test,
         input: Some("./test/errors/*.xml"),
@@ -6067,16 +5962,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
     TestDesc {
         desc: "HTML regression tests",
         func: err_parse_test,
-        input: Some("./test/HTML/*"),
-        out: Some("./result/HTML/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XML_PARSE_HTML,
-    },
-    #[cfg(feature = "html")]
-    TestDesc {
-        desc: "HTML regression tests from file descriptor",
-        func: fd_parse_test,
         input: Some("./test/HTML/*"),
         out: Some("./result/HTML/"),
         suffix: Some(""),
