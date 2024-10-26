@@ -1372,7 +1372,8 @@ unsafe extern "C" fn xml_ioerr(code: XmlParserErrors, extra: *const c_char) {
  *
  * Flush an I/O channel
  */
-unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
+#[doc(hidden)]
+pub unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
     if context.is_null() {
         return -1;
     }
@@ -1933,8 +1934,9 @@ unsafe extern "C" fn xml_file_open_w(filename: *const c_char) -> *mut c_void {
  *
  * Returns the number of bytes written
  */
+#[doc(hidden)]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_file_write(
+pub unsafe extern "C" fn xml_file_write(
     context: *mut c_void,
     buffer: *const c_char,
     len: c_int,
@@ -2359,35 +2361,6 @@ unsafe extern "C" fn xml_fd_write(
 }
 
 /**
- * xmlOutputBufferCreateFd:
- * @fd:  a file descriptor number
- * @encoder:  the encoding converter or NULL
- *
- * Create a buffered output for the progressive saving
- * to a file descriptor
- *
- * Returns the new parser output or NULL
- */
-#[cfg(feature = "output")]
-pub unsafe fn xml_output_buffer_create_fd(
-    fd: c_int,
-    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-) -> XmlOutputBufferPtr {
-    if fd < 0 {
-        return null_mut();
-    }
-
-    let ret: XmlOutputBufferPtr = xml_alloc_output_buffer_internal(encoder);
-    if !ret.is_null() {
-        (*ret).context = fd as ptrdiff_t as *mut c_void;
-        (*ret).writecallback = Some(xml_fd_write);
-        (*ret).closecallback = None;
-    }
-
-    ret
-}
-
-/**
  * xmlOutputBufferCreateIO:
  * @iowrite:  an I/O write function
  * @ioclose:  an I/O close function
@@ -2582,7 +2555,6 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     _compression: c_int,
 ) -> XmlOutputBufferPtr {
     let ret: XmlOutputBufferPtr;
-
     let mut context: *mut c_void = null_mut();
     let mut unescaped: *mut c_char = null_mut();
     // #ifdef LIBXML_ZLIB_ENABLED

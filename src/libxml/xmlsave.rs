@@ -40,9 +40,9 @@ use crate::{
             XmlNotationTablePtr,
         },
         xml_io::{
-            xml_output_buffer_close, xml_output_buffer_create_fd,
-            xml_output_buffer_create_filename, xml_output_buffer_create_io, XmlOutputBufferPtr,
-            XmlOutputCloseCallback, XmlOutputWriteCallback,
+            xml_output_buffer_close, xml_output_buffer_create_filename,
+            xml_output_buffer_create_io, XmlOutputBufferPtr, XmlOutputCloseCallback,
+            XmlOutputWriteCallback,
         },
         xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strdup, XmlChar},
@@ -1784,34 +1784,6 @@ unsafe extern "C" fn xml_new_save_ctxt(
         (*ret).format = 2;
     }
 
-    ret
-}
-
-/**
- * xmlSaveToFd:
- * @fd:  a file descriptor number
- * @encoding:  the encoding name to use or NULL
- * @options:  a set of xmlSaveOptions
- *
- * Create a document saving context serializing to a file descriptor
- * with the encoding and the options given.
- *
- * Returns a new serialization context or NULL in case of error.
- */
-pub unsafe extern "C" fn xml_save_to_fd(
-    fd: c_int,
-    encoding: *const c_char,
-    options: c_int,
-) -> XmlSaveCtxtPtr {
-    let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
-    if ret.is_null() {
-        return null_mut();
-    }
-    (*ret).buf = xml_output_buffer_create_fd(fd, (*ret).handler.clone());
-    if (*ret).buf.is_null() {
-        xml_free_save_ctxt(ret);
-        return null_mut();
-    }
     ret
 }
 

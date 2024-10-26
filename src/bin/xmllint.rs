@@ -79,8 +79,9 @@ use exml::{
         },
         xinclude::xml_xinclude_process_flags,
         xml_io::{
-            xml_free_parser_input_buffer, xml_no_net_external_entity_loader,
-            xml_parser_input_buffer_create_filename, XmlParserInputBufferPtr,
+            xml_file_flush, xml_file_write, xml_free_parser_input_buffer,
+            xml_no_net_external_entity_loader, xml_parser_input_buffer_create_filename,
+            XmlParserInputBufferPtr,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
@@ -88,7 +89,7 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlsave::{
-            xml_save_close, xml_save_doc, xml_save_to_fd, xml_save_to_filename, XmlSaveCtxtPtr,
+            xml_save_close, xml_save_doc, xml_save_to_filename, xml_save_to_io, XmlSaveCtxtPtr,
             XmlSaveOption,
         },
         xmlschemas::{
@@ -3028,8 +3029,13 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         save_opts,
                     );
                 } else {
-                    ctxt = xml_save_to_fd(
-                        1,
+                    extern "C" {
+                        static stdout: *mut FILE;
+                    }
+                    ctxt = xml_save_to_io(
+                        Some(xml_file_write),
+                        Some(xml_file_flush),
+                        stdout as _,
                         ENCODING
                             .lock()
                             .unwrap()
