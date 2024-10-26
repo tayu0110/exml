@@ -5246,9 +5246,11 @@ static NUM_THREADS: usize = unsafe { THREAD_PARAMS.len() };
 extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     use std::io::{stderr, stdout};
 
-    unsafe {
-        use exml::libxml::globals::xml_do_validity_checking_default_value;
+    use exml::globals::{
+        get_do_validity_checking_default_value, set_do_validity_checking_default_value,
+    };
 
+    unsafe {
         let my_doc: XmlDocPtr;
         let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
         let filename: *const c_char = (*params).filename.as_ptr();
@@ -5265,11 +5267,11 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         }
 
         if strcmp(filename, c"./test/threads/invalid.xml".as_ptr()) == 0 {
-            *xml_do_validity_checking_default_value() = 0;
+            set_do_validity_checking_default_value(0);
             let stdout: Box<dyn Write> = Box::new(stdout());
             set_generic_error(None, Some(GenericErrorContext::new(stdout)));
         } else {
-            *xml_do_validity_checking_default_value() = 1;
+            set_do_validity_checking_default_value(1);
             let stderr: Box<dyn Write> = Box::new(stderr());
             set_generic_error(None, Some(GenericErrorContext::new(stderr)));
         }
@@ -5288,7 +5290,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             okay = 0;
         }
         if strcmp(filename, c"./test/threads/invalid.xml".as_ptr()) == 0 {
-            if *xml_do_validity_checking_default_value() != 0 {
+            if get_do_validity_checking_default_value() != 0 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
@@ -5301,7 +5303,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             //     println!("xmlGenericErrorContext override failed");
             //     okay = 0;
             // }
-            if *xml_do_validity_checking_default_value() != 1 {
+            if get_do_validity_checking_default_value() != 1 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }

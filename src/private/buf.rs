@@ -14,10 +14,7 @@ use libc::{fwrite, memcpy, memmove, size_t, FILE};
 
 pub(crate) use crate::buf::libxml_api::*;
 use crate::libxml::{
-    globals::{
-        xml_buffer_alloc_scheme, xml_default_buffer_size, xml_free, xml_malloc, xml_malloc_atomic,
-        xml_realloc,
-    },
+    globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
     parser::XmlParserInputPtr,
     parser_internals::XML_MAX_TEXT_LENGTH,
     tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
@@ -32,7 +29,13 @@ const SIZE_MAX: size_t = size_t::MAX;
 mod legacy {
     use std::ffi::c_uint;
 
-    use crate::error::XmlErrorDomain;
+    use crate::{
+        error::XmlErrorDomain,
+        globals::{
+            get_default_buffer_allocation_scheme, get_default_buffer_size,
+            set_default_buffer_allocation_scheme,
+        },
+    };
 
     use super::*;
 
@@ -155,9 +158,9 @@ mod legacy {
         (*ret).using = 0;
         (*ret).error = 0;
         (*ret).buffer = null_mut();
-        (*ret).size = *xml_default_buffer_size() as _;
+        (*ret).size = get_default_buffer_size();
         UPDATE_COMPAT!(ret);
-        (*ret).alloc = *xml_buffer_alloc_scheme();
+        (*ret).alloc = get_default_buffer_allocation_scheme();
         (*ret).content = xml_malloc_atomic((*ret).size) as *mut XmlChar;
         if (*ret).content.is_null() {
             xml_buf_memory_error(ret, c"creating buffer".as_ptr() as _);
@@ -188,7 +191,7 @@ mod legacy {
         (*ret).using = 0;
         (*ret).error = 0;
         (*ret).buffer = null_mut();
-        (*ret).alloc = *xml_buffer_alloc_scheme();
+        (*ret).alloc = get_default_buffer_allocation_scheme();
         (*ret).size = if size != 0 { size + 1 } else { 0 }; /* +1 for ending null */
         UPDATE_COMPAT!(ret);
         if (*ret).size != 0 {
@@ -1132,7 +1135,7 @@ mod legacy {
                 | XmlBufferAllocationScheme::XmlBufferAllocDoubleit
                 | XmlBufferAllocationScheme::XmlBufferAllocHybrid
         ) {
-            *xml_buffer_alloc_scheme() = scheme;
+            set_default_buffer_allocation_scheme(scheme);
         }
     }
 
@@ -1150,7 +1153,7 @@ mod legacy {
      * Returns the current allocation scheme
      */
     pub unsafe extern "C" fn xml_get_buffer_allocation_scheme() -> XmlBufferAllocationScheme {
-        *xml_buffer_alloc_scheme()
+        get_default_buffer_allocation_scheme()
     }
 
     /**

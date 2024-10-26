@@ -13,10 +13,11 @@ use std::{
 
 use exml::{
     error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
-    globals::{reset_last_error, set_structured_error, GenericErrorContext},
+    globals::{
+        reset_last_error, set_get_warnings_default_value, set_structured_error, GenericErrorContext,
+    },
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
-        globals::xml_get_warnings_default_value,
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
@@ -381,7 +382,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 }
 
 unsafe extern "C" fn initialize_libxml2() {
-    *xml_get_warnings_default_value() = 0;
+    set_get_warnings_default_value(0);
     xml_pedantic_parser_default(0);
 
     xml_mem_setup(

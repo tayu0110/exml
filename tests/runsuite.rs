@@ -14,9 +14,11 @@ use exml::{
         xml_buf_add, xml_buf_content, xml_buf_create, xml_buf_empty, xml_buf_free,
         xml_buf_set_allocation_scheme, xml_buf_use,
     },
-    globals::{reset_last_error, set_generic_error, GenericErrorContext},
+    globals::{
+        reset_last_error, set_generic_error, set_get_warnings_default_value, GenericErrorContext,
+    },
     libxml::{
-        globals::{xml_free, xml_get_warnings_default_value},
+        globals::xml_free,
         parser::{
             xml_cleanup_parser, xml_init_parser, xml_pedantic_parser_default, xml_read_file,
             xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr,
@@ -209,7 +211,7 @@ fn test_error_handler(_ctx: Option<GenericErrorContext>, msg: &str) {
 static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
 
 unsafe extern "C" fn initialize_libxml2() {
-    *xml_get_warnings_default_value() = 0;
+    set_get_warnings_default_value(0);
     xml_pedantic_parser_default(0);
 
     xml_mem_setup(

@@ -200,6 +200,26 @@ pub fn get_default_buffer_allocation_scheme() -> XmlBufferAllocationScheme {
     GLOBAL_STATE.with_borrow(|state| state.buffer_alloc_scheme)
 }
 
+pub fn get_default_buffer_size() -> usize {
+    GLOBAL_STATE.with_borrow(|state| state.default_buffer_size)
+}
+
+pub fn get_do_validity_checking_default_value() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.do_validity_checking_default_value)
+}
+
+pub fn set_do_validity_checking_default_value(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.do_validity_checking_default_value = value)
+}
+
+pub fn get_get_warnings_default_value() -> i32 {
+    GLOBAL_STATE.with_borrow(|state| state.get_warnings_default_value)
+}
+
+pub fn set_get_warnings_default_value(value: i32) {
+    GLOBAL_STATE.with_borrow_mut(|state| state.get_warnings_default_value = value)
+}
+
 /// Reset last global error.
 pub fn reset_last_error() {
     GLOBAL_STATE.with_borrow_mut(|state| state.last_error.reset());

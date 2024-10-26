@@ -9,10 +9,12 @@ use std::{
 };
 
 use exml::{
-    globals::{set_generic_error, GenericErrorContext},
+    globals::{
+        get_do_validity_checking_default_value, set_do_validity_checking_default_value,
+        set_generic_error, GenericErrorContext,
+    },
     libxml::{
         catalog::{xml_catalog_cleanup, xml_load_catalog},
-        globals::xml_do_validity_checking_default_value,
         parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
         tree::{xml_free_doc, XmlDocPtr},
         xmlmemory::xml_memory_dump,
@@ -70,11 +72,11 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         let mut okay: c_int = 1;
 
         if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
-            *xml_do_validity_checking_default_value() = 0;
+            set_do_validity_checking_default_value(0);
             let stdout: Box<dyn Write> = Box::new(stdout());
             set_generic_error(None, Some(GenericErrorContext::new(stdout)));
         } else {
-            *xml_do_validity_checking_default_value() = 1;
+            set_do_validity_checking_default_value(1);
             let stderr: Box<dyn Write> = Box::new(stderr());
             set_generic_error(None, Some(GenericErrorContext::new(stderr)));
         }
@@ -93,11 +95,11 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             okay = 0;
         }
         if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
-            if *xml_do_validity_checking_default_value() != 0 {
+            if get_do_validity_checking_default_value() != 0 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
-        } else if *xml_do_validity_checking_default_value() != 1 {
+        } else if get_do_validity_checking_default_value() != 1 {
             println!("ValidityCheckingDefaultValue override failed");
             okay = 0;
         }

@@ -23,7 +23,10 @@ use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
     generic_error,
-    globals::{GenericError, GenericErrorContext, StructuredError},
+    globals::{
+        get_do_validity_checking_default_value, get_get_warnings_default_value, GenericError,
+        GenericErrorContext, StructuredError,
+    },
     hash::XmlHashTableRef,
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
@@ -34,11 +37,11 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_handler, xml_default_sax_locator,
-            xml_do_validity_checking_default_value, xml_free, xml_get_warnings_default_value,
-            xml_indent_tree_output, xml_init_globals_internal, xml_keep_blanks_default_value,
-            xml_line_numbers_default_value, xml_load_ext_dtd_default_value, xml_malloc,
-            xml_malloc_atomic, xml_parser_debug_entities, xml_pedantic_parser_default_value,
-            xml_realloc, xml_substitute_entities_default_value,
+            xml_free, xml_indent_tree_output, xml_init_globals_internal,
+            xml_keep_blanks_default_value, xml_line_numbers_default_value,
+            xml_load_ext_dtd_default_value, xml_malloc, xml_malloc_atomic,
+            xml_parser_debug_entities, xml_pedantic_parser_default_value, xml_realloc,
+            xml_substitute_entities_default_value,
         },
         hash::{
             xml_hash_default_deallocator, xml_hash_free, xml_hash_lookup2, xml_hash_qlookup2,
@@ -4679,7 +4682,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     if (*ctxt).loadsubset != 0 {
         (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
     }
-    (*ctxt).validate = *xml_do_validity_checking_default_value();
+    (*ctxt).validate = get_do_validity_checking_default_value();
     (*ctxt).pedantic = *xml_pedantic_parser_default_value();
     if (*ctxt).pedantic != 0 {
         (*ctxt).options |= XmlParserOption::XmlParsePedantic as i32;
@@ -4696,7 +4699,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).vctxt.error = Some(parser_validity_error);
     (*ctxt).vctxt.warning = Some(parser_validity_warning);
     if (*ctxt).validate != 0 {
-        if *xml_get_warnings_default_value() == 0 {
+        if get_get_warnings_default_value() == 0 {
             (*ctxt).vctxt.warning = None;
         } else {
             (*ctxt).vctxt.warning = Some(parser_validity_warning);
