@@ -52,8 +52,7 @@ use crate::{
         },
         xinclude::XmlXincludeCtxtPtr,
         xml_io::{
-            xml_free_parser_input_buffer, xml_parser_input_buffer_create_filename,
-            XmlOutputBufferPtr, XmlParserInputBufferPtr,
+            xml_parser_input_buffer_create_filename, XmlOutputBufferPtr, XmlParserInputBuffer,
         },
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
         xmlerror::XmlParserErrors,
@@ -1240,10 +1239,10 @@ pub(crate) unsafe extern "C" fn desret_xml_dtd_ptr(val: XmlDtdPtr) {
     desret_xml_node_ptr(val as XmlNodePtr);
 }
 
-pub(crate) unsafe extern "C" fn gen_xml_parser_input_buffer_ptr(
+pub(crate) unsafe fn gen_xml_parser_input_buffer_ptr(
     no: c_int,
     _nr: c_int,
-) -> XmlParserInputBufferPtr {
+) -> Option<XmlParserInputBuffer> {
     if no == 0 {
         return xml_parser_input_buffer_create_filename(
             c"missing.xml".as_ptr(),
@@ -1280,15 +1279,15 @@ pub(crate) unsafe extern "C" fn gen_xml_parser_input_buffer_ptr(
     if no == 6 {
         return xml_parser_input_buffer_create_filename(REMOTE1BAD.as_ptr(), XmlCharEncoding::None);
     }
-    null_mut()
+    None
 }
-pub(crate) unsafe extern "C" fn des_xml_parser_input_buffer_ptr(
-    _no: c_int,
-    val: XmlParserInputBufferPtr,
-    _nr: c_int,
-) {
-    xml_free_parser_input_buffer(val);
-}
+// pub(crate) unsafe extern "C" fn des_xml_parser_input_buffer_ptr(
+//     _no: c_int,
+//     val: XmlParserInputBufferPtr,
+//     _nr: c_int,
+// ) {
+//     xml_free_parser_input_buffer(val);
+// }
 
 pub(crate) fn gen_xml_feature(no: c_int, _nr: c_int) -> Option<XmlFeature> {
     if no == 1 {
@@ -1325,9 +1324,9 @@ pub(crate) unsafe extern "C" fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr
     xml_free_parser_ctxt(val);
 }
 
-pub(crate) unsafe extern "C" fn desret_xml_parser_input_buffer_ptr(val: XmlParserInputBufferPtr) {
-    xml_free_parser_input_buffer(val);
-}
+// pub(crate) unsafe extern "C" fn desret_xml_parser_input_buffer_ptr(val: XmlParserInputBufferPtr) {
+//     xml_free_parser_input_buffer(val);
+// }
 
 pub(crate) fn gen_xml_parser_node_info_seq_ptr(_no: c_int, _nr: c_int) -> XmlParserNodeInfoSeqPtr {
     null_mut()

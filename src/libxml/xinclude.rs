@@ -41,7 +41,7 @@ use crate::{
             xml_build_relative_uri, xml_build_uri, xml_free_uri, xml_parse_uri, xml_save_uri,
             xml_uri_escape, XmlURIPtr,
         },
-        xml_io::{xml_parser_get_directory, XmlParserInputBufferPtr},
+        xml_io::xml_parser_get_directory,
         xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, XmlChar},
         xpath::{
@@ -2231,8 +2231,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         xml_free(url as _);
         return ret;
     }
-    let buf: XmlParserInputBufferPtr = (*input_stream).buf;
-    if buf.is_null() {
+    let Some(buf) = (*input_stream).buf.as_mut() else {
         // goto error;
         xml_free_node(node);
         xml_free_input_stream(input_stream);
@@ -2241,8 +2240,8 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         xml_free_uri(uri);
         xml_free(url as _);
         return ret;
-    }
-    (*buf).encoder = get_encoding_handler(enc);
+    };
+    buf.borrow_mut().encoder = get_encoding_handler(enc);
     node = xml_new_doc_text((*ctxt).doc, null_mut());
     if node.is_null() {
         xml_xinclude_err_memory(ctxt, (*refe).elem, null());
@@ -2259,16 +2258,16 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     /*
      * Scan all chars from the resource and add the to the node
      */
-    while (*buf).grow(4096) > 0 {}
+    while buf.borrow_mut().grow(4096) > 0 {}
 
-    let content: *const XmlChar = (*buf).buffer.map_or(null_mut(), |buf| {
+    let content: *const XmlChar = buf.borrow().buffer.map_or(null_mut(), |buf| {
         if buf.is_ok() {
             buf.as_ref().as_ptr()
         } else {
             null_mut()
         }
     });
-    let len: c_int = (*buf).buffer.map_or(0, |buf| buf.len()) as i32;
+    let len: c_int = buf.borrow().buffer.map_or(0, |buf| buf.len()) as i32;
     i = 0;
     while i < len {
         let mut l: c_int = 0;

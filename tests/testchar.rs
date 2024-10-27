@@ -2,9 +2,11 @@
 //! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
+    cell::RefCell,
     ffi::{c_char, c_int, c_uchar},
     io::{stdout, Write},
     ptr::{addr_of_mut, null_mut},
+    rc::Rc,
     sync::RwLock,
 };
 
@@ -20,10 +22,7 @@ use exml::{
         },
         parser_internals::{input_push, xml_current_char, xml_new_input_stream},
         tree::{xml_free_doc, XmlDocPtr},
-        xml_io::{
-            xml_free_parser_input_buffer, xml_parser_input_buffer_create_mem,
-            XmlParserInputBufferPtr,
-        },
+        xml_io::xml_parser_input_buffer_create_mem,
         xmlerror::XmlParserErrors,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
@@ -671,26 +670,29 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
      */
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     assert!(!ctxt.is_null(), "Failed to allocate parser context");
-    let buf: XmlParserInputBufferPtr = xml_parser_input_buffer_create_mem(
+    let Some(buf) = xml_parser_input_buffer_create_mem(
         data.as_mut_ptr(),
         data.len() as i32,
         XmlCharEncoding::None,
-    );
-    if buf.is_null() {
+    ) else {
         xml_free_parser_ctxt(ctxt);
         panic!("Failed to allocate input buffer");
-    }
+    };
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
-        xml_free_parser_input_buffer(buf);
+        // xml_free_parser_input_buffer(buf);
         test_ret = 1;
         // goto error;
         xml_free_parser_ctxt(ctxt);
         return test_ret;
     }
     (*input).filename = null_mut();
-    (*input).buf = buf;
-    (*input).cur = (*(*input).buf)
+    (*input).buf = Some(Rc::new(RefCell::new(buf)));
+    (*input).cur = (*input)
+        .buf
+        .as_ref()
+        .unwrap()
+        .borrow()
         .buffer
         .map_or(null_mut(), |buf| buf.as_ref().as_ptr());
     (*input).base = (*input).cur;

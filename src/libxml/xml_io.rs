@@ -163,7 +163,6 @@ pub type XmlOutputWriteCallback =
 #[cfg(feature = "output")]
 pub type XmlOutputCloseCallback = unsafe extern "C" fn(context: *mut c_void) -> c_int;
 
-pub type XmlParserInputBufferPtr = *mut XmlParserInputBuffer;
 #[repr(C)]
 pub struct XmlParserInputBuffer {
     pub(crate) context: *mut c_void,
@@ -414,6 +413,23 @@ impl XmlParserInputBuffer {
                 return -1;
             }
             buf.len() as i32
+        }
+    }
+}
+
+impl Drop for XmlParserInputBuffer {
+    fn drop(&mut self) {
+        if let Some(callback) = self.closecallback {
+            unsafe {
+                callback(self.context);
+            }
+            self.context = null_mut();
+        }
+        if let Some(buffer) = self.buffer.take() {
+            buffer.free();
+        }
+        if let Some(raw) = self.raw.take() {
+            raw.free();
         }
     }
 }
@@ -1111,32 +1127,33 @@ pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
  *
  * Returns the new parser input or NULL
  */
-pub unsafe fn xml_alloc_parser_input_buffer(enc: XmlCharEncoding) -> XmlParserInputBufferPtr {
-    let ret: XmlParserInputBufferPtr =
-        xml_malloc(size_of::<XmlParserInputBuffer>()) as XmlParserInputBufferPtr;
-    if ret.is_null() {
-        xml_ioerr_memory(c"creating input buffer".as_ptr() as _);
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlParserInputBuffer>());
-    let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
-    let Some(mut new_buf) = XmlBufRef::with_capacity(2 * default_buffer_size) else {
-        xml_free(ret as _);
-        return null_mut();
+pub fn xml_alloc_parser_input_buffer(enc: XmlCharEncoding) -> XmlParserInputBuffer {
+    let mut ret = XmlParserInputBuffer {
+        context: null_mut(),
+        readcallback: None,
+        closecallback: None,
+        encoder: None,
+        buffer: None,
+        raw: None,
+        compressed: 0,
+        error: XmlParserErrors::default(),
+        rawconsumed: 0,
     };
-    (*ret).buffer = Some(new_buf);
+    let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
+    let mut new_buf = XmlBufRef::with_capacity(2 * default_buffer_size).unwrap();
+    ret.buffer = Some(new_buf);
     new_buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    (*ret).encoder = get_encoding_handler(enc);
-    (*ret).raw = if (*ret).encoder.is_some() {
+    ret.encoder = get_encoding_handler(enc);
+    ret.raw = if ret.encoder.is_some() {
         XmlBufRef::with_capacity(2 * default_buffer_size)
     } else {
         None
     };
-    (*ret).readcallback = None;
-    (*ret).closecallback = None;
-    (*ret).context = null_mut();
-    (*ret).compressed = -1;
-    (*ret).rawconsumed = 0;
+    ret.readcallback = None;
+    ret.closecallback = None;
+    ret.context = null_mut();
+    ret.compressed = -1;
+    ret.rawconsumed = 0;
 
     ret
 }
@@ -1157,16 +1174,13 @@ pub unsafe fn xml_alloc_parser_input_buffer(enc: XmlCharEncoding) -> XmlParserIn
 pub unsafe fn xml_parser_input_buffer_create_filename(
     uri: *const c_char,
     enc: XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
+) -> Option<XmlParserInputBuffer> {
     if let Some(f) =
         GLOBAL_STATE.with_borrow(|state| state.parser_input_buffer_create_filename_value)
     {
         let uri = CStr::from_ptr(uri).to_str().unwrap();
         return f(uri, enc);
     }
-    // if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
-    //     return f(uri, enc);
-    // }
     __xml_parser_input_buffer_create_filename(uri, enc)
 }
 
@@ -1406,23 +1420,20 @@ pub unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
 pub unsafe fn xml_parser_input_buffer_create_file(
     file: *mut FILE,
     enc: XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
+) -> Option<XmlParserInputBuffer> {
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
         xml_register_default_input_callbacks();
     }
 
     if file.is_null() {
-        return null_mut();
+        return None;
     }
 
-    let ret: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
-    if !ret.is_null() {
-        (*ret).context = file as _;
-        (*ret).readcallback = Some(xml_file_read);
-        (*ret).closecallback = Some(xml_file_flush);
-    }
-
-    ret
+    let mut ret = xml_alloc_parser_input_buffer(enc);
+    ret.context = file as _;
+    ret.readcallback = Some(xml_file_read);
+    ret.closecallback = Some(xml_file_flush);
+    Some(ret)
 }
 
 /**
@@ -1440,31 +1451,29 @@ pub unsafe fn xml_parser_input_buffer_create_mem(
     mem: *const c_char,
     size: c_int,
     enc: XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
+) -> Option<XmlParserInputBuffer> {
     if size < 0 {
-        return null_mut();
+        return None;
     }
     if mem.is_null() {
-        return null_mut();
+        return None;
     }
 
-    let ret: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
-    if !ret.is_null() {
-        (*ret).context = mem as _;
-        (*ret).readcallback = None;
-        (*ret).closecallback = None;
-        if (*ret)
-            .buffer
-            .expect("Internal Error")
-            .push_bytes(from_raw_parts(mem as *const u8, size as usize))
-            .is_err()
-        {
-            xml_free_parser_input_buffer(ret);
-            return null_mut();
-        }
+    let mut ret = xml_alloc_parser_input_buffer(enc);
+    ret.context = mem as _;
+    ret.readcallback = None;
+    ret.closecallback = None;
+    if ret
+        .buffer
+        .expect("Internal Error")
+        .push_bytes(from_raw_parts(mem as *const u8, size as usize))
+        .is_err()
+    {
+        // xml_free_parser_input_buffer(ret);
+        return None;
     }
 
-    ret
+    Some(ret)
 }
 
 /**
@@ -1484,19 +1493,14 @@ pub unsafe fn xml_parser_input_buffer_create_io(
     ioclose: Option<XmlInputCloseCallback>,
     ioctx: *mut c_void,
     enc: XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
-    if ioread.is_none() {
-        return null_mut();
-    }
+) -> Option<XmlParserInputBuffer> {
+    ioread?;
 
-    let ret: XmlParserInputBufferPtr = xml_alloc_parser_input_buffer(enc);
-    if !ret.is_null() {
-        (*ret).context = ioctx as _;
-        (*ret).readcallback = ioread;
-        (*ret).closecallback = ioclose;
-    }
-
-    ret
+    let mut ret = xml_alloc_parser_input_buffer(enc);
+    ret.context = ioctx as _;
+    ret.readcallback = ioread;
+    ret.closecallback = ioclose;
+    Some(ret)
 }
 
 const MINLEN: usize = 4000;
@@ -1515,30 +1519,30 @@ unsafe extern "C" fn end_of_input(
     0
 }
 
-/**
- * xmlFreeParserInputBuffer:
- * @in:  a buffered parser input
- *
- * Free up the memory used by a buffered parser input
- */
-pub unsafe extern "C" fn xml_free_parser_input_buffer(input: XmlParserInputBufferPtr) {
-    if input.is_null() {
-        return;
-    }
+// /**
+//  * xmlFreeParserInputBuffer:
+//  * @in:  a buffered parser input
+//  *
+//  * Free up the memory used by a buffered parser input
+//  */
+// pub unsafe extern "C" fn xml_free_parser_input_buffer(input: XmlParserInputBufferPtr) {
+//     if input.is_null() {
+//         return;
+//     }
 
-    if let Some(raw) = (*input).raw.take() {
-        raw.free();
-    }
-    let _ = (*input).encoder.take();
-    if let Some(callback) = (*input).closecallback {
-        callback((*input).context);
-    }
-    if let Some(buffer) = (*input).buffer.take() {
-        buffer.free();
-    }
+//     if let Some(raw) = (*input).raw.take() {
+//         raw.free();
+//     }
+//     let _ = (*input).encoder.take();
+//     if let Some(callback) = (*input).closecallback {
+//         callback((*input).context);
+//     }
+//     if let Some(buffer) = (*input).buffer.take() {
+//         buffer.free();
+//     }
 
-    xml_free(input as _);
-}
+//     xml_free(input as _);
+// }
 
 /**
  * xmlParserGetDirectory:
@@ -1627,8 +1631,7 @@ pub fn xml_register_input_callbacks(
 pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
     uri: *const c_char,
     enc: XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
-    let ret: XmlParserInputBufferPtr;
+) -> Option<XmlParserInputBuffer> {
     let mut context: *mut c_void = null_mut();
 
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
@@ -1636,7 +1639,7 @@ pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
     }
 
     if uri.is_null() {
-        return null_mut();
+        return None;
     }
 
     let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
@@ -1657,47 +1660,47 @@ pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
                     /*
                      * Allocate the Input buffer front-end.
                      */
-                    ret = xml_alloc_parser_input_buffer(enc);
-                    if !ret.is_null() {
-                        (*ret).context = context;
-                        (*ret).readcallback = callbacks[i].readcallback;
-                        (*ret).closecallback = callbacks[i].closecallback;
-                    // #ifdef LIBXML_ZLIB_ENABLED
-                    // 	if ((xmlInputCallbackTable[i].opencallback == xmlGzfileOpen) &&
-                    // 		strcmp(URI, "-") != 0) {
-                    // // #if defined(ZLIB_VERNUM) && ZLIB_VERNUM >= 0x1230
-                    // //             (*ret).compressed = !gzdirect(context);
-                    // // #else
-                    // // 	    if ((*(context as *mut z_stream)).avail_in > 4) {
-                    // // 	        c_char *cptr, buff4[4];
-                    // // 		cptr = (c_char *) (*(context as *mut z_stream)).next_in;
-                    // // 		if (gzread(context, buff4, 4) == 4) {
-                    // // 		    if (strncmp(buff4, cptr, 4) == 0)
-                    // // 		        (*ret).compressed = 0;
-                    // // 		    else
-                    // // 		        (*ret).compressed = 1;
-                    // // 		    gzrewind(context);
-                    // // 		}
-                    // // 	    }
-                    // // #endif
-                    // 	}
-                    // #endif
-                    // #ifdef LIBXML_LZMA_ENABLED
-                    // 	if ((xmlInputCallbackTable[i].opencallback == xmlXzfileOpen) &&
-                    // 		strcmp(URI, "-") != 0) {
-                    //             (*ret).compressed = __libxml2_xzcompressed(context);
-                    // 	}
-                    // #endif
-                    } else {
-                        (callbacks[i].closecallback.unwrap())(context);
-                    }
+                    let mut ret = xml_alloc_parser_input_buffer(enc);
+                    ret.context = context;
+                    ret.readcallback = callbacks[i].readcallback;
+                    ret.closecallback = callbacks[i].closecallback;
+                    // if !ret.is_null() {
+                    //     // #ifdef LIBXML_ZLIB_ENABLED
+                    //     // 	if ((xmlInputCallbackTable[i].opencallback == xmlGzfileOpen) &&
+                    //     // 		strcmp(URI, "-") != 0) {
+                    //     // // #if defined(ZLIB_VERNUM) && ZLIB_VERNUM >= 0x1230
+                    //     // //             (*ret).compressed = !gzdirect(context);
+                    //     // // #else
+                    //     // // 	    if ((*(context as *mut z_stream)).avail_in > 4) {
+                    //     // // 	        c_char *cptr, buff4[4];
+                    //     // // 		cptr = (c_char *) (*(context as *mut z_stream)).next_in;
+                    //     // // 		if (gzread(context, buff4, 4) == 4) {
+                    //     // // 		    if (strncmp(buff4, cptr, 4) == 0)
+                    //     // // 		        (*ret).compressed = 0;
+                    //     // // 		    else
+                    //     // // 		        (*ret).compressed = 1;
+                    //     // // 		    gzrewind(context);
+                    //     // // 		}
+                    //     // // 	    }
+                    //     // // #endif
+                    //     // 	}
+                    //     // #endif
+                    //     // #ifdef LIBXML_LZMA_ENABLED
+                    //     // 	if ((xmlInputCallbackTable[i].opencallback == xmlXzfileOpen) &&
+                    //     // 		strcmp(URI, "-") != 0) {
+                    //     //             (*ret).compressed = __libxml2_xzcompressed(context);
+                    //     // 	}
+                    //     // #endif
+                    // } else {
+                    //     (callbacks[i].closecallback.unwrap())(context);
+                    // }
 
-                    return ret;
+                    return Some(ret);
                 }
             }
         }
     }
-    null_mut()
+    None
 }
 
 /*
@@ -2746,15 +2749,16 @@ pub unsafe extern "C" fn xml_check_http_input(
     #[cfg(feature = "http")]
     {
         if !ret.is_null()
-            && !(*ret).buf.is_null()
-            && (*(*ret).buf).readcallback == Some(xml_io_http_read)
-            && !(*(*ret).buf).context.is_null()
+            && (*ret).buf.is_some()
+            && (*ret).buf.as_ref().unwrap().borrow().readcallback == Some(xml_io_http_read)
+            && !(*ret).buf.as_ref().unwrap().borrow().context.is_null()
         {
             let encoding: *const c_char;
             let redir: *const c_char;
             let mime: *const c_char;
 
-            let code: c_int = xml_nanohttp_return_code((*(*ret).buf).context);
+            let code: c_int =
+                xml_nanohttp_return_code((*ret).buf.as_ref().unwrap().borrow().context);
             if code >= 400 {
                 /* fatal error */
                 if !(*ret).filename.is_null() {
@@ -2773,11 +2777,11 @@ pub unsafe extern "C" fn xml_check_http_input(
                 xml_free_input_stream(ret);
                 ret = null_mut();
             } else {
-                mime = xml_nanohttp_mime_type((*(*ret).buf).context);
+                mime = xml_nanohttp_mime_type((*ret).buf.as_ref().unwrap().borrow().context);
                 if !xml_strstr(mime as _, c"/xml".as_ptr() as _).is_null()
                     || !xml_strstr(mime as _, c"+xml".as_ptr() as _).is_null()
                 {
-                    encoding = xml_nanohttp_encoding((*(*ret).buf).context);
+                    encoding = xml_nanohttp_encoding((*ret).buf.as_ref().unwrap().borrow().context);
                     if !encoding.is_null() {
                         if let Some(handler) =
                             find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
@@ -2797,7 +2801,7 @@ pub unsafe extern "C" fn xml_check_http_input(
                         }
                     }
                 }
-                redir = xml_nanohttp_redir((*(*ret).buf).context);
+                redir = xml_nanohttp_redir((*ret).buf.as_ref().unwrap().borrow().context);
                 if !redir.is_null() {
                     if !(*ret).filename.is_null() {
                         xml_free((*ret).filename as _);

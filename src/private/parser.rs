@@ -18,7 +18,6 @@ use crate::{
             input_pop, xml_err_internal, xml_free_input_stream, INPUT_CHUNK, LINE_LEN,
             XML_MAX_LOOKUP_LIMIT,
         },
-        xml_io::{xml_free_parser_input_buffer, XmlParserInputBufferPtr},
         xmlerror::XmlParserErrors,
         xmlstring::XmlChar,
     },
@@ -192,9 +191,10 @@ pub unsafe extern "C" fn xml_halt_parser(ctxt: XmlParserCtxtPtr) {
             free((*(*ctxt).input).base as *mut XmlChar);
             (*(*ctxt).input).free = None;
         }
-        if !(*(*ctxt).input).buf.is_null() {
-            xml_free_parser_input_buffer((*(*ctxt).input).buf);
-            (*(*ctxt).input).buf = null_mut();
+        if (*(*ctxt).input).buf.is_some() {
+            // xml_free_parser_input_buffer((*(*ctxt).input).buf);
+            // (*(*ctxt).input).buf = null_mut();
+            let _ = (*(*ctxt).input).buf.take();
         }
         (*(*ctxt).input).cur = c"".as_ptr() as _;
         (*(*ctxt).input).length = 0;
@@ -210,19 +210,18 @@ pub unsafe extern "C" fn xml_halt_parser(ctxt: XmlParserCtxtPtr) {
 #[doc(hidden)]
 pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
     let input: XmlParserInputPtr = (*ctxt).input;
-    let buf: XmlParserInputBufferPtr = (*input).buf;
     let cur_end: ptrdiff_t = (*input).end.offset_from((*input).cur);
     let cur_base: ptrdiff_t = (*input).cur.offset_from((*input).base);
 
-    if buf.is_null() {
+    let Some(buf) = (*input).buf.as_mut() else {
         return 0;
-    }
+    };
     /* Don't grow push parser buffer. */
     if (*ctxt).progressive != 0 {
         return 0;
     }
     /* Don't grow memory buffers. */
-    if (*buf).encoder.is_none() && (*buf).readcallback.is_none() {
+    if (*buf).borrow().encoder.is_none() && (*buf).borrow().readcallback.is_none() {
         return 0;
     }
 
@@ -238,9 +237,12 @@ pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
         return 0;
     }
 
-    let ret: c_int = (*buf).grow(INPUT_CHUNK as _);
+    let ret: c_int = (*buf).borrow_mut().grow(INPUT_CHUNK as _);
     xml_buf_set_input_base_cur(
-        (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+        (*buf)
+            .borrow()
+            .buffer
+            .map_or(null_mut(), |buf| buf.as_ptr()),
         input,
         0,
         cur_base as _,
@@ -262,12 +264,15 @@ pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
 #[doc(hidden)]
 pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
     let input: XmlParserInputPtr = (*ctxt).input;
-    let buf: XmlParserInputBufferPtr = (*input).buf;
     let mut used: size_t;
 
     /* Don't shrink pull parser memory buffers. */
-    if buf.is_null()
-        || (*ctxt).progressive == 0 && (*buf).encoder.is_none() && (*buf).readcallback.is_none()
+    let Some(buf) = (*input).buf.as_mut() else {
+        return;
+    };
+    if (*ctxt).progressive == 0
+        && (*buf).borrow().encoder.is_none()
+        && (*buf).borrow().readcallback.is_none()
     {
         return;
     }
@@ -278,7 +283,8 @@ pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
      * was consumed
      */
     if used > INPUT_CHUNK {
-        let res: size_t = (*buf)
+        let res: size_t = buf
+            .borrow()
             .buffer
             .map_or(0, |mut buf| buf.trim_head(used - LINE_LEN));
 
@@ -293,7 +299,10 @@ pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
     }
 
     xml_buf_set_input_base_cur(
-        (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+        (*buf)
+            .borrow()
+            .buffer
+            .map_or(null_mut(), |buf| buf.as_ptr()),
         input,
         0,
         used,

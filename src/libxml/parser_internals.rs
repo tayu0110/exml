@@ -3,9 +3,11 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+use std::cell::RefCell;
 use std::ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, CStr, CString};
 use std::mem::{size_of, size_of_val, zeroed};
 use std::ptr::{addr_of_mut, null, null_mut};
+use std::rc::Rc;
 use std::slice::from_raw_parts;
 use std::str::from_utf8_mut;
 use std::sync::atomic::Ordering;
@@ -40,7 +42,6 @@ use crate::libxml::valid::{
     xml_create_enumeration, xml_free_doc_element_content, xml_free_enumeration,
     xml_new_doc_element_content, xml_validate_element, xml_validate_root,
 };
-use crate::libxml::xml_io::XmlParserInputBufferPtr;
 use crate::libxml::xmlerror::XmlParserErrors;
 use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
 
@@ -80,7 +81,7 @@ use super::tree::{
 };
 use super::uri::{xml_build_uri, xml_canonic_path};
 use super::xml_io::{
-    __xml_loader_err, xml_check_http_input, xml_free_parser_input_buffer, xml_parser_get_directory,
+    __xml_loader_err, xml_check_http_input, xml_parser_get_directory,
     xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_mem,
 };
 use super::xmlstring::{
@@ -808,24 +809,28 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
         return null_mut();
     }
 
-    let buf: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_mem(buffer, size, crate::encoding::XmlCharEncoding::None);
-    if buf.is_null() {
+    let Some(buf) =
+        xml_parser_input_buffer_create_mem(buffer, size, crate::encoding::XmlCharEncoding::None)
+    else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
-    }
+    };
 
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
-        xml_free_parser_input_buffer(buf);
+        // xml_free_parser_input_buffer(buf);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
 
     (*input).filename = null_mut();
-    (*input).buf = buf;
+    (*input).buf = Some(Rc::new(RefCell::new(buf)));
     xml_buf_reset_input(
-        (*(*input).buf)
+        (*input)
+            .buf
+            .as_ref()
+            .unwrap()
+            .borrow()
             .buffer
             .map_or(null_mut(), |ptr| ptr.as_ptr()),
         input,
@@ -1042,7 +1047,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
         && (*(*ctxt).input).cur == (*(*ctxt).input).base
         && matches!(
             enc,
-            crate::encoding::XmlCharEncoding::UTF8
+            XmlCharEncoding::UTF8
                 | crate::encoding::XmlCharEncoding::UTF16LE
                 | crate::encoding::XmlCharEncoding::UTF16BE
         )
@@ -1073,12 +1078,12 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
         }
         crate::encoding::XmlCharEncoding::None => {
             /* let's assume it's UTF-8 without the XML decl */
-            (*ctxt).charset = crate::encoding::XmlCharEncoding::UTF8;
+            (*ctxt).charset = XmlCharEncoding::UTF8;
             return 0;
         }
-        crate::encoding::XmlCharEncoding::UTF8 => {
+        XmlCharEncoding::UTF8 => {
             /* default encoding, no conversion should be needed */
-            (*ctxt).charset = crate::encoding::XmlCharEncoding::UTF8;
+            (*ctxt).charset = XmlCharEncoding::UTF8;
             return 0;
         }
         crate::encoding::XmlCharEncoding::EBCDIC => xml_detect_ebcdic((*ctxt).input),
@@ -1090,7 +1095,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
         match enc {
             crate::encoding::XmlCharEncoding::ASCII => {
                 /* default encoding, no conversion should be needed */
-                (*ctxt).charset = crate::encoding::XmlCharEncoding::UTF8;
+                (*ctxt).charset = XmlCharEncoding::UTF8;
                 return 0;
             }
             crate::encoding::XmlCharEncoding::ISO8859_1 => {
@@ -1147,7 +1152,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
  */
 pub unsafe fn xml_switch_to_encoding(
     ctxt: XmlParserCtxtPtr,
-    handler: crate::encoding::XmlCharEncodingHandler,
+    handler: XmlCharEncodingHandler,
 ) -> c_int {
     if ctxt.is_null() {
         return -1;
@@ -1169,22 +1174,21 @@ pub unsafe fn xml_switch_to_encoding(
 pub(crate) unsafe fn xml_switch_input_encoding(
     ctxt: XmlParserCtxtPtr,
     input: XmlParserInputPtr,
-    handler: crate::encoding::XmlCharEncodingHandler,
+    handler: XmlCharEncodingHandler,
 ) -> c_int {
     if input.is_null() {
         return -1;
     }
-    let input_buf: XmlParserInputBufferPtr = (*input).buf;
-    if input_buf.is_null() {
+    let Some(input_buf) = (*input).buf.as_mut() else {
         xml_err_internal(
             ctxt,
             c"static memory buffer doesn't support encoding\n".as_ptr() as _,
             null(),
         );
         return -1;
-    }
+    };
 
-    if (*input_buf).encoder.replace(handler).is_some() {
+    if input_buf.borrow_mut().encoder.replace(handler).is_some() {
         /*
          * Switching encodings during parsing is a really bad idea,
          * but Chromium can match between ISO-8859-1 and UTF-16 before
@@ -1196,93 +1200,96 @@ pub(crate) unsafe fn xml_switch_input_encoding(
         return 0;
     }
 
-    (*ctxt).charset = crate::encoding::XmlCharEncoding::UTF8;
+    (*ctxt).charset = XmlCharEncoding::UTF8;
 
     /*
      * Is there already some content down the pipe to convert ?
      */
-    // if xml_buf_is_empty((*input_buf).buffer) == 0 {
-    if let Some(mut buf) = (*input_buf).buffer.filter(|buf| !buf.is_empty()) {
-        /*
-         * FIXME: The BOM shouldn't be skipped here, but in the parsing code.
-         */
+    let Some(mut buf) = input_buf.borrow().buffer.filter(|buf| !buf.is_empty()) else {
+        return 0;
+    };
+    /*
+     * FIXME: The BOM shouldn't be skipped here, but in the parsing code.
+     */
 
-        /*
-         * Specific handling of the Byte Order Mark for
-         * UTF-16
-         */
-        if matches!(
-            (*input_buf).encoder.as_ref().unwrap().name(),
-            "UTF-16LE" | "UTF-16"
-        ) && *(*input).cur.add(0) == 0xFF
-            && *(*input).cur.add(1) == 0xFE
-        {
-            (*input).cur = (*input).cur.add(2);
-        }
-        if (*input_buf).encoder.as_ref().unwrap().name() == "UTF-16BE"
-            && *(*input).cur.add(0) == 0xFE
-            && *(*input).cur.add(1) == 0xFF
-        {
-            (*input).cur = (*input).cur.add(2);
-        }
-        /*
-         * Errata on XML-1.0 June 20 2001
-         * Specific handling of the Byte Order Mark for
-         * UTF-8
-         */
-        if (*input_buf).encoder.as_ref().unwrap().name() == "UTF-8"
-            && *(*input).cur.add(0) == 0xEF
-            && *(*input).cur.add(1) == 0xBB
-            && *(*input).cur.add(2) == 0xBF
-        {
-            (*input).cur = (*input).cur.add(3);
-        }
-
-        /*
-         * Shrink the current input buffer.
-         * Move it as the raw buffer and create a new input buffer
-         */
-        let processed: size_t = (*input).cur.offset_from((*input).base) as usize;
-        buf.trim_head(processed as usize);
-        (*input).consumed += processed as u64;
-        (*input_buf).raw = Some(buf);
-        (*input_buf).buffer = XmlBufRef::new();
-        assert!((*input_buf).buffer.is_some());
-        (*input_buf).rawconsumed = processed as u64;
-        let using: size_t = buf.len();
-
-        /*
-         * TODO: We must flush and decode the whole buffer to make functions
-         * like xmlReadMemory work with a user-provided encoding. If the
-         * encoding is specified directly, we should probably set
-         * XML_PARSE_IGNORE_ENC in xmlDoRead to avoid switching encodings
-         * twice. Then we could set "flush" to false which should save
-         * a considerable amount of memory when parsing from memory.
-         * It's probably even possible to remove this whole if-block
-         * completely.
-         */
-        let res = (*input_buf).decode(true);
-        xml_buf_reset_input(
-            (*input_buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
-            input,
-        );
-        if res.is_err() {
-            /* TODO: This could be an out of memory or an encoding error. */
-            xml_err_internal(
-                ctxt,
-                c"switching encoding: encoder error\n".as_ptr() as _,
-                null(),
-            );
-            xml_halt_parser(ctxt);
-            return -1;
-        }
-        let consumed: size_t = using - (*input_buf).raw.map_or(0, |raw| raw.len());
-        if consumed as u64 > u64::MAX || (*input_buf).rawconsumed > u64::MAX - consumed as c_ulong {
-            (*input_buf).rawconsumed = u64::MAX;
-        } else {
-            (*input_buf).rawconsumed += consumed as u64;
-        }
+    /*
+     * Specific handling of the Byte Order Mark for
+     * UTF-16
+     */
+    if matches!(
+        (*input_buf).borrow().encoder.as_ref().unwrap().name(),
+        "UTF-16LE" | "UTF-16"
+    ) && *(*input).cur.add(0) == 0xFF
+        && *(*input).cur.add(1) == 0xFE
+    {
+        (*input).cur = (*input).cur.add(2);
     }
+    if (*input_buf).borrow().encoder.as_ref().unwrap().name() == "UTF-16BE"
+        && *(*input).cur.add(0) == 0xFE
+        && *(*input).cur.add(1) == 0xFF
+    {
+        (*input).cur = (*input).cur.add(2);
+    }
+    /*
+     * Errata on XML-1.0 June 20 2001
+     * Specific handling of the Byte Order Mark for
+     * UTF-8
+     */
+    if (*input_buf).borrow().encoder.as_ref().unwrap().name() == "UTF-8"
+        && *(*input).cur.add(0) == 0xEF
+        && *(*input).cur.add(1) == 0xBB
+        && *(*input).cur.add(2) == 0xBF
+    {
+        (*input).cur = (*input).cur.add(3);
+    }
+
+    /*
+     * Shrink the current input buffer.
+     * Move it as the raw buffer and create a new input buffer
+     */
+    let processed: size_t = (*input).cur.offset_from((*input).base) as usize;
+    buf.trim_head(processed as usize);
+    (*input).consumed += processed as u64;
+    input_buf.borrow_mut().raw = Some(buf);
+    input_buf.borrow_mut().buffer = XmlBufRef::new();
+    assert!(input_buf.borrow_mut().buffer.is_some());
+    input_buf.borrow_mut().rawconsumed = processed as u64;
+    let using: size_t = buf.len();
+
+    /*
+     * TODO: We must flush and decode the whole buffer to make functions
+     * like xmlReadMemory work with a user-provided encoding. If the
+     * encoding is specified directly, we should probably set
+     * XML_PARSE_IGNORE_ENC in xmlDoRead to avoid switching encodings
+     * twice. Then we could set "flush" to false which should save
+     * a considerable amount of memory when parsing from memory.
+     * It's probably even possible to remove this whole if-block
+     * completely.
+     */
+    let res = input_buf.borrow_mut().decode(true);
+    xml_buf_reset_input(
+        (*input_buf)
+            .borrow()
+            .buffer
+            .map_or(null_mut(), |buf| buf.as_ptr()),
+        input,
+    );
+    if res.is_err() {
+        /* TODO: This could be an out of memory or an encoding error. */
+        xml_err_internal(
+            ctxt,
+            c"switching encoding: encoder error\n".as_ptr() as _,
+            null(),
+        );
+        xml_halt_parser(ctxt);
+        return -1;
+    }
+    let consumed: size_t = using - (*input_buf).borrow().raw.map_or(0, |raw| raw.len());
+    let rawconsumed = (*input_buf)
+        .borrow()
+        .rawconsumed
+        .saturating_add(consumed as u64);
+    (*input_buf).borrow_mut().rawconsumed = rawconsumed;
     0
 }
 
@@ -1319,27 +1326,30 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
                 .collect::<String>()
         );
     }
-    let buf: XmlParserInputBufferPtr = xml_parser_input_buffer_create_mem(
+    let Some(buf) = xml_parser_input_buffer_create_mem(
         buffer as *const c_char,
         xml_strlen(buffer),
-        crate::encoding::XmlCharEncoding::None,
-    );
-    if buf.is_null() {
+        XmlCharEncoding::None,
+    ) else {
         xml_err_memory(ctxt, null());
         return null_mut();
-    }
+    };
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
         xml_err_memory(
             ctxt,
             c"couldn't allocate a new input stream\n".as_ptr() as _,
         );
-        xml_free_parser_input_buffer(buf);
+        // xml_free_parser_input_buffer(buf);
         return null_mut();
     }
-    (*input).buf = buf;
+    (*input).buf = Some(Rc::new(RefCell::new(buf)));
     xml_buf_reset_input(
-        (*(*input).buf)
+        (*input)
+            .buf
+            .as_ref()
+            .unwrap()
+            .borrow()
             .buffer
             .map_or(null_mut(), |buf| buf.as_ptr()),
         input,
@@ -1723,9 +1733,7 @@ pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
             free((*input).base as _);
         }
     }
-    if !(*input).buf.is_null() {
-        xml_free_parser_input_buffer((*input).buf);
-    }
+    let _ = (*input).buf.take();
     xml_free(input as _);
 }
 
@@ -1753,9 +1761,9 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     if ctxt.is_null() {
         return null_mut();
     }
-    let buf: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None);
-    if buf.is_null() {
+    let Some(buf) =
+        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None)
+    else {
         if filename.is_null() {
             __xml_loader_err(
                 ctxt as _,
@@ -1770,15 +1778,15 @@ pub unsafe extern "C" fn xml_new_input_from_file(
             );
         }
         return null_mut();
-    }
+    };
 
     input_stream = xml_new_input_stream(ctxt);
     if input_stream.is_null() {
-        xml_free_parser_input_buffer(buf);
+        // xml_free_parser_input_buffer(buf);
         return null_mut();
     }
 
-    (*input_stream).buf = buf;
+    (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
     input_stream = xml_check_http_input(ctxt, input_stream);
     if input_stream.is_null() {
         return null_mut();
@@ -1800,7 +1808,11 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     (*input_stream).directory = directory;
 
     xml_buf_reset_input(
-        (*(*input_stream).buf)
+        (*input_stream)
+            .buf
+            .as_ref()
+            .unwrap()
+            .borrow()
             .buffer
             .map_or(null_mut(), |buf| buf.as_ptr()),
         input_stream,
@@ -1832,6 +1844,7 @@ pub unsafe extern "C" fn xml_new_input_stream(ctxt: XmlParserCtxtPtr) -> XmlPars
     (*input).line = 1;
     (*input).col = 1;
     (*input).standalone = -1;
+    std::ptr::write(&raw mut (*input).buf, None);
 
     /*
      * If the context is NULL the id cannot be initialized, but that
@@ -4823,7 +4836,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         if value == 0 {
             return;
         }
-        if (*ctxt).charset != crate::encoding::XmlCharEncoding::UTF8 {
+        if (*ctxt).charset != XmlCharEncoding::UTF8 {
             /*
              * So we are using non-UTF-8 buffers
              * Check that the c_char fit on 8bits, if not
@@ -6408,8 +6421,14 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
              * encoding mismatch fatal error
              */
             if (*ctxt).encoding.is_null()
-                && !(*(*ctxt).input).buf.is_null()
-                && (*(*(*ctxt).input).buf).encoder.is_none()
+                && (*(*ctxt).input).buf.is_some()
+                && (*(*ctxt).input)
+                    .buf
+                    .as_ref()
+                    .unwrap()
+                    .borrow()
+                    .encoder
+                    .is_none()
             {
                 xml_fatal_err_msg(
                     ctxt,
@@ -7030,7 +7049,7 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
         return 0;
     }
     'encoding_error: {
-        if ctxt.is_null() || (*ctxt).charset == crate::encoding::XmlCharEncoding::UTF8 {
+        if ctxt.is_null() || (*ctxt).charset == XmlCharEncoding::UTF8 {
             /*
              * We are supposed to handle UTF8, check it's valid
              * From rfc2044: encoding of the Unicode values on UTF-8:
@@ -7559,7 +7578,7 @@ pub unsafe extern "C" fn xml_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_in
     }
     'incomplete_sequence: {
         'encoding_error: {
-            if (*ctxt).charset == crate::encoding::XmlCharEncoding::UTF8 {
+            if (*ctxt).charset == XmlCharEncoding::UTF8 {
                 /*
                  * We are supposed to handle UTF8, check it's valid
                  * From rfc2044: encoding of the Unicode values on UTF-8:
@@ -7845,7 +7864,7 @@ pub(crate) unsafe extern "C" fn xml_next_char(ctxt: XmlParserCtxtPtr) {
     }
 
     'encoding_error: {
-        if (*ctxt).charset == crate::encoding::XmlCharEncoding::UTF8 {
+        if (*ctxt).charset == XmlCharEncoding::UTF8 {
             /*
              *   2.11 End-of-Line Handling
              *   the literal two-character sequence "#xD#xA" or a standalone
@@ -8002,7 +8021,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     if input.is_null() {
         return;
     }
-    if (*input).buf.is_null() {
+    if (*input).buf.is_none() {
         return;
     }
     if (*input).base.is_null() {
@@ -8011,7 +8030,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     if (*input).cur.is_null() {
         return;
     }
-    let Some(mut buf) = (*(*input).buf).buffer else {
+    let Some(mut buf) = (*input).buf.as_ref().unwrap().borrow().buffer else {
         return;
     };
 
@@ -8033,7 +8052,12 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     }
 
     if buf.len() <= INPUT_CHUNK {
-        (*(*input).buf).read(2 * INPUT_CHUNK as i32);
+        (*input)
+            .buf
+            .as_mut()
+            .unwrap()
+            .borrow_mut()
+            .read(2 * INPUT_CHUNK as i32);
     }
 
     (*input).base = buf.as_ref().as_ptr();

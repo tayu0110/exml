@@ -79,9 +79,8 @@ use exml::{
         },
         xinclude::xml_xinclude_process_flags,
         xml_io::{
-            xml_file_flush, xml_file_write, xml_free_parser_input_buffer,
-            xml_no_net_external_entity_loader, xml_parser_input_buffer_create_filename,
-            XmlParserInputBufferPtr,
+            xml_file_flush, xml_file_write, xml_no_net_external_entity_loader,
+            xml_parser_input_buffer_create_filename,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
@@ -1733,17 +1732,17 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
     if f {
         #[cfg(feature = "schema")]
         {
-            let buf: XmlParserInputBufferPtr =
-                xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None);
-            if buf.is_null() {
+            let Some(buf) =
+                xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None)
+            else {
                 return;
-            }
+            };
 
             let vctxt: XmlSchemaValidCtxtPtr =
                 xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
             if vctxt.is_null() {
                 PROGRESULT = XmllintReturnCode::ErrMem;
-                xml_free_parser_input_buffer(buf);
+                // xml_free_parser_input_buffer(buf);
                 return;
             }
             xml_schema_set_valid_errors(
@@ -1956,7 +1955,6 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
     let mut fd: c_int = -1;
     let mut info: stat = unsafe { zeroed() };
     let mut base: *const c_char = null();
-    let input: XmlParserInputBufferPtr = null_mut();
 
     if MEMORY != 0 {
         if stat(filename, addr_of_mut!(info)) < 0 {
@@ -2136,7 +2134,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         PATSTREAM.store(null_mut(), Ordering::Relaxed);
     }
     if MEMORY != 0 {
-        xml_free_parser_input_buffer(input);
+        // xml_free_parser_input_buffer(input);
         munmap(base as _, info.st_size as _);
         close(fd);
     }

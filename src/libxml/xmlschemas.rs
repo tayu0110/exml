@@ -4,10 +4,12 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
+    cell::RefCell,
     ffi::{c_char, c_int, c_uint, c_ulong, CStr},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
+    rc::Rc,
     sync::atomic::Ordering,
 };
 
@@ -93,7 +95,7 @@ use crate::{
         },
         uri::xml_build_uri,
         valid::{xml_add_id, xml_free_enumeration},
-        xml_io::{xml_parser_input_buffer_create_filename, XmlParserInputBufferPtr},
+        xml_io::xml_parser_input_buffer_create_filename,
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_new_all_trans,
             xml_automata_new_count_trans2, xml_automata_new_counted_trans,
@@ -131,6 +133,8 @@ use crate::{
     private::error::__xml_simple_error,
     IS_BLANK_CH,
 };
+
+use super::xml_io::XmlParserInputBuffer;
 
 /**
  * This error codes are obsolete; not used any more.
@@ -1353,7 +1357,7 @@ pub struct XmlSchemaValidCtxt {
 
     schema: XmlSchemaPtr, /* The schema in use */
     doc: XmlDocPtr,
-    input: XmlParserInputBufferPtr,
+    input: Option<Rc<RefCell<XmlParserInputBuffer>>>,
     enc: XmlCharEncoding,
     sax: XmlSAXHandlerPtr,
     parser_ctxt: XmlParserCtxtPtr,
@@ -30887,7 +30891,7 @@ unsafe extern "C" fn xml_schema_validate_stream_locator(
  */
 pub unsafe fn xml_schema_validate_stream(
     ctxt: XmlSchemaValidCtxtPtr,
-    input: XmlParserInputBufferPtr,
+    input: XmlParserInputBuffer,
     enc: XmlCharEncoding,
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
@@ -30897,7 +30901,9 @@ pub unsafe fn xml_schema_validate_stream(
 
     let mut ret: c_int;
 
-    if ctxt.is_null() || input.is_null() {
+    if ctxt.is_null()
+    // || input.is_null()
+    {
         return -1;
     }
 
@@ -30921,14 +30927,15 @@ pub unsafe fn xml_schema_validate_stream(
     (*pctxt).linenumbers = 1;
     xml_schema_validate_set_locator(ctxt, Some(xml_schema_validate_stream_locator), pctxt as _);
 
-    let input_stream: XmlParserInputPtr = xml_new_io_input_stream(pctxt, input, enc);
+    let input = Rc::new(RefCell::new(input));
+    let input_stream: XmlParserInputPtr = xml_new_io_input_stream(pctxt, Rc::clone(&input), enc);
     if input_stream.is_null() {
         ret = -1;
     // goto done;
     } else {
         input_push(pctxt, input_stream);
         (*ctxt).parser_ctxt = pctxt;
-        (*ctxt).input = input;
+        (*ctxt).input = Some(Rc::clone(&input));
 
         /*
          * Plug the validation and launch the parsing
@@ -30942,7 +30949,7 @@ pub unsafe fn xml_schema_validate_stream(
             ret = -1;
             // goto done;
         } else {
-            (*ctxt).input = input;
+            (*ctxt).input = Some(input);
             (*ctxt).enc = enc;
             (*ctxt).sax = (*pctxt).sax;
             (*ctxt).flags |= XML_SCHEMA_VALID_CTXT_FLAG_STREAM;
@@ -30960,7 +30967,7 @@ pub unsafe fn xml_schema_validate_stream(
     // done:
     (*ctxt).parser_ctxt = null_mut();
     (*ctxt).sax = null_mut();
-    (*ctxt).input = null_mut();
+    (*ctxt).input = None;
     if !plug.is_null() {
         xml_schema_sax_unplug(plug);
     }
@@ -30992,11 +30999,11 @@ pub unsafe extern "C" fn xml_schema_validate_file(
         return -1;
     }
 
-    let input: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None);
-    if input.is_null() {
+    let Some(input) =
+        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None)
+    else {
         return -1;
-    }
+    };
     let ret: c_int = xml_schema_validate_stream(
         ctxt,
         input,

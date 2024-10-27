@@ -4,10 +4,12 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
+    cell::RefCell,
     ffi::{c_char, c_int, c_long, c_uint, CStr},
     mem::{size_of, transmute, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
+    rc::Rc,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
@@ -40,8 +42,8 @@ use crate::{
         },
         uri::{xml_build_uri, xml_canonic_path},
         xml_io::{
-            xml_free_parser_input_buffer, xml_output_buffer_create_file, xml_parser_get_directory,
-            xml_parser_input_buffer_create_filename, XmlOutputBufferPtr, XmlParserInputBufferPtr,
+            xml_output_buffer_create_file, xml_parser_get_directory,
+            xml_parser_input_buffer_create_filename, XmlOutputBufferPtr,
         },
         xmlerror::XmlParserErrors,
         xmlstring::{
@@ -3953,24 +3955,34 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
         return null_mut();
     }
 
-    let buf: XmlParserInputBufferPtr =
-        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None);
-    if buf.is_null() {
+    let Some(buf) =
+        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None)
+    else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
-    }
+    };
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input_stream.is_null() {
-        xml_free_parser_input_buffer(buf);
+        // xml_free_parser_input_buffer(buf);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
 
     (*input_stream).filename = xml_canonic_path(filename as _) as _;
-    (*input_stream).buf = buf;
+    // (*input_stream).buf = Some(buf);
+    std::ptr::write(
+        &raw mut (*input_stream).buf,
+        Some(Rc::new(RefCell::new(buf))),
+    );
     xml_buf_reset_input(
-        (*buf).buffer.map_or(null_mut(), |ptr| ptr.as_ptr()),
+        (*input_stream)
+            .buf
+            .as_ref()
+            .unwrap()
+            .borrow()
+            .buffer
+            .map_or(null_mut(), |ptr| ptr.as_ptr()),
         input_stream,
     );
 

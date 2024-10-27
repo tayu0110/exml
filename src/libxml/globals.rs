@@ -17,14 +17,12 @@ use libc::{free, malloc, memset, realloc};
 #[cfg(feature = "legacy")]
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
-    encoding::{XmlCharEncoding, XmlCharEncodingHandler},
+    encoding::XmlCharEncodingHandler,
     error::{parser_error, parser_warning, XmlError},
     globals::reset_last_error,
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
-        xml_io::{
-            XmlOutputBufferPtr, XmlParserInputBufferPtr, __xml_output_buffer_create_filename,
-        },
+        xml_io::{XmlOutputBufferPtr, __xml_output_buffer_create_filename},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
     private::threads::{__xml_global_init_mutex_destroy, xml_cleanup_mutex, xml_init_mutex},
@@ -45,7 +43,6 @@ use super::{
     },
     threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
-    xml_io::__xml_parser_input_buffer_create_filename,
     xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
     xmlversion::LIBXML_VERSION_STRING,
 };
@@ -82,8 +79,8 @@ pub unsafe extern "C" fn xml_cleanup_globals() {}
  * Returns the new xmlParserInputBufferPtr in case of success or NULL if no
  *         method was found.
  */
-pub type XmlParserInputBufferCreateFilenameFunc =
-    unsafe fn(URI: *const c_char, enc: XmlCharEncoding) -> XmlParserInputBufferPtr;
+// pub type XmlParserInputBufferCreateFilenameFunc =
+//     unsafe fn(URI: *const c_char, enc: XmlCharEncoding) -> XmlParserInputBufferPtr;
 
 /**
  * xmlOutputBufferCreateFilenameFunc:
@@ -102,24 +99,24 @@ pub type XmlOutputBufferCreateFilenameFunc = unsafe fn(
     compression: c_int,
 ) -> XmlOutputBufferPtr;
 
-/**
- * xmlParserInputBufferCreateFilenameDefault:
- * @func: function poc_inter to the new ParserInputBufferCreateFilenameFunc
- *
- * Registers a callback for URI input file handling
- *
- * Returns the old value of the registration function
- */
-pub unsafe fn xml_parser_input_buffer_create_filename_default(
-    func: Option<XmlParserInputBufferCreateFilenameFunc>,
-) -> XmlParserInputBufferCreateFilenameFunc {
-    let old: XmlParserInputBufferCreateFilenameFunc =
-        _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
-            .unwrap_or(__xml_parser_input_buffer_create_filename);
+// /**
+//  * xmlParserInputBufferCreateFilenameDefault:
+//  * @func: function poc_inter to the new ParserInputBufferCreateFilenameFunc
+//  *
+//  * Registers a callback for URI input file handling
+//  *
+//  * Returns the old value of the registration function
+//  */
+// pub unsafe fn xml_parser_input_buffer_create_filename_default(
+//     func: Option<XmlParserInputBufferCreateFilenameFunc>,
+// ) -> XmlParserInputBufferCreateFilenameFunc {
+//     let old: XmlParserInputBufferCreateFilenameFunc =
+//         _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
+//             .unwrap_or(__xml_parser_input_buffer_create_filename);
 
-    _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE = func;
-    old
-}
+//     _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE = func;
+//     old
+// }
 
 /**
 * xmlOutputBufferCreateFilenameDefault:
@@ -198,8 +195,8 @@ pub struct XmlGlobalState {
     pub(crate) xml_malloc_atomic: Option<XmlMallocFunc>,
     pub(crate) xml_last_error: XmlError,
 
-    pub(crate) xml_parser_input_buffer_create_filename_value:
-        Option<XmlParserInputBufferCreateFilenameFunc>,
+    // pub(crate) xml_parser_input_buffer_create_filename_value:
+    //     Option<XmlParserInputBufferCreateFilenameFunc>,
     pub(crate) xml_output_buffer_create_filename_value: Option<XmlOutputBufferCreateFilenameFunc>,
 
     pub(crate) xml_structured_error_context: AtomicPtr<c_void>,
@@ -413,18 +410,6 @@ pub(crate) static mut _XML_DEREGISTER_NODE_DEFAULT_VALUE: Option<XmlDeregisterNo
 static mut XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF: Option<XmlDeregisterNodeFunc> = None;
 
 /**
- * xmlParserInputBufferCreateFilenameValue:
- *
- * DEPRECATED: Don't use
- */
-pub(crate) static mut _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE: Option<
-    XmlParserInputBufferCreateFilenameFunc,
-> = None;
-pub(crate) static mut XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF: Option<
-    XmlParserInputBufferCreateFilenameFunc,
-> = None;
-
-/**
  * xmlOutputBufferCreateFilenameValue:
  *
  * DEPRECATED: Don't use
@@ -503,8 +488,8 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).xml_register_node_default_value = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_deregister_node_default_value = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
-    (*gs).xml_parser_input_buffer_create_filename_value =
-        XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
+    // (*gs).xml_parser_input_buffer_create_filename_value =
+    //     XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
     (*gs).xml_output_buffer_create_filename_value = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
     memset(
         addr_of_mut!((*gs).xml_last_error) as _,
@@ -594,18 +579,18 @@ pub unsafe fn xml_thr_def_output_buffer_create_filename_default(
     old
 }
 
-pub unsafe fn xml_thr_def_parser_input_buffer_create_filename_default(
-    func: Option<XmlParserInputBufferCreateFilenameFunc>,
-) -> XmlParserInputBufferCreateFilenameFunc {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    let old = XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF
-        .unwrap_or(__xml_parser_input_buffer_create_filename);
+// pub unsafe fn xml_thr_def_parser_input_buffer_create_filename_default(
+//     func: Option<XmlParserInputBufferCreateFilenameFunc>,
+// ) -> XmlParserInputBufferCreateFilenameFunc {
+//     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
+//     let old = XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF
+//         .unwrap_or(__xml_parser_input_buffer_create_filename);
 
-    XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = func;
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+//     XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = func;
+//     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
-    old
-}
+//     old
+// }
 
 /*
  * Helpful Macro
@@ -1058,34 +1043,34 @@ pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
     _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
 }
 
-pub(crate) unsafe fn __xml_parser_input_buffer_create_filename_value(
-) -> Option<XmlParserInputBufferCreateFilenameFunc> {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
-    } else {
-        (*xml_get_global_state()).xml_parser_input_buffer_create_filename_value
-    }
-}
+// pub(crate) unsafe fn __xml_parser_input_buffer_create_filename_value(
+// ) -> Option<XmlParserInputBufferCreateFilenameFunc> {
+//     if IS_MAIN_THREAD!() != 0 {
+//         _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
+//     } else {
+//         (*xml_get_global_state()).xml_parser_input_buffer_create_filename_value
+//     }
+// }
 
-#[cfg(feature = "thread")]
-pub unsafe fn xml_parser_input_buffer_create_filename_value(
-    uri: *const c_char,
-    enc: XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
-    if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
-        f(uri, enc)
-    } else {
-        null_mut()
-    }
-}
-#[deprecated]
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_value(
-    uri: *const c_char,
-    enc: XmlCharEncoding,
-) -> XmlParserInputBufferPtr {
-    _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE.unwrap()(uri, enc)
-}
+// #[cfg(feature = "thread")]
+// pub unsafe fn xml_parser_input_buffer_create_filename_value(
+//     uri: *const c_char,
+//     enc: XmlCharEncoding,
+// ) -> XmlParserInputBufferPtr {
+//     if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
+//         f(uri, enc)
+//     } else {
+//         null_mut()
+//     }
+// }
+// #[deprecated]
+// #[cfg(not(feature = "thread"))]
+// pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_value(
+//     uri: *const c_char,
+//     enc: XmlCharEncoding,
+// ) -> XmlParserInputBufferPtr {
+//     _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE.unwrap()(uri, enc)
+// }
 
 #[deprecated]
 pub unsafe fn __xml_output_buffer_create_filename_value(
