@@ -5792,15 +5792,15 @@ unsafe fn automata_test(
 }
 
 const TEST_DESCRIPTIONS: &[TestDesc] = &[
-    #[cfg(feature = "html")]
+    #[cfg(all(feature = "libxml_reader", feature = "valid"))]
     TestDesc {
         desc: "for debug",
-        func: err_parse_test,
-        input: Some("./test/HTML/doc3.htm"),
-        out: Some("./result/HTML/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XML_PARSE_HTML,
+        func: stream_parse_test,
+        input: Some("./test/errors/754946.xml"),
+        out: Some("./result/errors/"),
+        suffix: None,
+        err: Some(".str"),
+        options: 0,
     },
     TestDesc {
         desc: "XML regression tests",

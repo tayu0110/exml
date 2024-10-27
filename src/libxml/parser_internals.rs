@@ -809,9 +809,7 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
         return null_mut();
     }
 
-    let Some(buf) =
-        xml_parser_input_buffer_create_mem(buffer, size, crate::encoding::XmlCharEncoding::None)
-    else {
+    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     };
@@ -945,7 +943,7 @@ unsafe fn xml_detect_ebcdic(input: XmlParserInputPtr) -> Option<XmlCharEncodingH
      * To detect the EBCDIC code page, we convert the first 200 bytes
      * to EBCDIC-US and try to find the encoding declaration.
      */
-    let mut handler = get_encoding_handler(crate::encoding::XmlCharEncoding::EBCDIC)?;
+    let mut handler = get_encoding_handler(XmlCharEncoding::EBCDIC)?;
     let inlen = (*input).end.offset_from((*input).cur) as usize;
     // let res: c_int = xml_enc_input_chunk(
     //     handler,
@@ -1047,9 +1045,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
         && (*(*ctxt).input).cur == (*(*ctxt).input).base
         && matches!(
             enc,
-            XmlCharEncoding::UTF8
-                | crate::encoding::XmlCharEncoding::UTF16LE
-                | crate::encoding::XmlCharEncoding::UTF16BE
+            XmlCharEncoding::UTF8 | XmlCharEncoding::UTF16LE | XmlCharEncoding::UTF16BE
         )
     {
         /*
@@ -1066,7 +1062,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
     }
 
     let Some(handler) = (match enc {
-        crate::encoding::XmlCharEncoding::Error => {
+        XmlCharEncoding::Error => {
             __xml_err_encoding(
                 ctxt,
                 XmlParserErrors::XmlErrUnknownEncoding,
@@ -1076,7 +1072,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
             );
             return -1;
         }
-        crate::encoding::XmlCharEncoding::None => {
+        XmlCharEncoding::None => {
             /* let's assume it's UTF-8 without the XML decl */
             (*ctxt).charset = XmlCharEncoding::UTF8;
             return 0;
@@ -1086,19 +1082,19 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
             (*ctxt).charset = XmlCharEncoding::UTF8;
             return 0;
         }
-        crate::encoding::XmlCharEncoding::EBCDIC => xml_detect_ebcdic((*ctxt).input),
+        XmlCharEncoding::EBCDIC => xml_detect_ebcdic((*ctxt).input),
         _ => get_encoding_handler(enc),
     }) else {
         /*
          * Default handlers.
          */
         match enc {
-            crate::encoding::XmlCharEncoding::ASCII => {
+            XmlCharEncoding::ASCII => {
                 /* default encoding, no conversion should be needed */
                 (*ctxt).charset = XmlCharEncoding::UTF8;
                 return 0;
             }
-            crate::encoding::XmlCharEncoding::ISO8859_1 => {
+            XmlCharEncoding::ISO8859_1 => {
                 if (*ctxt).input_nr == 1
                     && (*ctxt).encoding.is_null()
                     && !(*ctxt).input.is_null()
@@ -1761,9 +1757,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     if ctxt.is_null() {
         return null_mut();
     }
-    let Some(buf) =
-        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None)
-    else {
+    let Some(buf) = xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None) else {
         if filename.is_null() {
             __xml_loader_err(
                 ctxt as _,
@@ -5556,7 +5550,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     start[2] = NXT!(ctxt, 2);
                     start[3] = NXT!(ctxt, 3);
                     let enc = detect_encoding(&start);
-                    if !matches!(enc, crate::encoding::XmlCharEncoding::None) {
+                    if !matches!(enc, XmlCharEncoding::None) {
                         xml_switch_encoding(ctxt, enc);
                     }
                 }
@@ -6630,7 +6624,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
         let enc = detect_encoding(&start);
-        if !matches!(enc, crate::encoding::XmlCharEncoding::None) {
+        if !matches!(enc, XmlCharEncoding::None) {
             xml_switch_encoding(ctxt, enc);
         }
     }
@@ -7730,7 +7724,7 @@ pub unsafe extern "C" fn xml_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_in
                 null(),
             );
         }
-        (*ctxt).charset = crate::encoding::XmlCharEncoding::ISO8859_1;
+        (*ctxt).charset = XmlCharEncoding::ISO8859_1;
         *len = 1;
         return *(*(*ctxt).input).cur as i32;
     }
@@ -8000,7 +7994,7 @@ pub(crate) unsafe extern "C" fn xml_next_char(ctxt: XmlParserCtxtPtr) {
             null(),
         );
     }
-    (*ctxt).charset = crate::encoding::XmlCharEncoding::ISO8859_1;
+    (*ctxt).charset = XmlCharEncoding::ISO8859_1;
     (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
 }
 

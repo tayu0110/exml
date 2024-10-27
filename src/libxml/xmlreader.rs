@@ -8,7 +8,7 @@ use std::{
     ffi::{c_char, c_int, c_long, c_uint, c_ulong},
     mem::{size_of, size_of_val},
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
+    ptr::{addr_of_mut, null, null_mut},
     sync::atomic::Ordering,
 };
 
@@ -188,9 +188,10 @@ const XML_TEXTREADER_CTXT: i32 = 2;
 
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum XmlTextReaderState {
     None = -1,
+    #[default]
     Start = 0,
     Element = 1,
     End = 2,
@@ -202,8 +203,9 @@ enum XmlTextReaderState {
 
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum XmlTextReaderValidate {
+    #[default]
     NotValidate = 0,
     ValidateDtd = 1,
     ValidateRng = 2,
@@ -300,6 +302,79 @@ pub struct XmlTextReader {
     parser_flags: c_int, /* the set of options set */
     /* Structured error handling */
     serror_func: Option<StructuredError>, /* callback function */
+}
+
+impl Default for XmlTextReader {
+    fn default() -> Self {
+        Self {
+            mode: 0,
+            doc: null_mut(),
+            validate: XmlTextReaderValidate::default(),
+            allocs: 0,
+            state: XmlTextReaderState::default(),
+            ctxt: null_mut(),
+            sax: null_mut(),
+            input: None,
+            start_element: None,
+            end_element: None,
+            start_element_ns: None,
+            end_element_ns: None,
+            characters: None,
+            cdata_block: None,
+            base: 0,
+            cur: 0,
+            node: null_mut(),
+            curnode: null_mut(),
+            depth: 0,
+            faketext: null_mut(),
+            preserve: 0,
+            buffer: null_mut(),
+            dict: null_mut(),
+            ent: null_mut(),
+            ent_nr: 0,
+            ent_max: 0,
+            ent_tab: null_mut(),
+            error_func: None,
+            error_func_arg: None,
+            #[cfg(feature = "schema")]
+            rng_schemas: null_mut(),
+            #[cfg(feature = "schema")]
+            rng_valid_ctxt: null_mut(),
+            #[cfg(feature = "schema")]
+            rng_preserve_ctxt: 0,
+            #[cfg(feature = "schema")]
+            rng_valid_errors: 0,
+            #[cfg(feature = "schema")]
+            rng_full_node: null_mut(),
+            #[cfg(feature = "schema")]
+            xsd_schemas: null_mut(),
+            #[cfg(feature = "schema")]
+            xsd_valid_ctxt: null_mut(),
+            #[cfg(feature = "schema")]
+            xsd_preserve_ctxt: 0,
+            #[cfg(feature = "schema")]
+            xsd_valid_errors: 0,
+            #[cfg(feature = "schema")]
+            xsd_plug: null_mut(),
+            #[cfg(feature = "xinclude")]
+            xinclude: 0,
+            #[cfg(feature = "xinclude")]
+            xinclude_name: null(),
+            #[cfg(feature = "xinclude")]
+            xincctxt: null_mut(),
+            #[cfg(feature = "xinclude")]
+            in_xinclude: 0,
+            #[cfg(feature = "libxml_pattern")]
+            pattern_nr: 0,
+            #[cfg(feature = "libxml_pattern")]
+            pattern_max: 0,
+            #[cfg(feature = "libxml_pattern")]
+            pattern_tab: null_mut(),
+            preserves: 0,
+            parser_flags: 0,
+            serror_func: None,
+        }
+    }
 }
 
 const NODE_IS_EMPTY: i32 = 0x1;
@@ -554,13 +629,12 @@ pub unsafe fn xml_new_text_reader(
         generic_error!("xmlNewTextReader : malloc failed\n");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlTextReader>());
+    std::ptr::write(ret, XmlTextReader::default());
     (*ret).doc = null_mut();
     (*ret).ent_tab = null_mut();
     (*ret).ent_max = 0;
     (*ret).ent_nr = 0;
-    // (*ret).input = Some(input);
-    std::ptr::write(&raw mut (*ret).input, Some(input));
+    (*ret).input = Some(input);
     (*ret).buffer = xml_buf_create_size(100);
     if (*ret).buffer.is_null() {
         xml_free(ret as _);
@@ -691,11 +765,11 @@ pub unsafe fn xml_new_text_reader(
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderPtr {
+    use crate::encoding::XmlCharEncoding;
+
     let mut directory: *mut c_char = null_mut();
 
-    let Some(input) =
-        xml_parser_input_buffer_create_filename(uri, crate::encoding::XmlCharEncoding::None)
-    else {
+    let Some(input) = xml_parser_input_buffer_create_filename(uri, XmlCharEncoding::None) else {
         return null_mut();
     };
     let ret: XmlTextReaderPtr = xml_new_text_reader(input, uri);
@@ -819,7 +893,7 @@ pub unsafe fn xml_text_reader_setup(
     use std::{cell::RefCell, ffi::CStr, rc::Rc};
 
     use crate::{
-        encoding::find_encoding_handler,
+        encoding::{find_encoding_handler, XmlCharEncoding},
         generic_error,
         libxml::xinclude::{xml_xinclude_free_context, XINCLUDE_NODE},
     };
@@ -848,6 +922,7 @@ pub unsafe fn xml_text_reader_setup(
         let _ = (*reader).input.take();
         (*reader).allocs -= XML_TEXTREADER_INPUT;
     }
+    let replaced = input.is_some();
     if input.is_some() {
         (*reader).input = input;
         (*reader).allocs |= XML_TEXTREADER_INPUT;
@@ -904,16 +979,37 @@ pub unsafe fn xml_text_reader_setup(
     (*reader).mode = XmlTextReaderMode::XmlTextreaderModeInitial as _;
     (*reader).node = null_mut();
     (*reader).curnode = null_mut();
-    if let Some(input) = (*reader).input.as_mut() {
-        if input.buffer.map_or(0, |buf| buf.len()) < 4 {
-            input.read(4);
+    if replaced {
+        if (*reader)
+            .input
+            .as_ref()
+            .unwrap()
+            .buffer
+            .map_or(0, |buf| buf.len())
+            < 4
+        {
+            (*reader).input.as_mut().unwrap().read(4);
         }
         if (*reader).ctxt.is_null() {
-            if input.buffer.map_or(0, |buf| buf.len()) >= 4 {
+            if (*reader)
+                .input
+                .as_mut()
+                .unwrap()
+                .buffer
+                .map_or(0, |buf| buf.len())
+                >= 4
+            {
                 (*reader).ctxt = xml_create_push_parser_ctxt(
                     (*reader).sax,
                     None,
-                    input.buffer.expect("Internal Error").as_ref().as_ptr() as _,
+                    (*reader)
+                        .input
+                        .as_mut()
+                        .unwrap()
+                        .buffer
+                        .expect("Internal Error")
+                        .as_ref()
+                        .as_ptr() as _,
                     4,
                     url,
                 );
@@ -926,7 +1022,7 @@ pub unsafe fn xml_text_reader_setup(
                 (*reader).cur = 0;
             }
         } else {
-            let enc = crate::encoding::XmlCharEncoding::None;
+            let enc = XmlCharEncoding::None;
 
             xml_ctxt_reset((*reader).ctxt);
             let buf = xml_alloc_parser_input_buffer(enc);
@@ -5992,9 +6088,9 @@ pub unsafe extern "C" fn xml_reader_for_memory(
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
-    let Some(buf) =
-        xml_parser_input_buffer_create_mem(buffer, size, crate::encoding::XmlCharEncoding::None)
-    else {
+    use crate::encoding::XmlCharEncoding;
+
+    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None) else {
         return null_mut();
     };
     let reader: XmlTextReaderPtr = xml_new_text_reader(buf, url);
@@ -6030,16 +6126,15 @@ pub unsafe extern "C" fn xml_reader_for_io(
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
+    use crate::encoding::XmlCharEncoding;
+
     if ioread.is_none() {
         return null_mut();
     }
 
-    let Some(input) = xml_parser_input_buffer_create_io(
-        ioread,
-        ioclose,
-        ioctx,
-        crate::encoding::XmlCharEncoding::None,
-    ) else {
+    let Some(input) =
+        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None)
+    else {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
         }
@@ -6155,6 +6250,8 @@ pub unsafe extern "C" fn xml_reader_new_file(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
+    use crate::encoding::XmlCharEncoding;
+
     if filename.is_null() {
         return -1;
     }
@@ -6162,8 +6259,7 @@ pub unsafe extern "C" fn xml_reader_new_file(
         return -1;
     }
 
-    let Some(input) =
-        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None)
+    let Some(input) = xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None)
     else {
         return -1;
     };
@@ -6194,6 +6290,8 @@ pub unsafe extern "C" fn xml_reader_new_memory(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
+    use crate::encoding::XmlCharEncoding;
+
     if reader.is_null() {
         return -1;
     }
@@ -6201,8 +6299,7 @@ pub unsafe extern "C" fn xml_reader_new_memory(
         return -1;
     }
 
-    let Some(input) =
-        xml_parser_input_buffer_create_mem(buffer, size, crate::encoding::XmlCharEncoding::None)
+    let Some(input) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None)
     else {
         return -1;
     };
@@ -6236,6 +6333,8 @@ pub unsafe extern "C" fn xml_reader_new_io(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
+    use crate::encoding::XmlCharEncoding;
+
     if ioread.is_none() {
         return -1;
     }
@@ -6243,12 +6342,9 @@ pub unsafe extern "C" fn xml_reader_new_io(
         return -1;
     }
 
-    let Some(input) = xml_parser_input_buffer_create_io(
-        ioread,
-        ioclose,
-        ioctx,
-        crate::encoding::XmlCharEncoding::None,
-    ) else {
+    let Some(input) =
+        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None)
+    else {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
         }

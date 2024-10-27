@@ -5935,7 +5935,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
         return 0;
     }
 
-    if (*ctxt).charset != crate::encoding::XmlCharEncoding::UTF8 {
+    if (*ctxt).charset != XmlCharEncoding::UTF8 {
         /*
          * Assume it's a fixed length encoding (1) with
          * a compatible encoding for the ASCII set, since
@@ -5960,7 +5960,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
          */
         let guess: *mut XmlChar = html_find_encoding(ctxt);
         if guess.is_null() {
-            xml_switch_encoding(ctxt, crate::encoding::XmlCharEncoding::ISO8859_1);
+            xml_switch_encoding(ctxt, XmlCharEncoding::ISO8859_1);
         } else {
             if !(*(*ctxt).input).encoding.is_null() {
                 xml_free((*(*ctxt).input).encoding as _);
@@ -5986,7 +5986,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
                 );
             }
         }
-        (*ctxt).charset = crate::encoding::XmlCharEncoding::UTF8;
+        (*ctxt).charset = XmlCharEncoding::UTF8;
     }
 
     /*
@@ -6129,7 +6129,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
             .encoder
             .is_none()
     {
-        xml_switch_encoding(ctxt, crate::encoding::XmlCharEncoding::ISO8859_1);
+        xml_switch_encoding(ctxt, XmlCharEncoding::ISO8859_1);
     }
     *len = 1;
     *(*(*ctxt).input).cur as _
@@ -7132,23 +7132,23 @@ unsafe extern "C" fn html_check_encoding_direct(
         }
         (*(*ctxt).input).encoding = xml_strdup(encoding);
 
-        let enc = CStr::from_ptr(encoding as *const i8).to_str().map_or(
-            crate::encoding::XmlCharEncoding::Error,
-            |s| {
-                s.parse::<crate::encoding::XmlCharEncoding>()
-                    .unwrap_or(crate::encoding::XmlCharEncoding::Error)
-            },
-        );
+        let enc =
+            CStr::from_ptr(encoding as *const i8)
+                .to_str()
+                .map_or(XmlCharEncoding::Error, |s| {
+                    s.parse::<XmlCharEncoding>()
+                        .unwrap_or(XmlCharEncoding::Error)
+                });
         /*
          * registered set of known encodings
          */
-        if !matches!(enc, crate::encoding::XmlCharEncoding::Error) {
+        if !matches!(enc, XmlCharEncoding::Error) {
             if matches!(
                 enc,
-                crate::encoding::XmlCharEncoding::UTF16LE
-                    | crate::encoding::XmlCharEncoding::UTF16BE
-                    | crate::encoding::XmlCharEncoding::UCS4LE
-                    | crate::encoding::XmlCharEncoding::UCS4BE
+                XmlCharEncoding::UTF16LE
+                    | XmlCharEncoding::UTF16BE
+                    | XmlCharEncoding::UCS4LE
+                    | XmlCharEncoding::UCS4BE
             ) && (*(*ctxt).input).buf.is_some()
                 && (*(*ctxt).input)
                     .buf
@@ -7168,7 +7168,7 @@ unsafe extern "C" fn html_check_encoding_direct(
             } else {
                 xml_switch_encoding(ctxt, enc);
             }
-            (*ctxt).charset = crate::encoding::XmlCharEncoding::UTF8;
+            (*ctxt).charset = XmlCharEncoding::UTF8;
         } else {
             /*
              * fallback for unknown encodings
@@ -7177,7 +7177,7 @@ unsafe extern "C" fn html_check_encoding_direct(
                 find_encoding_handler(CStr::from_ptr(encoding as *const i8).to_str().unwrap())
             {
                 xml_switch_to_encoding(ctxt, handler);
-                (*ctxt).charset = crate::encoding::XmlCharEncoding::UTF8;
+                (*ctxt).charset = XmlCharEncoding::UTF8;
             } else {
                 html_parse_err(
                     ctxt,
@@ -9622,9 +9622,7 @@ pub unsafe extern "C" fn html_create_memory_parser_ctxt(
         return null_mut();
     }
 
-    let Some(buf) =
-        xml_parser_input_buffer_create_mem(buffer, size, crate::encoding::XmlCharEncoding::None)
-    else {
+    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     };
@@ -10084,7 +10082,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
         let enc = detect_encoding(&start);
-        if !matches!(enc, crate::encoding::XmlCharEncoding::None) {
+        if !matches!(enc, XmlCharEncoding::None) {
             xml_switch_encoding(ctxt, enc);
         }
     }
@@ -10224,13 +10222,13 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
 
         let enc = CStr::from_ptr(encoding)
             .to_str()
-            .map_or(crate::encoding::XmlCharEncoding::Error, |s| {
-                s.parse().unwrap_or(crate::encoding::XmlCharEncoding::Error)
+            .map_or(XmlCharEncoding::Error, |s| {
+                s.parse().unwrap_or(XmlCharEncoding::Error)
             });
         /*
          * registered set of known encodings
          */
-        if !matches!(enc, crate::encoding::XmlCharEncoding::Error) {
+        if !matches!(enc, XmlCharEncoding::Error) {
             xml_switch_encoding(ctxt, enc);
             if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
                 html_parse_err(
@@ -10846,8 +10844,8 @@ pub unsafe fn html_create_push_parser_ctxt(
         // xml_free_parser_input_buffer(buf);
         return null_mut();
     }
-    if matches!(enc, crate::encoding::XmlCharEncoding::UTF8) || buf.encoder.is_some() {
-        (*ctxt).charset = crate::encoding::XmlCharEncoding::UTF8;
+    if matches!(enc, XmlCharEncoding::UTF8) || buf.encoder.is_some() {
+        (*ctxt).charset = XmlCharEncoding::UTF8;
     }
     if filename.is_null() {
         (*ctxt).directory = null_mut();
@@ -12040,7 +12038,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).in_subset = 0;
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
-    (*ctxt).charset = crate::encoding::XmlCharEncoding::None;
+    (*ctxt).charset = XmlCharEncoding::None;
     (*ctxt).catalogs = null_mut();
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
 
@@ -12287,12 +12285,9 @@ pub unsafe extern "C" fn html_read_io(
     }
     xml_init_parser();
 
-    let Some(input) = xml_parser_input_buffer_create_io(
-        ioread,
-        ioclose,
-        ioctx,
-        crate::encoding::XmlCharEncoding::None,
-    ) else {
+    let Some(input) =
+        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None)
+    else {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
         }
@@ -12303,11 +12298,8 @@ pub unsafe extern "C" fn html_read_io(
         // xml_free_parser_input_buffer(input);
         return null_mut();
     }
-    let stream: XmlParserInputPtr = xml_new_io_input_stream(
-        ctxt,
-        Rc::new(RefCell::new(input)),
-        crate::encoding::XmlCharEncoding::None,
-    );
+    let stream: XmlParserInputPtr =
+        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
         // xml_free_parser_input_buffer(input);
         xml_free_parser_ctxt(ctxt);
@@ -12411,17 +12403,13 @@ pub unsafe extern "C" fn html_ctxt_read_memory(
 
     html_ctxt_reset(ctxt);
 
-    let Some(input) =
-        xml_parser_input_buffer_create_mem(buffer, size, crate::encoding::XmlCharEncoding::None)
+    let Some(input) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None)
     else {
         return null_mut();
     };
 
-    let stream: XmlParserInputPtr = xml_new_io_input_stream(
-        ctxt,
-        Rc::new(RefCell::new(input)),
-        crate::encoding::XmlCharEncoding::None,
-    );
+    let stream: XmlParserInputPtr =
+        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
         // xml_free_parser_input_buffer(input);
         return null_mut();
@@ -12465,22 +12453,16 @@ pub unsafe extern "C" fn html_ctxt_read_io(
 
     html_ctxt_reset(ctxt);
 
-    let Some(input) = xml_parser_input_buffer_create_io(
-        ioread,
-        ioclose,
-        ioctx,
-        crate::encoding::XmlCharEncoding::None,
-    ) else {
+    let Some(input) =
+        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None)
+    else {
         if let Some(ioclose) = ioclose {
             ioclose(ioctx);
         }
         return null_mut();
     };
-    let stream: XmlParserInputPtr = xml_new_io_input_stream(
-        ctxt,
-        Rc::new(RefCell::new(input)),
-        crate::encoding::XmlCharEncoding::None,
-    );
+    let stream: XmlParserInputPtr =
+        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
         // xml_free_parser_input_buffer(input);
         return null_mut();
