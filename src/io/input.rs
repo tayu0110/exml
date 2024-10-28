@@ -10,12 +10,16 @@ use std::{
 
 use crate::{
     buf::XmlBufRef,
-    encoding::{xml_encoding_err, EncodingError, XmlCharEncodingHandler},
+    encoding::{
+        get_encoding_handler, xml_encoding_err, EncodingError, XmlCharEncoding,
+        XmlCharEncodingHandler,
+    },
+    globals::GLOBAL_STATE,
     io::{
         xml_io_ftp_close, xml_io_ftp_match, xml_io_ftp_open, xml_io_ftp_read, xml_io_http_close,
         xml_io_http_match, xml_io_http_open, xml_io_http_read,
     },
-    libxml::xmlerror::XmlParserErrors,
+    libxml::{tree::XmlBufferAllocationScheme, xmlerror::XmlParserErrors},
 };
 
 use super::{
@@ -78,6 +82,37 @@ pub struct XmlParserInputBuffer {
 }
 
 impl XmlParserInputBuffer {
+    #[doc(alias = "xmlAllocParserInputBuffer")]
+    pub fn new(enc: XmlCharEncoding) -> Self {
+        let mut ret = XmlParserInputBuffer {
+            context: null_mut(),
+            readcallback: None,
+            closecallback: None,
+            encoder: None,
+            buffer: None,
+            raw: None,
+            compressed: 0,
+            error: XmlParserErrors::default(),
+            rawconsumed: 0,
+        };
+        let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
+        let mut new_buf = XmlBufRef::with_capacity(2 * default_buffer_size).unwrap();
+        ret.buffer = Some(new_buf);
+        new_buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+        ret.encoder = get_encoding_handler(enc);
+        ret.raw = if ret.encoder.is_some() {
+            XmlBufRef::with_capacity(2 * default_buffer_size)
+        } else {
+            None
+        };
+        ret.readcallback = None;
+        ret.closecallback = None;
+        ret.context = null_mut();
+        ret.compressed = -1;
+        ret.rawconsumed = 0;
+        ret
+    }
+
     /// Generic front-end for the encoding handler on parser input.  
     /// If you try to flush all the raw buffer, set `flush` to `true`.
     ///

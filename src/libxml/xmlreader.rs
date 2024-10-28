@@ -892,7 +892,6 @@ pub unsafe fn xml_text_reader_setup(
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         generic_error,
-        io::xml_alloc_parser_input_buffer,
         libxml::xinclude::{xml_xinclude_free_context, XINCLUDE_NODE},
     };
 
@@ -1023,7 +1022,7 @@ pub unsafe fn xml_text_reader_setup(
             let enc = XmlCharEncoding::None;
 
             xml_ctxt_reset((*reader).ctxt);
-            let buf = xml_alloc_parser_input_buffer(enc);
+            let buf = XmlParserInputBuffer::new(enc);
             // if buf.is_null() {
             //     return -1;
             // }

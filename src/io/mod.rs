@@ -32,9 +32,7 @@ use libc::{
 use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
-    encoding::{
-        find_encoding_handler, get_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler,
-    },
+    encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{XmlErrorDomain, XmlErrorLevel},
     globals::{GenericError, StructuredError, GLOBAL_STATE},
     libxml::{
@@ -90,45 +88,6 @@ pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
         null(),
         extra as _,
     );
-}
-
-/**
- * xmlAllocParserInputBuffer:
- * @enc:  the charset encoding if known
- *
- * Create a buffered parser input for progressive parsing
- *
- * Returns the new parser input or NULL
- */
-pub fn xml_alloc_parser_input_buffer(enc: XmlCharEncoding) -> XmlParserInputBuffer {
-    let mut ret = XmlParserInputBuffer {
-        context: null_mut(),
-        readcallback: None,
-        closecallback: None,
-        encoder: None,
-        buffer: None,
-        raw: None,
-        compressed: 0,
-        error: XmlParserErrors::default(),
-        rawconsumed: 0,
-    };
-    let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
-    let mut new_buf = XmlBufRef::with_capacity(2 * default_buffer_size).unwrap();
-    ret.buffer = Some(new_buf);
-    new_buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    ret.encoder = get_encoding_handler(enc);
-    ret.raw = if ret.encoder.is_some() {
-        XmlBufRef::with_capacity(2 * default_buffer_size)
-    } else {
-        None
-    };
-    ret.readcallback = None;
-    ret.closecallback = None;
-    ret.context = null_mut();
-    ret.compressed = -1;
-    ret.rawconsumed = 0;
-
-    ret
 }
 
 /**
@@ -402,7 +361,7 @@ pub unsafe fn xml_parser_input_buffer_create_file(
         return None;
     }
 
-    let mut ret = xml_alloc_parser_input_buffer(enc);
+    let mut ret = XmlParserInputBuffer::new(enc);
     ret.context = file as _;
     ret.readcallback = Some(xml_file_read);
     ret.closecallback = Some(xml_file_flush);
@@ -432,7 +391,7 @@ pub unsafe fn xml_parser_input_buffer_create_mem(
         return None;
     }
 
-    let mut ret = xml_alloc_parser_input_buffer(enc);
+    let mut ret = XmlParserInputBuffer::new(enc);
     ret.context = mem as _;
     ret.readcallback = None;
     ret.closecallback = None;
@@ -469,7 +428,7 @@ pub unsafe fn xml_parser_input_buffer_create_io(
 ) -> Option<XmlParserInputBuffer> {
     ioread?;
 
-    let mut ret = xml_alloc_parser_input_buffer(enc);
+    let mut ret = XmlParserInputBuffer::new(enc);
     ret.context = ioctx as _;
     ret.readcallback = ioread;
     ret.closecallback = ioclose;
@@ -563,7 +522,7 @@ pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
                     /*
                      * Allocate the Input buffer front-end.
                      */
-                    let mut ret = xml_alloc_parser_input_buffer(enc);
+                    let mut ret = XmlParserInputBuffer::new(enc);
                     ret.context = context;
                     ret.readcallback = callbacks[i].readcallback;
                     ret.closecallback = callbacks[i].closecallback;

@@ -10831,11 +10831,11 @@ pub unsafe fn html_create_push_parser_ctxt(
 ) -> HtmlParserCtxtPtr {
     use std::slice::from_raw_parts;
 
-    use crate::io::{xml_alloc_parser_input_buffer, xml_parser_get_directory};
+    use crate::io::{xml_parser_get_directory, XmlParserInputBuffer};
 
     xml_init_parser();
 
-    let buf = xml_alloc_parser_input_buffer(enc);
+    let buf = XmlParserInputBuffer::new(enc);
     // if buf.is_null() {
     //     return null_mut();
     // }

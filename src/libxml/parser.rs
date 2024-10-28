@@ -36,7 +36,7 @@ use crate::{
     },
     hash::XmlHashTableRef,
     io::{
-        xml_alloc_parser_input_buffer, xml_cleanup_input_callbacks, xml_cleanup_output_callbacks,
+        xml_cleanup_input_callbacks, xml_cleanup_output_callbacks,
         xml_default_external_entity_loader, xml_ioerr_memory, xml_no_net_exists,
         xml_parser_get_directory, xml_parser_input_buffer_create_io,
         xml_parser_input_buffer_create_mem, xml_register_default_input_callbacks,
@@ -5320,9 +5320,9 @@ pub unsafe fn xml_create_push_parser_ctxt(
     size: c_int,
     filename: *const c_char,
 ) -> XmlParserCtxtPtr {
-    use crate::io::{xml_alloc_parser_input_buffer, xml_parser_get_directory};
+    use crate::io::xml_parser_get_directory;
 
-    let buf = Rc::new(RefCell::new(xml_alloc_parser_input_buffer(
+    let buf = Rc::new(RefCell::new(XmlParserInputBuffer::new(
         XmlCharEncoding::None,
     )));
 
@@ -11286,7 +11286,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
         XmlCharEncoding::None
     };
 
-    let buf = xml_alloc_parser_input_buffer(enc);
+    let buf = XmlParserInputBuffer::new(enc);
     // if buf.is_null() {
     //     return 1;
     // }
