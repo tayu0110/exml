@@ -1827,24 +1827,24 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
     let mut name: *const XmlChar;
     let value: *const XmlChar;
 
-    let typ: c_int = xml_text_reader_node_type(reader);
-    let empty: c_int = xml_text_reader_is_empty_element(reader);
+    let typ: c_int = xml_text_reader_node_type(&mut *reader);
+    let empty: c_int = xml_text_reader_is_empty_element(&mut *reader);
 
     if DEBUG != 0 {
-        name = xml_text_reader_const_name(reader);
+        name = xml_text_reader_const_name(&mut *reader);
         if name.is_null() {
             name = c"--".as_ptr() as _;
         }
 
-        value = xml_text_reader_const_value(reader);
+        value = xml_text_reader_const_value(&mut *reader);
 
         print!(
             "{} {} {} {} {}",
-            xml_text_reader_depth(reader),
+            xml_text_reader_depth(&mut *reader),
             typ,
             CStr::from_ptr(name as _).to_string_lossy(),
             empty,
-            xml_text_reader_has_value(reader)
+            xml_text_reader_has_value(&mut *reader)
         );
         if value.is_null() {
             println!();
@@ -1890,8 +1890,8 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
             if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
                 ret = xml_stream_push(
                     PATSTREAM.load(Ordering::Relaxed),
-                    xml_text_reader_const_local_name(reader),
-                    xml_text_reader_const_namespace_uri(reader),
+                    xml_text_reader_const_local_name(&mut *reader),
+                    xml_text_reader_const_namespace_uri(&mut *reader),
                 );
                 if ret < 0 {
                     eprintln!("xmlStreamPush() failure");
@@ -1913,7 +1913,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                         eprintln!(
                             "  pattern {} node {}",
                             PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy(),
-                            CStr::from_ptr(xml_text_reader_const_name(reader) as _)
+                            CStr::from_ptr(xml_text_reader_const_name(&mut *reader) as _)
                                 .to_string_lossy()
                         );
                     }

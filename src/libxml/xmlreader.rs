@@ -844,7 +844,7 @@ pub unsafe extern "C" fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         xml_free((*reader).pattern_tab as _);
     }
     if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeClosed as i32 {
-        xml_text_reader_close(reader);
+        xml_text_reader_close(&mut *reader);
     }
     if !(*reader).ctxt.is_null() {
         if (*reader).dict == (*(*reader).ctxt).dict {
@@ -2442,41 +2442,32 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> c_i
  *         string must be deallocated by the caller.
  */
 #[cfg(all(feature = "libxml_reader", feature = "writer"))]
-pub unsafe extern "C" fn xml_text_reader_read_inner_xml(reader: XmlTextReaderPtr) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
+    reader: &mut XmlTextReader,
+) -> *mut XmlChar {
     use crate::{buf::XmlBufRef, private::buf::xml_buf_detach};
 
     use super::tree::xml_buf_node_dump;
 
     let mut node: XmlNodePtr;
     let mut cur_node: XmlNodePtr;
-    // let mut buff2: XmlBufPtr;
 
     if xml_text_reader_expand(reader).is_null() {
         return null_mut();
     }
-    let doc: XmlDocPtr = (*(*reader).node).doc;
-    // let buff: XmlBufferPtr = xml_buffer_create();
+    let doc: XmlDocPtr = (*reader.node).doc;
     let buff = xml_buf_create();
     if buff.is_null() {
         return null_mut();
     }
-    // xml_buffer_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    cur_node = (*(*reader).node).children;
+    cur_node = (*reader.node).children;
     while !cur_node.is_null() {
         /* XXX: Why is the node copied? */
         node = xml_doc_copy_node(cur_node, doc, 1);
         /* XXX: Why do we need a second buffer? */
-        // let buff2 = xml_buffer_create();
         let buff2 = xml_buf_create();
-        // xml_buffer_set_allocation_scheme(buff2, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
         xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-        // if xml_node_dump(buff2, doc, node, 0, 0) == -1 {
-        //     xml_free_node(node);
-        //     xml_buffer_free(buff2);
-        //     xml_buffer_free(buff);
-        //     return null_mut();
-        // }
         if xml_buf_node_dump(buff2, doc, node, 0, 0) == 0
             || !XmlBufRef::from_raw(buff2).unwrap().is_ok()
         {
@@ -2485,18 +2476,13 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(reader: XmlTextReaderPtr
             xml_buf_free(buff);
             return null_mut();
         }
-        // xml_buffer_cat(buff, (*buff2).content);
         xml_buf_cat(buff, xml_buf_content(buff2));
         xml_free_node(node);
-        // xml_buffer_free(buff2);
         xml_buf_free(buff2);
         cur_node = (*cur_node).next;
     }
-    // let resbuf: *mut XmlChar = (*buff).content;
-    // (*buff).content = null_mut();
     let resbuf = xml_buf_detach(buff);
 
-    // xml_buffer_free(buff);
     xml_buf_free(buff);
     resbuf
 }
@@ -2512,7 +2498,9 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(reader: XmlTextReaderPtr
  *         by the caller.
  */
 #[cfg(all(feature = "libxml_reader", feature = "writer"))]
-pub unsafe extern "C" fn xml_text_reader_read_outer_xml(reader: XmlTextReaderPtr) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_text_reader_read_outer_xml(
+    reader: &mut XmlTextReader,
+) -> *mut XmlChar {
     use crate::{buf::XmlBufRef, libxml::tree::xml_buf_node_dump};
 
     let mut node: XmlNodePtr;
@@ -2520,7 +2508,7 @@ pub unsafe extern "C" fn xml_text_reader_read_outer_xml(reader: XmlTextReaderPtr
     if xml_text_reader_expand(reader).is_null() {
         return null_mut();
     }
-    node = (*reader).node;
+    node = reader.node;
     let doc: XmlDocPtr = (*node).doc;
     /* XXX: Why is the node copied? */
     if (*node).typ == XmlElementType::XmlDtdNode {
@@ -2528,15 +2516,8 @@ pub unsafe extern "C" fn xml_text_reader_read_outer_xml(reader: XmlTextReaderPtr
     } else {
         node = xml_doc_copy_node(node, doc, 1);
     }
-    // let buff: XmlBufferPtr = xml_buffer_create();
     let buff = xml_buf_create();
-    // xml_buffer_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    // if xml_node_dump(buff, doc, node, 0, 0) == -1 {
-    //     xml_free_node(node);
-    //     xml_buffer_free(buff);
-    //     return null_mut();
-    // }
     if xml_buf_node_dump(buff, doc, node, 0, 0) == 0 || !XmlBufRef::from_raw(buff).unwrap().is_ok()
     {
         xml_free_node(node);
@@ -2544,12 +2525,9 @@ pub unsafe extern "C" fn xml_text_reader_read_outer_xml(reader: XmlTextReaderPtr
         return null_mut();
     }
 
-    // let resbuf: *mut XmlChar = (*buff).content;
-    // (*buff).content = null_mut();
     let resbuf = xml_buf_content(buff);
 
     xml_free_node(node);
-    // xml_buffer_free(buff);
     xml_buf_free(buff);
     resbuf
 }
@@ -2645,33 +2623,33 @@ unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *
  *          nodes to read, or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_do_expand(reader: XmlTextReaderPtr) -> c_int {
+unsafe extern "C" fn xml_text_reader_do_expand(reader: &mut XmlTextReader) -> c_int {
     let mut val: c_int;
 
-    if reader.is_null() || (*reader).node.is_null() || (*reader).ctxt.is_null() {
+    if reader.node.is_null() || reader.ctxt.is_null() {
         return -1;
     }
     while {
-        if matches!((*(*reader).ctxt).instate, XmlParserInputState::XmlParserEOF) {
+        if matches!((*reader.ctxt).instate, XmlParserInputState::XmlParserEOF) {
             return 1;
         }
 
-        if !xml_text_reader_get_successor((*reader).node).is_null() {
+        if !xml_text_reader_get_successor(reader.node).is_null() {
             return 1;
         }
-        if (*(*reader).ctxt).node_nr < (*reader).depth {
+        if (*reader.ctxt).node_nr < reader.depth {
             return 1;
         }
-        if (*reader).mode == XmlTextReaderMode::XmlTextreaderModeEof as i32 {
+        if reader.mode == XmlTextReaderMode::XmlTextreaderModeEof as i32 {
             return 1;
         }
-        val = xml_text_reader_push_data(&mut *reader);
+        val = xml_text_reader_push_data(reader);
         if val < 0 {
-            (*reader).mode = XmlTextReaderMode::XmlTextreaderModeError as i32;
+            reader.mode = XmlTextReaderMode::XmlTextreaderModeError as i32;
             return -1;
         }
 
-        (*reader).mode != XmlTextReaderMode::XmlTextreaderModeEof as i32
+        reader.mode != XmlTextReaderMode::XmlTextreaderModeEof as i32
     } {}
     1
 }
@@ -2687,15 +2665,15 @@ unsafe extern "C" fn xml_text_reader_do_expand(reader: XmlTextReaderPtr) -> c_in
  *         The string must be deallocated by the caller.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_read_string(reader: XmlTextReaderPtr) -> *mut XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_read_string(reader: &mut XmlTextReader) -> *mut XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
 
-    let node: XmlNodePtr = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node: XmlNodePtr = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     match (*node).typ {
         XmlElementType::XmlTextNode => {
@@ -2728,42 +2706,38 @@ pub unsafe extern "C" fn xml_text_reader_read_string(reader: XmlTextReaderPtr) -
  *         in case of error.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
+pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: &mut XmlTextReader) -> c_int {
+    if reader.node.is_null() {
         return -1;
     }
-    if (*reader).node.is_null() {
-        return -1;
-    }
-    if (*reader).curnode.is_null() {
+    if reader.curnode.is_null() {
         return 0;
     }
-    if (*(*reader).curnode).typ == XmlElementType::XmlAttributeNode {
-        if (*(*reader).curnode).children.is_null() {
+    if (*reader.curnode).typ == XmlElementType::XmlAttributeNode {
+        if (*reader.curnode).children.is_null() {
             return 0;
         }
-        (*reader).curnode = (*(*reader).curnode).children;
-    } else if (*(*reader).curnode).typ == XmlElementType::XmlNamespaceDecl {
-        let ns: XmlNsPtr = (*reader).curnode as XmlNsPtr;
+        reader.curnode = (*reader.curnode).children;
+    } else if (*reader.curnode).typ == XmlElementType::XmlNamespaceDecl {
+        let ns: XmlNsPtr = reader.curnode as XmlNsPtr;
 
-        if (*reader).faketext.is_null() {
-            (*reader).faketext =
-                xml_new_doc_text((*(*reader).node).doc, (*ns).href.load(Ordering::Relaxed));
+        if reader.faketext.is_null() {
+            reader.faketext =
+                xml_new_doc_text((*reader.node).doc, (*ns).href.load(Ordering::Relaxed));
         } else {
-            if !(*(*reader).faketext).content.is_null()
-                && (*(*reader).faketext).content
-                    != addr_of_mut!((*(*reader).faketext).properties) as _
+            if !(*reader.faketext).content.is_null()
+                && (*reader.faketext).content != addr_of_mut!((*reader.faketext).properties) as _
             {
-                xml_free((*(*reader).faketext).content as _);
+                xml_free((*reader.faketext).content as _);
             }
-            (*(*reader).faketext).content = xml_strdup((*ns).href.load(Ordering::Relaxed));
+            (*reader.faketext).content = xml_strdup((*ns).href.load(Ordering::Relaxed));
         }
-        (*reader).curnode = (*reader).faketext;
+        reader.curnode = reader.faketext;
     } else {
-        if (*(*reader).curnode).next.is_null() {
+        if (*reader.curnode).next.is_null() {
             return 0;
         }
-        (*reader).curnode = (*(*reader).curnode).next;
+        reader.curnode = (*reader.curnode).next;
     }
     1
 }
@@ -2780,29 +2754,26 @@ pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: XmlTextRea
  * Returns 0 i no attributes, -1 in case of error or the attribute count
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: XmlTextReaderPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> c_int {
     let mut ret: c_int;
     let mut attr: XmlAttrPtr;
     let mut ns: XmlNsPtr;
 
-    if reader.is_null() {
-        return -1;
-    }
-    if (*reader).node.is_null() {
+    if reader.node.is_null() {
         return 0;
     }
 
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
 
     if (*node).typ != XmlElementType::XmlElementNode {
         return 0;
     }
     if matches!(
-        (*reader).state,
+        reader.state,
         XmlTextReaderState::End | XmlTextReaderState::Backtrack
     ) {
         return 0;
@@ -2830,24 +2801,21 @@ pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: XmlTextReaderPt
  * Returns the depth or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_depth(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
-        return -1;
-    }
-    if (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_depth(reader: &mut XmlTextReader) -> c_int {
+    if reader.node.is_null() {
         return 0;
     }
 
-    if !(*reader).curnode.is_null() {
+    if !reader.curnode.is_null() {
         if matches!(
-            (*(*reader).curnode).typ,
+            (*reader.curnode).typ,
             XmlElementType::XmlAttributeNode | XmlElementType::XmlNamespaceDecl
         ) {
-            return (*reader).depth + 1;
+            return reader.depth + 1;
         }
-        return (*reader).depth + 2;
+        return reader.depth + 2;
     }
-    (*reader).depth
+    reader.depth
 }
 
 /**
@@ -2859,17 +2827,14 @@ pub unsafe extern "C" fn xml_text_reader_depth(reader: XmlTextReaderPtr) -> c_in
  * Returns 1 if true, 0 if false, and -1 in case or error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_has_attributes(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
-        return -1;
-    }
-    if (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_has_attributes(reader: &mut XmlTextReader) -> c_int {
+    if reader.node.is_null() {
         return 0;
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
 
     if (*node).typ == XmlElementType::XmlElementNode
@@ -2890,17 +2855,14 @@ pub unsafe extern "C" fn xml_text_reader_has_attributes(reader: XmlTextReaderPtr
  * Returns 1 if true, 0 if false, and -1 in case or error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_has_value(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
-        return -1;
-    }
-    if (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_has_value(reader: &mut XmlTextReader) -> c_int {
+    if reader.node.is_null() {
         return 0;
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
 
     match (*node).typ {
@@ -2924,10 +2886,7 @@ pub unsafe extern "C" fn xml_text_reader_has_value(reader: XmlTextReaderPtr) -> 
  * Returns 0 if not defaulted, 1 if defaulted, and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_is_default(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
-        return -1;
-    }
+pub unsafe extern "C" fn xml_text_reader_is_default(_reader: &mut XmlTextReader) -> c_int {
     0
 }
 
@@ -2940,30 +2899,30 @@ pub unsafe extern "C" fn xml_text_reader_is_default(reader: XmlTextReaderPtr) ->
  * Returns 1 if empty, 0 if not and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_is_empty_element(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() || (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_is_empty_element(reader: &mut XmlTextReader) -> c_int {
+    if reader.node.is_null() {
         return -1;
     }
-    if (*(*reader).node).typ != XmlElementType::XmlElementNode {
+    if (*reader.node).typ != XmlElementType::XmlElementNode {
         return 0;
     }
-    if !(*reader).curnode.is_null() {
+    if !reader.curnode.is_null() {
         return 0;
     }
-    if !(*(*reader).node).children.is_null() {
+    if !(*reader.node).children.is_null() {
         return 0;
     }
-    if (*reader).state == XmlTextReaderState::End {
+    if reader.state == XmlTextReaderState::End {
         return 0;
     }
-    if !(*reader).doc.is_null() {
+    if !reader.doc.is_null() {
         return 1;
     }
     #[cfg(feature = "xinclude")]
-    if (*reader).in_xinclude > 0 {
+    if reader.in_xinclude > 0 {
         return 1;
     }
-    ((*(*reader).node).extra & NODE_IS_EMPTY as u16 != 0) as i32
+    ((*reader.node).extra & NODE_IS_EMPTY as u16 != 0) as i32
 }
 
 /**
@@ -2977,22 +2936,19 @@ pub unsafe extern "C" fn xml_text_reader_is_empty_element(reader: XmlTextReaderP
  * Returns the xmlReaderTypes of the current node or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_node_type(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
-        return -1;
-    }
-    if (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_node_type(reader: &mut XmlTextReader) -> c_int {
+    if reader.node.is_null() {
         return XmlReaderTypes::XmlReaderTypeNone as i32;
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     match (*node).typ {
         XmlElementType::XmlElementNode => {
             if matches!(
-                (*reader).state,
+                reader.state,
                 XmlTextReaderState::End | XmlTextReaderState::Backtrack
             ) {
                 return XmlReaderTypes::XmlReaderTypeEndElement as i32;
@@ -3003,8 +2959,8 @@ pub unsafe extern "C" fn xml_text_reader_node_type(reader: XmlTextReaderPtr) -> 
             XmlReaderTypes::XmlReaderTypeAttribute as i32
         }
         XmlElementType::XmlTextNode => {
-            if xml_is_blank_node((*reader).node) != 0 {
-                if xml_node_get_space_preserve((*reader).node) != 0 {
+            if xml_is_blank_node(reader.node) != 0 {
+                if xml_node_get_space_preserve(reader.node) != 0 {
                     XmlReaderTypes::XmlReaderTypeSignificantWhitespace as i32
                 } else {
                     XmlReaderTypes::XmlReaderTypeWhitespace as i32
@@ -3046,10 +3002,7 @@ pub unsafe extern "C" fn xml_text_reader_node_type(reader: XmlTextReaderPtr) -> 
  * Returns " or ' and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_quote_char(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
-        return -1;
-    }
+pub unsafe extern "C" fn xml_text_reader_quote_char(_reader: &mut XmlTextReader) -> c_int {
     /* TODO maybe lookup the attribute value for " first */
     b'"' as _
 }
@@ -3063,11 +3016,8 @@ pub unsafe extern "C" fn xml_text_reader_quote_char(reader: XmlTextReaderPtr) ->
  * Returns the state value, or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_read_state(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
-        return -1;
-    }
-    (*reader).mode
+pub unsafe extern "C" fn xml_text_reader_read_state(reader: &mut XmlTextReader) -> c_int {
+    reader.mode
 }
 
 /**
@@ -3082,17 +3032,14 @@ pub unsafe extern "C" fn xml_text_reader_read_state(reader: XmlTextReaderPtr) ->
  * error.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_is_namespace_decl(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
+pub unsafe extern "C" fn xml_text_reader_is_namespace_decl(reader: &mut XmlTextReader) -> c_int {
+    if reader.node.is_null() {
         return -1;
     }
-    if (*reader).node.is_null() {
-        return -1;
-    }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
 
     if XmlElementType::XmlNamespaceDecl == (*node).typ {
@@ -3113,12 +3060,12 @@ pub unsafe extern "C" fn xml_text_reader_is_namespace_decl(reader: XmlTextReader
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_base_uri(
-    reader: XmlTextReaderPtr,
+    reader: &mut XmlTextReader,
 ) -> *const XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let tmp: *mut XmlChar = xml_node_get_base(null_mut(), (*reader).node);
+    let tmp: *mut XmlChar = xml_node_get_base(null_mut(), reader.node);
     if tmp.is_null() {
         return null_mut();
     }
@@ -3138,15 +3085,15 @@ pub unsafe extern "C" fn xml_text_reader_const_base_uri(
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_local_name(
-    reader: XmlTextReaderPtr,
+    reader: &mut XmlTextReader,
 ) -> *const XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
@@ -3175,14 +3122,14 @@ pub unsafe extern "C" fn xml_text_reader_const_local_name(
  *         deallocated with the reader.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_name(reader: XmlTextReaderPtr) -> *const XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     match (*node).typ {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
@@ -3248,15 +3195,15 @@ pub unsafe extern "C" fn xml_text_reader_const_name(reader: XmlTextReaderPtr) ->
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
-    reader: XmlTextReaderPtr,
+    reader: &mut XmlTextReader,
 ) -> *const XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         return CONSTSTR!(reader, c"http://www.w3.org/2000/xmlns/".as_ptr() as _);
@@ -3283,14 +3230,16 @@ pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
  *         with the reader.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_prefix(reader: XmlTextReaderPtr) -> *const XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_const_prefix(
+    reader: &mut XmlTextReader,
+) -> *const XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
@@ -3321,15 +3270,12 @@ pub unsafe extern "C" fn xml_text_reader_const_prefix(reader: XmlTextReaderPtr) 
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
-    reader: XmlTextReaderPtr,
+    reader: &mut XmlTextReader,
 ) -> *const XmlChar {
-    if reader.is_null() {
+    if reader.node.is_null() {
         return null_mut();
     }
-    if (*reader).node.is_null() {
-        return null_mut();
-    }
-    let tmp: *mut XmlChar = xml_node_get_lang((*reader).node);
+    let tmp: *mut XmlChar = xml_node_get_lang(reader.node);
     if tmp.is_null() {
         return null_mut();
     }
@@ -3351,12 +3297,9 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_string(
-    reader: XmlTextReaderPtr,
+    reader: &mut XmlTextReader,
     str: *const XmlChar,
 ) -> *const XmlChar {
-    if reader.is_null() {
-        return null_mut();
-    }
     CONSTSTR!(reader, str)
 }
 
@@ -3370,19 +3313,16 @@ pub unsafe extern "C" fn xml_text_reader_const_string(
  *     deallocated on the next Read() operation.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -> *const XmlChar {
+pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const XmlChar {
     use crate::generic_error;
 
-    if reader.is_null() {
+    if reader.node.is_null() {
         return null_mut();
     }
-    if (*reader).node.is_null() {
-        return null_mut();
-    }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
 
     match (*node).typ {
@@ -3399,27 +3339,27 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -
             {
                 return (*(*attr).children).content;
             } else {
-                if (*reader).buffer.is_null() {
-                    (*reader).buffer = xml_buf_create_size(100);
-                    if (*reader).buffer.is_null() {
+                if reader.buffer.is_null() {
+                    reader.buffer = xml_buf_create_size(100);
+                    if reader.buffer.is_null() {
                         generic_error!("xmlTextReaderSetup : malloc failed\n");
                         return null_mut();
                     }
                     xml_buf_set_allocation_scheme(
-                        (*reader).buffer,
+                        reader.buffer,
                         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
                     );
                 } else {
-                    xml_buf_empty((*reader).buffer);
+                    xml_buf_empty(reader.buffer);
                 }
-                xml_buf_get_node_content((*reader).buffer, node);
-                ret = xml_buf_content((*reader).buffer);
+                xml_buf_get_node_content(reader.buffer, node);
+                ret = xml_buf_content(reader.buffer);
                 if ret.is_null() {
                     /* error on the buffer best to reallocate */
-                    xml_buf_free((*reader).buffer);
-                    (*reader).buffer = xml_buf_create_size(100);
+                    xml_buf_free(reader.buffer);
+                    reader.buffer = xml_buf_create_size(100);
                     xml_buf_set_allocation_scheme(
-                        (*reader).buffer,
+                        reader.buffer,
                         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
                     );
                     ret = c"".as_ptr() as _;
@@ -3450,11 +3390,11 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: XmlTextReaderPtr) -
  *    if non NULL it need to be freed by the caller.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_base_uri(reader: XmlTextReaderPtr) -> *mut XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_base_uri(reader: &mut XmlTextReader) -> *mut XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
-    xml_node_get_base(null_mut(), (*reader).node)
+    xml_node_get_base(null_mut(), reader.node)
 }
 
 /**
@@ -3467,14 +3407,14 @@ pub unsafe extern "C" fn xml_text_reader_base_uri(reader: XmlTextReaderPtr) -> *
  *   if non NULL it need to be freed by the caller.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_local_name(reader: XmlTextReaderPtr) -> *mut XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_local_name(reader: &mut XmlTextReader) -> *mut XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
@@ -3503,16 +3443,16 @@ pub unsafe extern "C" fn xml_text_reader_local_name(reader: XmlTextReaderPtr) ->
  *   if non NULL it need to be freed by the caller.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_name(reader: XmlTextReaderPtr) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_text_reader_name(reader: &mut XmlTextReader) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
 
-    if reader.is_null() || (*reader).node.is_null() {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     match (*node).typ {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
@@ -3572,14 +3512,14 @@ pub unsafe extern "C" fn xml_text_reader_name(reader: XmlTextReaderPtr) -> *mut 
  *    if non NULL it need to be freed by the caller.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_namespace_uri(reader: XmlTextReaderPtr) -> *mut XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_namespace_uri(reader: &mut XmlTextReader) -> *mut XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         return xml_strdup(c"http://www.w3.org/2000/xmlns/".as_ptr() as _);
@@ -3606,14 +3546,14 @@ pub unsafe extern "C" fn xml_text_reader_namespace_uri(reader: XmlTextReaderPtr)
  *    if non NULL it need to be freed by the caller.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_prefix(reader: XmlTextReaderPtr) -> *mut XmlChar {
-    if reader.is_null() || (*reader).node.is_null() {
+pub unsafe extern "C" fn xml_text_reader_prefix(reader: &mut XmlTextReader) -> *mut XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
@@ -3644,14 +3584,11 @@ pub unsafe extern "C" fn xml_text_reader_prefix(reader: XmlTextReaderPtr) -> *mu
  *    if non NULL it need to be freed by the caller.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_xml_lang(reader: XmlTextReaderPtr) -> *mut XmlChar {
-    if reader.is_null() {
+pub unsafe extern "C" fn xml_text_reader_xml_lang(reader: &mut XmlTextReader) -> *mut XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
-    if (*reader).node.is_null() {
-        return null_mut();
-    }
-    xml_node_get_lang((*reader).node)
+    xml_node_get_lang(reader.node)
 }
 
 /**
@@ -3664,17 +3601,14 @@ pub unsafe extern "C" fn xml_text_reader_xml_lang(reader: XmlTextReaderPtr) -> *
  *     with xml_free as _()
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_value(reader: XmlTextReaderPtr) -> *mut XmlChar {
-    if reader.is_null() {
+pub unsafe extern "C" fn xml_text_reader_value(reader: &mut XmlTextReader) -> *mut XmlChar {
+    if reader.node.is_null() {
         return null_mut();
     }
-    if (*reader).node.is_null() {
-        return null_mut();
-    }
-    let node = if !(*reader).curnode.is_null() {
-        (*reader).curnode
+    let node = if !reader.curnode.is_null() {
+        reader.curnode
     } else {
-        (*reader).node
+        reader.node
     };
 
     match (*node).typ {
@@ -3711,7 +3645,7 @@ pub unsafe extern "C" fn xml_text_reader_value(reader: XmlTextReaderPtr) -> *mut
  * Free up all the structures used by a document, tree included.
  */
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_doc(reader: XmlTextReaderPtr, cur: XmlDocPtr) {
+unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
     let mut ext_subset: XmlDtdPtr;
 
     if cur.is_null() {
@@ -3791,45 +3725,42 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: XmlTextReaderPtr, cur: Xml
  * Returns 0 or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_close(reader: XmlTextReaderPtr) -> c_int {
-    if reader.is_null() {
-        return -1;
+pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> c_int {
+    reader.node = null_mut();
+    reader.curnode = null_mut();
+    reader.mode = XmlTextReaderMode::XmlTextreaderModeClosed as i32;
+    if !reader.faketext.is_null() {
+        xml_free_node(reader.faketext);
+        reader.faketext = null_mut();
     }
-    (*reader).node = null_mut();
-    (*reader).curnode = null_mut();
-    (*reader).mode = XmlTextReaderMode::XmlTextreaderModeClosed as i32;
-    if !(*reader).faketext.is_null() {
-        xml_free_node((*reader).faketext);
-        (*reader).faketext = null_mut();
-    }
-    if !(*reader).ctxt.is_null() {
+    if !reader.ctxt.is_null() {
         #[cfg(feature = "valid")]
-        if !(*(*reader).ctxt).vctxt.vstate_tab.is_null() && (*(*reader).ctxt).vctxt.vstate_max > 0 {
+        if !(*reader.ctxt).vctxt.vstate_tab.is_null() && (*reader.ctxt).vctxt.vstate_max > 0 {
             #[cfg(feature = "regexp")]
-            while (*(*reader).ctxt).vctxt.vstate_nr > 0 {
+            while (*reader.ctxt).vctxt.vstate_nr > 0 {
                 xml_validate_pop_element(
-                    addr_of_mut!((*(*reader).ctxt).vctxt),
+                    addr_of_mut!((*reader.ctxt).vctxt),
                     null_mut(),
                     null_mut(),
                     null_mut(),
                 );
             }
-            xml_free((*(*reader).ctxt).vctxt.vstate_tab as _);
-            (*(*reader).ctxt).vctxt.vstate_tab = null_mut();
-            (*(*reader).ctxt).vctxt.vstate_max = 0;
+            xml_free((*reader.ctxt).vctxt.vstate_tab as _);
+            (*reader.ctxt).vctxt.vstate_tab = null_mut();
+            (*reader.ctxt).vctxt.vstate_max = 0;
         }
-        xml_stop_parser((*reader).ctxt);
-        if !(*(*reader).ctxt).my_doc.is_null() {
-            if (*reader).preserve == 0 {
-                xml_text_reader_free_doc(reader, (*(*reader).ctxt).my_doc);
+        xml_stop_parser(reader.ctxt);
+        if !(*reader.ctxt).my_doc.is_null() {
+            if reader.preserve == 0 {
+                xml_text_reader_free_doc(reader, (*reader.ctxt).my_doc);
             }
-            (*(*reader).ctxt).my_doc = null_mut();
+            (*reader.ctxt).my_doc = null_mut();
         }
     }
-    if (*reader).input.is_some() && (*reader).allocs & XML_TEXTREADER_INPUT != 0 {
+    if reader.input.is_some() && reader.allocs & XML_TEXTREADER_INPUT != 0 {
         // xml_free_parser_input_buffer((*reader).input);
-        let _ = (*reader).input.take();
-        (*reader).allocs -= XML_TEXTREADER_INPUT;
+        let _ = reader.input.take();
+        reader.allocs -= XML_TEXTREADER_INPUT;
     }
     0
 }
@@ -4072,7 +4003,7 @@ pub unsafe fn xml_text_reader_get_remainder(
         xml_stop_parser((*reader).ctxt);
         if !(*(*reader).ctxt).my_doc.is_null() {
             if (*reader).preserve == 0 {
-                xml_text_reader_free_doc(reader, (*(*reader).ctxt).my_doc);
+                xml_text_reader_free_doc(&mut *reader, (*(*reader).ctxt).my_doc);
             }
             (*(*reader).ctxt).my_doc = null_mut();
         }
@@ -4860,7 +4791,7 @@ pub unsafe extern "C" fn xml_text_reader_expand(reader: XmlTextReaderPtr) -> Xml
     if (*reader).ctxt.is_null() {
         return null_mut();
     }
-    if xml_text_reader_do_expand(reader) < 0 {
+    if xml_text_reader_do_expand(&mut *reader) < 0 {
         return null_mut();
     }
     (*reader).node
@@ -6670,38 +6601,6 @@ mod tests {
 
     use super::*;
 
-    // #[test]
-    // fn test_xml_new_text_reader() {
-    //     #[cfg(feature = "libxml_reader")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_input in 0..GEN_NB_XML_PARSER_INPUT_BUFFER_PTR {
-    //             for n_uri in 0..GEN_NB_FILEPATH {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let input = gen_xml_parser_input_buffer_ptr(n_input, 0);
-    //                 let uri = gen_filepath(n_uri, 1);
-
-    //                 let ret_val = xml_new_text_reader(input, uri);
-    //                 desret_xml_text_reader_ptr(ret_val);
-    //                 des_xml_parser_input_buffer_ptr(n_input, input, 0);
-    //                 des_filepath(n_uri, uri, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlNewTextReader",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlNewTextReader()");
-    //                     eprint!(" {}", n_input);
-    //                     eprintln!(" {}", n_uri);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     #[test]
     fn test_xml_new_text_reader_filename() {
         #[cfg(feature = "libxml_reader")]
@@ -7085,66 +6984,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_text_reader_attribute_count() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_attribute_count(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderAttributeCount",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderAttributeCount()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_base_uri() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_base_uri(reader);
-                desret_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderBaseUri",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderBaseUri()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_text_reader_byte_consumed() {
         #[cfg(feature = "libxml_reader")]
         unsafe {
@@ -7175,66 +7014,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_text_reader_close() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_close(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderClose",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderClose()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_base_uri() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_base_uri(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstBaseUri",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstBaseUri()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_text_reader_const_encoding() {
         #[cfg(feature = "libxml_reader")]
         unsafe {
@@ -7257,221 +7036,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlTextReaderConstEncoding()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_local_name() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_local_name(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstLocalName",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstLocalName()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_name() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_name(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstName",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstName()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_namespace_uri() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_namespace_uri(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstNamespaceUri",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstNamespaceUri()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_prefix() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_prefix(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstPrefix",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstPrefix()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_string() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let reader = gen_xml_text_reader_ptr(n_reader, 0);
-                    let str = gen_const_xml_char_ptr(n_str, 1);
-
-                    let ret_val = xml_text_reader_const_string(reader, str);
-                    desret_const_xml_char_ptr(ret_val);
-                    des_xml_text_reader_ptr(n_reader, reader, 0);
-                    des_const_xml_char_ptr(n_str, str, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlTextReaderConstString",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlTextReaderConstString()"
-                        );
-                        eprint!(" {}", n_reader);
-                        eprintln!(" {}", n_str);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_value() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_value(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstValue",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstValue()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_xml_lang() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_xml_lang(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstXmlLang",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstXmlLang()"
                     );
                     eprintln!(" {}", n_reader);
                 }
@@ -7562,36 +7126,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlTextReaderCurrentNode()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_depth() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_depth(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderDepth",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderDepth()"
                     );
                     eprintln!(" {}", n_reader);
                 }
@@ -7740,45 +7274,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_text_reader_get_error_handler() {
-    //     #[cfg(feature = "libxml_reader")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-    //             for n_f in 0..GEN_NB_XML_TEXT_READER_ERROR_FUNC_PTR {
-    //                 for n_arg in 0..GEN_NB_VOID_PTR_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let reader = gen_xml_text_reader_ptr(n_reader, 0);
-    //                     let f = gen_xml_text_reader_error_func_ptr(n_f, 1);
-    //                     let arg = gen_void_ptr_ptr(n_arg, 2);
-
-    //                     xml_text_reader_get_error_handler(reader, f, arg);
-    //                     des_xml_text_reader_ptr(n_reader, reader, 0);
-    //                     des_xml_text_reader_error_func_ptr(n_f, f, 1);
-    //                     des_void_ptr_ptr(n_arg, arg, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlTextReaderGetErrorHandler",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         assert!(
-    //                             leaks == 0,
-    //                             "{leaks} Leaks are found in xmlTextReaderGetErrorHandler()"
-    //                         );
-    //                         eprint!(" {}", n_reader);
-    //                         eprint!(" {}", n_f);
-    //                         eprintln!(" {}", n_arg);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     #[test]
     fn test_xml_text_reader_get_parser_column_number() {
         #[cfg(feature = "libxml_reader")]
@@ -7874,186 +7369,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_text_reader_get_remainder() {
-    //     #[cfg(feature = "libxml_reader")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-    //             let ret_val = xml_text_reader_get_remainder(reader);
-    //             desret_xml_parser_input_buffer_ptr(ret_val);
-    //             des_xml_text_reader_ptr(n_reader, reader, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlTextReaderGetRemainder",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(
-    //                     leaks == 0,
-    //                     "{leaks} Leaks are found in xmlTextReaderGetRemainder()"
-    //                 );
-    //                 eprintln!(" {}", n_reader);
-    //             }
-    //         }
-    //     }
-    // }
-
-    #[test]
-    fn test_xml_text_reader_has_attributes() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_has_attributes(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderHasAttributes",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderHasAttributes()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_has_value() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_has_value(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderHasValue",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderHasValue()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_is_default() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_is_default(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderIsDefault",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderIsDefault()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_is_empty_element() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_is_empty_element(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderIsEmptyElement",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderIsEmptyElement()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_is_namespace_decl() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_is_namespace_decl(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderIsNamespaceDecl",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderIsNamespaceDecl()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
     #[test]
     fn test_xml_text_reader_is_valid() {
         #[cfg(feature = "libxml_reader")]
@@ -8077,36 +7392,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlTextReaderIsValid()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_local_name() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_local_name(reader);
-                desret_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderLocalName",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderLocalName()"
                     );
                     eprintln!(" {}", n_reader);
                 }
@@ -8411,63 +7696,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_text_reader_name() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_name(reader);
-                desret_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderName",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlTextReaderName()");
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_namespace_uri() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_namespace_uri(reader);
-                desret_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderNamespaceUri",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderNamespaceUri()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_text_reader_next() {
         #[cfg(feature = "libxml_reader")]
         unsafe {
@@ -8525,36 +7753,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_text_reader_node_type() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_node_type(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderNodeType",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderNodeType()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_text_reader_normalization() {
         #[cfg(feature = "libxml_reader")]
         unsafe {
@@ -8577,36 +7775,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlTextReaderNormalization()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_prefix() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_prefix(reader);
-                desret_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderPrefix",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderPrefix()"
                     );
                     eprintln!(" {}", n_reader);
                 }
@@ -8687,123 +7855,6 @@ mod tests {
                             eprintln!(" {}", n_namespaces);
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_quote_char() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_quote_char(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderQuoteChar",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderQuoteChar()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    // #[test]
-    // fn test_xml_text_reader_read() {
-    //     #[cfg(feature = "libxml_reader")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-    //             let ret_val = xml_text_reader_read(reader);
-    //             desret_int(ret_val);
-    //             des_xml_text_reader_ptr(n_reader, reader, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlTextReaderRead",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlTextReaderRead()");
-    //                 eprintln!(" {}", n_reader);
-    //             }
-    //         }
-    //     }
-    // }
-
-    #[test]
-    fn test_xml_text_reader_read_attribute_value() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_read_attribute_value(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderReadAttributeValue",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderReadAttributeValue()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_read_state() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_read_state(reader);
-                desret_int(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderReadState",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderReadState()"
-                    );
-                    eprintln!(" {}", n_reader);
                 }
             }
         }
@@ -9065,56 +8116,6 @@ mod tests {
         /* missing type support */
     }
 
-    // #[test]
-    // fn test_xml_text_reader_setup() {
-    //     #[cfg(feature = "libxml_reader")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-    //             for n_input in 0..GEN_NB_XML_PARSER_INPUT_BUFFER_PTR {
-    //                 for n_url in 0..GEN_NB_FILEPATH {
-    //                     for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-    //                         for n_options in 0..GEN_NB_PARSEROPTIONS {
-    //                             let mem_base = xml_mem_blocks();
-    //                             let reader = gen_xml_text_reader_ptr(n_reader, 0);
-    //                             let input = gen_xml_parser_input_buffer_ptr(n_input, 1);
-    //                             let url = gen_filepath(n_url, 2);
-    //                             let encoding = gen_const_char_ptr(n_encoding, 3);
-    //                             let options = gen_parseroptions(n_options, 4);
-
-    //                             let ret_val =
-    //                                 xml_text_reader_setup(reader, input, url, encoding, options);
-    //                             desret_int(ret_val);
-    //                             des_xml_text_reader_ptr(n_reader, reader, 0);
-    //                             des_filepath(n_url, url, 2);
-    //                             des_const_char_ptr(n_encoding, encoding, 3);
-    //                             des_parseroptions(n_options, options, 4);
-    //                             reset_last_error();
-    //                             if mem_base != xml_mem_blocks() {
-    //                                 leaks += 1;
-    //                                 eprint!(
-    //                                     "Leak of {} blocks found in xmlTextReaderSetup",
-    //                                     xml_mem_blocks() - mem_base
-    //                                 );
-    //                                 assert!(
-    //                                     leaks == 0,
-    //                                     "{leaks} Leaks are found in xmlTextReaderSetup()"
-    //                                 );
-    //                                 eprint!(" {}", n_reader);
-    //                                 eprint!(" {}", n_input);
-    //                                 eprint!(" {}", n_url);
-    //                                 eprint!(" {}", n_encoding);
-    //                                 eprintln!(" {}", n_options);
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     #[test]
     fn test_xml_text_reader_standalone() {
         #[cfg(feature = "libxml_reader")]
@@ -9138,66 +8139,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlTextReaderStandalone()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_value() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_value(reader);
-                desret_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderValue",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderValue()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_xml_lang() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_xml_lang(reader);
-                desret_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderXmlLang",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderXmlLang()"
                     );
                     eprintln!(" {}", n_reader);
                 }

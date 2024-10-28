@@ -2766,24 +2766,24 @@ unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
 
     let mut name: *const XmlChar;
 
-    let typ: c_int = xml_text_reader_node_type(reader);
-    let empty: c_int = xml_text_reader_is_empty_element(reader);
+    let typ: c_int = xml_text_reader_node_type(&mut *reader);
+    let empty: c_int = xml_text_reader_is_empty_element(&mut *reader);
 
-    name = xml_text_reader_const_name(reader);
+    name = xml_text_reader_const_name(&mut *reader);
     if name.is_null() {
         name = c"--".as_ptr() as _;
     }
 
-    let value: *const XmlChar = xml_text_reader_const_value(reader);
+    let value: *const XmlChar = xml_text_reader_const_value(&mut *reader);
 
     write!(
         out,
         "{} {} {} {} {}",
-        xml_text_reader_depth(reader),
+        xml_text_reader_depth(&mut *reader),
         typ,
         CStr::from_ptr(name as _).to_string_lossy(),
         empty,
-        xml_text_reader_has_value(reader),
+        xml_text_reader_has_value(&mut *reader),
     )
     .ok();
     if value.is_null() {
@@ -4451,8 +4451,8 @@ unsafe extern "C" fn pattern_node(
     let mut path: *mut XmlChar = null_mut();
     let mut is_match: c_int = -1;
 
-    let typ: c_int = xml_text_reader_node_type(reader);
-    let empty: c_int = xml_text_reader_is_empty_element(reader);
+    let typ: c_int = xml_text_reader_node_type(&mut *reader);
+    let empty: c_int = xml_text_reader_is_empty_element(&mut *reader);
 
     if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
         /* do the check only on element start */
@@ -4475,8 +4475,8 @@ unsafe extern "C" fn pattern_node(
         if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
             ret = xml_stream_push(
                 patstream,
-                xml_text_reader_const_local_name(reader),
-                xml_text_reader_const_namespace_uri(reader),
+                xml_text_reader_const_local_name(&mut *reader),
+                xml_text_reader_const_namespace_uri(&mut *reader),
             );
             if ret < 0 {
                 writeln!(out, "xmlStreamPush() failure").ok();
