@@ -2,15 +2,26 @@ use std::{
     ffi::c_void,
     ptr::{null, null_mut},
     str::from_utf8_mut,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Mutex,
+    },
 };
 
 use crate::{
     buf::XmlBufRef,
     encoding::{xml_encoding_err, EncodingError, XmlCharEncodingHandler},
+    io::{
+        xml_io_ftp_close, xml_io_ftp_match, xml_io_ftp_open, xml_io_ftp_read, xml_io_http_close,
+        xml_io_http_match, xml_io_http_open, xml_io_http_read,
+    },
     libxml::xmlerror::XmlParserErrors,
 };
 
-use super::{xml_ioerr, xml_ioerr_memory, MINLEN};
+use super::{
+    xml_file_close, xml_file_match, xml_file_open, xml_file_read, xml_ioerr, xml_ioerr_memory,
+    MINLEN,
+};
 
 /**
  * xmlInputMatchCallback:
@@ -330,4 +341,160 @@ impl Drop for XmlParserInputBuffer {
  */
 unsafe extern "C" fn end_of_input(_context: *mut c_void, _bufferr: *mut i8, _len: i32) -> i32 {
     0
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct XmlInputCallback {
+    pub(in crate::io) matchcallback: Option<XmlInputMatchCallback>,
+    pub(in crate::io) opencallback: Option<XmlInputOpenCallback>,
+    pub(in crate::io) readcallback: Option<XmlInputReadCallback>,
+    pub(in crate::io) closecallback: Option<XmlInputCloseCallback>,
+}
+
+pub(crate) const MAX_INPUT_CALLBACK: usize = 15;
+pub(in crate::io) static XML_INPUT_CALLBACK_TABLE: Mutex<[XmlInputCallback; MAX_INPUT_CALLBACK]> =
+    Mutex::new(
+        [XmlInputCallback {
+            matchcallback: None,
+            opencallback: None,
+            readcallback: None,
+            closecallback: None,
+        }; MAX_INPUT_CALLBACK],
+    );
+pub(in crate::io) static XML_INPUT_CALLBACK_NR: AtomicUsize = AtomicUsize::new(0);
+pub(in crate::io) static XML_INPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
+/*
+ * Interfaces for input
+ */
+/**
+ * xmlCleanupInputCallbacks:
+ *
+ * clears the entire input callback table. this includes the
+ * compiled-in I/O.
+ */
+pub fn xml_cleanup_input_callbacks() {
+    let is_initialized = XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
+    if !is_initialized {
+        return;
+    }
+
+    let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
+    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[..num_callbacks].fill(XmlInputCallback {
+        matchcallback: None,
+        opencallback: None,
+        readcallback: None,
+        closecallback: None,
+    });
+
+    XML_INPUT_CALLBACK_NR.store(0, Ordering::Release);
+    XML_INPUT_CALLBACK_INITIALIZED.store(false, Ordering::Release);
+}
+
+/**
+ * xmlPopInputCallbacks:
+ *
+ * Clear the top input callback from the input stack. this includes the
+ * compiled-in I/O.
+ *
+ * Returns the number of input callback registered or -1 in case of error.
+ */
+pub fn xml_pop_input_callbacks() -> i32 {
+    let is_initialized = XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
+    if !is_initialized {
+        return -1;
+    }
+
+    let mut num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
+    if num_callbacks == 0 {
+        return -1;
+    }
+
+    num_callbacks -= 1;
+    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[num_callbacks].matchcallback = None;
+    callbacks[num_callbacks].opencallback = None;
+    callbacks[num_callbacks].readcallback = None;
+    callbacks[num_callbacks].closecallback = None;
+
+    XML_INPUT_CALLBACK_NR.store(num_callbacks, Ordering::Release);
+    num_callbacks as _
+}
+
+/**
+ * xmlRegisterDefaultInputCallbacks:
+ *
+ * Registers the default compiled-in I/O handlers.
+ */
+pub fn xml_register_default_input_callbacks() {
+    if XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
+        return;
+    }
+
+    xml_register_input_callbacks(
+        Some(xml_file_match),
+        Some(xml_file_open),
+        Some(xml_file_read),
+        Some(xml_file_close),
+    );
+    // #ifdef LIBXML_ZLIB_ENABLED
+    //     xmlRegisterInputCallbacks(xmlGzfileMatch, xmlGzfileOpen,
+    // 	                      xmlGzfileRead, xmlGzfileClose);
+    // #endif /* LIBXML_ZLIB_ENABLED */
+    // #ifdef LIBXML_LZMA_ENABLED
+    //     xmlRegisterInputCallbacks(xmlXzfileMatch, xmlXzfileOpen,
+    // 	                      xmlXzfileRead, xmlXzfileClose);
+    // #endif /* LIBXML_LZMA_ENABLED */
+    #[cfg(feature = "http")]
+    {
+        xml_register_input_callbacks(
+            Some(xml_io_http_match),
+            Some(xml_io_http_open),
+            Some(xml_io_http_read),
+            Some(xml_io_http_close),
+        );
+    }
+    #[cfg(feature = "ftp")]
+    {
+        xml_register_input_callbacks(
+            Some(xml_io_ftp_match),
+            Some(xml_io_ftp_open),
+            Some(xml_io_ftp_read),
+            Some(xml_io_ftp_close),
+        );
+    }
+    XML_INPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
+}
+
+/**
+ * xmlRegisterInputCallbacks:
+ * @matchFunc:  the xmlInputMatchCallback
+ * @openFunc:  the xmlInputOpenCallback
+ * @readFunc:  the xmlInputReadCallback
+ * @closeFunc:  the xmlInputCloseCallback
+ *
+ * Register a new set of I/O callback for handling parser input.
+ *
+ * Returns the registered handler number or -1 in case of error
+ */
+pub fn xml_register_input_callbacks(
+    match_func: Option<XmlInputMatchCallback>,
+    open_func: Option<XmlInputOpenCallback>,
+    read_func: Option<XmlInputReadCallback>,
+    close_func: Option<XmlInputCloseCallback>,
+) -> i32 {
+    let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
+    if num_callbacks >= MAX_INPUT_CALLBACK {
+        return -1;
+    }
+    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
+    callbacks[num_callbacks].matchcallback = match_func;
+    callbacks[num_callbacks].opencallback = open_func;
+    callbacks[num_callbacks].readcallback = read_func;
+    callbacks[num_callbacks].closecallback = close_func;
+    XML_INPUT_CALLBACK_INITIALIZED.store(true, Ordering::Relaxed);
+    XML_INPUT_CALLBACK_NR.store(num_callbacks + 1, Ordering::Release);
+    num_callbacks as _
 }
