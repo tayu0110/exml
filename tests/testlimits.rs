@@ -1166,9 +1166,9 @@ unsafe extern "C" fn reader_test(
         );
         return 1;
     }
-    let mut ret = xml_text_reader_read(reader);
+    let mut ret = xml_text_reader_read(&mut *reader);
     while ret == 1 {
-        ret = xml_text_reader_read(reader);
+        ret = xml_text_reader_read(&mut *reader);
     }
     if ret != 0 {
         if fail != 0 {

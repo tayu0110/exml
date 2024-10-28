@@ -2057,7 +2057,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         if TIMING != 0 && REPEAT == 0 {
             start_timer();
         }
-        ret = xml_text_reader_read(reader);
+        ret = xml_text_reader_read(&mut *reader);
         while ret == 1 {
             #[cfg(feature = "libxml_pattern")]
             let f = !PATTERNC.load(Ordering::Relaxed).is_null();
@@ -2066,7 +2066,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             if DEBUG != 0 || f {
                 process_node(reader);
             }
-            ret = xml_text_reader_read(reader);
+            ret = xml_text_reader_read(&mut *reader);
         }
         if TIMING != 0 && REPEAT == 0 {
             #[cfg(any(feature = "schema", feature = "valid"))]
@@ -2216,7 +2216,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
         if TIMING != 0 && REPEAT == 0 {
             start_timer();
         }
-        ret = xml_text_reader_read(reader);
+        ret = xml_text_reader_read(&mut *reader);
         while ret == 1 {
             #[cfg(feature = "libxml_pattern")]
             let f = !PATTERNC.load(Ordering::Relaxed).is_null();
@@ -2225,7 +2225,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
             if DEBUG != 0 || f {
                 process_node(reader);
             }
-            ret = xml_text_reader_read(reader);
+            ret = xml_text_reader_read(&mut *reader);
         }
         if TIMING != 0 && REPEAT == 0 {
             end_timer!("walking through the doc");

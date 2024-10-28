@@ -2851,12 +2851,12 @@ unsafe fn stream_process_test(
             return 0;
         }
     }
-    ret = xml_text_reader_read(reader);
+    ret = xml_text_reader_read(&mut *reader);
     while ret == 1 {
         if let Some(t) = t.as_mut().filter(|_| rng.is_null()) {
             process_node(t, reader);
         }
-        ret = xml_text_reader_read(reader);
+        ret = xml_text_reader_read(&mut *reader);
     }
     if ret != 0 {
         test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
@@ -4666,10 +4666,10 @@ unsafe fn pattern_test(
                     NB_TESTS += 1;
 
                     reader = xml_reader_walker(doc);
-                    res = xml_text_reader_read(reader);
+                    res = xml_text_reader_read(&mut *reader);
                     while res == 1 {
                         pattern_node(&mut o, reader, str.as_ptr() as _, patternc, patstream);
-                        res = xml_text_reader_read(reader);
+                        res = xml_text_reader_read(&mut *reader);
                     }
                     if res != 0 {
                         writeln!(o, "{filename} : failed to parse",).ok();
