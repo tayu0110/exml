@@ -36,7 +36,7 @@ use super::{
  *
  * Returns 1 if yes and 0 if another Input module should be used
  */
-pub type XmlInputMatchCallback = unsafe extern "C" fn(filename: *const i8) -> i32;
+pub type XmlInputMatchCallback = unsafe fn(filename: &str) -> i32;
 /**
  * xmlInputOpenCallback:
  * @filename: the filename or URI
@@ -45,7 +45,7 @@ pub type XmlInputMatchCallback = unsafe extern "C" fn(filename: *const i8) -> i3
  *
  * Returns an Input context or NULL in case or error
  */
-pub type XmlInputOpenCallback = unsafe extern "C" fn(filename: *const i8) -> *mut c_void;
+pub type XmlInputOpenCallback = unsafe fn(filename: &str) -> *mut c_void;
 /**
  * xmlInputReadCallback:
  * @context:  an Input context

@@ -1732,9 +1732,10 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
     if f {
         #[cfg(feature = "schema")]
         {
-            let Some(buf) =
-                xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None)
-            else {
+            let Some(buf) = xml_parser_input_buffer_create_filename(
+                CStr::from_ptr(filename).to_string_lossy().as_ref(),
+                XmlCharEncoding::None,
+            ) else {
                 return;
             };
 

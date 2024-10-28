@@ -104,13 +104,12 @@ pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
  * Returns the new parser input or NULL
  */
 pub unsafe fn xml_parser_input_buffer_create_filename(
-    uri: *const c_char,
+    uri: &str,
     enc: XmlCharEncoding,
 ) -> Option<XmlParserInputBuffer> {
     if let Some(f) =
         GLOBAL_STATE.with_borrow(|state| state.parser_input_buffer_create_filename_value)
     {
-        let uri = CStr::from_ptr(uri).to_str().unwrap();
         return f(uri, enc);
     }
     __xml_parser_input_buffer_create_filename(uri, enc)
@@ -491,17 +490,13 @@ pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *m
 }
 
 pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
-    uri: *const c_char,
+    uri: &str,
     enc: XmlCharEncoding,
 ) -> Option<XmlParserInputBuffer> {
     let mut context: *mut c_void = null_mut();
 
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         xml_register_default_input_callbacks();
-    }
-
-    if uri.is_null() {
-        return None;
     }
 
     let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
@@ -1248,7 +1243,9 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
         for i in (0..num_callbacks).rev() {
             if callbacks[i]
                 .matchcallback
-                .filter(|callback| callback(unescaped) != 0)
+                .filter(|callback| {
+                    callback(CStr::from_ptr(unescaped).to_string_lossy().as_ref()) != 0
+                })
                 .is_some()
             {
                 // #if defined(LIBXML_HTTP_ENABLED) && defined(LIBXML_ZLIB_ENABLED)
@@ -1302,7 +1299,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
         for i in (0..num_callbacks).rev() {
             if callbacks[i]
                 .matchcallback
-                .filter(|callback| callback(uri) != 0)
+                .filter(|callback| callback(CStr::from_ptr(uri).to_string_lossy().as_ref()) != 0)
                 .is_some()
             {
                 // #if defined(LIBXML_HTTP_ENABLED) && defined(LIBXML_ZLIB_ENABLED)
@@ -1840,7 +1837,7 @@ pub fn xml_check_filename(path: impl AsRef<Path>) -> i32 {
  *
  * Returns 1 if matches, 0 otherwise
  */
-pub unsafe extern "C" fn xml_file_match(_filename: *const c_char) -> c_int {
+pub fn xml_file_match(_filename: &str) -> c_int {
     1
 }
 
@@ -1897,17 +1894,14 @@ unsafe fn xml_file_open_real(mut filename: &str) -> *mut c_void {
  *
  * Returns a handler or NULL in case or failure
  */
-pub unsafe extern "C" fn xml_file_open(filename: *const c_char) -> *mut c_void {
+pub unsafe fn xml_file_open(filename: &str) -> *mut c_void {
     let unescaped: *mut c_char;
     let mut retval: *mut c_void;
 
-    retval = if !filename.is_null() {
-        xml_file_open_real(CStr::from_ptr(filename).to_string_lossy().as_ref())
-    } else {
-        null_mut()
-    };
+    retval = xml_file_open_real(filename);
     if retval.is_null() {
-        unescaped = xml_uri_unescape_string(filename, 0, null_mut());
+        let filename = CString::new(filename).unwrap();
+        unescaped = xml_uri_unescape_string(filename.as_ptr(), 0, null_mut());
         if !unescaped.is_null() {
             retval = xml_file_open_real(CStr::from_ptr(unescaped).to_string_lossy().as_ref());
             xml_free(unescaped as _);
@@ -1996,11 +1990,8 @@ pub unsafe extern "C" fn xml_file_close(context: *mut c_void) -> c_int {
  * Returns 1 if matches, 0 otherwise
  */
 #[cfg(feature = "http")]
-pub unsafe extern "C" fn xml_io_http_match(filename: *const c_char) -> c_int {
-    if xml_strncasecmp(filename as _, c"http://".as_ptr() as _, 7) == 0 {
-        return 1;
-    }
-    0
+pub fn xml_io_http_match(filename: &str) -> c_int {
+    filename.starts_with("http://") as i32
 }
 
 /**
@@ -2012,8 +2003,9 @@ pub unsafe extern "C" fn xml_io_http_match(filename: *const c_char) -> c_int {
  * Returns an I/O context or NULL in case of error
  */
 #[cfg(feature = "http")]
-pub unsafe extern "C" fn xml_io_http_open(filename: *const c_char) -> *mut c_void {
-    xml_nanohttp_open(filename as _, null_mut())
+pub unsafe fn xml_io_http_open(filename: &str) -> *mut c_void {
+    let filename = CString::new(filename).unwrap();
+    xml_nanohttp_open(filename.as_ptr(), null_mut())
 }
 
 /**
@@ -2126,11 +2118,8 @@ pub unsafe extern "C" fn xml_io_http_close(context: *mut c_void) -> c_int {
  * Returns 1 if matches, 0 otherwise
  */
 #[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xml_io_ftp_match(filename: *const c_char) -> c_int {
-    if xml_strncasecmp(filename as _, c"ftp://".as_ptr() as _, 6) == 0 {
-        return 1;
-    }
-    0
+pub fn xml_io_ftp_match(filename: &str) -> c_int {
+    filename.starts_with("ftp://") as i32
 }
 /**
  * xmlIOFTPOpen:
@@ -2141,8 +2130,9 @@ pub unsafe extern "C" fn xml_io_ftp_match(filename: *const c_char) -> c_int {
  * Returns an I/O context or NULL in case of error
  */
 #[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xml_io_ftp_open(filename: *const c_char) -> *mut c_void {
-    xml_nanoftp_open(filename)
+pub unsafe fn xml_io_ftp_open(filename: &str) -> *mut c_void {
+    let filename = CString::new(filename).unwrap();
+    xml_nanoftp_open(filename.as_ptr())
 }
 
 /**
@@ -2185,32 +2175,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    // #[test]
-    // fn test_xml_check_filename() {
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_path in 0..GEN_NB_CONST_CHAR_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let path = gen_const_char_ptr(n_path, 0);
-
-    //             let ret_val = xml_check_filename(path);
-    //             desret_int(ret_val);
-    //             des_const_char_ptr(n_path, path, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlCheckFilename",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlCheckFilename()");
-    //                 eprintln!(" {}", n_path);
-    //             }
-    //         }
-    //     }
-    // }
 
     #[test]
     fn test_xml_check_httpinput() {
@@ -2316,58 +2280,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_file_match() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_file_match(filename);
-                desret_int(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlFileMatch",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlFileMatch()");
-                    eprintln!(" {}", n_filename);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_file_open() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_file_open(filename);
-                desret_void_ptr(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlFileOpen",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlFileOpen()");
-                    eprintln!(" {}", n_filename);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_file_read() {
         unsafe {
             let mut leaks = 0;
@@ -2425,60 +2337,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlIOFTPClose()");
                     eprintln!(" {}", n_context);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ioftpmatch() {
-        #[cfg(feature = "ftp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_io_ftp_match(filename);
-                desret_int(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlIOFTPMatch",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlIOFTPMatch()");
-                    eprintln!(" {}", n_filename);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ioftpopen() {
-        #[cfg(feature = "ftp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_io_ftp_open(filename);
-                desret_void_ptr(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlIOFTPOpen",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlIOFTPOpen()");
-                    eprintln!(" {}", n_filename);
                 }
             }
         }
@@ -2543,60 +2401,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlIOHTTPClose()");
                     eprintln!(" {}", n_context);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_iohttpmatch() {
-        #[cfg(feature = "http")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_io_http_match(filename);
-                desret_int(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlIOHTTPMatch",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlIOHTTPMatch()");
-                    eprintln!(" {}", n_filename);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_iohttpopen() {
-        #[cfg(feature = "http")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_io_http_open(filename);
-                desret_xml_nano_httpctxt_ptr(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlIOHTTPOpen",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlIOHTTPOpen()");
-                    eprintln!(" {}", n_filename);
                 }
             }
         }

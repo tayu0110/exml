@@ -1242,40 +1242,37 @@ pub(crate) unsafe fn gen_xml_parser_input_buffer_ptr(
     _nr: c_int,
 ) -> Option<XmlParserInputBuffer> {
     if no == 0 {
-        return xml_parser_input_buffer_create_filename(
-            c"missing.xml".as_ptr(),
-            XmlCharEncoding::None,
-        );
+        return xml_parser_input_buffer_create_filename("missing.xml", XmlCharEncoding::None);
     }
     if no == 1 {
-        return xml_parser_input_buffer_create_filename(c"<foo/>".as_ptr(), XmlCharEncoding::None);
+        return xml_parser_input_buffer_create_filename("<foo/>", XmlCharEncoding::None);
     }
     if no == 2 {
-        return xml_parser_input_buffer_create_filename(
-            c"test/ent2".as_ptr(),
-            XmlCharEncoding::None,
-        );
+        return xml_parser_input_buffer_create_filename("test/ent2", XmlCharEncoding::None);
     }
     if no == 3 {
         return xml_parser_input_buffer_create_filename(
-            c"test/valid/REC-xml-19980210.xml".as_ptr(),
+            "test/valid/REC-xml-19980210.xml",
             XmlCharEncoding::None,
         );
     }
     if no == 4 {
         return xml_parser_input_buffer_create_filename(
-            c"test/valid/dtds/xhtml1-strict.dtd".as_ptr(),
+            "test/valid/dtds/xhtml1-strict.dtd",
             XmlCharEncoding::None,
         );
     }
     if no == 5 {
         return xml_parser_input_buffer_create_filename(
-            REMOTE1GOOD.as_ptr(),
+            REMOTE1GOOD.to_string_lossy().as_ref(),
             XmlCharEncoding::None,
         );
     }
     if no == 6 {
-        return xml_parser_input_buffer_create_filename(REMOTE1BAD.as_ptr(), XmlCharEncoding::None);
+        return xml_parser_input_buffer_create_filename(
+            REMOTE1BAD.to_string_lossy().as_ref(),
+            XmlCharEncoding::None,
+        );
     }
     None
 }

@@ -3607,23 +3607,23 @@ const URIP_TEST_URLS: &[&CStr] = &[
     c"urip://example.com/r\xe9sum\xe9.html",
     c"urip://example.com/test?a=1&b=2%263&c=4#foo",
 ];
-const URIP_RCVS_URLS: &[&CStr] = &[
+const URIP_RCVS_URLS: &[&str] = &[
     /* it is an URI the strings must be escaped */
-    c"urip://example.com/a%20b.html",
+    "urip://example.com/a%20b.html",
     /* check that % escaping is not broken */
-    c"urip://example.com/a%20b.html",
+    "urip://example.com/a%20b.html",
     /* it's an URI path the strings must be escaped */
-    c"file:///path/to/a%20b.html",
+    "file:///path/to/a%20b.html",
     /* check that % escaping is not broken */
-    c"file:///path/to/a%20b.html",
+    "file:///path/to/a%20b.html",
     /* this is not an URI, this is a path, so this should not be escaped */
-    c"/path/to/a b.html",
+    "/path/to/a b.html",
     /* check that paths with % are not broken */
-    c"/path/to/a%20b.html",
+    "/path/to/a%20b.html",
     /* out of context the encoding can't be guessed byte by byte conversion */
-    c"urip://example.com/r%E9sum%E9.html",
+    "urip://example.com/r%E9sum%E9.html",
     /* verify we don't destroy URIs especially the query part */
-    c"urip://example.com/test?a=1&b=2%263&c=4#foo",
+    "urip://example.com/test?a=1&b=2%263&c=4#foo",
 ];
 const URIP_RES: &CStr = c"<list/>";
 static URIP_CUR: AtomicPtr<c_char> = AtomicPtr::new(null_mut());
@@ -3637,13 +3637,13 @@ static mut URIP_RLEN: usize = 0;
  *
  * Returns 1 if yes and 0 if another Input module should be used
  */
-unsafe extern "C" fn urip_match(uri: *const c_char) -> c_int {
-    const CATALOG_URL: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog\0");
-    if uri.is_null() || strcmp(uri, CATALOG_URL.as_ptr() as _) == 0 {
+unsafe fn urip_match(uri: &str) -> c_int {
+    const CATALOG_URL: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
+    if uri == CATALOG_URL {
         return 0;
     }
     /* Verify we received the escaped URL */
-    if strcmp(URIP_RCVS_URLS[URIP_CURRENT].as_ptr(), uri) != 0 {
+    if URIP_RCVS_URLS[URIP_CURRENT] != uri {
         URIP_SUCCESS = 0;
     }
     1
@@ -3658,13 +3658,13 @@ unsafe extern "C" fn urip_match(uri: *const c_char) -> c_int {
  *
  * Returns an Input context or NULL in case or error
  */
-unsafe extern "C" fn urip_open(uri: *const c_char) -> *mut c_void {
-    const CATALOG_URL: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog\0");
-    if uri.is_null() || strcmp(uri, CATALOG_URL.as_ptr() as _) == 0 {
+unsafe fn urip_open(uri: &str) -> *mut c_void {
+    const CATALOG_URL: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
+    if uri == CATALOG_URL {
         return null_mut();
     }
     /* Verify we received the escaped URL */
-    if strcmp(URIP_RCVS_URLS[URIP_CURRENT].as_ptr(), uri) != 0 {
+    if URIP_RCVS_URLS[URIP_CURRENT] != uri {
         URIP_SUCCESS = 0;
     }
     URIP_CUR.store(URIP_RES.as_ptr() as _, Ordering::Relaxed);

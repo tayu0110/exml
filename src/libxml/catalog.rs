@@ -3954,9 +3954,15 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
         return null_mut();
     }
 
-    let Some(buf) =
-        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None)
-    else {
+    if filename.is_null() {
+        xml_free_parser_ctxt(ctxt);
+        return null_mut();
+    }
+
+    let Some(buf) = xml_parser_input_buffer_create_filename(
+        CStr::from_ptr(filename).to_string_lossy().as_ref(),
+        crate::encoding::XmlCharEncoding::None,
+    ) else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     };

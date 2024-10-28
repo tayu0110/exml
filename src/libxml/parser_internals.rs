@@ -1757,7 +1757,19 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     if ctxt.is_null() {
         return null_mut();
     }
-    let Some(buf) = xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None) else {
+
+    if filename.is_null() {
+        __xml_loader_err(
+            ctxt as _,
+            c"failed to load external entity: NULL filename \n".as_ptr() as _,
+            null(),
+        );
+        return null_mut();
+    }
+    let Some(buf) = xml_parser_input_buffer_create_filename(
+        CStr::from_ptr(filename).to_string_lossy().as_ref(),
+        XmlCharEncoding::None,
+    ) else {
         if filename.is_null() {
             __xml_loader_err(
                 ctxt as _,

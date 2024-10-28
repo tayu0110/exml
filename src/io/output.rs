@@ -31,7 +31,7 @@ use super::{
  *
  * Returns 1 if yes and 0 if another Output module should be used
  */
-pub type XmlOutputMatchCallback = unsafe extern "C" fn(filename: *const i8) -> i32;
+pub type XmlOutputMatchCallback = unsafe fn(filename: &str) -> i32;
 /**
  * xmlOutputOpenCallback:
  * @filename: the filename or URI

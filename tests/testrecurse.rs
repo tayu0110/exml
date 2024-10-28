@@ -33,9 +33,7 @@ use exml::{
         xmlstring::{xml_strlen, XmlChar},
     },
 };
-use libc::{
-    free, glob, glob_t, globfree, memcpy, snprintf, strcmp, strdup, strlen, strncpy, GLOB_DOOFFS,
-};
+use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
 
 const OPT_SAX: i32 = 1 << 0;
 const OPT_NO_SUBST: i32 = 1 << 1;
@@ -58,7 +56,7 @@ struct TestDesc<'a> {
 }
 
 struct XmlHugeDocParts<'a> {
-    url: &'a CStr,
+    url: &'a str,
     start: &'a CStr,
     segment: &'a CStr,
     finish: &'a CStr,
@@ -66,13 +64,13 @@ struct XmlHugeDocParts<'a> {
 
 const HUGE_DOC_TABLE: &[XmlHugeDocParts] = &[
     XmlHugeDocParts{
-        url: c"test/recurse/huge.xml",
+        url: "test/recurse/huge.xml",
         start: c"<!DOCTYPE foo [<!ELEMENT foo (bar*)> <!ELEMENT bar (#PCDATA)> <!ATTLIST bar attr CDATA #IMPLIED> <!ENTITY a SYSTEM 'ga.ent'> <!ENTITY b SYSTEM 'gb.ent'> <!ENTITY c SYSTEM 'gc.ent'> <!ENTITY f 'some internal data'> <!ENTITY e '&f;&f;'> <!ENTITY d '&e;&e;'> ]> <foo>",
         segment: c"  <bar attr='&e; &f; &d;'>&a; &b; &c; &e; &f; &d;</bar>\n  <bar>_123456789_123456789_123456789_123456789</bar>\n  <bar>_123456789_123456789_123456789_123456789</bar>\n  <bar>_123456789_123456789_123456789_123456789</bar>\n  <bar>_123456789_123456789_123456789_123456789</bar>\n",
         finish: c"</foo>"
     },
     XmlHugeDocParts{
-        url: c"test/recurse/huge_dtd.dtd",
+        url: "test/recurse/huge_dtd.dtd",
         start: c"<!ELEMENT foo (#PCDATA)>\n<!ENTITY ent 'success'>\n<!ENTITY % a SYSTEM 'pa.ent'>\n<!ENTITY % b SYSTEM 'pb.ent'>\n<!ENTITY % c SYSTEM 'pc.ent'>\n<!ENTITY % d '<!-- comment -->'>\n<!ENTITY % e '%d;%d;'>\n<!ENTITY % f '%e;%e;'>\n",
         segment: c"<!ENTITY ent '%a; %b; %c; %d; %e; %f;'>\n%a; %b; %c; %d; %e; %f;\n<!-- _123456789_123456789_123456789_123456789 -->\n<!-- _123456789_123456789_123456789_123456789 -->\n<!-- _123456789_123456789_123456789_123456789 -->\n",
         finish: c""
@@ -92,13 +90,9 @@ static mut RLEN: usize = 0;
  *
  * Returns 1 if yes and 0 if another Input module should be used
  */
-unsafe extern "C" fn huge_match(uri: *const c_char) -> c_int {
-    if uri.is_null() {
-        return 0;
-    }
-
+fn huge_match(uri: &str) -> c_int {
     for doc in HUGE_DOC_TABLE {
-        if strcmp(uri, doc.url.as_ptr()) == 0 {
+        if uri == doc.url {
             return 1;
         }
     }
@@ -115,13 +109,9 @@ unsafe extern "C" fn huge_match(uri: *const c_char) -> c_int {
  *
  * Returns an Input context or NULL in case or error
  */
-unsafe extern "C" fn huge_open(uri: *const c_char) -> *mut c_void {
-    if uri.is_null() {
-        return null_mut();
-    }
-
+unsafe fn huge_open(uri: &str) -> *mut c_void {
     for doc in HUGE_DOC_TABLE {
-        if strcmp(uri, doc.url.as_ptr()) == 0 {
+        if uri == doc.url {
             HUGE_DOC_PARTS = doc;
             CURRENT.store(doc.start.as_ptr() as _, Ordering::Relaxed);
             CURSEG = 0;

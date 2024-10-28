@@ -31,7 +31,7 @@ use exml::{
         xmlstring::XmlChar,
     },
 };
-use libc::{memcpy, strcmp, strlen, strncmp};
+use libc::{memcpy, strlen, strncmp};
 
 static mut VERBOSE: i32 = 0;
 static mut TESTS_QUIET: i32 = 0;
@@ -72,7 +72,7 @@ fn check_time() -> i32 {
 
 struct HugeTest<'a> {
     _description: &'a str,
-    name: &'a CStr,
+    name: &'a str,
     start: &'a CStr,
     end: &'a CStr,
 }
@@ -80,25 +80,25 @@ struct HugeTest<'a> {
 static HUGE_TESTS: &[HugeTest] = &[
     HugeTest {
         _description: "Huge text node",
-        name: c"huge:textNode",
+        name: "huge:textNode",
         start: c"<foo>",
         end: c"</foo>",
     },
     HugeTest {
         _description: "Huge attribute node",
-        name: c"huge:attrNode",
+        name: "huge:attrNode",
         start: c"<foo bar='",
         end: c"'/>",
     },
     HugeTest {
         _description: "Huge comment node",
-        name: c"huge:commentNode",
+        name: "huge:commentNode",
         start: c"<foo><!--",
         end: c"--></foo>",
     },
     HugeTest {
         _description: "Huge PI node",
-        name: c"huge:piNode",
+        name: "huge:piNode",
         start: c"<foo><?bar ",
         end: c"?></foo>",
     },
@@ -117,11 +117,8 @@ static mut INSTATE: i32 = 0;
  *
  * Returns 1 if yes and 0 if another Input module should be used
  */
-unsafe extern "C" fn huge_match(uri: *const i8) -> i32 {
-    if !uri.is_null() && strncmp(uri, c"huge:".as_ptr(), 5) == 0 {
-        return 1;
-    }
-    0
+fn huge_match(uri: &str) -> i32 {
+    uri.starts_with("huge:") as i32
 }
 
 /**
@@ -133,14 +130,14 @@ unsafe extern "C" fn huge_match(uri: *const i8) -> i32 {
  *
  * Returns an Input context or NULL in case or error
  */
-unsafe extern "C" fn huge_open(uri: *const i8) -> *mut c_void {
-    if uri.is_null() || strncmp(uri, c"huge:".as_ptr(), 5) != 0 {
+unsafe fn huge_open(uri: &str) -> *mut c_void {
+    if !uri.starts_with("huge:") {
         return null_mut();
     }
 
     CURRENT_TEST = 0;
     while CURRENT_TEST < HUGE_TESTS.len() {
-        if strcmp(HUGE_TESTS[CURRENT_TEST].name.as_ptr(), uri) == 0 {
+        if HUGE_TESTS[CURRENT_TEST].name == uri {
             RLEN = HUGE_TESTS[CURRENT_TEST].start.to_bytes().len();
             CURRENT.store(
                 HUGE_TESTS[CURRENT_TEST].start.as_ptr() as _,
@@ -287,11 +284,8 @@ const CRAZY: &CStr = c"<?xml version='1.0' encoding='UTF-8'?><?tst ?><!-- tst --
  *
  * Returns 1 if yes and 0 if another Input module should be used
  */
-unsafe extern "C" fn crazy_match(uri: *const i8) -> i32 {
-    if !uri.is_null() && strncmp(uri, c"crazy:".as_ptr(), 6) == 0 {
-        return 1;
-    }
-    0
+fn crazy_match(uri: &str) -> i32 {
+    uri.starts_with("crazy:") as i32
 }
 
 /**
@@ -303,8 +297,8 @@ unsafe extern "C" fn crazy_match(uri: *const i8) -> i32 {
  *
  * Returns an Input context or NULL in case or error
  */
-unsafe extern "C" fn crazy_open(uri: *const i8) -> *mut c_void {
-    if uri.is_null() || strncmp(uri, c"crazy:".as_ptr(), 6) != 0 {
+unsafe fn crazy_open(uri: &str) -> *mut c_void {
+    if !uri.starts_with("crazy:") {
         return null_mut();
     }
 

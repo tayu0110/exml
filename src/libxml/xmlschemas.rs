@@ -30998,8 +30998,10 @@ pub unsafe extern "C" fn xml_schema_validate_file(
         return -1;
     }
 
-    let Some(input) = xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None)
-    else {
+    let Some(input) = xml_parser_input_buffer_create_filename(
+        CStr::from_ptr(filename).to_string_lossy().as_ref(),
+        XmlCharEncoding::None,
+    ) else {
         return -1;
     };
     let ret: c_int =
