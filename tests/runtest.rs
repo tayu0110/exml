@@ -2862,7 +2862,7 @@ unsafe fn stream_process_test(
         test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
     }
     if !rng.is_null() {
-        if xml_text_reader_is_valid(reader) != 1 {
+        if xml_text_reader_is_valid(&mut *reader) != 1 {
             test_error_handler(None, format!("{filename} fails to validate\n").as_str());
         } else {
             test_error_handler(None, format!("{filename} validates\n").as_str());
@@ -4456,10 +4456,10 @@ unsafe extern "C" fn pattern_node(
 
     if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
         /* do the check only on element start */
-        is_match = xml_pattern_match(patternc, xml_text_reader_current_node(reader));
+        is_match = xml_pattern_match(patternc, xml_text_reader_current_node(&mut *reader));
 
         if is_match != 0 {
-            path = xml_get_node_path(xml_text_reader_current_node(reader));
+            path = xml_get_node_path(xml_text_reader_current_node(&mut *reader));
             writeln!(
                 out,
                 "Node {} matches pattern {}",
@@ -4484,7 +4484,7 @@ unsafe extern "C" fn pattern_node(
                 patstream = null_mut();
             } else if ret != is_match {
                 if path.is_null() {
-                    path = xml_get_node_path(xml_text_reader_current_node(reader));
+                    path = xml_get_node_path(xml_text_reader_current_node(&mut *reader));
                 }
                 writeln!(out, "xmlPatternMatch and xmlStreamPush disagree").ok();
                 writeln!(

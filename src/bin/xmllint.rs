@@ -1861,13 +1861,13 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
             /* do the check only on element start */
             is_match = xml_pattern_match(
                 PATTERNC.load(Ordering::Relaxed),
-                xml_text_reader_current_node(reader),
+                xml_text_reader_current_node(&mut *reader),
             );
 
             if is_match != 0 {
                 #[cfg(any(feature = "tree", feature = "libxml_debug"))]
                 {
-                    path = xml_get_node_path(xml_text_reader_current_node(reader));
+                    path = xml_get_node_path(xml_text_reader_current_node(&mut *reader));
                     println!(
                         "Node {} matches pattern {}",
                         CStr::from_ptr(path as _).to_string_lossy(),
@@ -1900,7 +1900,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                 } else if ret != is_match {
                     #[cfg(any(feature = "tree", feature = "libxml_debug"))]
                     if path.is_null() {
-                        path = xml_get_node_path(xml_text_reader_current_node(reader));
+                        path = xml_get_node_path(xml_text_reader_current_node(&mut *reader));
                     }
                     eprintln!("xmlPatternMatch and xmlStreamPush disagree");
                     if !path.is_null() {
@@ -1999,13 +1999,13 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         #[cfg(feature = "valid")]
         if VALID != 0 {
             xml_text_reader_set_parser_prop(
-                reader,
+                &mut *reader,
                 XmlParserProperties::XmlParserValidate as i32,
                 1,
             );
         } else if LOADDTD != 0 {
             xml_text_reader_set_parser_prop(
-                reader,
+                &mut *reader,
                 XmlParserProperties::XmlParserLoaddtd as i32,
                 1,
             );
@@ -2093,14 +2093,14 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         }
 
         #[cfg(feature = "valid")]
-        if VALID != 0 && xml_text_reader_is_valid(reader) != 1 {
+        if VALID != 0 && xml_text_reader_is_valid(&mut *reader) != 1 {
             let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
         #[cfg(feature = "schema")]
         if RELAXNG.lock().unwrap().is_some() || SCHEMA.lock().unwrap().is_some() {
-            if xml_text_reader_is_valid(reader) != 1 {
+            if xml_text_reader_is_valid(&mut *reader) != 1 {
                 eprintln!(
                     "{} fails to validate",
                     CStr::from_ptr(filename).to_string_lossy()

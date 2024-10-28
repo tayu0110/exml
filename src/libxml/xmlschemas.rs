@@ -2622,7 +2622,8 @@ unsafe extern "C" fn xml_schema_lookup_namespace(
     } {
         #[cfg(feature = "libxml_reader")]
         {
-            let ns_name: *mut XmlChar = xml_text_reader_lookup_namespace((*vctxt).reader, prefix);
+            let ns_name: *mut XmlChar =
+                xml_text_reader_lookup_namespace(&mut *(*vctxt).reader, prefix);
             if !ns_name.is_null() {
                 let ret: *const XmlChar = xml_dict_lookup((*vctxt).dict, ns_name, -1);
                 xml_free(ns_name as _);
