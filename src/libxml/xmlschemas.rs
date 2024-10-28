@@ -21,6 +21,7 @@ use crate::{
     error::{XmlErrorDomain, XmlErrorLevel},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
+    io::{xml_parser_input_buffer_create_filename, XmlParserInputBuffer},
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         entities::XmlEntityPtr,
@@ -95,7 +96,6 @@ use crate::{
         },
         uri::xml_build_uri,
         valid::{xml_add_id, xml_free_enumeration},
-        xml_io::xml_parser_input_buffer_create_filename,
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_new_all_trans,
             xml_automata_new_count_trans2, xml_automata_new_counted_trans,
@@ -133,8 +133,6 @@ use crate::{
     private::error::__xml_simple_error,
     IS_BLANK_CH,
 };
-
-use super::xml_io::XmlParserInputBuffer;
 
 /**
  * This error codes are obsolete; not used any more.
@@ -31000,18 +30998,12 @@ pub unsafe extern "C" fn xml_schema_validate_file(
         return -1;
     }
 
-    let Some(input) =
-        xml_parser_input_buffer_create_filename(filename, crate::encoding::XmlCharEncoding::None)
+    let Some(input) = xml_parser_input_buffer_create_filename(filename, XmlCharEncoding::None)
     else {
         return -1;
     };
-    let ret: c_int = xml_schema_validate_stream(
-        ctxt,
-        input,
-        crate::encoding::XmlCharEncoding::None,
-        null_mut(),
-        None,
-    );
+    let ret: c_int =
+        xml_schema_validate_stream(ctxt, input, XmlCharEncoding::None, null_mut(), None);
     ret
 }
 

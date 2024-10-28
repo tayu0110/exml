@@ -19,6 +19,7 @@ use libc::{close, fprintf, getenv, memset, open, read, snprintf, stat, FILE, O_R
 use crate::{
     __xml_raise_error, generic_error,
     hash::XmlHashTableRef,
+    io::{xml_parser_get_directory, xml_parser_input_buffer_create_filename},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
@@ -41,10 +42,6 @@ use crate::{
             xml_set_prop, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
         },
         uri::{xml_build_uri, xml_canonic_path},
-        xml_io::{
-            xml_output_buffer_create_file, xml_parser_get_directory,
-            xml_parser_input_buffer_create_filename, XmlOutputBufferPtr,
-        },
         xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
@@ -3315,6 +3312,8 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
     /*
      * Rebuild a catalog
      */
+
+    use crate::io::{xml_output_buffer_create_file, XmlOutputBufferPtr};
     let doc: XmlDocPtr = xml_new_doc(null_mut());
     if doc.is_null() {
         return -1;

@@ -20,10 +20,10 @@ use libc::{
 
 use crate::{
     error::XmlErrorDomain,
+    io::__xml_ioerr,
     libxml::{
         globals::{xml_free, xml_malloc, xml_mem_strdup},
         uri::{xml_free_uri, xml_parse_uri_raw, xml_uri_unescape_string, XmlURIPtr},
-        xml_io::__xml_ioerr,
         xmlerror::XmlParserErrors,
         xmlstring::xml_strndup,
     },
@@ -475,9 +475,6 @@ unsafe extern "C" fn xml_nanoftp_send_user(ctx: *mut c_void) -> c_int {
     }
     *buf.last_mut().unwrap() = 0;
     let len: c_int = strlen(buf.as_ptr() as _) as _;
-    // #ifdef DEBUG_FTP
-    //     xmlGenericError(xmlGenericErrorContext, c"%s".as_ptr() as _, buf);
-    // #endif
     let res: c_int = send((*ctxt).control_fd, buf.as_ptr() as _, len as _, 0) as _;
     if res < 0 {
         __xml_ioerr(

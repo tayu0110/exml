@@ -20,9 +20,9 @@ use crate::{
     encoding::XmlCharEncodingHandler,
     error::{parser_error, parser_warning, XmlError},
     globals::reset_last_error,
+    io::{XmlOutputBufferPtr, __xml_output_buffer_create_filename},
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
-        xml_io::{XmlOutputBufferPtr, __xml_output_buffer_create_filename},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
     private::threads::{__xml_global_init_mutex_destroy, xml_cleanup_mutex, xml_init_mutex},
@@ -98,25 +98,6 @@ pub type XmlOutputBufferCreateFilenameFunc = unsafe fn(
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     compression: c_int,
 ) -> XmlOutputBufferPtr;
-
-// /**
-//  * xmlParserInputBufferCreateFilenameDefault:
-//  * @func: function poc_inter to the new ParserInputBufferCreateFilenameFunc
-//  *
-//  * Registers a callback for URI input file handling
-//  *
-//  * Returns the old value of the registration function
-//  */
-// pub unsafe fn xml_parser_input_buffer_create_filename_default(
-//     func: Option<XmlParserInputBufferCreateFilenameFunc>,
-// ) -> XmlParserInputBufferCreateFilenameFunc {
-//     let old: XmlParserInputBufferCreateFilenameFunc =
-//         _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
-//             .unwrap_or(__xml_parser_input_buffer_create_filename);
-
-//     _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE = func;
-//     old
-// }
 
 /**
 * xmlOutputBufferCreateFilenameDefault:

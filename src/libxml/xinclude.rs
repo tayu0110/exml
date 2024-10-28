@@ -18,6 +18,7 @@ use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
     __xml_raise_error,
     encoding::get_encoding_handler,
+    io::xml_parser_get_directory,
     libxml::{
         dict::{xml_dict_free, xml_dict_reference},
         entities::{xml_add_doc_entity, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
@@ -41,7 +42,6 @@ use crate::{
             xml_build_relative_uri, xml_build_uri, xml_free_uri, xml_parse_uri, xml_save_uri,
             xml_uri_escape, XmlURIPtr,
         },
-        xml_io::xml_parser_get_directory,
         xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, XmlChar},
         xpath::{

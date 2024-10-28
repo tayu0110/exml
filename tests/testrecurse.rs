@@ -16,6 +16,7 @@ use exml::{
     globals::{
         reset_last_error, set_get_warnings_default_value, set_structured_error, GenericErrorContext,
     },
+    io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         parser::{
@@ -24,7 +25,6 @@ use exml::{
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
         },
         tree::{xml_free_doc, XmlDocPtr, XmlElementType},
-        xml_io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
         xmlerror::XmlParserErrors,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,

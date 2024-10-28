@@ -14,6 +14,7 @@ use exml::{
     encoding::XmlCharEncoding,
     error::XmlError,
     globals::{set_structured_error, GenericErrorContext},
+    io::xml_parser_input_buffer_create_mem,
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::{
@@ -22,7 +23,6 @@ use exml::{
         },
         parser_internals::{input_push, xml_current_char, xml_new_input_stream},
         tree::{xml_free_doc, XmlDocPtr},
-        xml_io::xml_parser_input_buffer_create_mem,
         xmlerror::XmlParserErrors,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,

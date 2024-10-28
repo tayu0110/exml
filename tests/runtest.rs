@@ -21,6 +21,9 @@ use const_format::concatcp;
 use exml::{
     error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
     globals::{reset_last_error, set_generic_error, set_structured_error, GenericErrorContext},
+    io::{
+        xml_no_net_external_entity_loader, xml_pop_input_callbacks, xml_register_input_callbacks,
+    },
     libxml::{
         entities::XmlEntityPtr,
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
@@ -48,10 +51,6 @@ use exml::{
         },
         valid::xml_free_enumeration,
         xinclude::xml_xinclude_process_flags,
-        xml_io::{
-            xml_no_net_external_entity_loader, xml_pop_input_callbacks,
-            xml_register_input_callbacks,
-        },
         xmlerror::XmlParserErrors,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,

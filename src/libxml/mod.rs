@@ -39,7 +39,6 @@ pub mod valid;
 pub mod xinclude;
 #[cfg(feature = "libxml_xptr")]
 pub mod xlink;
-pub mod xml_io;
 #[cfg(any(feature = "regexp", feature = "libxml_automata"))]
 pub mod xmlautomata;
 pub mod xmlerror;

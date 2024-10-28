@@ -18,6 +18,7 @@ pub mod encoding;
 pub mod error;
 pub mod globals;
 pub mod hash;
+pub mod io;
 pub mod libxml;
 pub mod list;
 pub mod nanohttp;

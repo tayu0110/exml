@@ -12,6 +12,7 @@ use libc::{free, malloc, realloc};
 use crate::{
     encoding::{XmlCharEncoding, XmlCharEncodingHandler},
     error::{generic_error_default, XmlError},
+    io::{XmlOutputBuffer, XmlParserInputBuffer},
     libxml::{
         globals::{XmlDeregisterNodeFunc, XmlRegisterNodeFunc},
         parser::{XmlSAXHandlerV1, XmlSaxlocator},
@@ -20,7 +21,6 @@ use crate::{
             xml_sax2_get_system_id,
         },
         tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
-        xml_io::{XmlOutputBuffer, XmlParserInputBuffer},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
         xmlstring::xml_strdup,
     },

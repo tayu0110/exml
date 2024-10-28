@@ -14,7 +14,14 @@ use std::{
 
 use libc::{memcpy, memset};
 
-use crate::{__xml_raise_error, private::buf::xml_buf_write_quoted_string};
+use crate::{
+    __xml_raise_error,
+    io::{
+        xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_create_filename,
+        XmlOutputBufferPtr,
+    },
+    private::buf::xml_buf_write_quoted_string,
+};
 
 use super::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -28,10 +35,6 @@ use super::{
         XML_XML_NAMESPACE,
     },
     uri::{xml_build_uri, xml_free_uri, xml_parse_uri, XmlURIPtr},
-    xml_io::{
-        xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_create_filename,
-        XmlOutputBufferPtr,
-    },
     xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcat, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
     xpath::XmlNodeSetPtr,

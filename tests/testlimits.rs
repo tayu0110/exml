@@ -13,6 +13,7 @@ use std::{
 use exml::{
     error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
     globals::{set_get_warnings_default_value, set_structured_error, GenericErrorContext},
+    io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
     libxml::{
         entities::XmlEntityPtr,
         parser::{
@@ -23,7 +24,6 @@ use exml::{
         },
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
         tree::{xml_free_doc, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr},
-        xml_io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,

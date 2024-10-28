@@ -20,6 +20,7 @@ use crate::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
     },
     globals::{GenericErrorContext, StructuredError},
+    io::{XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBuffer},
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
@@ -61,11 +62,6 @@ use crate::{
             xml_xinclude_new_context, xml_xinclude_process_node, xml_xinclude_set_flags,
             xml_xinclude_set_streaming_mode, XmlXincludeCtxtPtr,
         },
-        xml_io::{
-            xml_alloc_parser_input_buffer, xml_parser_get_directory,
-            xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_io,
-            xml_parser_input_buffer_create_mem, XmlInputCloseCallback, XmlInputReadCallback,
-        },
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
             xml_schema_is_valid, xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
@@ -80,8 +76,6 @@ use crate::{
         xml_buf_create_size, xml_buf_empty, xml_buf_reset_input, xml_buf_set_allocation_scheme,
     },
 };
-
-use super::xml_io::XmlParserInputBuffer;
 
 /**
  * xmlParserSeverities:
@@ -765,7 +759,10 @@ pub unsafe fn xml_new_text_reader(
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderPtr {
-    use crate::encoding::XmlCharEncoding;
+    use crate::{
+        encoding::XmlCharEncoding,
+        io::{xml_parser_get_directory, xml_parser_input_buffer_create_filename},
+    };
 
     let mut directory: *mut c_char = null_mut();
 
@@ -895,6 +892,7 @@ pub unsafe fn xml_text_reader_setup(
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         generic_error,
+        io::xml_alloc_parser_input_buffer,
         libxml::xinclude::{xml_xinclude_free_context, XINCLUDE_NODE},
     };
 
@@ -5941,7 +5939,7 @@ pub unsafe extern "C" fn xml_reader_for_memory(
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
-    use crate::encoding::XmlCharEncoding;
+    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_mem};
 
     let Some(buf) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None) else {
         return null_mut();
@@ -5979,7 +5977,7 @@ pub unsafe extern "C" fn xml_reader_for_io(
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
-    use crate::encoding::XmlCharEncoding;
+    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_io};
 
     if ioread.is_none() {
         return null_mut();
@@ -6103,7 +6101,7 @@ pub unsafe extern "C" fn xml_reader_new_file(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
-    use crate::encoding::XmlCharEncoding;
+    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_filename};
 
     if filename.is_null() {
         return -1;
@@ -6143,7 +6141,7 @@ pub unsafe extern "C" fn xml_reader_new_memory(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
-    use crate::encoding::XmlCharEncoding;
+    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_mem};
 
     if reader.is_null() {
         return -1;
@@ -6186,7 +6184,7 @@ pub unsafe extern "C" fn xml_reader_new_io(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
-    use crate::encoding::XmlCharEncoding;
+    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_io};
 
     if ioread.is_none() {
         return -1;

@@ -10,6 +10,7 @@ use libc::{fclose, fopen, snprintf, FILE};
 use crate::{
     buf::XmlBuf,
     encoding::XmlCharEncoding,
+    io::{xml_parser_input_buffer_create_filename, XmlOutputBufferPtr, XmlParserInputBuffer},
     libxml::{
         catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
         chvalid::XmlChRangeGroup,
@@ -51,9 +52,6 @@ use crate::{
             XmlAttributeTablePtr, XmlElementTablePtr, XmlNotationTablePtr, XmlValidCtxtPtr,
         },
         xinclude::XmlXincludeCtxtPtr,
-        xml_io::{
-            xml_parser_input_buffer_create_filename, XmlOutputBufferPtr, XmlParserInputBuffer,
-        },
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
         xmlerror::XmlParserErrors,
         xmlmodule::XmlModulePtr,
@@ -732,7 +730,7 @@ pub(crate) fn des_xml_automata_state_ptr(_no: i32, _val: XmlAutomataStatePtr, _n
 
 #[cfg(feature = "output")]
 pub(crate) unsafe extern "C" fn desret_xml_output_buffer_ptr(val: XmlOutputBufferPtr) {
-    use crate::libxml::xml_io::xml_output_buffer_close;
+    use crate::io::xml_output_buffer_close;
 
     xml_output_buffer_close(val);
 }
@@ -1965,7 +1963,7 @@ pub(crate) unsafe extern "C" fn gen_xml_output_buffer_ptr(
     no: c_int,
     _nr: c_int,
 ) -> XmlOutputBufferPtr {
-    use crate::libxml::xml_io::xml_output_buffer_create_filename;
+    use crate::io::xml_output_buffer_create_filename;
 
     if no == 0 {
         return xml_output_buffer_create_filename(c"test.out".as_ptr() as _, None, 0);
@@ -1979,7 +1977,7 @@ pub(crate) unsafe extern "C" fn des_xml_output_buffer_ptr(
     val: XmlOutputBufferPtr,
     _nr: c_int,
 ) {
-    use crate::libxml::xml_io::xml_output_buffer_close;
+    use crate::io::xml_output_buffer_close;
 
     if !val.is_null() {
         xml_output_buffer_close(val);

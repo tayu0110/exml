@@ -22,6 +22,10 @@ use crate::{
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::XmlErrorDomain,
     globals::{get_indent_tree_output, GLOBAL_STATE},
+    io::{
+        xml_output_buffer_close, xml_output_buffer_create_filename, xml_output_buffer_create_io,
+        XmlOutputBufferPtr, XmlOutputCloseCallback, XmlOutputWriteCallback,
+    },
     libxml::{
         entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{xml_free, xml_malloc},
@@ -38,11 +42,6 @@ use crate::{
         valid::{
             xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table,
             XmlNotationTablePtr,
-        },
-        xml_io::{
-            xml_output_buffer_close, xml_output_buffer_create_filename,
-            xml_output_buffer_create_io, XmlOutputBufferPtr, XmlOutputCloseCallback,
-            XmlOutputWriteCallback,
         },
         xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strdup, XmlChar},

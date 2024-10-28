@@ -17,11 +17,11 @@ use libc::{memcpy, memset, ptrdiff_t, size_t, snprintf, strlen, FILE};
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
     error::XmlErrorDomain,
+    io::XmlOutputBufferPtr,
     libxml::{
         dict::xml_dict_free,
         entities::XmlEntityPtr,
         valid::{xml_free_id_table, xml_free_ref_table, xml_get_dtd_qattr_desc, xml_remove_id},
-        xml_io::{XmlOutputBuffer, XmlOutputBufferPtr},
         xmlstring::XmlChar,
     },
     private::{
@@ -9456,12 +9456,10 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
 
     use crate::{
         encoding::find_encoding_handler,
-        libxml::{
-            xml_io::{xml_alloc_output_buffer, xml_output_buffer_close, XmlOutputBufferPtr},
-            xmlsave::{
-                xml_doc_content_dump_output, xml_save_ctxt_init, xml_save_err, xml_save_err_memory,
-                XmlSaveCtxt, XmlSaveOption,
-            },
+        io::{xml_alloc_output_buffer, xml_output_buffer_close, XmlOutputBufferPtr},
+        libxml::xmlsave::{
+            xml_doc_content_dump_output, xml_save_ctxt_init, xml_save_err, xml_save_err_memory,
+            XmlSaveCtxt, XmlSaveOption,
         },
     };
 
@@ -9569,10 +9567,8 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
 
     use crate::{
         encoding::find_encoding_handler,
-        libxml::{
-            xml_io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
-            xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
-        },
+        io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
+        libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
     use super::xmlsave::XmlSaveCtxt;
@@ -9640,10 +9636,9 @@ pub unsafe extern "C" fn xml_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNodePtr) {
-    use crate::libxml::{
-        htmltree::html_node_dump_output,
-        parser::xml_init_parser,
-        xml_io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
+    use crate::{
+        io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
+        libxml::{htmltree::html_node_dump_output, parser::xml_init_parser},
     };
 
     xml_init_parser();
@@ -9738,7 +9733,8 @@ pub unsafe extern "C" fn xml_buf_node_dump(
 ) -> size_t {
     use crate::{
         buf::XmlBufRef,
-        libxml::{xml_io::XmlOutputBufferPtr, xmlsave::xml_save_err_memory},
+        io::{XmlOutputBuffer, XmlOutputBufferPtr},
+        libxml::xmlsave::xml_save_err_memory,
         private::buf::xml_buf_get_allocation_scheme,
     };
 
@@ -9834,9 +9830,9 @@ pub unsafe extern "C" fn xml_save_file_to(
 ) -> c_int {
     use std::mem::{size_of_val, zeroed};
 
-    use crate::libxml::{
-        xml_io::xml_output_buffer_close,
-        xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
+    use crate::{
+        io::xml_output_buffer_close,
+        libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
     use super::xmlsave::XmlSaveCtxt;
@@ -9884,9 +9880,9 @@ pub unsafe extern "C" fn xml_save_format_file_to(
 ) -> c_int {
     use std::mem::{size_of_val, zeroed};
 
-    use crate::libxml::{
-        xml_io::xml_output_buffer_close,
-        xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
+    use crate::{
+        io::xml_output_buffer_close,
+        libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
     use super::xmlsave::XmlSaveCtxt;
@@ -10023,10 +10019,8 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
 
     use crate::{
         encoding::find_encoding_handler,
-        libxml::{
-            xml_io::{xml_output_buffer_close, xml_output_buffer_create_filename},
-            xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
-        },
+        io::{xml_output_buffer_close, xml_output_buffer_create_filename},
+        libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
     use super::xmlsave::XmlSaveCtxt;

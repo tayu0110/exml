@@ -44,32 +44,30 @@ use crate::{
     error::{XmlErrorDomain, XmlErrorLevel},
     globals::{GenericError, StructuredError, GLOBAL_STATE},
     libxml::{
-        globals::xml_mem_strdup,
-        parser::{XmlParserInputState, XML_SAX2_MAGIC},
-        parser_internals::{xml_free_input_stream, xml_switch_input_encoding},
-        xmlstring::{xml_strdup, xml_strstr},
+        catalog::{
+            xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
+            xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
+        },
+        globals::{xml_free, xml_malloc, xml_mem_strdup},
+        nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
+        nanohttp::{
+            xml_nanohttp_close, xml_nanohttp_encoding, xml_nanohttp_method, xml_nanohttp_mime_type,
+            xml_nanohttp_open, xml_nanohttp_read, xml_nanohttp_redir, xml_nanohttp_return_code,
+        },
+        parser::{
+            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption,
+            XML_SAX2_MAGIC,
+        },
+        parser_internals::{
+            xml_free_input_stream, xml_new_input_from_file, xml_switch_input_encoding,
+        },
+        tree::XmlBufferAllocationScheme,
+        uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
+        xmlerror::XmlParserErrors,
+        xmlstring::{xml_str_equal, xml_strdup, xml_strncasecmp, xml_strstr, XmlChar},
     },
     private::{error::__xml_simple_error, parser::__xml_err_encoding},
     xml_str_printf,
-};
-
-use super::{
-    catalog::{
-        xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
-        xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
-    },
-    globals::{xml_free, xml_malloc},
-    nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
-    nanohttp::{
-        xml_nanohttp_close, xml_nanohttp_encoding, xml_nanohttp_method, xml_nanohttp_mime_type,
-        xml_nanohttp_open, xml_nanohttp_read, xml_nanohttp_redir, xml_nanohttp_return_code,
-    },
-    parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption},
-    parser_internals::xml_new_input_from_file,
-    tree::XmlBufferAllocationScheme,
-    uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
-    xmlerror::XmlParserErrors,
-    xmlstring::{xml_str_equal, xml_strncasecmp, XmlChar},
 };
 
 /**

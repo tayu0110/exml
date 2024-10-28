@@ -22,6 +22,10 @@ use crate::encoding::{
     XmlCharEncodingHandler,
 };
 use crate::globals::{get_parser_debug_entities, GenericErrorContext};
+use crate::io::{
+    __xml_loader_err, xml_check_http_input, xml_parser_get_directory,
+    xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_mem,
+};
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::libxml::dict::xml_dict_owns;
@@ -80,10 +84,6 @@ use super::tree::{
     XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
 };
 use super::uri::{xml_build_uri, xml_canonic_path};
-use super::xml_io::{
-    __xml_loader_err, xml_check_http_input, xml_parser_get_directory,
-    xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_mem,
-};
 use super::xmlstring::{
     xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
 };

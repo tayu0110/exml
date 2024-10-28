@@ -17,6 +17,7 @@ use exml::{
     globals::{
         reset_last_error, set_generic_error, set_get_warnings_default_value, GenericErrorContext,
     },
+    io::xml_no_net_external_entity_loader,
     libxml::{
         globals::xml_free,
         parser::{
@@ -37,7 +38,6 @@ use exml::{
             xml_get_prop, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr,
         },
         uri::xml_build_uri,
-        xml_io::xml_no_net_external_entity_loader,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,

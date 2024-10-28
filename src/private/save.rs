@@ -6,9 +6,9 @@
 use std::{ffi::c_int, ptr::null_mut, sync::atomic::Ordering};
 
 use crate::{
+    io::XmlOutputBufferPtr,
     libxml::{
         tree::{XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlNsPtr},
-        xml_io::XmlOutputBufferPtr,
         xmlerror::XmlParserErrors,
         xmlsave::{xml_ns_dump_output, xml_save_err, xml_serialize_hex_char_ref},
         xmlstring::XmlChar,

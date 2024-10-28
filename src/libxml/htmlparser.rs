@@ -22,6 +22,10 @@ use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
     globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
+    io::{
+        xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
+        XmlInputCloseCallback, XmlInputReadCallback,
+    },
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -44,11 +48,6 @@ use crate::{
             xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
         },
         uri::xml_canonic_path,
-        xml_io::{
-            xml_alloc_parser_input_buffer, xml_parser_get_directory,
-            xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
-            XmlInputCloseCallback, XmlInputReadCallback,
-        },
         xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strcmp, xml_strdup, xml_strlen,
@@ -10831,6 +10830,8 @@ pub unsafe fn html_create_push_parser_ctxt(
     enc: XmlCharEncoding,
 ) -> HtmlParserCtxtPtr {
     use std::slice::from_raw_parts;
+
+    use crate::io::{xml_alloc_parser_input_buffer, xml_parser_get_directory};
 
     xml_init_parser();
 

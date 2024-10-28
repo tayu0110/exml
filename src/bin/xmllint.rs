@@ -30,6 +30,10 @@ use exml::{
         get_load_ext_dtd_default_value, set_load_ext_dtd_default_value, set_parser_debug_entities,
         set_tree_indent_string, GenericError, GenericErrorContext,
     },
+    io::{
+        xml_file_flush, xml_file_write, xml_no_net_external_entity_loader,
+        xml_parser_input_buffer_create_filename,
+    },
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
@@ -78,10 +82,6 @@ use exml::{
             xml_valid_get_valid_elements, xml_validate_document, xml_validate_dtd,
         },
         xinclude::xml_xinclude_process_flags,
-        xml_io::{
-            xml_file_flush, xml_file_write, xml_no_net_external_entity_loader,
-            xml_parser_input_buffer_create_filename,
-        },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_size,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
@@ -2253,10 +2253,12 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
  ************************************************************************/
 #[cfg(feature = "xpath")]
 unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
-    use exml::libxml::{
-        tree::{xml_node_dump_output, XmlNodePtr},
-        xml_io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
-        xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
+    use exml::{
+        io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
+        libxml::{
+            tree::{xml_node_dump_output, XmlNodePtr},
+            xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
+        },
     };
 
     match (*cur).typ {

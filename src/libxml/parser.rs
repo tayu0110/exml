@@ -35,6 +35,14 @@ use crate::{
         GenericErrorContext, StructuredError,
     },
     hash::XmlHashTableRef,
+    io::{
+        xml_alloc_parser_input_buffer, xml_cleanup_input_callbacks, xml_cleanup_output_callbacks,
+        xml_default_external_entity_loader, xml_ioerr_memory, xml_no_net_exists,
+        xml_parser_get_directory, xml_parser_input_buffer_create_io,
+        xml_parser_input_buffer_create_mem, xml_register_default_input_callbacks,
+        xml_register_default_output_callbacks, XmlInputCloseCallback, XmlInputReadCallback,
+        XmlParserInputBuffer,
+    },
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
         dict::{
@@ -88,13 +96,6 @@ use crate::{
             xml_free_doc_element_content, xml_free_enumeration, xml_is_mixed_element,
             xml_new_doc_element_content, xml_validate_root, XmlValidCtxt,
         },
-        xml_io::{
-            xml_alloc_parser_input_buffer, xml_cleanup_input_callbacks,
-            xml_cleanup_output_callbacks, xml_default_external_entity_loader, xml_ioerr_memory,
-            xml_no_net_exists, xml_parser_get_directory, xml_parser_input_buffer_create_io,
-            xml_parser_input_buffer_create_mem, xml_register_default_input_callbacks,
-            xml_register_default_output_callbacks, XmlInputCloseCallback, XmlInputReadCallback,
-        },
         xmlerror::XmlParserErrors,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
@@ -125,8 +126,6 @@ use crate::{
     IS_BLANK_CH, IS_BYTE_CHAR, IS_CHAR, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
     IS_PUBIDCHAR_CH,
 };
-
-use super::xml_io::XmlParserInputBuffer;
 
 /**
  * XML_DEFAULT_VERSION:
@@ -3167,6 +3166,8 @@ pub unsafe extern "C" fn xml_sax_parse_file_with_data(
     recovery: c_int,
     data: *mut c_void,
 ) -> XmlDocPtr {
+    use crate::io::xml_parser_get_directory;
+
     let ret: XmlDocPtr;
 
     xml_init_parser();
@@ -5319,6 +5320,8 @@ pub unsafe fn xml_create_push_parser_ctxt(
     size: c_int,
     filename: *const c_char,
 ) -> XmlParserCtxtPtr {
+    use crate::io::{xml_alloc_parser_input_buffer, xml_parser_get_directory};
+
     let buf = Rc::new(RefCell::new(xml_alloc_parser_input_buffer(
         XmlCharEncoding::None,
     )));

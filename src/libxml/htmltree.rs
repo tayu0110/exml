@@ -12,6 +12,8 @@ use std::{
 
 use libc::{memset, size_t, snprintf, FILE};
 
+use crate::io::XmlOutputBufferPtr;
+
 use super::{
     globals::{xml_malloc, xml_register_node_default_value},
     htmlparser::{html_err_memory, HtmlDocPtr, HtmlNodePtr},
@@ -20,7 +22,6 @@ use super::{
         xml_new_doc_node, xml_new_prop, xml_set_prop, xml_unlink_node, XmlAttrPtr, XmlBufPtr,
         XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
-    xml_io::XmlOutputBufferPtr,
     xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strstr, XmlChar},
 };
@@ -525,12 +526,8 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
 
     use crate::{
         encoding::find_encoding_handler,
-        libxml::{
-            parser::xml_init_parser,
-            xml_io::{xml_alloc_output_buffer_internal, xml_output_buffer_close},
-            xmlerror::XmlParserErrors,
-            xmlstring::xml_strndup,
-        },
+        io::{xml_alloc_output_buffer_internal, xml_output_buffer_close, XmlOutputBufferPtr},
+        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors, xmlstring::xml_strndup},
     };
 
     xml_init_parser();
@@ -620,11 +617,8 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
 
     use crate::{
         encoding::find_encoding_handler,
-        libxml::{
-            parser::xml_init_parser,
-            xml_io::{xml_output_buffer_close, xml_output_buffer_create_file},
-            xmlerror::XmlParserErrors,
-        },
+        io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
+        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
     };
 
     xml_init_parser();
@@ -681,11 +675,8 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
 
     use crate::{
         encoding::find_encoding_handler,
-        libxml::{
-            parser::xml_init_parser,
-            xml_io::{xml_output_buffer_close, xml_output_buffer_create_filename},
-            xmlerror::XmlParserErrors,
-        },
+        io::{xml_output_buffer_close, xml_output_buffer_create_filename, XmlOutputBufferPtr},
+        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
     };
 
     if cur.is_null() || filename.is_null() {
@@ -777,7 +768,8 @@ unsafe extern "C" fn html_buf_node_dump_format(
 ) -> size_t {
     use crate::{
         buf::XmlBufRef,
-        libxml::{globals::xml_free, tree::xml_buf_use, xml_io::XmlOutputBuffer},
+        io::{XmlOutputBuffer, XmlOutputBufferPtr},
+        libxml::{globals::xml_free, tree::xml_buf_use},
     };
 
     if cur.is_null() {
@@ -881,11 +873,8 @@ pub unsafe extern "C" fn html_node_dump_file_format(
 
     use crate::{
         encoding::find_encoding_handler,
-        libxml::{
-            parser::xml_init_parser,
-            xml_io::{xml_output_buffer_close, xml_output_buffer_create_file},
-            xmlerror::XmlParserErrors,
-        },
+        io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
+        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
     };
 
     xml_init_parser();
@@ -967,11 +956,8 @@ pub unsafe extern "C" fn html_save_file_format(
 
     use crate::{
         encoding::find_encoding_handler,
-        libxml::{
-            parser::xml_init_parser,
-            xml_io::{xml_output_buffer_close, xml_output_buffer_create_filename},
-            xmlerror::XmlParserErrors,
-        },
+        io::{xml_output_buffer_close, xml_output_buffer_create_filename, XmlOutputBufferPtr},
+        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
     };
 
     if cur.is_null() || filename.is_null() {
