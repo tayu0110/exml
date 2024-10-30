@@ -51,6 +51,49 @@ pub struct XmlNanoHTTPCtxt {
     mime_type: Option<Cow<'static, str>>,    /* Mime-Type extracted from the contentType */
 }
 
+impl XmlNanoHTTPCtxt {
+    // This function try to open a connection to the indicated resource via HTTP GET.
+    //
+    // Returns NULL in case of failure, otherwise a request handler.
+    // The contentType, if provided must be freed by the caller
+    //
+    #[doc(alias = "xmlNanoHTTPOpen")]
+    pub fn open(
+        url: &str,
+        content_type: &mut Option<Cow<'static, str>>,
+    ) -> io::Result<XmlNanoHTTPCtxt> {
+        xml_nanohttp_method(url, None, None, content_type, None)
+    }
+
+    /// Get the latest HTTP return code received.  
+    /// Returns the HTTP return code for the request.
+    #[doc(alias = "xmlNanoHTTPReturnCode")]
+    pub fn return_code(&self) -> i32 {
+        self.return_value
+    }
+
+    /// Provides the specified Mime-Type if specified in the HTTP headers.  
+    /// Return the specified Mime-Type or NULL if not available
+    #[doc(alias = "xmlNanoHTTPMimeType")]
+    pub fn mime_type(&self) -> Option<&str> {
+        self.mime_type.as_deref()
+    }
+
+    /// Provides the specified encoding if specified in the HTTP headers.  
+    /// Return the specified encoding or NULL if not available
+    #[doc(alias = "xmlNanoHTTPEncoding")]
+    pub fn encoding(&self) -> Option<&str> {
+        self.encoding.as_deref()
+    }
+
+    /// Provides the specified redirection URL if available from the HTTP header.  
+    /// Return the specified redirection URL or NULL if not redirected.
+    #[doc(alias = "xmlNanoHTTPRedir")]
+    pub fn redirection(&self) -> Option<&str> {
+        self.location.as_deref()
+    }
+}
+
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static PROXY: Mutex<String> = Mutex::new(String::new()); /* the proxy name if any */
 static PROXY_PORT: AtomicI32 = AtomicI32::new(0); /* the proxy port if any */
@@ -257,7 +300,7 @@ pub fn xml_nanohttp_fetch(
     content_type: &mut Option<Cow<'static, str>>,
 ) -> io::Result<()> {
     let mut len = 0;
-    let mut ctxt = xml_nanohttp_open(url, content_type)?;
+    let mut ctxt = XmlNanoHTTPCtxt::open(url, content_type)?;
 
     let mut writer: Box<dyn Write> = if filename == "-" {
         Box::new(stdout())
@@ -847,25 +890,6 @@ pub fn xml_nanohttp_method_redir(
 }
 
 /**
- * xmlNanoHTTPOpen:
- * @URL:  The URL to load
- * @contentType:  if available the Content-Type information will be
- *                returned at that location
- *
- * This function try to open a connection to the indicated resource
- * via HTTP GET.
- *
- * Returns NULL in case of failure, otherwise a request handler.
- *     The contentType, if provided must be freed by the caller
- */
-pub fn xml_nanohttp_open(
-    url: &str,
-    content_type: &mut Option<Cow<'static, str>>,
-) -> io::Result<XmlNanoHTTPCtxt> {
-    xml_nanohttp_method(url, None, None, content_type, None)
-}
-
-/**
  * xmlNanoHTTPOpenRedir:
  * @URL:  The URL to load
  * @contentType:  if available the Content-Type information will be
@@ -887,18 +911,6 @@ pub fn xml_nanohttp_open_redir(
 }
 
 /**
- * xmlNanoHTTPReturnCode:
- * @ctx:  the HTTP context
- *
- * Get the latest HTTP return code received
- *
- * Returns the HTTP return code for the request.
- */
-pub fn xml_nanohttp_return_code(ctxt: &mut XmlNanoHTTPCtxt) -> i32 {
-    ctxt.return_value
-}
-
-/**
  * xmlNanoHTTPAuthHeader:
  * @ctx:  the HTTP context
  *
@@ -909,18 +921,6 @@ pub fn xml_nanohttp_return_code(ctxt: &mut XmlNanoHTTPCtxt) -> i32 {
  */
 pub fn xml_nanohttp_auth_header(ctxt: &mut XmlNanoHTTPCtxt) -> Option<String> {
     ctxt.auth_header.as_deref().map(|s| s.to_owned())
-}
-
-/**
- * xmlNanoHTTPRedir:
- * @ctx:  the HTTP context
- *
- * Provides the specified redirection URL if available from the HTTP header.
- *
- * Return the specified redirection URL or NULL if not redirected.
- */
-pub fn xml_nanohttp_redir(ctxt: &mut XmlNanoHTTPCtxt) -> Option<String> {
-    ctxt.location.as_deref().map(|s| s.to_owned())
 }
 
 /**
@@ -935,30 +935,6 @@ pub fn xml_nanohttp_redir(ctxt: &mut XmlNanoHTTPCtxt) -> Option<String> {
  */
 pub fn xml_nanohttp_content_length(ctxt: &mut XmlNanoHTTPCtxt) -> i32 {
     ctxt.content_length
-}
-
-/**
- * xmlNanoHTTPEncoding:
- * @ctx:  the HTTP context
- *
- * Provides the specified encoding if specified in the HTTP headers.
- *
- * Return the specified encoding or NULL if not available
- */
-pub fn xml_nanohttp_encoding(ctxt: &mut XmlNanoHTTPCtxt) -> Option<String> {
-    ctxt.encoding.as_deref().map(|s| s.to_owned())
-}
-
-/**
- * xmlNanoHTTPMimeType:
- * @ctx:  the HTTP context
- *
- * Provides the specified Mime-Type if specified in the HTTP headers.
- *
- * Return the specified Mime-Type or NULL if not available
- */
-pub fn xml_nanohttp_mime_type(ctxt: &mut XmlNanoHTTPCtxt) -> Option<String> {
-    ctxt.mime_type.as_deref().map(|s| s.to_owned())
 }
 
 /**
@@ -1036,4 +1012,29 @@ pub fn xml_nanohttp_save(ctxt: &mut XmlNanoHTTPCtxt, filename: &str) -> i32 {
     }
 
     ret
+}
+
+impl Read for XmlNanoHTTPCtxt {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        let mut len = buf.len();
+        while self.inptr - self.inrptr < len {
+            if xml_nanohttp_recv(self)
+                .ok()
+                .filter(|&len| len > 0)
+                .is_none()
+            {
+                break;
+            }
+        }
+        if self.inptr - self.inrptr < len {
+            len = self.inptr - self.inrptr;
+        }
+        buf[..len].copy_from_slice(&self.input[self.inrptr..self.inrptr + len]);
+        self.inrptr += len;
+        Ok(len)
+    }
 }

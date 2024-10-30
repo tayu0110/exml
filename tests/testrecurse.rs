@@ -5,6 +5,7 @@ use std::{
     env::args,
     ffi::{c_char, c_int, c_ulong, c_void, CStr},
     fs::metadata,
+    io::{self, Read},
     mem::zeroed,
     process::exit,
     ptr::{addr_of_mut, null_mut},
@@ -16,7 +17,7 @@ use exml::{
     globals::{
         reset_last_error, set_get_warnings_default_value, set_structured_error, GenericErrorContext,
     },
-    io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
+    io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         parser::{
@@ -387,13 +388,41 @@ unsafe extern "C" fn initialize_libxml2() {
     /*
      * register the new I/O handlers
      */
-    if xml_register_input_callbacks(
-        Some(huge_match),
-        Some(huge_open),
-        Some(huge_read),
-        Some(huge_close),
-    ) < 0
-    {
+    struct HugeTestIO(*mut c_void);
+    impl Read for HugeTestIO {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let res = unsafe { huge_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
+            if res < 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(res as usize)
+            }
+        }
+    }
+    unsafe impl Send for HugeTestIO {}
+    impl Drop for HugeTestIO {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                unsafe {
+                    huge_close(self.0);
+                }
+            }
+        }
+    }
+    impl XmlInputCallback for HugeTestIO {
+        fn is_match(&self, filename: &str) -> bool {
+            huge_match(filename) != 0
+        }
+        fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
+            let ptr = unsafe { huge_open(filename) };
+            if ptr.is_null() {
+                Err(io::Error::other("Failed to execute huge_open"))
+            } else {
+                Ok(Box::new(Self(ptr)))
+            }
+        }
+    }
+    if register_input_callbacks(HugeTestIO(null_mut())).is_err() {
         eprintln!("failed to register Huge handler");
         exit(1);
     }

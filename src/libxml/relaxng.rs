@@ -9,6 +9,7 @@ use std::{
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
+    slice::from_raw_parts,
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
@@ -8703,7 +8704,8 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
             return null_mut();
         }
     } else if !(*ctxt).buffer.is_null() {
-        doc = xml_read_memory((*ctxt).buffer, (*ctxt).size, null_mut(), null_mut(), 0);
+        let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize).to_vec();
+        doc = xml_read_memory(mem, null_mut(), null_mut(), 0);
         if doc.is_null() {
             xml_rng_perr(
                 ctxt,

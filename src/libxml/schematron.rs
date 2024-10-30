@@ -8,6 +8,7 @@ use std::{
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of, null, null_mut},
+    slice::from_raw_parts,
     sync::atomic::Ordering,
 };
 
@@ -1218,13 +1219,8 @@ pub unsafe extern "C" fn xml_schematron_parse(
         }
         (*ctxt).preserve = 0;
     } else if !(*ctxt).buffer.is_null() {
-        doc = xml_read_memory(
-            (*ctxt).buffer,
-            (*ctxt).size,
-            null_mut(),
-            null_mut(),
-            SCHEMATRON_PARSE_OPTIONS as i32,
-        );
+        let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize).to_vec();
+        doc = xml_read_memory(mem, null_mut(), null_mut(), SCHEMATRON_PARSE_OPTIONS as i32);
         if doc.is_null() {
             xml_schematron_perr(
                 ctxt,

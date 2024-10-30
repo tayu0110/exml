@@ -3202,8 +3202,7 @@ unsafe extern "C" fn xml_shell_set_content(
 
     let ret = xml_parse_in_node_context(
         node,
-        value,
-        strlen(value as _) as i32,
+        CStr::from_ptr(value).to_bytes().to_vec(),
         0,
         addr_of_mut!(results),
     );

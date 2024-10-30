@@ -1,9 +1,11 @@
 use std::{
+    any::{type_name, type_name_of_val},
     ffi::c_void,
-    ptr::{null, null_mut},
+    io::{self, Read},
+    ptr::null,
     str::from_utf8_mut,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, Ordering},
         Mutex,
     },
 };
@@ -15,17 +17,12 @@ use crate::{
         XmlCharEncodingHandler,
     },
     globals::GLOBAL_STATE,
-    io::{
-        xml_io_ftp_close, xml_io_ftp_match, xml_io_ftp_open, xml_io_ftp_read, xml_io_http_close,
-        xml_io_http_match, xml_io_http_open, xml_io_http_read,
-    },
+    io::DefaultHTTPIOCallbacks,
     libxml::{tree::XmlBufferAllocationScheme, xmlerror::XmlParserErrors},
+    nanohttp::XmlNanoHTTPCtxt,
 };
 
-use super::{
-    xml_file_close, xml_file_match, xml_file_open, xml_file_read, xml_ioerr, xml_ioerr_memory,
-    MINLEN,
-};
+use super::{xml_ioerr, xml_ioerr_memory, DefaultFileIOCallbacks, MINLEN};
 
 /**
  * xmlInputMatchCallback:
@@ -70,30 +67,28 @@ pub type XmlInputCloseCallback = unsafe extern "C" fn(context: *mut c_void) -> i
 
 #[repr(C)]
 pub struct XmlParserInputBuffer {
-    pub(crate) context: *mut c_void,
-    pub(crate) readcallback: Option<XmlInputReadCallback>,
-    pub(crate) closecallback: Option<XmlInputCloseCallback>,
+    pub(crate) context: Option<Box<dyn Read>>,
     pub(crate) encoder: Option<XmlCharEncodingHandler>, /* I18N conversions to UTF-8 */
     pub buffer: Option<XmlBufRef>,                      /* Local buffer encoded in UTF-8 */
     pub(crate) raw: Option<XmlBufRef>, /* if encoder != NULL buffer for raw input */
     pub(crate) compressed: i32,        /* -1=unknown, 0=not compressed, 1=compressed */
     pub(crate) error: XmlParserErrors,
     pub(crate) rawconsumed: u64, /* amount consumed from raw */
+    pub(in crate::io) use_nanohttp: bool,
 }
 
 impl XmlParserInputBuffer {
     #[doc(alias = "xmlAllocParserInputBuffer")]
     pub fn new(enc: XmlCharEncoding) -> Self {
         let mut ret = XmlParserInputBuffer {
-            context: null_mut(),
-            readcallback: None,
-            closecallback: None,
+            context: None,
             encoder: None,
             buffer: None,
             raw: None,
             compressed: 0,
             error: XmlParserErrors::default(),
             rawconsumed: 0,
+            use_nanohttp: false,
         };
         let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
         let mut new_buf = XmlBufRef::with_capacity(2 * default_buffer_size).unwrap();
@@ -105,9 +100,6 @@ impl XmlParserInputBuffer {
         } else {
             None
         };
-        ret.readcallback = None;
-        ret.closecallback = None;
-        ret.context = null_mut();
         ret.compressed = -1;
         ret.rawconsumed = 0;
         ret
@@ -208,7 +200,7 @@ impl XmlParserInputBuffer {
     ///
     /// Returns the number of chars read and stored in the buffer, or -1 in case of error.
     #[doc(alias = "xmlParserInputBufferRead")]
-    pub unsafe fn read(&mut self, len: i32) -> i32 {
+    pub fn read(&mut self, len: i32) -> i32 {
         self.grow(len)
     }
 
@@ -221,7 +213,7 @@ impl XmlParserInputBuffer {
     ///
     /// Returns the number of chars read and stored in the buffer, or -1 in case of error.
     #[doc(alias = "xmlParserInputBufferGrow")]
-    pub unsafe fn grow(&mut self, mut len: i32) -> i32 {
+    pub fn grow(&mut self, mut len: i32) -> i32 {
         let mut res: i32 = 0;
 
         if !self.error.is_ok() {
@@ -231,8 +223,8 @@ impl XmlParserInputBuffer {
             len = MINLEN as i32;
         }
 
-        let buf = if self.encoder.is_none() {
-            if self.readcallback.is_none() {
+        let mut buf = if self.encoder.is_none() {
+            if self.context.is_none() {
                 return 0;
             }
             self.buffer
@@ -246,40 +238,28 @@ impl XmlParserInputBuffer {
         /*
          * Call the read method for this I/O type.
          */
-        if let Some(callback) = self.readcallback {
+        if let Some(context) = self.context.as_mut() {
             if buf.map_or(true, |mut buf| buf.grow((len + 1) as usize).is_err()) {
-                xml_ioerr_memory(c"growing input buffer".as_ptr() as _);
+                unsafe {
+                    xml_ioerr_memory(c"growing input buffer".as_ptr() as _);
+                }
                 self.error = XmlParserErrors::XmlErrNoMemory;
                 return -1;
             }
 
-            res = callback(
-                self.context,
-                buf.map_or(null_mut(), |buf| {
-                    buf.as_ref().as_ptr().add(buf.len()) as *mut i8
-                }),
-                len,
-            );
-            if res <= 0 {
-                self.readcallback = Some(end_of_input);
-            }
-            if res < 0 {
+            let mut buffer = vec![0; len as usize];
+            let Ok(len) = context.read(&mut buffer) else {
                 return -1;
-            }
-
-            if buf.map_or(true, |mut buf| buf.add_len(res as usize).is_err()) {
-                return -1;
-            }
+            };
+            buf.as_mut().unwrap().push_bytes(&buffer[..len]);
+            res = len as i32;
         }
 
         /*
          * try to establish compressed status of input if not done already
          */
         if self.compressed == -1 {
-            // #ifdef LIBXML_LZMA_ENABLED
-            // 	if ((*input).readcallback == xmlXzfileRead)
-            //             (*input).compressed = __libxml2_xzcompressed((*input).context);
-            // #endif
+            // TODO: related with LIBXML_LZMA_ENABLED
         }
 
         if self.encoder.is_some() {
@@ -288,7 +268,9 @@ impl XmlParserInputBuffer {
              */
             let using = buf.map_or(0, |buf| buf.len());
             let Ok(written) = self.decode(true) else {
-                xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                unsafe {
+                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                }
                 self.error = XmlParserErrors::XmlIoEncoder;
                 return -1;
             };
@@ -349,16 +331,29 @@ impl XmlParserInputBuffer {
             buf.len() as i32
         }
     }
+
+    /// If the context of this buffer is `XmlNanoHTTPCtxt`, return the mutable context wrapped `Some`,
+    /// otherwise return `None`.
+    pub(crate) fn nanohttp_context(&mut self) -> Option<&mut XmlNanoHTTPCtxt> {
+        self.use_nanohttp
+            .then(|| {
+                self.context.as_deref_mut().map(|ctxt| unsafe {
+                    // Safety
+                    // `use_nanohttp` is true only when the context is `XmlNanoHTTPCtxt`.
+                    // The context is a Boxed Trait object,
+                    // a fat-pointer consisting of the original element and a pointer to the vtable.
+                    // As long as the constraints of `use_nanohttp` are observed, this conversion is safe.
+                    let ptr = ctxt as *mut dyn Read;
+                    let ptr = ptr as *mut XmlNanoHTTPCtxt;
+                    &mut *ptr
+                })
+            })
+            .flatten()
+    }
 }
 
 impl Drop for XmlParserInputBuffer {
     fn drop(&mut self) {
-        if let Some(callback) = self.closecallback {
-            unsafe {
-                callback(self.context);
-            }
-            self.context = null_mut();
-        }
         if let Some(buffer) = self.buffer.take() {
             buffer.free();
         }
@@ -368,168 +363,83 @@ impl Drop for XmlParserInputBuffer {
     }
 }
 
-/**
- * endOfInput:
- *
- * When reading from an Input channel indicated end of file or error
- * don't reread from it again.
- */
-unsafe extern "C" fn end_of_input(_context: *mut c_void, _bufferr: *mut i8, _len: i32) -> i32 {
-    0
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct XmlInputCallback {
-    pub(in crate::io) matchcallback: Option<XmlInputMatchCallback>,
-    pub(in crate::io) opencallback: Option<XmlInputOpenCallback>,
-    pub(in crate::io) readcallback: Option<XmlInputReadCallback>,
-    pub(in crate::io) closecallback: Option<XmlInputCloseCallback>,
+pub trait XmlInputCallback: Send {
+    fn is_match(&self, filename: &str) -> bool;
+    fn open(&mut self, filename: &str) -> io::Result<Box<dyn Read>>;
 }
 
 pub(crate) const MAX_INPUT_CALLBACK: usize = 15;
-pub(in crate::io) static XML_INPUT_CALLBACK_TABLE: Mutex<[XmlInputCallback; MAX_INPUT_CALLBACK]> =
-    Mutex::new(
-        [XmlInputCallback {
-            matchcallback: None,
-            opencallback: None,
-            readcallback: None,
-            closecallback: None,
-        }; MAX_INPUT_CALLBACK],
-    );
-pub(in crate::io) static XML_INPUT_CALLBACK_NR: AtomicUsize = AtomicUsize::new(0);
+pub(in crate::io) static XML_INPUT_CALLBACK_TABLE: Mutex<Vec<(Box<dyn XmlInputCallback>, bool)>> =
+    Mutex::new(vec![]);
 pub(in crate::io) static XML_INPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
-/*
- * Interfaces for input
- */
-/**
- * xmlCleanupInputCallbacks:
- *
- * clears the entire input callback table. this includes the
- * compiled-in I/O.
- */
-pub fn xml_cleanup_input_callbacks() {
+/// clears the entire input callback table. this includes the compiled-in I/O.
+#[doc(alias = "xmlCleanupInputCallbacks")]
+pub fn cleanup_input_callbacks() {
     let is_initialized = XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         return;
     }
 
-    let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
     let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
-    callbacks[..num_callbacks].fill(XmlInputCallback {
-        matchcallback: None,
-        opencallback: None,
-        readcallback: None,
-        closecallback: None,
-    });
+    callbacks.clear();
 
-    XML_INPUT_CALLBACK_NR.store(0, Ordering::Release);
     XML_INPUT_CALLBACK_INITIALIZED.store(false, Ordering::Release);
 }
 
-/**
- * xmlPopInputCallbacks:
- *
- * Clear the top input callback from the input stack. this includes the
- * compiled-in I/O.
- *
- * Returns the number of input callback registered or -1 in case of error.
- */
-pub fn xml_pop_input_callbacks() -> i32 {
+/// Clear the top input callback from the input stack. this includes the compiled-in I/O.  
+/// Returns the number of input callback registered after execution.
+///
+/// Even if no callbacks are registered, this function does not fail and return `0`.
+#[doc(alias = "xmlPopInputCallbacks")]
+pub fn pop_input_callbacks() -> usize {
     let is_initialized = XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
-        return -1;
+        return 0;
     }
 
-    let mut num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
-    if num_callbacks == 0 {
-        return -1;
-    }
-
-    num_callbacks -= 1;
     let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
-    callbacks[num_callbacks].matchcallback = None;
-    callbacks[num_callbacks].opencallback = None;
-    callbacks[num_callbacks].readcallback = None;
-    callbacks[num_callbacks].closecallback = None;
-
-    XML_INPUT_CALLBACK_NR.store(num_callbacks, Ordering::Release);
-    num_callbacks as _
+    callbacks.pop();
+    callbacks.len()
 }
 
-/**
- * xmlRegisterDefaultInputCallbacks:
- *
- * Registers the default compiled-in I/O handlers.
- */
-pub fn xml_register_default_input_callbacks() {
+/// Registers the default compiled-in I/O handlers.
+#[doc(alias = "xmlRegisterDefaultInputCallbacks")]
+pub fn register_default_input_callbacks() {
     if XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return;
     }
 
-    xml_register_input_callbacks(
-        Some(xml_file_match),
-        Some(xml_file_open),
-        Some(xml_file_read),
-        Some(xml_file_close),
-    );
-    // #ifdef LIBXML_ZLIB_ENABLED
-    //     xmlRegisterInputCallbacks(xmlGzfileMatch, xmlGzfileOpen,
-    // 	                      xmlGzfileRead, xmlGzfileClose);
-    // #endif /* LIBXML_ZLIB_ENABLED */
-    // #ifdef LIBXML_LZMA_ENABLED
-    //     xmlRegisterInputCallbacks(xmlXzfileMatch, xmlXzfileOpen,
-    // 	                      xmlXzfileRead, xmlXzfileClose);
-    // #endif /* LIBXML_LZMA_ENABLED */
+    register_input_callbacks(DefaultFileIOCallbacks);
     #[cfg(feature = "http")]
     {
-        xml_register_input_callbacks(
-            Some(xml_io_http_match),
-            Some(xml_io_http_open),
-            Some(xml_io_http_read),
-            Some(xml_io_http_close),
-        );
+        register_input_callbacks(DefaultHTTPIOCallbacks);
     }
     #[cfg(feature = "ftp")]
     {
-        xml_register_input_callbacks(
-            Some(xml_io_ftp_match),
-            Some(xml_io_ftp_open),
-            Some(xml_io_ftp_read),
-            Some(xml_io_ftp_close),
-        );
+        // TODO:
+        // xml_register_input_callbacks(
+        //     Some(xml_io_ftp_match),
+        //     Some(xml_io_ftp_open),
+        //     Some(xml_io_ftp_read),
+        //     Some(xml_io_ftp_close),
+        // );
     }
     XML_INPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
 }
 
-/**
- * xmlRegisterInputCallbacks:
- * @matchFunc:  the xmlInputMatchCallback
- * @openFunc:  the xmlInputOpenCallback
- * @readFunc:  the xmlInputReadCallback
- * @closeFunc:  the xmlInputCloseCallback
- *
- * Register a new set of I/O callback for handling parser input.
- *
- * Returns the registered handler number or -1 in case of error
- */
-pub fn xml_register_input_callbacks(
-    match_func: Option<XmlInputMatchCallback>,
-    open_func: Option<XmlInputOpenCallback>,
-    read_func: Option<XmlInputReadCallback>,
-    close_func: Option<XmlInputCloseCallback>,
-) -> i32 {
-    let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
-    if num_callbacks >= MAX_INPUT_CALLBACK {
-        return -1;
-    }
+/// Register a new set of I/O callback for handling parser input.  
+/// If success, returns the registered handler number wrapped `Ok`, otherwise return `Err`.
+///
+/// This function fails if the number of callbacks exceeds `MAX_INPUT_CALLBACKS`.
+#[doc(alias = "xmlRegisterInputCallbacks")]
+pub fn register_input_callbacks(callback: impl XmlInputCallback + 'static) -> io::Result<usize> {
     let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
-    callbacks[num_callbacks].matchcallback = match_func;
-    callbacks[num_callbacks].opencallback = open_func;
-    callbacks[num_callbacks].readcallback = read_func;
-    callbacks[num_callbacks].closecallback = close_func;
+    if callbacks.len() == MAX_INPUT_CALLBACK {
+        return Err(io::Error::other("Too many input callbacks."));
+    }
+    let is_nanohttp = type_name_of_val(&callback) == type_name::<DefaultHTTPIOCallbacks>();
+    callbacks.push((Box::new(callback), is_nanohttp));
     XML_INPUT_CALLBACK_INITIALIZED.store(true, Ordering::Relaxed);
-    XML_INPUT_CALLBACK_NR.store(num_callbacks + 1, Ordering::Release);
-    num_callbacks as _
+    Ok(callbacks.len())
 }

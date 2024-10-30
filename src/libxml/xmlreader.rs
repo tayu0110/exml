@@ -6,6 +6,7 @@
 use std::{
     any::type_name,
     ffi::{c_char, c_int, c_long, c_uint, c_ulong},
+    io::Read,
     mem::{size_of, size_of_val},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -20,7 +21,7 @@ use crate::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
     },
     globals::{GenericErrorContext, StructuredError},
-    io::{XmlInputCloseCallback, XmlInputReadCallback, XmlParserInputBuffer},
+    io::XmlParserInputBuffer,
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
@@ -1275,7 +1276,7 @@ unsafe extern "C" fn xml_text_reader_push_data(reader: &mut XmlTextReader) -> c_
              */
             if reader.mode != XmlTextReaderMode::XmlTextreaderModeEof as i32 {
                 val = reader.input.as_mut().unwrap().read(4096);
-                if val == 0 && reader.input.as_ref().unwrap().readcallback.is_none() {
+                if val == 0 && reader.input.as_ref().unwrap().context.is_none() {
                     if xml_buf_use(inbuf) == reader.cur as _ {
                         reader.mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
                         reader.state = oldstate;
@@ -1333,7 +1334,7 @@ unsafe extern "C" fn xml_text_reader_push_data(reader: &mut XmlTextReader) -> c_
      * Discard the consumed input when needed and possible
      */
     if reader.mode == XmlTextReaderMode::XmlTextreaderModeInteractive as i32 {
-        if reader.input.as_ref().unwrap().readcallback.is_some()
+        if reader.input.as_ref().unwrap().context.is_some()
             && (reader.cur >= 4096 && xml_buf_use(inbuf) - reader.cur as usize <= CHUNK_SIZE)
         {
             val = xml_buf_shrink(inbuf, reader.cur as _) as _;
@@ -5893,12 +5894,18 @@ pub unsafe extern "C" fn xml_reader_for_doc(
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
+    use std::ffi::CStr;
+
     if cur.is_null() {
         return null_mut();
     }
-    let len: c_int = xml_strlen(cur);
 
-    xml_reader_for_memory(cur as _, len, url, encoding, options)
+    xml_reader_for_memory(
+        CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
+        url,
+        encoding,
+        options,
+    )
 }
 
 /**
@@ -5940,21 +5947,19 @@ pub unsafe extern "C" fn xml_reader_for_file(
  * Returns the new reader or NULL in case of error.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_for_memory(
-    buffer: *const c_char,
-    size: c_int,
+pub unsafe fn xml_reader_for_memory(
+    buffer: Vec<u8>,
     url: *const c_char,
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
     use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_mem};
 
-    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None) else {
+    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
         return null_mut();
     };
     let reader: XmlTextReaderPtr = xml_new_text_reader(buf, url);
     if reader.is_null() {
-        // xml_free_parser_input_buffer(buf);
         return null_mut();
     }
     (*reader).allocs |= XML_TEXTREADER_INPUT;
@@ -5978,30 +5983,18 @@ pub unsafe extern "C" fn xml_reader_for_memory(
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_for_io(
-    ioread: Option<XmlInputReadCallback>,
-    ioclose: Option<XmlInputCloseCallback>,
-    ioctx: *mut c_void,
+    ioctx: impl Read + 'static,
     url: *const c_char,
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
     use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_io};
 
-    if ioread.is_none() {
-        return null_mut();
-    }
-
-    let Some(input) =
-        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None)
-    else {
-        if let Some(ioclose) = ioclose {
-            ioclose(ioctx);
-        }
+    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
         return null_mut();
     };
     let reader: XmlTextReaderPtr = xml_new_text_reader(input, url);
     if reader.is_null() {
-        // xml_free_parser_input_buffer(input);
         return null_mut();
     }
     (*reader).allocs |= XML_TEXTREADER_INPUT;
@@ -6078,6 +6071,8 @@ pub unsafe extern "C" fn xml_reader_new_doc(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
+    use std::ffi::CStr;
+
     if cur.is_null() {
         return -1;
     }
@@ -6085,8 +6080,13 @@ pub unsafe extern "C" fn xml_reader_new_doc(
         return -1;
     }
 
-    let len: c_int = xml_strlen(cur);
-    xml_reader_new_memory(reader, cur as _, len, url, encoding, options)
+    xml_reader_new_memory(
+        reader,
+        CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
+        url,
+        encoding,
+        options,
+    )
 }
 
 /**
@@ -6145,10 +6145,9 @@ pub unsafe extern "C" fn xml_reader_new_file(
  * Returns 0 in case of success and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_new_memory(
+pub unsafe fn xml_reader_new_memory(
     reader: XmlTextReaderPtr,
-    buffer: *const c_char,
-    size: c_int,
+    buffer: Vec<u8>,
     url: *const c_char,
     encoding: *const c_char,
     options: c_int,
@@ -6158,12 +6157,8 @@ pub unsafe extern "C" fn xml_reader_new_memory(
     if reader.is_null() {
         return -1;
     }
-    if buffer.is_null() {
-        return -1;
-    }
 
-    let Some(input) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None)
-    else {
+    let Some(input) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
         return -1;
     };
     xml_text_reader_setup(reader, Some(input), url, encoding, options)
@@ -6189,28 +6184,18 @@ pub unsafe extern "C" fn xml_reader_new_memory(
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_new_io(
     reader: XmlTextReaderPtr,
-    ioread: Option<XmlInputReadCallback>,
-    ioclose: Option<XmlInputCloseCallback>,
-    ioctx: *mut c_void,
+    ioctx: impl Read + 'static,
     url: *const c_char,
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
     use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_io};
 
-    if ioread.is_none() {
-        return -1;
-    }
     if reader.is_null() {
         return -1;
     }
 
-    let Some(input) =
-        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None)
-    else {
-        if let Some(ioclose) = ioclose {
-            ioclose(ioctx);
-        }
+    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
         return -1;
     };
     xml_text_reader_setup(reader, Some(input), url, encoding, options)
@@ -6669,60 +6654,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_reader_for_memory() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buffer in 0..GEN_NB_CONST_CHAR_PTR {
-                for n_size in 0..GEN_NB_INT {
-                    for n_url in 0..GEN_NB_FILEPATH {
-                        for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            for n_options in 0..GEN_NB_PARSEROPTIONS {
-                                let mem_base = xml_mem_blocks();
-                                let buffer = gen_const_char_ptr(n_buffer, 0);
-                                let mut size = gen_int(n_size, 1);
-                                let url = gen_filepath(n_url, 2);
-                                let encoding = gen_const_char_ptr(n_encoding, 3);
-                                let options = gen_parseroptions(n_options, 4);
-                                if !buffer.is_null() && size > xml_strlen(buffer as _) {
-                                    size = 0;
-                                }
-
-                                let ret_val =
-                                    xml_reader_for_memory(buffer, size, url, encoding, options);
-                                desret_xml_text_reader_ptr(ret_val);
-                                des_const_char_ptr(n_buffer, buffer, 0);
-                                des_int(n_size, size, 1);
-                                des_filepath(n_url, url, 2);
-                                des_const_char_ptr(n_encoding, encoding, 3);
-                                des_parseroptions(n_options, options, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlReaderForMemory",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlReaderForMemory()"
-                                    );
-                                    eprint!(" {}", n_buffer);
-                                    eprint!(" {}", n_size);
-                                    eprint!(" {}", n_url);
-                                    eprint!(" {}", n_encoding);
-                                    eprintln!(" {}", n_options);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_reader_new_doc() {
         #[cfg(feature = "libxml_reader")]
         unsafe {
@@ -6810,66 +6741,6 @@ mod tests {
                                 eprint!(" {}", n_filename);
                                 eprint!(" {}", n_encoding);
                                 eprintln!(" {}", n_options);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reader_new_memory() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                for n_buffer in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_size in 0..GEN_NB_INT {
-                        for n_url in 0..GEN_NB_FILEPATH {
-                            for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                                for n_options in 0..GEN_NB_PARSEROPTIONS {
-                                    let mem_base = xml_mem_blocks();
-                                    let reader = gen_xml_text_reader_ptr(n_reader, 0);
-                                    let buffer = gen_const_char_ptr(n_buffer, 1);
-                                    let mut size = gen_int(n_size, 2);
-                                    let url = gen_filepath(n_url, 3);
-                                    let encoding = gen_const_char_ptr(n_encoding, 4);
-                                    let options = gen_parseroptions(n_options, 5);
-                                    if !buffer.is_null() && size > xml_strlen(buffer as _) {
-                                        size = 0;
-                                    }
-
-                                    let ret_val = xml_reader_new_memory(
-                                        reader, buffer, size, url, encoding, options,
-                                    );
-                                    desret_int(ret_val);
-                                    des_xml_text_reader_ptr(n_reader, reader, 0);
-                                    des_const_char_ptr(n_buffer, buffer, 1);
-                                    des_int(n_size, size, 2);
-                                    des_filepath(n_url, url, 3);
-                                    des_const_char_ptr(n_encoding, encoding, 4);
-                                    des_parseroptions(n_options, options, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlReaderNewMemory",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        assert!(
-                                            leaks == 0,
-                                            "{leaks} Leaks are found in xmlReaderNewMemory()"
-                                        );
-                                        eprint!(" {}", n_reader);
-                                        eprint!(" {}", n_buffer);
-                                        eprint!(" {}", n_size);
-                                        eprint!(" {}", n_url);
-                                        eprint!(" {}", n_encoding);
-                                        eprintln!(" {}", n_options);
-                                    }
-                                }
                             }
                         }
                     }

@@ -793,14 +793,8 @@ pub unsafe extern "C" fn xml_create_url_parser_ctxt(
  *
  * Returns the new parser context or NULL
  */
-pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
-    buffer: *const c_char,
-    size: c_int,
-) -> XmlParserCtxtPtr {
-    if buffer.is_null() {
-        return null_mut();
-    }
-    if size <= 0 {
+pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr {
+    if buffer.is_empty() {
         return null_mut();
     }
 
@@ -809,14 +803,13 @@ pub unsafe extern "C" fn xml_create_memory_parser_ctxt(
         return null_mut();
     }
 
-    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None) else {
+    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     };
 
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
-        // xml_free_parser_input_buffer(buf);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -1323,8 +1316,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
         );
     }
     let Some(buf) = xml_parser_input_buffer_create_mem(
-        buffer as *const c_char,
-        xml_strlen(buffer),
+        CStr::from_ptr(buffer as *const i8).to_bytes().to_vec(),
         XmlCharEncoding::None,
     ) else {
         xml_err_memory(ctxt, null());
@@ -4618,9 +4610,8 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         return XmlParserErrors::XmlErrInternalError;
     }
 
-    let size: c_int = xml_strlen(string);
-
-    let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(string as _, size);
+    let ctxt: XmlParserCtxtPtr =
+        xml_create_memory_parser_ctxt(CStr::from_ptr(string as *const i8).to_bytes().to_vec());
     if ctxt.is_null() {
         return XmlParserErrors::XmlWarUndeclaredEntity;
     }
@@ -8728,43 +8719,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlCreateFileParserCtxt()"
                     );
                     eprintln!(" {}", n_filename);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_create_memory_parser_ctxt() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buffer in 0..GEN_NB_CONST_CHAR_PTR {
-                for n_size in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let buffer = gen_const_char_ptr(n_buffer, 0);
-                    let mut size = gen_int(n_size, 1);
-                    if !buffer.is_null() && size > xml_strlen(buffer as _) {
-                        size = 0;
-                    }
-
-                    let ret_val = xml_create_memory_parser_ctxt(buffer, size);
-                    desret_xml_parser_ctxt_ptr(ret_val);
-                    des_const_char_ptr(n_buffer, buffer, 0);
-                    des_int(n_size, size, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCreateMemoryParserCtxt",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlCreateMemoryParserCtxt()"
-                        );
-                        eprint!(" {}", n_buffer);
-                        eprintln!(" {}", n_size);
-                    }
                 }
             }
         }

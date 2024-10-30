@@ -10,6 +10,7 @@ use std::{
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
+    slice::from_raw_parts,
     sync::atomic::Ordering,
 };
 
@@ -5899,11 +5900,13 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                             SCHEMAS_PARSE_OPTIONS,
                         );
                     } else if !schema_buffer.is_null() {
+                        let mem =
+                            from_raw_parts(schema_buffer as *const u8, schema_buffer_len as usize)
+                                .to_vec();
                         /* Parse from memory buffer. */
                         doc = xml_ctxt_read_memory(
                             parser_ctxt,
-                            schema_buffer,
-                            schema_buffer_len,
+                            mem,
                             null_mut(),
                             null_mut(),
                             SCHEMAS_PARSE_OPTIONS,

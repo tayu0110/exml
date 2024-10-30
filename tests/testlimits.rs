@@ -4,6 +4,7 @@
 use std::{
     env::args,
     ffi::{CStr, CString},
+    io::{self, Read},
     os::raw::c_void,
     ptr::{addr_of, null_mut},
     sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering},
@@ -13,7 +14,7 @@ use std::{
 use exml::{
     error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
     globals::{set_get_warnings_default_value, set_structured_error, GenericErrorContext},
-    io::{xml_no_net_external_entity_loader, xml_register_input_callbacks},
+    io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
     libxml::{
         entities::XmlEntityPtr,
         parser::{
@@ -595,22 +596,78 @@ unsafe extern "C" fn initialize_libxml2() {
     /*
      * register the new I/O handlers
      */
-    if xml_register_input_callbacks(
-        Some(huge_match),
-        Some(huge_open),
-        Some(huge_read),
-        Some(huge_close),
-    ) < 0
-    {
+    struct HugeTestIO(*mut c_void);
+    impl Read for HugeTestIO {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let res = unsafe { huge_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
+            if res < 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(res as usize)
+            }
+        }
+    }
+    unsafe impl Send for HugeTestIO {}
+    impl Drop for HugeTestIO {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                unsafe {
+                    huge_close(self.0);
+                }
+            }
+        }
+    }
+    impl XmlInputCallback for HugeTestIO {
+        fn is_match(&self, filename: &str) -> bool {
+            huge_match(filename) != 0
+        }
+        fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
+            let ptr = unsafe { huge_open(filename) };
+            if ptr.is_null() {
+                Err(io::Error::other("Failed to execute huge_open"))
+            } else {
+                Ok(Box::new(Self(ptr)))
+            }
+        }
+    }
+    if register_input_callbacks(HugeTestIO(null_mut())).is_err() {
         panic!("failed to register Huge handlers");
     }
-    if xml_register_input_callbacks(
-        Some(crazy_match),
-        Some(crazy_open),
-        Some(crazy_read),
-        Some(crazy_close),
-    ) < 0
-    {
+    struct CrazyTestIO(*mut c_void);
+    impl Read for CrazyTestIO {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let res = unsafe { crazy_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
+            if res < 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(res as usize)
+            }
+        }
+    }
+    unsafe impl Send for CrazyTestIO {}
+    impl Drop for CrazyTestIO {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                unsafe {
+                    crazy_close(self.0);
+                }
+            }
+        }
+    }
+    impl XmlInputCallback for CrazyTestIO {
+        fn is_match(&self, filename: &str) -> bool {
+            crazy_match(filename) != 0
+        }
+        fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
+            let ptr = unsafe { crazy_open(filename) };
+            if ptr.is_null() {
+                Err(io::Error::other("Failed to execute crazy_open"))
+            } else {
+                Ok(Box::new(Self(ptr)))
+            }
+        }
+    }
+    if register_input_callbacks(CrazyTestIO(null_mut())).is_err() {
         panic!("failed to register Crazy handlers");
     }
 }

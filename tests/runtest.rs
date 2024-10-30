@@ -5,7 +5,7 @@ use std::{
     env::args,
     ffi::{c_char, c_int, c_ulong, CStr, CString},
     fs::{metadata, remove_file, File},
-    io::{BufRead, BufReader, Read, Write},
+    io::{self, BufRead, BufReader, Read, Write},
     mem::zeroed,
     os::{fd::AsRawFd, raw::c_void},
     path::Path,
@@ -22,7 +22,8 @@ use exml::{
     error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
     globals::{reset_last_error, set_generic_error, set_structured_error, GenericErrorContext},
     io::{
-        xml_no_net_external_entity_loader, xml_pop_input_callbacks, xml_register_input_callbacks,
+        pop_input_callbacks, register_input_callbacks, xml_no_net_external_entity_loader,
+        XmlInputCallback,
     },
     libxml::{
         entities::XmlEntityPtr,
@@ -2573,7 +2574,8 @@ unsafe fn mem_parse_test(
         return -1;
     }
 
-    let doc: XmlDocPtr = xml_read_memory(base, size, cfilename.as_ptr(), null_mut(), 0);
+    let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
+    let doc: XmlDocPtr = xml_read_memory(buffer, cfilename.as_ptr(), null_mut(), 0);
     unload_mem(base);
     if doc.is_null() {
         return 1;
@@ -2982,8 +2984,9 @@ unsafe fn stream_mem_parse_test(
         eprintln!("Failed to load {filename}",);
         return -1;
     }
+    let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
     let reader: XmlTextReaderPtr =
-        xml_reader_for_memory(base, size, cfilename.as_ptr(), null_mut(), options);
+        xml_reader_for_memory(buffer, cfilename.as_ptr(), null_mut(), options);
     let ret: c_int = stream_process_test(filename, result, err, reader, null_mut(), options);
     free(base as _);
     xml_free_text_reader(reader);
@@ -3746,13 +3749,41 @@ unsafe fn uri_path_test(
     /*
      * register the new I/O handlers
      */
-    if xml_register_input_callbacks(
-        Some(urip_match),
-        Some(urip_open),
-        Some(urip_read),
-        Some(urip_close),
-    ) < 0
-    {
+    struct URIPTest(*mut c_void);
+    impl Read for URIPTest {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let res = unsafe { urip_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
+            if res < 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(res as usize)
+            }
+        }
+    }
+    unsafe impl Send for URIPTest {}
+    impl Drop for URIPTest {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                unsafe {
+                    urip_close(self.0);
+                }
+            }
+        }
+    }
+    impl XmlInputCallback for URIPTest {
+        fn is_match(&self, filename: &str) -> bool {
+            unsafe { urip_match(filename) != 0 }
+        }
+        fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
+            let ptr = unsafe { urip_open(filename) };
+            if ptr.is_null() {
+                Err(io::Error::other("Failed to execute urip_open"))
+            } else {
+                Ok(Box::new(Self(ptr)))
+            }
+        }
+    }
+    if register_input_callbacks(URIPTest(null_mut())).is_err() {
         eprintln!("failed to register HTTP handler");
         return -1;
     }
@@ -3778,7 +3809,7 @@ unsafe fn uri_path_test(
         URIP_CURRENT += 1;
     }
 
-    xml_pop_input_callbacks();
+    pop_input_callbacks();
     failures
 }
 

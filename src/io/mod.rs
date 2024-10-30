@@ -8,9 +8,11 @@ mod input;
 mod output;
 
 use std::{
+    borrow::Cow,
     cell::RefCell,
     ffi::{c_char, c_int, c_uint, c_void, CStr, CString},
-    fs::metadata,
+    fs::{metadata, File},
+    io::{self, stdin, Cursor, ErrorKind, Read},
     mem::size_of,
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
@@ -28,6 +30,7 @@ use libc::{
     ENOTSUP, ENOTTY, ENXIO, EOF, EPERM, EPIPE, ERANGE, EROFS, ESPIPE, ESRCH, ETIMEDOUT, EXDEV,
     FILE,
 };
+use url::Url;
 
 use crate::{
     __xml_raise_error,
@@ -43,8 +46,8 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_mem_strdup},
         nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
         nanohttp::{
-            xml_nanohttp_close, xml_nanohttp_encoding, xml_nanohttp_method, xml_nanohttp_mime_type,
-            xml_nanohttp_open, xml_nanohttp_read, xml_nanohttp_redir, xml_nanohttp_return_code,
+            xml_nanohttp_close, xml_nanohttp_method, xml_nanohttp_open, xml_nanohttp_read,
+            xml_nanohttp_return_code,
         },
         parser::{
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption,
@@ -56,8 +59,9 @@ use crate::{
         tree::XmlBufferAllocationScheme,
         uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
         xmlerror::XmlParserErrors,
-        xmlstring::{xml_str_equal, xml_strdup, xml_strncasecmp, xml_strstr, XmlChar},
+        xmlstring::{xml_str_equal, xml_strdup, xml_strncasecmp, XmlChar},
     },
+    nanohttp::XmlNanoHTTPCtxt,
     private::{error::__xml_simple_error, parser::__xml_err_encoding},
     xml_str_printf,
 };
@@ -349,21 +353,15 @@ pub unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
  * Returns the new parser input or NULL
  */
 pub unsafe fn xml_parser_input_buffer_create_file(
-    file: *mut FILE,
+    file: File,
     enc: XmlCharEncoding,
 ) -> Option<XmlParserInputBuffer> {
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
-        xml_register_default_input_callbacks();
-    }
-
-    if file.is_null() {
-        return None;
+        register_default_input_callbacks();
     }
 
     let mut ret = XmlParserInputBuffer::new(enc);
-    ret.context = file as _;
-    ret.readcallback = Some(xml_file_read);
-    ret.closecallback = Some(xml_file_flush);
+    ret.context = Some(Box::new(file));
     Some(ret)
 }
 
@@ -378,32 +376,19 @@ pub unsafe fn xml_parser_input_buffer_create_file(
  *
  * Returns the new parser input or NULL
  */
+/// TODO: Allow the slice as memory.
 pub unsafe fn xml_parser_input_buffer_create_mem(
-    mem: *const c_char,
-    size: c_int,
+    mem: Vec<u8>,
     enc: XmlCharEncoding,
 ) -> Option<XmlParserInputBuffer> {
-    if size < 0 {
-        return None;
-    }
-    if mem.is_null() {
-        return None;
-    }
-
     let mut ret = XmlParserInputBuffer::new(enc);
-    ret.context = mem as _;
-    ret.readcallback = None;
-    ret.closecallback = None;
-    if ret
-        .buffer
-        .expect("Internal Error")
-        .push_bytes(from_raw_parts(mem as *const u8, size as usize))
-        .is_err()
-    {
-        // xml_free_parser_input_buffer(ret);
-        return None;
-    }
-
+    // I believe `mem` should be set as `context`,
+    // but for some reason the `testchar::test_user_encoding` test fails...
+    //
+    // Until the cause is found, push data directly into the buffer
+    // and set the `context` to an empty source, as in the original code.
+    ret.context = Some(Box::new(Cursor::new(vec![])));
+    ret.buffer.as_mut().unwrap().push_bytes(&mem);
     Some(ret)
 }
 
@@ -420,17 +405,11 @@ pub unsafe fn xml_parser_input_buffer_create_mem(
  * Returns the new parser input or NULL
  */
 pub unsafe fn xml_parser_input_buffer_create_io(
-    ioread: Option<XmlInputReadCallback>,
-    ioclose: Option<XmlInputCloseCallback>,
-    ioctx: *mut c_void,
+    ioctx: impl Read + 'static,
     enc: XmlCharEncoding,
 ) -> Option<XmlParserInputBuffer> {
-    ioread?;
-
     let mut ret = XmlParserInputBuffer::new(enc);
-    ret.context = ioctx as _;
-    ret.readcallback = ioread;
-    ret.closecallback = ioclose;
+    ret.context = Some(Box::new(ioctx));
     Some(ret)
 }
 
@@ -450,7 +429,7 @@ pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *m
     let mut cur: *mut c_char;
 
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
-        xml_register_default_input_callbacks();
+        register_default_input_callbacks();
     }
 
     if filename.is_null() {
@@ -493,67 +472,25 @@ pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
     uri: &str,
     enc: XmlCharEncoding,
 ) -> Option<XmlParserInputBuffer> {
-    let mut context: *mut c_void = null_mut();
-
     if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-        xml_register_default_input_callbacks();
+        register_default_input_callbacks();
     }
 
-    let num_callbacks = XML_INPUT_CALLBACK_NR.load(Ordering::Acquire);
-    let callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
+    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
     /*
      * Try to find one of the input accept method accepting that scheme
      * Go in reverse to give precedence to user defined handlers.
      */
-    if context.is_null() {
-        for i in (0..num_callbacks).rev() {
-            if callbacks[i]
-                .matchcallback
-                .filter(|callback| callback(uri) != 0)
-                .is_some()
-            {
-                context = (callbacks[i].opencallback.unwrap())(uri);
-                if !context.is_null() {
-                    /*
-                     * Allocate the Input buffer front-end.
-                     */
-                    let mut ret = XmlParserInputBuffer::new(enc);
-                    ret.context = context;
-                    ret.readcallback = callbacks[i].readcallback;
-                    ret.closecallback = callbacks[i].closecallback;
-                    // if !ret.is_null() {
-                    //     // #ifdef LIBXML_ZLIB_ENABLED
-                    //     // 	if ((xmlInputCallbackTable[i].opencallback == xmlGzfileOpen) &&
-                    //     // 		strcmp(URI, "-") != 0) {
-                    //     // // #if defined(ZLIB_VERNUM) && ZLIB_VERNUM >= 0x1230
-                    //     // //             (*ret).compressed = !gzdirect(context);
-                    //     // // #else
-                    //     // // 	    if ((*(context as *mut z_stream)).avail_in > 4) {
-                    //     // // 	        c_char *cptr, buff4[4];
-                    //     // // 		cptr = (c_char *) (*(context as *mut z_stream)).next_in;
-                    //     // // 		if (gzread(context, buff4, 4) == 4) {
-                    //     // // 		    if (strncmp(buff4, cptr, 4) == 0)
-                    //     // // 		        (*ret).compressed = 0;
-                    //     // // 		    else
-                    //     // // 		        (*ret).compressed = 1;
-                    //     // // 		    gzrewind(context);
-                    //     // // 		}
-                    //     // // 	    }
-                    //     // // #endif
-                    //     // 	}
-                    //     // #endif
-                    //     // #ifdef LIBXML_LZMA_ENABLED
-                    //     // 	if ((xmlInputCallbackTable[i].opencallback == xmlXzfileOpen) &&
-                    //     // 		strcmp(URI, "-") != 0) {
-                    //     //             (*ret).compressed = __libxml2_xzcompressed(context);
-                    //     // 	}
-                    //     // #endif
-                    // } else {
-                    //     (callbacks[i].closecallback.unwrap())(context);
-                    // }
-
-                    return Some(ret);
-                }
+    for (callback, is_nanohttp) in callbacks.iter_mut().rev() {
+        if callback.is_match(uri) {
+            if let Ok(context) = callback.open(uri) {
+                /*
+                 * Allocate the Input buffer front-end.
+                 */
+                let mut ret = XmlParserInputBuffer::new(enc);
+                ret.context = Some(context);
+                ret.use_nanohttp = *is_nanohttp;
+                return Some(ret);
             }
         }
     }
@@ -1446,69 +1383,63 @@ pub unsafe extern "C" fn xml_check_http_input(
 ) -> XmlParserInputPtr {
     #[cfg(feature = "http")]
     {
-        if !ret.is_null()
-            && (*ret).buf.is_some()
-            && (*ret).buf.as_ref().unwrap().borrow().readcallback == Some(xml_io_http_read)
-            && !(*ret).buf.as_ref().unwrap().borrow().context.is_null()
-        {
-            let encoding: *const c_char;
-            let redir: *const c_char;
-            let mime: *const c_char;
-
-            let code: c_int =
-                xml_nanohttp_return_code((*ret).buf.as_ref().unwrap().borrow().context);
-            if code >= 400 {
-                /* fatal error */
-                if !(*ret).filename.is_null() {
-                    __xml_loader_err(
-                        ctxt as _,
-                        c"failed to load HTTP resource \"%s\"\n".as_ptr() as _,
-                        (*ret).filename as *const c_char,
-                    );
-                } else {
-                    __xml_loader_err(
-                        ctxt as _,
-                        c"failed to load HTTP resource\n".as_ptr() as _,
-                        null(),
-                    );
-                }
-                xml_free_input_stream(ret);
-                ret = null_mut();
-            } else {
-                mime = xml_nanohttp_mime_type((*ret).buf.as_ref().unwrap().borrow().context);
-                if !xml_strstr(mime as _, c"/xml".as_ptr() as _).is_null()
-                    || !xml_strstr(mime as _, c"+xml".as_ptr() as _).is_null()
-                {
-                    encoding = xml_nanohttp_encoding((*ret).buf.as_ref().unwrap().borrow().context);
-                    if !encoding.is_null() {
-                        if let Some(handler) =
-                            find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
-                        {
-                            xml_switch_input_encoding(ctxt, ret, handler);
+        if !ret.is_null() {
+            if let Some(buf) = (*ret).buf.as_mut() {
+                if let Some(context) = buf.borrow_mut().nanohttp_context() {
+                    let code = context.return_code();
+                    if code >= 400 {
+                        /* fatal error */
+                        if !(*ret).filename.is_null() {
+                            __xml_loader_err(
+                                ctxt as _,
+                                c"failed to load HTTP resource \"%s\"\n".as_ptr() as _,
+                                (*ret).filename as *const c_char,
+                            );
                         } else {
-                            __xml_err_encoding(
-                                ctxt,
-                                XmlParserErrors::XmlErrUnknownEncoding,
-                                c"Unknown encoding %s".as_ptr() as _,
-                                encoding as _,
+                            __xml_loader_err(
+                                ctxt as _,
+                                c"failed to load HTTP resource\n".as_ptr() as _,
                                 null(),
                             );
                         }
-                        if (*ret).encoding.is_null() {
-                            (*ret).encoding = xml_strdup(encoding as _);
+                        xml_free_input_stream(ret);
+                        ret = null_mut();
+                    } else {
+                        if context
+                            .mime_type()
+                            .filter(|mime| mime.contains("/xml") || mime.contains("+xml"))
+                            .is_some()
+                        {
+                            if let Some(encoding) = context.encoding() {
+                                let enc = CString::new(encoding).unwrap();
+                                if let Some(handler) = find_encoding_handler(encoding) {
+                                    xml_switch_input_encoding(ctxt, ret, handler);
+                                } else {
+                                    __xml_err_encoding(
+                                        ctxt,
+                                        XmlParserErrors::XmlErrUnknownEncoding,
+                                        c"Unknown encoding %s".as_ptr() as _,
+                                        enc.as_ptr() as *const u8,
+                                        null(),
+                                    );
+                                }
+                                if (*ret).encoding.is_null() {
+                                    (*ret).encoding = xml_strdup(enc.as_ptr() as *const u8);
+                                }
+                            }
+                        }
+                        if let Some(redir) = context.redirection() {
+                            if !(*ret).filename.is_null() {
+                                xml_free((*ret).filename as _);
+                            }
+                            if !(*ret).directory.is_null() {
+                                xml_free((*ret).directory as _);
+                                (*ret).directory = null_mut();
+                            }
+                            let redir = CString::new(redir).unwrap();
+                            (*ret).filename = xml_strdup(redir.as_ptr() as _) as _;
                         }
                     }
-                }
-                redir = xml_nanohttp_redir((*ret).buf.as_ref().unwrap().borrow().context);
-                if !redir.is_null() {
-                    if !(*ret).filename.is_null() {
-                        xml_free((*ret).filename as _);
-                    }
-                    if !(*ret).directory.is_null() {
-                        xml_free((*ret).directory as _);
-                        (*ret).directory = null_mut();
-                    }
-                    (*ret).filename = xml_strdup(redir as _) as _;
                 }
             }
         }
@@ -2170,6 +2101,54 @@ pub unsafe extern "C" fn xml_io_ftp_close(context: *mut c_void) -> c_int {
     xml_nanoftp_close(context)
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct DefaultFileIOCallbacks;
+
+impl XmlInputCallback for DefaultFileIOCallbacks {
+    fn is_match(&self, _filename: &str) -> bool {
+        true
+    }
+
+    fn open(&mut self, filename: &str) -> io::Result<Box<dyn Read>> {
+        if filename == "-" {
+            return Ok(Box::new(stdin()));
+        }
+
+        let filename = if let Ok(Ok(name)) = Url::parse(filename).map(|url| url.to_file_path()) {
+            Cow::Owned(name)
+        } else {
+            Cow::Borrowed(Path::new(filename))
+        };
+
+        if xml_check_filename(filename.as_ref()) == 0 {
+            return Err(io::Error::new(
+                ErrorKind::NotFound,
+                format!("{} is not found", filename.display()),
+            ));
+        }
+
+        File::open(filename.as_ref())
+            .inspect_err(|_| unsafe {
+                let path = CString::new(filename.to_string_lossy().as_ref()).unwrap();
+                xml_ioerr(XmlParserErrors::XmlErrOK, path.as_ptr())
+            })
+            .map(|file| Box::new(file) as Box<dyn Read>)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct DefaultHTTPIOCallbacks;
+
+impl XmlInputCallback for DefaultHTTPIOCallbacks {
+    fn is_match(&self, filename: &str) -> bool {
+        filename.starts_with("http://")
+    }
+
+    fn open(&mut self, filename: &str) -> io::Result<Box<dyn Read>> {
+        XmlNanoHTTPCtxt::open(filename, &mut None).map(|ctxt| Box::new(ctxt) as Box<dyn Read>)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
@@ -2213,7 +2192,7 @@ mod tests {
             let mut leaks = 0;
             let mem_base = xml_mem_blocks();
 
-            xml_cleanup_input_callbacks();
+            cleanup_input_callbacks();
             reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -2511,295 +2490,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_output_buffer_flush() {
-    //     #[cfg(feature = "output")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_out in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let out = gen_xml_output_buffer_ptr(n_out, 0);
-
-    //             let ret_val = xml_output_buffer_flush(out);
-    //             desret_int(ret_val);
-    //             des_xml_output_buffer_ptr(n_out, out, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlOutputBufferFlush",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(
-    //                     leaks == 0,
-    //                     "{leaks} Leaks are found in xmlOutputBufferFlush()"
-    //                 );
-    //                 eprintln!(" {}", n_out);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_output_buffer_get_content() {
-    //     #[cfg(feature = "output")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_out in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let out = gen_xml_output_buffer_ptr(n_out, 0);
-
-    //             let ret_val = xml_output_buffer_get_content(out);
-    //             desret_const_xml_char_ptr(ret_val);
-    //             des_xml_output_buffer_ptr(n_out, out, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlOutputBufferGetContent",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(
-    //                     leaks == 0,
-    //                     "{leaks} Leaks are found in xmlOutputBufferGetContent()"
-    //                 );
-    //                 eprintln!(" {}", n_out);
-    //             }
-    //         }
-    //     }
-    // }
-
-    #[test]
-    fn test_xml_output_buffer_get_size() {
-
-        /* missing type support */
-    }
-
-    // #[test]
-    // fn test_xml_output_buffer_write() {
-    //     #[cfg(feature = "output")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_out in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-    //             for n_len in 0..GEN_NB_INT {
-    //                 for n_buf in 0..GEN_NB_CONST_CHAR_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let out = gen_xml_output_buffer_ptr(n_out, 0);
-    //                     let mut len = gen_int(n_len, 1);
-    //                     let buf = gen_const_char_ptr(n_buf, 2);
-    //                     if !buf.is_null() && len > xml_strlen(buf as _) {
-    //                         len = 0;
-    //                     }
-
-    //                     let ret_val = xml_output_buffer_write(out, len, buf);
-    //                     desret_int(ret_val);
-    //                     des_xml_output_buffer_ptr(n_out, out, 0);
-    //                     des_int(n_len, len, 1);
-    //                     des_const_char_ptr(n_buf, buf, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlOutputBufferWrite",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         assert!(
-    //                             leaks == 0,
-    //                             "{leaks} Leaks are found in xmlOutputBufferWrite()"
-    //                         );
-    //                         eprint!(" {}", n_out);
-    //                         eprint!(" {}", n_len);
-    //                         eprintln!(" {}", n_buf);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    #[test]
-    fn test_xml_output_buffer_write_escape() {
-
-        /* missing type support */
-    }
-
-    // #[test]
-    // fn test_xml_output_buffer_write_string() {
-    //     #[cfg(feature = "output")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_out in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-    //             for n_str in 0..GEN_NB_CONST_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let out = gen_xml_output_buffer_ptr(n_out, 0);
-    //                 let str = gen_const_char_ptr(n_str, 1);
-
-    //                 let ret_val = xml_output_buffer_write_string(out, str);
-    //                 desret_int(ret_val);
-    //                 des_xml_output_buffer_ptr(n_out, out, 0);
-    //                 des_const_char_ptr(n_str, str, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlOutputBufferWriteString",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlOutputBufferWriteString()"
-    //                     );
-    //                     eprint!(" {}", n_out);
-    //                     eprintln!(" {}", n_str);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    #[test]
-    fn test_xml_parser_get_directory() {
-
-        /* missing type support */
-    }
-
-    // #[test]
-    // fn test_xml_parser_input_buffer_grow() {
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_in in 0..GEN_NB_XML_PARSER_INPUT_BUFFER_PTR {
-    //             for n_len in 0..GEN_NB_INT {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let input = gen_xml_parser_input_buffer_ptr(n_in, 0);
-    //                 let len = gen_int(n_len, 1);
-
-    //                 let ret_val = xml_parser_input_buffer_grow(input, len);
-    //                 desret_int(ret_val);
-    //                 des_xml_parser_input_buffer_ptr(n_in, input, 0);
-    //                 des_int(n_len, len, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlParserInputBufferGrow",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlParserInputBufferGrow()"
-    //                     );
-    //                     eprint!(" {}", n_in);
-    //                     eprintln!(" {}", n_len);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_parser_input_buffer_push() {
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_in in 0..GEN_NB_XML_PARSER_INPUT_BUFFER_PTR {
-    //             for n_len in 0..GEN_NB_INT {
-    //                 for n_buf in 0..GEN_NB_CONST_CHAR_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let input = gen_xml_parser_input_buffer_ptr(n_in, 0);
-    //                     let mut len = gen_int(n_len, 1);
-    //                     let buf = gen_const_char_ptr(n_buf, 2);
-    //                     if !buf.is_null() && len > xml_strlen(buf as _) {
-    //                         len = 0;
-    //                     }
-
-    //                     let ret_val = xml_parser_input_buffer_push(input, len, buf);
-    //                     desret_int(ret_val);
-    //                     des_xml_parser_input_buffer_ptr(n_in, input, 0);
-    //                     des_int(n_len, len, 1);
-    //                     des_const_char_ptr(n_buf, buf, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlParserInputBufferPush",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         assert!(
-    //                             leaks == 0,
-    //                             "{leaks} Leaks are found in xmlParserInputBufferPush()"
-    //                         );
-    //                         eprint!(" {}", n_in);
-    //                         eprint!(" {}", n_len);
-    //                         eprintln!(" {}", n_buf);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_parser_input_buffer_read() {
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_in in 0..GEN_NB_XML_PARSER_INPUT_BUFFER_PTR {
-    //             for n_len in 0..GEN_NB_INT {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let input = gen_xml_parser_input_buffer_ptr(n_in, 0);
-    //                 let len = gen_int(n_len, 1);
-
-    //                 let ret_val = xml_parser_input_buffer_read(input, len);
-    //                 desret_int(ret_val);
-    //                 des_xml_parser_input_buffer_ptr(n_in, input, 0);
-    //                 des_int(n_len, len, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlParserInputBufferRead",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlParserInputBufferRead()"
-    //                     );
-    //                     eprint!(" {}", n_in);
-    //                     eprintln!(" {}", n_len);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    #[test]
-    fn test_xml_pop_input_callbacks() {
-        unsafe {
-            let mut leaks = 0;
-            let mem_base = xml_mem_blocks();
-
-            let ret_val = xml_pop_input_callbacks();
-            desret_int(ret_val);
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlPopInputCallbacks",
-                    xml_mem_blocks() - mem_base
-                );
-                assert!(
-                    leaks == 0,
-                    "{leaks} Leaks are found in xmlPopInputCallbacks()"
-                );
-            }
-        }
-    }
-
     #[test]
     fn test_xml_pop_output_callbacks() {
         #[cfg(feature = "output")]
@@ -2831,7 +2521,7 @@ mod tests {
             let mut leaks = 0;
             let mem_base = xml_mem_blocks();
 
-            xml_register_default_input_callbacks();
+            register_default_input_callbacks();
             reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;

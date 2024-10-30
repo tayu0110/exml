@@ -10,11 +10,13 @@
 use std::{
     env::args,
     ffi::{c_char, c_int, c_long, c_void, CStr, CString},
-    io::{stderr, Write},
+    fs::File,
+    io::{stderr, stdin, Write},
     mem::zeroed,
     num::IntErrorKind,
     process::exit,
     ptr::{addr_of_mut, null, null_mut},
+    slice::from_raw_parts,
     sync::{
         atomic::{AtomicPtr, Ordering},
         Mutex,
@@ -1939,7 +1941,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
 
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn stream_file(filename: *mut c_char) {
-    use std::ptr::null;
+    use std::{ptr::null, slice::from_raw_parts};
 
     use exml::libxml::{
         pattern::{xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_stream_push},
@@ -1976,7 +1978,8 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             return;
         }
 
-        reader = xml_reader_for_memory(base, info.st_size as _, filename, null_mut(), OPTIONS);
+        let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
+        reader = xml_reader_for_memory(mem, filename, null_mut(), OPTIONS);
     } else {
         reader = xml_reader_for_file(filename, null_mut(), OPTIONS);
     }
@@ -2462,7 +2465,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 return;
             }
 
-            doc = html_read_memory(base, info.st_size as _, filename, null_mut(), OPTIONS);
+            let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
+            doc = html_read_memory(mem, filename, null_mut(), OPTIONS);
 
             munmap(base as _, info.st_size as _);
             close(fd);
@@ -2534,40 +2538,15 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             }
         }
     } else if TEST_IO != 0 {
-        extern "C" {
-            static stdin: *mut FILE;
-        }
         if *filename.add(0) == b'-' as i8 && *filename.add(1) == 0 {
-            doc = xml_read_io(
-                Some(my_read),
-                Some(my_close),
-                stdin as _,
-                null_mut(),
-                null_mut(),
-                OPTIONS,
-            );
+            doc = xml_read_io(stdin(), null_mut(), null_mut(), OPTIONS);
         } else {
             let f: *mut FILE = fopen(filename, c"rb".as_ptr());
-            if !f.is_null() {
+            if let Ok(f) = File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
                 if rectxt.is_null() {
-                    doc = xml_read_io(
-                        Some(my_read),
-                        Some(my_close),
-                        f as _,
-                        filename,
-                        null_mut(),
-                        OPTIONS,
-                    );
+                    doc = xml_read_io(f, filename, null_mut(), OPTIONS);
                 } else {
-                    doc = xml_ctxt_read_io(
-                        rectxt,
-                        Some(my_read),
-                        Some(my_close),
-                        f as _,
-                        filename,
-                        null_mut(),
-                        OPTIONS,
-                    );
+                    doc = xml_ctxt_read_io(rectxt, f, filename, null_mut(), OPTIONS);
                 }
             } else {
                 doc = null_mut();
@@ -2618,17 +2597,11 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             return;
         }
 
+        let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
         if rectxt.is_null() {
-            doc = xml_read_memory(base, info.st_size as _, filename, null_mut(), OPTIONS);
+            doc = xml_read_memory(mem, filename, null_mut(), OPTIONS);
         } else {
-            doc = xml_ctxt_read_memory(
-                rectxt,
-                base,
-                info.st_size as _,
-                filename,
-                null_mut(),
-                OPTIONS,
-            );
+            doc = xml_ctxt_read_memory(rectxt, mem, filename, null_mut(), OPTIONS);
         }
 
         munmap(base as _, info.st_size as _);

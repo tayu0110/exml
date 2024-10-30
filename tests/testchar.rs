@@ -7,13 +7,14 @@ use std::{
     io::{stdout, Write},
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
+    slice::from_raw_parts,
     sync::RwLock,
 };
 
 use exml::{
     encoding::XmlCharEncoding,
     error::XmlError,
-    globals::{set_structured_error, GenericErrorContext},
+    globals::{get_last_error, set_structured_error, GenericErrorContext},
     io::xml_parser_input_buffer_create_mem,
     libxml::{
         globals::{xml_free, xml_malloc},
@@ -83,7 +84,8 @@ unsafe extern "C" fn test_document_range_byte1(
 
         *data.add(0) = i as c_char;
 
-        let res = xml_read_memory(document, len, c"test".as_ptr() as _, null_mut(), 0);
+        let buffer = from_raw_parts(document as *const u8, len as usize).to_vec();
+        let res = xml_read_memory(buffer, c"test".as_ptr() as _, null_mut(), 0);
         let last_error = LAST_ERROR.read().unwrap();
 
         if i as i32 == forbid1 || i as i32 == forbid2 {
@@ -131,7 +133,8 @@ unsafe extern "C" fn test_document_range_byte2(
             *data.add(0) = i as c_char;
             *data.add(1) = j as c_char;
 
-            let res = xml_read_memory(document, len, c"test".as_ptr() as _, null_mut(), 0);
+            let buffer = from_raw_parts(document as *const u8, len as usize).to_vec();
+            let res = xml_read_memory(buffer, c"test".as_ptr() as _, null_mut(), 0);
             let last_error = *LAST_ERROR.read().unwrap();
 
             #[allow(clippy::if_same_then_else)]
@@ -659,7 +662,7 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
  */
 
 unsafe extern "C" fn test_char_ranges() -> c_int {
-    let mut data: [c_char; 5] = [0; 5];
+    let mut data: [u8; 5] = [0; 5];
     let mut test_ret: c_int = 0;
 
     memset(data.as_mut_ptr() as _, 0, 5);
@@ -670,11 +673,7 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
      */
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     assert!(!ctxt.is_null(), "Failed to allocate parser context");
-    let Some(buf) = xml_parser_input_buffer_create_mem(
-        data.as_mut_ptr(),
-        data.len() as i32,
-        XmlCharEncoding::None,
-    ) else {
+    let Some(buf) = xml_parser_input_buffer_create_mem(data.to_vec(), XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         panic!("Failed to allocate input buffer");
     };
@@ -754,14 +753,11 @@ unsafe extern "C" fn test_user_encoding() -> c_int {
         k += 1;
     }
 
-    let doc: XmlDocPtr = xml_read_memory(
-        buf as _,
-        2 * total_size,
-        null_mut(),
-        c"UTF-16LE".as_ptr() as _,
-        0,
-    );
+    let buffer = from_raw_parts(buf, 2 * total_size as usize).to_vec();
+    let doc: XmlDocPtr = xml_read_memory(buffer, null_mut(), c"UTF-16LE".as_ptr() as _, 0);
     if doc.is_null() {
+        let error = get_last_error();
+        eprintln!("error: {error:?}");
         // goto error;
         xml_free_doc(doc);
         xml_free(buf as _);

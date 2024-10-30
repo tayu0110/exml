@@ -6,6 +6,7 @@
 use std::{
     cell::RefCell,
     ffi::{c_char, c_int, c_uchar, c_uint, CStr},
+    io::Read,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -22,10 +23,7 @@ use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
     globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
-    io::{
-        xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem,
-        XmlInputCloseCallback, XmlInputReadCallback,
-    },
+    io::{xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem},
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -9605,14 +9603,8 @@ pub unsafe fn html_new_sax_parser_ctxt(
  *
  * Returns the new parser context or NULL
  */
-pub unsafe extern "C" fn html_create_memory_parser_ctxt(
-    buffer: *const c_char,
-    size: c_int,
-) -> HtmlParserCtxtPtr {
-    if buffer.is_null() {
-        return null_mut();
-    }
-    if size <= 0 {
+pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtPtr {
+    if buffer.is_empty() {
         return null_mut();
     }
 
@@ -9621,7 +9613,7 @@ pub unsafe extern "C" fn html_create_memory_parser_ctxt(
         return null_mut();
     }
 
-    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None) else {
+    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     };
@@ -10207,8 +10199,8 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
     if cur.is_null() {
         return null_mut();
     }
-    let len: c_int = xml_strlen(cur);
-    let ctxt: HtmlParserCtxtPtr = html_create_memory_parser_ctxt(cur as _, len);
+    let s = CStr::from_ptr(cur as *const i8).to_bytes().to_vec();
+    let ctxt: HtmlParserCtxtPtr = html_create_memory_parser_ctxt(s);
     if ctxt.is_null() {
         return null_mut();
     }
@@ -12245,15 +12237,14 @@ pub unsafe extern "C" fn html_read_file(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_read_memory(
-    buffer: *const c_char,
-    size: c_int,
+pub unsafe fn html_read_memory(
+    buffer: Vec<u8>,
     url: *const c_char,
     encoding: *const c_char,
     options: c_int,
 ) -> HtmlDocPtr {
     xml_init_parser();
-    let ctxt: HtmlParserCtxtPtr = html_create_memory_parser_ctxt(buffer, size);
+    let ctxt: HtmlParserCtxtPtr = html_create_memory_parser_ctxt(buffer);
     if ctxt.is_null() {
         return null_mut();
     }
@@ -12273,36 +12264,24 @@ pub unsafe extern "C" fn html_read_memory(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_read_io(
-    ioread: Option<XmlInputReadCallback>,
-    ioclose: Option<XmlInputCloseCallback>,
-    ioctx: *mut c_void,
+pub unsafe fn html_read_io(
+    ioctx: impl Read + 'static,
     url: *const c_char,
     encoding: *const c_char,
     options: c_int,
 ) -> HtmlDocPtr {
-    if ioread.is_none() {
-        return null_mut();
-    }
     xml_init_parser();
 
-    let Some(input) =
-        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None)
-    else {
-        if let Some(ioclose) = ioclose {
-            ioclose(ioctx);
-        }
+    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
         return null_mut();
     };
     let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
     if ctxt.is_null() {
-        // xml_free_parser_input_buffer(input);
         return null_mut();
     }
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
-        // xml_free_parser_input_buffer(input);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -12333,7 +12312,13 @@ pub unsafe extern "C" fn html_ctxt_read_doc(
     if cur.is_null() {
         return null_mut();
     }
-    html_ctxt_read_memory(ctxt, cur as _, xml_strlen(cur), url, encoding, options)
+    html_ctxt_read_memory(
+        ctxt,
+        CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
+        url,
+        encoding,
+        options,
+    )
 }
 
 /**
@@ -12386,10 +12371,9 @@ pub unsafe extern "C" fn html_ctxt_read_file(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_ctxt_read_memory(
+pub unsafe fn html_ctxt_read_memory(
     ctxt: XmlParserCtxtPtr,
-    buffer: *const c_char,
-    size: c_int,
+    buffer: Vec<u8>,
     url: *const c_char,
     encoding: *const c_char,
     options: c_int,
@@ -12397,15 +12381,11 @@ pub unsafe extern "C" fn html_ctxt_read_memory(
     if ctxt.is_null() {
         return null_mut();
     }
-    if buffer.is_null() {
-        return null_mut();
-    }
     xml_init_parser();
 
     html_ctxt_reset(ctxt);
 
-    let Some(input) = xml_parser_input_buffer_create_mem(buffer, size, XmlCharEncoding::None)
-    else {
+    let Some(input) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
         return null_mut();
     };
 
@@ -12435,18 +12415,13 @@ pub unsafe extern "C" fn html_ctxt_read_memory(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_ctxt_read_io(
+pub unsafe fn html_ctxt_read_io(
     ctxt: XmlParserCtxtPtr,
-    ioread: Option<XmlInputReadCallback>,
-    ioclose: Option<XmlInputCloseCallback>,
-    ioctx: *mut c_void,
+    ioctx: impl Read + 'static,
     url: *const c_char,
     encoding: *const c_char,
     options: c_int,
 ) -> HtmlDocPtr {
-    if ioread.is_none() {
-        return null_mut();
-    }
     if ctxt.is_null() {
         return null_mut();
     }
@@ -12454,18 +12429,12 @@ pub unsafe extern "C" fn html_ctxt_read_io(
 
     html_ctxt_reset(ctxt);
 
-    let Some(input) =
-        xml_parser_input_buffer_create_io(ioread, ioclose, ioctx, XmlCharEncoding::None)
-    else {
-        if let Some(ioclose) = ioclose {
-            ioclose(ioctx);
-        }
+    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
         return null_mut();
     };
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
-        // xml_free_parser_input_buffer(input);
         return null_mut();
     }
     input_push(ctxt, stream);
@@ -12693,40 +12662,6 @@ mod tests {
 
     use super::*;
 
-    // #[test]
-    // fn test_html_new_saxparser_ctxt() {
-    //     #[cfg(feature = "html")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_sax in 0..GEN_NB_CONST_HTML_SAXHANDLER_PTR {
-    //             for n_user_data in 0..GEN_NB_USERDATA {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let sax = gen_const_html_saxhandler_ptr(n_sax, 0);
-    //                 let user_data = gen_userdata(n_user_data, 1);
-
-    //                 let ret_val = html_new_sax_parser_ctxt(sax as _, user_data);
-    //                 desret_html_parser_ctxt_ptr(ret_val);
-    //                 des_const_html_saxhandler_ptr(n_sax, sax, 0);
-    //                 des_userdata(n_user_data, user_data, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     eprintln!(
-    //                         "Leak of {} blocks found in htmlNewSAXParserCtxt {n_sax} {n_user_data}",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     leaks += 1;
-    //                 }
-    //             }
-    //         }
-
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in htmlNewSAXParserCtxt()"
-    //         );
-    //     }
-    // }
-
     #[test]
     fn test_html_auto_close_tag() {
         #[cfg(feature = "html")]
@@ -12822,204 +12757,6 @@ mod tests {
     }
 
     #[test]
-    fn test_html_read_memory() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buffer in 0..GEN_NB_CONST_CHAR_PTR {
-                for n_size in 0..GEN_NB_INT {
-                    for n_url in 0..GEN_NB_FILEPATH {
-                        for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            for n_options in 0..GEN_NB_INT {
-                                let mem_base = xml_mem_blocks();
-                                let buffer = gen_const_char_ptr(n_buffer, 0);
-                                let mut size = gen_int(n_size, 1);
-                                let url = gen_filepath(n_url, 2);
-                                let encoding = gen_const_char_ptr(n_encoding, 3);
-                                let options = gen_int(n_options, 4);
-                                if !buffer.is_null() && size > xml_strlen(buffer as _) {
-                                    size = 0;
-                                }
-
-                                let ret_val =
-                                    html_read_memory(buffer, size, url, encoding, options);
-                                desret_html_doc_ptr(ret_val);
-                                des_const_char_ptr(n_buffer, buffer, 0);
-                                des_int(n_size, size, 1);
-                                des_filepath(n_url, url, 2);
-                                des_const_char_ptr(n_encoding, encoding, 3);
-                                des_int(n_options, options, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    eprint!(
-                                        "Leak of {} blocks found in htmlReadMemory",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    eprint!(" {}", n_buffer);
-                                    eprint!(" {}", n_size);
-                                    eprint!(" {}", n_url);
-                                    eprint!(" {}", n_encoding);
-                                    eprintln!(" {}", n_options);
-                                    leaks += 1;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlReadMemory()");
-        }
-    }
-
-    // #[test]
-    // fn test_html_saxparse_doc() {
-    //     #[cfg(feature = "html")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //             for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-    //                 for n_sax in 0..GEN_NB_HTML_SAXHANDLER_PTR {
-    //                     for n_user_data in 0..GEN_NB_USERDATA {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let cur = gen_const_xml_char_ptr(n_cur, 0);
-    //                         let encoding = gen_const_char_ptr(n_encoding, 1);
-    //                         let sax = gen_html_saxhandler_ptr(n_sax, 2);
-    //                         let user_data = gen_userdata(n_user_data, 3);
-
-    //                         let ret_val = html_sax_parse_doc(cur, encoding, sax, user_data);
-    //                         desret_html_doc_ptr(ret_val);
-    //                         des_const_xml_char_ptr(n_cur, cur, 0);
-    //                         des_const_char_ptr(n_encoding, encoding, 1);
-    //                         des_html_saxhandler_ptr(n_sax, sax, 2);
-    //                         des_userdata(n_user_data, user_data, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in htmlSAXParseDoc",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             eprint!(" {}", n_cur);
-    //                             eprint!(" {}", n_encoding);
-    //                             eprint!(" {}", n_sax);
-    //                             eprintln!(" {}", n_user_data);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         assert!(leaks == 0, "{leaks} Leaks are found in htmlSAXParseDoc()");
-    //     }
-    // }
-
-    // #[test]
-    // fn test_html_saxparse_file() {
-    //     #[cfg(feature = "html")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_filename in 0..GEN_NB_FILEPATH {
-    //             for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-    //                 for n_sax in 0..GEN_NB_HTML_SAXHANDLER_PTR {
-    //                     for n_user_data in 0..GEN_NB_USERDATA {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let filename = gen_filepath(n_filename, 0);
-    //                         let encoding = gen_const_char_ptr(n_encoding, 1);
-    //                         let sax = gen_html_saxhandler_ptr(n_sax, 2);
-    //                         let user_data = gen_userdata(n_user_data, 3);
-
-    //                         let ret_val = html_sax_parse_file(filename, encoding, sax, user_data);
-    //                         desret_html_doc_ptr(ret_val);
-    //                         des_filepath(n_filename, filename, 0);
-    //                         des_const_char_ptr(n_encoding, encoding, 1);
-    //                         des_html_saxhandler_ptr(n_sax, sax, 2);
-    //                         des_userdata(n_user_data, user_data, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in htmlSAXParseFile",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             eprint!(" {}", n_filename);
-    //                             eprint!(" {}", n_encoding);
-    //                             eprint!(" {}", n_sax);
-    //                             eprintln!(" {}", n_user_data);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         assert!(leaks == 0, "{leaks} Leaks are found in htmlSAXParseFile()");
-    //     }
-    // }
-
-    // #[test]
-    // fn test_html_create_push_parser_ctxt() {
-    //     #[cfg(all(feature = "html", feature = "push"))]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_sax in 0..GEN_NB_HTML_SAXHANDLER_PTR {
-    //             for n_user_data in 0..GEN_NB_USERDATA {
-    //                 for n_chunk in 0..GEN_NB_CONST_CHAR_PTR {
-    //                     for n_size in 0..GEN_NB_INT {
-    //                         for n_filename in 0..GEN_NB_FILEOUTPUT {
-    //                             for n_enc in 0..GEN_NB_XML_CHAR_ENCODING {
-    //                                 let mem_base = xml_mem_blocks();
-    //                                 let sax = gen_html_saxhandler_ptr(n_sax, 0);
-    //                                 let user_data = gen_userdata(n_user_data, 1);
-    //                                 let chunk = gen_const_char_ptr(n_chunk, 2);
-    //                                 let mut size = gen_int(n_size, 3);
-    //                                 let filename = gen_fileoutput(n_filename, 4);
-    //                                 let enc = gen_xml_char_encoding(n_enc, 5);
-    //                                 if !chunk.is_null() && size > xml_strlen(chunk as _) {
-    //                                     size = 0;
-    //                                 }
-
-    //                                 let ret_val = html_create_push_parser_ctxt(
-    //                                     sax, user_data, chunk, size, filename, enc,
-    //                                 );
-    //                                 desret_html_parser_ctxt_ptr(ret_val);
-    //                                 des_html_saxhandler_ptr(n_sax, sax, 0);
-    //                                 des_userdata(n_user_data, user_data, 1);
-    //                                 des_const_char_ptr(n_chunk, chunk, 2);
-    //                                 des_int(n_size, size, 3);
-    //                                 des_fileoutput(n_filename, filename, 4);
-    //                                 des_xml_char_encoding(n_enc, enc, 5);
-    //                                 xml_reset_last_error();
-    //                                 if mem_base != xml_mem_blocks() {
-    //                                     leaks += 1;
-    //                                     eprint!(
-    //                                         "Leak of {} blocks found in htmlCreatePushParserCtxt",
-    //                                         xml_mem_blocks() - mem_base
-    //                                     );
-    //                                     eprint!(" {}", n_sax);
-    //                                     eprint!(" {}", n_user_data);
-    //                                     eprint!(" {}", n_chunk);
-    //                                     eprint!(" {}", n_size);
-    //                                     eprint!(" {}", n_filename);
-    //                                     eprintln!(" {}", n_enc);
-    //                                 }
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in htmlCreatePushParserCtxt()"
-    //         );
-    //     }
-    // }
-
-    #[test]
     fn test_html_ctxt_read_file() {
         #[cfg(feature = "html")]
         unsafe {
@@ -13091,106 +12828,6 @@ mod tests {
             }
 
             assert!(leaks == 0, "{leaks} Leaks are found in htmlCtxtReadDoc()");
-        }
-    }
-
-    #[test]
-    fn test_html_create_memory_parser_ctxt() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buffer in 0..GEN_NB_CONST_CHAR_PTR {
-                for n_size in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let buffer = gen_const_char_ptr(n_buffer, 0);
-                    let mut size = gen_int(n_size, 1);
-                    if !buffer.is_null() && size > xml_strlen(buffer as _) {
-                        size = 0;
-                    }
-
-                    let ret_val = html_create_memory_parser_ctxt(buffer, size);
-                    desret_html_parser_ctxt_ptr(ret_val);
-                    des_const_char_ptr(n_buffer, buffer, 0);
-                    des_int(n_size, size, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlCreateMemoryParserCtxt",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_buffer);
-                        eprintln!(" {}", n_size);
-                    }
-                }
-            }
-
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlCreateMemoryParserCtxt()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_html_ctxt_read_memory() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_HTML_PARSER_CTXT_PTR {
-                for n_buffer in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_size in 0..GEN_NB_INT {
-                        for n_url in 0..GEN_NB_FILEPATH {
-                            for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                                for n_options in 0..GEN_NB_INT {
-                                    let mem_base = xml_mem_blocks();
-                                    let ctxt = gen_html_parser_ctxt_ptr(n_ctxt, 0);
-                                    let buffer = gen_const_char_ptr(n_buffer, 1);
-                                    let mut size = gen_int(n_size, 2);
-                                    let url = gen_filepath(n_url, 3);
-                                    let encoding = gen_const_char_ptr(n_encoding, 4);
-                                    let options = gen_int(n_options, 5);
-                                    if !buffer.is_null() && size > xml_strlen(buffer as _) {
-                                        size = 0;
-                                    }
-
-                                    let ret_val = html_ctxt_read_memory(
-                                        ctxt, buffer, size, url, encoding, options,
-                                    );
-                                    desret_html_doc_ptr(ret_val);
-                                    des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                                    des_const_char_ptr(n_buffer, buffer, 1);
-                                    des_int(n_size, size, 2);
-                                    des_filepath(n_url, url, 3);
-                                    des_const_char_ptr(n_encoding, encoding, 4);
-                                    des_int(n_options, options, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in htmlCtxtReadMemory",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        eprint!(" {}", n_ctxt);
-                                        eprint!(" {}", n_buffer);
-                                        eprint!(" {}", n_size);
-                                        eprint!(" {}", n_url);
-                                        eprint!(" {}", n_encoding);
-                                        eprintln!(" {}", n_options);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlCtxtReadMemory()"
-            );
         }
     }
 

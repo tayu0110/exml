@@ -1341,7 +1341,7 @@ pub(crate) unsafe extern "C" fn gen_xml_parser_ctxt_ptr(no: c_int, _nr: c_int) -
         return xml_new_parser_ctxt();
     }
     if no == 1 {
-        return xml_create_memory_parser_ctxt(c"<doc/>".as_ptr() as _, 6);
+        return xml_create_memory_parser_ctxt("<doc/>".as_bytes().to_vec());
     }
     null_mut()
 }
@@ -1694,7 +1694,7 @@ unsafe extern "C" fn get_api_root() -> XmlNodePtr {
 
 unsafe extern "C" fn get_api_doc() -> XmlDocPtr {
     if API_DOC.load(Ordering::Relaxed).is_null() {
-        API_DOC.store(xml_read_memory(c"<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_ptr() as _, 88, c"root_test".as_ptr() as _, null_mut(), 0), Ordering::Relaxed);
+        API_DOC.store(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), c"root_test".as_ptr() as _, null_mut(), 0), Ordering::Relaxed);
         API_ROOT.store(null_mut(), Ordering::Relaxed);
         API_ATTR.store(null_mut(), Ordering::Relaxed);
     }
@@ -1786,8 +1786,7 @@ pub(crate) unsafe extern "C" fn gen_html_doc_ptr(no: c_int, _nr: c_int) -> HtmlD
     }
     if no == 1 {
         return html_read_memory(
-            c"<html/>".as_ptr() as _,
-            7,
+            "<html/>".as_bytes().to_vec(),
             c"test".as_ptr() as _,
             null_mut(),
             0,
@@ -1857,7 +1856,7 @@ pub(crate) unsafe extern "C" fn gen_html_parser_ctxt_ptr(
         return xml_new_parser_ctxt();
     }
     if no == 1 {
-        return html_create_memory_parser_ctxt(c"<html/>".as_ptr(), 7);
+        return html_create_memory_parser_ctxt("<html/>".as_bytes().to_vec());
     }
     null_mut()
 }
@@ -1987,8 +1986,7 @@ pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: c_int, _nr: c_int) -> XmlDoc
     }
     if no == 1 {
         return xml_read_memory(
-            c"<foo/>".as_ptr() as _,
-            6,
+            "<foo/>".as_bytes().to_vec(),
             c"test".as_ptr() as _,
             null_mut(),
             0,
@@ -1996,8 +1994,7 @@ pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: c_int, _nr: c_int) -> XmlDoc
     }
     if no == 2 {
         return xml_read_memory(
-            c"<!DOCTYPE foo []> <foo/>".as_ptr() as _,
-            24,
+            "<!DOCTYPE foo []> <foo/>".as_bytes().to_vec(),
             c"test".as_ptr() as _,
             null_mut(),
             0,
