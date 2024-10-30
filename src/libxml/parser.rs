@@ -560,6 +560,10 @@ impl XmlParserCtxt {
     pub(crate) unsafe fn current_ptr(&self) -> *const u8 {
         (*self.input).cur
     }
+
+    pub(crate) unsafe fn base_ptr(&self) -> *const u8 {
+        (*self.input).base
+    }
 }
 /**
  * xmlSAXLocator:
@@ -1127,11 +1131,6 @@ pub type XmlExternalEntityLoader = unsafe extern "C" fn(
  *            the index
  *   GROW, SHRINK  handling of input buffers
  */
-macro_rules! BASE_PTR {
-    ($ctxt:expr) => {
-        (*(*$ctxt).input).base
-    };
-}
 macro_rules! CMP4 {
     ( $s:expr, $c1:expr, $c2:expr, $c3:expr, $c4:expr ) => {
         *($s as *mut c_uchar).add(0) == $c1
@@ -5628,14 +5627,10 @@ unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const 
         XML_MAX_NAME_LENGTH as i32
     };
 
-    // #ifdef DEBUG
-    //     nbParseNCNameComplex++;
-    // #endif
-
     /*
      * Handler for more complex cases
      */
-    let start_position: size_t = (*ctxt).current_ptr().offset_from(BASE_PTR!(ctxt)) as _;
+    let start_position: size_t = (*ctxt).current_ptr().offset_from((*ctxt).base_ptr()) as _;
     c = CUR_CHAR!(ctxt, l);
     if c == b' ' as i32
         || c == b'>' as i32
@@ -5667,7 +5662,7 @@ unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const 
         );
         return null_mut();
     }
-    xml_dict_lookup((*ctxt).dict, BASE_PTR!(ctxt).add(start_position), len)
+    xml_dict_lookup((*ctxt).dict, (*ctxt).base_ptr().add(start_position), len)
 }
 
 /**
@@ -5694,10 +5689,6 @@ unsafe extern "C" fn xml_parse_ncname(ctxt: XmlParserCtxtPtr) -> *const XmlChar 
     } else {
         XML_MAX_NAME_LENGTH
     };
-
-    // #ifdef DEBUG
-    //     nbParseNCName++;
-    // #endif
 
     /*
      * Accelerator for simple ASCII names
@@ -6107,10 +6098,6 @@ pub(crate) unsafe extern "C" fn xml_parse_string_name(
     } else {
         XML_MAX_NAME_LENGTH as i32
     };
-
-    // #ifdef DEBUG
-    //     nbParseStringName++;
-    // #endif
 
     c = CUR_SCHAR!(ctxt, cur, l);
     if xml_is_name_start_char(ctxt, c) == 0 {
@@ -6634,7 +6621,6 @@ unsafe extern "C" fn xml_load_entity_content(
         );
     }
 
-    // let buf: XmlBufferPtr = xml_buffer_create();
     let buf = xml_buf_create();
     if buf.is_null() {
         xml_fatal_err(
@@ -6644,7 +6630,6 @@ unsafe extern "C" fn xml_load_entity_content(
         );
         return -1;
     }
-    // xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
 
     let input: XmlParserInputPtr = xml_new_entity_input_stream(ctxt, entity);
@@ -6654,7 +6639,6 @@ unsafe extern "C" fn xml_load_entity_content(
             XmlParserErrors::XmlErrInternalError,
             c"xmlLoadEntityContent input error".as_ptr() as _,
         );
-        // xml_buffer_free(buf);
         xml_buf_free(buf);
         return -1;
     }
@@ -6664,7 +6648,6 @@ unsafe extern "C" fn xml_load_entity_content(
      * saving to the buffer until the end of the entity or an error
      */
     if xml_push_input(ctxt, input) < 0 {
-        // xml_buffer_free(buf);
         xml_buf_free(buf);
         xml_free_input_stream(input);
         return -1;
@@ -6673,13 +6656,11 @@ unsafe extern "C" fn xml_load_entity_content(
     GROW!(ctxt);
     c = CUR_CHAR!(ctxt, l);
     while (*ctxt).input == input && (*(*ctxt).input).cur < (*(*ctxt).input).end && IS_CHAR!(c) {
-        // xml_buffer_add(buf, (*(*ctxt).input).cur, l);
         xml_buf_add(buf, (*(*ctxt).input).cur, l);
         NEXTL!(ctxt, l);
         c = CUR_CHAR!(ctxt, l);
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        // xml_buffer_free(buf);
         xml_buf_free(buf);
         return -1;
     }
@@ -6697,7 +6678,6 @@ unsafe extern "C" fn xml_load_entity_content(
             c"xmlLoadEntityContent: invalid char value %d\n".as_ptr() as _,
             c,
         );
-        // xml_buffer_free(buf);
         xml_buf_free(buf);
         return -1;
     }
@@ -6705,10 +6685,6 @@ unsafe extern "C" fn xml_load_entity_content(
     (*entity)
         .content
         .store(xml_buf_detach(buf), Ordering::Relaxed);
-    // (*entity).content.store((*buf).content, Ordering::Relaxed);
-    // (*entity).length = (*buf).using as _;
-    // (*buf).content = null_mut();
-    // xml_buffer_free(buf);
     xml_buf_free(buf);
 
     0
