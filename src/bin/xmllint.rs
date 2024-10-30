@@ -32,10 +32,7 @@ use exml::{
         get_load_ext_dtd_default_value, set_load_ext_dtd_default_value, set_parser_debug_entities,
         set_tree_indent_string, GenericError, GenericErrorContext,
     },
-    io::{
-        xml_file_flush, xml_file_write, xml_no_net_external_entity_loader,
-        xml_parser_input_buffer_create_filename,
-    },
+    io::{xml_file_flush, xml_file_write, xml_no_net_external_entity_loader, XmlParserInputBuffer},
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
@@ -1734,7 +1731,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
     if f {
         #[cfg(feature = "schema")]
         {
-            let Some(buf) = xml_parser_input_buffer_create_filename(
+            let Some(buf) = XmlParserInputBuffer::from_uri(
                 CStr::from_ptr(filename).to_string_lossy().as_ref(),
                 XmlCharEncoding::None,
             ) else {

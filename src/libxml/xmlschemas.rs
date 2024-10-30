@@ -22,7 +22,7 @@ use crate::{
     error::{XmlErrorDomain, XmlErrorLevel},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
-    io::{xml_parser_input_buffer_create_filename, XmlParserInputBuffer},
+    io::XmlParserInputBuffer,
     libxml::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         entities::XmlEntityPtr,
@@ -31001,7 +31001,7 @@ pub unsafe extern "C" fn xml_schema_validate_file(
         return -1;
     }
 
-    let Some(input) = xml_parser_input_buffer_create_filename(
+    let Some(input) = XmlParserInputBuffer::from_uri(
         CStr::from_ptr(filename).to_string_lossy().as_ref(),
         XmlCharEncoding::None,
     ) else {

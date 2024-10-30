@@ -35,7 +35,7 @@ use url::Url;
 use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
-    encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
+    encoding::{find_encoding_handler, XmlCharEncodingHandler},
     error::{XmlErrorDomain, XmlErrorLevel},
     globals::{GenericError, StructuredError, GLOBAL_STATE},
     libxml::{
@@ -92,31 +92,6 @@ pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
         null(),
         extra as _,
     );
-}
-
-/**
- * xmlParserInputBufferCreateFilename:
- * @URI:  a C string containing the URI or filename
- * @enc:  the charset encoding if known
- *
- * Create a buffered parser input for the progressive parsing of a file
- * If filename is "-' then we use stdin as the input.
- * Automatic support for ZLIB/Compress compressed document is provided
- * by default if found at compile-time.
- * Do an encoding check if enc == XML_CHAR_ENCODING_NONE
- *
- * Returns the new parser input or NULL
- */
-pub unsafe fn xml_parser_input_buffer_create_filename(
-    uri: &str,
-    enc: XmlCharEncoding,
-) -> Option<XmlParserInputBuffer> {
-    if let Some(f) =
-        GLOBAL_STATE.with_borrow(|state| state.parser_input_buffer_create_filename_value)
-    {
-        return f(uri, enc);
-    }
-    __xml_parser_input_buffer_create_filename(uri, enc)
 }
 
 const IOERR: &[*const c_char] = &[
@@ -395,35 +370,6 @@ pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *m
         ret = xml_mem_strdup(dir.as_ptr() as _) as _;
     }
     ret
-}
-
-pub(crate) unsafe fn __xml_parser_input_buffer_create_filename(
-    uri: &str,
-    enc: XmlCharEncoding,
-) -> Option<XmlParserInputBuffer> {
-    if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-        register_default_input_callbacks();
-    }
-
-    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
-    /*
-     * Try to find one of the input accept method accepting that scheme
-     * Go in reverse to give precedence to user defined handlers.
-     */
-    for (callback, is_nanohttp) in callbacks.iter_mut().rev() {
-        if callback.is_match(uri) {
-            if let Ok(context) = callback.open(uri) {
-                /*
-                 * Allocate the Input buffer front-end.
-                 */
-                let mut ret = XmlParserInputBuffer::new(enc);
-                ret.context = Some(context);
-                ret.use_nanohttp = *is_nanohttp;
-                return Some(ret);
-            }
-        }
-    }
-    None
 }
 
 /*

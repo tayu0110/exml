@@ -762,10 +762,7 @@ pub unsafe fn xml_new_text_reader(
 pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderPtr {
     use std::ffi::CStr;
 
-    use crate::{
-        encoding::XmlCharEncoding,
-        io::{xml_parser_get_directory, xml_parser_input_buffer_create_filename},
-    };
+    use crate::{encoding::XmlCharEncoding, io::xml_parser_get_directory};
 
     let mut directory: *mut c_char = null_mut();
 
@@ -773,7 +770,7 @@ pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> Xml
         return null_mut();
     }
 
-    let Some(input) = xml_parser_input_buffer_create_filename(
+    let Some(input) = XmlParserInputBuffer::from_uri(
         CStr::from_ptr(uri).to_string_lossy().as_ref(),
         XmlCharEncoding::None,
     ) else {
@@ -6109,7 +6106,7 @@ pub unsafe extern "C" fn xml_reader_new_file(
 ) -> c_int {
     use std::ffi::CStr;
 
-    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_filename};
+    use crate::encoding::XmlCharEncoding;
 
     if filename.is_null() {
         return -1;
@@ -6118,7 +6115,7 @@ pub unsafe extern "C" fn xml_reader_new_file(
         return -1;
     }
 
-    let Some(input) = xml_parser_input_buffer_create_filename(
+    let Some(input) = XmlParserInputBuffer::from_uri(
         CStr::from_ptr(filename).to_string_lossy().as_ref(),
         XmlCharEncoding::None,
     ) else {

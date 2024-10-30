@@ -23,8 +23,7 @@ use crate::encoding::{
 };
 use crate::globals::{get_parser_debug_entities, GenericErrorContext};
 use crate::io::{
-    __xml_loader_err, xml_check_http_input, xml_parser_get_directory,
-    xml_parser_input_buffer_create_filename, XmlParserInputBuffer,
+    __xml_loader_err, xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer,
 };
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
@@ -1758,7 +1757,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
         );
         return null_mut();
     }
-    let Some(buf) = xml_parser_input_buffer_create_filename(
+    let Some(buf) = XmlParserInputBuffer::from_uri(
         CStr::from_ptr(filename).to_string_lossy().as_ref(),
         XmlCharEncoding::None,
     ) else {

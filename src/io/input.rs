@@ -136,6 +136,21 @@ impl XmlParserInputBuffer {
         ret
     }
 
+    /// Create a buffered parser input for the progressive parsing of a file.  
+    /// If filename is `"-"` then we use stdin as the input.  
+    ///
+    /// If successfully created, return the new parser input wrapped `Some`,
+    /// otherwise return `None`.
+    #[doc(alias = "xmlParserInputBufferCreateFilename")]
+    pub fn from_uri(uri: &str, enc: XmlCharEncoding) -> Option<XmlParserInputBuffer> {
+        if let Some(f) =
+            GLOBAL_STATE.with_borrow(|state| state.parser_input_buffer_create_filename_value)
+        {
+            return f(uri, enc);
+        }
+        __xml_parser_input_buffer_create_filename(uri, enc)
+    }
+
     /// Generic front-end for the encoding handler on parser input.  
     /// If you try to flush all the raw buffer, set `flush` to `true`.
     ///
@@ -473,4 +488,33 @@ pub fn register_input_callbacks(callback: impl XmlInputCallback + 'static) -> io
     callbacks.push((Box::new(callback), is_nanohttp));
     XML_INPUT_CALLBACK_INITIALIZED.store(true, Ordering::Relaxed);
     Ok(callbacks.len())
+}
+
+pub(crate) fn __xml_parser_input_buffer_create_filename(
+    uri: &str,
+    enc: XmlCharEncoding,
+) -> Option<XmlParserInputBuffer> {
+    if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
+        register_default_input_callbacks();
+    }
+
+    let mut callbacks = XML_INPUT_CALLBACK_TABLE.lock().unwrap();
+    /*
+     * Try to find one of the input accept method accepting that scheme
+     * Go in reverse to give precedence to user defined handlers.
+     */
+    for (callback, is_nanohttp) in callbacks.iter_mut().rev() {
+        if callback.is_match(uri) {
+            if let Ok(context) = callback.open(uri) {
+                /*
+                 * Allocate the Input buffer front-end.
+                 */
+                let mut ret = XmlParserInputBuffer::new(enc);
+                ret.context = Some(context);
+                ret.use_nanohttp = *is_nanohttp;
+                return Some(ret);
+            }
+        }
+    }
+    None
 }

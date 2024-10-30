@@ -10,7 +10,7 @@ use libc::{fclose, fopen, snprintf, FILE};
 use crate::{
     buf::XmlBuf,
     encoding::XmlCharEncoding,
-    io::{xml_parser_input_buffer_create_filename, XmlOutputBufferPtr, XmlParserInputBuffer},
+    io::{XmlOutputBufferPtr, XmlParserInputBuffer},
     libxml::{
         catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
         chvalid::XmlChRangeGroup,
@@ -1242,34 +1242,34 @@ pub(crate) unsafe fn gen_xml_parser_input_buffer_ptr(
     _nr: c_int,
 ) -> Option<XmlParserInputBuffer> {
     if no == 0 {
-        return xml_parser_input_buffer_create_filename("missing.xml", XmlCharEncoding::None);
+        return XmlParserInputBuffer::from_uri("missing.xml", XmlCharEncoding::None);
     }
     if no == 1 {
-        return xml_parser_input_buffer_create_filename("<foo/>", XmlCharEncoding::None);
+        return XmlParserInputBuffer::from_uri("<foo/>", XmlCharEncoding::None);
     }
     if no == 2 {
-        return xml_parser_input_buffer_create_filename("test/ent2", XmlCharEncoding::None);
+        return XmlParserInputBuffer::from_uri("test/ent2", XmlCharEncoding::None);
     }
     if no == 3 {
-        return xml_parser_input_buffer_create_filename(
+        return XmlParserInputBuffer::from_uri(
             "test/valid/REC-xml-19980210.xml",
             XmlCharEncoding::None,
         );
     }
     if no == 4 {
-        return xml_parser_input_buffer_create_filename(
+        return XmlParserInputBuffer::from_uri(
             "test/valid/dtds/xhtml1-strict.dtd",
             XmlCharEncoding::None,
         );
     }
     if no == 5 {
-        return xml_parser_input_buffer_create_filename(
+        return XmlParserInputBuffer::from_uri(
             REMOTE1GOOD.to_string_lossy().as_ref(),
             XmlCharEncoding::None,
         );
     }
     if no == 6 {
-        return xml_parser_input_buffer_create_filename(
+        return XmlParserInputBuffer::from_uri(
             REMOTE1BAD.to_string_lossy().as_ref(),
             XmlCharEncoding::None,
         );

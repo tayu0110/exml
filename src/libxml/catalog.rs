@@ -19,7 +19,7 @@ use libc::{close, fprintf, getenv, memset, open, read, snprintf, stat, FILE, O_R
 use crate::{
     __xml_raise_error, generic_error,
     hash::XmlHashTableRef,
-    io::{xml_parser_get_directory, xml_parser_input_buffer_create_filename},
+    io::{xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
@@ -3959,7 +3959,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
         return null_mut();
     }
 
-    let Some(buf) = xml_parser_input_buffer_create_filename(
+    let Some(buf) = XmlParserInputBuffer::from_uri(
         CStr::from_ptr(filename).to_string_lossy().as_ref(),
         crate::encoding::XmlCharEncoding::None,
     ) else {
