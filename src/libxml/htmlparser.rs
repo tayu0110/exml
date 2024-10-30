@@ -53,7 +53,7 @@ use crate::{
         },
     },
     private::{
-        buf::{xml_buf_get_input_base, xml_buf_set_input_base_cur},
+        buf::xml_buf_set_input_base_cur,
         parser::{xml_parser_grow, XML_VCTXT_USE_PCTXT},
     },
     IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH, IS_COMBINING,
@@ -10849,16 +10849,7 @@ pub unsafe fn html_create_push_parser_ctxt(
     input_push(ctxt, input_stream);
 
     if size > 0 && !chunk.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
-        let base: size_t = xml_buf_get_input_base(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |ptr| ptr.as_ptr()),
-            (*ctxt).input,
-        );
+        let base: size_t = (*(*ctxt).input).get_base();
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         (*(*ctxt).input)
@@ -11787,16 +11778,7 @@ pub unsafe extern "C" fn html_parse_chunk(
         && (*(*ctxt).input).buf.is_some()
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
-        let base: size_t = xml_buf_get_input_base(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |ptr| ptr.as_ptr()),
-            (*ctxt).input,
-        );
+        let base: size_t = (*(*ctxt).input).get_base();
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         let res: c_int = (*(*ctxt).input)
@@ -11829,8 +11811,7 @@ pub unsafe extern "C" fn html_parse_chunk(
             && input.borrow().buffer.is_some()
             && input.borrow().raw.is_some()
         {
-            let base: size_t =
-                xml_buf_get_input_base(input.borrow().buffer.unwrap().as_ptr(), (*ctxt).input);
+            let base: size_t = (*(*ctxt).input).get_base();
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
             let res = input.borrow_mut().decode(terminate != 0);

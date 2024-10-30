@@ -40,7 +40,7 @@ unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
  * Handle a buffer overflow error
  * To be improved...
  */
-unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
+pub(crate) unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
     let extra = CString::new(extra).unwrap();
     __xml_simple_error(
         XmlErrorDomain::XmlFromBuffer,
@@ -782,25 +782,6 @@ pub mod libxml_api {
 
     pub(crate) extern "C" fn xml_buf_shrink(buf: XmlBufPtr, len: usize) -> usize {
         XmlBufRef::from_raw(buf).map_or(0, |mut buf| buf.trim_head(len))
-    }
-
-    pub(crate) unsafe extern "C" fn xml_buf_get_input_base(
-        buf: XmlBufPtr,
-        input: XmlParserInputPtr,
-    ) -> usize {
-        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
-            return 0;
-        };
-        if !buf.is_ok() || input.is_null() {
-            return 0;
-        }
-
-        let mut base = (*input).base.offset_from(buf.as_mut_ptr()) as usize;
-        if base > buf.capacity() {
-            xml_buf_overflow_error(buf.deref_mut(), "Input reference outside of the buffer");
-            base = 0;
-        }
-        base
     }
 
     pub(crate) unsafe extern "C" fn xml_buf_set_input_base_cur(

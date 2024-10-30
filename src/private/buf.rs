@@ -1177,37 +1177,6 @@ mod legacy {
     }
 
     /**
-     * xmlBufGetInputBase:
-     * @buf: an xmlBufPtr
-     * @input: an xmlParserInputPtr
-     *
-     * Get the base of the @input relative to the beginning of the buffer
-     *
-     * Returns the size_t corresponding to the displacement
-     */
-    pub(crate) unsafe extern "C" fn xml_buf_get_input_base(
-        buf: XmlBufPtr,
-        input: XmlParserInputPtr,
-    ) -> size_t {
-        let mut base: size_t;
-
-        if input.is_null() || buf.is_null() || (*buf).error != 0 {
-            return 0;
-        }
-        CHECK_COMPAT!(buf);
-        base = (*input).base.offset_from((*buf).content) as _;
-        /*
-         * We could do some pointer arithmetic checks but that's probably
-         * sufficient.
-         */
-        if base > (*buf).size {
-            xml_buf_overflow_error(buf, c"Input reference outside of the buffer".as_ptr() as _);
-            base = 0;
-        }
-        base
-    }
-
-    /**
      * xmlBufSetInputBaseCur:
      * @buf: an xmlBufPtr
      * @input: an xmlParserInputPtr

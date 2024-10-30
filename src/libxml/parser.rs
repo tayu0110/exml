@@ -9,6 +9,7 @@ use std::{
     ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void, CStr},
     io::Read,
     mem::{size_of, size_of_val},
+    ops::DerefMut,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
@@ -22,7 +23,7 @@ use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen,
 
 use crate::{
     __xml_raise_error,
-    buf::libxml_api::xml_buf_create,
+    buf::{libxml_api::xml_buf_create, xml_buf_overflow_error},
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
     generic_error,
@@ -105,8 +106,8 @@ use crate::{
     },
     private::{
         buf::{
-            xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_get_input_base,
-            xml_buf_set_allocation_scheme, xml_buf_set_input_base_cur,
+            xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme,
+            xml_buf_set_input_base_cur,
         },
         entities::{
             XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -194,6 +195,27 @@ impl XmlParserInput {
             self.end = buffer.as_mut_ptr().add(buffer.len());
         }
         0
+    }
+
+    /// Returns the distance between the base and the top of the buffer.
+    #[doc(alias = "xmlBufGetInputBase")]
+    pub(crate) fn get_base(&self) -> usize {
+        let Some(mut buffer) = self
+            .buf
+            .as_ref()
+            .and_then(|buf| buf.borrow().buffer)
+            .filter(|buf| buf.is_ok())
+        else {
+            return 0;
+        };
+        unsafe {
+            let mut base = self.base.offset_from(buffer.as_mut_ptr()) as usize;
+            if base > buffer.capacity() {
+                xml_buf_overflow_error(buffer.deref_mut(), "Input reference outside of the buffer");
+                base = 0;
+            }
+            base
+        }
     }
 }
 
@@ -5382,16 +5404,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
     (*ctxt).charset = XmlCharEncoding::None;
 
     if size != 0 && !chunk.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
-        let base: size_t = xml_buf_get_input_base(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr()),
-            (*ctxt).input,
-        );
+        let base: size_t = (*(*ctxt).input).get_base();
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         (*(*ctxt).input)
@@ -9732,13 +9745,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 if input_buffer.borrow().raw.is_some()
                     && !input_buffer.borrow().raw.unwrap().is_empty()
                 {
-                    let base: size_t = xml_buf_get_input_base(
-                        input_buffer
-                            .borrow()
-                            .buffer
-                            .map_or(null_mut(), |buf| buf.as_ptr()),
-                        (*ctxt).input,
-                    );
+                    let base: size_t = (*(*ctxt).input).get_base();
                     let current: size_t =
                         (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
@@ -10516,16 +10523,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
         && (*(*ctxt).input).buf.is_some()
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
-        let base: size_t = xml_buf_get_input_base(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr()),
-            (*ctxt).input,
-        );
+        let base: size_t = (*(*ctxt).input).get_base();
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         let res: c_int = (*(*ctxt).input)
@@ -10559,8 +10557,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
             && input.borrow().buffer.is_some()
             && input.borrow().raw.is_some()
         {
-            let base: size_t =
-                xml_buf_get_input_base(input.borrow().buffer.unwrap().as_ptr(), (*ctxt).input);
+            let base: size_t = (*(*ctxt).input).get_base();
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
             let res = input.borrow_mut().decode(terminate != 0);
@@ -10602,16 +10599,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
     }
 
     if end_in_lf == 1 && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
-        let base: size_t = xml_buf_get_input_base(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr()),
-            (*ctxt).input,
-        );
+        let base: size_t = (*(*ctxt).input).get_base();
         let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         (*(*ctxt).input)
@@ -11300,16 +11288,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
     input_push(ctxt, input_stream);
 
     if size > 0 && !chunk.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
-        let base: size_t = xml_buf_get_input_base(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr()),
-            (*ctxt).input,
-        );
+        let base: size_t = (*(*ctxt).input).get_base();
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
         (*(*ctxt).input)
