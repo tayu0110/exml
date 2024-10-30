@@ -1237,7 +1237,7 @@ pub(crate) unsafe extern "C" fn desret_xml_dtd_ptr(val: XmlDtdPtr) {
     desret_xml_node_ptr(val as XmlNodePtr);
 }
 
-pub(crate) unsafe fn gen_xml_parser_input_buffer_ptr(
+pub(crate) fn gen_xml_parser_input_buffer_ptr(
     no: c_int,
     _nr: c_int,
 ) -> Option<XmlParserInputBuffer> {

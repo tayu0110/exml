@@ -1,6 +1,5 @@
 use std::{
     any::{type_name, type_name_of_val},
-    ffi::c_void,
     io::{self, Cursor, Read},
     ptr::null,
     str::from_utf8_mut,
@@ -23,47 +22,6 @@ use crate::{
 };
 
 use super::{xml_ioerr, xml_ioerr_memory, DefaultFileIOCallbacks, MINLEN};
-
-/**
- * xmlInputMatchCallback:
- * @filename: the filename or URI
- *
- * Callback used in the I/O Input API to detect if the current handler
- * can provide input functionality for this resource.
- *
- * Returns 1 if yes and 0 if another Input module should be used
- */
-pub type XmlInputMatchCallback = unsafe fn(filename: &str) -> i32;
-/**
- * xmlInputOpenCallback:
- * @filename: the filename or URI
- *
- * Callback used in the I/O Input API to open the resource
- *
- * Returns an Input context or NULL in case or error
- */
-pub type XmlInputOpenCallback = unsafe fn(filename: &str) -> *mut c_void;
-/**
- * xmlInputReadCallback:
- * @context:  an Input context
- * @buffer:  the buffer to store data read
- * @len:  the length of the buffer in bytes
- *
- * Callback used in the I/O Input API to read the resource
- *
- * Returns the number of bytes read or -1 in case of error
- */
-pub type XmlInputReadCallback =
-    unsafe extern "C" fn(context: *mut c_void, buffer: *mut i8, len: i32) -> i32;
-/**
- * xmlInputCloseCallback:
- * @context:  an Input context
- *
- * Callback used in the I/O Input API to close the resource
- *
- * Returns 0 or -1 in case of error
- */
-pub type XmlInputCloseCallback = unsafe extern "C" fn(context: *mut c_void) -> i32;
 
 #[repr(C)]
 pub struct XmlParserInputBuffer {
