@@ -24,7 +24,7 @@ use crate::encoding::{
 use crate::globals::{get_parser_debug_entities, GenericErrorContext};
 use crate::io::{
     __xml_loader_err, xml_check_http_input, xml_parser_get_directory,
-    xml_parser_input_buffer_create_filename, xml_parser_input_buffer_create_mem,
+    xml_parser_input_buffer_create_filename, XmlParserInputBuffer,
 };
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
@@ -803,7 +803,7 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
         return null_mut();
     }
 
-    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
+    let Some(buf) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     };
@@ -1315,7 +1315,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
                 .collect::<String>()
         );
     }
-    let Some(buf) = xml_parser_input_buffer_create_mem(
+    let Some(buf) = XmlParserInputBuffer::from_memory(
         CStr::from_ptr(buffer as *const i8).to_bytes().to_vec(),
         XmlCharEncoding::None,
     ) else {

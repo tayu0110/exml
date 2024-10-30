@@ -12,7 +12,7 @@ use std::{
     cell::RefCell,
     ffi::{c_char, c_int, c_uint, c_void, CStr, CString},
     fs::{metadata, File},
-    io::{self, stdin, Cursor, ErrorKind, Read},
+    io::{self, stdin, ErrorKind, Read},
     mem::size_of,
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
@@ -362,33 +362,6 @@ pub unsafe fn xml_parser_input_buffer_create_file(
 
     let mut ret = XmlParserInputBuffer::new(enc);
     ret.context = Some(Box::new(file));
-    Some(ret)
-}
-
-/**
- * xmlParserInputBufferCreateMem:
- * @mem:  the memory input
- * @size:  the length of the memory block
- * @enc:  the charset encoding if known
- *
- * Create a buffered parser input for the progressive parsing for the input
- * from a memory area.
- *
- * Returns the new parser input or NULL
- */
-/// TODO: Allow the slice as memory.
-pub unsafe fn xml_parser_input_buffer_create_mem(
-    mem: Vec<u8>,
-    enc: XmlCharEncoding,
-) -> Option<XmlParserInputBuffer> {
-    let mut ret = XmlParserInputBuffer::new(enc);
-    // I believe `mem` should be set as `context`,
-    // but for some reason the `testchar::test_user_encoding` test fails...
-    //
-    // Until the cause is found, push data directly into the buffer
-    // and set the `context` to an empty source, as in the original code.
-    ret.context = Some(Box::new(Cursor::new(vec![])));
-    ret.buffer.as_mut().unwrap().push_bytes(&mem);
     Some(ret)
 }
 

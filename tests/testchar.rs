@@ -15,7 +15,7 @@ use exml::{
     encoding::XmlCharEncoding,
     error::XmlError,
     globals::{get_last_error, set_structured_error, GenericErrorContext},
-    io::xml_parser_input_buffer_create_mem,
+    io::XmlParserInputBuffer,
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::{
@@ -673,7 +673,7 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
      */
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     assert!(!ctxt.is_null(), "Failed to allocate parser context");
-    let Some(buf) = xml_parser_input_buffer_create_mem(data.to_vec(), XmlCharEncoding::None) else {
+    let Some(buf) = XmlParserInputBuffer::from_memory(data.to_vec(), XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         panic!("Failed to allocate input buffer");
     };

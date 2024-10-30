@@ -23,7 +23,7 @@ use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
     globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
-    io::{xml_parser_input_buffer_create_io, xml_parser_input_buffer_create_mem},
+    io::{xml_parser_input_buffer_create_io, XmlParserInputBuffer},
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -9613,7 +9613,7 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
         return null_mut();
     }
 
-    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
+    let Some(buf) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     };
@@ -12385,7 +12385,7 @@ pub unsafe fn html_ctxt_read_memory(
 
     html_ctxt_reset(ctxt);
 
-    let Some(input) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
+    let Some(input) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
         return null_mut();
     };
 

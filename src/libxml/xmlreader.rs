@@ -5953,9 +5953,9 @@ pub unsafe fn xml_reader_for_memory(
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
-    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_mem};
+    use crate::encoding::XmlCharEncoding;
 
-    let Some(buf) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
+    let Some(buf) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
         return null_mut();
     };
     let reader: XmlTextReaderPtr = xml_new_text_reader(buf, url);
@@ -6152,13 +6152,13 @@ pub unsafe fn xml_reader_new_memory(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
-    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_mem};
+    use crate::encoding::XmlCharEncoding;
 
     if reader.is_null() {
         return -1;
     }
 
-    let Some(input) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
+    let Some(input) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
         return -1;
     };
     xml_text_reader_setup(reader, Some(input), url, encoding, options)

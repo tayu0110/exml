@@ -1,7 +1,7 @@
 use std::{
     any::{type_name, type_name_of_val},
     ffi::c_void,
-    io::{self, Read},
+    io::{self, Cursor, Read},
     ptr::null,
     str::from_utf8_mut,
     sync::{
@@ -103,6 +103,23 @@ impl XmlParserInputBuffer {
         ret.compressed = -1;
         ret.rawconsumed = 0;
         ret
+    }
+
+    /// Create a buffered parser input for the progressive parsing for the input from a memory area.  
+    /// Returns the new parser input buffer.
+    ///
+    /// TODO: Allow the slice as memory.
+    #[doc(alias = "xmlParserInputBufferCreateMem")]
+    pub fn from_memory(mem: Vec<u8>, enc: XmlCharEncoding) -> Option<Self> {
+        let mut ret = XmlParserInputBuffer::new(enc);
+        // I believe `mem` should be set as `context`,
+        // but for some reason the `testchar::test_user_encoding` test fails...
+        //
+        // Until the cause is found, push data directly into the buffer
+        // and set the `context` to an empty source, as in the original code.
+        ret.context = Some(Box::new(Cursor::new(vec![])));
+        ret.buffer.as_mut().unwrap().push_bytes(&mem).ok()?;
+        Some(ret)
     }
 
     /// Generic front-end for the encoding handler on parser input.  

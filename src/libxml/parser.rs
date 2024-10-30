@@ -40,8 +40,7 @@ use crate::{
         cleanup_input_callbacks, register_default_input_callbacks, xml_cleanup_output_callbacks,
         xml_default_external_entity_loader, xml_ioerr_memory, xml_no_net_exists,
         xml_parser_get_directory, xml_parser_input_buffer_create_io,
-        xml_parser_input_buffer_create_mem, xml_register_default_output_callbacks,
-        XmlParserInputBuffer,
+        xml_register_default_output_callbacks, XmlParserInputBuffer,
     },
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
@@ -11642,13 +11641,11 @@ pub unsafe fn xml_ctxt_read_memory(
         return null_mut();
     }
     xml_init_parser();
-
     xml_ctxt_reset(ctxt);
 
-    let Some(input) = xml_parser_input_buffer_create_mem(buffer, XmlCharEncoding::None) else {
+    let Some(input) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
         return null_mut();
     };
-
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
