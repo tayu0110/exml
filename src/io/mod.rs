@@ -342,50 +342,6 @@ pub unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
     ret
 }
 
-/**
- * xmlParserInputBufferCreateFile:
- * @file:  a FILE*
- * @enc:  the charset encoding if known
- *
- * Create a buffered parser input for the progressive parsing of a FILE *
- * buffered C I/O
- *
- * Returns the new parser input or NULL
- */
-pub unsafe fn xml_parser_input_buffer_create_file(
-    file: File,
-    enc: XmlCharEncoding,
-) -> Option<XmlParserInputBuffer> {
-    if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
-        register_default_input_callbacks();
-    }
-
-    let mut ret = XmlParserInputBuffer::new(enc);
-    ret.context = Some(Box::new(file));
-    Some(ret)
-}
-
-/**
- * xmlParserInputBufferCreateIO:
- * @ioread:  an I/O read function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @enc:  the charset encoding if known
- *
- * Create a buffered parser input for the progressive parsing for the input
- * from an I/O handler
- *
- * Returns the new parser input or NULL
- */
-pub unsafe fn xml_parser_input_buffer_create_io(
-    ioctx: impl Read + 'static,
-    enc: XmlCharEncoding,
-) -> Option<XmlParserInputBuffer> {
-    let mut ret = XmlParserInputBuffer::new(enc);
-    ret.context = Some(Box::new(ioctx));
-    Some(ret)
-}
-
 const MINLEN: usize = 4000;
 
 /**

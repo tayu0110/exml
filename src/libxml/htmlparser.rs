@@ -23,7 +23,7 @@ use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{parser_validity_error, parser_validity_warning, XmlError},
     globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
-    io::{xml_parser_input_buffer_create_io, XmlParserInputBuffer},
+    io::XmlParserInputBuffer,
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -12272,9 +12272,7 @@ pub unsafe fn html_read_io(
 ) -> HtmlDocPtr {
     xml_init_parser();
 
-    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
-        return null_mut();
-    };
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
     if ctxt.is_null() {
         return null_mut();
@@ -12429,9 +12427,7 @@ pub unsafe fn html_ctxt_read_io(
 
     html_ctxt_reset(ctxt);
 
-    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
-        return null_mut();
-    };
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {

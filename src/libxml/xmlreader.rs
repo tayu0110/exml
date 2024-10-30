@@ -5988,11 +5988,9 @@ pub unsafe extern "C" fn xml_reader_for_io(
     encoding: *const c_char,
     options: c_int,
 ) -> XmlTextReaderPtr {
-    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_io};
+    use crate::encoding::XmlCharEncoding;
 
-    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
-        return null_mut();
-    };
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     let reader: XmlTextReaderPtr = xml_new_text_reader(input, url);
     if reader.is_null() {
         return null_mut();
@@ -6189,15 +6187,13 @@ pub unsafe extern "C" fn xml_reader_new_io(
     encoding: *const c_char,
     options: c_int,
 ) -> c_int {
-    use crate::{encoding::XmlCharEncoding, io::xml_parser_input_buffer_create_io};
+    use crate::encoding::XmlCharEncoding;
 
     if reader.is_null() {
         return -1;
     }
 
-    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
-        return -1;
-    };
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     xml_text_reader_setup(reader, Some(input), url, encoding, options)
 }
 

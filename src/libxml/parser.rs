@@ -39,8 +39,7 @@ use crate::{
     io::{
         cleanup_input_callbacks, register_default_input_callbacks, xml_cleanup_output_callbacks,
         xml_default_external_entity_loader, xml_ioerr_memory, xml_no_net_exists,
-        xml_parser_get_directory, xml_parser_input_buffer_create_io,
-        xml_register_default_output_callbacks, XmlParserInputBuffer,
+        xml_parser_get_directory, xml_register_default_output_callbacks, XmlParserInputBuffer,
     },
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
@@ -10674,10 +10673,7 @@ pub unsafe fn xml_create_io_parser_ctxt(
     ioctx: impl Read + 'static,
     enc: XmlCharEncoding,
 ) -> XmlParserCtxtPtr {
-    let Some(buf) = xml_parser_input_buffer_create_io(ioctx, enc) else {
-        return null_mut();
-    };
-
+    let buf = XmlParserInputBuffer::from_reader(ioctx, enc);
     let ctxt: XmlParserCtxtPtr = xml_new_sax_parser_ctxt(sax, user_data);
     if ctxt.is_null() {
         return null_mut();
@@ -11531,9 +11527,7 @@ pub unsafe extern "C" fn xml_read_io(
 ) -> XmlDocPtr {
     xml_init_parser();
 
-    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
-        return null_mut();
-    };
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
         return null_mut();
@@ -11682,12 +11676,9 @@ pub unsafe extern "C" fn xml_ctxt_read_io(
         return null_mut();
     }
     xml_init_parser();
-
     xml_ctxt_reset(ctxt);
 
-    let Some(input) = xml_parser_input_buffer_create_io(ioctx, XmlCharEncoding::None) else {
-        return null_mut();
-    };
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {

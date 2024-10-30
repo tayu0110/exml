@@ -122,6 +122,20 @@ impl XmlParserInputBuffer {
         Some(ret)
     }
 
+    /// Create a buffered parser input for the progressive parsing for the input from an I/O handler.  
+    /// Returns the new parser input buffer.
+    #[doc(alias = "xmlParserInputBufferCreateIO")]
+    #[doc(alias = "xmlParserInputBufferCreateFile")]
+    pub fn from_reader(reader: impl Read + 'static, enc: XmlCharEncoding) -> Self {
+        if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
+            register_default_input_callbacks();
+        }
+
+        let mut ret = XmlParserInputBuffer::new(enc);
+        ret.context = Some(Box::new(reader));
+        ret
+    }
+
     /// Generic front-end for the encoding handler on parser input.  
     /// If you try to flush all the raw buffer, set `flush` to `true`.
     ///
