@@ -53,7 +53,7 @@ use crate::{
         },
     },
     private::{
-        buf::{xml_buf_get_input_base, xml_buf_reset_input, xml_buf_set_input_base_cur},
+        buf::{xml_buf_get_input_base, xml_buf_set_input_base_cur},
         parser::{xml_parser_grow, XML_VCTXT_USE_PCTXT},
     },
     IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH, IS_COMBINING,
@@ -7227,17 +7227,7 @@ unsafe extern "C" fn html_check_encoding_direct(
                 .unwrap()
                 .borrow_mut()
                 .decode(true);
-            xml_buf_reset_input(
-                (*(*ctxt).input)
-                    .buf
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .buffer
-                    .unwrap()
-                    .as_ptr(),
-                (*ctxt).input,
-            );
+            (*(*ctxt).input).reset_base();
             if res.is_err() {
                 html_parse_err(
                     ctxt,
@@ -9628,16 +9618,7 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
     (*input).filename = null_mut();
     // (*input).buf = Some(buf);
     std::ptr::write(&raw mut (*input).buf, Some(Rc::new(RefCell::new(buf))));
-    xml_buf_reset_input(
-        (*input)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |ptr| ptr.as_ptr()),
-        input,
-    );
+    (*input).reset_base();
 
     input_push(ctxt, input);
     ctxt
@@ -10863,16 +10844,7 @@ pub unsafe fn html_create_push_parser_ctxt(
         &raw mut (*input_stream).buf,
         Some(Rc::new(RefCell::new(buf))),
     );
-    xml_buf_reset_input(
-        (*input_stream)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |ptr| ptr.as_ptr()),
-        input_stream,
-    );
+    (*input_stream).reset_base();
 
     input_push(ctxt, input_stream);
 

@@ -48,7 +48,6 @@ use crate::libxml::valid::{
 use crate::libxml::xmlerror::XmlParserErrors;
 use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
 
-use crate::private::buf::xml_buf_reset_input;
 use crate::private::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
@@ -815,16 +814,7 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
 
     (*input).filename = null_mut();
     (*input).buf = Some(Rc::new(RefCell::new(buf)));
-    xml_buf_reset_input(
-        (*input)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |ptr| ptr.as_ptr()),
-        input,
-    );
+    (*input).reset_base();
 
     input_push(ctxt, input);
     ctxt
@@ -1255,13 +1245,7 @@ pub(crate) unsafe fn xml_switch_input_encoding(
      * completely.
      */
     let res = input_buf.borrow_mut().decode(true);
-    xml_buf_reset_input(
-        (*input_buf)
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr()),
-        input,
-    );
+    (*input).reset_base();
     if res.is_err() {
         /* TODO: This could be an out of memory or an encoding error. */
         xml_err_internal(
@@ -1331,16 +1315,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
         return null_mut();
     }
     (*input).buf = Some(Rc::new(RefCell::new(buf)));
-    xml_buf_reset_input(
-        (*input)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr()),
-        input,
-    );
+    (*input).reset_base();
     input
 }
 
@@ -1803,17 +1778,8 @@ pub unsafe extern "C" fn xml_new_input_from_file(
         xml_free(uri as _);
     }
     (*input_stream).directory = directory;
+    (*input_stream).reset_base();
 
-    xml_buf_reset_input(
-        (*input_stream)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr()),
-        input_stream,
-    );
     if (*ctxt).directory.is_null() && !directory.is_null() {
         (*ctxt).directory = xml_strdup(directory as *const XmlChar) as *mut c_char;
     }

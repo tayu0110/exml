@@ -105,7 +105,7 @@ use crate::{
     },
     private::{
         buf::{
-            xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_get_input_base, xml_buf_reset_input,
+            xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_get_input_base,
             xml_buf_set_allocation_scheme, xml_buf_set_input_base_cur,
         },
         entities::{
@@ -172,6 +172,29 @@ pub struct XmlParserInput {
     pub(crate) id: c_int,                               /* an unique identifier for the entity */
     pub(crate) parent_consumed: c_ulong,                /* consumed bytes from parents */
     pub(crate) entity: XmlEntityPtr,                    /* entity, if any */
+}
+
+impl XmlParserInput {
+    /// Update the input to use the current set of pointers from the buffer.
+    ///
+    /// Returns `-1` in case of error, `0` otherwise
+    #[doc(alias = "xmlBufResetInput")]
+    pub(crate) fn reset_base(&mut self) -> i32 {
+        let Some(mut buffer) = self
+            .buf
+            .as_ref()
+            .and_then(|buf| buf.borrow().buffer)
+            .filter(|buf| buf.is_ok())
+        else {
+            return -1;
+        };
+        self.base = buffer.as_mut_ptr();
+        self.cur = buffer.as_mut_ptr();
+        unsafe {
+            self.end = buffer.as_mut_ptr().add(buffer.len());
+        }
+        0
+    }
 }
 
 /**
@@ -5348,16 +5371,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
         }
     }
     (*input_stream).buf = Some(buf);
-    xml_buf_reset_input(
-        (*input_stream)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr()),
-        input_stream,
-    );
+    (*input_stream).reset_base();
     input_push(ctxt, input_stream);
 
     /*
@@ -10718,16 +10732,7 @@ pub unsafe fn xml_new_io_input_stream(
     }
     (*input_stream).filename = null_mut();
     (*input_stream).buf = Some(input);
-    xml_buf_reset_input(
-        (*input_stream)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr()),
-        input_stream,
-    );
+    (*input_stream).reset_base();
 
     if !matches!(enc, XmlCharEncoding::None) {
         xml_switch_encoding(ctxt, enc);
@@ -11290,16 +11295,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
         (*input_stream).filename = xml_canonic_path(filename as _) as _;
     }
     (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
-    xml_buf_reset_input(
-        (*input_stream)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr()),
-        input_stream,
-    );
+    (*input_stream).reset_base();
 
     input_push(ctxt, input_stream);
 

@@ -784,29 +784,6 @@ pub mod libxml_api {
         XmlBufRef::from_raw(buf).map_or(0, |mut buf| buf.trim_head(len))
     }
 
-    /// TODO: this should be implemented as the method of `XmlParserInput`.
-    ///
-    /// # Safety
-    /// - The contents of `buf` are shared with `input`
-    ///   and may be inconsistent if the contents are modified from one of the interfaces thereafter.
-    /// - DO NOT release buffers from `input`.
-    pub(crate) unsafe extern "C" fn xml_buf_reset_input(
-        buf: XmlBufPtr,
-        input: XmlParserInputPtr,
-    ) -> i32 {
-        let Some(mut buf) = XmlBufRef::from_raw(buf) else {
-            return -1;
-        };
-        if !buf.is_ok() || input.is_null() {
-            return -1;
-        }
-
-        (*input).base = buf.as_mut_ptr();
-        (*input).cur = buf.as_mut_ptr();
-        (*input).end = buf.as_mut_ptr().add(buf.len());
-        0
-    }
-
     pub(crate) unsafe extern "C" fn xml_buf_get_input_base(
         buf: XmlBufPtr,
         input: XmlParserInputPtr,

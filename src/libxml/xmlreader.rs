@@ -73,9 +73,7 @@ use crate::{
         },
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, XmlChar},
     },
-    private::buf::{
-        xml_buf_create_size, xml_buf_empty, xml_buf_reset_input, xml_buf_set_allocation_scheme,
-    },
+    private::buf::{xml_buf_create_size, xml_buf_empty, xml_buf_set_allocation_scheme},
 };
 
 /**
@@ -1045,16 +1043,7 @@ pub unsafe fn xml_text_reader_setup(
                 (*input_stream).filename = xml_canonic_path(url as _) as _;
             }
             (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
-            xml_buf_reset_input(
-                (*input_stream)
-                    .buf
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .buffer
-                    .map_or(null_mut(), |buf| buf.as_ptr()),
-                input_stream,
-            );
+            (*input_stream).reset_base();
 
             input_push((*reader).ctxt, input_stream);
             (*reader).cur = 0;

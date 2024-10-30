@@ -47,7 +47,6 @@ use crate::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
     },
-    private::buf::xml_buf_reset_input,
     xml_is_blank_ch, IS_BLANK_CH, IS_DIGIT, IS_LETTER, IS_PUBIDCHAR_CH, SYSCONFDIR,
 };
 
@@ -3980,16 +3979,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
         &raw mut (*input_stream).buf,
         Some(Rc::new(RefCell::new(buf))),
     );
-    xml_buf_reset_input(
-        (*input_stream)
-            .buf
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |ptr| ptr.as_ptr()),
-        input_stream,
-    );
+    (*input_stream).reset_base();
 
     input_push(ctxt, input_stream);
     if (*ctxt).directory.is_null() {

@@ -1177,29 +1177,6 @@ mod legacy {
     }
 
     /**
-     * xmlBufResetInput:
-     * @buf: an xmlBufPtr
-     * @input: an xmlParserInputPtr
-     *
-     * Update the input to use the current set of pointers from the buffer.
-     *
-     * Returns -1 in case of error, 0 otherwise
-     */
-    pub(crate) unsafe extern "C" fn xml_buf_reset_input(
-        buf: XmlBufPtr,
-        input: XmlParserInputPtr,
-    ) -> c_int {
-        if input.is_null() || buf.is_null() || (*buf).error != 0 {
-            return -1;
-        }
-        CHECK_COMPAT!(buf);
-        (*input).base = (*buf).content;
-        (*input).cur = (*buf).content;
-        (*input).end = (*buf).content.add((*buf).using);
-        0
-    }
-
-    /**
      * xmlBufGetInputBase:
      * @buf: an xmlBufPtr
      * @input: an xmlParserInputPtr
