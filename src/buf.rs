@@ -548,7 +548,7 @@ pub mod libxml_api {
 
     use libc::{fileno, FILE};
 
-    use crate::libxml::{globals::xml_malloc, parser::XmlParserInputPtr};
+    use crate::libxml::globals::xml_malloc;
 
     use super::*;
 
@@ -782,28 +782,6 @@ pub mod libxml_api {
 
     pub(crate) extern "C" fn xml_buf_shrink(buf: XmlBufPtr, len: usize) -> usize {
         XmlBufRef::from_raw(buf).map_or(0, |mut buf| buf.trim_head(len))
-    }
-
-    pub(crate) unsafe extern "C" fn xml_buf_set_input_base_cur(
-        buf: XmlBufPtr,
-        input: XmlParserInputPtr,
-        base: usize,
-        cur: usize,
-    ) -> i32 {
-        if input.is_null() {
-            return -1;
-        }
-        let Some(mut buf) = XmlBufRef::from_raw(buf).filter(|buf| buf.is_ok()) else {
-            (*input).base = c"".as_ptr() as _;
-            (*input).cur = (*input).base;
-            (*input).end = (*input).base;
-            return -1;
-        };
-
-        (*input).base = buf.as_mut_ptr().add(base);
-        (*input).cur = (*input).base.add(cur);
-        (*input).end = buf.as_mut_ptr().add(buf.len());
-        0
     }
 }
 

@@ -3,10 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{
-    ffi::c_int,
-    ptr::{null, null_mut},
-};
+use std::{ffi::c_int, ptr::null};
 
 use libc::{c_ulong, ptrdiff_t, size_t};
 
@@ -22,8 +19,6 @@ use crate::{
         xmlstring::XmlChar,
     },
 };
-
-use super::buf::xml_buf_set_input_base_cur;
 
 /**
  * XML_VCTXT_DTD_VALIDATED:
@@ -238,15 +233,7 @@ pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
     }
 
     let ret: c_int = (*buf).borrow_mut().grow(INPUT_CHUNK as _);
-    xml_buf_set_input_base_cur(
-        (*buf)
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr()),
-        input,
-        0,
-        cur_base as _,
-    );
+    (*input).set_base_and_cursor(0, cur_base as usize);
 
     /* TODO: Get error code from xmlParserInputBufferGrow */
     if ret < 0 {
@@ -298,13 +285,5 @@ pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
         }
     }
 
-    xml_buf_set_input_base_cur(
-        (*buf)
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr()),
-        input,
-        0,
-        used,
-    );
+    (*input).set_base_and_cursor(0, used);
 }

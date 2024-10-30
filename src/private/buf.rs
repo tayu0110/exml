@@ -15,7 +15,6 @@ use libc::{fwrite, memcpy, memmove, size_t, FILE};
 pub(crate) use crate::buf::libxml_api::*;
 use crate::libxml::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
-    parser::XmlParserInputPtr,
     parser_internals::XML_MAX_TEXT_LENGTH,
     tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
     xmlerror::XmlParserErrors,
@@ -887,122 +886,6 @@ mod legacy {
         ret
     }
 
-    // /**
-    //  * xmlBufFromBuffer:
-    //  * @buffer: incoming old buffer to convert to a new one
-    //  *
-    //  * Helper routine to switch from the old buffer structures in use
-    //  * in various APIs. It creates a wrapper xmlBufPtr which will be
-    //  * used for internal processing until the xmlBufBackToBuffer() is
-    //  * issued.
-    //  *
-    //  * Returns a new xmlBufPtr unless the call failed and NULL is returned
-    //  */
-    // pub(crate) unsafe extern "C" fn xml_buf_from_buffer(buffer: XmlBufferPtr) -> XmlBufPtr {
-    //     if buffer.is_null() {
-    //         return null_mut();
-    //     }
-
-    //     let ret: XmlBufPtr = xml_malloc(size_of::<XmlBuf>()) as XmlBufPtr;
-    //     if ret.is_null() {
-    //         xml_buf_memory_error(null_mut(), c"creating buffer".as_ptr() as _);
-    //         return null_mut();
-    //     }
-    //     (*ret).using = (*buffer).using as _;
-    //     (*ret).size = (*buffer).size as _;
-    //     UPDATE_COMPAT!(ret);
-    //     (*ret).error = 0;
-    //     (*ret).buffer = buffer;
-    //     (*ret).alloc = (*buffer).alloc;
-    //     (*ret).content = (*buffer).content;
-    //     (*ret).content_io = (*buffer).content_io;
-
-    //     ret
-    // }
-
-    // /**
-    //  * xmlBufBackToBuffer:
-    //  * @buf: new buffer wrapping the old one
-    //  *
-    //  * Function to be called once internal processing had been done to
-    //  * update back the buffer provided by the user. This can lead to
-    //  * a failure in case the size accumulated in the xmlBuf is larger
-    //  * than what an xmlBuffer can support on 64 bits (i32::MAX)
-    //  * The xmlBufPtr @buf wrapper is deallocated by this call in any case.
-    //  *
-    //  * Returns the old xmlBufferPtr unless the call failed and NULL is returned
-    //  */
-    // pub(crate) unsafe extern "C" fn xml_buf_back_to_buffer(buf: XmlBufPtr) -> XmlBufferPtr {
-    //     if buf.is_null() {
-    //         return null_mut();
-    //     }
-    //     CHECK_COMPAT!(buf);
-    //     if (*buf).error != 0 || (*buf).buffer.is_null() {
-    //         xml_buf_free(buf);
-    //         return null_mut();
-    //     }
-
-    //     let ret: XmlBufferPtr = (*buf).buffer;
-    //     /*
-    //      * What to do in case of error in the buffer ???
-    //      */
-    //     if (*buf).using > i32::MAX as usize {
-    //         /*
-    //          * Worse case, we really allocated and used more than the
-    //          * maximum allowed memory for an xmlBuffer on this architecture.
-    //          * Keep the buffer but provide a truncated size value.
-    //          */
-    //         xml_buf_overflow_error(buf, c"Used size too big for xmlBuffer".as_ptr() as _);
-    //         (*ret).using = i32::MAX as _;
-    //         (*ret).size = i32::MAX as _;
-    //     } else if (*buf).size > i32::MAX as usize {
-    //         /*
-    //          * milder case, we allocated more than the maximum allowed memory
-    //          * for an xmlBuffer on this architecture, but used less than the
-    //          * limit.
-    //          * Keep the buffer but provide a truncated size value.
-    //          */
-    //         xml_buf_overflow_error(buf, c"Allocated size too big for xmlBuffer".as_ptr() as _);
-    //         (*ret).using = (*buf).using as _;
-    //         (*ret).size = i32::MAX as _;
-    //     } else {
-    //         (*ret).using = (*buf).using as _;
-    //         (*ret).size = (*buf).size as _;
-    //     }
-    //     (*ret).alloc = (*buf).alloc;
-    //     (*ret).content = (*buf).content;
-    //     (*ret).content_io = (*buf).content_io;
-    //     xml_free(buf as _);
-    //     ret
-    // }
-
-    // /**
-    //  * xmlBufMergeBuffer:
-    //  * @buf: an xmlBufPtr
-    //  * @buffer: the buffer to consume into @buf
-    //  *
-    //  * The content of @buffer is appended to @buf and @buffer is freed
-    //  *
-    //  * Returns -1 in case of error, 0 otherwise, in any case @buffer is freed
-    //  */
-    // pub(crate) unsafe extern "C" fn xml_buf_merge_buffer(
-    //     buf: XmlBufPtr,
-    //     buffer: XmlBufferPtr,
-    // ) -> c_int {
-    //     let mut ret: c_int = 0;
-
-    //     if buf.is_null() || (*buf).error != 0 {
-    //         xml_buffer_free(buffer);
-    //         return -1;
-    //     }
-    //     CHECK_COMPAT!(buf);
-    //     if !buffer.is_null() && !(*buffer).content.is_null() && (*buffer).using > 0 {
-    //         ret = xml_buf_add(buf, (*buffer).content, (*buffer).using as _);
-    //     }
-    //     xml_buffer_free(buffer);
-    //     ret
-    // }
-
     /**
      * xmlBufContent:
      * @buf:  the buffer
@@ -1174,39 +1057,5 @@ mod legacy {
         if !buf.is_null() && (*buf).error == 0 {
             (*buf).error = XmlParserErrors::XmlBufOverflow as _;
         }
-    }
-
-    /**
-     * xmlBufSetInputBaseCur:
-     * @buf: an xmlBufPtr
-     * @input: an xmlParserInputPtr
-     * @base: the base value relative to the beginning of the buffer
-     * @cur: the cur value relative to the beginning of the buffer
-     *
-     * Update the input to use the base and cur relative to the buffer
-     * after a possible reallocation of its content
-     *
-     * Returns -1 in case of error, 0 otherwise
-     */
-    pub(crate) unsafe extern "C" fn xml_buf_set_input_base_cur(
-        buf: XmlBufPtr,
-        input: XmlParserInputPtr,
-        base: size_t,
-        cur: size_t,
-    ) -> c_int {
-        if input.is_null() {
-            return -1;
-        }
-        if buf.is_null() || (*buf).error != 0 {
-            (*input).base = c"".as_ptr() as _;
-            (*input).cur = (*input).base;
-            (*input).end = (*input).base;
-            return -1;
-        }
-        CHECK_COMPAT!(buf);
-        (*input).base = (*buf).content.add(base);
-        (*input).cur = (*input).base.add(cur);
-        (*input).end = (*buf).content.add((*buf).using);
-        0
     }
 }

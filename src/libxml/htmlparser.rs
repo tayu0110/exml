@@ -52,10 +52,7 @@ use crate::{
             xml_strncasecmp, xml_strndup, XmlChar,
         },
     },
-    private::{
-        buf::xml_buf_set_input_base_cur,
-        parser::{xml_parser_grow, XML_VCTXT_USE_PCTXT},
-    },
+    private::parser::{xml_parser_grow, XML_VCTXT_USE_PCTXT},
     IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH, IS_COMBINING,
     IS_DIGIT, IS_EXTENDER, IS_LETTER, IS_PUBIDCHAR_CH,
 };
@@ -10858,19 +10855,7 @@ pub unsafe fn html_create_push_parser_ctxt(
             .unwrap()
             .borrow_mut()
             .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-
-        xml_buf_set_input_base_cur(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |ptr| ptr.as_ptr()),
-            (*ctxt).input,
-            base,
-            cur,
-        );
+        (*(*ctxt).input).set_base_and_cursor(base, cur);
     }
     (*ctxt).progressive = 1;
 
@@ -11787,18 +11772,7 @@ pub unsafe extern "C" fn html_parse_chunk(
             .unwrap()
             .borrow_mut()
             .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-        xml_buf_set_input_base_cur(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |ptr| ptr.as_ptr()),
-            (*ctxt).input,
-            base,
-            cur,
-        );
+        (*(*ctxt).input).set_base_and_cursor(base, cur);
         if res < 0 {
             html_err_memory(ctxt, null());
             return (*ctxt).err_no;
@@ -11815,12 +11789,7 @@ pub unsafe extern "C" fn html_parse_chunk(
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
             let res = input.borrow_mut().decode(terminate != 0);
-            xml_buf_set_input_base_cur(
-                input.borrow().buffer.map_or(null_mut(), |ptr| ptr.as_ptr()),
-                (*ctxt).input,
-                base,
-                current,
-            );
+            (*(*ctxt).input).set_base_and_cursor(base, current);
             if res.is_err() {
                 html_parse_err(
                     ctxt,

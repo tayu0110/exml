@@ -105,10 +105,7 @@ use crate::{
         xpath::xml_init_xpath_internal,
     },
     private::{
-        buf::{
-            xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme,
-            xml_buf_set_input_base_cur,
-        },
+        buf::{xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme},
         entities::{
             XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
             XML_ENT_PARSED,
@@ -216,6 +213,32 @@ impl XmlParserInput {
             }
             base
         }
+    }
+
+    /// Update the input to use the base and cur relative to the buffer
+    /// after a possible reallocation of its content
+    ///
+    /// Returns -1 in case of error, 0 otherwise
+    #[doc(alias = "xmlBufSetInputBaseCur")]
+    pub(crate) fn set_base_and_cursor(&mut self, base: usize, cur: usize) -> i32 {
+        let Some(mut buffer) = self
+            .buf
+            .as_ref()
+            .and_then(|buf| buf.borrow().buffer)
+            .filter(|buf| buf.is_ok())
+        else {
+            self.base = c"".as_ptr() as _;
+            self.cur = self.base;
+            self.end = self.base;
+            return -1;
+        };
+
+        unsafe {
+            self.base = buffer.as_mut_ptr().add(base);
+            self.cur = self.base.add(cur);
+            self.end = buffer.as_mut_ptr().add(buffer.len());
+        }
+        0
     }
 }
 
@@ -5413,19 +5436,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
             .unwrap()
             .borrow_mut()
             .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-
-        xml_buf_set_input_base_cur(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr()),
-            (*ctxt).input,
-            base,
-            cur,
-        );
+        (*(*ctxt).input).set_base_and_cursor(base, cur);
     }
 
     ctxt
@@ -9750,15 +9761,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
                     input_buffer.borrow_mut().push_bytes(b"");
-                    xml_buf_set_input_base_cur(
-                        input_buffer
-                            .borrow()
-                            .buffer
-                            .map_or(null_mut(), |buf| buf.as_ptr()),
-                        (*ctxt).input,
-                        base,
-                        current,
-                    );
+                    (*(*ctxt).input).set_base_and_cursor(base, current);
                 }
             }
             avail = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
@@ -10532,18 +10535,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
             .unwrap()
             .borrow_mut()
             .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-        xml_buf_set_input_base_cur(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr()),
-            (*ctxt).input,
-            base,
-            cur,
-        );
+        (*(*ctxt).input).set_base_and_cursor(base, cur);
         if res < 0 {
             (*ctxt).err_no = XmlParserInputState::XmlParserEOF as i32;
             xml_halt_parser(ctxt);
@@ -10561,12 +10553,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
             let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
             let res = input.borrow_mut().decode(terminate != 0);
-            xml_buf_set_input_base_cur(
-                input.borrow().buffer.unwrap().as_ptr(),
-                (*ctxt).input,
-                base,
-                current,
-            );
+            (*(*ctxt).input).set_base_and_cursor(base, current);
             if res.is_err() {
                 /* TODO 2.6.0 */
                 generic_error!("xmlParseChunk: encoder error\n");
@@ -10608,19 +10595,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
             .unwrap()
             .borrow_mut()
             .push_bytes(b"\r");
-
-        xml_buf_set_input_base_cur(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr()),
-            (*ctxt).input,
-            base,
-            current,
-        );
+        (*(*ctxt).input).set_base_and_cursor(base, current);
     }
     if terminate != 0 {
         /*
@@ -11297,19 +11272,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
             .unwrap()
             .borrow_mut()
             .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
-
-        xml_buf_set_input_base_cur(
-            (*(*ctxt).input)
-                .buf
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr()),
-            (*ctxt).input,
-            base,
-            cur,
-        );
+        (*(*ctxt).input).set_base_and_cursor(base, cur);
     }
 
     if !encoding.is_null() {
