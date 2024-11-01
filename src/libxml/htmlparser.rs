@@ -7416,7 +7416,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
     if (*ctxt).name_nr > 0 && xml_str_equal(name, c"html".as_ptr() as _) {
         html_parse_err(
             ctxt,
-            XmlParserErrors::XmlHtmlStrucureError,
+            XmlParserErrors::XmlHTMLStrucureError,
             c"htmlParseStartTag: misplaced <html> tag\n".as_ptr() as _,
             name,
             null(),
@@ -7427,7 +7427,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
     if (*ctxt).name_nr != 1 && xml_str_equal(name, c"head".as_ptr() as _) {
         html_parse_err(
             ctxt,
-            XmlParserErrors::XmlHtmlStrucureError,
+            XmlParserErrors::XmlHTMLStrucureError,
             c"htmlParseStartTag: misplaced <head> tag\n".as_ptr() as _,
             name,
             null(),
@@ -7440,7 +7440,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
             if xml_str_equal(*(*ctxt).name_tab.add(indx as usize), c"body".as_ptr() as _) {
                 html_parse_err(
                     ctxt,
-                    XmlParserErrors::XmlHtmlStrucureError,
+                    XmlParserErrors::XmlHTMLStrucureError,
                     c"htmlParseStartTag: misplaced <body> tag\n".as_ptr() as _,
                     name,
                     null(),
@@ -8184,7 +8184,7 @@ unsafe extern "C" fn html_parse_external_id(
         if uri.is_null() {
             html_parse_err(
                 ctxt,
-                XmlParserErrors::XmlErrUriRequired,
+                XmlParserErrors::XmlErrURIRequired,
                 c"htmlParseExternalID: SYSTEM, no URI\n".as_ptr() as _,
                 null(),
                 null(),
@@ -8504,7 +8504,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
 unsafe extern "C" fn html_skip_bogus_comment(ctxt: HtmlParserCtxtPtr) {
     html_parse_err(
         ctxt,
-        XmlParserErrors::XmlHtmlIncorrectlyOpenedComment,
+        XmlParserErrors::XmlHTMLIncorrectlyOpenedComment,
         c"Incorrectly opened comment\n".as_ptr() as _,
         null(),
         null(),
@@ -9201,7 +9201,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
             {
                 html_parse_err(
                     ctxt,
-                    XmlParserErrors::XmlHtmlStrucureError,
+                    XmlParserErrors::XmlHTMLStrucureError,
                     c"Misplaced DOCTYPE declaration\n".as_ptr() as _,
                     c"DOCTYPE".as_ptr() as _,
                     null(),
@@ -9325,7 +9325,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     if info.is_null() {
         html_parse_err(
             ctxt,
-            XmlParserErrors::XmlHtmlUnknownTag,
+            XmlParserErrors::XmlHTMLUnknownTag,
             c"Tag %s invalid\n".as_ptr() as _,
             name,
             null(),
@@ -9751,7 +9751,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     if info.is_null() {
         html_parse_err(
             ctxt,
-            XmlParserErrors::XmlHtmlUnknownTag,
+            XmlParserErrors::XmlHTMLUnknownTag,
             c"Tag %s invalid\n".as_ptr() as _,
             name,
             null(),
@@ -9944,7 +9944,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
             {
                 html_parse_err(
                     ctxt,
-                    XmlParserErrors::XmlHtmlStrucureError,
+                    XmlParserErrors::XmlHTMLStrucureError,
                     c"Misplaced DOCTYPE declaration\n".as_ptr() as _,
                     c"DOCTYPE".as_ptr() as _,
                     null(),
@@ -11364,7 +11364,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 if info.is_null() {
                     html_parse_err(
                         ctxt,
-                        XmlParserErrors::XmlHtmlUnknownTag,
+                        XmlParserErrors::XmlHTMLUnknownTag,
                         c"Tag %s invalid\n".as_ptr() as _,
                         name,
                         null(),
@@ -11540,7 +11540,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                         }
                         html_parse_err(
                             ctxt,
-                            XmlParserErrors::XmlHtmlStrucureError,
+                            XmlParserErrors::XmlHTMLStrucureError,
                             c"Misplaced DOCTYPE declaration\n".as_ptr() as _,
                             c"DOCTYPE".as_ptr() as _,
                             null(),

@@ -2510,7 +2510,7 @@ unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, nam
     if name.is_null() && CUR!(ctxt) == b'/' && NXT!(ctxt, 1) != b'1' {
         xml_xptr_err(
             ctxt,
-            XmlParserErrors::XmlXptrChildseqStart,
+            XmlParserErrors::XmlXPtrChildseqStart,
             c"warning: ChildSeq not starting by /1\n".as_ptr() as _,
             null_mut(),
         );
@@ -2720,7 +2720,7 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
     } else {
         xml_xptr_err(
             ctxt,
-            XmlParserErrors::XmlXptrUnknownScheme,
+            XmlParserErrors::XmlXPtrUnknownScheme,
             c"unsupported scheme '%s'\n".as_ptr() as _,
             name,
         );
@@ -2772,7 +2772,7 @@ unsafe extern "C" fn xml_xptr_eval_full_xptr(
 
         /* in case of syntax error, break here */
         if (*ctxt).error != XmlXPathError::XpathExpressionOk as i32
-            && (*ctxt).error != XmlParserErrors::XmlXptrUnknownScheme as i32
+            && (*ctxt).error != XmlParserErrors::XmlXPtrUnknownScheme as i32
         {
             return;
         }
@@ -2909,7 +2909,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
     if f {
         xml_xptr_err(
             ctxt,
-            XmlParserErrors::XmlXptrEvalFailed,
+            XmlParserErrors::XmlXPtrEvalFailed,
             c"xmlXPtrEval: evaluation failed to return a node set\n".as_ptr() as _,
             null(),
         );
@@ -2944,7 +2944,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
     if stack != 0 {
         xml_xptr_err(
             ctxt,
-            XmlParserErrors::XmlXptrExtraObjects,
+            XmlParserErrors::XmlXPtrExtraObjects,
             c"xmlXPtrEval: object(s) left on the eval stack\n".as_ptr() as _,
             null(),
         );

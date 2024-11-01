@@ -1118,12 +1118,12 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
         }
     };
     let ret: c_int = xml_switch_input_encoding(ctxt, (*ctxt).input, handler);
-    if ret < 0 || (*ctxt).err_no == XmlParserErrors::XmlI18nConvFailed as i32 {
+    if ret < 0 || (*ctxt).err_no == XmlParserErrors::XmlI18NConvFailed as i32 {
         /*
          * on encoding conversion errors, stop the parser
          */
         xml_stop_parser(ctxt);
-        (*ctxt).err_no = XmlParserErrors::XmlI18nConvFailed as i32;
+        (*ctxt).err_no = XmlParserErrors::XmlI18NConvFailed as i32;
     }
     ret
 }
@@ -1503,7 +1503,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
         XmlParserErrors::XmlErrMisplacedCdataEnd => {
             c"Sequence ']]>' not allowed in content".as_ptr() as _
         }
-        XmlParserErrors::XmlErrUriRequired => c"SYSTEM or PUBLIC, the URI is missing".as_ptr() as _,
+        XmlParserErrors::XmlErrURIRequired => c"SYSTEM or PUBLIC, the URI is missing".as_ptr() as _,
         XmlParserErrors::XmlErrPubidRequired => {
             c"PUBLIC, the Public Identifier is missing".as_ptr() as _
         }
@@ -1517,7 +1517,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
             c"'>' required to close NOTATION declaration".as_ptr() as _
         }
         XmlParserErrors::XmlErrValueRequired => c"Entity value required".as_ptr() as _,
-        XmlParserErrors::XmlErrUriFragment => c"Fragment not allowed".as_ptr() as _,
+        XmlParserErrors::XmlErrURIFragment => c"Fragment not allowed".as_ptr() as _,
         XmlParserErrors::XmlErrAttlistNotStarted => {
             c"'(' required to start ATTLIST enumeration".as_ptr() as _
         }
@@ -1530,7 +1530,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
         XmlParserErrors::XmlErrMixedNotStarted => {
             c"MixedContentDecl : '|' or ')*' expected".as_ptr() as _
         }
-        XmlParserErrors::XmlErrPcdataRequired => {
+        XmlParserErrors::XmlErrPCDATARequired => {
             c"MixedContentDecl : '#PCDATA' expected".as_ptr() as _
         }
         XmlParserErrors::XmlErrElemcontentNotStarted => {
@@ -3630,7 +3630,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
             if xml_str_equal(name, (*tmp).name) {
                 xml_validity_error(
                     ctxt,
-                    XmlParserErrors::XmlDtdDupToken,
+                    XmlParserErrors::XmlDTDDupToken,
                     c"standalone: attribute notation value token %s duplicated\n".as_ptr() as _,
                     name,
                     null(),
@@ -3711,7 +3711,7 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
             if xml_str_equal(name, (*tmp).name) {
                 xml_validity_error(
                     ctxt,
-                    XmlParserErrors::XmlDtdDupToken,
+                    XmlParserErrors::XmlDTDDupToken,
                     c"standalone: attribute enumeration value token %s duplicated\n".as_ptr() as _,
                     name,
                     null(),
@@ -4229,7 +4229,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
             return null_mut();
         }
     } else {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrPcdataRequired, null());
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrPCDATARequired, null());
     }
     ret
 }

@@ -4848,7 +4848,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
             xml_rng_perr(
                 ctxt,
                 node,
-                XmlParserErrors::XmlRngpXmlnsName,
+                XmlParserErrors::XmlRngpXmlNsName,
                 c"Attribute with QName 'xmlns' is not allowed\n".as_ptr() as _,
                 val,
                 null_mut(),

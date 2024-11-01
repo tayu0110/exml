@@ -400,7 +400,7 @@ pub fn register_encoding_handler(handler: CustomEncodingHandler) -> Result<(), E
     if handlers.len() >= MAX_ENCODING_HANDLERS {
         unsafe {
             xml_encoding_err(
-                XmlParserErrors::XmlI18nExcessHandler,
+                XmlParserErrors::XmlI18NExcessHandler,
                 "xmlRegisterCharEncodingHandler: Too many handler registered, see MAX_ENCODING_HANDLERS\n",
                 "MAX_ENCODING_HANDLERS",
             );

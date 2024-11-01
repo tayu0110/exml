@@ -1038,7 +1038,7 @@ pub unsafe extern "C" fn xml_nanoftp_connect(ctx: *mut c_void) -> c_int {
             if r == 3 {
                 __xml_ioerr(
                     XmlErrorDomain::XmlFromFTP,
-                    XmlParserErrors::XmlFtpAccnt,
+                    XmlParserErrors::XmlFTPAccnt,
                     c"FTP server asking for ACCNT on anonymous\n".as_ptr() as _,
                 );
             }
@@ -1154,7 +1154,7 @@ pub unsafe extern "C" fn xml_nanoftp_scan_proxy(url: *const c_char) {
     {
         __xml_ioerr(
             XmlErrorDomain::XmlFromFTP,
-            XmlParserErrors::XmlFtpUrlSyntax,
+            XmlParserErrors::XmlFTPUrlSyntax,
             c"Syntax Error\n".as_ptr() as _,
         );
         if !uri.is_null() {
@@ -1812,7 +1812,7 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
             if sscanf(cur, c"%u".as_ptr() as _, &temp[0]) != 1 {
                 __xml_ioerr(
                     XmlErrorDomain::XmlFromFTP,
-                    XmlParserErrors::XmlFtpEpsvAnswer,
+                    XmlParserErrors::XmlFTPEpsvAnswer,
                     c"Invalid answer to EPSV\n".as_ptr() as _,
                 );
                 if (*ctxt).data_fd != INVALID_SOCKET {
@@ -1842,7 +1842,7 @@ pub unsafe extern "C" fn xml_nanoftp_get_connection(ctx: *mut c_void) -> Socket 
             {
                 __xml_ioerr(
                     XmlErrorDomain::XmlFromFTP,
-                    XmlParserErrors::XmlFtpPasvAnswer,
+                    XmlParserErrors::XmlFTPPasvAnswer,
                     c"Invalid answer to PASV\n".as_ptr() as _,
                 );
                 if (*ctxt).data_fd != INVALID_SOCKET {

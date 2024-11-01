@@ -473,14 +473,14 @@ pub unsafe extern "C" fn xml_add_doc_entity(
 ) -> XmlEntityPtr {
     if doc.is_null() {
         xml_entities_err(
-            XmlParserErrors::XmlDtdNoDoc,
+            XmlParserErrors::XmlDTDNoDoc,
             c"xmlAddDocEntity: document is NULL".as_ptr() as _,
         );
         return null_mut();
     }
     if (*doc).int_subset.is_null() {
         xml_entities_err(
-            XmlParserErrors::XmlDtdNoDtd,
+            XmlParserErrors::XmlDTDNoDtd,
             c"xmlAddDocEntity: document without internal subset".as_ptr() as _,
         );
         return null_mut();
@@ -530,14 +530,14 @@ pub unsafe extern "C" fn xml_add_dtd_entity(
 ) -> XmlEntityPtr {
     if doc.is_null() {
         xml_entities_err(
-            XmlParserErrors::XmlDtdNoDoc,
+            XmlParserErrors::XmlDTDNoDoc,
             c"xmlAddDtdEntity: document is NULL".as_ptr() as _,
         );
         return null_mut();
     }
     if (*doc).ext_subset.is_null() {
         xml_entities_err(
-            XmlParserErrors::XmlDtdNoDtd,
+            XmlParserErrors::XmlDTDNoDtd,
             c"xmlAddDtdEntity: document without external subset".as_ptr() as _,
         );
         return null_mut();
@@ -1586,7 +1586,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
         }
         _ => {
             xml_entities_err(
-                XmlParserErrors::XmlDtdUnknownEntity,
+                XmlParserErrors::XmlDTDUnknownEntity,
                 c"xmlDumpEntitiesDecl: internal: unknown type entity type".as_ptr() as _,
             );
         }

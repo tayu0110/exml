@@ -183,7 +183,7 @@ pub unsafe extern "C" fn xml_nanohttp_scan_proxy(url: *const c_char) {
     {
         __xml_ioerr(
             XmlErrorDomain::XmlFromHTTP,
-            XmlParserErrors::XmlHttpUrlSyntax,
+            XmlParserErrors::XmlHTTPUrlSyntax,
             c"Syntax Error\n".as_ptr() as _,
         );
         if !uri.is_null() {
@@ -1317,7 +1317,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
         if (*ctxt).protocol.is_null() || strcmp((*ctxt).protocol as _, c"http".as_ptr() as _) != 0 {
             __xml_ioerr(
                 XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::XmlHttpUrlSyntax,
+                XmlParserErrors::XmlHTTPUrlSyntax,
                 c"Not a valid HTTP URI".as_ptr() as _,
             );
             xml_nanohttp_free_ctxt(ctxt);
@@ -1329,7 +1329,7 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
         if (*ctxt).hostname.is_null() {
             __xml_ioerr(
                 XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::XmlHttpUnknownHost,
+                XmlParserErrors::XmlHTTPUnknownHost,
                 c"Failed to identify host in URI".as_ptr() as _,
             );
             xml_nanohttp_free_ctxt(ctxt);

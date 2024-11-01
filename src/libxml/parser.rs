@@ -8162,7 +8162,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         if uri.is_null() {
                             xml_ns_err(
                                 ctxt,
-                                XmlParserErrors::XmlWarNsUri,
+                                XmlParserErrors::XmlWarNsURI,
                                 c"xmlns: '%s' is not a valid URI\n".as_ptr() as _,
                                 url,
                                 null(),
@@ -8172,7 +8172,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             if (*uri).scheme.is_null() {
                                 xml_ns_warn(
                                     ctxt,
-                                    XmlParserErrors::XmlWarNsUriRelative,
+                                    XmlParserErrors::XmlWarNsURIRelative,
                                     c"xmlns: URI %s is not absolute\n".as_ptr() as _,
                                     url,
                                     null(),
@@ -8297,7 +8297,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                     if uri.is_null() {
                         xml_ns_err(
                             ctxt,
-                            XmlParserErrors::XmlWarNsUri,
+                            XmlParserErrors::XmlWarNsURI,
                             c"xmlns:%s: '%s' is not a valid URI\n".as_ptr() as _,
                             attname,
                             url,
@@ -8307,7 +8307,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         if (*ctxt).pedantic != 0 && (*uri).scheme.is_null() {
                             xml_ns_warn(
                                 ctxt,
-                                XmlParserErrors::XmlWarNsUriRelative,
+                                XmlParserErrors::XmlWarNsURIRelative,
                                 c"xmlns:%s: URI %s is not absolute\n".as_ptr() as _,
                                 attname,
                                 url,
@@ -8526,7 +8526,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         {
                             xml_validity_error(
                                 ctxt,
-                                XmlParserErrors::XmlDtdStandaloneDefaulted,
+                                XmlParserErrors::XmlDTDStandaloneDefaulted,
                                 c"standalone: attribute %s on %s defaulted from external subset\n"
                                     .as_ptr() as _,
                                 attname,
@@ -11876,7 +11876,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
         }
         uri = xml_parse_system_literal(ctxt);
         if uri.is_null() {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrUriRequired, null());
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIRequired, null());
         }
     } else if CMP6!(CUR_PTR!(ctxt), b'P', b'U', b'B', b'L', b'I', b'C') {
         SKIP!(ctxt, 6);
@@ -11918,7 +11918,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
         }
         uri = xml_parse_system_literal(ctxt);
         if uri.is_null() {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrUriRequired, null());
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIRequired, null());
         }
     }
     uri
@@ -12229,7 +12229,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     if parsed_uri.is_null() {
                         xml_err_msg_str(
                             ctxt,
-                            XmlParserErrors::XmlErrInvalidUri,
+                            XmlParserErrors::XmlErrInvalidURI,
                             c"Invalid URI: %s\n".as_ptr() as _,
                             uri as _,
                         );
@@ -12244,7 +12244,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                              * Okay this is foolish to block those but not
                              * invalid URIs.
                              */
-                            xml_fatal_err(ctxt, XmlParserErrors::XmlErrUriFragment, null());
+                            xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIFragment, null());
                         } else if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                             if let Some(ent) = (*(*ctxt).sax).entity_decl {
                                 ent(
@@ -12326,7 +12326,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 if parsed_uri.is_null() {
                     xml_err_msg_str(
                         ctxt,
-                        XmlParserErrors::XmlErrInvalidUri,
+                        XmlParserErrors::XmlErrInvalidURI,
                         c"Invalid URI: %s\n".as_ptr() as _,
                         uri as _,
                     );
@@ -12341,7 +12341,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                          * Okay this is foolish to block those but not
                          * invalid URIs.
                          */
-                        xml_fatal_err(ctxt, XmlParserErrors::XmlErrUriFragment, null());
+                        xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIFragment, null());
                     }
                     xml_free_uri(parsed_uri);
                 }
@@ -13451,7 +13451,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
     (*ctxt).instate = XmlParserInputState::XmlParserCDATASection;
     r = CUR_CHAR!(ctxt, rl);
     if !IS_CHAR!(r) {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrCdataNotFinished, null());
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, null());
         // goto out;
         if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -13462,7 +13462,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
     NEXTL!(ctxt, rl);
     s = CUR_CHAR!(ctxt, sl);
     if !IS_CHAR!(s) {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrCdataNotFinished, null());
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, null());
         // goto out;
         if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -13501,7 +13501,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         if len > max_length {
             xml_fatal_err_msg(
                 ctxt,
-                XmlParserErrors::XmlErrCdataNotFinished,
+                XmlParserErrors::XmlErrCDATANotFinished,
                 c"CData section too big found\n".as_ptr() as _,
             );
             // goto out;
@@ -13526,7 +13526,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
     if cur != b'>' as i32 {
         xml_fatal_err_msg_str(
             ctxt,
-            XmlParserErrors::XmlErrCdataNotFinished,
+            XmlParserErrors::XmlErrCDATANotFinished,
             c"CData section not finished\n%.50s\n".as_ptr() as _,
             buf,
         );

@@ -101,14 +101,14 @@ impl_xml_parser_errors!(
     XmlErrExtSubsetNotFinished,    /* 60 */
     XmlErrDoctypeNotFinished,      /* 61 */
     XmlErrMisplacedCdataEnd,       /* 62 */
-    XmlErrCdataNotFinished,        /* 63 */
+    XmlErrCDATANotFinished,        /* 63 */
     XmlErrReservedXmlName,         /* 64 */
     XmlErrSpaceRequired,           /* 65 */
     XmlErrSeparatorRequired,       /* 66 */
     XmlErrNmtokenRequired,         /* 67 */
     XmlErrNameRequired,            /* 68 */
-    XmlErrPcdataRequired,          /* 69 */
-    XmlErrUriRequired,             /* 70 */
+    XmlErrPCDATARequired,          /* 69 */
+    XmlErrURIRequired,             /* 70 */
     XmlErrPubidRequired,           /* 71 */
     XmlErrLtRequired,              /* 72 */
     XmlErrGtRequired,              /* 73 */
@@ -129,16 +129,16 @@ impl_xml_parser_errors!(
     XmlErrEntityPeInternal,        /* 88 */
     XmlErrEntityLoop,              /* 89 */
     XmlErrEntityBoundary,          /* 90 */
-    XmlErrInvalidUri,              /* 91 */
-    XmlErrUriFragment,             /* 92 */
+    XmlErrInvalidURI,              /* 91 */
+    XmlErrURIFragment,             /* 92 */
     XmlWarCatalogPI,               /* 93 */
-    XmlErrNoDtd,                   /* 94 */
+    XmlErrNoDTD,                   /* 94 */
     XmlErrCondsecInvalidKeyword,   /* 95 */
     XmlErrVersionMissing,          /* 96 */
     XmlWarUnknownVersion,          /* 97 */
     XmlWarLangValue,               /* 98 */
-    XmlWarNsUri,                   /* 99 */
-    XmlWarNsUriRelative,           /* 100 */
+    XmlWarNsURI,                   /* 99 */
+    XmlWarNsURIRelative,           /* 100 */
     XmlErrMissingEncoding,         /* 101 */
     XmlWarSpaceValue,              /* 102 */
     XmlErrNotStandalone,           /* 103 */
@@ -157,51 +157,51 @@ impl_xml_parser_errors!(
     XmlNsErrAttributeRedefined, /* 203 */
     XmlNsErrEmpty,              /* 204 */
     XmlNsErrColon,              /* 205 */
-    XmlDtdAttributeDefault = 500,
-    XmlDtdAttributeRedefined,    /* 501 */
-    XmlDtdAttributeValue,        /* 502 */
-    XmlDtdContentError,          /* 503 */
-    XmlDtdContentModel,          /* 504 */
-    XmlDtdContentNotDeterminist, /* 505 */
-    XmlDtdDifferentPrefix,       /* 506 */
-    XmlDtdElemDefaultNamespace,  /* 507 */
-    XmlDtdElemNamespace,         /* 508 */
-    XmlDtdElemRedefined,         /* 509 */
-    XmlDtdEmptyNotation,         /* 510 */
-    XmlDtdEntityType,            /* 511 */
-    XmlDtdIdFixed,               /* 512 */
-    XmlDtdIdRedefined,           /* 513 */
-    XmlDtdIdSubset,              /* 514 */
-    XmlDtdInvalidChild,          /* 515 */
-    XmlDtdInvalidDefault,        /* 516 */
-    XmlDtdLoadError,             /* 517 */
-    XmlDtdMissingAttribute,      /* 518 */
-    XmlDtdMixedCorrupt,          /* 519 */
-    XmlDtdMultipleId,            /* 520 */
-    XmlDtdNoDoc,                 /* 521 */
-    XmlDtdNoDtd,                 /* 522 */
-    XmlDtdNoElemName,            /* 523 */
-    XmlDtdNoPrefix,              /* 524 */
-    XmlDtdNoRoot,                /* 525 */
-    XmlDtdNotationRedefined,     /* 526 */
-    XmlDtdNotationValue,         /* 527 */
-    XmlDtdNotEmpty,              /* 528 */
-    XmlDtdNotPcdata,             /* 529 */
-    XmlDtdNotStandalone,         /* 530 */
-    XmlDtdRootName,              /* 531 */
-    XmlDtdStandaloneWhiteSpace,  /* 532 */
-    XmlDtdUnknownAttribute,      /* 533 */
-    XmlDtdUnknownElem,           /* 534 */
-    XmlDtdUnknownEntity,         /* 535 */
-    XmlDtdUnknownId,             /* 536 */
-    XmlDtdUnknownNotation,       /* 537 */
-    XmlDtdStandaloneDefaulted,   /* 538 */
-    XmlDtdXmlidValue,            /* 539 */
-    XmlDtdXmlidType,             /* 540 */
-    XmlDtdDupToken,              /* 541 */
-    XmlHtmlStrucureError = 800,
-    XmlHtmlUnknownTag,               /* 801 */
-    XmlHtmlIncorrectlyOpenedComment, /* 802 */
+    XmlDTDAttributeDefault = 500,
+    XmlDTDAttributeRedefined,    /* 501 */
+    XmlDTDAttributeValue,        /* 502 */
+    XmlDTDContentError,          /* 503 */
+    XmlDTDContentModel,          /* 504 */
+    XmlDTDContentNotDeterminist, /* 505 */
+    XmlDTDDifferentPrefix,       /* 506 */
+    XmlDTDElemDefaultNamespace,  /* 507 */
+    XmlDTDElemNamespace,         /* 508 */
+    XmlDTDElemRedefined,         /* 509 */
+    XmlDTDEmptyNotation,         /* 510 */
+    XmlDTDEntityType,            /* 511 */
+    XmlDTDIDFixed,               /* 512 */
+    XmlDTDIDRedefined,           /* 513 */
+    XmlDTDIDSubset,              /* 514 */
+    XmlDTDInvalidChild,          /* 515 */
+    XmlDTDInvalidDefault,        /* 516 */
+    XmlDTDLoadError,             /* 517 */
+    XmlDTDMissingAttribute,      /* 518 */
+    XmlDTDMixedCorrupt,          /* 519 */
+    XmlDTDMultipleId,            /* 520 */
+    XmlDTDNoDoc,                 /* 521 */
+    XmlDTDNoDtd,                 /* 522 */
+    XmlDTDNoElemName,            /* 523 */
+    XmlDTDNoPrefix,              /* 524 */
+    XmlDTDNoRoot,                /* 525 */
+    XmlDTDNotationRedefined,     /* 526 */
+    XmlDTDNotationValue,         /* 527 */
+    XmlDTDNotEmpty,              /* 528 */
+    XmlDTDNotPcdata,             /* 529 */
+    XmlDTDNotStandalone,         /* 530 */
+    XmlDTDRootName,              /* 531 */
+    XmlDTDStandaloneWhiteSpace,  /* 532 */
+    XmlDTDUnknownAttribute,      /* 533 */
+    XmlDTDUnknownElem,           /* 534 */
+    XmlDTDUnknownEntity,         /* 535 */
+    XmlDTDUnknownId,             /* 536 */
+    XmlDTDUnknownNotation,       /* 537 */
+    XmlDTDStandaloneDefaulted,   /* 538 */
+    XmlDTDXmlidValue,            /* 539 */
+    XmlDTDXmlidType,             /* 540 */
+    XmlDTDDupToken,              /* 541 */
+    XmlHTMLStrucureError = 800,
+    XmlHTMLUnknownTag,               /* 801 */
+    XmlHTMLIncorrectlyOpenedComment, /* 802 */
     XmlRngpAnynameAttrAncestor = 1000,
     XmlRngpAttrConflict,             /* 1001 */
     XmlRngpAttributeChildren,        /* 1002 */
@@ -323,121 +323,121 @@ impl_xml_parser_errors!(
     XmlRngpUriNotAbsolute,           /* 1118 */
     XmlRngpValueEmpty,               /* 1119 */
     XmlRngpValueNoContent,           /* 1120 */
-    XmlRngpXmlnsName,                /* 1121 */
+    XmlRngpXmlNsName,                /* 1121 */
     XmlRngpXmlNs,                    /* 1122 */
-    XmlXpathExpressionOk = 1200,
-    XmlXpathNumberError,            /* 1201 */
-    XmlXpathUnfinishedLiteralError, /* 1202 */
-    XmlXpathStartLiteralError,      /* 1203 */
-    XmlXpathVariableRefError,       /* 1204 */
-    XmlXpathUndefVariableError,     /* 1205 */
-    XmlXpathInvalidPredicateError,  /* 1206 */
-    XmlXpathExprError,              /* 1207 */
-    XmlXpathUnclosedError,          /* 1208 */
-    XmlXpathUnknownFuncError,       /* 1209 */
-    XmlXpathInvalidOperand,         /* 1210 */
-    XmlXpathInvalidType,            /* 1211 */
-    XmlXpathInvalidArity,           /* 1212 */
-    XmlXpathInvalidCtxtSize,        /* 1213 */
-    XmlXpathInvalidCtxtPosition,    /* 1214 */
-    XmlXpathMemoryError,            /* 1215 */
-    XmlXptrSyntaxError,             /* 1216 */
-    XmlXptrResourceError,           /* 1217 */
-    XmlXptrSubResourceError,        /* 1218 */
-    XmlXpathUndefPrefixError,       /* 1219 */
-    XmlXpathEncodingError,          /* 1220 */
-    XmlXpathInvalidCharError,       /* 1221 */
-    XmlXpathInvalidCtxt,
-    XmlXpathStackError,
-    XmlXpathForbidVariableError,
-    XmlXpathOpLimitExceeded,
-    XmlXpathRecursionLimitExceeded,
+    XmlXPathExpressionOk = 1200,
+    XmlXPathNumberError,            /* 1201 */
+    XmlXPathUnfinishedLiteralError, /* 1202 */
+    XmlXPathStartLiteralError,      /* 1203 */
+    XmlXPathVariableRefError,       /* 1204 */
+    XmlXPathUndefVariableError,     /* 1205 */
+    XmlXPathInvalidPredicateError,  /* 1206 */
+    XmlXPathExprError,              /* 1207 */
+    XmlXPathUnclosedError,          /* 1208 */
+    XmlXPathUnknownFuncError,       /* 1209 */
+    XmlXPathInvalidOperand,         /* 1210 */
+    XmlXPathInvalidType,            /* 1211 */
+    XmlXPathInvalidArity,           /* 1212 */
+    XmlXPathInvalidCtxtSize,        /* 1213 */
+    XmlXPathInvalidCtxtPosition,    /* 1214 */
+    XmlXPathMemoryError,            /* 1215 */
+    XmlXPtrSyntaxError,             /* 1216 */
+    XmlXPtrResourceError,           /* 1217 */
+    XmlXPtrSubResourceError,        /* 1218 */
+    XmlXPathUndefPrefixError,       /* 1219 */
+    XmlXPathEncodingError,          /* 1220 */
+    XmlXPathInvalidCharError,       /* 1221 */
+    XmlXPathInvalidCtxt,
+    XmlXPathStackError,
+    XmlXPathForbidVariableError,
+    XmlXPathOpLimitExceeded,
+    XmlXPathRecursionLimitExceeded,
     XmlXPathUnknownError, // 1227, this must put at the end of XPath errors
     XmlTreeInvalidHex = 1300,
     XmlTreeInvalidDec,         /* 1301 */
     XmlTreeUnterminatedEntity, /* 1302 */
-    XmlTreeNotUtf8,            /* 1303 */
-    XmlSaveNotUtf8 = 1400,
+    XmlTreeNotUTF8,            /* 1303 */
+    XmlSaveNotUTF8 = 1400,
     XmlSaveCharInvalid,     /* 1401 */
     XmlSaveNoDoctype,       /* 1402 */
     XmlSaveUnknownEncoding, /* 1403 */
     XmlRegexpCompileError = 1450,
-    XmlIoUnknown = 1500,
-    XmlIoEacces,         /* 1501 */
-    XmlIoEagain,         /* 1502 */
-    XmlIoEbadf,          /* 1503 */
-    XmlIoEbadmsg,        /* 1504 */
-    XmlIoEbusy,          /* 1505 */
-    XmlIoEcanceled,      /* 1506 */
-    XmlIoEchild,         /* 1507 */
-    XmlIoEdeadlk,        /* 1508 */
-    XmlIoEdom,           /* 1509 */
-    XmlIoEexist,         /* 1510 */
-    XmlIoEfault,         /* 1511 */
-    XmlIoEfbig,          /* 1512 */
-    XmlIoEinprogress,    /* 1513 */
-    XmlIoEintr,          /* 1514 */
-    XmlIoEinval,         /* 1515 */
-    XmlIoEio,            /* 1516 */
-    XmlIoEisdir,         /* 1517 */
-    XmlIoEmfile,         /* 1518 */
-    XmlIoEmlink,         /* 1519 */
-    XmlIoEmsgsize,       /* 1520 */
-    XmlIoEnametoolong,   /* 1521 */
-    XmlIoEnfile,         /* 1522 */
-    XmlIoEnodev,         /* 1523 */
-    XmlIoEnoent,         /* 1524 */
-    XmlIoEnoexec,        /* 1525 */
-    XmlIoEnolck,         /* 1526 */
-    XmlIoEnomem,         /* 1527 */
-    XmlIoEnospc,         /* 1528 */
-    XmlIoEnosys,         /* 1529 */
-    XmlIoEnotdir,        /* 1530 */
-    XmlIoEnotempty,      /* 1531 */
-    XmlIoEnotsup,        /* 1532 */
-    XmlIoEnotty,         /* 1533 */
-    XmlIoEnxio,          /* 1534 */
-    XmlIoEperm,          /* 1535 */
-    XmlIoEpipe,          /* 1536 */
-    XmlIoErange,         /* 1537 */
-    XmlIoErofs,          /* 1538 */
-    XmlIoEspipe,         /* 1539 */
-    XmlIoEsrch,          /* 1540 */
-    XmlIoEtimedout,      /* 1541 */
-    XmlIoExdev,          /* 1542 */
-    XmlIoNetworkAttempt, /* 1543 */
-    XmlIoEncoder,        /* 1544 */
-    XmlIoFlush,          /* 1545 */
-    XmlIoWrite,          /* 1546 */
-    XmlIoNoInput,        /* 1547 */
-    XmlIoBufferFull,     /* 1548 */
-    XmlIoLoadError,      /* 1549 */
-    XmlIoEnotsock,       /* 1550 */
-    XmlIoEisconn,        /* 1551 */
-    XmlIoEconnrefused,   /* 1552 */
-    XmlIoEnetunreach,    /* 1553 */
-    XmlIoEaddrinuse,     /* 1554 */
-    XmlIoEalready,       /* 1555 */
-    XmlIoEafnosupport,   /* 1556 */
-    XmlXincludeRecursion = 1600,
-    XmlXincludeParseValue,           /* 1601 */
-    XmlXincludeEntityDefMismatch,    /* 1602 */
-    XmlXincludeNoHref,               /* 1603 */
-    XmlXincludeNoFallback,           /* 1604 */
-    XmlXincludeHrefUri,              /* 1605 */
-    XmlXincludeTextFragment,         /* 1606 */
-    XmlXincludeTextDocument,         /* 1607 */
-    XmlXincludeInvalidChar,          /* 1608 */
-    XmlXincludeBuildFailed,          /* 1609 */
-    XmlXincludeUnknownEncoding,      /* 1610 */
-    XmlXincludeMultipleRoot,         /* 1611 */
-    XmlXincludeXptrFailed,           /* 1612 */
-    XmlXincludeXptrResult,           /* 1613 */
-    XmlXincludeIncludeInInclude,     /* 1614 */
-    XmlXincludeFallbacksInInclude,   /* 1615 */
-    XmlXincludeFallbackNotInInclude, /* 1616 */
-    XmlXincludeDeprecatedNs,         /* 1617 */
-    XmlXincludeFragmentId,           /* 1618 */
+    XmlIOUnknown = 1500,
+    XmlIOEacces,         /* 1501 */
+    XmlIOEagain,         /* 1502 */
+    XmlIOEbadf,          /* 1503 */
+    XmlIOEbadmsg,        /* 1504 */
+    XmlIOEbusy,          /* 1505 */
+    XmlIOEcanceled,      /* 1506 */
+    XmlIOEchild,         /* 1507 */
+    XmlIOEdeadlk,        /* 1508 */
+    XmlIOEdom,           /* 1509 */
+    XmlIOEexist,         /* 1510 */
+    XmlIOEfault,         /* 1511 */
+    XmlIOEfbig,          /* 1512 */
+    XmlIOEinprogress,    /* 1513 */
+    XmlIOEintr,          /* 1514 */
+    XmlIOEinval,         /* 1515 */
+    XmlIOEio,            /* 1516 */
+    XmlIOEisdir,         /* 1517 */
+    XmlIOEmfile,         /* 1518 */
+    XmlIOEmlink,         /* 1519 */
+    XmlIOEmsgsize,       /* 1520 */
+    XmlIOEnametoolong,   /* 1521 */
+    XmlIOEnfile,         /* 1522 */
+    XmlIOEnodev,         /* 1523 */
+    XmlIOEnoent,         /* 1524 */
+    XmlIOEnoexec,        /* 1525 */
+    XmlIOEnolck,         /* 1526 */
+    XmlIOEnomem,         /* 1527 */
+    XmlIOEnospc,         /* 1528 */
+    XmlIOEnosys,         /* 1529 */
+    XmlIOEnotdir,        /* 1530 */
+    XmlIOEnotempty,      /* 1531 */
+    XmlIOEnotsup,        /* 1532 */
+    XmlIOEnotty,         /* 1533 */
+    XmlIOEnxio,          /* 1534 */
+    XmlIOEperm,          /* 1535 */
+    XmlIOEpipe,          /* 1536 */
+    XmlIOErange,         /* 1537 */
+    XmlIOErofs,          /* 1538 */
+    XmlIOEspipe,         /* 1539 */
+    XmlIOEsrch,          /* 1540 */
+    XmlIOEtimedout,      /* 1541 */
+    XmlIOExdev,          /* 1542 */
+    XmlIONetworkAttempt, /* 1543 */
+    XmlIOEncoder,        /* 1544 */
+    XmlIOFlush,          /* 1545 */
+    XmlIOWrite,          /* 1546 */
+    XmlIONoInput,        /* 1547 */
+    XmlIOBufferFull,     /* 1548 */
+    XmlIOLoadError,      /* 1549 */
+    XmlIOEnotsock,       /* 1550 */
+    XmlIOEisconn,        /* 1551 */
+    XmlIOEconnrefused,   /* 1552 */
+    XmlIOEnetunreach,    /* 1553 */
+    XmlIOEaddrinuse,     /* 1554 */
+    XmlIOEalready,       /* 1555 */
+    XmlIOEafnosupport,   /* 1556 */
+    XmlXIncludeRecursion = 1600,
+    XmlXIncludeParseValue,           /* 1601 */
+    XmlXIncludeEntityDefMismatch,    /* 1602 */
+    XmlXIncludeNoHref,               /* 1603 */
+    XmlXIncludeNoFallback,           /* 1604 */
+    XmlXIncludeHrefUri,              /* 1605 */
+    XmlXIncludeTextFragment,         /* 1606 */
+    XmlXIncludeTextDocument,         /* 1607 */
+    XmlXIncludeInvalidChar,          /* 1608 */
+    XmlXIncludeBuildFailed,          /* 1609 */
+    XmlXIncludeUnknownEncoding,      /* 1610 */
+    XmlXIncludeMultipleRoot,         /* 1611 */
+    XmlXIncludeXptrFailed,           /* 1612 */
+    XmlXIncludeXptrResult,           /* 1613 */
+    XmlXIncludeIncludeInInclude,     /* 1614 */
+    XmlXIncludeFallbacksInInclude,   /* 1615 */
+    XmlXIncludeFallbackNotInInclude, /* 1616 */
+    XmlXIncludeDeprecatedNs,         /* 1617 */
+    XmlXIncludeFragmentID,           /* 1618 */
     XmlCatalogMissingAttr = 1650,
     XmlCatalogEntryBroken, /* 1651 */
     XmlCatalogPreferValue, /* 1652 */
@@ -623,23 +623,23 @@ impl_xml_parser_errors!(
     XmlSchemavCvcIdc,                 /* 1877 */
     XmlSchemavCvcWildcard,            /* 1878 */
     XmlSchemavMisc,                   /* 1879 */
-    XmlXptrUnknownScheme = 1900,
-    XmlXptrChildseqStart, /* 1901 */
-    XmlXptrEvalFailed,    /* 1902 */
-    XmlXptrExtraObjects,  /* 1903 */
-    XmlC14nCreateCtxt = 1950,
-    XmlC14nRequiresUtf8,      /* 1951 */
-    XmlC14nCreateStack,       /* 1952 */
-    XmlC14nInvalidNode,       /* 1953 */
-    XmlC14nUnknowNode,        /* 1954 */
-    XmlC14nRelativeNamespace, /* 1955 */
-    XmlFtpPasvAnswer = 2000,
-    XmlFtpEpsvAnswer, /* 2001 */
-    XmlFtpAccnt,      /* 2002 */
-    XmlFtpUrlSyntax,  /* 2003 */
-    XmlHttpUrlSyntax = 2020,
-    XmlHttpUseIp,       /* 2021 */
-    XmlHttpUnknownHost, /* 2022 */
+    XmlXPtrUnknownScheme = 1900,
+    XmlXPtrChildseqStart, /* 1901 */
+    XmlXPtrEvalFailed,    /* 1902 */
+    XmlXPtrExtraObjects,  /* 1903 */
+    XmlC14NCreateCtxt = 1950,
+    XmlC14NRequiresUtf8,      /* 1951 */
+    XmlC14NCreateStack,       /* 1952 */
+    XmlC14NInvalidNode,       /* 1953 */
+    XmlC14NUnknowNode,        /* 1954 */
+    XmlC14NRelativeNamespace, /* 1955 */
+    XmlFTPPasvAnswer = 2000,
+    XmlFTPEpsvAnswer, /* 2001 */
+    XmlFTPAccnt,      /* 2002 */
+    XmlFTPUrlSyntax,  /* 2003 */
+    XmlHTTPUrlSyntax = 2020,
+    XmlHTTPUseIp,       /* 2021 */
+    XmlHTTPUnknownHost, /* 2022 */
     XmlSchemapSrcSimpleType1 = 3000,
     XmlSchemapSrcSimpleType2,                   /* 3001 */
     XmlSchemapSrcSimpleType3,                   /* 3002 */
@@ -774,11 +774,11 @@ impl_xml_parser_errors!(
     XmlCheckOutsideDict,    /* 5035 */
     XmlCheckWrongName,      /* 5036 */
     XmlCheckNameNotNull,    /* 5037 */
-    XmlI18nNoName = 6000,
-    XmlI18nNoHandler,     /* 6001 */
-    XmlI18nExcessHandler, /* 6002 */
-    XmlI18nConvFailed,    /* 6003 */
-    XmlI18nNoOutput,      /* 6004 */
+    XmlI18NNoName = 6000,
+    XmlI18NNoHandler,     /* 6001 */
+    XmlI18NExcessHandler, /* 6002 */
+    XmlI18NConvFailed,    /* 6003 */
+    XmlI18NNoOutput,      /* 6004 */
     XmlBufOverflow = 7000
 );
 
