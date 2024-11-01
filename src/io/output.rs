@@ -187,7 +187,7 @@ impl XmlOutputBuffer {
 
                             unsafe {
                                 xml_encoding_err(
-                                    XmlParserErrors::XmlI18nConvFailed,
+                                    XmlParserErrors::XmlI18NConvFailed,
                                     format!(
                                         "output conversion failed due to conv error, bytes {msg}\n"
                                     )
@@ -262,8 +262,8 @@ impl XmlOutputBuffer {
                     Ok(len) => Ok(len),
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                     _ => {
-                        xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                        self.error = XmlParserErrors::XmlIoEncoder;
+                        xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                        self.error = XmlParserErrors::XmlIOEncoder;
                         return -1;
                     }
                 };
@@ -321,8 +321,8 @@ impl XmlOutputBuffer {
                     }
                 }
                 if ret < 0 {
-                    xml_ioerr(XmlParserErrors::XmlIoWrite, null());
-                    self.error = XmlParserErrors::XmlIoWrite;
+                    xml_ioerr(XmlParserErrors::XmlIOWrite, null());
+                    self.error = XmlParserErrors::XmlIOWrite;
                     return ret;
                 }
                 self.written = self.written.saturating_add(ret);
@@ -418,8 +418,8 @@ impl XmlOutputBuffer {
                     Ok(len) => Ok(len),
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                     _ => {
-                        xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                        self.error = XmlParserErrors::XmlIoEncoder;
+                        xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                        self.error = XmlParserErrors::XmlIOEncoder;
                         return -1;
                     }
                 };
@@ -484,8 +484,8 @@ impl XmlOutputBuffer {
                     }
                 }
                 if ret < 0 {
-                    xml_ioerr(XmlParserErrors::XmlIoWrite, null());
-                    self.error = XmlParserErrors::XmlIoWrite;
+                    xml_ioerr(XmlParserErrors::XmlIOWrite, null());
+                    self.error = XmlParserErrors::XmlIOWrite;
                     return ret;
                 }
                 self.written = self.written.wrapping_add(ret);
@@ -520,8 +520,8 @@ impl XmlOutputBuffer {
              */
             while {
                 let Ok(nbchars) = self.encode(false) else {
-                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
-                    self.error = XmlParserErrors::XmlIoEncoder;
+                    xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                    self.error = XmlParserErrors::XmlIOEncoder;
                     return -1;
                 };
 
@@ -563,8 +563,8 @@ impl XmlOutputBuffer {
             }
         }
         if ret < 0 {
-            xml_ioerr(XmlParserErrors::XmlIoFlush, null());
-            self.error = XmlParserErrors::XmlIoFlush;
+            xml_ioerr(XmlParserErrors::XmlIOFlush, null());
+            self.error = XmlParserErrors::XmlIOFlush;
             return ret;
         }
         self.written = self.written.saturating_add(ret);

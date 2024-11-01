@@ -1076,7 +1076,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
         error = MAXERRNO;
     }
     if ctxt.is_null() {
-        let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
+        let code = error + XmlParserErrors::XmlXPathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32;
         let code = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(
@@ -1106,7 +1106,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
     }
     (*ctxt).error = error;
     if (*ctxt).context.is_null() {
-        let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
+        let code = error + XmlParserErrors::XmlXPathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32;
         let code = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(
@@ -1139,7 +1139,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
 
     (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXPath;
     (*(*ctxt).context).last_error.code = XmlParserErrors::try_from(
-        error + XmlParserErrors::XmlXpathExpressionOk as i32
+        error + XmlParserErrors::XmlXPathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32,
     )
     .unwrap();
@@ -1159,7 +1159,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             &(*(*ctxt).context).last_error,
         );
     } else {
-        let code = error + XmlParserErrors::XmlXpathExpressionOk as i32
+        let code = error + XmlParserErrors::XmlXPathExpressionOk as i32
             - XmlXPathError::XpathExpressionOk as i32;
         let code = XmlParserErrors::try_from(code).unwrap();
         __xml_raise_error!(

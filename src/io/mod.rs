@@ -174,108 +174,108 @@ pub(crate) unsafe fn __xml_ioerr(
         if errno == 0 {
             code = XmlParserErrors::XmlErrOK;
         } else if errno == EACCES {
-            code = XmlParserErrors::XmlIoEacces;
+            code = XmlParserErrors::XmlIOEACCES;
         } else if errno == EAGAIN {
-            code = XmlParserErrors::XmlIoEagain;
+            code = XmlParserErrors::XmlIOEAGAIN;
         } else if errno == EBADF {
-            code = XmlParserErrors::XmlIoEbadf;
+            code = XmlParserErrors::XmlIOEBADF;
         } else if errno == EBADMSG {
-            code = XmlParserErrors::XmlIoEbadmsg;
+            code = XmlParserErrors::XmlIOEBADMSG;
         } else if errno == EBUSY {
-            code = XmlParserErrors::XmlIoEbusy;
+            code = XmlParserErrors::XmlIOEBUSY;
         } else if errno == ECANCELED {
-            code = XmlParserErrors::XmlIoEcanceled;
+            code = XmlParserErrors::XmlIOECANCELED;
         } else if errno == ECHILD {
-            code = XmlParserErrors::XmlIoEchild;
+            code = XmlParserErrors::XmlIOECHILD;
         } else if errno == EDEADLK {
-            code = XmlParserErrors::XmlIoEdeadlk;
+            code = XmlParserErrors::XmlIOEDEADLK;
         } else if errno == EDOM {
-            code = XmlParserErrors::XmlIoEdom;
+            code = XmlParserErrors::XmlIOEDOM;
         } else if errno == EEXIST {
-            code = XmlParserErrors::XmlIoEexist;
+            code = XmlParserErrors::XmlIOEEXIST;
         } else if errno == EFAULT {
-            code = XmlParserErrors::XmlIoEfault;
+            code = XmlParserErrors::XmlIOEFAULT;
         } else if errno == EFBIG {
-            code = XmlParserErrors::XmlIoEfbig;
+            code = XmlParserErrors::XmlIOEFBIG;
         } else if errno == EINPROGRESS {
-            code = XmlParserErrors::XmlIoEinprogress;
+            code = XmlParserErrors::XmlIOEINPROGRESS;
         } else if errno == EINTR {
-            code = XmlParserErrors::XmlIoEintr;
+            code = XmlParserErrors::XmlIOEINTR;
         } else if errno == EINVAL {
-            code = XmlParserErrors::XmlIoEinval;
+            code = XmlParserErrors::XmlIOEINVAL;
         } else if errno == EIO {
-            code = XmlParserErrors::XmlIoEio;
+            code = XmlParserErrors::XmlIOEIO;
         } else if errno == EISDIR {
-            code = XmlParserErrors::XmlIoEisdir;
+            code = XmlParserErrors::XmlIOEISDIR;
         } else if errno == EMFILE {
-            code = XmlParserErrors::XmlIoEmfile;
+            code = XmlParserErrors::XmlIOEMFILE;
         } else if errno == EMLINK {
-            code = XmlParserErrors::XmlIoEmlink;
+            code = XmlParserErrors::XmlIOEMLINK;
         } else if errno == EMSGSIZE {
-            code = XmlParserErrors::XmlIoEmsgsize;
+            code = XmlParserErrors::XmlIOEMSGSIZE;
         } else if errno == ENAMETOOLONG {
-            code = XmlParserErrors::XmlIoEnametoolong;
+            code = XmlParserErrors::XmlIOENAMETOOLONG;
         } else if errno == ENFILE {
-            code = XmlParserErrors::XmlIoEnfile;
+            code = XmlParserErrors::XmlIOENFILE;
         } else if errno == ENODEV {
-            code = XmlParserErrors::XmlIoEnodev;
+            code = XmlParserErrors::XmlIOENODEV;
         } else if errno == ENOENT {
-            code = XmlParserErrors::XmlIoEnoent;
+            code = XmlParserErrors::XmlIOENOENT;
         } else if errno == ENOEXEC {
-            code = XmlParserErrors::XmlIoEnoexec;
+            code = XmlParserErrors::XmlIOENOEXEC;
         } else if errno == ENOLCK {
-            code = XmlParserErrors::XmlIoEnolck;
+            code = XmlParserErrors::XmlIOENOLCK;
         } else if errno == ENOMEM {
-            code = XmlParserErrors::XmlIoEnomem;
+            code = XmlParserErrors::XmlIOENOMEM;
         } else if errno == ENOSPC {
-            code = XmlParserErrors::XmlIoEnospc;
+            code = XmlParserErrors::XmlIOENOSPC;
         } else if errno == ENOSYS {
-            code = XmlParserErrors::XmlIoEnosys;
+            code = XmlParserErrors::XmlIOENOSYS;
         } else if errno == ENOTDIR {
-            code = XmlParserErrors::XmlIoEnotdir;
+            code = XmlParserErrors::XmlIOENOTDIR;
         } else if errno == ENOTEMPTY {
-            code = XmlParserErrors::XmlIoEnotempty;
+            code = XmlParserErrors::XmlIOENOTEMPTY;
         } else if errno == ENOTSUP {
-            code = XmlParserErrors::XmlIoEnotsup;
+            code = XmlParserErrors::XmlIOENOTSUP;
         } else if errno == ENOTTY {
-            code = XmlParserErrors::XmlIoEnotty;
+            code = XmlParserErrors::XmlIOENOTTY;
         } else if errno == ENXIO {
-            code = XmlParserErrors::XmlIoEnxio;
+            code = XmlParserErrors::XmlIOENXIO;
         } else if errno == EPERM {
-            code = XmlParserErrors::XmlIoEperm;
+            code = XmlParserErrors::XmlIOEPERM;
         } else if errno == EPIPE {
-            code = XmlParserErrors::XmlIoEpipe;
+            code = XmlParserErrors::XmlIOEPIPE;
         } else if errno == ERANGE {
-            code = XmlParserErrors::XmlIoErange;
+            code = XmlParserErrors::XmlIOERANGE;
         } else if errno == EROFS {
-            code = XmlParserErrors::XmlIoErofs;
+            code = XmlParserErrors::XmlIOEROFS;
         } else if errno == ESPIPE {
-            code = XmlParserErrors::XmlIoEspipe;
+            code = XmlParserErrors::XmlIOESPIPE;
         } else if errno == ESRCH {
-            code = XmlParserErrors::XmlIoEsrch;
+            code = XmlParserErrors::XmlIOESRCH;
         } else if errno == ETIMEDOUT {
-            code = XmlParserErrors::XmlIoEtimedout;
+            code = XmlParserErrors::XmlIOETIMEOUT;
         } else if errno == EXDEV {
-            code = XmlParserErrors::XmlIoExdev;
+            code = XmlParserErrors::XmlIOEXDEV;
         } else if errno == ENOTSOCK {
-            code = XmlParserErrors::XmlIoEnotsock;
+            code = XmlParserErrors::XmlIOENOTSOCK;
         } else if errno == EISCONN {
-            code = XmlParserErrors::XmlIoEisconn;
+            code = XmlParserErrors::XmlIOEISCONN;
         } else if errno == ECONNREFUSED {
-            code = XmlParserErrors::XmlIoEconnrefused;
+            code = XmlParserErrors::XmlIOECONNREFUSED;
         } else if errno == EADDRINUSE {
-            code = XmlParserErrors::XmlIoEaddrinuse;
+            code = XmlParserErrors::XmlIOEADDRINUSE;
         } else if errno == EALREADY {
-            code = XmlParserErrors::XmlIoEalready;
+            code = XmlParserErrors::XmlIOEALREADY;
         } else if errno == EAFNOSUPPORT {
-            code = XmlParserErrors::XmlIoEafnosupport;
+            code = XmlParserErrors::XmlIOEAFNOSUPPORT;
         } else {
-            code = XmlParserErrors::XmlIoUnknown;
+            code = XmlParserErrors::XmlIOUnknown;
         }
     }
     idx = 0;
-    if code as i32 >= XmlParserErrors::XmlIoUnknown as i32 {
-        idx = code as u32 - XmlParserErrors::XmlIoUnknown as u32;
+    if code as i32 >= XmlParserErrors::XmlIOUnknown as i32 {
+        idx = code as u32 - XmlParserErrors::XmlIOUnknown as u32;
     }
     if idx >= IOERR.len() as u32 {
         idx = 0;
@@ -541,7 +541,7 @@ unsafe extern "C" fn xml_io_http_write(
                 c"Error sending document to URI".as_ptr(),
                 (*ctxt).uri
             );
-            xml_ioerr(XmlParserErrors::XmlIoWrite, msg.as_ptr() as _);
+            xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
         }
     }
 
@@ -638,7 +638,7 @@ unsafe extern "C" fn xml_io_http_close_write(
             "data to URI",
             (*ctxt).uri
         );
-        xml_ioerr(XmlParserErrors::XmlIoWrite, msg.as_ptr() as _);
+        xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
     } else {
         http_ctxt = xml_nanohttp_method(
             (*ctxt).uri,
@@ -666,7 +666,7 @@ unsafe extern "C" fn xml_io_http_close_write(
                     c"failed.  HTTP return code:".as_ptr(),
                     http_rtn
                 );
-                xml_ioerr(XmlParserErrors::XmlIoWrite, msg.as_ptr() as _);
+                xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
             }
 
             xml_nanohttp_close(http_ctxt);
@@ -1223,7 +1223,7 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
         ctxt as _,
         null_mut(),
         XmlErrorDomain::XmlFromIO,
-        XmlParserErrors::XmlIoLoadError,
+        XmlParserErrors::XmlIOLoadError,
         level,
         null_mut(),
         0,
@@ -1517,7 +1517,7 @@ pub unsafe extern "C" fn xml_no_net_external_entity_loader(
         && (xml_strncasecmp(resource as _, c"ftp://".as_ptr() as _, 6) == 0
             || xml_strncasecmp(resource as _, c"http://".as_ptr() as _, 7) == 0)
     {
-        xml_ioerr(XmlParserErrors::XmlIoNetworkAttempt, resource as _);
+        xml_ioerr(XmlParserErrors::XmlIONetworkAttempt, resource as _);
         if resource != url as _ {
             xml_free(resource as _);
         }

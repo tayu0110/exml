@@ -106,7 +106,7 @@ pub(crate) unsafe extern "C" fn xml_save_err(
     extra: *const c_char,
 ) {
     let msg = match code {
-        XmlParserErrors::XmlSaveNotUtf8 => c"string is not in UTF-8\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveNotUTF8 => c"string is not in UTF-8\n".as_ptr() as _,
         XmlParserErrors::XmlSaveCharInvalid => c"invalid character value\n".as_ptr() as _,
         XmlParserErrors::XmlSaveUnknownEncoding => c"unknown encoding %s\n".as_ptr() as _,
         XmlParserErrors::XmlSaveNoDoctype => c"document has no DOCTYPE\n".as_ptr() as _,

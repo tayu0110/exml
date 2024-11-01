@@ -496,7 +496,7 @@ unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extr
     use super::xmlerror::XmlParserErrors;
 
     let msg = match code {
-        XmlParserErrors::XmlSaveNotUtf8 => c"string is not in UTF-8\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveNotUTF8 => c"string is not in UTF-8\n".as_ptr() as _,
         XmlParserErrors::XmlSaveCharInvalid => c"invalid character value\n".as_ptr() as _,
         XmlParserErrors::XmlSaveUnknownEncoding => c"unknown encoding %s\n".as_ptr() as _,
         XmlParserErrors::XmlSaveNoDoctype => c"HTML has no DOCTYPE\n".as_ptr() as _,

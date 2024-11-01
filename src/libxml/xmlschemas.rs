@@ -6788,7 +6788,7 @@ unsafe extern "C" fn xml_schema_parse_schema_element(
                 if res != 0 {
                     xml_schema_psimple_type_err(
                         ctxt,
-                        XmlParserErrors::XmlSchemapElemformdefaultValue,
+                        XmlParserErrors::XmlSchemapElemFormDefaultValue,
                         null_mut(),
                         attr as XmlNodePtr,
                         null_mut(),
@@ -6812,7 +6812,7 @@ unsafe extern "C" fn xml_schema_parse_schema_element(
                 if res != 0 {
                     xml_schema_psimple_type_err(
                         ctxt,
-                        XmlParserErrors::XmlSchemapAttrformdefaultValue,
+                        XmlParserErrors::XmlSchemapAttrFormDefaultValue,
                         null_mut(),
                         attr as XmlNodePtr,
                         null_mut(),

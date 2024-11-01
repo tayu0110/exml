@@ -369,7 +369,7 @@ pub unsafe extern "C" fn xml_new_text_writer_filename(
     if out.is_null() {
         xml_writer_err_msg(
             null_mut(),
-            XmlParserErrors::XmlIoEio,
+            XmlParserErrors::XmlIOEIO,
             c"xmlNewTextWriterFilename : cannot open uri\n".as_ptr() as _,
         );
         return null_mut();

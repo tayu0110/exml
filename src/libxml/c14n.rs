@@ -580,7 +580,7 @@ unsafe extern "C" fn xml_c14n_new_ctx(
         xml_c14n_err(
             ctx,
             doc as _,
-            XmlParserErrors::XmlC14nRequiresUtf8,
+            XmlParserErrors::XmlC14NRequiresUtf8,
             c"xmlC14NNewCtx: output buffer encoder != NULL but C14N requires UTF8 output\n".as_ptr()
                 as _,
         );
@@ -613,7 +613,7 @@ unsafe extern "C" fn xml_c14n_new_ctx(
         xml_c14n_err(
             ctx,
             doc as _,
-            XmlParserErrors::XmlC14nCreateStack,
+            XmlParserErrors::XmlC14NCreateStack,
             c"xmlC14NNewCtx: xmlC14NVisibleNsStackCreate failed\n".as_ptr() as _,
         );
         xml_c14n_free_ctx(ctx);
@@ -659,7 +659,7 @@ unsafe extern "C" fn xml_c14n_err_relative_namespace(ns_uri: *const c_char) {
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,
-        XmlParserErrors::XmlC14nRelativeNamespace,
+        XmlParserErrors::XmlC14NRelativeNamespace,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -2203,7 +2203,7 @@ unsafe extern "C" fn xml_c14n_err_invalid_node(node_type: *const c_char, extra: 
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,
-        XmlParserErrors::XmlC14nInvalidNode,
+        XmlParserErrors::XmlC14NInvalidNode,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -2232,7 +2232,7 @@ unsafe extern "C" fn xml_c14n_err_unknown_node(node_type: c_int, extra: *const c
         null_mut(),
         null_mut(),
         XmlErrorDomain::XmlFromC14N,
-        XmlParserErrors::XmlC14nUnknowNode,
+        XmlParserErrors::XmlC14NUnknowNode,
         XmlErrorLevel::XmlErrError,
         null_mut(),
         0,
@@ -2532,7 +2532,7 @@ pub unsafe extern "C" fn xml_c14n_execute(
         xml_c14n_err(
             null_mut(),
             doc as XmlNodePtr,
-            XmlParserErrors::XmlC14nRequiresUtf8,
+            XmlParserErrors::XmlC14NRequiresUtf8,
             c"xmlC14NExecute: output buffer encoder != NULL but C14N requires UTF8 output\n"
                 .as_ptr() as _,
         );
@@ -2552,7 +2552,7 @@ pub unsafe extern "C" fn xml_c14n_execute(
         xml_c14n_err(
             null_mut(),
             doc as XmlNodePtr,
-            XmlParserErrors::XmlC14nCreateCtxt,
+            XmlParserErrors::XmlC14NCreateCtxt,
             c"xmlC14NExecute: unable to create C14N context\n".as_ptr() as _,
         );
         return -1;

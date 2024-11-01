@@ -7339,7 +7339,7 @@ unsafe extern "C" fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra
         XmlParserErrors::XmlTreeUnterminatedEntity => {
             c"unterminated entity reference %15s\n".as_ptr() as _
         }
-        XmlParserErrors::XmlTreeNotUtf8 => c"string is not in UTF-8\n".as_ptr() as _,
+        XmlParserErrors::XmlTreeNotUTF8 => c"string is not in UTF-8\n".as_ptr() as _,
         _ => c"unexpected error number\n".as_ptr() as _,
     };
     __xml_simple_error(XmlErrorDomain::XmlFromTree, code, node, msg, extra);

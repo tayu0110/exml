@@ -167,7 +167,7 @@ pub fn xml_nanohttp_scan_proxy(url: &str) {
         unsafe {
             __xml_ioerr(
                 XmlErrorDomain::XmlFromHTTP,
-                XmlParserErrors::XmlHttpUrlSyntax,
+                XmlParserErrors::XmlHTTPUrlSyntax,
                 c"Syntax Error\n".as_ptr() as _,
             );
         }
@@ -746,7 +746,7 @@ pub fn xml_nanohttp_method_redir(
             unsafe {
                 __xml_ioerr(
                     XmlErrorDomain::XmlFromHTTP,
-                    XmlParserErrors::XmlHttpUrlSyntax,
+                    XmlParserErrors::XmlHTTPUrlSyntax,
                     c"Not a valid HTTP URI".as_ptr() as _,
                 );
                 return Err(io::Error::new(
@@ -759,7 +759,7 @@ pub fn xml_nanohttp_method_redir(
             unsafe {
                 __xml_ioerr(
                     XmlErrorDomain::XmlFromHTTP,
-                    XmlParserErrors::XmlHttpUnknownHost,
+                    XmlParserErrors::XmlHTTPUnknownHost,
                     c"Failed to identify host in URI".as_ptr() as _,
                 );
             }

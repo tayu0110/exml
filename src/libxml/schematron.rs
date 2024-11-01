@@ -780,7 +780,7 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
                 xml_schematron_perr(
                     ctxt,
                     child,
-                    XmlParserErrors::XmlSchemavAttrinvalid,
+                    XmlParserErrors::XmlSchemavAttrInvalid,
                     c"value-of has no select attribute".as_ptr() as _,
                     null(),
                     null_mut(),
@@ -794,7 +794,7 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
                     xml_schematron_perr(
                         ctxt,
                         child,
-                        XmlParserErrors::XmlSchemavAttrinvalid,
+                        XmlParserErrors::XmlSchemavAttrInvalid,
                         c"Failed to compile select expression %s".as_ptr() as _,
                         select,
                         null_mut(),

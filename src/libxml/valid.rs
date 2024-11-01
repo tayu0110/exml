@@ -473,7 +473,7 @@ pub unsafe extern "C" fn xml_add_notation_decl(
         {
             xml_err_valid(
                 null_mut(),
-                XmlParserErrors::XmlDtdNotationRedefined,
+                XmlParserErrors::XmlDTDNotationRedefined,
                 c"xmlAddNotationDecl: %s already defined\n".as_ptr() as _,
                 name as *const c_char,
             );
@@ -1334,7 +1334,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
                 xml_err_valid_node(
                     ctxt,
                     dtd as XmlNodePtr,
-                    XmlParserErrors::XmlDtdElemRedefined,
+                    XmlParserErrors::XmlDTDElemRedefined,
                     c"Redefinition of element %s\n".as_ptr() as _,
                     name,
                     null_mut(),
@@ -1398,7 +1398,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
                 xml_err_valid_node(
                     ctxt,
                     dtd as XmlNodePtr,
-                    XmlParserErrors::XmlDtdElemRedefined,
+                    XmlParserErrors::XmlDTDElemRedefined,
                     c"Redefinition of element %s\n".as_ptr() as _,
                     name,
                     null_mut(),
@@ -2394,7 +2394,7 @@ unsafe extern "C" fn xml_scan_id_attribute_decl(
                 xml_err_valid_node(
                     ctxt,
                     elem as XmlNodePtr,
-                    XmlParserErrors::XmlDtdMultipleId,
+                    XmlParserErrors::XmlDTDMultipleID,
                     c"Element %s has too many ID attributes defined : %s\n".as_ptr() as _,
                     (*elem).name,
                     (*cur).name,
@@ -2488,7 +2488,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
             xml_err_valid_node(
                 ctxt,
                 dtd as XmlNodePtr,
-                XmlParserErrors::XmlDtdAttributeDefault,
+                XmlParserErrors::XmlDTDAttributeDefault,
                 c"Attribute %s of %s: invalid default value\n".as_ptr() as _,
                 elem,
                 name,
@@ -2585,7 +2585,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
             xml_err_valid_warning(
                 ctxt,
                 dtd as XmlNodePtr,
-                XmlParserErrors::XmlDtdAttributeRedefined,
+                XmlParserErrors::XmlDTDAttributeRedefined,
                 c"Attribute %s of element %s: already defined\n".as_ptr() as _,
                 name,
                 elem,
@@ -2610,7 +2610,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
                 xml_err_valid_node(
                     ctxt,
                     dtd as XmlNodePtr,
-                    XmlParserErrors::XmlDtdMultipleId,
+                    XmlParserErrors::XmlDTDMultipleID,
                     c"Element %s has too may ID attributes defined : %s\n".as_ptr() as _,
                     elem,
                     name,
@@ -3025,7 +3025,7 @@ pub unsafe extern "C" fn xml_add_id(
             xml_err_valid_node(
                 ctxt,
                 (*attr).parent,
-                XmlParserErrors::XmlDtdIdRedefined,
+                XmlParserErrors::XmlDTDIDRedefined,
                 c"ID %s already defined\n".as_ptr() as _,
                 value,
                 null_mut(),
@@ -3697,7 +3697,7 @@ pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr
     if root.is_null() || (*root).name.is_null() {
         xml_err_valid(
             ctxt,
-            XmlParserErrors::XmlDtdNoRoot,
+            XmlParserErrors::XmlDTDNoRoot,
             c"no root element\n".as_ptr() as _,
             null_mut(),
         );
@@ -3745,7 +3745,7 @@ pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr
             xml_err_valid_node(
                 ctxt,
                 root,
-                XmlParserErrors::XmlDtdRootName,
+                XmlParserErrors::XmlDTDRootName,
                 c"root and DTD name do not match '%s' and '%s'\n".as_ptr() as _,
                 (*root).name,
                 (*(*doc).int_subset).name,
@@ -3834,7 +3834,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                                 xml_err_valid_node(
                                     ctxt,
                                     elem as XmlNodePtr,
-                                    XmlParserErrors::XmlDtdContentError,
+                                    XmlParserErrors::XmlDTDContentError,
                                     c"Definition of %s has duplicate references of %s\n".as_ptr()
                                         as _,
                                     (*elem).name,
@@ -3845,7 +3845,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                                 xml_err_valid_node(
                                     ctxt,
                                     elem as XmlNodePtr,
-                                    XmlParserErrors::XmlDtdContentError,
+                                    XmlParserErrors::XmlDTDContentError,
                                     c"Definition of %s has duplicate references of %s:%s\n".as_ptr()
                                         as _,
                                     (*elem).name,
@@ -3873,7 +3873,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                             xml_err_valid_node(
                                 ctxt,
                                 elem as XmlNodePtr,
-                                XmlParserErrors::XmlDtdContentError,
+                                XmlParserErrors::XmlDTDContentError,
                                 c"Definition of %s has duplicate references to %s\n".as_ptr() as _,
                                 (*elem).name,
                                 name,
@@ -3883,7 +3883,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                             xml_err_valid_node(
                                 ctxt,
                                 elem as XmlNodePtr,
-                                XmlParserErrors::XmlDtdContentError,
+                                XmlParserErrors::XmlDTDContentError,
                                 c"Definition of %s has duplicate references to %s:%s\n".as_ptr()
                                     as _,
                                 (*elem).name,
@@ -3910,7 +3910,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
         xml_err_valid_node(
             ctxt,
             elem as XmlNodePtr,
-            XmlParserErrors::XmlDtdElemRedefined,
+            XmlParserErrors::XmlDTDElemRedefined,
             c"Redefinition of element %s\n".as_ptr() as _,
             (*elem).name,
             null_mut(),
@@ -3927,7 +3927,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
         xml_err_valid_node(
             ctxt,
             elem as XmlNodePtr,
-            XmlParserErrors::XmlDtdElemRedefined,
+            XmlParserErrors::XmlDTDElemRedefined,
             c"Redefinition of element %s\n".as_ptr() as _,
             (*elem).name,
             null_mut(),
@@ -4112,7 +4112,7 @@ pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
     }
     xml_valid_normalize_string(ret);
     if (*doc).standalone != 0 && extsubset == 1 && !xml_str_equal(value, ret) {
-        xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDtdNotStandalone,
+        xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDNotStandalone,
 c"standalone: %s on %s value had to be normalized based on external subset declaration\n".as_ptr() as _,
 	       name, (*elem).name, null_mut());
         (*ctxt).valid = 0;
@@ -4244,7 +4244,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
             xml_err_valid_node(
                 ctxt,
                 attr as XmlNodePtr,
-                XmlParserErrors::XmlDtdAttributeDefault,
+                XmlParserErrors::XmlDTDAttributeDefault,
                 c"Syntax of default value for attribute %s of %s is not valid\n".as_ptr() as _,
                 (*attr).name,
                 (*attr).elem,
@@ -4264,7 +4264,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
         xml_err_valid_node(
             ctxt,
             attr as XmlNodePtr,
-            XmlParserErrors::XmlDtdIdFixed,
+            XmlParserErrors::XmlDTDIDFixed,
             c"ID attribute %s of %s is not valid must be #IMPLIED or #REQUIRED\n".as_ptr() as _,
             (*attr).name,
             (*attr).elem,
@@ -4305,7 +4305,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
             xml_err_valid_node_nr(
                 ctxt,
                 attr as XmlNodePtr,
-                XmlParserErrors::XmlDtdIdSubset,
+                XmlParserErrors::XmlDTDIDSubset,
                 c"Element %s has %d ID attribute defined in the internal subset : %s\n".as_ptr()
                     as _,
                 (*attr).elem,
@@ -4322,7 +4322,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                 xml_err_valid_node_nr(
                     ctxt,
                     attr as XmlNodePtr,
-                    XmlParserErrors::XmlDtdIdSubset,
+                    XmlParserErrors::XmlDTDIDSubset,
                     c"Element %s has %d ID attribute defined in the external subset : %s\n".as_ptr()
                         as _,
                     (*attr).elem,
@@ -4330,7 +4330,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                     (*attr).name,
                 );
             } else if ext_id + nb_id > 1 {
-                xml_err_valid_node(ctxt, attr as XmlNodePtr, XmlParserErrors::XmlDtdIdSubset, c"Element %s has ID attributes defined in the internal and external subset : %s\n".as_ptr() as _,
+                xml_err_valid_node(ctxt, attr as XmlNodePtr, XmlParserErrors::XmlDTDIDSubset, c"Element %s has ID attributes defined in the internal and external subset : %s\n".as_ptr() as _,
 		       (*attr).elem, (*attr).name, null_mut());
             }
         }
@@ -4349,7 +4349,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
             xml_err_valid_node(
                 ctxt,
                 attr as XmlNodePtr,
-                XmlParserErrors::XmlDtdAttributeValue,
+                XmlParserErrors::XmlDTDAttributeValue,
                 c"Default value \"%s\" for attribute %s of %s is not among the enumerated set\n"
                     .as_ptr() as _,
                 (*attr).default_value,
@@ -4532,7 +4532,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                 xml_err_valid_node(
                     ctxt,
                     doc as XmlNodePtr,
-                    XmlParserErrors::XmlDtdUnknownEntity,
+                    XmlParserErrors::XmlDTDUnknownEntity,
                     c"ENTITY attribute %s reference an unknown entity \"%s\"\n".as_ptr() as _,
                     name,
                     value,
@@ -4546,7 +4546,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                 xml_err_valid_node(
                     ctxt,
                     doc as XmlNodePtr,
-                    XmlParserErrors::XmlDtdEntityType,
+                    XmlParserErrors::XmlDTDEntityType,
                     c"ENTITY attribute %s reference an entity \"%s\" of wrong type\n".as_ptr() as _,
                     name,
                     value,
@@ -4578,7 +4578,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                     xml_err_valid_node(
                         ctxt,
                         doc as XmlNodePtr,
-                        XmlParserErrors::XmlDtdUnknownEntity,
+                        XmlParserErrors::XmlDTDUnknownEntity,
                         c"ENTITIES attribute %s reference an unknown entity \"%s\"\n".as_ptr() as _,
                         name,
                         nam,
@@ -4592,7 +4592,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                     xml_err_valid_node(
                         ctxt,
                         doc as XmlNodePtr,
-                        XmlParserErrors::XmlDtdEntityType,
+                        XmlParserErrors::XmlDTDEntityType,
                         c"ENTITIES attribute %s reference an entity \"%s\" of wrong type\n".as_ptr()
                             as _,
                         name,
@@ -4623,7 +4623,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                 xml_err_valid_node(
                     ctxt,
                     doc as XmlNodePtr,
-                    XmlParserErrors::XmlDtdUnknownNotation,
+                    XmlParserErrors::XmlDTDUnknownNotation,
                     c"NOTATION attribute %s reference an unknown notation \"%s\"\n".as_ptr() as _,
                     name,
                     value,
@@ -4720,7 +4720,7 @@ extern "C" fn xml_validate_attribute_callback(
                 xml_err_valid_node(
                     ctxt,
                     null_mut(),
-                    XmlParserErrors::XmlDtdUnknownElem,
+                    XmlParserErrors::XmlDTDUnknownElem,
                     c"attribute %s: could not find decl for element %s\n".as_ptr() as _,
                     (*cur).name,
                     (*cur).elem,
@@ -4732,7 +4732,7 @@ extern "C" fn xml_validate_attribute_callback(
                 xml_err_valid_node(
                     ctxt,
                     null_mut(),
-                    XmlParserErrors::XmlDtdEmptyNotation,
+                    XmlParserErrors::XmlDTDEmptyNotation,
                     c"NOTATION attribute %s declared for EMPTY element %s\n".as_ptr() as _,
                     (*cur).name,
                     (*cur).elem,
@@ -4853,7 +4853,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
     if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
         xml_err_valid(
             ctxt,
-            XmlParserErrors::XmlDtdNoDtd,
+            XmlParserErrors::XmlDTDNoDTD,
             c"no DTD found!\n".as_ptr() as _,
             null_mut(),
         );
@@ -4870,7 +4870,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
             if sys_id.is_null() {
                 xml_err_valid(
                     ctxt,
-                    XmlParserErrors::XmlDtdLoadError,
+                    XmlParserErrors::XmlDTDLoadError,
                     c"Could not build URI for external subset \"%s\"\n".as_ptr() as _,
                     (*(*doc).int_subset).system_id as *const c_char,
                 );
@@ -4888,14 +4888,14 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
             if !(*(*doc).int_subset).system_id.is_null() {
                 xml_err_valid(
                     ctxt,
-                    XmlParserErrors::XmlDtdLoadError,
+                    XmlParserErrors::XmlDTDLoadError,
                     c"Could not load the external subset \"%s\"\n".as_ptr() as _,
                     (*(*doc).int_subset).system_id as *const c_char,
                 );
             } else {
                 xml_err_valid(
                     ctxt,
-                    XmlParserErrors::XmlDtdLoadError,
+                    XmlParserErrors::XmlDTDLoadError,
                     c"Could not load the external subset \"%s\"\n".as_ptr() as _,
                     (*(*doc).int_subset).external_id as *const c_char,
                 );
@@ -5076,7 +5076,7 @@ unsafe extern "C" fn xml_valid_get_elem_decl(
         xml_err_valid_node(
             ctxt,
             elem,
-            XmlParserErrors::XmlDtdUnknownElem,
+            XmlParserErrors::XmlDTDUnknownElem,
             c"No declaration for element %s\n".as_ptr() as _,
             (*elem).name,
             null_mut(),
@@ -6020,7 +6020,7 @@ unsafe extern "C" fn xml_validate_element_content(
                 xml_err_valid_node(
                     ctxt,
                     elem_decl as XmlNodePtr,
-                    XmlParserErrors::XmlDtdContentNotDeterminist,
+                    XmlParserErrors::XmlDTDContentNotDeterminist,
                     c"Content model of %s is not deterministic: %s\n".as_ptr() as _,
                     name,
                     expr.as_ptr() as _,
@@ -6142,7 +6142,7 @@ unsafe extern "C" fn xml_validate_element_content(
                     xml_err_valid_node(
                         ctxt,
                         parent,
-                        XmlParserErrors::XmlDtdContentModel,
+                        XmlParserErrors::XmlDTDContentModel,
                         c"Element %s content does not follow the DTD, expecting %s, got %s\n"
                             .as_ptr() as _,
                         name,
@@ -6153,7 +6153,7 @@ unsafe extern "C" fn xml_validate_element_content(
                     xml_err_valid_node(
                         ctxt,
                         parent,
-                        XmlParserErrors::XmlDtdContentModel,
+                        XmlParserErrors::XmlDTDContentModel,
                         c"Element content does not follow the DTD, expecting %s, got %s\n".as_ptr()
                             as _,
                         expr.as_ptr() as _,
@@ -6165,7 +6165,7 @@ unsafe extern "C" fn xml_validate_element_content(
                 xml_err_valid_node(
                     ctxt,
                     parent,
-                    XmlParserErrors::XmlDtdContentModel,
+                    XmlParserErrors::XmlDTDContentModel,
                     c"Element %s content does not follow the DTD\n".as_ptr() as _,
                     name,
                     null_mut(),
@@ -6175,7 +6175,7 @@ unsafe extern "C" fn xml_validate_element_content(
                 xml_err_valid_node(
                     ctxt,
                     parent,
-                    XmlParserErrors::XmlDtdContentModel,
+                    XmlParserErrors::XmlDTDContentModel,
                     c"Element content does not follow the DTD\n".as_ptr() as _,
                     null_mut(),
                     null_mut(),
@@ -6397,7 +6397,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                 xml_err_valid_node(
                     ctxt,
                     elem,
-                    XmlParserErrors::XmlDtdUnknownElem,
+                    XmlParserErrors::XmlDTDUnknownElem,
                     c"No declaration for element %s\n".as_ptr() as _,
                     (*elem).name,
                     null_mut(),
@@ -6410,7 +6410,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     xml_err_valid_node(
                         ctxt,
                         elem,
-                        XmlParserErrors::XmlDtdNotEmpty,
+                        XmlParserErrors::XmlDTDNotEmpty,
                         c"Element %s was declared EMPTY this one has content\n".as_ptr() as _,
                         (*elem).name,
                         null_mut(),
@@ -6432,7 +6432,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         xml_err_valid_node(
                             ctxt,
                             elem,
-                            XmlParserErrors::XmlDtdNotPcdata,
+                            XmlParserErrors::XmlDTDNotPCDATA,
                             c"Element %s was declared #PCDATA but contains non text nodes\n"
                                 .as_ptr() as _,
                             (*elem).name,
@@ -6491,7 +6491,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                         {
                                             xml_err_valid(
                                                 null_mut(),
-                                                XmlParserErrors::XmlDtdMixedCorrupt,
+                                                XmlParserErrors::XmlDTDMixedCorrupt,
                                                 c"Internal: MIXED struct corrupted\n".as_ptr() as _,
                                                 null_mut(),
                                             );
@@ -6541,7 +6541,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                     {
                                         xml_err_valid(
                                             ctxt,
-                                            XmlParserErrors::XmlDtdMixedCorrupt,
+                                            XmlParserErrors::XmlDTDMixedCorrupt,
                                             c"Internal: MIXED struct corrupted\n".as_ptr() as _,
                                             null_mut(),
                                         );
@@ -6550,7 +6550,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                     cont = (*cont).c2;
                                 }
                                 if cont.is_null() {
-                                    xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDtdInvalidChild,
+                                    xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDInvalidChild,
                                 c"Element %s is not declared in %s list of possible children\n".as_ptr() as _,
                                        name, (*elem).name, null_mut());
                                     ret = 0;
@@ -6578,7 +6578,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                 content = content.add(1);
                             }
                             if *content == 0 {
-                                xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDtdStandaloneWhiteSpace, c"standalone: %s declared in the external subset contains white spaces nodes\n".as_ptr() as _, (*elem).name, null_mut(), null_mut());
+                                xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDStandaloneWhiteSpace, c"standalone: %s declared in the external subset contains white spaces nodes\n".as_ptr() as _, (*elem).name, null_mut(), null_mut());
                                 ret = 0;
                                 break;
                             }
@@ -6672,7 +6672,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         xml_err_valid_node(
                             ctxt,
                             elem,
-                            XmlParserErrors::XmlDtdMissingAttribute,
+                            XmlParserErrors::XmlDTDMissingAttribute,
                             c"Element %s does not carry attribute %s\n".as_ptr() as _,
                             (*elem).name,
                             (*attr).name,
@@ -6683,7 +6683,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         xml_err_valid_node(
                             ctxt,
                             elem,
-                            XmlParserErrors::XmlDtdMissingAttribute,
+                            XmlParserErrors::XmlDTDMissingAttribute,
                             c"Element %s does not carry attribute %s:%s\n".as_ptr() as _,
                             (*elem).name,
                             (*attr).prefix,
@@ -6695,7 +6695,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     xml_err_valid_warning(
                         ctxt,
                         elem,
-                        XmlParserErrors::XmlDtdNoPrefix,
+                        XmlParserErrors::XmlDTDNoPrefix,
                         c"Element %s required attribute %s:%s has no prefix\n".as_ptr() as _,
                         (*elem).name,
                         (*attr).prefix,
@@ -6705,7 +6705,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     xml_err_valid_warning(
                         ctxt,
                         elem,
-                        XmlParserErrors::XmlDtdDifferentPrefix,
+                        XmlParserErrors::XmlDTDDifferentPrefix,
                         c"Element %s required attribute %s:%s has different prefix\n".as_ptr() as _,
                         (*elem).name,
                         (*attr).prefix,
@@ -6729,7 +6729,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                 (*ns).href.load(Ordering::Relaxed),
                             ) {
                                 xml_err_valid_node(ctxt, elem,
-                                    XmlParserErrors::XmlDtdElemDefaultNamespace,
+                                    XmlParserErrors::XmlDTDElemDefaultNamespace,
                                 c"Element %s namespace name for default namespace does not match the DTD\n".as_ptr() as _,
                                    (*elem).name, null_mut(), null_mut());
                                 ret = 0;
@@ -6751,7 +6751,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                 xml_err_valid_node(
                                     ctxt,
                                     elem,
-                                    XmlParserErrors::XmlDtdElemNamespace,
+                                    XmlParserErrors::XmlDTDElemNamespace,
                                     c"Element %s namespace name for %s does not match the DTD\n"
                                         .as_ptr() as _,
                                     (*elem).name,
@@ -6882,7 +6882,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         xml_err_valid_node(
             ctxt,
             elem,
-            XmlParserErrors::XmlDtdUnknownAttribute,
+            XmlParserErrors::XmlDTDUnknownAttribute,
             c"No declaration for attribute %s of element %s\n".as_ptr() as _,
             (*attr).name,
             (*elem).name,
@@ -6897,7 +6897,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         xml_err_valid_node(
             ctxt,
             elem,
-            XmlParserErrors::XmlDtdAttributeValue,
+            XmlParserErrors::XmlDTDAttributeValue,
             c"Syntax of value for attribute %s of %s is not valid\n".as_ptr() as _,
             (*attr).name,
             (*elem).name,
@@ -6913,7 +6913,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         xml_err_valid_node(
             ctxt,
             elem,
-            XmlParserErrors::XmlDtdAttributeDefault,
+            XmlParserErrors::XmlDTDAttributeDefault,
             c"Value for attribute %s of %s is different from default \"%s\"\n".as_ptr() as _,
             (*attr).name,
             (*elem).name,
@@ -6952,7 +6952,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdUnknownNotation,
+                XmlParserErrors::XmlDTDUnknownNotation,
                 c"Value \"%s\" for attribute %s of %s is not a declared Notation\n".as_ptr() as _,
                 value,
                 (*attr).name,
@@ -6972,7 +6972,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdNotationValue,
+                XmlParserErrors::XmlDTDNotationValue,
                 c"Value \"%s\" for attribute %s of %s is not among the enumerated notations\n"
                     .as_ptr() as _,
                 value,
@@ -6999,7 +6999,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdAttributeValue,
+                XmlParserErrors::XmlDTDAttributeValue,
                 c"Value \"%s\" for attribute %s of %s is not among the enumerated set\n".as_ptr()
                     as _,
                 value,
@@ -7017,7 +7017,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         xml_err_valid_node(
             ctxt,
             elem,
-            XmlParserErrors::XmlDtdAttributeValue,
+            XmlParserErrors::XmlDTDAttributeValue,
             c"Value for attribute %s of %s must be \"%s\"\n".as_ptr() as _,
             (*attr).name,
             (*elem).name,
@@ -7144,7 +7144,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdUnknownAttribute,
+                XmlParserErrors::XmlDTDUnknownAttribute,
                 c"No declaration for attribute xmlns:%s of element %s\n".as_ptr() as _,
                 (*ns).prefix.load(Ordering::Relaxed) as _,
                 (*elem).name,
@@ -7154,7 +7154,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdUnknownAttribute,
+                XmlParserErrors::XmlDTDUnknownAttribute,
                 c"No declaration for attribute xmlns of element %s\n".as_ptr() as _,
                 (*elem).name,
                 null_mut(),
@@ -7170,7 +7170,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdInvalidDefault,
+                XmlParserErrors::XmlDTDInvalidDefault,
                 c"Syntax of value for attribute xmlns:%s of %s is not valid\n".as_ptr() as _,
                 (*ns).prefix.load(Ordering::Relaxed) as _,
                 (*elem).name,
@@ -7180,7 +7180,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdInvalidDefault,
+                XmlParserErrors::XmlDTDInvalidDefault,
                 c"Syntax of value for attribute xmlns of %s is not valid\n".as_ptr() as _,
                 (*elem).name,
                 null_mut(),
@@ -7198,7 +7198,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdAttributeDefault,
+                XmlParserErrors::XmlDTDAttributeDefault,
                 c"Value for attribute xmlns:%s of %s is different from default \"%s\"\n".as_ptr()
                     as _,
                 (*ns).prefix.load(Ordering::Relaxed) as _,
@@ -7209,7 +7209,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdAttributeDefault,
+                XmlParserErrors::XmlDTDAttributeDefault,
                 c"Value for attribute xmlns of %s is different from default \"%s\"\n".as_ptr() as _,
                 (*elem).name,
                 (*attr_decl).default_value,
@@ -7254,7 +7254,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                 xml_err_valid_node(
                     ctxt,
                     elem,
-                    XmlParserErrors::XmlDtdUnknownNotation,
+                    XmlParserErrors::XmlDTDUnknownNotation,
                     c"Value \"%s\" for attribute xmlns:%s of %s is not a declared Notation\n"
                         .as_ptr() as _,
                     value,
@@ -7265,7 +7265,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                 xml_err_valid_node(
                     ctxt,
                     elem,
-                    XmlParserErrors::XmlDtdUnknownNotation,
+                    XmlParserErrors::XmlDTDUnknownNotation,
                     c"Value \"%s\" for attribute xmlns of %s is not a declared Notation\n".as_ptr()
                         as _,
                     value,
@@ -7285,9 +7285,9 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
         }
         if tree.is_null() {
             if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
-                xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDtdNotationValue, c"Value \"%s\" for attribute xmlns:%s of %s is not among the enumerated notations\n".as_ptr() as _, value, (*ns).prefix.load(Ordering::Relaxed) as _, (*elem).name);
+                xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDNotationValue, c"Value \"%s\" for attribute xmlns:%s of %s is not among the enumerated notations\n".as_ptr() as _, value, (*ns).prefix.load(Ordering::Relaxed) as _, (*elem).name);
             } else {
-                xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDtdNotationValue, c"Value \"%s\" for attribute xmlns of %s is not among the enumerated notations\n".as_ptr() as _, value, (*elem).name, null_mut());
+                xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDNotationValue, c"Value \"%s\" for attribute xmlns of %s is not among the enumerated notations\n".as_ptr() as _, value, (*elem).name, null_mut());
             }
             ret = 0;
         }
@@ -7310,7 +7310,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                 xml_err_valid_node(
                     ctxt,
                     elem,
-                    XmlParserErrors::XmlDtdAttributeValue,
+                    XmlParserErrors::XmlDTDAttributeValue,
                     c"Value \"%s\" for attribute xmlns:%s of %s is not among the enumerated set\n"
                         .as_ptr() as _,
                     value,
@@ -7321,7 +7321,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                 xml_err_valid_node(
                     ctxt,
                     elem,
-                    XmlParserErrors::XmlDtdAttributeValue,
+                    XmlParserErrors::XmlDTDAttributeValue,
                     c"Value \"%s\" for attribute xmlns of %s is not among the enumerated set\n"
                         .as_ptr() as _,
                     value,
@@ -7341,7 +7341,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdElemNamespace,
+                XmlParserErrors::XmlDTDElemNamespace,
                 c"Value for attribute xmlns:%s of %s must be \"%s\"\n".as_ptr() as _,
                 (*ns).prefix.load(Ordering::Relaxed) as _,
                 (*elem).name,
@@ -7351,7 +7351,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_err_valid_node(
                 ctxt,
                 elem,
-                XmlParserErrors::XmlDtdElemNamespace,
+                XmlParserErrors::XmlDTDElemNamespace,
                 c"Value for attribute xmlns of %s must be \"%s\"\n".as_ptr() as _,
                 (*elem).name,
                 (*attr_decl).default_value,
@@ -7433,7 +7433,7 @@ unsafe extern "C" fn xml_validate_ref(
                 xml_err_valid_node_nr(
                     ctxt,
                     null_mut(),
-                    XmlParserErrors::XmlDtdUnknownId,
+                    XmlParserErrors::XmlDTDUnknownID,
                     c"attribute %s line %d references an unknown ID \"%s\"\n".as_ptr() as _,
                     (*refe).name,
                     (*refe).lineno,
@@ -7456,7 +7456,7 @@ unsafe extern "C" fn xml_validate_ref(
             xml_err_valid_node(
                 ctxt,
                 (*attr).parent,
-                XmlParserErrors::XmlDtdUnknownId,
+                XmlParserErrors::XmlDTDUnknownID,
                 c"IDREF attribute %s references an unknown ID \"%s\"\n".as_ptr() as _,
                 (*attr).name,
                 name,
@@ -7488,7 +7488,7 @@ unsafe extern "C" fn xml_validate_ref(
                 xml_err_valid_node(
                     ctxt,
                     (*attr).parent,
-                    XmlParserErrors::XmlDtdUnknownId,
+                    XmlParserErrors::XmlDTDUnknownID,
                     c"IDREFS attribute %s references an unknown ID \"%s\"\n".as_ptr() as _,
                     (*attr).name,
                     str,
@@ -7577,7 +7577,7 @@ pub unsafe extern "C" fn xml_validate_document_final(
     if doc.is_null() {
         xml_err_valid(
             ctxt,
-            XmlParserErrors::XmlDtdNoDoc,
+            XmlParserErrors::XmlDTDNoDoc,
             c"xmlValidateDocumentFinal: doc == NULL\n".as_ptr() as _,
             null_mut(),
         );
@@ -7637,7 +7637,7 @@ pub unsafe extern "C" fn xml_validate_notation_use(
         xml_err_valid_node(
             ctxt,
             doc as XmlNodePtr,
-            XmlParserErrors::XmlDtdUnknownNotation,
+            XmlParserErrors::XmlDTDUnknownNotation,
             c"NOTATION %s is not declared\n".as_ptr() as _,
             notation_name,
             null_mut(),
@@ -8403,7 +8403,7 @@ pub unsafe extern "C" fn xml_valid_build_content_model(
         xml_err_valid_node(
             ctxt,
             elem as XmlNodePtr,
-            XmlParserErrors::XmlDtdContentNotDeterminist,
+            XmlParserErrors::XmlDTDContentNotDeterminist,
             c"Content model of %s is not deterministic: %s\n".as_ptr() as _,
             (*elem).name,
             expr.as_ptr() as _,
@@ -8467,7 +8467,7 @@ unsafe extern "C" fn xml_validate_check_mixed(
             {
                 xml_err_valid(
                     null_mut(),
-                    XmlParserErrors::XmlDtdMixedCorrupt,
+                    XmlParserErrors::XmlDTDMixedCorrupt,
                     c"Internal: MIXED struct corrupted\n".as_ptr() as _,
                     null_mut(),
                 );
@@ -8506,7 +8506,7 @@ unsafe extern "C" fn xml_validate_check_mixed(
             {
                 xml_err_valid(
                     ctxt,
-                    XmlParserErrors::XmlDtdMixedCorrupt,
+                    XmlParserErrors::XmlDTDMixedCorrupt,
                     c"Internal: MIXED struct corrupted\n".as_ptr() as _,
                     null_mut(),
                 );
@@ -8686,7 +8686,7 @@ pub unsafe extern "C" fn xml_validate_push_element(
                     xml_err_valid_node(
                         ctxt,
                         (*state).node,
-                        XmlParserErrors::XmlDtdNotEmpty,
+                        XmlParserErrors::XmlDTDNotEmpty,
                         c"Element %s was declared EMPTY this one has content\n".as_ptr() as _,
                         (*(*state).node).name,
                         null_mut(),
@@ -8706,7 +8706,7 @@ pub unsafe extern "C" fn xml_validate_push_element(
                         xml_err_valid_node(
                             ctxt,
                             (*state).node,
-                            XmlParserErrors::XmlDtdNotPcdata,
+                            XmlParserErrors::XmlDTDNotPCDATA,
                             c"Element %s was declared #PCDATA but contains non text nodes\n"
                                 .as_ptr() as _,
                             (*(*state).node).name,
@@ -8720,7 +8720,7 @@ pub unsafe extern "C" fn xml_validate_push_element(
                             xml_err_valid_node(
                                 ctxt,
                                 (*state).node,
-                                XmlParserErrors::XmlDtdInvalidChild,
+                                XmlParserErrors::XmlDTDInvalidChild,
                                 c"Element %s is not declared in %s list of possible children\n"
                                     .as_ptr() as _,
                                 qname,
@@ -8743,7 +8743,7 @@ pub unsafe extern "C" fn xml_validate_push_element(
                             xml_err_valid_node(
                                 ctxt,
                                 (*state).node,
-                                XmlParserErrors::XmlDtdContentModel,
+                                XmlParserErrors::XmlDTDContentModel,
                                 c"Element %s content does not follow the DTD, Misplaced %s\n"
                                     .as_ptr() as _,
                                 (*(*state).node).name,
@@ -8807,7 +8807,7 @@ pub unsafe extern "C" fn xml_validate_push_cdata(
                     xml_err_valid_node(
                         ctxt,
                         (*state).node,
-                        XmlParserErrors::XmlDtdNotEmpty,
+                        XmlParserErrors::XmlDTDNotEmpty,
                         c"Element %s was declared EMPTY this one has content\n".as_ptr() as _,
                         (*(*state).node).name,
                         null_mut(),
@@ -8823,7 +8823,7 @@ pub unsafe extern "C" fn xml_validate_push_cdata(
                             xml_err_valid_node(
                                 ctxt,
                                 (*state).node,
-                                XmlParserErrors::XmlDtdContentModel,
+                                XmlParserErrors::XmlDTDContentModel,
                                 c"Element %s content does not follow the DTD, Text not allowed\n"
                                     .as_ptr() as _,
                                 (*(*state).node).name,
@@ -8929,7 +8929,7 @@ pub unsafe extern "C" fn xml_validate_pop_element(
                     xml_err_valid_node(
                         ctxt,
                         (*state).node,
-                        XmlParserErrors::XmlDtdContentModel,
+                        XmlParserErrors::XmlDTDContentModel,
                         c"Element %s content does not follow the DTD, Expecting more children\n"
                             .as_ptr() as _,
                         (*(*state).node).name,

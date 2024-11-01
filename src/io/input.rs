@@ -182,7 +182,7 @@ impl XmlParserInputBuffer {
 
                 unsafe {
                     xml_encoding_err(
-                        XmlParserErrors::XmlI18nConvFailed,
+                        XmlParserErrors::XmlI18NConvFailed,
                         format!("input conversion failed due to input error, bytes {buf}\n")
                             .as_str(),
                         &buf,
@@ -273,9 +273,9 @@ impl XmlParserInputBuffer {
             let using = buf.map_or(0, |buf| buf.len());
             let Ok(written) = self.decode(true) else {
                 unsafe {
-                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                    xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
                 }
-                self.error = XmlParserErrors::XmlIoEncoder;
+                self.error = XmlParserErrors::XmlIOEncoder;
                 return -1;
             };
             res = written as i32;
@@ -315,9 +315,9 @@ impl XmlParserInputBuffer {
             let using = self.raw.map_or(0, |raw| raw.len());
             let Ok(written) = self.decode(true) else {
                 unsafe {
-                    xml_ioerr(XmlParserErrors::XmlIoEncoder, null());
+                    xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
                 }
-                self.error = XmlParserErrors::XmlIoEncoder;
+                self.error = XmlParserErrors::XmlIOEncoder;
                 return -1;
             };
             let consumed = using - self.raw.map_or(0, |raw| raw.len());

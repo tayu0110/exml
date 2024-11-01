@@ -924,7 +924,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         let tmp: c_int = (*ctxt).valid;
         xml_err_valid(
             ctxt,
-            XmlParserErrors::XmlDtdXmlidType,
+            XmlParserErrors::XmlDTDXmlidType,
             c"xml:id : attribute type should be ID\n".as_ptr() as _,
             null(),
             null(),
@@ -1755,7 +1755,7 @@ unsafe fn xml_sax2_attribute_internal(
             if uri.is_null() {
                 xml_ns_warn_msg(
                     ctxt,
-                    XmlParserErrors::XmlWarNsUri,
+                    XmlParserErrors::XmlWarNsURI,
                     c"xmlns:%s: %s not a valid URI\n".as_ptr() as _,
                     name,
                     value,
@@ -1764,7 +1764,7 @@ unsafe fn xml_sax2_attribute_internal(
                 if (*uri).scheme.is_null() {
                     xml_ns_warn_msg(
                         ctxt,
-                        XmlParserErrors::XmlWarNsUriRelative,
+                        XmlParserErrors::XmlWarNsURIRelative,
                         "xmlns:%s: URI %s is not absolute\n".as_ptr() as _,
                         name,
                         value,
@@ -1981,7 +1981,7 @@ unsafe fn xml_sax2_attribute_internal(
             if xml_validate_ncname(content, 1) != 0 {
                 xml_err_valid(
                     ctxt,
-                    XmlParserErrors::XmlDtdXmlidValue,
+                    XmlParserErrors::XmlDTDXmlidValue,
                     c"xml:id : attribute value %s is not an NCName\n".as_ptr() as _,
                     content as _,
                     null(),
@@ -2108,7 +2108,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                         if att.is_null() {
                             xml_err_valid(
                                 ctxt,
-                                XmlParserErrors::XmlDtdStandaloneDefaulted,
+                                XmlParserErrors::XmlDTDStandaloneDefaulted,
                                 c"standalone: attribute %s on %s defaulted from external subset\n"
                                     .as_ptr() as _,
                                 fulln as _,
@@ -2263,7 +2263,7 @@ pub unsafe fn xml_sax2_start_element(
     {
         xml_err_valid(
             ctxt,
-            XmlParserErrors::XmlErrNoDtd,
+            XmlParserErrors::XmlErrNoDTD,
             c"Validation failed: no DTD found !".as_ptr() as _,
             null(),
             null(),
@@ -2566,7 +2566,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     {
         xml_err_valid(
             ctxt,
-            XmlParserErrors::XmlDtdNoDtd,
+            XmlParserErrors::XmlDTDNoDTD,
             c"Validation failed: no DTD found !".as_ptr() as _,
             null(),
             null(),
@@ -3231,7 +3231,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                 if xml_validate_ncname(content, 1) != 0 {
                     xml_err_valid(
                         ctxt,
-                        XmlParserErrors::XmlDtdXmlidValue,
+                        XmlParserErrors::XmlDTDXmlidValue,
                         c"xml:id : attribute value %s is not an NCName\n".as_ptr() as _,
                         content as _,
                         null(),

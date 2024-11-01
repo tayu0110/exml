@@ -103,7 +103,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
                 xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
             if *cur < 0xC0 {
-                xml_save_err(XmlParserErrors::XmlSaveNotUtf8 as _, attr as _, null_mut());
+                xml_save_err(XmlParserErrors::XmlSaveNotUTF8 as _, attr as _, null_mut());
                 xml_serialize_hex_char_ref(&mut tmp, *cur as _);
                 xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);
