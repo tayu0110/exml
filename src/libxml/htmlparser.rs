@@ -7755,7 +7755,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
     if CUR!(ctxt) != b'<' || NXT!(ctxt, 1) != b'/' {
         html_parse_err(
             ctxt,
-            XmlParserErrors::XmlErrLtslashRequired,
+            XmlParserErrors::XmlErrLtSlashRequired,
             c"htmlParseEndTag: '</' not found\n".as_ptr() as _,
             null(),
             null(),

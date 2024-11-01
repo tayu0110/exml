@@ -8923,7 +8923,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
     /* test also done in xmlCurrentChar() */
     {
         if cur == b']' as i32 && NXT!(ctxt, 1) == b']' && NXT!(ctxt, 2) == b'>' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrMisplacedCdataEnd, null());
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrMisplacedCDATAEnd, null());
         }
         COPY_BUF!(l, buf.as_mut_ptr(), nbchar, cur);
         /* move current position before possible calling of (*(*ctxt).sax).characters */
@@ -9115,7 +9115,7 @@ pub(crate) unsafe extern "C" fn xml_parse_char_data_internal(
             }
             if *input == b']' {
                 if *input.add(1) == b']' && *input.add(2) == b'>' {
-                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrMisplacedCdataEnd, null());
+                    xml_fatal_err(ctxt, XmlParserErrors::XmlErrMisplacedCDATAEnd, null());
                     if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                         (*(*ctxt).input).cur = input.add(1);
                     }
@@ -9317,7 +9317,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
 
     GROW!(ctxt);
     if RAW!(ctxt) != b'<' || NXT!(ctxt, 1) != b'/' {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrLtslashRequired, null());
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrLtSlashRequired, null());
         return;
     }
     SKIP!(ctxt, 2);
@@ -9427,7 +9427,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
     if RAW!(ctxt) != b'<' || NXT!(ctxt, 1) != b'/' {
         xml_fatal_err_msg(
             ctxt,
-            XmlParserErrors::XmlErrLtslashRequired,
+            XmlParserErrors::XmlErrLtSlashRequired,
             c"xmlParseEndTag: '</' not found\n".as_ptr() as _,
         );
         return;

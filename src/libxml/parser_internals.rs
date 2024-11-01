@@ -1488,7 +1488,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
         XmlParserErrors::XmlErrPERefSemicolMissing => c"PEReference: expecting ';'".as_ptr() as _,
         XmlParserErrors::XmlErrEntityLoop => c"Detected an entity reference loop".as_ptr() as _,
         XmlParserErrors::XmlErrEntityNotStarted => c"EntityValue: \" or ' expected".as_ptr() as _,
-        XmlParserErrors::XmlErrEntityPeInternal => {
+        XmlParserErrors::XmlErrEntityPEInternal => {
             c"PEReferences forbidden in internal subset".as_ptr() as _
         }
         XmlParserErrors::XmlErrEntityNotFinished => c"EntityValue: \" or ' expected".as_ptr() as _,
@@ -1500,7 +1500,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
         XmlParserErrors::XmlErrLiteralNotFinished => {
             c"Unfinished System or Public ID \" or ' expected".as_ptr() as _
         }
-        XmlParserErrors::XmlErrMisplacedCdataEnd => {
+        XmlParserErrors::XmlErrMisplacedCDATAEnd => {
             c"Sequence ']]>' not allowed in content".as_ptr() as _
         }
         XmlParserErrors::XmlErrURIRequired => c"SYSTEM or PUBLIC, the URI is missing".as_ptr() as _,
@@ -1566,7 +1566,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
         }
         XmlParserErrors::XmlErrEntityRefSemicolMissing => c"EntityRef: expecting ';'".as_ptr() as _,
         XmlParserErrors::XmlErrDoctypeNotFinished => c"DOCTYPE improperly terminated".as_ptr() as _,
-        XmlParserErrors::XmlErrLtslashRequired => c"EndTag: '</' not found".as_ptr() as _,
+        XmlParserErrors::XmlErrLtSlashRequired => c"EndTag: '</' not found".as_ptr() as _,
         XmlParserErrors::XmlErrEqualRequired => c"expected '='".as_ptr() as _,
         XmlParserErrors::XmlErrStringNotClosed => {
             c"String not closed expecting \" or '".as_ptr() as _
@@ -2536,7 +2536,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
                 return ret;
             }
             if tmp == b'%' && (*ctxt).in_subset == 1 && (*ctxt).input_nr == 1 {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityPeInternal, null());
+                xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityPEInternal, null());
                 //  goto error;
                 if !buf.is_null() {
                     xml_free(buf as _);
@@ -4996,7 +4996,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             );
             (*ctxt).depth -= 1;
         } else {
-            ret = XmlParserErrors::XmlErrEntityPeInternal;
+            ret = XmlParserErrors::XmlErrEntityPEInternal;
             xml_err_msg_str(
                 ctxt,
                 XmlParserErrors::XmlErrInternalError,
@@ -5141,7 +5141,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 /* Undo the change to sizeentities */
                 (*ctxt).sizeentities = oldsizeentities;
             } else {
-                ret = XmlParserErrors::XmlErrEntityPeInternal;
+                ret = XmlParserErrors::XmlErrEntityPEInternal;
                 xml_err_msg_str(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,

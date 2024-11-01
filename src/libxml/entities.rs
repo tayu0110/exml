@@ -480,7 +480,7 @@ pub unsafe extern "C" fn xml_add_doc_entity(
     }
     if (*doc).int_subset.is_null() {
         xml_entities_err(
-            XmlParserErrors::XmlDTDNoDtd,
+            XmlParserErrors::XmlDTDNoDTD,
             c"xmlAddDocEntity: document without internal subset".as_ptr() as _,
         );
         return null_mut();
@@ -537,7 +537,7 @@ pub unsafe extern "C" fn xml_add_dtd_entity(
     }
     if (*doc).ext_subset.is_null() {
         xml_entities_err(
-            XmlParserErrors::XmlDTDNoDtd,
+            XmlParserErrors::XmlDTDNoDTD,
             c"xmlAddDtdEntity: document without external subset".as_ptr() as _,
         );
         return null_mut();
@@ -1076,7 +1076,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                         || *cur.add(0) & 0xF8 == 0xF8
                     {
                         xml_entities_err(
-                            XmlParserErrors::XmlCheckNotUtf8,
+                            XmlParserErrors::XmlCheckNotUTF8,
                             c"xmlEncodeEntities: input not UTF-8".as_ptr() as _,
                         );
                         if !doc.is_null() {

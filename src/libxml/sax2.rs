@@ -2566,7 +2566,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     {
         xml_err_valid(
             ctxt,
-            XmlParserErrors::XmlDTDNoDtd,
+            XmlParserErrors::XmlDTDNoDTD,
             c"Validation failed: no DTD found !".as_ptr() as _,
             null(),
             null(),

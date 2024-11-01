@@ -174,101 +174,101 @@ pub(crate) unsafe fn __xml_ioerr(
         if errno == 0 {
             code = XmlParserErrors::XmlErrOK;
         } else if errno == EACCES {
-            code = XmlParserErrors::XmlIOEacces;
+            code = XmlParserErrors::XmlIOEACCES;
         } else if errno == EAGAIN {
-            code = XmlParserErrors::XmlIOEagain;
+            code = XmlParserErrors::XmlIOEAGAIN;
         } else if errno == EBADF {
-            code = XmlParserErrors::XmlIOEbadf;
+            code = XmlParserErrors::XmlIOEBADF;
         } else if errno == EBADMSG {
-            code = XmlParserErrors::XmlIOEbadmsg;
+            code = XmlParserErrors::XmlIOEBADMSG;
         } else if errno == EBUSY {
-            code = XmlParserErrors::XmlIOEbusy;
+            code = XmlParserErrors::XmlIOEBUSY;
         } else if errno == ECANCELED {
-            code = XmlParserErrors::XmlIOEcanceled;
+            code = XmlParserErrors::XmlIOECANCELED;
         } else if errno == ECHILD {
-            code = XmlParserErrors::XmlIOEchild;
+            code = XmlParserErrors::XmlIOECHILD;
         } else if errno == EDEADLK {
-            code = XmlParserErrors::XmlIOEdeadlk;
+            code = XmlParserErrors::XmlIOEDEADLK;
         } else if errno == EDOM {
-            code = XmlParserErrors::XmlIOEdom;
+            code = XmlParserErrors::XmlIOEDOM;
         } else if errno == EEXIST {
-            code = XmlParserErrors::XmlIOEexist;
+            code = XmlParserErrors::XmlIOEEXIST;
         } else if errno == EFAULT {
-            code = XmlParserErrors::XmlIOEfault;
+            code = XmlParserErrors::XmlIOEFAULT;
         } else if errno == EFBIG {
-            code = XmlParserErrors::XmlIOEfbig;
+            code = XmlParserErrors::XmlIOEFBIG;
         } else if errno == EINPROGRESS {
-            code = XmlParserErrors::XmlIOEinprogress;
+            code = XmlParserErrors::XmlIOEINPROGRESS;
         } else if errno == EINTR {
-            code = XmlParserErrors::XmlIOEintr;
+            code = XmlParserErrors::XmlIOEINTR;
         } else if errno == EINVAL {
-            code = XmlParserErrors::XmlIOEinval;
+            code = XmlParserErrors::XmlIOEINVAL;
         } else if errno == EIO {
-            code = XmlParserErrors::XmlIOEio;
+            code = XmlParserErrors::XmlIOEIO;
         } else if errno == EISDIR {
-            code = XmlParserErrors::XmlIOEisdir;
+            code = XmlParserErrors::XmlIOEISDIR;
         } else if errno == EMFILE {
-            code = XmlParserErrors::XmlIOEmfile;
+            code = XmlParserErrors::XmlIOEMFILE;
         } else if errno == EMLINK {
-            code = XmlParserErrors::XmlIOEmlink;
+            code = XmlParserErrors::XmlIOEMLINK;
         } else if errno == EMSGSIZE {
-            code = XmlParserErrors::XmlIOEmsgsize;
+            code = XmlParserErrors::XmlIOEMSGSIZE;
         } else if errno == ENAMETOOLONG {
-            code = XmlParserErrors::XmlIOEnametoolong;
+            code = XmlParserErrors::XmlIOENAMETOOLONG;
         } else if errno == ENFILE {
-            code = XmlParserErrors::XmlIOEnfile;
+            code = XmlParserErrors::XmlIOENFILE;
         } else if errno == ENODEV {
-            code = XmlParserErrors::XmlIOEnodev;
+            code = XmlParserErrors::XmlIOENODEV;
         } else if errno == ENOENT {
-            code = XmlParserErrors::XmlIOEnoent;
+            code = XmlParserErrors::XmlIOENOENT;
         } else if errno == ENOEXEC {
-            code = XmlParserErrors::XmlIOEnoexec;
+            code = XmlParserErrors::XmlIOENOEXEC;
         } else if errno == ENOLCK {
-            code = XmlParserErrors::XmlIOEnolck;
+            code = XmlParserErrors::XmlIOENOLCK;
         } else if errno == ENOMEM {
-            code = XmlParserErrors::XmlIOEnomem;
+            code = XmlParserErrors::XmlIOENOMEM;
         } else if errno == ENOSPC {
-            code = XmlParserErrors::XmlIOEnospc;
+            code = XmlParserErrors::XmlIOENOSPC;
         } else if errno == ENOSYS {
-            code = XmlParserErrors::XmlIOEnosys;
+            code = XmlParserErrors::XmlIOENOSYS;
         } else if errno == ENOTDIR {
-            code = XmlParserErrors::XmlIOEnotdir;
+            code = XmlParserErrors::XmlIOENOTDIR;
         } else if errno == ENOTEMPTY {
-            code = XmlParserErrors::XmlIOEnotempty;
+            code = XmlParserErrors::XmlIOENOTEMPTY;
         } else if errno == ENOTSUP {
-            code = XmlParserErrors::XmlIOEnotsup;
+            code = XmlParserErrors::XmlIOENOTSUP;
         } else if errno == ENOTTY {
-            code = XmlParserErrors::XmlIOEnotty;
+            code = XmlParserErrors::XmlIOENOTTY;
         } else if errno == ENXIO {
-            code = XmlParserErrors::XmlIOEnxio;
+            code = XmlParserErrors::XmlIOENXIO;
         } else if errno == EPERM {
-            code = XmlParserErrors::XmlIOEperm;
+            code = XmlParserErrors::XmlIOEPERM;
         } else if errno == EPIPE {
-            code = XmlParserErrors::XmlIOEpipe;
+            code = XmlParserErrors::XmlIOEPIPE;
         } else if errno == ERANGE {
-            code = XmlParserErrors::XmlIOErange;
+            code = XmlParserErrors::XmlIOERANGE;
         } else if errno == EROFS {
-            code = XmlParserErrors::XmlIOErofs;
+            code = XmlParserErrors::XmlIOEROFS;
         } else if errno == ESPIPE {
-            code = XmlParserErrors::XmlIOEspipe;
+            code = XmlParserErrors::XmlIOESPIPE;
         } else if errno == ESRCH {
-            code = XmlParserErrors::XmlIOEsrch;
+            code = XmlParserErrors::XmlIOESRCH;
         } else if errno == ETIMEDOUT {
-            code = XmlParserErrors::XmlIOEtimedout;
+            code = XmlParserErrors::XmlIOETIMEOUT;
         } else if errno == EXDEV {
-            code = XmlParserErrors::XmlIOExdev;
+            code = XmlParserErrors::XmlIOEXDEV;
         } else if errno == ENOTSOCK {
-            code = XmlParserErrors::XmlIOEnotsock;
+            code = XmlParserErrors::XmlIOENOTSOCK;
         } else if errno == EISCONN {
-            code = XmlParserErrors::XmlIOEisconn;
+            code = XmlParserErrors::XmlIOEISCONN;
         } else if errno == ECONNREFUSED {
-            code = XmlParserErrors::XmlIOEconnrefused;
+            code = XmlParserErrors::XmlIOECONNREFUSED;
         } else if errno == EADDRINUSE {
-            code = XmlParserErrors::XmlIOEaddrinuse;
+            code = XmlParserErrors::XmlIOEADDRINUSE;
         } else if errno == EALREADY {
-            code = XmlParserErrors::XmlIOEalready;
+            code = XmlParserErrors::XmlIOEALREADY;
         } else if errno == EAFNOSUPPORT {
-            code = XmlParserErrors::XmlIOEafnosupport;
+            code = XmlParserErrors::XmlIOEAFNOSUPPORT;
         } else {
             code = XmlParserErrors::XmlIOUnknown;
         }

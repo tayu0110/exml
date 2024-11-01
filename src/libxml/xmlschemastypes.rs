@@ -5827,7 +5827,7 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
             if ret == -1 {
                 return 0;
             }
-            return XmlParserErrors::XmlSchemavCvcMaxexclusiveValid as i32;
+            return XmlParserErrors::XmlSchemavCvcMaxExclusiveValid as i32;
         }
         XmlSchemaTypeType::XmlSchemaFacetMaxinclusive => {
             ret = xml_schema_compare_values(val, (*facet).val);
@@ -5837,7 +5837,7 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
             if ret == -1 || ret == 0 {
                 return 0;
             }
-            return XmlParserErrors::XmlSchemavCvcMaxinclusiveValid as i32;
+            return XmlParserErrors::XmlSchemavCvcMaxInclusiveValid as i32;
         }
         XmlSchemaTypeType::XmlSchemaFacetMinexclusive => {
             ret = xml_schema_compare_values(val, (*facet).val);
@@ -5847,7 +5847,7 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
             if ret == 1 {
                 return 0;
             }
-            return XmlParserErrors::XmlSchemavCvcMinexclusiveValid as i32;
+            return XmlParserErrors::XmlSchemavCvcMinExclusiveValid as i32;
         }
         XmlSchemaTypeType::XmlSchemaFacetMininclusive => {
             ret = xml_schema_compare_values(val, (*facet).val);
@@ -5857,7 +5857,7 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
             if ret == 1 || ret == 0 {
                 return 0;
             }
-            return XmlParserErrors::XmlSchemavCvcMininclusiveValid as i32;
+            return XmlParserErrors::XmlSchemavCvcMinInclusiveValid as i32;
         }
         XmlSchemaTypeType::XmlSchemaFacetWhitespace => {
             /* TODO whitespaces */
@@ -5988,10 +5988,10 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
                 }
             } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
                 if (len as u64) < (*(*facet).val).value.decimal.lo {
-                    return XmlParserErrors::XmlSchemavCvcMinlengthValid as i32;
+                    return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
                 }
             } else if len as u64 > (*(*facet).val).value.decimal.lo {
-                return XmlParserErrors::XmlSchemavCvcMaxlengthValid as i32;
+                return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
             }
         }
         XmlSchemaTypeType::XmlSchemaFacetTotaldigits
@@ -6028,12 +6028,12 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
             }
             if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
                 if (*val).value.decimal.total as u64 > (*(*facet).val).value.decimal.lo {
-                    return XmlParserErrors::XmlSchemavCvcTotaldigitsValid as i32;
+                    return XmlParserErrors::XmlSchemavCvcTotalDigitsValid as i32;
                 }
             } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetFractiondigits
                 && (*val).value.decimal.frac as u64 > (*(*facet).val).value.decimal.lo
             {
-                return XmlParserErrors::XmlSchemavCvcFractiondigitsValid as i32;
+                return XmlParserErrors::XmlSchemavCvcFractionDigitsValid as i32;
             }
         }
         _ => {
@@ -6630,14 +6630,14 @@ pub unsafe extern "C" fn xml_schema_validate_list_simple_type_facet(
             if !expected_len.is_null() {
                 *expected_len = (*(*facet).val).value.decimal.lo;
             }
-            return XmlParserErrors::XmlSchemavCvcMinlengthValid as i32;
+            return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
         }
     } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMaxlength {
         if actual_len > (*(*facet).val).value.decimal.lo {
             if !expected_len.is_null() {
                 *expected_len = (*(*facet).val).value.decimal.lo;
             }
-            return XmlParserErrors::XmlSchemavCvcMaxlengthValid as i32;
+            return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
         }
     } else {
         /*
@@ -7089,10 +7089,10 @@ unsafe extern "C" fn xml_schema_validate_length_facet_internal(
         }
     } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
         if (len as u64) < (*(*facet).val).value.decimal.lo {
-            return XmlParserErrors::XmlSchemavCvcMinlengthValid as i32;
+            return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
         }
     } else if len as u64 > (*(*facet).val).value.decimal.lo {
-        return XmlParserErrors::XmlSchemavCvcMaxlengthValid as i32;
+        return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
     }
 
     0

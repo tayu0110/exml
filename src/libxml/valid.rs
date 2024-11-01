@@ -2394,7 +2394,7 @@ unsafe extern "C" fn xml_scan_id_attribute_decl(
                 xml_err_valid_node(
                     ctxt,
                     elem as XmlNodePtr,
-                    XmlParserErrors::XmlDTDMultipleId,
+                    XmlParserErrors::XmlDTDMultipleID,
                     c"Element %s has too many ID attributes defined : %s\n".as_ptr() as _,
                     (*elem).name,
                     (*cur).name,
@@ -2610,7 +2610,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
                 xml_err_valid_node(
                     ctxt,
                     dtd as XmlNodePtr,
-                    XmlParserErrors::XmlDTDMultipleId,
+                    XmlParserErrors::XmlDTDMultipleID,
                     c"Element %s has too may ID attributes defined : %s\n".as_ptr() as _,
                     elem,
                     name,
@@ -4853,7 +4853,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
     if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
         xml_err_valid(
             ctxt,
-            XmlParserErrors::XmlDTDNoDtd,
+            XmlParserErrors::XmlDTDNoDTD,
             c"no DTD found!\n".as_ptr() as _,
             null_mut(),
         );
@@ -6432,7 +6432,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         xml_err_valid_node(
                             ctxt,
                             elem,
-                            XmlParserErrors::XmlDTDNotPcdata,
+                            XmlParserErrors::XmlDTDNotPCDATA,
                             c"Element %s was declared #PCDATA but contains non text nodes\n"
                                 .as_ptr() as _,
                             (*elem).name,
@@ -7433,7 +7433,7 @@ unsafe extern "C" fn xml_validate_ref(
                 xml_err_valid_node_nr(
                     ctxt,
                     null_mut(),
-                    XmlParserErrors::XmlDTDUnknownId,
+                    XmlParserErrors::XmlDTDUnknownID,
                     c"attribute %s line %d references an unknown ID \"%s\"\n".as_ptr() as _,
                     (*refe).name,
                     (*refe).lineno,
@@ -7456,7 +7456,7 @@ unsafe extern "C" fn xml_validate_ref(
             xml_err_valid_node(
                 ctxt,
                 (*attr).parent,
-                XmlParserErrors::XmlDTDUnknownId,
+                XmlParserErrors::XmlDTDUnknownID,
                 c"IDREF attribute %s references an unknown ID \"%s\"\n".as_ptr() as _,
                 (*attr).name,
                 name,
@@ -7488,7 +7488,7 @@ unsafe extern "C" fn xml_validate_ref(
                 xml_err_valid_node(
                     ctxt,
                     (*attr).parent,
-                    XmlParserErrors::XmlDTDUnknownId,
+                    XmlParserErrors::XmlDTDUnknownID,
                     c"IDREFS attribute %s references an unknown ID \"%s\"\n".as_ptr() as _,
                     (*attr).name,
                     str,
@@ -8706,7 +8706,7 @@ pub unsafe extern "C" fn xml_validate_push_element(
                         xml_err_valid_node(
                             ctxt,
                             (*state).node,
-                            XmlParserErrors::XmlDTDNotPcdata,
+                            XmlParserErrors::XmlDTDNotPCDATA,
                             c"Element %s was declared #PCDATA but contains non text nodes\n"
                                 .as_ptr() as _,
                             (*(*state).node).name,

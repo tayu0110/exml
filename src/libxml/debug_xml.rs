@@ -371,7 +371,7 @@ unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const Xm
     if (*ctxt).check != 0 && xml_check_utf8(str) == 0 {
         xml_debug_err3(
             ctxt,
-            XmlParserErrors::XmlCheckNotUtf8,
+            XmlParserErrors::XmlCheckNotUTF8,
             c"String is not UTF-8 %s".as_ptr(),
             str as *const c_char,
         );
@@ -400,7 +400,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
         if xml_validate_name(name, 0) != 0 {
             xml_debug_err3(
                 ctxt,
-                XmlParserErrors::XmlCheckNotNcname,
+                XmlParserErrors::XmlCheckNotNCName,
                 c"Name is not an NCName '%s'".as_ptr(),
                 name as *const c_char,
             );
@@ -626,7 +626,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
     if (*dtd).typ != XmlElementType::XmlDtdNode {
         xml_debug_err(
             ctxt,
-            XmlParserErrors::XmlCheckNotDtd,
+            XmlParserErrors::XmlCheckNotDTD,
             c"Node is not a DTD".as_ptr(),
         );
         return;
@@ -1567,14 +1567,14 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         XmlElementType::XmlCdataSectionNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundCdata,
+                XmlParserErrors::XmlCheckFoundCDATA,
                 c"Misplaced CDATA node\n".as_ptr(),
             );
         }
         XmlElementType::XmlEntityRefNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundEntityref,
+                XmlParserErrors::XmlCheckFoundEntityRef,
                 c"Misplaced ENTITYREF node\n".as_ptr(),
             );
         }
@@ -1588,7 +1588,7 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         XmlElementType::XmlPiNode => {
             xml_debug_err(
                 ctxt,
-                XmlParserErrors::XmlCheckFoundPi,
+                XmlParserErrors::XmlCheckFoundPI,
                 c"Misplaced PI node\n".as_ptr(),
             );
         }
