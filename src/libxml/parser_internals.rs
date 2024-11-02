@@ -2722,12 +2722,6 @@ macro_rules! CMP10 {
     };
 }
 
-macro_rules! CUR_PTR {
-    ($ctxt:expr) => {
-        (*(*$ctxt).input).cur
-    };
-}
-
 macro_rules! SKIP_BLANKS {
     ($ctxt:expr) => {
         $crate::libxml::parser::xml_skip_blank_chars($ctxt)
@@ -3470,7 +3464,7 @@ pub(crate) unsafe extern "C" fn xml_parse_default_decl(
 
     *value = null_mut();
     if CMP9!(
-        CUR_PTR!(ctxt),
+        (*ctxt).current_ptr(),
         b'#',
         b'R',
         b'E',
@@ -3485,7 +3479,7 @@ pub(crate) unsafe extern "C" fn xml_parse_default_decl(
         return XmlAttributeDefault::XmlAttributeRequired as i32;
     }
     if CMP8!(
-        CUR_PTR!(ctxt),
+        (*ctxt).current_ptr(),
         b'#',
         b'I',
         b'M',
@@ -3499,7 +3493,7 @@ pub(crate) unsafe extern "C" fn xml_parse_default_decl(
         return XmlAttributeDefault::XmlAttributeImplied as i32;
     }
     val = XmlAttributeDefault::XmlAttributeNone as i32;
-    if CMP6!(CUR_PTR!(ctxt), b'#', b'F', b'I', b'X', b'E', b'D') {
+    if CMP6!((*ctxt).current_ptr(), b'#', b'F', b'I', b'X', b'E', b'D') {
         (*ctxt).advance(6);
         val = XmlAttributeDefault::XmlAttributeFixed as i32;
         if SKIP_BLANKS!(ctxt) == 0 {
@@ -3716,7 +3710,7 @@ pub(crate) unsafe extern "C" fn xml_parse_enumerated_type(
     tree: *mut XmlEnumerationPtr,
 ) -> c_int {
     if CMP8!(
-        CUR_PTR!(ctxt),
+        (*ctxt).current_ptr(),
         b'N',
         b'O',
         b'T',
@@ -3799,23 +3793,23 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
     ctxt: XmlParserCtxtPtr,
     tree: *mut XmlEnumerationPtr,
 ) -> c_int {
-    if CMP5!(CUR_PTR!(ctxt), b'C', b'D', b'A', b'T', b'A') {
+    if CMP5!((*ctxt).current_ptr(), b'C', b'D', b'A', b'T', b'A') {
         (*ctxt).advance(5);
         return XmlAttributeType::XmlAttributeCdata as i32;
-    } else if CMP6!(CUR_PTR!(ctxt), b'I', b'D', b'R', b'E', b'F', b'S') {
+    } else if CMP6!((*ctxt).current_ptr(), b'I', b'D', b'R', b'E', b'F', b'S') {
         (*ctxt).advance(6);
         return XmlAttributeType::XmlAttributeIdrefs as i32;
-    } else if CMP5!(CUR_PTR!(ctxt), b'I', b'D', b'R', b'E', b'F') {
+    } else if CMP5!((*ctxt).current_ptr(), b'I', b'D', b'R', b'E', b'F') {
         (*ctxt).advance(5);
         return XmlAttributeType::XmlAttributeIdref as i32;
     } else if RAW!(ctxt) == b'I' && NXT!(ctxt, 1) == b'D' {
         (*ctxt).advance(2);
         return XmlAttributeType::XmlAttributeId as i32;
-    } else if CMP6!(CUR_PTR!(ctxt), b'E', b'N', b'T', b'I', b'T', b'Y') {
+    } else if CMP6!((*ctxt).current_ptr(), b'E', b'N', b'T', b'I', b'T', b'Y') {
         (*ctxt).advance(6);
         return XmlAttributeType::XmlAttributeEntity as i32;
     } else if CMP8!(
-        CUR_PTR!(ctxt),
+        (*ctxt).current_ptr(),
         b'E',
         b'N',
         b'T',
@@ -3828,7 +3822,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
         (*ctxt).advance(8);
         return XmlAttributeType::XmlAttributeEntities as i32;
     } else if CMP8!(
-        CUR_PTR!(ctxt),
+        (*ctxt).current_ptr(),
         b'N',
         b'M',
         b'T',
@@ -3840,7 +3834,16 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
     ) {
         (*ctxt).advance(8);
         return XmlAttributeType::XmlAttributeNmtokens as i32;
-    } else if CMP7!(CUR_PTR!(ctxt), b'N', b'M', b'T', b'O', b'K', b'E', b'N') {
+    } else if CMP7!(
+        (*ctxt).current_ptr(),
+        b'N',
+        b'M',
+        b'T',
+        b'O',
+        b'K',
+        b'E',
+        b'N'
+    ) {
         (*ctxt).advance(7);
         return XmlAttributeType::XmlAttributeNmtoken as i32;
     }
@@ -4049,7 +4052,16 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
     let mut elem: *const XmlChar = null();
 
     GROW!(ctxt);
-    if CMP7!(CUR_PTR!(ctxt), b'#', b'P', b'C', b'D', b'A', b'T', b'A') {
+    if CMP7!(
+        (*ctxt).current_ptr(),
+        b'#',
+        b'P',
+        b'C',
+        b'D',
+        b'A',
+        b'T',
+        b'A'
+    ) {
         (*ctxt).advance(7);
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) == b')' {
@@ -4258,7 +4270,16 @@ pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
         return -1;
     }
     SKIP_BLANKS!(ctxt);
-    if CMP7!(CUR_PTR!(ctxt), b'#', b'P', b'C', b'D', b'A', b'T', b'A') {
+    if CMP7!(
+        (*ctxt).current_ptr(),
+        b'#',
+        b'P',
+        b'C',
+        b'D',
+        b'A',
+        b'T',
+        b'A'
+    ) {
         tree = xml_parse_element_mixed_content_decl(ctxt, inputid);
         res = XmlElementTypeVal::XmlElementTypeMixed as i32;
     } else {
@@ -5500,7 +5521,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     }
                 }
 
-                if CMP5!(CUR_PTR!(ctxt), b'<', b'?', b'x', b'm', b'l')
+                if CMP5!((*ctxt).current_ptr(), b'<', b'?', b'x', b'm', b'l')
                     && IS_BLANK_CH!(NXT!(ctxt, 5))
                 {
                     xml_parse_text_decl(ctxt);
@@ -5934,8 +5955,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
 
     /* Capture start position */
     if (*ctxt).record_info != 0 {
-        node_info.begin_pos =
-            (*(*ctxt).input).consumed + CUR_PTR!(ctxt).offset_from((*(*ctxt).input).base) as u64;
+        node_info.begin_pos = (*(*ctxt).input).consumed
+            + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
         node_info.begin_line = (*(*ctxt).input).line as _;
     }
 
@@ -6027,7 +6048,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         if !cur.is_null() && (*ctxt).record_info != 0 {
             node_info.node = cur;
             node_info.end_pos = (*(*ctxt).input).consumed
-                + CUR_PTR!(ctxt).offset_from((*(*ctxt).input).base) as u64;
+                + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
             node_info.end_line = (*(*ctxt).input).line as _;
             xml_parser_add_node_info(ctxt, addr_of_mut!(node_info));
         }
@@ -6103,7 +6124,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
             xml_parser_find_node_info(ctxt, cur) as XmlParserNodeInfoPtr;
         if !node_info.is_null() {
             (*node_info).end_pos = (*(*ctxt).input).consumed
-                + CUR_PTR!(ctxt).offset_from((*(*ctxt).input).base) as u64;
+                + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
             (*node_info).end_line = (*(*ctxt).input).line as _;
         }
     }
@@ -6134,7 +6155,7 @@ pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPt
          */
         /* 2.6.0 test was *cur not RAW */
         else if CMP9!(
-            CUR_PTR!(ctxt),
+            (*ctxt).current_ptr(),
             b'<',
             b'!',
             b'[',
@@ -6234,7 +6255,16 @@ pub unsafe extern "C" fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
 pub(crate) unsafe extern "C" fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut version: *mut XmlChar = null_mut();
 
-    if CMP7!(CUR_PTR!(ctxt), b'v', b'e', b'r', b's', b'i', b'o', b'n') {
+    if CMP7!(
+        (*ctxt).current_ptr(),
+        b'v',
+        b'e',
+        b'r',
+        b's',
+        b'i',
+        b'o',
+        b'n'
+    ) {
         (*ctxt).advance(7);
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) != b'=' {
@@ -6285,7 +6315,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
 
     SKIP_BLANKS!(ctxt);
     if CMP8!(
-        CUR_PTR!(ctxt),
+        (*ctxt).current_ptr(),
         b'e',
         b'n',
         b'c',
@@ -6447,7 +6477,7 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> c_in
 
     SKIP_BLANKS!(ctxt);
     if CMP10!(
-        CUR_PTR!(ctxt),
+        (*ctxt).current_ptr(),
         b's',
         b't',
         b'a',
@@ -6523,7 +6553,7 @@ pub(crate) unsafe extern "C" fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
         GROW!(ctxt);
         if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'?' {
             xml_parse_pi(ctxt);
-        } else if CMP4!(CUR_PTR!(ctxt), b'<', b'!', b'-', b'-') {
+        } else if CMP4!((*ctxt).current_ptr(), b'<', b'!', b'-', b'-') {
             xml_parse_comment(ctxt);
         } else {
             break;
@@ -6564,7 +6594,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
         }
     }
 
-    if CMP5!(CUR_PTR!(ctxt), b'<', b'?', b'x', b'm', b'l') {
+    if CMP5!((*ctxt).current_ptr(), b'<', b'?', b'x', b'm', b'l') {
         xml_parse_text_decl(ctxt);
         if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
             /*
