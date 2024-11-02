@@ -5707,16 +5707,6 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
     name
 }
 
-macro_rules! NEXT1 {
-    ($ctxt:expr) => {
-        (*(*$ctxt).input).col += 1;
-        (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add(1);
-        if *(*(*$ctxt).input).cur == 0 {
-            (*$ctxt).grow();
-        }
-    };
-}
-
 /**
  * xmlParseStartTag:
  * @ctxt:  an XML parser context
@@ -5758,7 +5748,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
     if RAW!(ctxt) != b'<' {
         return null_mut();
     }
-    NEXT1!(ctxt);
+    (*ctxt).advance(1);
 
     let name: *const XmlChar = xml_parse_name(ctxt);
     if name.is_null() {
@@ -6044,7 +6034,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         return 1;
     }
     if RAW!(ctxt) == b'>' {
-        NEXT1!(ctxt);
+        (*ctxt).advance(1);
         if !cur.is_null() && (*ctxt).record_info != 0 {
             node_info.node = cur;
             node_info.end_pos = 0;

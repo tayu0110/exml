@@ -1292,16 +1292,6 @@ macro_rules! CMP9 {
     };
 }
 
-macro_rules! NEXT1 {
-    ($ctxt:expr) => {
-        (*(*$ctxt).input).col += 1;
-        (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add(1);
-        if *(*(*$ctxt).input).cur == 0 {
-            (*$ctxt).grow();
-        }
-    };
-}
-
 macro_rules! SKIPL {
     ($ctxt:expr, $val:expr) => {
         for _ in 0..$val {
@@ -8220,7 +8210,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     if (*ctxt).current_byte() != b'<' {
         return null_mut();
     }
-    NEXT1!(ctxt);
+    (*ctxt).advance(1);
 
     let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
     let inputid: c_int = (*(*ctxt).input).id;
@@ -9485,7 +9475,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
     if !IS_BYTE_CHAR!((*ctxt).current_byte()) || (*ctxt).current_byte() != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, null());
     } else {
-        NEXT1!(ctxt);
+        (*ctxt).advance(1);
     }
 
     /*
@@ -9590,7 +9580,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
     if !IS_BYTE_CHAR!((*ctxt).current_byte()) || (*ctxt).current_byte() != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, null());
     } else {
-        NEXT1!(ctxt);
+        (*ctxt).advance(1);
     }
 
     /*
