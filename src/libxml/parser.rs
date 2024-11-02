@@ -8963,7 +8963,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
     /* test also done in xmlCurrentChar() */
     {
         if cur == b']' as i32 && (*ctxt).nth_byte(1) == b']' && (*ctxt).nth_byte(2) == b'>' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrMisplacedCdataEnd, null());
+            xml_fatal_err(ctxt, XmlParserErrors::XmlErrMisplacedCDATAEnd, null());
         }
         COPY_BUF!(l, buf.as_mut_ptr(), nbchar, cur);
         /* move current position before possible calling of (*(*ctxt).sax).characters */
@@ -9357,7 +9357,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
 
     GROW!(ctxt);
     if (*ctxt).current_byte() != b'<' || (*ctxt).nth_byte(1) != b'/' {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrLtslashRequired, null());
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrLtSlashRequired, null());
         return;
     }
     SKIP!(ctxt, 2);
