@@ -2905,17 +2905,6 @@ unsafe extern "C" fn xml_parse_comment_complex(
     xml_free(buf as _);
 }
 
-macro_rules! SHRINK {
-    ($ctxt:expr) => {
-        if (*$ctxt).progressive == 0
-            && (*(*$ctxt).input).cur.offset_from((*(*$ctxt).input).base) > 2 * INPUT_CHUNK as isize
-            && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur) < 2 * INPUT_CHUNK as isize
-        {
-            (*$ctxt).shrink();
-        }
-    };
-}
-
 /**
  * xmlParseComment:
  * @ctxt:  an XML parser context
@@ -3061,7 +3050,7 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
                 }
                 // input = input.sub(1);
             }
-            SHRINK!(ctxt);
+            (*ctxt).shrink();
             GROW!(ctxt);
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                 xml_free(buf as _);
@@ -5885,7 +5874,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
                 c"attributes construct error\n".as_ptr() as _,
             );
         }
-        SHRINK!(ctxt);
+        (*ctxt).shrink();
         GROW!(ctxt);
     }
 
@@ -6216,7 +6205,7 @@ pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPt
             xml_parse_char_data_internal(ctxt, 0);
         }
 
-        SHRINK!(ctxt);
+        (*ctxt).shrink();
         GROW!(ctxt);
     }
 }
@@ -6633,7 +6622,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
             return;
         }
         SKIP_BLANKS!(ctxt);
-        SHRINK!(ctxt);
+        (*ctxt).shrink();
     }
 
     if RAW!(ctxt) != 0 {

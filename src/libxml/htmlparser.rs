@@ -5586,16 +5586,6 @@ macro_rules! BASE_PTR {
     };
 }
 
-macro_rules! SHRINK {
-    ($ctxt:expr) => {
-        if (*(*$ctxt).input).cur.offset_from((*(*$ctxt).input).base) > 2 * INPUT_CHUNK as isize
-            && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur) < 2 * INPUT_CHUNK as isize
-        {
-            (*$ctxt).shrink()
-        }
-    };
-}
-
 macro_rules! GROW {
     ($ctxt:expr) => {
         if (*$ctxt).progressive == 0
@@ -7968,7 +7958,7 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                 characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar as _);
             }
             nbchar = 0;
-            SHRINK!(ctxt);
+            (*ctxt).shrink();
         }
         cur = CUR_CHAR!(ctxt, l);
     }
@@ -9047,7 +9037,7 @@ unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, read
                 }
             }
             nbchar = 0;
-            SHRINK!(ctxt);
+            (*ctxt).shrink();
         }
         cur = CUR_CHAR!(ctxt, l);
     }
@@ -9249,7 +9239,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
             html_parse_char_data(ctxt);
         }
 
-        SHRINK!(ctxt);
+        (*ctxt).shrink();
         GROW!(ctxt);
     }
     if !current_node.is_null() {
@@ -9993,7 +9983,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
             html_parse_char_data(ctxt);
         }
 
-        SHRINK!(ctxt);
+        (*ctxt).shrink();
         GROW!(ctxt);
     }
     if !current_node.is_null() {

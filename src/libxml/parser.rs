@@ -607,7 +607,7 @@ impl XmlParserCtxt {
     }
 
     #[doc(alias = "xmlParserShrink")]
-    pub(crate) unsafe fn shrink(&mut self) {
+    pub(crate) unsafe fn force_shrink(&mut self) {
         let input: XmlParserInputPtr = self.input;
         let mut used: size_t;
 
@@ -645,6 +645,15 @@ impl XmlParserCtxt {
         }
 
         (*input).set_base_and_cursor(0, used);
+    }
+
+    pub(crate) unsafe fn shrink(&mut self) {
+        if self.progressive == 0
+            && (*self.input).cur.offset_from((*self.input).base) > 2 * INPUT_CHUNK as isize
+            && (*self.input).end.offset_from((*self.input).cur) < 2 * INPUT_CHUNK as isize
+        {
+            self.force_shrink();
+        }
     }
 
     /// Blocks further parser processing don't override error.
@@ -1307,17 +1316,6 @@ macro_rules! SKIPL {
         }
         if *(*(*$ctxt).input).cur == 0 {
             (*$ctxt).grow();
-        }
-    };
-}
-
-macro_rules! SHRINK {
-    ($ctxt:expr) => {
-        if (*$ctxt).progressive == 0
-            && (*(*$ctxt).input).cur.offset_from((*(*$ctxt).input).base) > 2 * INPUT_CHUNK as isize
-            && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur) < 2 * INPUT_CHUNK as isize
-        {
-            (*$ctxt).shrink();
         }
     };
 }
@@ -2554,7 +2552,7 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
         }
 
         SKIP_BLANKS!(ctxt);
-        SHRINK!(ctxt);
+        (*ctxt).shrink();
         GROW!(ctxt);
     }
 
@@ -2615,7 +2613,7 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
                 return;
             }
             SKIP_BLANKS!(ctxt);
-            SHRINK!(ctxt);
+            (*ctxt).shrink();
             GROW!(ctxt);
         }
         if (*ctxt).current_byte() == b']' {
@@ -9104,7 +9102,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
             if !matches!((*ctxt).instate, XmlParserInputState::XmlParserContent) {
                 return;
             }
-            SHRINK!(ctxt);
+            (*ctxt).shrink();
         }
         cur = CUR_CHAR!(ctxt, l);
     }
@@ -9330,7 +9328,7 @@ pub(crate) unsafe extern "C" fn xml_parse_char_data_internal(
         if *input == b'&' {
             return;
         }
-        SHRINK!(ctxt);
+        (*ctxt).shrink();
         GROW!(ctxt);
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             return;
@@ -9846,7 +9844,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
     }
 
     if !(*ctxt).input.is_null() && (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) > 4096 {
-        (*ctxt).shrink();
+        (*ctxt).force_shrink();
     }
 
     'encoding_error: {
