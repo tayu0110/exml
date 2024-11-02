@@ -5568,17 +5568,6 @@ macro_rules! UPP {
     };
 }
 
-macro_rules! GROW {
-    ($ctxt:expr) => {
-        if (*$ctxt).progressive == 0
-            && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur)
-                < crate::libxml::parser_internals::INPUT_CHUNK as isize
-        {
-            (*$ctxt).grow();
-        }
-    };
-}
-
 macro_rules! SKIP_BLANKS {
     ($ctxt:expr) => {
         html_skip_blank_chars($ctxt)
@@ -5680,7 +5669,7 @@ unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> c_int {
         }
         (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
         if *(*(*ctxt).input).cur == 0 {
-            (*ctxt).grow();
+            (*ctxt).force_grow();
         }
         res = res.saturating_add(1);
     }
@@ -5891,7 +5880,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
     }
 
     if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < INPUT_CHUNK as isize
-        && (*ctxt).grow() < 0
+        && (*ctxt).force_grow() < 0
     {
         return 0;
     }
@@ -6184,7 +6173,7 @@ unsafe extern "C" fn html_parse_name(ctxt: HtmlParserCtxtPtr) -> *const XmlChar 
     let ret: *const XmlChar;
     let count: c_int;
 
-    GROW!(ctxt);
+    (*ctxt).grow();
 
     /*
      * Accelerator for simple ASCII names
@@ -6262,7 +6251,7 @@ pub(crate) unsafe extern "C" fn html_parse_entity_ref(
                 null(),
             );
         } else {
-            GROW!(ctxt);
+            (*ctxt).grow();
             if (*ctxt).current_byte() == b';' {
                 if !str.is_null() {
                     *str = name;
@@ -7329,7 +7318,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
     atts = (*ctxt).atts;
     maxatts = (*ctxt).maxatts;
 
-    GROW!(ctxt);
+    (*ctxt).grow();
     let name: *const XmlChar = html_parse_html_name(ctxt);
     if name.is_null() {
         html_parse_err(
@@ -7416,7 +7405,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
         && ((*ctxt).current_byte() != b'/' || NXT!(ctxt, 1) != b'>')
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
-        GROW!(ctxt);
+        (*ctxt).grow();
         attname = html_parse_attribute(ctxt, addr_of_mut!(attvalue));
         if !attname.is_null() {
             /*
@@ -9072,7 +9061,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
     let current_node: *mut XmlChar = xml_strdup((*ctxt).name);
     let depth: c_int = (*ctxt).name_nr;
     loop {
-        GROW!(ctxt);
+        (*ctxt).grow();
 
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             break;
@@ -9217,7 +9206,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
         }
 
         (*ctxt).shrink();
-        GROW!(ctxt);
+        (*ctxt).grow();
     }
     if !current_node.is_null() {
         xml_free(current_node as _);
@@ -9780,7 +9769,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
         }
     }
     loop {
-        GROW!(ctxt);
+        (*ctxt).grow();
 
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             break;
@@ -9961,7 +9950,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
         }
 
         (*ctxt).shrink();
-        GROW!(ctxt);
+        (*ctxt).grow();
     }
     if !current_node.is_null() {
         xml_free(current_node as _);
@@ -9994,7 +9983,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
         );
         return XmlParserErrors::XmlErrInternalError as i32;
     }
-    GROW!(ctxt);
+    (*ctxt).grow();
     /*
      * SAX: beginning of the document processing.
      */
