@@ -837,6 +837,105 @@ impl XmlParserCtxt {
         self.charset = XmlCharEncoding::ISO8859_1;
         (*self.input).cur = (*self.input).cur.add(1);
     }
+
+    /// skip all blanks character found at that point in the input streams.  
+    /// It pops up finished entities in the process if allowable at that point.
+    ///
+    /// Returns the number of space chars skipped
+    #[doc(alias = "xmlSkipBlankChars")]
+    pub(crate) unsafe extern "C" fn skip_blanks(&mut self) -> i32 {
+        let mut res: c_int = 0;
+
+        /*
+         * It's Okay to use CUR/NEXT here since all the blanks are on
+         * the ASCII range.
+         */
+        if (self.input_nr == 1 && !matches!(self.instate, XmlParserInputState::XmlParserDTD))
+            || matches!(self.instate, XmlParserInputState::XmlParserStart)
+        {
+            let mut cur: *const XmlChar;
+            /*
+             * if we are in the document content, go really fast
+             */
+            cur = (*self.input).cur;
+            while IS_BLANK_CH!(*cur) {
+                if *cur == b'\n' {
+                    (*self.input).line += 1;
+                    (*self.input).col = 1;
+                } else {
+                    (*self.input).col += 1;
+                }
+                cur = cur.add(1);
+                res = res.saturating_add(1);
+                if *cur == 0 {
+                    (*self.input).cur = cur;
+                    self.force_grow();
+                    cur = (*self.input).cur;
+                }
+            }
+            (*self.input).cur = cur;
+        } else {
+            let expand_pe: c_int = (self.external != 0 || self.input_nr != 1) as i32;
+
+            while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+                if IS_BLANK_CH!(self.current_byte()) {
+                    /* CHECKED tstblanks.xml */
+                    self.skip_char();
+                } else if self.current_byte() == b'%' {
+                    /*
+                     * Need to handle support of entities branching here
+                     */
+                    if expand_pe == 0 || IS_BLANK_CH!(self.nth_byte(1)) || self.nth_byte(1) == 0 {
+                        break;
+                    }
+                    xml_parse_pe_reference(self);
+                } else if self.current_byte() == 0 {
+                    let mut consumed: c_ulong;
+
+                    if self.input_nr <= 1 {
+                        break;
+                    }
+
+                    consumed = (*self.input).consumed;
+                    xml_saturated_add_size_t(
+                        addr_of_mut!(consumed),
+                        (*self.input).cur.offset_from((*self.input).base) as _,
+                    );
+
+                    /*
+                     * Add to sizeentities when parsing an external entity
+                     * for the first time.
+                     */
+                    let ent: XmlEntityPtr = (*self.input).entity;
+                    if matches!(
+                        (*ent).etype,
+                        Some(XmlEntityType::XmlExternalParameterEntity)
+                    ) && (*ent).flags & XML_ENT_PARSED as i32 == 0
+                    {
+                        (*ent).flags |= XML_ENT_PARSED as i32;
+
+                        xml_saturated_add(addr_of_mut!(self.sizeentities), consumed);
+                    }
+
+                    xml_parser_entity_check(self, consumed);
+
+                    xml_pop_input(self);
+                } else {
+                    break;
+                }
+
+                /*
+                 * Also increase the counter when entering or exiting a PERef.
+                 * The spec says: "When a parameter-entity reference is recognized
+                 * in the DTD and included, its replacement text MUST be enlarged
+                 * by the attachment of one leading and one following space (#x20)
+                 * character."
+                 */
+                res = res.saturating_add(1);
+            }
+        }
+        res
+    }
 }
 /**
  * xmlSAXLocator:
@@ -1404,12 +1503,6 @@ pub type XmlExternalEntityLoader = unsafe extern "C" fn(
  *            the index
  *   GROW, SHRINK  handling of input buffers
  */
-
-macro_rules! SKIP_BLANKS {
-    ($ctxt:expr) => {
-        xml_skip_blank_chars($ctxt)
-    };
-}
 
 macro_rules! NEXTL {
     ($ctxt:expr, $l:expr) => {
@@ -2467,11 +2560,11 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
             let id: c_int = (*(*ctxt).input).id;
 
             (*ctxt).advance(3);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
 
             if (*ctxt).content_bytes().starts_with(b"INCLUDE") {
                 (*ctxt).advance(7);
-                SKIP_BLANKS!(ctxt);
+                (*ctxt).skip_blanks();
                 if (*ctxt).current_byte() != b'[' {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrCondsecInvalid, null());
                     (*ctxt).halt();
@@ -2512,7 +2605,7 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
                 let mut ignore_depth: size_t = 0;
 
                 (*ctxt).advance(6);
-                SKIP_BLANKS!(ctxt);
+                (*ctxt).skip_blanks();
                 if (*ctxt).current_byte() != b'[' {
                     xml_fatal_err(ctxt, XmlParserErrors::XmlErrCondsecInvalid, null());
                     (*ctxt).halt();
@@ -2611,7 +2704,7 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
             break;
         }
 
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         (*ctxt).shrink();
         (*ctxt).grow();
     }
@@ -2641,7 +2734,7 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
          * PEReferences.
          * Subsequence (markupdecl | PEReference | S)*
          */
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         #[allow(clippy::while_immutable_condition)]
         while ((*ctxt).current_byte() != b']' || (*ctxt).input_nr > base_input_nr)
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
@@ -2672,13 +2765,13 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
                 (*ctxt).halt();
                 return;
             }
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             (*ctxt).shrink();
             (*ctxt).grow();
         }
         if (*ctxt).current_byte() == b']' {
             (*ctxt).skip_char();
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 
@@ -2829,7 +2922,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
             return -1;
         }
         (*ctxt).standalone = (*(*ctxt).input).standalone;
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
     } else {
         (*ctxt).version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
     }
@@ -3027,7 +3120,7 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> c_i
              */
             return -1;
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
     } else {
         (*ctxt).version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
     }
@@ -7951,11 +8044,11 @@ unsafe extern "C" fn xml_parse_attribute2(
     /*
      * read the value
      */
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
 
     if (*ctxt).current_byte() == b'=' {
         (*ctxt).skip_char();
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         val = xml_parse_att_value_internal(ctxt, len, alloc, normalize);
         if val.is_null() {
             return null_mut();
@@ -8292,7 +8385,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
      *
      * (S Attribute)* S?
      */
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
     (*ctxt).grow();
 
     'done: {
@@ -8577,7 +8670,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
             {
                 break;
             }
-            if SKIP_BLANKS!(ctxt) == 0 {
+            if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -9525,7 +9618,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return;
     }
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
     if !IS_BYTE_CHAR!((*ctxt).current_byte()) || (*ctxt).current_byte() != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, null());
     } else {
@@ -9630,7 +9723,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
      * We should definitely be at the ending "S? '>'" part
      */
     (*ctxt).grow();
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
     if !IS_BYTE_CHAR!((*ctxt).current_byte()) || (*ctxt).current_byte() != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, null());
     } else {
@@ -10422,7 +10515,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                 XmlParserInputState::XmlParserMisc
                 | XmlParserInputState::XmlParserProlog
                 | XmlParserInputState::XmlParserEpilog => {
-                    SKIP_BLANKS!(ctxt);
+                    (*ctxt).skip_blanks();
                     avail = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
                     if avail < 2 {
                         // goto done;
@@ -11957,7 +12050,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
     *public_id = null_mut();
     if (*ctxt).content_bytes().starts_with(b"SYSTEM") {
         (*ctxt).advance(6);
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -11970,7 +12063,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
         }
     } else if (*ctxt).content_bytes().starts_with(b"PUBLIC") {
         (*ctxt).advance(6);
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -11985,7 +12078,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
             /*
              * We don't handle [83] so "S SystemLiteral" is required.
              */
-            if SKIP_BLANKS!(ctxt) == 0 {
+            if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -11999,7 +12092,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
              * system literal was found, but this is harmless since we must
              * be at the end of a NotationDecl.
              */
-            if SKIP_BLANKS!(ctxt) == 0 {
+            if (*ctxt).skip_blanks() == 0 {
                 return null_mut();
             }
             if (*ctxt).current_byte() != b'\'' && (*ctxt).current_byte() != b'"' {
@@ -12126,7 +12219,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
     if (*ctxt).content_bytes().starts_with(b"NOTATION") {
         let inputid: c_int = (*(*ctxt).input).id;
         (*ctxt).advance(8);
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -12150,7 +12243,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
                 null(),
             );
         }
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -12163,7 +12256,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
          * Parse the IDs.
          */
         systemid = xml_parse_external_id(ctxt, addr_of_mut!(pubid), 0);
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
 
         if (*ctxt).current_byte() == b'>' {
             if inputid != (*(*ctxt).input).id {
@@ -12233,7 +12326,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
     if (*ctxt).content_bytes().starts_with(b"ENTITY") {
         let inputid: c_int = (*(*ctxt).input).id;
         (*ctxt).advance(6);
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -12243,7 +12336,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
 
         if (*ctxt).current_byte() == b'%' {
             (*ctxt).skip_char();
-            if SKIP_BLANKS!(ctxt) == 0 {
+            if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -12272,7 +12365,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 null(),
             );
         }
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -12426,7 +12519,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     xml_free_uri(parsed_uri);
                 }
             }
-            if (*ctxt).current_byte() != b'>' && SKIP_BLANKS!(ctxt) == 0 {
+            if (*ctxt).current_byte() != b'>' && (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -12435,7 +12528,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
             }
             if (*ctxt).content_bytes().starts_with(b"NDATA") {
                 (*ctxt).advance(5);
-                if SKIP_BLANKS!(ctxt) == 0 {
+                if (*ctxt).skip_blanks() == 0 {
                     xml_fatal_err_msg(
                         ctxt,
                         XmlParserErrors::XmlErrSpaceRequired,
@@ -12522,7 +12615,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
             }
             return;
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         if (*ctxt).current_byte() != b'>' {
             xml_fatal_err_msg_str(
                 ctxt,
@@ -12618,7 +12711,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
         let inputid: c_int = (*(*ctxt).input).id;
 
         (*ctxt).advance(7);
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -12634,7 +12727,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
             );
             return;
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         (*ctxt).grow();
         #[allow(clippy::while_immutable_condition)]
         while (*ctxt).current_byte() != b'>'
@@ -12654,7 +12747,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                 break;
             }
             (*ctxt).grow();
-            if SKIP_BLANKS!(ctxt) == 0 {
+            if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -12669,7 +12762,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
             }
 
             (*ctxt).grow();
-            if SKIP_BLANKS!(ctxt) == 0 {
+            if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -12696,7 +12789,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
             }
 
             (*ctxt).grow();
-            if (*ctxt).current_byte() != b'>' && SKIP_BLANKS!(ctxt) == 0 {
+            if (*ctxt).current_byte() != b'>' && (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -12809,20 +12902,20 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
                           depth);
         return null_mut();
     }
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
     (*ctxt).grow();
     if (*ctxt).current_byte() == b'(' {
         let inputid: c_int = (*(*ctxt).input).id;
 
         /* Recurse on first child */
         (*ctxt).skip_char();
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         cur = xml_parse_element_children_content_decl_priv(ctxt, inputid, depth + 1);
         ret = cur;
         if cur.is_null() {
             return null_mut();
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         (*ctxt).grow();
     } else {
         elem = xml_parse_name(ctxt);
@@ -12855,7 +12948,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
         }
         (*ctxt).grow();
     }
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
     #[allow(clippy::while_immutable_condition)]
     while ((*ctxt).current_byte() != b')')
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
@@ -12986,13 +13079,13 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
             return null_mut();
         }
         (*ctxt).grow();
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         (*ctxt).grow();
         if (*ctxt).current_byte() == b'(' {
             let inputid: c_int = (*(*ctxt).input).id;
             /* Recurse on second child */
             (*ctxt).skip_char();
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             last = xml_parse_element_children_content_decl_priv(ctxt, inputid, depth + 1);
             if last.is_null() {
                 if !ret.is_null() {
@@ -13000,7 +13093,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
                 }
                 return null_mut();
             }
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         } else {
             elem = xml_parse_name(ctxt);
             if elem.is_null() {
@@ -13034,7 +13127,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
                 (*last).ocur = XmlElementContentOccur::XmlElementContentOnce;
             }
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         (*ctxt).grow();
     }
     if !cur.is_null() && !last.is_null() {
@@ -13182,7 +13275,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -
         let inputid: c_int = (*(*ctxt).input).id;
 
         (*ctxt).advance(7);
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -13199,7 +13292,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -
             );
             return -1;
         }
-        if SKIP_BLANKS!(ctxt) == 0 {
+        if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -13243,7 +13336,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -
             return -1;
         }
 
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
 
         if (*ctxt).current_byte() != b'>' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, null());
@@ -13859,7 +13952,7 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
             c"Blank needed after '<?xml'\n".as_ptr() as _,
         );
     }
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
 
     /*
      * We must have the VersionInfo here.
@@ -13946,10 +14039,10 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
      */
     (*ctxt).grow();
 
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
     (*(*ctxt).input).standalone = xml_parse_sddecl(ctxt);
 
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
     if (*ctxt).current_byte() == b'?' && (*ctxt).nth_byte(1) == b'>' {
         (*ctxt).advance(2);
     } else if (*ctxt).current_byte() == b'>' {
@@ -13999,7 +14092,7 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
     let oldstate: c_int = (*ctxt).instate as _;
     (*ctxt).instate = XmlParserInputState::XmlParserStart;
 
-    if SKIP_BLANKS!(ctxt) == 0 {
+    if (*ctxt).skip_blanks() == 0 {
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrSpaceRequired,
@@ -14013,7 +14106,7 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
     version = xml_parse_version_info(ctxt);
     if version.is_null() {
         version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
-    } else if SKIP_BLANKS!(ctxt) == 0 {
+    } else if (*ctxt).skip_blanks() == 0 {
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrSpaceRequired,
@@ -14044,7 +14137,7 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
         );
     }
 
-    SKIP_BLANKS!(ctxt);
+    (*ctxt).skip_blanks();
     if (*ctxt).current_byte() == b'?' && (*ctxt).nth_byte(1) == b'>' {
         (*ctxt).advance(2);
     } else if (*ctxt).current_byte() == b'>' {
@@ -14067,111 +14160,6 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
     }
 
     (*ctxt).instate = oldstate.try_into().unwrap();
-}
-
-/**
- * xmlSkipBlankChars:
- * @ctxt:  the XML parser context
- *
- * DEPRECATED: Internal function, do not use.
- *
- * skip all blanks character found at that point in the input streams.
- * It pops up finished entities in the process if allowable at that point.
- *
- * Returns the number of space chars skipped
- */
-pub(crate) unsafe extern "C" fn xml_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> c_int {
-    let mut res: c_int = 0;
-
-    /*
-     * It's Okay to use CUR/NEXT here since all the blanks are on
-     * the ASCII range.
-     */
-    if ((*ctxt).input_nr == 1 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserDTD))
-        || matches!((*ctxt).instate, XmlParserInputState::XmlParserStart)
-    {
-        let mut cur: *const XmlChar;
-        /*
-         * if we are in the document content, go really fast
-         */
-        cur = (*(*ctxt).input).cur;
-        while IS_BLANK_CH!(*cur) {
-            if *cur == b'\n' {
-                (*(*ctxt).input).line += 1;
-                (*(*ctxt).input).col = 1;
-            } else {
-                (*(*ctxt).input).col += 1;
-            }
-            cur = cur.add(1);
-            res = res.saturating_add(1);
-            if *cur == 0 {
-                (*(*ctxt).input).cur = cur;
-                (*ctxt).force_grow();
-                cur = (*(*ctxt).input).cur;
-            }
-        }
-        (*(*ctxt).input).cur = cur;
-    } else {
-        let expand_pe: c_int = ((*ctxt).external != 0 || (*ctxt).input_nr != 1) as i32;
-
-        while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            if IS_BLANK_CH!((*ctxt).current_byte()) {
-                /* CHECKED tstblanks.xml */
-                (*ctxt).skip_char();
-            } else if (*ctxt).current_byte() == b'%' {
-                /*
-                 * Need to handle support of entities branching here
-                 */
-                if expand_pe == 0 || IS_BLANK_CH!((*ctxt).nth_byte(1)) || (*ctxt).nth_byte(1) == 0 {
-                    break;
-                }
-                xml_parse_pe_reference(ctxt);
-            } else if (*ctxt).current_byte() == 0 {
-                let mut consumed: c_ulong;
-
-                if (*ctxt).input_nr <= 1 {
-                    break;
-                }
-
-                consumed = (*(*ctxt).input).consumed;
-                xml_saturated_add_size_t(
-                    addr_of_mut!(consumed),
-                    (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _,
-                );
-
-                /*
-                 * Add to sizeentities when parsing an external entity
-                 * for the first time.
-                 */
-                let ent: XmlEntityPtr = (*(*ctxt).input).entity;
-                if matches!(
-                    (*ent).etype,
-                    Some(XmlEntityType::XmlExternalParameterEntity)
-                ) && (*ent).flags & XML_ENT_PARSED as i32 == 0
-                {
-                    (*ent).flags |= XML_ENT_PARSED as i32;
-
-                    xml_saturated_add(addr_of_mut!((*ctxt).sizeentities), consumed);
-                }
-
-                xml_parser_entity_check(ctxt, consumed);
-
-                xml_pop_input(ctxt);
-            } else {
-                break;
-            }
-
-            /*
-             * Also increase the counter when entering or exiting a PERef.
-             * The spec says: "When a parameter-entity reference is recognized
-             * in the DTD and included, its replacement text MUST be enlarged
-             * by the attachment of one leading and one following space (#x20)
-             * character."
-             */
-            res = res.saturating_add(1);
-        }
-    }
-    res
 }
 
 #[cfg(test)]
