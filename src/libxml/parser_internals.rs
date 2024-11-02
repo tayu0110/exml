@@ -2728,16 +2728,6 @@ macro_rules! CUR_PTR {
     };
 }
 
-macro_rules! SKIP {
-    ($ctxt:expr, $val:expr) => {
-        (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add($val as usize);
-        (*(*$ctxt).input).col += $val;
-        if *(*(*$ctxt).input).cur == 0 {
-            (*$ctxt).grow();
-        }
-    };
-}
-
 macro_rules! SKIP_BLANKS {
     ($ctxt:expr) => {
         $crate::libxml::parser::xml_skip_blank_chars($ctxt)
@@ -2937,14 +2927,14 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
     if RAW!(ctxt) != b'<' || NXT!(ctxt, 1) != b'!' {
         return;
     }
-    SKIP!(ctxt, 2);
+    (*ctxt).advance(2);
     if RAW!(ctxt) != b'-' || NXT!(ctxt, 1) != b'-' {
         return;
     }
     let state: XmlParserInputState = (*ctxt).instate;
     (*ctxt).instate = XmlParserInputState::XmlParserComment;
     let inputid: c_int = (*(*ctxt).input).id;
-    SKIP!(ctxt, 2);
+    (*ctxt).advance(2);
     GROW!(ctxt);
 
     /*
@@ -3068,7 +3058,7 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
                                     as _,
                             );
                         }
-                        SKIP!(ctxt, 3);
+                        (*ctxt).advance(3);
                         if !(*ctxt).sax.is_null()
                             && (*(*ctxt).sax).comment.is_some()
                             && (*ctxt).disable_sax == 0
@@ -3310,7 +3300,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
         /*
          * this is a Processing Instruction.
          */
-        SKIP!(ctxt, 2);
+        (*ctxt).advance(2);
 
         /*
          * Parse the target name and check for special support like
@@ -3326,7 +3316,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                         c"PI declaration doesn't start and stop in the same entity\n".as_ptr() as _,
                     );
                 }
-                SKIP!(ctxt, 2);
+                (*ctxt).advance(2);
 
                 /*
                  * SAX: PI detected.
@@ -3409,7 +3399,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                         c"PI declaration doesn't start and stop in the same entity\n".as_ptr() as _,
                     );
                 }
-                SKIP!(ctxt, 2);
+                (*ctxt).advance(2);
 
                 #[cfg(feature = "catalog")]
                 if matches!(
@@ -3491,7 +3481,7 @@ pub(crate) unsafe extern "C" fn xml_parse_default_decl(
         b'E',
         b'D'
     ) {
-        SKIP!(ctxt, 9);
+        (*ctxt).advance(9);
         return XmlAttributeDefault::XmlAttributeRequired as i32;
     }
     if CMP8!(
@@ -3505,12 +3495,12 @@ pub(crate) unsafe extern "C" fn xml_parse_default_decl(
         b'E',
         b'D'
     ) {
-        SKIP!(ctxt, 8);
+        (*ctxt).advance(8);
         return XmlAttributeDefault::XmlAttributeImplied as i32;
     }
     val = XmlAttributeDefault::XmlAttributeNone as i32;
     if CMP6!(CUR_PTR!(ctxt), b'#', b'F', b'I', b'X', b'E', b'D') {
-        SKIP!(ctxt, 6);
+        (*ctxt).advance(6);
         val = XmlAttributeDefault::XmlAttributeFixed as i32;
         if SKIP_BLANKS!(ctxt) == 0 {
             xml_fatal_err_msg(
@@ -3736,7 +3726,7 @@ pub(crate) unsafe extern "C" fn xml_parse_enumerated_type(
         b'O',
         b'N'
     ) {
-        SKIP!(ctxt, 8);
+        (*ctxt).advance(8);
         if SKIP_BLANKS!(ctxt) == 0 {
             xml_fatal_err_msg(
                 ctxt,
@@ -3810,19 +3800,19 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
     tree: *mut XmlEnumerationPtr,
 ) -> c_int {
     if CMP5!(CUR_PTR!(ctxt), b'C', b'D', b'A', b'T', b'A') {
-        SKIP!(ctxt, 5);
+        (*ctxt).advance(5);
         return XmlAttributeType::XmlAttributeCdata as i32;
     } else if CMP6!(CUR_PTR!(ctxt), b'I', b'D', b'R', b'E', b'F', b'S') {
-        SKIP!(ctxt, 6);
+        (*ctxt).advance(6);
         return XmlAttributeType::XmlAttributeIdrefs as i32;
     } else if CMP5!(CUR_PTR!(ctxt), b'I', b'D', b'R', b'E', b'F') {
-        SKIP!(ctxt, 5);
+        (*ctxt).advance(5);
         return XmlAttributeType::XmlAttributeIdref as i32;
     } else if RAW!(ctxt) == b'I' && NXT!(ctxt, 1) == b'D' {
-        SKIP!(ctxt, 2);
+        (*ctxt).advance(2);
         return XmlAttributeType::XmlAttributeId as i32;
     } else if CMP6!(CUR_PTR!(ctxt), b'E', b'N', b'T', b'I', b'T', b'Y') {
-        SKIP!(ctxt, 6);
+        (*ctxt).advance(6);
         return XmlAttributeType::XmlAttributeEntity as i32;
     } else if CMP8!(
         CUR_PTR!(ctxt),
@@ -3835,7 +3825,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
         b'E',
         b'S'
     ) {
-        SKIP!(ctxt, 8);
+        (*ctxt).advance(8);
         return XmlAttributeType::XmlAttributeEntities as i32;
     } else if CMP8!(
         CUR_PTR!(ctxt),
@@ -3848,10 +3838,10 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
         b'N',
         b'S'
     ) {
-        SKIP!(ctxt, 8);
+        (*ctxt).advance(8);
         return XmlAttributeType::XmlAttributeNmtokens as i32;
     } else if CMP7!(CUR_PTR!(ctxt), b'N', b'M', b'T', b'O', b'K', b'E', b'N') {
-        SKIP!(ctxt, 7);
+        (*ctxt).advance(7);
         return XmlAttributeType::XmlAttributeNmtoken as i32;
     }
     xml_parse_enumerated_type(ctxt, tree)
@@ -4060,7 +4050,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
 
     GROW!(ctxt);
     if CMP7!(CUR_PTR!(ctxt), b'#', b'P', b'C', b'D', b'A', b'T', b'A') {
-        SKIP!(ctxt, 7);
+        (*ctxt).advance(7);
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) == b')' {
             if (*(*ctxt).input).id != inputchk {
@@ -4175,7 +4165,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
                         .as_ptr() as _,
                 );
             }
-            SKIP!(ctxt, 2);
+            (*ctxt).advance(2);
         } else {
             xml_free_doc_element_content((*ctxt).my_doc, ret);
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrMixedNotStarted, null());
@@ -5542,7 +5532,7 @@ pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) 
     /*
      * We know that '<!DOCTYPE' has been detected.
      */
-    SKIP!(ctxt, 9);
+    (*ctxt).advance(9);
 
     SKIP_BLANKS!(ctxt);
 
@@ -6017,7 +6007,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
      * Check for an Empty Element.
      */
     if RAW!(ctxt) == b'/' && NXT!(ctxt, 1) == b'>' {
-        SKIP!(ctxt, 2);
+        (*ctxt).advance(2);
         if (*ctxt).sax2 != 0 {
             if !(*ctxt).sax.is_null()
                 && (*(*ctxt).sax).end_element_ns.is_some()
@@ -6097,7 +6087,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
 
     if (*ctxt).name_nr <= 0 {
         if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'/' {
-            SKIP!(ctxt, 2);
+            (*ctxt).advance(2);
         }
         return;
     }
@@ -6255,7 +6245,7 @@ pub(crate) unsafe extern "C" fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -
     let mut version: *mut XmlChar = null_mut();
 
     if CMP7!(CUR_PTR!(ctxt), b'v', b'e', b'r', b's', b'i', b'o', b'n') {
-        SKIP!(ctxt, 7);
+        (*ctxt).advance(7);
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) != b'=' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
@@ -6315,7 +6305,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
         b'n',
         b'g'
     ) {
-        SKIP!(ctxt, 8);
+        (*ctxt).advance(8);
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) != b'=' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
@@ -6479,7 +6469,7 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> c_in
         b'n',
         b'e'
     ) {
-        SKIP!(ctxt, 10);
+        (*ctxt).advance(10);
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) != b'=' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
@@ -6491,10 +6481,10 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> c_in
             NEXT!(ctxt);
             if RAW!(ctxt) == b'n' && NXT!(ctxt, 1) == b'o' {
                 standalone = 0;
-                SKIP!(ctxt, 2);
+                (*ctxt).advance(2);
             } else if RAW!(ctxt) == b'y' && NXT!(ctxt, 1) == b'e' && NXT!(ctxt, 2) == b's' {
                 standalone = 1;
-                SKIP!(ctxt, 3);
+                (*ctxt).advance(3);
             } else {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStandaloneValue, null());
             }
@@ -6507,10 +6497,10 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> c_in
             NEXT!(ctxt);
             if RAW!(ctxt) == b'n' && NXT!(ctxt, 1) == b'o' {
                 standalone = 0;
-                SKIP!(ctxt, 2);
+                (*ctxt).advance(2);
             } else if RAW!(ctxt) == b'y' && NXT!(ctxt, 1) == b'e' && NXT!(ctxt, 2) == b's' {
                 standalone = 1;
-                SKIP!(ctxt, 3);
+                (*ctxt).advance(3);
             } else {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStandaloneValue, null());
             }

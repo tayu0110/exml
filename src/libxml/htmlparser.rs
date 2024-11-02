@@ -5556,13 +5556,6 @@ macro_rules! UPPER {
     };
 }
 
-macro_rules! SKIP {
-    ($ctxt:expr, $val:expr) => {
-        (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add($val as usize);
-        (*(*$ctxt).input).col += $val;
-    };
-}
-
 macro_rules! NXT {
     ($ctxt:expr, $val:expr) => {
         *(*(*$ctxt).input).cur.add($val as usize)
@@ -6346,7 +6339,7 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
         && NXT!(ctxt, 1) == b'#'
         && (NXT!(ctxt, 2) == b'x' || NXT!(ctxt, 2) == b'X')
     {
-        SKIP!(ctxt, 3);
+        (*ctxt).advance(3);
         #[allow(clippy::while_immutable_condition)]
         while CUR!(ctxt) != b';' {
             if CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' {
@@ -6377,7 +6370,7 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
             NEXT!(ctxt);
         }
     } else if CUR!(ctxt) == b'&' && NXT!(ctxt, 1) == b'#' {
-        SKIP!(ctxt, 2);
+        (*ctxt).advance(2);
         #[allow(clippy::while_immutable_condition)]
         while CUR!(ctxt) != b';' {
             if CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' {
@@ -7739,7 +7732,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
         );
         return 0;
     }
-    SKIP!(ctxt, 2);
+    (*ctxt).advance(2);
 
     let name: *const XmlChar = html_parse_html_name(ctxt);
     if name.is_null() {
@@ -8146,7 +8139,7 @@ unsafe extern "C" fn html_parse_external_id(
         && UPP!(ctxt, 4) == b'E'
         && UPP!(ctxt, 5) == b'M'
     {
-        SKIP!(ctxt, 6);
+        (*ctxt).advance(6);
         if !IS_BLANK_CH!(CUR!(ctxt)) {
             html_parse_err(
                 ctxt,
@@ -8174,7 +8167,7 @@ unsafe extern "C" fn html_parse_external_id(
         && UPP!(ctxt, 4) == b'I'
         && UPP!(ctxt, 5) == b'C'
     {
-        SKIP!(ctxt, 6);
+        (*ctxt).advance(6);
         if !IS_BLANK_CH!(CUR!(ctxt)) {
             html_parse_err(
                 ctxt,
@@ -8218,7 +8211,7 @@ unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
     /*
      * We know that '<!DOCTYPE' has been detected.
      */
-    SKIP!(ctxt, 9);
+    (*ctxt).advance(9);
 
     SKIP_BLANKS!(ctxt);
 
@@ -8333,7 +8326,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
 
     let state: XmlParserInputState = (*ctxt).instate;
     (*ctxt).instate = XmlParserInputState::XmlParserComment;
-    SKIP!(ctxt, 4);
+    (*ctxt).advance(4);
     buf = xml_malloc_atomic(size as usize) as _;
     if buf.is_null() {
         html_err_memory(ctxt, c"buffer allocation failed\n".as_ptr() as _);
@@ -8526,7 +8519,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
         /*
          * this is a Processing Instruction.
          */
-        SKIP!(ctxt, 2);
+        (*ctxt).advance(2);
 
         /*
          * Parse the target name and check for special support like
@@ -8535,7 +8528,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
         target = html_parse_name(ctxt);
         if !target.is_null() {
             if RAW!(ctxt) == b'>' {
-                SKIP!(ctxt, 1);
+                (*ctxt).advance(1);
 
                 /*
                  * SAX: PI detected.
@@ -8622,7 +8615,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     null(),
                 );
             } else {
-                SKIP!(ctxt, 1);
+                (*ctxt).advance(1);
 
                 /*
                  * SAX: PI detected.
@@ -9313,7 +9306,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
      * Check for an Empty Element labeled the XML/SGML way
      */
     if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'>' {
-        SKIP!(ctxt, 2);
+        (*ctxt).advance(2);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
             ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
         }
@@ -9730,7 +9723,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
      * Check for an Empty Element labeled the XML/SGML way
      */
     if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'>' {
-        SKIP!(ctxt, 2);
+        (*ctxt).advance(2);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
             ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
         }
@@ -11039,7 +11032,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
          */
         cur = *(*input).cur.add(0);
         if cur == 0 {
-            SKIP!(ctxt, 1);
+            (*ctxt).advance(1);
             continue;
         }
 
@@ -11313,7 +11306,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                  * Check for an Empty Element labeled the XML/SGML way
                  */
                 if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'>' {
-                    SKIP!(ctxt, 2);
+                    (*ctxt).advance(2);
                     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
                         ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
                     }
