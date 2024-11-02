@@ -52,7 +52,7 @@ use crate::{
             xml_strncasecmp, xml_strndup, XmlChar,
         },
     },
-    private::parser::{xml_parser_grow, XML_VCTXT_USE_PCTXT},
+    private::parser::XML_VCTXT_USE_PCTXT,
     IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH, IS_COMBINING,
     IS_DIGIT, IS_EXTENDER, IS_LETTER, IS_PUBIDCHAR_CH,
 };
@@ -5602,7 +5602,7 @@ macro_rules! GROW {
             && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur)
                 < crate::libxml::parser_internals::INPUT_CHUNK as isize
         {
-            crate::private::parser::xml_parser_grow($ctxt);
+            (*$ctxt).grow();
         }
     };
 }
@@ -5713,7 +5713,7 @@ unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> c_int {
         }
         (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
         if *(*(*ctxt).input).cur == 0 {
-            xml_parser_grow(ctxt);
+            (*ctxt).grow();
         }
         res = res.saturating_add(1);
     }
@@ -5924,7 +5924,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
     }
 
     if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < INPUT_CHUNK as isize
-        && xml_parser_grow(ctxt) < 0
+        && (*ctxt).grow() < 0
     {
         return 0;
     }

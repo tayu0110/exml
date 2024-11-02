@@ -3,18 +3,15 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{ffi::c_int, ptr::null};
+use std::ptr::null;
 
-use libc::{c_ulong, ptrdiff_t, size_t};
+use libc::{c_ulong, size_t};
 
 use crate::{
     __xml_raise_error,
     libxml::{
-        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
-        parser_internals::{
-            input_pop, xml_err_internal, xml_free_input_stream, INPUT_CHUNK, LINE_LEN,
-            XML_MAX_LOOKUP_LIMIT,
-        },
+        parser::{XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState},
+        parser_internals::{input_pop, xml_free_input_stream, INPUT_CHUNK, LINE_LEN},
         xmlerror::XmlParserErrors,
         xmlstring::XmlChar,
     },
@@ -167,81 +164,32 @@ pub unsafe extern "C" fn __xml_err_encoding(
  * for internal use
  */
 #[doc(hidden)]
-pub unsafe extern "C" fn xml_halt_parser(ctxt: XmlParserCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).instate = XmlParserInputState::XmlParserEOF;
-    (*ctxt).disable_sax = 1;
+pub unsafe extern "C" fn xml_halt_parser(ctxt: &mut XmlParserCtxt) {
+    ctxt.instate = XmlParserInputState::XmlParserEOF;
+    ctxt.disable_sax = 1;
     #[allow(clippy::while_immutable_condition)]
-    while (*ctxt).input_nr > 1 {
+    while ctxt.input_nr > 1 {
         xml_free_input_stream(input_pop(ctxt));
     }
-    if !(*ctxt).input.is_null() {
+    if !ctxt.input.is_null() {
         /*
          * in case there was a specific allocation deallocate before
          * overriding base
          */
-        if let Some(free) = (*(*ctxt).input).free {
-            free((*(*ctxt).input).base as *mut XmlChar);
-            (*(*ctxt).input).free = None;
+        if let Some(free) = (*ctxt.input).free {
+            free((*ctxt.input).base as *mut XmlChar);
+            (*ctxt.input).free = None;
         }
-        if (*(*ctxt).input).buf.is_some() {
-            // xml_free_parser_input_buffer((*(*ctxt).input).buf);
-            // (*(*ctxt).input).buf = null_mut();
-            let _ = (*(*ctxt).input).buf.take();
+        if (*ctxt.input).buf.is_some() {
+            // xml_free_parser_input_buffer((*ctxt.input).buf);
+            // (*ctxt.input).buf = null_mut();
+            let _ = (*ctxt.input).buf.take();
         }
-        (*(*ctxt).input).cur = c"".as_ptr() as _;
-        (*(*ctxt).input).length = 0;
-        (*(*ctxt).input).base = (*(*ctxt).input).cur;
-        (*(*ctxt).input).end = (*(*ctxt).input).cur;
+        (*ctxt.input).cur = c"".as_ptr() as _;
+        (*ctxt.input).length = 0;
+        (*ctxt.input).base = (*ctxt.input).cur;
+        (*ctxt.input).end = (*ctxt.input).cur;
     }
-}
-
-/**
- * xmlParserGrow:
- * @ctxt:  an XML parser context
- */
-#[doc(hidden)]
-pub unsafe extern "C" fn xml_parser_grow(ctxt: XmlParserCtxtPtr) -> c_int {
-    let input: XmlParserInputPtr = (*ctxt).input;
-    let cur_end: ptrdiff_t = (*input).end.offset_from((*input).cur);
-    let cur_base: ptrdiff_t = (*input).cur.offset_from((*input).base);
-
-    let Some(buf) = (*input).buf.as_mut() else {
-        return 0;
-    };
-    /* Don't grow push parser buffer. */
-    if (*ctxt).progressive != 0 {
-        return 0;
-    }
-    /* Don't grow memory buffers. */
-    if (*buf).borrow().encoder.is_none() && (*buf).borrow().context.is_none() {
-        return 0;
-    }
-
-    if (cur_end > XML_MAX_LOOKUP_LIMIT as isize || cur_base > XML_MAX_LOOKUP_LIMIT as isize)
-        && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
-    {
-        xml_err_internal(ctxt, c"Huge input lookup".as_ptr() as _, null());
-        xml_halt_parser(ctxt);
-        return -1;
-    }
-
-    if cur_end >= INPUT_CHUNK as isize {
-        return 0;
-    }
-
-    let ret: c_int = (*buf).borrow_mut().grow(INPUT_CHUNK as _);
-    (*input).set_base_and_cursor(0, cur_base as usize);
-
-    /* TODO: Get error code from xmlParserInputBufferGrow */
-    if ret < 0 {
-        xml_err_internal(ctxt, c"Growing input buffer".as_ptr() as _, null());
-        xml_halt_parser(ctxt);
-    }
-
-    ret
 }
 
 /**
