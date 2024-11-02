@@ -1632,18 +1632,6 @@ pub type XmlExternalEntityLoader = unsafe extern "C" fn(
  *   GROW, SHRINK  handling of input buffers
  */
 
-macro_rules! NEXTL {
-    ($ctxt:expr, $l:expr) => {
-        if (*((*(*$ctxt).input).cur) == b'\n') {
-            (*(*$ctxt).input).line += 1;
-            (*(*$ctxt).input).col = 1;
-        } else {
-            (*(*$ctxt).input).col += 1;
-        }
-        (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add($l as usize);
-    };
-}
-
 macro_rules! CUR_SCHAR {
     ($ctxt:expr, $s:expr, $l:expr) => {
         crate::libxml::parser_internals::xml_string_current_char($ctxt, $s, addr_of_mut!($l))
@@ -6004,7 +5992,7 @@ unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const 
         if len <= i32::MAX - l {
             len += l;
         }
-        NEXTL!(ctxt, l);
+        (*ctxt).advance_with_line_handling(l as usize);
         c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -7012,7 +7000,7 @@ unsafe extern "C" fn xml_load_entity_content(
         && IS_CHAR!(c as i32)
     {
         xml_buf_add(buf, (*(*ctxt).input).cur, l);
-        NEXTL!(ctxt, l);
+        (*ctxt).advance_with_line_handling(l as usize);
         c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -7658,7 +7646,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                             grow_buffer!(ctxt, buf, 10, buf_size, rep, 'mem_error);
                         }
                     }
-                    NEXTL!(ctxt, l);
+                    (*ctxt).advance_with_line_handling(l as usize);
                 }
                 (*ctxt).grow();
                 c = (*ctxt).current_char(&mut l).unwrap_or('\0');
@@ -9319,7 +9307,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
         }
         COPY_BUF!(l, buf.as_mut_ptr(), nbchar, cur);
         /* move current position before possible calling of (*(*ctxt).sax).characters */
-        NEXTL!(ctxt, l);
+        (*ctxt).advance_with_line_handling(l as usize);
         if nbchar >= XML_PARSER_BIG_BUFFER_SIZE as i32 {
             buf[nbchar as usize] = 0;
 
@@ -9393,7 +9381,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
                     c"Incomplete UTF-8 sequence starting with %02X\n".as_ptr() as _,
                     (*ctxt).current_byte() as _,
                 );
-                NEXTL!(ctxt, 1);
+                (*ctxt).advance_with_line_handling(1);
             }
         } else if cur != '<' && cur != '&' {
             /* Generate the error and skip the offending character */
@@ -9403,7 +9391,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
                 c"PCDATA invalid Char value %d\n".as_ptr() as _,
                 cur as _,
             );
-            NEXTL!(ctxt, l);
+            (*ctxt).advance_with_line_handling(l as usize);
         }
     }
 }
@@ -12292,7 +12280,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pubid_literal(ctxt: XmlParserCtxtPtr) 
     if cur != stop {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotFinished, null());
     } else {
-        NEXTL!(ctxt, 1);
+        (*ctxt).advance_with_line_handling(1);
     }
     (*ctxt).instate = oldstate;
     buf
@@ -13753,7 +13741,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         xml_free(buf as _);
         return;
     }
-    NEXTL!(ctxt, rl);
+    (*ctxt).advance_with_line_handling(rl as usize);
     let mut s = (*ctxt).current_char(&mut sl).unwrap_or('\0');
     if !IS_CHAR!(s as i32) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, null());
@@ -13764,7 +13752,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         xml_free(buf as _);
         return;
     }
-    NEXTL!(ctxt, sl);
+    (*ctxt).advance_with_line_handling(sl as usize);
     let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     buf = xml_malloc_atomic(size as usize) as *mut XmlChar;
     if buf.is_null() {
@@ -13809,7 +13797,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         rl = sl;
         s = cur;
         sl = l;
-        NEXTL!(ctxt, l);
+        (*ctxt).advance_with_line_handling(l as usize);
         cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     *buf.add(len as usize) = 0;
@@ -13831,7 +13819,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         xml_free(buf as _);
         return;
     }
-    NEXTL!(ctxt, l);
+    (*ctxt).advance_with_line_handling(l as usize);
 
     /*
      * OK the buffer is to be consumed as cdata.
