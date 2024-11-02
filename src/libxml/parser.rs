@@ -6,7 +6,7 @@
 use std::{
     any::type_name,
     cell::RefCell,
-    ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void, CStr},
+    ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void, CStr, CString},
     io::Read,
     mem::{size_of, size_of_val},
     ops::DerefMut,
@@ -968,174 +968,101 @@ impl XmlParserCtxt {
             *len = 1;
             return Some(*(*self.input).cur as char);
         }
-        'incomplete_sequence: {
-            'encoding_error: {
-                if self.charset == XmlCharEncoding::UTF8 {
-                    /*
-                     * We are supposed to handle UTF8, check it's valid
-                     * From rfc2044: encoding of the Unicode values on UTF-8:
-                     *
-                     * UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-                     * 0000 0000-0000 007F   0xxxxxxx
-                     * 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-                     * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-                     *
-                     * Check for the 0x110000 limit too
-                     */
-                    let cur: *const c_uchar = (*self.input).cur;
-                    let mut val: c_uint;
-                    let c: c_uchar = *cur;
 
-                    if c & 0x80 != 0 {
-                        if c & 0x40 == 0 || c == 0xC0 {
-                            break 'encoding_error;
-                        }
-
-                        let avail: size_t = (*self.input).end.offset_from((*self.input).cur) as _;
-
-                        if avail < 2 {
-                            break 'incomplete_sequence;
-                        }
-                        if *cur.add(1) & 0xc0 != 0x80 {
-                            break 'encoding_error;
-                        }
-                        if c & 0xe0 == 0xe0 {
-                            if avail < 3 {
-                                break 'incomplete_sequence;
-                            }
-                            if *cur.add(2) & 0xc0 != 0x80 {
-                                break 'encoding_error;
-                            }
-                            if c & 0xf0 == 0xf0 {
-                                if avail < 4 {
-                                    break 'incomplete_sequence;
-                                }
-                                if c & 0xf8 != 0xf0 || *cur.add(3) & 0xc0 != 0x80 {
-                                    break 'encoding_error;
-                                }
-                                /* 4-byte code */
-                                *len = 4;
-                                val = (*cur.add(0) as u32 & 0x7) << 18;
-                                val |= (*cur.add(1) as u32 & 0x3f) << 12;
-                                val |= (*cur.add(2) as u32 & 0x3f) << 6;
-                                val |= *cur.add(3) as u32 & 0x3f;
-                                if val < 0x10000 {
-                                    break 'encoding_error;
-                                }
-                            } else {
-                                /* 3-byte code */
-                                *len = 3;
-                                val = (*cur.add(0) as u32 & 0xf) << 12;
-                                val |= (*cur.add(1) as u32 & 0x3f) << 6;
-                                val |= *cur.add(2) as u32 & 0x3f;
-                                if val < 0x800 {
-                                    break 'encoding_error;
-                                }
-                            }
-                        } else {
-                            /* 2-byte code */
-                            *len = 2;
-                            val = (*cur.add(0) as u32 & 0x1f) << 6;
-                            val |= *cur.add(1) as u32 & 0x3f;
-                            if val < 0x80 {
-                                break 'encoding_error;
-                            }
-                        }
-                        if !IS_CHAR!(val) {
-                            xml_err_encoding_int(
-                                self,
-                                XmlParserErrors::XmlErrInvalidChar,
-                                c"Char 0x%X out of allowed range\n".as_ptr() as _,
-                                val as _,
-                            );
-                        }
-                        return char::from_u32(val as u32);
-                    } else {
-                        /* 1-byte code */
-                        *len = 1;
-                        if *(*self.input).cur == 0 && (*self.input).end > (*self.input).cur {
-                            xml_err_encoding_int(
-                                self,
-                                XmlParserErrors::XmlErrInvalidChar,
-                                c"Char 0x0 out of allowed range\n".as_ptr() as _,
-                                0,
-                            );
-                        }
-                        if *(*self.input).cur == 0xD {
-                            if *(*self.input).cur.add(1) == 0xA {
-                                (*self.input).cur = (*self.input).cur.add(1);
-                            }
-                            return Some('\u{A}');
-                        }
-                        return Some(*(*self.input).cur as char);
-                    }
-                }
-
-                /*
-                 * Assume it's a fixed length encoding (1) with
-                 * a compatible encoding for the ASCII set, since
-                 * XML constructs only use < 128 chars
-                 */
-                *len = 1;
-                if *(*self.input).cur == 0xD {
-                    if *(*self.input).cur.add(1) == 0xA {
-                        (*self.input).cur = (*self.input).cur.add(1);
-                    }
-                    return Some('\u{A}');
-                }
-                return Some(*(*self.input).cur as char);
-            }
-
-            // encoding_error:
+        if self.charset != XmlCharEncoding::UTF8 {
             /*
-             * If we detect an UTF8 error that probably mean that the
-             * input encoding didn't get properly advertised in the
-             * declaration header. Report the error and switch the encoding
-             * to ISO-Latin-1 (if you don't like this policy, just declare the
-             * encoding !)
+             * Assume it's a fixed length encoding (1) with
+             * a compatible encoding for the ASCII set, since
+             * XML constructs only use < 128 chars
              */
-            if (*self.input).end.offset_from((*self.input).cur) < 4 {
-                __xml_err_encoding(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    c"Input is not proper UTF-8, indicate encoding !\n".as_ptr() as _,
-                    null(),
-                    null(),
-                );
-            } else {
-                let mut buffer: [c_char; 150] = [0; 150];
-
-                snprintf(
-                    buffer.as_mut_ptr(),
-                    149,
-                    c"Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n".as_ptr() as _,
-                    *(*self.input).cur.add(0) as u32,
-                    *(*self.input).cur.add(1) as u32,
-                    *(*self.input).cur.add(2) as u32,
-                    *(*self.input).cur.add(3) as u32,
-                );
-                __xml_err_encoding(
-                    self,
-                    XmlParserErrors::XmlErrInvalidChar,
-                    c"Input is not proper UTF-8, indicate encoding !\n%s".as_ptr() as _,
-                    buffer.as_ptr() as _,
-                    null(),
-                );
-            }
-            self.charset = XmlCharEncoding::ISO8859_1;
             *len = 1;
+            if *(*self.input).cur == 0xD {
+                if *(*self.input).cur.add(1) == 0xA {
+                    (*self.input).cur = (*self.input).cur.add(1);
+                }
+                return Some('\u{A}');
+            }
             return Some(*(*self.input).cur as char);
         }
-
-        // incomplete_sequence:
-        /*
-         * An encoding problem may arise from a truncated input buffer
-         * splitting a character in the middle. In that case do not raise
-         * an error but return 0. This should only happen when push parsing
-         * c_char data.
-         */
-        *len = 0;
-        Some('\0')
+        let content = self.content_bytes();
+        let l = 4.min(content.len());
+        let c = match from_utf8(&content[..l]) {
+            Ok(s) => {
+                let Some(c) = s.chars().next() else {
+                    *len = 0;
+                    return None;
+                };
+                *len = c.len_utf8() as i32;
+                c
+            }
+            Err(e) if e.valid_up_to() > 0 => {
+                let s = from_utf8_unchecked(&content[..e.valid_up_to()]);
+                let c = s.chars().next().unwrap();
+                *len = c.len_utf8() as i32;
+                c
+            }
+            Err(e) => {
+                match e.error_len() {
+                    Some(l) => {
+                        *len = l as i32;
+                        /*
+                         * If we detect an UTF8 error that probably mean that the
+                         * input encoding didn't get properly advertised in the
+                         * declaration header. Report the error and switch the encoding
+                         * to ISO-Latin-1 (if you don't like this policy, just declare the
+                         * encoding !)
+                         */
+                        if (*self.input).end.offset_from((*self.input).cur) < 4 {
+                            __xml_err_encoding(
+                                self,
+                                XmlParserErrors::XmlErrInvalidChar,
+                                c"Input is not proper UTF-8, indicate encoding !\n".as_ptr() as _,
+                                null(),
+                                null(),
+                            );
+                        } else {
+                            let buffer = format!(
+                                "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+                                content[0], content[1], content[2], content[3],
+                            );
+                            let cb = CString::new(buffer).unwrap();
+                            __xml_err_encoding(
+                                self,
+                                XmlParserErrors::XmlErrInvalidChar,
+                                c"Input is not proper UTF-8, indicate encoding !\n%s".as_ptr() as _,
+                                cb.as_ptr() as _,
+                                null(),
+                            );
+                        }
+                        self.charset = XmlCharEncoding::ISO8859_1;
+                        *len = 1;
+                        return Some(*(*self.input).cur as char);
+                    }
+                    None => {
+                        *len = 0;
+                        return Some('\0');
+                    }
+                }
+            }
+        };
+        if (*len > 1 && !IS_CHAR!(c as i32))
+            || (*len == 1 && c == '\0' && (*self.input).cur < (*self.input).end)
+        {
+            xml_err_encoding_int(
+                self,
+                XmlParserErrors::XmlErrInvalidChar,
+                c"Char 0x%X out of allowed range\n".as_ptr() as _,
+                c as i32,
+            );
+        }
+        if c == '\r' {
+            let next = (*self.input).cur.add(1);
+            if next < (*self.input).end && *next == b'\n' {
+                (*self.input).cur = (*self.input).cur.add(1);
+            }
+            return Some('\n');
+        }
+        Some(c)
     }
 }
 /**
