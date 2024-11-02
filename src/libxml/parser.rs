@@ -691,6 +691,23 @@ impl XmlParserCtxt {
         (*self.input).col += nth as i32;
         assert!((*self.input).cur <= (*self.input).end);
     }
+
+    /// Advance the current pointer.  
+    /// If `'\n'` is found, line number is also increased.
+    pub(crate) unsafe fn advance_with_line_handling(&mut self, nth: usize) {
+        if (*self.input).cur.add(nth) > (*self.input).end {
+            self.grow();
+        }
+        for _ in 0..nth {
+            if *((*self.input).cur) == b'\n' {
+                (*self.input).line += 1;
+                (*self.input).col = 1;
+            } else {
+                (*self.input).col += 1;
+            }
+            (*self.input).cur = (*self.input).cur.add(1);
+        }
+    }
 }
 /**
  * xmlSAXLocator:
@@ -1289,23 +1306,6 @@ macro_rules! CMP8 {
 macro_rules! CMP9 {
     ( $s:expr, $c1:expr, $c2:expr, $c3:expr, $c4:expr, $c5:expr, $c6:expr, $c7:expr, $c8:expr, $c9:expr ) => {
         (CMP8!($s, $c1, $c2, $c3, $c4, $c5, $c6, $c7, $c8) && *($s as *mut c_uchar).add(8) == $c9)
-    };
-}
-
-macro_rules! SKIPL {
-    ($ctxt:expr, $val:expr) => {
-        for _ in 0..$val {
-            if *((*(*$ctxt).input).cur) == b'\n' {
-                (*(*$ctxt).input).line += 1;
-                (*(*$ctxt).input).col = 1;
-            } else {
-                (*(*$ctxt).input).col += 1;
-            }
-            (*(*$ctxt).input).cur = (*(*$ctxt).input).cur.add(1);
-        }
-        if *(*(*$ctxt).input).cur == 0 {
-            (*$ctxt).grow();
-        }
     };
 }
 
@@ -10316,7 +10316,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             // goto done;
                             return ret;
                         }
-                        SKIPL!(ctxt, tmp);
+                        (*ctxt).advance_with_line_handling(tmp as usize);
                     } else {
                         let base: c_int = term.offset_from((*ctxt).current_ptr()) as i32;
                         let mut tmp: c_int;
@@ -10361,7 +10361,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             // goto done;
                             return ret;
                         }
-                        SKIPL!(ctxt, base + 3);
+                        (*ctxt).advance_with_line_handling(base as usize + 3);
                         (*ctxt).instate = XmlParserInputState::XmlParserContent;
                     }
                 }
