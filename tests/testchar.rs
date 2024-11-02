@@ -22,7 +22,7 @@ use exml::{
             xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt,
             xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
         },
-        parser_internals::{input_push, xml_current_char, xml_new_input_stream},
+        parser_internals::{input_push, xml_new_input_stream},
         tree::{xml_free_doc, XmlDocPtr},
         xmlerror::XmlParserErrors,
         xmlmemory::xml_memory_dump,
@@ -374,7 +374,6 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
 }
 
 unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
-    let mut c: c_int;
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
 
     *data.add(1) = 0;
@@ -387,7 +386,7 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
 
         *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
         let mut len = 0;
-        c = xml_current_char(ctxt, addr_of_mut!(len));
+        let c = (*ctxt).current_char(addr_of_mut!(len)).unwrap_or('\0');
         if i == 0 || i >= 0x80 {
             /* we must see an error there */
             if *LAST_ERROR.read().unwrap() != XmlParserErrors::XmlErrInvalidChar {
@@ -395,11 +394,11 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
                 return 1;
             }
         } else if i == 0xD {
-            if c != 0xA || len != 1 {
+            if c != '\u{A}' || len != 1 {
                 eprintln!("Failed to convert char for Byte 0x{i:02X}");
                 return 1;
             }
-        } else if c != i || len != 1 {
+        } else if c as i32 != i || len != 1 {
             eprintln!("Failed to parse char for Byte 0x{i:02X}");
             return 1;
         }
@@ -421,7 +420,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
 
             *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
             let mut len = 0;
-            let c = xml_current_char(ctxt, addr_of_mut!(len));
+            let c = (*ctxt).current_char(addr_of_mut!(len)).unwrap_or('\0');
             let last_error = *LAST_ERROR.read().unwrap();
 
             #[allow(clippy::if_same_then_else)]
@@ -472,7 +471,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
             /*
              * Finally check the value is right
              */
-            else if c != (j & 0x3F) + ((i & 0x1F) << 6) {
+            else if c as i32 != (j & 0x3F) + ((i & 0x1F) << 6) {
                 eprintln!(
                     "Failed to parse char for Bytes 0x{i:02X} 0x{j:02X}: expect {} got {c}",
                     (j & 0x3F) + ((i & 0x1F) << 6),
@@ -502,7 +501,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
 
                 *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
                 let mut len = 0;
-                let c = xml_current_char(ctxt, addr_of_mut!(len));
+                let c = (*ctxt).current_char(addr_of_mut!(len)).unwrap_or('\0');
                 let last_error = *LAST_ERROR.read().unwrap();
 
                 #[allow(clippy::if_same_then_else)]
@@ -563,7 +562,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                     /*
                      * Finally check the value is right
                      */
-                    assert!(c == value,
+                    assert!(c as i32 == value,
                         "Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{:02X}: expect {value} got {c}",
                         *data.add(2)
                     );
@@ -596,7 +595,7 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
 
                     *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
                     let mut len = 0;
-                    let c = xml_current_char(ctxt, addr_of_mut!(len));
+                    let c = (*ctxt).current_char(addr_of_mut!(len)).unwrap_or('\0');
                     let last_error = *LAST_ERROR.read().unwrap();
 
                     #[allow(clippy::if_same_then_else)]
@@ -642,7 +641,7 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                     /*
                      * Finally check the value is right
                      */
-                    else if c != value {
+                    else if c as i32 != value {
                         eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{:02X}: expect {value} got {c}", *data.add(2) as i32);
                         return 1;
                     }

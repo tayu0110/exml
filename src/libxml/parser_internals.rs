@@ -1807,11 +1807,6 @@ pub unsafe extern "C" fn xml_new_input_stream(ctxt: XmlParserCtxtPtr) -> XmlPars
     input
 }
 
-macro_rules! CUR_CHAR {
-    ($ctxt:expr, $l:expr) => {
-        xml_current_char($ctxt, addr_of_mut!($l))
-    };
-}
 macro_rules! CUR_SCHAR {
     ($ctxt:expr, $s:expr, $l:expr) => {
         xml_string_current_char($ctxt, $s, addr_of_mut!($l))
@@ -2007,7 +2002,6 @@ pub unsafe extern "C" fn xml_split_qname(
 unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let mut len: c_int = 0;
     let mut l: c_int = 0;
-    let mut c: i32;
     let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH as i32
     } else {
@@ -2021,90 +2015,90 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
     /*
      * Handler for more complex cases
      */
-    c = CUR_CHAR!(ctxt, l);
+    let c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
     if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {
         /*
          * Use the new checks of production [4] [4a] amd [5] of the
          * Update 5 of XML-1.0
          */
-        if c == b' ' as i32
-            || c == b'>' as i32
-            || c == b'/' as i32 /* accelerators */
-            || (!((b'a' as i32..=b'z' as i32).contains(&c)
-                || (b'A' as i32..=b'Z' as i32).contains(&c)
-                || c == b'_' as i32
-                || c == b':' as i32
-                || (0xC0..=0xD6).contains(&c)
-                || (0xD8..=0xF6).contains(&c)
-                || (0xF8..=0x2FF).contains(&c)
-                || (0x370..=0x37D).contains(&c)
-                || (0x37F..=0x1FFF).contains(&c)
-                || (0x200C..=0x200D).contains(&c)
-                || (0x2070..=0x218F).contains(&c)
-                || (0x2C00..=0x2FEF).contains(&c)
-                || (0x3001..=0xD7FF).contains(&c)
-                || (0xF900..=0xFDCF).contains(&c)
-                || (0xFDF0..=0xFFFD).contains(&c)
-                || (0x10000..=0xEFFFF).contains(&c)))
+        if c == ' '
+            || c == '>'
+            || c == '/' /* accelerators */
+            || (!(c.is_ascii_lowercase()
+                || c.is_ascii_uppercase()
+                || c == '_'
+                || c == ':'
+                || ('\u{C0}'..='\u{D6}').contains(&c)
+                || ('\u{D8}'..='\u{F6}').contains(&c)
+                || ('\u{F8}'..='\u{2FF}').contains(&c)
+                || ('\u{370}'..='\u{37D}').contains(&c)
+                || ('\u{37F}'..='\u{1FFF}').contains(&c)
+                || ('\u{200C}'..='\u{200D}').contains(&c)
+                || ('\u{2070}'..='\u{218F}').contains(&c)
+                || ('\u{2C00}'..='\u{2FEF}').contains(&c)
+                || ('\u{3001}'..='\u{D7FF}').contains(&c)
+                || ('\u{F900}'..='\u{FDCF}').contains(&c)
+                || ('\u{FDF0}'..='\u{FFFD}').contains(&c)
+                || ('\u{10000}'..='\u{EFFFF}').contains(&c)))
         {
             return null_mut();
         }
         len += l;
         NEXTL!(ctxt, l);
-        c = CUR_CHAR!(ctxt, l);
-        while c != b' ' as i32
-            && c != b'>' as i32
-            && c != b'/' as i32
-            && ((b'a' as i32..=b'z' as i32).contains(&c)
-                || (b'A' as i32..=b'Z' as i32).contains(&c)
-                || (b'0' as i32..=b'9' as i32).contains(&c)
-                || c == b'_' as i32
-                || c == b':' as i32
-                || c == b'-' as i32
-                || c == b'.' as i32
-                || c == 0xB7
-                || (0xC0..=0xD6).contains(&c)
-                || (0xD8..=0xF6).contains(&c)
-                || (0xF8..=0x2FF).contains(&c)
-                || (0x300..=0x36F).contains(&c)
-                || (0x370..=0x37D).contains(&c)
-                || (0x37F..=0x1FFF).contains(&c)
-                || (0x200C..=0x200D).contains(&c)
-                || (0x203F..=0x2040).contains(&c)
-                || (0x2070..=0x218F).contains(&c)
-                || (0x2C00..=0x2FEF).contains(&c)
-                || (0x3001..=0xD7FF).contains(&c)
-                || (0xF900..=0xFDCF).contains(&c)
-                || (0xFDF0..=0xFFFD).contains(&c)
-                || (0x10000..=0xEFFFF).contains(&c))
+        let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        while c != ' '
+            && c != '>'
+            && c != '/'
+            && (c.is_ascii_lowercase()
+                || c.is_ascii_uppercase()
+                || c.is_ascii_digit()
+                || c == '_'
+                || c == ':'
+                || c == '-'
+                || c == '.'
+                || c == '\u{B7}'
+                || ('\u{C0}'..='\u{D6}').contains(&c)
+                || ('\u{D8}'..='\u{F6}').contains(&c)
+                || ('\u{F8}'..='\u{2FF}').contains(&c)
+                || ('\u{300}'..='\u{36F}').contains(&c)
+                || ('\u{370}'..='\u{37D}').contains(&c)
+                || ('\u{37F}'..='\u{1FFF}').contains(&c)
+                || ('\u{200C}'..='\u{200D}').contains(&c)
+                || ('\u{203F}'..='\u{2040}').contains(&c)
+                || ('\u{2070}'..='\u{218F}').contains(&c)
+                || ('\u{2C00}'..='\u{2FEF}').contains(&c)
+                || ('\u{3001}'..='\u{D7FF}').contains(&c)
+                || ('\u{F900}'..='\u{FDCF}').contains(&c)
+                || ('\u{FDF0}'..='\u{FFFD}').contains(&c)
+                || ('\u{10000}'..='\u{EFFFF}').contains(&c))
         {
             if len <= INT_MAX - l {
                 len += l;
             }
             NEXTL!(ctxt, l);
-            c = CUR_CHAR!(ctxt, l);
+            c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
         }
     } else {
-        if c == b' ' as i32
-            || c == b'>' as i32
-            || c == b'/' as i32 /* accelerators */
-            || (!IS_LETTER!(c as u32) && c != b'_' as i32 && c != b':' as i32)
+        if c == ' '
+            || c == '>'
+            || c == '/' /* accelerators */
+            || (!IS_LETTER!(c as u32) && c != '_' && c != ':')
         {
             return null_mut();
         }
         len += l;
         NEXTL!(ctxt, l);
-        c = CUR_CHAR!(ctxt, l);
 
-        while c != b' ' as i32
-            && c != b'>' as i32
-            && c != b'/' as i32 /* test bigname.xml */
+        let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        while c != ' '
+            && c != '>'
+            && c != '/' /* test bigname.xml */
             && (IS_LETTER!(c as u32)
                 || IS_DIGIT!(c as u32)
-                || c == b'.' as i32
-                || c == b'-' as i32
-                || c == b'_' as i32
-                || c == b':' as i32
+                || c == '.'
+                || c == '-'
+                || c == '_'
+                || c == ':'
                 || IS_COMBINING!(c as u32)
                 || IS_EXTENDER!(c as u32))
         {
@@ -2112,7 +2106,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
                 len += l;
             }
             NEXTL!(ctxt, l);
-            c = CUR_CHAR!(ctxt, l);
+            c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2247,19 +2241,17 @@ pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mu
     let mut buf: [XmlChar; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
     let mut len: c_int = 0;
     let mut l: c_int = 0;
-    let mut c: c_int;
     let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH as i32
     } else {
         XML_MAX_NAME_LENGTH as i32
     };
 
-    c = CUR_CHAR!(ctxt, l);
-
-    while xml_is_name_char(ctxt, c) != 0 {
+    let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    while xml_is_name_char(ctxt, c as i32) != 0 {
         COPY_BUF!(l, buf.as_mut_ptr(), len, c);
         NEXTL!(ctxt, l);
-        c = CUR_CHAR!(ctxt, l);
+        c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
         if len >= XML_MAX_NAMELEN as i32 {
             /*
              * Okay someone managed to make a huge token, so he's ready to pay
@@ -2274,7 +2266,7 @@ pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mu
                 return null_mut();
             }
             memcpy(buffer as _, buf.as_ptr() as _, len as usize);
-            while xml_is_name_char(ctxt, c) != 0 {
+            while xml_is_name_char(ctxt, c as i32) != 0 {
                 if len + 10 > max {
                     max *= 2;
                     let tmp: *mut XmlChar = xml_realloc(buffer as _, max as usize) as *mut XmlChar;
@@ -2296,7 +2288,7 @@ pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mu
                     return null_mut();
                 }
                 NEXTL!(ctxt, l);
-                c = CUR_CHAR!(ctxt, l);
+                c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
             }
             *buffer.add(len as usize) = 0;
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2344,7 +2336,6 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
     let mut buf: *mut XmlChar;
     let mut len: c_int = 0;
     let mut size: c_int = XML_PARSER_BUFFER_SIZE as _;
-    let mut c: c_int;
     let mut l: c_int = 0;
     let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_HUGE_LENGTH as i32
@@ -2384,7 +2375,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
         return ret;
     }
     (*ctxt).skip_char();
-    c = CUR_CHAR!(ctxt, l);
+    let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
     /*
      * NOTE: 4.4.5 Included in Literal
      * When a parameter entity reference appears in a literal entity
@@ -2394,7 +2385,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
      * In practice it means we stop the loop only when back at parsing
      * the initial entity and the quote is found
      */
-    while (IS_CHAR!(c) && (c != stop as i32 || (*ctxt).input != input))
+    while (IS_CHAR!(c as i32) && (c as i32 != stop as i32 || (*ctxt).input != input))
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
         if len + 5 >= size {
@@ -2414,10 +2405,10 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
         NEXTL!(ctxt, l);
 
         (*ctxt).grow();
-        c = CUR_CHAR!(ctxt, l);
-        if c == 0 {
+        c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        if c == '\0' {
             (*ctxt).grow();
-            c = CUR_CHAR!(ctxt, l);
+            c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
         }
 
         if len > max_length {
@@ -2441,7 +2432,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
         }
         return ret;
     }
-    if c != stop as i32 {
+    if c as i32 != stop as i32 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityNotFinished, null());
         //  goto error;
         if !buf.is_null() {
@@ -2587,7 +2578,6 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
     let mut buf: *mut XmlChar;
     let mut len: c_int = 0;
     let mut size: c_int = XML_PARSER_BUFFER_SIZE as _;
-    let mut cur: c_int;
     let mut l: c_int = 0;
     let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH as i32
@@ -2613,8 +2603,8 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
         return null_mut();
     }
     (*ctxt).instate = XmlParserInputState::XmlParserSystemLiteral;
-    cur = CUR_CHAR!(ctxt, l);
-    while IS_CHAR!(cur) && cur != stop as i32 {
+    let mut cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    while IS_CHAR!(cur as i32) && cur as i32 != stop as i32 {
         if len + 5 >= size {
             size *= 2;
             let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as *mut XmlChar;
@@ -2638,7 +2628,7 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
             return null_mut();
         }
         NEXTL!(ctxt, l);
-        cur = CUR_CHAR!(ctxt, l);
+        cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
     }
     *buf.add(len as usize) = 0;
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2646,7 +2636,7 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
         return null_mut();
     }
     (*ctxt).instate = XmlParserInputState::try_from(state).unwrap();
-    if !IS_CHAR!(cur) {
+    if !IS_CHAR!(cur as i32) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotFinished, null());
     } else {
         (*ctxt).skip_char();
@@ -2685,11 +2675,8 @@ unsafe extern "C" fn xml_parse_comment_complex(
     mut len: size_t,
     mut size: size_t,
 ) {
-    let mut q: i32;
     let mut ql: c_int = 0;
-    let mut r: i32;
     let mut rl: c_int = 0;
-    let mut cur: i32;
     let mut l: c_int = 0;
     let max_length: size_t = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_HUGE_LENGTH
@@ -2708,12 +2695,12 @@ unsafe extern "C" fn xml_parse_comment_complex(
             return;
         }
     }
-    q = CUR_CHAR!(ctxt, ql);
+    let mut q = (*ctxt).current_char(&raw mut ql).unwrap_or('\0');
     'not_terminated: {
-        if q == 0 {
+        if q == '\0' {
             break 'not_terminated;
         }
-        if !IS_CHAR!(q) {
+        if !IS_CHAR!(q as i32) {
             xml_fatal_err_msg_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -2724,11 +2711,11 @@ unsafe extern "C" fn xml_parse_comment_complex(
             return;
         }
         NEXTL!(ctxt, ql);
-        r = CUR_CHAR!(ctxt, rl);
-        if r == 0 {
+        let mut r = (*ctxt).current_char(&raw mut rl).unwrap_or('\0');
+        if r == '\0' {
             break 'not_terminated;
         }
-        if !IS_CHAR!(r) {
+        if !IS_CHAR!(r as i32) {
             xml_fatal_err_msg_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -2739,12 +2726,12 @@ unsafe extern "C" fn xml_parse_comment_complex(
             return;
         }
         NEXTL!(ctxt, rl);
-        cur = CUR_CHAR!(ctxt, l);
-        if cur == 0 {
+        let mut cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        if cur == '\0' {
             break 'not_terminated;
         }
-        while IS_CHAR!(cur) && (cur != b'>' as i32 || r != b'-' as i32 || q != b'-' as i32) {
-            if r == b'-' as i32 && q == b'-' as i32 {
+        while IS_CHAR!(cur as i32) && (cur != '>' || r != '-' || q != '-') {
+            if r == '-' && q == '-' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrHyphenInComment, null());
             }
             if len + 5 >= size {
@@ -2776,21 +2763,21 @@ unsafe extern "C" fn xml_parse_comment_complex(
             rl = l;
 
             NEXTL!(ctxt, l);
-            cur = CUR_CHAR!(ctxt, l);
+            cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
         }
         *buf.add(len) = 0;
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
             xml_free(buf as _);
             return;
         }
-        if cur == 0 {
+        if cur == '\0' {
             xml_fatal_err_msg_str(
                 ctxt,
                 XmlParserErrors::XmlErrCommentNotFinished,
                 c"Comment not terminated \n<!--%.50s\n".as_ptr() as _,
                 buf,
             );
-        } else if !IS_CHAR!(cur) {
+        } else if !IS_CHAR!(cur as i32) {
             xml_fatal_err_msg_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -3219,7 +3206,6 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
     } else {
         XML_MAX_TEXT_LENGTH
     };
-    let mut cur: c_int;
     let mut l: c_int = 0;
     let target: *const XmlChar;
     let state: XmlParserInputState;
@@ -3281,8 +3267,8 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                     target,
                 );
             }
-            cur = CUR_CHAR!(ctxt, l);
-            while IS_CHAR!(cur) && (cur != b'?' as i32 || NXT!(ctxt, 1) != b'>') {
+            let mut cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+            while IS_CHAR!(cur as i32) && (cur != '?' || NXT!(ctxt, 1) != b'>') {
                 if len + 5 >= size {
                     let new_size: size_t = size * 2;
                     let tmp: *mut XmlChar = xml_realloc(buf as _, new_size) as *mut XmlChar;
@@ -3308,14 +3294,14 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                     return;
                 }
                 NEXTL!(ctxt, l);
-                cur = CUR_CHAR!(ctxt, l);
+                cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
             }
             *buf.add(len as usize) = 0;
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                 xml_free(buf as _);
                 return;
             }
-            if cur != b'?' as i32 {
+            if cur != '?' {
                 xml_fatal_err_msg_str(
                     ctxt,
                     XmlParserErrors::XmlErrPINotFinished,
@@ -7307,213 +7293,6 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> c
 /*
  * Really core function shared with HTML parser.
  */
-/**
- * xmlCurrentChar:
- * @ctxt:  the XML parser context
- * @len:  pointer to the length of the c_char read
- *
- * DEPRECATED: Internal function, do not use.
- *
- * The current c_char value, if using UTF-8 this may actually span multiple
- * bytes in the input buffer. Implement the end of line normalization:
- * 2.11 End-of-Line Handling
- * Wherever an external parsed entity or the literal entity value
- * of an internal parsed entity contains either the literal two-character
- * sequence "#xD#xA" or a standalone literal #xD, an XML processor
- * must pass to the application the single character #xA.
- * This behavior can conveniently be produced by normalizing all
- * line breaks to #xA on input, before parsing.)
- *
- * Returns the current c_char value and its length
- */
-#[doc(hidden)]
-pub unsafe extern "C" fn xml_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) -> c_int {
-    if ctxt.is_null() || len.is_null() || (*ctxt).input.is_null() {
-        return 0;
-    }
-    if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        return 0;
-    }
-
-    if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < INPUT_CHUNK as isize
-        && (*ctxt).force_grow() < 0
-    {
-        return 0;
-    }
-
-    if *(*(*ctxt).input).cur >= 0x20 && *(*(*ctxt).input).cur <= 0x7F {
-        *len = 1;
-        return *(*(*ctxt).input).cur as _;
-    }
-    'incomplete_sequence: {
-        'encoding_error: {
-            if (*ctxt).charset == XmlCharEncoding::UTF8 {
-                /*
-                 * We are supposed to handle UTF8, check it's valid
-                 * From rfc2044: encoding of the Unicode values on UTF-8:
-                 *
-                 * UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-                 * 0000 0000-0000 007F   0xxxxxxx
-                 * 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-                 * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-                 *
-                 * Check for the 0x110000 limit too
-                 */
-                let cur: *const c_uchar = (*(*ctxt).input).cur;
-                let mut val: c_uint;
-                let c: c_uchar = *cur;
-
-                if c & 0x80 != 0 {
-                    if c & 0x40 == 0 || c == 0xC0 {
-                        break 'encoding_error;
-                    }
-
-                    let avail: size_t = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
-
-                    if avail < 2 {
-                        break 'incomplete_sequence;
-                    }
-                    if *cur.add(1) & 0xc0 != 0x80 {
-                        break 'encoding_error;
-                    }
-                    if c & 0xe0 == 0xe0 {
-                        if avail < 3 {
-                            break 'incomplete_sequence;
-                        }
-                        if *cur.add(2) & 0xc0 != 0x80 {
-                            break 'encoding_error;
-                        }
-                        if c & 0xf0 == 0xf0 {
-                            if avail < 4 {
-                                break 'incomplete_sequence;
-                            }
-                            if c & 0xf8 != 0xf0 || *cur.add(3) & 0xc0 != 0x80 {
-                                break 'encoding_error;
-                            }
-                            /* 4-byte code */
-                            *len = 4;
-                            val = (*cur.add(0) as u32 & 0x7) << 18;
-                            val |= (*cur.add(1) as u32 & 0x3f) << 12;
-                            val |= (*cur.add(2) as u32 & 0x3f) << 6;
-                            val |= *cur.add(3) as u32 & 0x3f;
-                            if val < 0x10000 {
-                                break 'encoding_error;
-                            }
-                        } else {
-                            /* 3-byte code */
-                            *len = 3;
-                            val = (*cur.add(0) as u32 & 0xf) << 12;
-                            val |= (*cur.add(1) as u32 & 0x3f) << 6;
-                            val |= *cur.add(2) as u32 & 0x3f;
-                            if val < 0x800 {
-                                break 'encoding_error;
-                            }
-                        }
-                    } else {
-                        /* 2-byte code */
-                        *len = 2;
-                        val = (*cur.add(0) as u32 & 0x1f) << 6;
-                        val |= *cur.add(1) as u32 & 0x3f;
-                        if val < 0x80 {
-                            break 'encoding_error;
-                        }
-                    }
-                    if !IS_CHAR!(val) {
-                        xml_err_encoding_int(
-                            ctxt,
-                            XmlParserErrors::XmlErrInvalidChar,
-                            c"Char 0x%X out of allowed range\n".as_ptr() as _,
-                            val as _,
-                        );
-                    }
-                    return val as _;
-                } else {
-                    /* 1-byte code */
-                    *len = 1;
-                    if *(*(*ctxt).input).cur == 0 && (*(*ctxt).input).end > (*(*ctxt).input).cur {
-                        xml_err_encoding_int(
-                            ctxt,
-                            XmlParserErrors::XmlErrInvalidChar,
-                            c"Char 0x0 out of allowed range\n".as_ptr() as _,
-                            0,
-                        );
-                    }
-                    if *(*(*ctxt).input).cur == 0xD {
-                        if *(*(*ctxt).input).cur.add(1) == 0xA {
-                            (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
-                        }
-                        return 0xA;
-                    }
-                    return *(*(*ctxt).input).cur as _;
-                }
-            }
-
-            /*
-             * Assume it's a fixed length encoding (1) with
-             * a compatible encoding for the ASCII set, since
-             * XML constructs only use < 128 chars
-             */
-            *len = 1;
-            if *(*(*ctxt).input).cur == 0xD {
-                if *(*(*ctxt).input).cur.add(1) == 0xA {
-                    (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
-                }
-                return 0xA;
-            }
-            return *(*(*ctxt).input).cur as _;
-        }
-
-        // encoding_error:
-        /*
-         * If we detect an UTF8 error that probably mean that the
-         * input encoding didn't get properly advertised in the
-         * declaration header. Report the error and switch the encoding
-         * to ISO-Latin-1 (if you don't like this policy, just declare the
-         * encoding !)
-         */
-        if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < 4 {
-            __xml_err_encoding(
-                ctxt,
-                XmlParserErrors::XmlErrInvalidChar,
-                c"Input is not proper UTF-8, indicate encoding !\n".as_ptr() as _,
-                null(),
-                null(),
-            );
-        } else {
-            let mut buffer: [c_char; 150] = [0; 150];
-
-            snprintf(
-                buffer.as_mut_ptr(),
-                149,
-                c"Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n".as_ptr() as _,
-                *(*(*ctxt).input).cur.add(0) as u32,
-                *(*(*ctxt).input).cur.add(1) as u32,
-                *(*(*ctxt).input).cur.add(2) as u32,
-                *(*(*ctxt).input).cur.add(3) as u32,
-            );
-            __xml_err_encoding(
-                ctxt,
-                XmlParserErrors::XmlErrInvalidChar,
-                c"Input is not proper UTF-8, indicate encoding !\n%s".as_ptr() as _,
-                buffer.as_ptr() as _,
-                null(),
-            );
-        }
-        (*ctxt).charset = XmlCharEncoding::ISO8859_1;
-        *len = 1;
-        return *(*(*ctxt).input).cur as i32;
-    }
-
-    // incomplete_sequence:
-    /*
-     * An encoding problem may arise from a truncated input buffer
-     * splitting a character in the middle. In that case do not raise
-     * an error but return 0. This should only happen when push parsing
-     * c_char data.
-     */
-    *len = 0;
-    0
-}
 
 /**
  * xmlCopyCharMultiByte:
@@ -8345,37 +8124,6 @@ mod tests {
                         );
                         eprint!(" {}", n_filename);
                         eprintln!(" {}", n_options);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_current_char() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_len in 0..GEN_NB_INT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let len = gen_int_ptr(n_len, 1);
-
-                    let ret_val = xml_current_char(ctxt, len);
-                    desret_int(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_int_ptr(n_len, len, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCurrentChar",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlCurrentChar()");
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_len);
                     }
                 }
             }
