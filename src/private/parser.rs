@@ -10,8 +10,8 @@ use libc::{c_ulong, size_t};
 use crate::{
     __xml_raise_error,
     libxml::{
-        parser::{XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState},
-        parser_internals::{input_pop, xml_free_input_stream, INPUT_CHUNK, LINE_LEN},
+        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState},
+        parser_internals::{INPUT_CHUNK, LINE_LEN},
         xmlerror::XmlParserErrors,
         xmlstring::XmlChar,
     },
@@ -39,8 +39,8 @@ pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
  */
 #[doc(hidden)]
 pub unsafe extern "C" fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: *const char) {
-    if (!ctxt.is_null())
-        && ((*ctxt).disable_sax != 0)
+    if !ctxt.is_null()
+        && (*ctxt).disable_sax != 0
         && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
         return;
@@ -153,42 +153,6 @@ pub unsafe extern "C" fn __xml_err_encoding(
         if (*ctxt).recovery == 0 {
             (*ctxt).disable_sax = 1;
         }
-    }
-}
-
-/**
- * xmlHaltParser:
- * @ctxt:  an XML parser context
- *
- * Blocks further parser processing don't override error
- * for internal use
- */
-#[doc(hidden)]
-pub unsafe extern "C" fn xml_halt_parser(ctxt: &mut XmlParserCtxt) {
-    ctxt.instate = XmlParserInputState::XmlParserEOF;
-    ctxt.disable_sax = 1;
-    #[allow(clippy::while_immutable_condition)]
-    while ctxt.input_nr > 1 {
-        xml_free_input_stream(input_pop(ctxt));
-    }
-    if !ctxt.input.is_null() {
-        /*
-         * in case there was a specific allocation deallocate before
-         * overriding base
-         */
-        if let Some(free) = (*ctxt.input).free {
-            free((*ctxt.input).base as *mut XmlChar);
-            (*ctxt.input).free = None;
-        }
-        if (*ctxt.input).buf.is_some() {
-            // xml_free_parser_input_buffer((*ctxt.input).buf);
-            // (*ctxt.input).buf = null_mut();
-            let _ = (*ctxt.input).buf.take();
-        }
-        (*ctxt.input).cur = c"".as_ptr() as _;
-        (*ctxt.input).length = 0;
-        (*ctxt.input).base = (*ctxt.input).cur;
-        (*ctxt.input).end = (*ctxt.input).cur;
     }
 }
 

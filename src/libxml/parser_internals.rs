@@ -51,9 +51,7 @@ use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
 use crate::private::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
-use crate::private::parser::{
-    __xml_err_encoding, xml_err_memory, xml_halt_parser, xml_parser_shrink,
-};
+use crate::private::parser::{__xml_err_encoding, xml_err_memory, xml_parser_shrink};
 use crate::{__xml_raise_error, generic_error};
 
 use super::catalog::xml_catalog_add_local;
@@ -1253,7 +1251,7 @@ pub(crate) unsafe fn xml_switch_input_encoding(
             c"switching encoding: encoder error\n".as_ptr() as _,
             null(),
         );
-        xml_halt_parser(&mut *ctxt);
+        (*ctxt).halt();
         return -1;
     }
     let consumed: size_t = using - (*input_buf).borrow().raw.map_or(0, |raw| raw.len());
@@ -4924,7 +4922,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
         if (*ent).flags & XML_ENT_EXPANDING as i32 != 0 {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, null());
-            xml_halt_parser(&mut *ctxt);
+            (*ctxt).halt();
             return;
         }
 
@@ -4975,7 +4973,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         (*ent).flags |= (XML_ENT_PARSED | XML_ENT_CHECKED) as i32;
         (*ent).expanded_size = (*ctxt).sizeentcopy;
         if matches!(ret, XmlParserErrors::XmlErrEntityLoop) {
-            xml_halt_parser(&mut *ctxt);
+            (*ctxt).halt();
             xml_free_node_list(list);
             return;
         }
@@ -5465,7 +5463,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
 
             if (*entity).flags & XML_ENT_EXPANDING as i32 != 0 {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, null());
-                xml_halt_parser(&mut *ctxt);
+                (*ctxt).halt();
                 return;
             }
 
@@ -5961,7 +5959,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
                 as _,
             XML_PARSER_MAX_DEPTH as _,
         );
-        xml_halt_parser(&mut *ctxt);
+        (*ctxt).halt();
         return -1;
     }
 
@@ -6603,7 +6601,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
             /*
              * The XML REC instructs us to stop parsing right here
              */
-            xml_halt_parser(&mut *ctxt);
+            (*ctxt).halt();
             return;
         }
     }
@@ -6631,7 +6629,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
             xml_parse_markup_decl(ctxt);
         } else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, null());
-            xml_halt_parser(&mut *ctxt);
+            (*ctxt).halt();
             return;
         }
         SKIP_BLANKS!(ctxt);
@@ -6777,7 +6775,7 @@ pub(crate) unsafe extern "C" fn node_push(ctxt: XmlParserCtxtPtr, value: XmlNode
             c"Excessive depth in document: %d use XML_PARSE_HUGE option\n".as_ptr() as _,
             XML_PARSER_MAX_DEPTH as i32,
         );
-        xml_halt_parser(&mut *ctxt);
+        (*ctxt).halt();
         return -1;
     }
     *(*ctxt).node_tab.add((*ctxt).node_nr as usize) = value;
