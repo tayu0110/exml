@@ -459,12 +459,6 @@ macro_rules! RAW {
     };
 }
 
-macro_rules! NEXT {
-    ($ctxt:expr) => {
-        xml_next_char($ctxt)
-    };
-}
-
 macro_rules! COPY_BUF {
     ($l:expr, $b:expr, $i:expr, $v:expr) => {
         if $l == 1 {
@@ -2390,7 +2384,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
         }
         return ret;
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
     c = CUR_CHAR!(ctxt, l);
     /*
      * NOTE: 4.4.5 Included in Literal
@@ -2456,7 +2450,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
         }
         return ret;
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
 
     /*
      * Raise problem w.r.t. '&' and '%' being used in non-entities
@@ -2604,10 +2598,10 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
     let state: c_int = (*ctxt).instate as i32;
 
     let stop = if RAW!(ctxt) == b'"' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         b'"'
     } else if RAW!(ctxt) == b'\'' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         b'\''
     } else {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotStarted, null());
@@ -2656,7 +2650,7 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
     if !IS_CHAR!(cur) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotFinished, null());
     } else {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     }
     buf
 }
@@ -2818,7 +2812,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
                     c"Comment doesn't start and stop in the same entity\n".as_ptr() as _,
                 );
             }
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             if !(*ctxt).sax.is_null()
                 && (*(*ctxt).sax).comment.is_some()
                 && (*ctxt).disable_sax == 0
@@ -3479,7 +3473,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
         return null_mut();
     }
     while {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         SKIP_BLANKS!(ctxt);
         name = xml_parse_name(ctxt);
         if name.is_null() {
@@ -3531,7 +3525,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
         xml_free_enumeration(ret);
         return null_mut();
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
     ret
 }
 
@@ -3565,7 +3559,7 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
         return null_mut();
     }
     while {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         SKIP_BLANKS!(ctxt);
         name = xml_parse_nmtoken(ctxt);
         if name.is_null() {
@@ -3614,7 +3608,7 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrAttlistNotFinished, null());
         return ret;
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
     ret
 }
 
@@ -3954,7 +3948,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
                         .as_ptr() as _,
                 );
             }
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             ret = xml_new_doc_element_content(
                 (*ctxt).my_doc,
                 null(),
@@ -3965,7 +3959,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
             }
             if RAW!(ctxt) == b'*' {
                 (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
-                NEXT!(ctxt);
+                (*ctxt).skip_char();
             }
             return ret;
         }
@@ -3982,7 +3976,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
         }
         #[allow(clippy::while_immutable_condition)]
         while RAW!(ctxt) == b'|' && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             if elem.is_null() {
                 ret = xml_new_doc_element_content(
                     (*ctxt).my_doc,
@@ -4145,7 +4139,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
         );
         return -1;
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
     (*ctxt).grow();
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return -1;
@@ -4204,7 +4198,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
     if RAW!(ctxt) != b'&' {
         return null_mut();
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
     let name: *const XmlChar = xml_parse_name(ctxt);
     if name.is_null() {
         xml_fatal_err_msg(
@@ -4218,7 +4212,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityRefSemicolMissing, null());
         return null_mut();
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
 
     /*
      * Predefined entities override any extra definition
@@ -5222,7 +5216,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
     if RAW!(ctxt) != b'%' {
         return;
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
     let name: *const XmlChar = xml_parse_name(ctxt);
     if name.is_null() {
         xml_fatal_err_msg(
@@ -5243,7 +5237,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
         return;
     }
 
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
 
     /*
      * Request the entity from SAX
@@ -5481,7 +5475,7 @@ pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) 
     if RAW!(ctxt) != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrDoctypeNotFinished, null());
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
 }
 
 /**
@@ -5542,7 +5536,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
      */
     SKIP_BLANKS!(ctxt);
     if RAW!(ctxt) == b'=' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         SKIP_BLANKS!(ctxt);
         val = xml_parse_att_value(ctxt);
         (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -6121,23 +6115,23 @@ pub(crate) unsafe extern "C" fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
             return null_mut();
         }
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) == b'"' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             version = xml_parse_version_num(ctxt);
             if RAW!(ctxt) != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
-                NEXT!(ctxt);
+                (*ctxt).skip_char();
             }
         } else if RAW!(ctxt) == b'\'' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             version = xml_parse_version_num(ctxt);
             if RAW!(ctxt) != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
-                NEXT!(ctxt);
+                (*ctxt).skip_char();
             }
         } else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotStarted, null());
@@ -6171,27 +6165,27 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
             return null_mut();
         }
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) == b'"' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             encoding = xml_parse_enc_name(ctxt);
             if RAW!(ctxt) != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
                 xml_free(encoding as _);
                 return null_mut();
             } else {
-                NEXT!(ctxt);
+                (*ctxt).skip_char();
             }
         } else if RAW!(ctxt) == b'\'' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             encoding = xml_parse_enc_name(ctxt);
             if RAW!(ctxt) != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
                 xml_free(encoding as _);
                 return null_mut();
             } else {
-                NEXT!(ctxt);
+                (*ctxt).skip_char();
             }
         } else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotStarted, null());
@@ -6323,10 +6317,10 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> c_in
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
             return standalone;
         }
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         SKIP_BLANKS!(ctxt);
         if RAW!(ctxt) == b'\'' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             if RAW!(ctxt) == b'n' && NXT!(ctxt, 1) == b'o' {
                 standalone = 0;
                 (*ctxt).advance(2);
@@ -6339,10 +6333,10 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> c_in
             if RAW!(ctxt) != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
-                NEXT!(ctxt);
+                (*ctxt).skip_char();
             }
         } else if RAW!(ctxt) == b'"' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             if RAW!(ctxt) == b'n' && NXT!(ctxt, 1) == b'o' {
                 standalone = 0;
                 (*ctxt).advance(2);
@@ -6355,7 +6349,7 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> c_in
             if RAW!(ctxt) != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
-                NEXT!(ctxt);
+                (*ctxt).skip_char();
             }
         } else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotStarted, null());
@@ -6772,7 +6766,7 @@ pub(crate) unsafe extern "C" fn name_push(ctxt: XmlParserCtxtPtr, value: *const 
  *
  * n encoding error
  */
-unsafe extern "C" fn xml_err_encoding_int(
+pub(crate) unsafe extern "C" fn xml_err_encoding_int(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
     msg: *const c_char,
@@ -7610,185 +7604,6 @@ pub unsafe extern "C" fn xml_copy_char(_len: c_int, out: *mut XmlChar, val: c_in
     }
     *out = val as _;
     1
-}
-
-/**
- * xmlNextChar:
- * @ctxt:  the XML parser context
- *
- * DEPRECATED: Internal function, do not use.
- *
- * Skip to the next c_char input c_char.
- */
-pub(crate) unsafe extern "C" fn xml_next_char(ctxt: XmlParserCtxtPtr) {
-    if ctxt.is_null()
-        || matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-        || (*ctxt).input.is_null()
-    {
-        return;
-    }
-
-    if !VALID_CTXT!(ctxt) {
-        xml_err_internal(
-            ctxt,
-            c"Parser input data memory error\n".as_ptr() as _,
-            null(),
-        );
-
-        (*ctxt).err_no = XmlParserErrors::XmlErrInternalError as i32;
-        xml_stop_parser(ctxt);
-
-        return;
-    }
-
-    if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < INPUT_CHUNK as isize {
-        if (*ctxt).force_grow() < 0 {
-            return;
-        }
-        if (*(*ctxt).input).cur >= (*(*ctxt).input).end {
-            return;
-        }
-    }
-
-    'encoding_error: {
-        if (*ctxt).charset == XmlCharEncoding::UTF8 {
-            /*
-             *   2.11 End-of-Line Handling
-             *   the literal two-character sequence "#xD#xA" or a standalone
-             *   literal #xD, an XML processor must pass to the application
-             *   the single character #xA.
-             */
-            if *(*(*ctxt).input).cur == b'\n' {
-                (*(*ctxt).input).line += 1;
-                (*(*ctxt).input).col = 1;
-            } else {
-                (*(*ctxt).input).col += 1;
-            }
-
-            /*
-             * We are supposed to handle UTF8, check it's valid
-             * From rfc2044: encoding of the Unicode values on UTF-8:
-             *
-             * UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-             * 0000 0000-0000 007F   0xxxxxxx
-             * 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-             * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-             *
-             * Check for the 0x110000 limit too
-             */
-            let cur: *const c_uchar = (*(*ctxt).input).cur;
-
-            let c: c_uchar = *cur;
-            if c & 0x80 != 0 {
-                if c == 0xC0 {
-                    break 'encoding_error;
-                }
-
-                let avail: size_t = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
-
-                if avail < 2 || *cur.add(1) & 0xc0 != 0x80 {
-                    break 'encoding_error;
-                }
-                if c & 0xe0 == 0xe0 {
-                    let mut val: c_uint;
-
-                    if avail < 3 || *cur.add(2) & 0xc0 != 0x80 {
-                        break 'encoding_error;
-                    }
-                    if c & 0xf0 == 0xf0 {
-                        if c & 0xf8 != 0xf0 || avail < 4 || *cur.add(3) & 0xc0 != 0x80 {
-                            break 'encoding_error;
-                        }
-                        /* 4-byte code */
-                        (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(4);
-                        val = (*cur.add(0) as u32 & 0x7) << 18;
-                        val |= (*cur.add(1) as u32 & 0x3f) << 12;
-                        val |= (*cur.add(2) as u32 & 0x3f) << 6;
-                        val |= *cur.add(3) as u32 & 0x3f;
-                    } else {
-                        /* 3-byte code */
-                        (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(3);
-                        val = (*cur.add(0) as u32 & 0xf) << 12;
-                        val |= (*cur.add(1) as u32 & 0x3f) << 6;
-                        val |= *cur.add(2) as u32 & 0x3f;
-                    }
-                    if (val > 0xd7ff && val < 0xe000)
-                        || (val > 0xfffd && val < 0x10000)
-                        || val >= 0x110000
-                    {
-                        xml_err_encoding_int(
-                            ctxt,
-                            XmlParserErrors::XmlErrInvalidChar,
-                            c"Char 0x%X out of allowed range\n".as_ptr() as _,
-                            val as _,
-                        );
-                    }
-                } else {
-                    /* 2-byte code */
-                    (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(2);
-                }
-            } else {
-                /* 1-byte code */
-                (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
-            }
-        } else {
-            /*
-             * Assume it's a fixed length encoding (1) with
-             * a compatible encoding for the ASCII set, since
-             * XML constructs only use < 128 chars
-             */
-
-            if *((*(*ctxt).input).cur) == b'\n' {
-                (*(*ctxt).input).line += 1;
-                (*(*ctxt).input).col = 1;
-            } else {
-                (*(*ctxt).input).col += 1;
-            }
-            (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
-        }
-        return;
-    }
-    // encoding_error:
-    /*
-     * If we detect an UTF8 error that probably mean that the
-     * input encoding didn't get properly advertised in the
-     * declaration header. Report the error and switch the encoding
-     * to ISO-Latin-1 (if you don't like this policy, just declare the
-     * encoding !)
-     */
-    if ctxt.is_null()
-        || (*ctxt).input.is_null()
-        || (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < 4
-    {
-        __xml_err_encoding(
-            ctxt,
-            XmlParserErrors::XmlErrInvalidChar,
-            c"Input is not proper UTF-8, indicate encoding !\n".as_ptr() as _,
-            null(),
-            null(),
-        );
-    } else {
-        let mut buffer: [c_char; 150] = [0; 150];
-
-        snprintf(
-            buffer.as_mut_ptr(),
-            149,
-            c"Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n".as_ptr() as _,
-            *(*(*ctxt).input).cur.add(0) as u32,
-            *(*(*ctxt).input).cur.add(1) as u32,
-            *(*(*ctxt).input).cur.add(2) as u32,
-            *(*(*ctxt).input).cur.add(3) as u32,
-        );
-        __xml_err_encoding(
-            ctxt,
-            XmlParserErrors::XmlErrInvalidChar,
-            c"Input is not proper UTF-8, indicate encoding !\n%s".as_ptr() as _,
-            buffer.as_ptr() as _,
-            null(),
-        );
-    }
-    (*ctxt).charset = XmlCharEncoding::ISO8859_1;
-    (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
 }
 
 /* we need to keep enough input to show errors in context */
@@ -8728,31 +8543,6 @@ mod tests {
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_buffer);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_next_char() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                xml_next_char(ctxt);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNextChar",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNextChar()");
-                    eprintln!(" {}", n_ctxt);
                 }
             }
         }

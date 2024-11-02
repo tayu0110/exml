@@ -5576,12 +5576,6 @@ macro_rules! SKIP_BLANKS {
 
 /* Imported from XML */
 
-macro_rules! NEXT {
-    ($ctxt:expr) => {
-        $crate::libxml::parser_internals::xml_next_char($ctxt)
-    };
-}
-
 macro_rules! RAW {
     ($ctxt:expr) => {
         if (*$ctxt).token != 0 {
@@ -6240,7 +6234,7 @@ pub(crate) unsafe extern "C" fn html_parse_entity_ref(
     }
 
     if (*ctxt).current_byte() == b'&' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         name = html_parse_name(ctxt);
         if name.is_null() {
             html_parse_err(
@@ -6263,7 +6257,7 @@ pub(crate) unsafe extern "C" fn html_parse_entity_ref(
                 ent = html_entity_lookup(name);
                 if !ent.is_null() {
                     /* OK that's ugly !!! */
-                    NEXT!(ctxt);
+                    (*ctxt).skip_char();
                 }
             } else {
                 html_parse_err(
@@ -6337,10 +6331,10 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
                 );
                 break;
             }
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
         if (*ctxt).current_byte() == b';' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
     } else if (*ctxt).current_byte() == b'&' && NXT!(ctxt, 1) == b'#' {
         (*ctxt).advance(2);
@@ -6360,10 +6354,10 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
                 );
                 break;
             }
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
         if (*ctxt).current_byte() == b';' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
     } else {
         html_parse_err(
@@ -6499,7 +6493,7 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
         }
         i += 1;
 
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     }
 
     let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, loc.as_ptr() as _, i as i32);
@@ -6947,7 +6941,7 @@ unsafe extern "C" fn html_parse_att_value(ctxt: HtmlParserCtxtPtr) -> *mut XmlCh
     let ret: *mut XmlChar;
 
     if (*ctxt).current_byte() == b'"' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         ret = html_parse_html_attribute(ctxt, b'"');
         if (*ctxt).current_byte() != b'"' {
             html_parse_err(
@@ -6958,10 +6952,10 @@ unsafe extern "C" fn html_parse_att_value(ctxt: HtmlParserCtxtPtr) -> *mut XmlCh
                 null(),
             );
         } else {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
     } else if (*ctxt).current_byte() == b'\'' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         ret = html_parse_html_attribute(ctxt, b'\'');
         if (*ctxt).current_byte() != b'\'' {
             html_parse_err(
@@ -6972,7 +6966,7 @@ unsafe extern "C" fn html_parse_att_value(ctxt: HtmlParserCtxtPtr) -> *mut XmlCh
                 null(),
             );
         } else {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
     } else {
         /*
@@ -7037,7 +7031,7 @@ unsafe extern "C" fn html_parse_attribute(
      */
     SKIP_BLANKS!(ctxt);
     if (*ctxt).current_byte() == b'=' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         SKIP_BLANKS!(ctxt);
         val = html_parse_att_value(ctxt);
     }
@@ -7313,7 +7307,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
     if (*ctxt).current_byte() != b'<' {
         return -1;
     }
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
 
     atts = (*ctxt).atts;
     maxatts = (*ctxt).maxatts;
@@ -7334,7 +7328,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
             && (*ctxt).current_byte() != b'>'
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
         return -1;
     }
@@ -7481,7 +7475,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
                 && ((*ctxt).current_byte() != b'/' || NXT!(ctxt, 1) != b'>')
                 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
             {
-                NEXT!(ctxt);
+                (*ctxt).skip_char();
             }
         }
         // failed:
@@ -7726,11 +7720,11 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
         /* Skip to next '>' */
         #[allow(clippy::while_immutable_condition)]
         while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() != b'>' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
     }
     if (*ctxt).current_byte() == b'>' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     }
 
     /*
@@ -7973,7 +7967,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
         return null_mut();
     }
     let quote: c_int = (*ctxt).current_byte() as _;
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
 
     if (*ctxt).current_ptr() < (*ctxt).base_ptr() {
         return ret;
@@ -7992,7 +7986,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
             );
             err = 1;
         }
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
         len += 1;
     }
     if (*ctxt).current_byte() as i32 != quote {
@@ -8007,7 +8001,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
         if err == 0 {
             ret = xml_strndup((*ctxt).base_ptr().add(start_position), len as _);
         }
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     }
 
     ret
@@ -8040,7 +8034,7 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
         return null_mut();
     }
     let quote: c_int = (*ctxt).current_byte() as _;
-    NEXT!(ctxt);
+    (*ctxt).skip_char();
 
     /*
      * Name ::= (Letter | '_') (NameChar)*
@@ -8062,7 +8056,7 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
             err = 1;
         }
         len += 1;
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     }
 
     if (*ctxt).current_byte() as i32 != quote {
@@ -8077,7 +8071,7 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
         if err == 0 {
             ret = xml_strndup((*ctxt).base_ptr().add(start_position), len as _);
         }
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     }
 
     ret
@@ -8230,11 +8224,11 @@ unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
             && (*ctxt).current_byte() != b'>'
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
     }
     if (*ctxt).current_byte() == b'>' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     }
 
     /*
@@ -8420,7 +8414,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
             return;
         }
         if cur == b'>' as i32 {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
             if !(*ctxt).sax.is_null()
                 && (*(*ctxt).sax).comment.is_some()
                 && (*ctxt).disable_sax == 0
@@ -8458,7 +8452,7 @@ unsafe extern "C" fn html_skip_bogus_comment(ctxt: HtmlParserCtxtPtr) {
         if c == 0 {
             break 'b;
         }
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
 
         c != b'>'
     } {}
@@ -9093,7 +9087,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
                 /* Dump the bogus tag like browsers do */
                 #[allow(clippy::while_immutable_condition)]
                 while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() != b'>' {
-                    NEXT!(ctxt);
+                    (*ctxt).skip_char();
                 }
 
                 if !current_node.is_null() {
@@ -9182,7 +9176,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
                     1,
                 );
             }
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
         /*
          * Fourth case : a reference. If if has not been resolved,
@@ -9256,7 +9250,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     let name: *const XmlChar = (*ctxt).name;
     if failed == -1 || name.is_null() {
         if (*ctxt).current_byte() == b'>' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
         return;
     }
@@ -9288,7 +9282,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     }
 
     if (*ctxt).current_byte() == b'>' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     } else {
         html_parse_err(
             ctxt,
@@ -9673,7 +9667,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     let name: *const XmlChar = (*ctxt).name;
     if failed == -1 || name.is_null() {
         if (*ctxt).current_byte() == b'>' {
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
         return;
     }
@@ -9705,7 +9699,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     }
 
     if (*ctxt).current_byte() == b'>' {
-        NEXT!(ctxt);
+        (*ctxt).skip_char();
     } else {
         html_parse_err(
             ctxt,
@@ -9811,7 +9805,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 /* Dump the bogus tag like browsers do */
                 #[allow(clippy::while_immutable_condition)]
                 while (*ctxt).current_byte() == 0 && (*ctxt).current_byte() != b'>' {
-                    NEXT!(ctxt);
+                    (*ctxt).skip_char();
                 }
 
                 html_parser_finish_element_parsing(ctxt);
@@ -9926,7 +9920,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                     1,
                 );
             }
-            NEXT!(ctxt);
+            (*ctxt).skip_char();
         }
         /*
          * Fourth case : a reference. If if has not been resolved,
@@ -11256,7 +11250,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 let name: *const XmlChar = (*ctxt).name;
                 if failed == -1 || name.is_null() {
                     if (*ctxt).current_byte() == b'>' {
-                        NEXT!(ctxt);
+                        (*ctxt).skip_char();
                     }
                     break 'to_break;
                 }
@@ -11289,7 +11283,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 }
 
                 if (*ctxt).current_byte() == b'>' {
-                    NEXT!(ctxt);
+                    (*ctxt).skip_char();
                 } else {
                     html_parse_err(
                         ctxt,
@@ -11494,7 +11488,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                             1,
                         );
                     }
-                    NEXT!(ctxt);
+                    (*ctxt).skip_char();
                 } else {
                     /*
                      * check that the text sequence is complete
