@@ -386,7 +386,7 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
 
         *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
         let mut len = 0;
-        let c = (*ctxt).current_char(addr_of_mut!(len)).unwrap_or('\0');
+        let c = (*ctxt).current_char(&mut len).unwrap_or('\0');
         if i == 0 || i >= 0x80 {
             /* we must see an error there */
             if *LAST_ERROR.read().unwrap() != XmlParserErrors::XmlErrInvalidChar {
@@ -420,7 +420,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
 
             *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
             let mut len = 0;
-            let c = (*ctxt).current_char(addr_of_mut!(len)).unwrap_or('\0');
+            let c = (*ctxt).current_char(&mut len).unwrap_or('\0');
             let last_error = *LAST_ERROR.read().unwrap();
 
             #[allow(clippy::if_same_then_else)]
@@ -501,7 +501,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
 
                 *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
                 let mut len = 0;
-                let c = (*ctxt).current_char(addr_of_mut!(len)).unwrap_or('\0');
+                let c = (*ctxt).current_char(&mut len).unwrap_or('\0');
                 let last_error = *LAST_ERROR.read().unwrap();
 
                 #[allow(clippy::if_same_then_else)]
@@ -595,7 +595,7 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
 
                     *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
                     let mut len = 0;
-                    let c = (*ctxt).current_char(addr_of_mut!(len)).unwrap_or('\0');
+                    let c = (*ctxt).current_char(&mut len).unwrap_or('\0');
                     let last_error = *LAST_ERROR.read().unwrap();
 
                     #[allow(clippy::if_same_then_else)]

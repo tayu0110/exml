@@ -2015,7 +2015,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
     /*
      * Handler for more complex cases
      */
-    let c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    let c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {
         /*
          * Use the new checks of production [4] [4a] amd [5] of the
@@ -2045,7 +2045,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
         }
         len += l;
         NEXTL!(ctxt, l);
-        let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
         while c != ' '
             && c != '>'
             && c != '/'
@@ -2076,7 +2076,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
                 len += l;
             }
             NEXTL!(ctxt, l);
-            c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+            c = (*ctxt).current_char(&mut l).unwrap_or('\0');
         }
     } else {
         if c == ' '
@@ -2089,7 +2089,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
         len += l;
         NEXTL!(ctxt, l);
 
-        let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
         while c != ' '
             && c != '>'
             && c != '/' /* test bigname.xml */
@@ -2106,7 +2106,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
                 len += l;
             }
             NEXTL!(ctxt, l);
-            c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+            c = (*ctxt).current_char(&mut l).unwrap_or('\0');
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2247,11 +2247,11 @@ pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mu
         XML_MAX_NAME_LENGTH as i32
     };
 
-    let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     while xml_is_name_char(ctxt, c as i32) != 0 {
         COPY_BUF!(l, buf.as_mut_ptr(), len, c);
         NEXTL!(ctxt, l);
-        c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        c = (*ctxt).current_char(&mut l).unwrap_or('\0');
         if len >= XML_MAX_NAMELEN as i32 {
             /*
              * Okay someone managed to make a huge token, so he's ready to pay
@@ -2288,7 +2288,7 @@ pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mu
                     return null_mut();
                 }
                 NEXTL!(ctxt, l);
-                c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+                c = (*ctxt).current_char(&mut l).unwrap_or('\0');
             }
             *buffer.add(len as usize) = 0;
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2375,7 +2375,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
         return ret;
     }
     (*ctxt).skip_char();
-    let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     /*
      * NOTE: 4.4.5 Included in Literal
      * When a parameter entity reference appears in a literal entity
@@ -2405,10 +2405,10 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
         NEXTL!(ctxt, l);
 
         (*ctxt).grow();
-        c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        c = (*ctxt).current_char(&mut l).unwrap_or('\0');
         if c == '\0' {
             (*ctxt).grow();
-            c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+            c = (*ctxt).current_char(&mut l).unwrap_or('\0');
         }
 
         if len > max_length {
@@ -2603,7 +2603,7 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
         return null_mut();
     }
     (*ctxt).instate = XmlParserInputState::XmlParserSystemLiteral;
-    let mut cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     while IS_CHAR!(cur as i32) && cur as i32 != stop as i32 {
         if len + 5 >= size {
             size *= 2;
@@ -2628,7 +2628,7 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
             return null_mut();
         }
         NEXTL!(ctxt, l);
-        cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     *buf.add(len as usize) = 0;
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2695,7 +2695,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
             return;
         }
     }
-    let mut q = (*ctxt).current_char(&raw mut ql).unwrap_or('\0');
+    let mut q = (*ctxt).current_char(&mut ql).unwrap_or('\0');
     'not_terminated: {
         if q == '\0' {
             break 'not_terminated;
@@ -2711,7 +2711,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
             return;
         }
         NEXTL!(ctxt, ql);
-        let mut r = (*ctxt).current_char(&raw mut rl).unwrap_or('\0');
+        let mut r = (*ctxt).current_char(&mut rl).unwrap_or('\0');
         if r == '\0' {
             break 'not_terminated;
         }
@@ -2726,7 +2726,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
             return;
         }
         NEXTL!(ctxt, rl);
-        let mut cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
         if cur == '\0' {
             break 'not_terminated;
         }
@@ -2763,7 +2763,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
             rl = l;
 
             NEXTL!(ctxt, l);
-            cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+            cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
         }
         *buf.add(len) = 0;
         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -3267,7 +3267,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                     target,
                 );
             }
-            let mut cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+            let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
             while IS_CHAR!(cur as i32) && (cur != '?' || NXT!(ctxt, 1) != b'>') {
                 if len + 5 >= size {
                     let new_size: size_t = size * 2;
@@ -3294,7 +3294,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                     return;
                 }
                 NEXTL!(ctxt, l);
-                cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+                cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
             }
             *buf.add(len as usize) = 0;
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {

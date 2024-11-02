@@ -950,8 +950,8 @@ impl XmlParserCtxt {
     /// Returns the current char value and its length
     #[doc(hidden)]
     #[doc(alias = "xmlCurrentChar")]
-    pub unsafe fn current_char(&mut self, len: *mut c_int) -> Option<char> {
-        if len.is_null() || self.input.is_null() {
+    pub unsafe fn current_char(&mut self, len: &mut c_int) -> Option<char> {
+        if self.input.is_null() {
             return None;
         }
         if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
@@ -6058,7 +6058,7 @@ unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const 
      * Handler for more complex cases
      */
     let start_position: size_t = (*ctxt).current_ptr().offset_from((*ctxt).base_ptr()) as _;
-    let Some(mut c) = (*ctxt).current_char(&raw mut l) else {
+    let Some(mut c) = (*ctxt).current_char(&mut l) else {
         return null_mut();
     };
     if c == ' '
@@ -6078,7 +6078,7 @@ unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const 
             len += l;
         }
         NEXTL!(ctxt, l);
-        c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return null_mut();
@@ -7079,14 +7079,14 @@ unsafe extern "C" fn xml_load_entity_content(
     }
 
     (*ctxt).grow();
-    let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     while (*ctxt).input == input
         && (*(*ctxt).input).cur < (*(*ctxt).input).end
         && IS_CHAR!(c as i32)
     {
         xml_buf_add(buf, (*(*ctxt).input).cur, l);
         NEXTL!(ctxt, l);
-        c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         xml_buf_free(buf);
@@ -7517,7 +7517,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
             /*
              * OK loop until we reach one of the ending c_char or a size limit.
              */
-            let mut c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+            let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
             while ((*ctxt).current_byte() != limit /* checked */ && IS_CHAR!(c as i32) && c != '<')
                 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
             {
@@ -7734,7 +7734,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                     NEXTL!(ctxt, l);
                 }
                 (*ctxt).grow();
-                c = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+                c = (*ctxt).current_char(&mut l).unwrap_or('\0');
                 if len > max_length {
                     xml_fatal_err_msg(
                         ctxt,
@@ -9383,7 +9383,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
     let mut nbchar: c_int = 0;
     let mut l: c_int = 0;
 
-    let mut cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     while cur != '<' /* checked */ && cur != '&' && IS_CHAR!(cur as i32)
     /* test also done in xmlCurrentChar() */
     {
@@ -9422,7 +9422,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
             }
             (*ctxt).shrink();
         }
-        cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return;
@@ -13816,7 +13816,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
     (*ctxt).advance(6);
 
     (*ctxt).instate = XmlParserInputState::XmlParserCDATASection;
-    let mut r = (*ctxt).current_char(&raw mut rl).unwrap_or('\0');
+    let mut r = (*ctxt).current_char(&mut rl).unwrap_or('\0');
     if !IS_CHAR!(r as i32) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, null());
         // goto out;
@@ -13827,7 +13827,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         return;
     }
     NEXTL!(ctxt, rl);
-    let mut s = (*ctxt).current_char(&raw mut sl).unwrap_or('\0');
+    let mut s = (*ctxt).current_char(&mut sl).unwrap_or('\0');
     if !IS_CHAR!(s as i32) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, null());
         // goto out;
@@ -13838,7 +13838,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         return;
     }
     NEXTL!(ctxt, sl);
-    let mut cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+    let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     buf = xml_malloc_atomic(size as usize) as *mut XmlChar;
     if buf.is_null() {
         xml_err_memory(ctxt, null());
@@ -13883,7 +13883,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         s = cur;
         sl = l;
         NEXTL!(ctxt, l);
-        cur = (*ctxt).current_char(&raw mut l).unwrap_or('\0');
+        cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     *buf.add(len as usize) = 0;
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
