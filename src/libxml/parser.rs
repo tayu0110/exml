@@ -13,7 +13,7 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
-    str::from_utf8,
+    str::{from_utf8, from_utf8_unchecked},
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
@@ -120,7 +120,7 @@ use crate::{
     IS_PUBIDCHAR_CH,
 };
 
-use super::parser_internals::{xml_err_encoding_int, LINE_LEN, XML_MAX_LOOKUP_LIMIT};
+use super::parser_internals::{LINE_LEN, XML_MAX_LOOKUP_LIMIT};
 
 /**
  * XML_DEFAULT_VERSION:
@@ -752,105 +752,53 @@ impl XmlParserCtxt {
             }
         }
 
-        'encoding_error: {
-            if self.charset == XmlCharEncoding::UTF8 {
-                /*
-                 *   2.11 End-of-Line Handling
-                 *   the literal two-character sequence "#xD#xA" or a standalone
-                 *   literal #xD, an XML processor must pass to the application
-                 *   the single character #xA.
-                 */
-                if *(*self.input).cur == b'\n' {
-                    (*self.input).line += 1;
-                    (*self.input).col = 1;
-                } else {
-                    (*self.input).col += 1;
-                }
+        if self.charset != XmlCharEncoding::UTF8 {
+            /*
+             * Assume it's a fixed length encoding (1) with
+             * a compatible encoding for the ASCII set, since
+             * XML constructs only use < 128 chars
+             */
 
-                /*
-                 * We are supposed to handle UTF8, check it's valid
-                 * From rfc2044: encoding of the Unicode values on UTF-8:
-                 *
-                 * UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-                 * 0000 0000-0000 007F   0xxxxxxx
-                 * 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-                 * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-                 *
-                 * Check for the 0x110000 limit too
-                 */
-                let cur: *const c_uchar = (*self.input).cur;
-
-                let c: c_uchar = *cur;
-                if c & 0x80 != 0 {
-                    if c == 0xC0 {
-                        break 'encoding_error;
-                    }
-
-                    let avail: size_t = (*self.input).end.offset_from((*self.input).cur) as _;
-
-                    if avail < 2 || *cur.add(1) & 0xc0 != 0x80 {
-                        break 'encoding_error;
-                    }
-                    if c & 0xe0 == 0xe0 {
-                        let mut val: c_uint;
-
-                        if avail < 3 || *cur.add(2) & 0xc0 != 0x80 {
-                            break 'encoding_error;
-                        }
-                        if c & 0xf0 == 0xf0 {
-                            if c & 0xf8 != 0xf0 || avail < 4 || *cur.add(3) & 0xc0 != 0x80 {
-                                break 'encoding_error;
-                            }
-                            /* 4-byte code */
-                            (*self.input).cur = (*self.input).cur.add(4);
-                            val = (*cur.add(0) as u32 & 0x7) << 18;
-                            val |= (*cur.add(1) as u32 & 0x3f) << 12;
-                            val |= (*cur.add(2) as u32 & 0x3f) << 6;
-                            val |= *cur.add(3) as u32 & 0x3f;
-                        } else {
-                            /* 3-byte code */
-                            (*self.input).cur = (*self.input).cur.add(3);
-                            val = (*cur.add(0) as u32 & 0xf) << 12;
-                            val |= (*cur.add(1) as u32 & 0x3f) << 6;
-                            val |= *cur.add(2) as u32 & 0x3f;
-                        }
-                        if (val > 0xd7ff && val < 0xe000)
-                            || (val > 0xfffd && val < 0x10000)
-                            || val >= 0x110000
-                        {
-                            xml_err_encoding_int(
-                                self,
-                                XmlParserErrors::XmlErrInvalidChar,
-                                c"Char 0x%X out of allowed range\n".as_ptr() as _,
-                                val as _,
-                            );
-                        }
-                    } else {
-                        /* 2-byte code */
-                        (*self.input).cur = (*self.input).cur.add(2);
-                    }
-                } else {
-                    /* 1-byte code */
-                    (*self.input).cur = (*self.input).cur.add(1);
-                }
+            if *((*self.input).cur) == b'\n' {
+                (*self.input).line += 1;
+                (*self.input).col = 1;
             } else {
-                /*
-                 * Assume it's a fixed length encoding (1) with
-                 * a compatible encoding for the ASCII set, since
-                 * XML constructs only use < 128 chars
-                 */
-
-                if *((*self.input).cur) == b'\n' {
-                    (*self.input).line += 1;
-                    (*self.input).col = 1;
-                } else {
-                    (*self.input).col += 1;
-                }
-                (*self.input).cur = (*self.input).cur.add(1);
+                (*self.input).col += 1;
             }
+            (*self.input).cur = (*self.input).cur.add(1);
             return;
         }
-        // encoding_error:
+
+        /*
+         *   2.11 End-of-Line Handling
+         *   the literal two-character sequence "#xD#xA" or a standalone
+         *   literal #xD, an XML processor must pass to the application
+         *   the single character #xA.
+         */
+        if *(*self.input).cur == b'\n' {
+            (*self.input).line += 1;
+            (*self.input).col = 1;
+        } else {
+            (*self.input).col += 1;
+        }
+
+        let bytes = self.content_bytes();
+        let len = 4.min(bytes.len());
+        match from_utf8(&bytes[..len]) {
+            Ok(s) => {
+                let c = s.chars().next().unwrap();
+                (*self.input).cur = (*self.input).cur.add(c.len_utf8());
+                return;
+            }
+            Err(e) if e.valid_up_to() > 0 => {
+                let s = from_utf8_unchecked(&bytes[..e.valid_up_to()]);
+                let c = s.chars().next().unwrap();
+                (*self.input).cur = (*self.input).cur.add(c.len_utf8());
+                return;
+            }
+            Err(_) => {}
+        }
+
         /*
          * If we detect an UTF8 error that probably mean that the
          * input encoding didn't get properly advertised in the
