@@ -68,10 +68,9 @@ use super::parser::{
     xml_parse_att_value_internal, xml_parse_char_data_internal, xml_parse_char_ref,
     xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
     xml_parse_external_entity_private, xml_parser_entity_check, xml_parser_find_node_info,
-    xml_saturated_add, xml_saturated_add_size_t, xml_stop_parser, xml_warning_msg, XmlDefAttrs,
-    XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserMode,
-    XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-    XML_SKIP_IDS,
+    xml_stop_parser, xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr,
+    XmlParserInput, XmlParserInputPtr, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr,
+    XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SKIP_IDS,
 };
 use super::sax2::xml_sax2_ignorable_whitespace;
 use super::tree::{
@@ -4576,14 +4575,11 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
      */
     if !(*ctxt).input.is_null() && !oldctxt.is_null() {
         let mut consumed: c_ulong = (*(*ctxt).input).consumed;
+        consumed =
+            consumed.saturating_add((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _);
 
-        xml_saturated_add_size_t(
-            addr_of_mut!(consumed),
-            (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _,
-        );
-
-        xml_saturated_add(addr_of_mut!((*oldctxt).sizeentcopy), consumed);
-        xml_saturated_add(addr_of_mut!((*oldctxt).sizeentcopy), (*ctxt).sizeentcopy);
+        (*oldctxt).sizeentcopy = (*oldctxt).sizeentcopy.saturating_add(consumed);
+        (*oldctxt).sizeentcopy = (*oldctxt).sizeentcopy.saturating_add((*ctxt).sizeentcopy);
     }
 
     (*oldctxt).nb_errors = (*ctxt).nb_errors;
@@ -5336,11 +5332,9 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     Some(XmlEntityType::XmlExternalParameterEntity)
                 ) && (*old_ent).flags & XML_ENT_PARSED as i32 == 0)
             {
-                xml_saturated_add(addr_of_mut!(parent_consumed), (*(*ctxt).input).consumed);
-                xml_saturated_add_size_t(
-                    addr_of_mut!(parent_consumed),
-                    (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _,
-                );
+                parent_consumed = parent_consumed.saturating_add((*(*ctxt).input).consumed);
+                parent_consumed = parent_consumed
+                    .saturating_add((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _);
             }
 
             input = xml_new_entity_input_stream(ctxt, entity);

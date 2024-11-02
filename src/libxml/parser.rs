@@ -844,7 +844,7 @@ impl XmlParserCtxt {
     /// Returns the number of space chars skipped
     #[doc(alias = "xmlSkipBlankChars")]
     pub(crate) unsafe extern "C" fn skip_blanks(&mut self) -> i32 {
-        let mut res: c_int = 0;
+        let mut res = 0i32;
 
         /*
          * It's Okay to use CUR/NEXT here since all the blanks are on
@@ -853,11 +853,10 @@ impl XmlParserCtxt {
         if (self.input_nr == 1 && !matches!(self.instate, XmlParserInputState::XmlParserDTD))
             || matches!(self.instate, XmlParserInputState::XmlParserStart)
         {
-            let mut cur: *const XmlChar;
             /*
              * if we are in the document content, go really fast
              */
-            cur = (*self.input).cur;
+            let mut cur = (*self.input).cur;
             while IS_BLANK_CH!(*cur) {
                 if *cur == b'\n' {
                     (*self.input).line += 1;
@@ -875,7 +874,7 @@ impl XmlParserCtxt {
             }
             (*self.input).cur = cur;
         } else {
-            let expand_pe: c_int = (self.external != 0 || self.input_nr != 1) as i32;
+            let expand_pe = self.external != 0 || self.input_nr != 1;
 
             while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 if IS_BLANK_CH!(self.current_byte()) {
@@ -885,7 +884,7 @@ impl XmlParserCtxt {
                     /*
                      * Need to handle support of entities branching here
                      */
-                    if expand_pe == 0 || IS_BLANK_CH!(self.nth_byte(1)) || self.nth_byte(1) == 0 {
+                    if !expand_pe || IS_BLANK_CH!(self.nth_byte(1)) || self.nth_byte(1) == 0 {
                         break;
                     }
                     xml_parse_pe_reference(self);
@@ -897,10 +896,8 @@ impl XmlParserCtxt {
                     }
 
                     consumed = (*self.input).consumed;
-                    xml_saturated_add_size_t(
-                        addr_of_mut!(consumed),
-                        (*self.input).cur.offset_from((*self.input).base) as _,
-                    );
+                    consumed = consumed
+                        .saturating_add((*self.input).cur.offset_from((*self.input).base) as _);
 
                     /*
                      * Add to sizeentities when parsing an external entity
@@ -914,7 +911,7 @@ impl XmlParserCtxt {
                     {
                         (*ent).flags |= XML_ENT_PARSED as i32;
 
-                        xml_saturated_add(addr_of_mut!(self.sizeentities), consumed);
+                        self.sizeentities = self.sizeentities.saturating_add(consumed);
                     }
 
                     xml_parser_entity_check(self, consumed);
@@ -4454,14 +4451,6 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     ret
 }
 
-pub(crate) unsafe extern "C" fn xml_saturated_add(dst: *mut c_ulong, val: c_ulong) {
-    *dst = (*dst).saturating_add(val);
-}
-
-pub(crate) unsafe extern "C" fn xml_saturated_add_size_t(dst: *mut c_ulong, val: c_ulong) {
-    *dst = (*dst).saturating_add(val);
-}
-
 /**
  * xmlParseExternalEntityPrivate:
  * @doc:  the document the chunk pertains to
@@ -4681,17 +4670,14 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
      */
     if !(*ctxt).input.is_null() && !oldctxt.is_null() {
         let mut consumed: c_ulong = (*(*ctxt).input).consumed;
+        consumed =
+            consumed.saturating_add((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _);
 
-        xml_saturated_add_size_t(
-            addr_of_mut!(consumed),
-            (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _,
-        );
+        (*oldctxt).sizeentities = (*oldctxt).sizeentities.saturating_add(consumed);
+        (*oldctxt).sizeentities = (*oldctxt).sizeentities.saturating_add((*ctxt).sizeentities);
 
-        xml_saturated_add(addr_of_mut!((*oldctxt).sizeentities), consumed);
-        xml_saturated_add(addr_of_mut!((*oldctxt).sizeentities), (*ctxt).sizeentities);
-
-        xml_saturated_add(addr_of_mut!((*oldctxt).sizeentcopy), consumed);
-        xml_saturated_add(addr_of_mut!((*oldctxt).sizeentcopy), (*ctxt).sizeentcopy);
+        (*oldctxt).sizeentcopy = (*oldctxt).sizeentcopy.saturating_add(consumed);
+        (*oldctxt).sizeentcopy = (*oldctxt).sizeentcopy.saturating_add((*ctxt).sizeentcopy);
     }
 
     if !oldctxt.is_null() {
@@ -6165,19 +6151,16 @@ pub(crate) unsafe extern "C" fn xml_parser_entity_check(
             Some(XmlEntityType::XmlExternalParameterEntity)
         ) && (*entity).flags & XML_ENT_PARSED as i32 == 0)
     {
-        xml_saturated_add(addr_of_mut!(consumed), (*input).consumed);
-        xml_saturated_add_size_t(
-            addr_of_mut!(consumed),
-            (*input).cur.offset_from((*input).base) as _,
-        );
+        consumed = consumed.saturating_add((*input).consumed);
+        consumed = consumed.saturating_add((*input).cur.offset_from((*input).base) as _);
     }
-    xml_saturated_add(addr_of_mut!(consumed), (*ctxt).sizeentities);
+    consumed = consumed.saturating_add((*ctxt).sizeentities);
 
     /*
      * Add extra cost and some fixed cost.
      */
-    xml_saturated_add(addr_of_mut!((*ctxt).sizeentcopy), extra);
-    xml_saturated_add(addr_of_mut!((*ctxt).sizeentcopy), XML_ENT_FIXED_COST as _);
+    (*ctxt).sizeentcopy = (*ctxt).sizeentcopy.saturating_add(extra);
+    (*ctxt).sizeentcopy = (*ctxt).sizeentcopy.saturating_add(XML_ENT_FIXED_COST as _);
 
     /*
      * It's important to always use saturation arithmetic when tracking
@@ -6909,10 +6892,9 @@ unsafe extern "C" fn xml_load_entity_content(
     }
 
     if (*ctxt).input == input && (*(*ctxt).input).cur >= (*(*ctxt).input).end {
-        xml_saturated_add(
-            addr_of_mut!((*ctxt).sizeentities),
-            (*(*ctxt).input).consumed,
-        );
+        (*ctxt).sizeentities = (*ctxt)
+            .sizeentities
+            .saturating_add((*(*ctxt).input).consumed);
         xml_pop_input(ctxt);
     } else if !IS_CHAR!(c) {
         xml_fatal_err_msg_int(
