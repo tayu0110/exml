@@ -5,13 +5,10 @@
 
 use std::ptr::null;
 
-use libc::{c_ulong, size_t};
-
 use crate::{
     __xml_raise_error,
     libxml::{
-        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState},
-        parser_internals::{INPUT_CHUNK, LINE_LEN},
+        parser::{XmlParserCtxtPtr, XmlParserInputState},
         xmlerror::XmlParserErrors,
         xmlstring::XmlChar,
     },
@@ -154,48 +151,4 @@ pub unsafe extern "C" fn __xml_err_encoding(
             (*ctxt).disable_sax = 1;
         }
     }
-}
-
-/**
- * xmlParserShrink:
- * @ctxt:  an XML parser context
- */
-#[doc(hidden)]
-pub unsafe extern "C" fn xml_parser_shrink(ctxt: XmlParserCtxtPtr) {
-    let input: XmlParserInputPtr = (*ctxt).input;
-    let mut used: size_t;
-
-    /* Don't shrink pull parser memory buffers. */
-    let Some(buf) = (*input).buf.as_mut() else {
-        return;
-    };
-    if (*ctxt).progressive == 0
-        && (*buf).borrow().encoder.is_none()
-        && (*buf).borrow().context.is_none()
-    {
-        return;
-    }
-
-    used = (*input).cur.offset_from((*input).base) as usize;
-    /*
-     * Do not shrink on large buffers whose only a tiny fraction
-     * was consumed
-     */
-    if used > INPUT_CHUNK {
-        let res: size_t = buf
-            .borrow()
-            .buffer
-            .map_or(0, |mut buf| buf.trim_head(used - LINE_LEN));
-
-        if res > 0 {
-            used -= res;
-            if res > c_ulong::MAX as size_t || (*input).consumed > c_ulong::MAX - res as c_ulong {
-                (*input).consumed = c_ulong::MAX;
-            } else {
-                (*input).consumed += res as u64;
-            }
-        }
-    }
-
-    (*input).set_base_and_cursor(0, used);
 }

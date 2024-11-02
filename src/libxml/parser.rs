@@ -110,7 +110,7 @@ use crate::{
             XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
             XML_ENT_PARSED,
         },
-        parser::{__xml_err_encoding, xml_err_memory, xml_parser_shrink, XML_VCTXT_USE_PCTXT},
+        parser::{__xml_err_encoding, xml_err_memory, XML_VCTXT_USE_PCTXT},
         threads::{
             __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock,
             xml_cleanup_threads_internal, xml_init_threads_internal,
@@ -120,7 +120,7 @@ use crate::{
     IS_PUBIDCHAR_CH,
 };
 
-use super::parser_internals::XML_MAX_LOOKUP_LIMIT;
+use super::parser_internals::{LINE_LEN, XML_MAX_LOOKUP_LIMIT};
 
 /**
  * XML_DEFAULT_VERSION:
@@ -604,6 +604,47 @@ impl XmlParserCtxt {
         }
 
         ret
+    }
+
+    #[doc(alias = "xmlParserShrink")]
+    pub(crate) unsafe fn shrink(&mut self) {
+        let input: XmlParserInputPtr = self.input;
+        let mut used: size_t;
+
+        /* Don't shrink pull parser memory buffers. */
+        let Some(buf) = (*input).buf.as_mut() else {
+            return;
+        };
+        if self.progressive == 0
+            && (*buf).borrow().encoder.is_none()
+            && (*buf).borrow().context.is_none()
+        {
+            return;
+        }
+
+        used = (*input).cur.offset_from((*input).base) as usize;
+        /*
+         * Do not shrink on large buffers whose only a tiny fraction
+         * was consumed
+         */
+        if used > INPUT_CHUNK {
+            let res: size_t = buf
+                .borrow()
+                .buffer
+                .map_or(0, |mut buf| buf.trim_head(used - LINE_LEN));
+
+            if res > 0 {
+                used -= res;
+                if res > c_ulong::MAX as size_t || (*input).consumed > c_ulong::MAX - res as c_ulong
+                {
+                    (*input).consumed = c_ulong::MAX;
+                } else {
+                    (*input).consumed += res as u64;
+                }
+            }
+        }
+
+        (*input).set_base_and_cursor(0, used);
     }
 
     /// Blocks further parser processing don't override error.
@@ -1276,7 +1317,7 @@ macro_rules! SHRINK {
             && (*(*$ctxt).input).cur.offset_from((*(*$ctxt).input).base) > 2 * INPUT_CHUNK as isize
             && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur) < 2 * INPUT_CHUNK as isize
         {
-            xml_parser_shrink($ctxt);
+            (*$ctxt).shrink();
         }
     };
 }
@@ -9805,7 +9846,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
     }
 
     if !(*ctxt).input.is_null() && (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) > 4096 {
-        xml_parser_shrink(ctxt);
+        (*ctxt).shrink();
     }
 
     'encoding_error: {

@@ -5591,7 +5591,7 @@ macro_rules! SHRINK {
         if (*(*$ctxt).input).cur.offset_from((*(*$ctxt).input).base) > 2 * INPUT_CHUNK as isize
             && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur) < 2 * INPUT_CHUNK as isize
         {
-            crate::private::parser::xml_parser_shrink($ctxt)
+            (*$ctxt).shrink()
         }
     };
 }

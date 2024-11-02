@@ -51,7 +51,7 @@ use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
 use crate::private::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
-use crate::private::parser::{__xml_err_encoding, xml_err_memory, xml_parser_shrink};
+use crate::private::parser::{__xml_err_encoding, xml_err_memory};
 use crate::{__xml_raise_error, generic_error};
 
 use super::catalog::xml_catalog_add_local;
@@ -2911,7 +2911,7 @@ macro_rules! SHRINK {
             && (*(*$ctxt).input).cur.offset_from((*(*$ctxt).input).base) > 2 * INPUT_CHUNK as isize
             && (*(*$ctxt).input).end.offset_from((*(*$ctxt).input).cur) < 2 * INPUT_CHUNK as isize
         {
-            xml_parser_shrink($ctxt);
+            (*$ctxt).shrink();
         }
     };
 }
