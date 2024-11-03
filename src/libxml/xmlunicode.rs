@@ -688,108 +688,77 @@ const XML_UNICODE_CATS: *const XmlUnicodeRange = [
 .as_ptr();
 
 const XML_CS: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x0..=0x1f },
+    XmlChSRange { range: 0x7f..=0x9f },
+    XmlChSRange { range: 0xad..=0xad },
     XmlChSRange {
-        low: 0x0,
-        high: 0x1f,
+        range: 0x600..=0x603,
     },
     XmlChSRange {
-        low: 0x7f,
-        high: 0x9f,
+        range: 0x6dd..=0x6dd,
     },
     XmlChSRange {
-        low: 0xad,
-        high: 0xad,
+        range: 0x70f..=0x70f,
     },
     XmlChSRange {
-        low: 0x600,
-        high: 0x603,
+        range: 0x17b4..=0x17b5,
     },
     XmlChSRange {
-        low: 0x6dd,
-        high: 0x6dd,
+        range: 0x200b..=0x200f,
     },
     XmlChSRange {
-        low: 0x70f,
-        high: 0x70f,
+        range: 0x202a..=0x202e,
     },
     XmlChSRange {
-        low: 0x17b4,
-        high: 0x17b5,
+        range: 0x2060..=0x2063,
     },
     XmlChSRange {
-        low: 0x200b,
-        high: 0x200f,
+        range: 0x206a..=0x206f,
     },
     XmlChSRange {
-        low: 0x202a,
-        high: 0x202e,
+        range: 0xd800..=0xd800,
     },
     XmlChSRange {
-        low: 0x2060,
-        high: 0x2063,
+        range: 0xdb7f..=0xdb80,
     },
     XmlChSRange {
-        low: 0x206a,
-        high: 0x206f,
+        range: 0xdbff..=0xdc00,
     },
     XmlChSRange {
-        low: 0xd800,
-        high: 0xd800,
+        range: 0xdfff..=0xe000,
     },
     XmlChSRange {
-        low: 0xdb7f,
-        high: 0xdb80,
+        range: 0xf8ff..=0xf8ff,
     },
     XmlChSRange {
-        low: 0xdbff,
-        high: 0xdc00,
+        range: 0xfeff..=0xfeff,
     },
     XmlChSRange {
-        low: 0xdfff,
-        high: 0xe000,
-    },
-    XmlChSRange {
-        low: 0xf8ff,
-        high: 0xf8ff,
-    },
-    XmlChSRange {
-        low: 0xfeff,
-        high: 0xfeff,
-    },
-    XmlChSRange {
-        low: 0xfff9,
-        high: 0xfffb,
+        range: 0xfff9..=0xfffb,
     },
 ];
 
 const XML_CL: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x1d173,
-        high: 0x1d17a,
+        range: 0x1d173..=0x1d17a,
     },
     XmlChLRange {
-        low: 0xe0001,
-        high: 0xe0001,
+        range: 0xe0001..=0xe0001,
     },
     XmlChLRange {
-        low: 0xe0020,
-        high: 0xe007f,
+        range: 0xe0020..=0xe007f,
     },
     XmlChLRange {
-        low: 0xf0000,
-        high: 0xf0000,
+        range: 0xf0000..=0xf0000,
     },
     XmlChLRange {
-        low: 0xffffd,
-        high: 0xffffd,
+        range: 0xffffd..=0xffffd,
     },
     XmlChLRange {
-        low: 0x100000,
-        high: 0x100000,
+        range: 0x100000..=0x100000,
     },
     XmlChLRange {
-        low: 0x10fffd,
-        high: 0x10fffd,
+        range: 0x10fffd..=0x10fffd,
     },
 ];
 
@@ -799,64 +768,48 @@ const XML_CG: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_CF_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0xad..=0xad },
     XmlChSRange {
-        low: 0xad,
-        high: 0xad,
+        range: 0x600..=0x603,
     },
     XmlChSRange {
-        low: 0x600,
-        high: 0x603,
+        range: 0x6dd..=0x6dd,
     },
     XmlChSRange {
-        low: 0x6dd,
-        high: 0x6dd,
+        range: 0x70f..=0x70f,
     },
     XmlChSRange {
-        low: 0x70f,
-        high: 0x70f,
+        range: 0x17b4..=0x17b5,
     },
     XmlChSRange {
-        low: 0x17b4,
-        high: 0x17b5,
+        range: 0x200b..=0x200f,
     },
     XmlChSRange {
-        low: 0x200b,
-        high: 0x200f,
+        range: 0x202a..=0x202e,
     },
     XmlChSRange {
-        low: 0x202a,
-        high: 0x202e,
+        range: 0x2060..=0x2063,
     },
     XmlChSRange {
-        low: 0x2060,
-        high: 0x2063,
+        range: 0x206a..=0x206f,
     },
     XmlChSRange {
-        low: 0x206a,
-        high: 0x206f,
+        range: 0xfeff..=0xfeff,
     },
     XmlChSRange {
-        low: 0xfeff,
-        high: 0xfeff,
-    },
-    XmlChSRange {
-        low: 0xfff9,
-        high: 0xfffb,
+        range: 0xfff9..=0xfffb,
     },
 ];
 
 const XML_CF_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x1d173,
-        high: 0x1d17a,
+        range: 0x1d173..=0x1d17a,
     },
     XmlChLRange {
-        low: 0xe0001,
-        high: 0xe0001,
+        range: 0xe0001..=0xe0001,
     },
     XmlChLRange {
-        low: 0xe0020,
-        high: 0xe007f,
+        range: 0xe0020..=0xe007f,
     },
 ];
 
@@ -866,1324 +819,981 @@ const XML_CF_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_LS: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x41..=0x5a },
+    XmlChSRange { range: 0x61..=0x7a },
+    XmlChSRange { range: 0xaa..=0xaa },
+    XmlChSRange { range: 0xb5..=0xb5 },
+    XmlChSRange { range: 0xba..=0xba },
+    XmlChSRange { range: 0xc0..=0xd6 },
+    XmlChSRange { range: 0xd8..=0xf6 },
     XmlChSRange {
-        low: 0x41,
-        high: 0x5a,
+        range: 0xf8..=0x236,
     },
     XmlChSRange {
-        low: 0x61,
-        high: 0x7a,
+        range: 0x250..=0x2c1,
     },
     XmlChSRange {
-        low: 0xaa,
-        high: 0xaa,
+        range: 0x2c6..=0x2d1,
     },
     XmlChSRange {
-        low: 0xb5,
-        high: 0xb5,
+        range: 0x2e0..=0x2e4,
     },
     XmlChSRange {
-        low: 0xba,
-        high: 0xba,
+        range: 0x2ee..=0x2ee,
     },
     XmlChSRange {
-        low: 0xc0,
-        high: 0xd6,
+        range: 0x37a..=0x37a,
     },
     XmlChSRange {
-        low: 0xd8,
-        high: 0xf6,
+        range: 0x386..=0x386,
     },
     XmlChSRange {
-        low: 0xf8,
-        high: 0x236,
+        range: 0x388..=0x38a,
     },
     XmlChSRange {
-        low: 0x250,
-        high: 0x2c1,
+        range: 0x38c..=0x38c,
     },
     XmlChSRange {
-        low: 0x2c6,
-        high: 0x2d1,
+        range: 0x38e..=0x3a1,
     },
     XmlChSRange {
-        low: 0x2e0,
-        high: 0x2e4,
+        range: 0x3a3..=0x3ce,
     },
     XmlChSRange {
-        low: 0x2ee,
-        high: 0x2ee,
+        range: 0x3d0..=0x3f5,
     },
     XmlChSRange {
-        low: 0x37a,
-        high: 0x37a,
+        range: 0x3f7..=0x3fb,
     },
     XmlChSRange {
-        low: 0x386,
-        high: 0x386,
+        range: 0x400..=0x481,
     },
     XmlChSRange {
-        low: 0x388,
-        high: 0x38a,
+        range: 0x48a..=0x4ce,
     },
     XmlChSRange {
-        low: 0x38c,
-        high: 0x38c,
+        range: 0x4d0..=0x4f5,
     },
     XmlChSRange {
-        low: 0x38e,
-        high: 0x3a1,
+        range: 0x4f8..=0x4f9,
     },
     XmlChSRange {
-        low: 0x3a3,
-        high: 0x3ce,
+        range: 0x500..=0x50f,
     },
     XmlChSRange {
-        low: 0x3d0,
-        high: 0x3f5,
+        range: 0x531..=0x556,
     },
     XmlChSRange {
-        low: 0x3f7,
-        high: 0x3fb,
+        range: 0x559..=0x559,
     },
     XmlChSRange {
-        low: 0x400,
-        high: 0x481,
+        range: 0x561..=0x587,
     },
     XmlChSRange {
-        low: 0x48a,
-        high: 0x4ce,
+        range: 0x5d0..=0x5ea,
     },
     XmlChSRange {
-        low: 0x4d0,
-        high: 0x4f5,
+        range: 0x5f0..=0x5f2,
     },
     XmlChSRange {
-        low: 0x4f8,
-        high: 0x4f9,
+        range: 0x621..=0x63a,
     },
     XmlChSRange {
-        low: 0x500,
-        high: 0x50f,
+        range: 0x640..=0x64a,
     },
     XmlChSRange {
-        low: 0x531,
-        high: 0x556,
+        range: 0x66e..=0x66f,
     },
     XmlChSRange {
-        low: 0x559,
-        high: 0x559,
+        range: 0x671..=0x6d3,
     },
     XmlChSRange {
-        low: 0x561,
-        high: 0x587,
+        range: 0x6d5..=0x6d5,
     },
     XmlChSRange {
-        low: 0x5d0,
-        high: 0x5ea,
+        range: 0x6e5..=0x6e6,
     },
     XmlChSRange {
-        low: 0x5f0,
-        high: 0x5f2,
+        range: 0x6ee..=0x6ef,
     },
     XmlChSRange {
-        low: 0x621,
-        high: 0x63a,
+        range: 0x6fa..=0x6fc,
     },
     XmlChSRange {
-        low: 0x640,
-        high: 0x64a,
+        range: 0x6ff..=0x6ff,
     },
     XmlChSRange {
-        low: 0x66e,
-        high: 0x66f,
+        range: 0x710..=0x710,
     },
     XmlChSRange {
-        low: 0x671,
-        high: 0x6d3,
+        range: 0x712..=0x72f,
     },
     XmlChSRange {
-        low: 0x6d5,
-        high: 0x6d5,
+        range: 0x74d..=0x74f,
     },
     XmlChSRange {
-        low: 0x6e5,
-        high: 0x6e6,
+        range: 0x780..=0x7a5,
     },
     XmlChSRange {
-        low: 0x6ee,
-        high: 0x6ef,
+        range: 0x7b1..=0x7b1,
     },
     XmlChSRange {
-        low: 0x6fa,
-        high: 0x6fc,
+        range: 0x904..=0x939,
     },
     XmlChSRange {
-        low: 0x6ff,
-        high: 0x6ff,
+        range: 0x93d..=0x93d,
     },
     XmlChSRange {
-        low: 0x710,
-        high: 0x710,
+        range: 0x950..=0x950,
     },
     XmlChSRange {
-        low: 0x712,
-        high: 0x72f,
+        range: 0x958..=0x961,
     },
     XmlChSRange {
-        low: 0x74d,
-        high: 0x74f,
+        range: 0x985..=0x98c,
     },
     XmlChSRange {
-        low: 0x780,
-        high: 0x7a5,
+        range: 0x98f..=0x990,
     },
     XmlChSRange {
-        low: 0x7b1,
-        high: 0x7b1,
+        range: 0x993..=0x9a8,
     },
     XmlChSRange {
-        low: 0x904,
-        high: 0x939,
+        range: 0x9aa..=0x9b0,
     },
     XmlChSRange {
-        low: 0x93d,
-        high: 0x93d,
+        range: 0x9b2..=0x9b2,
     },
     XmlChSRange {
-        low: 0x950,
-        high: 0x950,
+        range: 0x9b6..=0x9b9,
     },
     XmlChSRange {
-        low: 0x958,
-        high: 0x961,
+        range: 0x9bd..=0x9bd,
     },
     XmlChSRange {
-        low: 0x985,
-        high: 0x98c,
+        range: 0x9dc..=0x9dd,
     },
     XmlChSRange {
-        low: 0x98f,
-        high: 0x990,
+        range: 0x9df..=0x9e1,
     },
     XmlChSRange {
-        low: 0x993,
-        high: 0x9a8,
+        range: 0x9f0..=0x9f1,
     },
     XmlChSRange {
-        low: 0x9aa,
-        high: 0x9b0,
+        range: 0xa05..=0xa0a,
     },
     XmlChSRange {
-        low: 0x9b2,
-        high: 0x9b2,
+        range: 0xa0f..=0xa10,
     },
     XmlChSRange {
-        low: 0x9b6,
-        high: 0x9b9,
+        range: 0xa13..=0xa28,
     },
     XmlChSRange {
-        low: 0x9bd,
-        high: 0x9bd,
+        range: 0xa2a..=0xa30,
     },
     XmlChSRange {
-        low: 0x9dc,
-        high: 0x9dd,
+        range: 0xa32..=0xa33,
     },
     XmlChSRange {
-        low: 0x9df,
-        high: 0x9e1,
+        range: 0xa35..=0xa36,
     },
     XmlChSRange {
-        low: 0x9f0,
-        high: 0x9f1,
+        range: 0xa38..=0xa39,
     },
     XmlChSRange {
-        low: 0xa05,
-        high: 0xa0a,
+        range: 0xa59..=0xa5c,
     },
     XmlChSRange {
-        low: 0xa0f,
-        high: 0xa10,
+        range: 0xa5e..=0xa5e,
     },
     XmlChSRange {
-        low: 0xa13,
-        high: 0xa28,
+        range: 0xa72..=0xa74,
     },
     XmlChSRange {
-        low: 0xa2a,
-        high: 0xa30,
+        range: 0xa85..=0xa8d,
     },
     XmlChSRange {
-        low: 0xa32,
-        high: 0xa33,
+        range: 0xa8f..=0xa91,
     },
     XmlChSRange {
-        low: 0xa35,
-        high: 0xa36,
+        range: 0xa93..=0xaa8,
     },
     XmlChSRange {
-        low: 0xa38,
-        high: 0xa39,
+        range: 0xaaa..=0xab0,
     },
     XmlChSRange {
-        low: 0xa59,
-        high: 0xa5c,
+        range: 0xab2..=0xab3,
     },
     XmlChSRange {
-        low: 0xa5e,
-        high: 0xa5e,
+        range: 0xab5..=0xab9,
     },
     XmlChSRange {
-        low: 0xa72,
-        high: 0xa74,
+        range: 0xabd..=0xabd,
     },
     XmlChSRange {
-        low: 0xa85,
-        high: 0xa8d,
+        range: 0xad0..=0xad0,
     },
     XmlChSRange {
-        low: 0xa8f,
-        high: 0xa91,
+        range: 0xae0..=0xae1,
     },
     XmlChSRange {
-        low: 0xa93,
-        high: 0xaa8,
+        range: 0xb05..=0xb0c,
     },
     XmlChSRange {
-        low: 0xaaa,
-        high: 0xab0,
+        range: 0xb0f..=0xb10,
     },
     XmlChSRange {
-        low: 0xab2,
-        high: 0xab3,
+        range: 0xb13..=0xb28,
     },
     XmlChSRange {
-        low: 0xab5,
-        high: 0xab9,
+        range: 0xb2a..=0xb30,
     },
     XmlChSRange {
-        low: 0xabd,
-        high: 0xabd,
+        range: 0xb32..=0xb33,
     },
     XmlChSRange {
-        low: 0xad0,
-        high: 0xad0,
+        range: 0xb35..=0xb39,
     },
     XmlChSRange {
-        low: 0xae0,
-        high: 0xae1,
+        range: 0xb3d..=0xb3d,
     },
     XmlChSRange {
-        low: 0xb05,
-        high: 0xb0c,
+        range: 0xb5c..=0xb5d,
     },
     XmlChSRange {
-        low: 0xb0f,
-        high: 0xb10,
+        range: 0xb5f..=0xb61,
     },
     XmlChSRange {
-        low: 0xb13,
-        high: 0xb28,
+        range: 0xb71..=0xb71,
     },
     XmlChSRange {
-        low: 0xb2a,
-        high: 0xb30,
+        range: 0xb83..=0xb83,
     },
     XmlChSRange {
-        low: 0xb32,
-        high: 0xb33,
+        range: 0xb85..=0xb8a,
     },
     XmlChSRange {
-        low: 0xb35,
-        high: 0xb39,
+        range: 0xb8e..=0xb90,
     },
     XmlChSRange {
-        low: 0xb3d,
-        high: 0xb3d,
+        range: 0xb92..=0xb95,
     },
     XmlChSRange {
-        low: 0xb5c,
-        high: 0xb5d,
+        range: 0xb99..=0xb9a,
     },
     XmlChSRange {
-        low: 0xb5f,
-        high: 0xb61,
+        range: 0xb9c..=0xb9c,
     },
     XmlChSRange {
-        low: 0xb71,
-        high: 0xb71,
+        range: 0xb9e..=0xb9f,
     },
     XmlChSRange {
-        low: 0xb83,
-        high: 0xb83,
+        range: 0xba3..=0xba4,
     },
     XmlChSRange {
-        low: 0xb85,
-        high: 0xb8a,
+        range: 0xba8..=0xbaa,
     },
     XmlChSRange {
-        low: 0xb8e,
-        high: 0xb90,
+        range: 0xbae..=0xbb5,
     },
     XmlChSRange {
-        low: 0xb92,
-        high: 0xb95,
+        range: 0xbb7..=0xbb9,
     },
     XmlChSRange {
-        low: 0xb99,
-        high: 0xb9a,
+        range: 0xc05..=0xc0c,
     },
     XmlChSRange {
-        low: 0xb9c,
-        high: 0xb9c,
+        range: 0xc0e..=0xc10,
     },
     XmlChSRange {
-        low: 0xb9e,
-        high: 0xb9f,
+        range: 0xc12..=0xc28,
     },
     XmlChSRange {
-        low: 0xba3,
-        high: 0xba4,
+        range: 0xc2a..=0xc33,
     },
     XmlChSRange {
-        low: 0xba8,
-        high: 0xbaa,
+        range: 0xc35..=0xc39,
     },
     XmlChSRange {
-        low: 0xbae,
-        high: 0xbb5,
+        range: 0xc60..=0xc61,
     },
     XmlChSRange {
-        low: 0xbb7,
-        high: 0xbb9,
+        range: 0xc85..=0xc8c,
     },
     XmlChSRange {
-        low: 0xc05,
-        high: 0xc0c,
+        range: 0xc8e..=0xc90,
     },
     XmlChSRange {
-        low: 0xc0e,
-        high: 0xc10,
+        range: 0xc92..=0xca8,
     },
     XmlChSRange {
-        low: 0xc12,
-        high: 0xc28,
+        range: 0xcaa..=0xcb3,
     },
     XmlChSRange {
-        low: 0xc2a,
-        high: 0xc33,
+        range: 0xcb5..=0xcb9,
     },
     XmlChSRange {
-        low: 0xc35,
-        high: 0xc39,
+        range: 0xcbd..=0xcbd,
     },
     XmlChSRange {
-        low: 0xc60,
-        high: 0xc61,
+        range: 0xcde..=0xcde,
     },
     XmlChSRange {
-        low: 0xc85,
-        high: 0xc8c,
+        range: 0xce0..=0xce1,
     },
     XmlChSRange {
-        low: 0xc8e,
-        high: 0xc90,
+        range: 0xd05..=0xd0c,
     },
     XmlChSRange {
-        low: 0xc92,
-        high: 0xca8,
+        range: 0xd0e..=0xd10,
     },
     XmlChSRange {
-        low: 0xcaa,
-        high: 0xcb3,
+        range: 0xd12..=0xd28,
     },
     XmlChSRange {
-        low: 0xcb5,
-        high: 0xcb9,
+        range: 0xd2a..=0xd39,
     },
     XmlChSRange {
-        low: 0xcbd,
-        high: 0xcbd,
+        range: 0xd60..=0xd61,
     },
     XmlChSRange {
-        low: 0xcde,
-        high: 0xcde,
+        range: 0xd85..=0xd96,
     },
     XmlChSRange {
-        low: 0xce0,
-        high: 0xce1,
+        range: 0xd9a..=0xdb1,
     },
     XmlChSRange {
-        low: 0xd05,
-        high: 0xd0c,
+        range: 0xdb3..=0xdbb,
     },
     XmlChSRange {
-        low: 0xd0e,
-        high: 0xd10,
+        range: 0xdbd..=0xdbd,
     },
     XmlChSRange {
-        low: 0xd12,
-        high: 0xd28,
+        range: 0xdc0..=0xdc6,
     },
     XmlChSRange {
-        low: 0xd2a,
-        high: 0xd39,
+        range: 0xe01..=0xe30,
     },
     XmlChSRange {
-        low: 0xd60,
-        high: 0xd61,
+        range: 0xe32..=0xe33,
     },
     XmlChSRange {
-        low: 0xd85,
-        high: 0xd96,
+        range: 0xe40..=0xe46,
     },
     XmlChSRange {
-        low: 0xd9a,
-        high: 0xdb1,
+        range: 0xe81..=0xe82,
     },
     XmlChSRange {
-        low: 0xdb3,
-        high: 0xdbb,
+        range: 0xe84..=0xe84,
     },
     XmlChSRange {
-        low: 0xdbd,
-        high: 0xdbd,
+        range: 0xe87..=0xe88,
     },
     XmlChSRange {
-        low: 0xdc0,
-        high: 0xdc6,
+        range: 0xe8a..=0xe8a,
     },
     XmlChSRange {
-        low: 0xe01,
-        high: 0xe30,
+        range: 0xe8d..=0xe8d,
     },
     XmlChSRange {
-        low: 0xe32,
-        high: 0xe33,
+        range: 0xe94..=0xe97,
     },
     XmlChSRange {
-        low: 0xe40,
-        high: 0xe46,
+        range: 0xe99..=0xe9f,
     },
     XmlChSRange {
-        low: 0xe81,
-        high: 0xe82,
+        range: 0xea1..=0xea3,
     },
     XmlChSRange {
-        low: 0xe84,
-        high: 0xe84,
+        range: 0xea5..=0xea5,
     },
     XmlChSRange {
-        low: 0xe87,
-        high: 0xe88,
+        range: 0xea7..=0xea7,
     },
     XmlChSRange {
-        low: 0xe8a,
-        high: 0xe8a,
+        range: 0xeaa..=0xeab,
     },
     XmlChSRange {
-        low: 0xe8d,
-        high: 0xe8d,
+        range: 0xead..=0xeb0,
     },
     XmlChSRange {
-        low: 0xe94,
-        high: 0xe97,
+        range: 0xeb2..=0xeb3,
     },
     XmlChSRange {
-        low: 0xe99,
-        high: 0xe9f,
+        range: 0xebd..=0xebd,
     },
     XmlChSRange {
-        low: 0xea1,
-        high: 0xea3,
+        range: 0xec0..=0xec4,
     },
     XmlChSRange {
-        low: 0xea5,
-        high: 0xea5,
+        range: 0xec6..=0xec6,
     },
     XmlChSRange {
-        low: 0xea7,
-        high: 0xea7,
+        range: 0xedc..=0xedd,
     },
     XmlChSRange {
-        low: 0xeaa,
-        high: 0xeab,
+        range: 0xf00..=0xf00,
     },
     XmlChSRange {
-        low: 0xead,
-        high: 0xeb0,
+        range: 0xf40..=0xf47,
     },
     XmlChSRange {
-        low: 0xeb2,
-        high: 0xeb3,
+        range: 0xf49..=0xf6a,
     },
     XmlChSRange {
-        low: 0xebd,
-        high: 0xebd,
+        range: 0xf88..=0xf8b,
     },
     XmlChSRange {
-        low: 0xec0,
-        high: 0xec4,
+        range: 0x1000..=0x1021,
     },
     XmlChSRange {
-        low: 0xec6,
-        high: 0xec6,
+        range: 0x1023..=0x1027,
     },
     XmlChSRange {
-        low: 0xedc,
-        high: 0xedd,
+        range: 0x1029..=0x102a,
     },
     XmlChSRange {
-        low: 0xf00,
-        high: 0xf00,
+        range: 0x1050..=0x1055,
     },
     XmlChSRange {
-        low: 0xf40,
-        high: 0xf47,
+        range: 0x10a0..=0x10c5,
     },
     XmlChSRange {
-        low: 0xf49,
-        high: 0xf6a,
+        range: 0x10d0..=0x10f8,
     },
     XmlChSRange {
-        low: 0xf88,
-        high: 0xf8b,
+        range: 0x1100..=0x1159,
     },
     XmlChSRange {
-        low: 0x1000,
-        high: 0x1021,
+        range: 0x115f..=0x11a2,
     },
     XmlChSRange {
-        low: 0x1023,
-        high: 0x1027,
+        range: 0x11a8..=0x11f9,
     },
     XmlChSRange {
-        low: 0x1029,
-        high: 0x102a,
+        range: 0x1200..=0x1206,
     },
     XmlChSRange {
-        low: 0x1050,
-        high: 0x1055,
+        range: 0x1208..=0x1246,
     },
     XmlChSRange {
-        low: 0x10a0,
-        high: 0x10c5,
+        range: 0x1248..=0x1248,
     },
     XmlChSRange {
-        low: 0x10d0,
-        high: 0x10f8,
+        range: 0x124a..=0x124d,
     },
     XmlChSRange {
-        low: 0x1100,
-        high: 0x1159,
+        range: 0x1250..=0x1256,
     },
     XmlChSRange {
-        low: 0x115f,
-        high: 0x11a2,
+        range: 0x1258..=0x1258,
     },
     XmlChSRange {
-        low: 0x11a8,
-        high: 0x11f9,
+        range: 0x125a..=0x125d,
     },
     XmlChSRange {
-        low: 0x1200,
-        high: 0x1206,
+        range: 0x1260..=0x1286,
     },
     XmlChSRange {
-        low: 0x1208,
-        high: 0x1246,
+        range: 0x1288..=0x1288,
     },
     XmlChSRange {
-        low: 0x1248,
-        high: 0x1248,
+        range: 0x128a..=0x128d,
     },
     XmlChSRange {
-        low: 0x124a,
-        high: 0x124d,
+        range: 0x1290..=0x12ae,
     },
     XmlChSRange {
-        low: 0x1250,
-        high: 0x1256,
+        range: 0x12b0..=0x12b0,
     },
     XmlChSRange {
-        low: 0x1258,
-        high: 0x1258,
+        range: 0x12b2..=0x12b5,
     },
     XmlChSRange {
-        low: 0x125a,
-        high: 0x125d,
+        range: 0x12b8..=0x12be,
     },
     XmlChSRange {
-        low: 0x1260,
-        high: 0x1286,
+        range: 0x12c0..=0x12c0,
     },
     XmlChSRange {
-        low: 0x1288,
-        high: 0x1288,
+        range: 0x12c2..=0x12c5,
     },
     XmlChSRange {
-        low: 0x128a,
-        high: 0x128d,
+        range: 0x12c8..=0x12ce,
     },
     XmlChSRange {
-        low: 0x1290,
-        high: 0x12ae,
+        range: 0x12d0..=0x12d6,
     },
     XmlChSRange {
-        low: 0x12b0,
-        high: 0x12b0,
+        range: 0x12d8..=0x12ee,
     },
     XmlChSRange {
-        low: 0x12b2,
-        high: 0x12b5,
+        range: 0x12f0..=0x130e,
     },
     XmlChSRange {
-        low: 0x12b8,
-        high: 0x12be,
+        range: 0x1310..=0x1310,
     },
     XmlChSRange {
-        low: 0x12c0,
-        high: 0x12c0,
+        range: 0x1312..=0x1315,
     },
     XmlChSRange {
-        low: 0x12c2,
-        high: 0x12c5,
+        range: 0x1318..=0x131e,
     },
     XmlChSRange {
-        low: 0x12c8,
-        high: 0x12ce,
+        range: 0x1320..=0x1346,
     },
     XmlChSRange {
-        low: 0x12d0,
-        high: 0x12d6,
+        range: 0x1348..=0x135a,
     },
     XmlChSRange {
-        low: 0x12d8,
-        high: 0x12ee,
+        range: 0x13a0..=0x13f4,
     },
     XmlChSRange {
-        low: 0x12f0,
-        high: 0x130e,
+        range: 0x1401..=0x166c,
     },
     XmlChSRange {
-        low: 0x1310,
-        high: 0x1310,
+        range: 0x166f..=0x1676,
     },
     XmlChSRange {
-        low: 0x1312,
-        high: 0x1315,
+        range: 0x1681..=0x169a,
     },
     XmlChSRange {
-        low: 0x1318,
-        high: 0x131e,
+        range: 0x16a0..=0x16ea,
     },
     XmlChSRange {
-        low: 0x1320,
-        high: 0x1346,
+        range: 0x1700..=0x170c,
     },
     XmlChSRange {
-        low: 0x1348,
-        high: 0x135a,
+        range: 0x170e..=0x1711,
     },
     XmlChSRange {
-        low: 0x13a0,
-        high: 0x13f4,
+        range: 0x1720..=0x1731,
     },
     XmlChSRange {
-        low: 0x1401,
-        high: 0x166c,
+        range: 0x1740..=0x1751,
     },
     XmlChSRange {
-        low: 0x166f,
-        high: 0x1676,
+        range: 0x1760..=0x176c,
     },
     XmlChSRange {
-        low: 0x1681,
-        high: 0x169a,
+        range: 0x176e..=0x1770,
     },
     XmlChSRange {
-        low: 0x16a0,
-        high: 0x16ea,
+        range: 0x1780..=0x17b3,
     },
     XmlChSRange {
-        low: 0x1700,
-        high: 0x170c,
+        range: 0x17d7..=0x17d7,
     },
     XmlChSRange {
-        low: 0x170e,
-        high: 0x1711,
+        range: 0x17dc..=0x17dc,
     },
     XmlChSRange {
-        low: 0x1720,
-        high: 0x1731,
+        range: 0x1820..=0x1877,
     },
     XmlChSRange {
-        low: 0x1740,
-        high: 0x1751,
+        range: 0x1880..=0x18a8,
     },
     XmlChSRange {
-        low: 0x1760,
-        high: 0x176c,
+        range: 0x1900..=0x191c,
     },
     XmlChSRange {
-        low: 0x176e,
-        high: 0x1770,
+        range: 0x1950..=0x196d,
     },
     XmlChSRange {
-        low: 0x1780,
-        high: 0x17b3,
+        range: 0x1970..=0x1974,
     },
     XmlChSRange {
-        low: 0x17d7,
-        high: 0x17d7,
+        range: 0x1d00..=0x1d6b,
     },
     XmlChSRange {
-        low: 0x17dc,
-        high: 0x17dc,
+        range: 0x1e00..=0x1e9b,
     },
     XmlChSRange {
-        low: 0x1820,
-        high: 0x1877,
+        range: 0x1ea0..=0x1ef9,
     },
     XmlChSRange {
-        low: 0x1880,
-        high: 0x18a8,
+        range: 0x1f00..=0x1f15,
     },
     XmlChSRange {
-        low: 0x1900,
-        high: 0x191c,
+        range: 0x1f18..=0x1f1d,
     },
     XmlChSRange {
-        low: 0x1950,
-        high: 0x196d,
+        range: 0x1f20..=0x1f45,
     },
     XmlChSRange {
-        low: 0x1970,
-        high: 0x1974,
+        range: 0x1f48..=0x1f4d,
     },
     XmlChSRange {
-        low: 0x1d00,
-        high: 0x1d6b,
+        range: 0x1f50..=0x1f57,
     },
     XmlChSRange {
-        low: 0x1e00,
-        high: 0x1e9b,
+        range: 0x1f59..=0x1f59,
     },
     XmlChSRange {
-        low: 0x1ea0,
-        high: 0x1ef9,
+        range: 0x1f5b..=0x1f5b,
     },
     XmlChSRange {
-        low: 0x1f00,
-        high: 0x1f15,
+        range: 0x1f5d..=0x1f5d,
     },
     XmlChSRange {
-        low: 0x1f18,
-        high: 0x1f1d,
+        range: 0x1f5f..=0x1f7d,
     },
     XmlChSRange {
-        low: 0x1f20,
-        high: 0x1f45,
+        range: 0x1f80..=0x1fb4,
     },
     XmlChSRange {
-        low: 0x1f48,
-        high: 0x1f4d,
+        range: 0x1fb6..=0x1fbc,
     },
     XmlChSRange {
-        low: 0x1f50,
-        high: 0x1f57,
+        range: 0x1fbe..=0x1fbe,
     },
     XmlChSRange {
-        low: 0x1f59,
-        high: 0x1f59,
+        range: 0x1fc2..=0x1fc4,
     },
     XmlChSRange {
-        low: 0x1f5b,
-        high: 0x1f5b,
+        range: 0x1fc6..=0x1fcc,
     },
     XmlChSRange {
-        low: 0x1f5d,
-        high: 0x1f5d,
+        range: 0x1fd0..=0x1fd3,
     },
     XmlChSRange {
-        low: 0x1f5f,
-        high: 0x1f7d,
+        range: 0x1fd6..=0x1fdb,
     },
     XmlChSRange {
-        low: 0x1f80,
-        high: 0x1fb4,
+        range: 0x1fe0..=0x1fec,
     },
     XmlChSRange {
-        low: 0x1fb6,
-        high: 0x1fbc,
+        range: 0x1ff2..=0x1ff4,
     },
     XmlChSRange {
-        low: 0x1fbe,
-        high: 0x1fbe,
+        range: 0x1ff6..=0x1ffc,
     },
     XmlChSRange {
-        low: 0x1fc2,
-        high: 0x1fc4,
+        range: 0x2071..=0x2071,
     },
     XmlChSRange {
-        low: 0x1fc6,
-        high: 0x1fcc,
+        range: 0x207f..=0x207f,
     },
     XmlChSRange {
-        low: 0x1fd0,
-        high: 0x1fd3,
+        range: 0x2102..=0x2102,
     },
     XmlChSRange {
-        low: 0x1fd6,
-        high: 0x1fdb,
+        range: 0x2107..=0x2107,
     },
     XmlChSRange {
-        low: 0x1fe0,
-        high: 0x1fec,
+        range: 0x210a..=0x2113,
     },
     XmlChSRange {
-        low: 0x1ff2,
-        high: 0x1ff4,
+        range: 0x2115..=0x2115,
     },
     XmlChSRange {
-        low: 0x1ff6,
-        high: 0x1ffc,
+        range: 0x2119..=0x211d,
     },
     XmlChSRange {
-        low: 0x2071,
-        high: 0x2071,
+        range: 0x2124..=0x2124,
     },
     XmlChSRange {
-        low: 0x207f,
-        high: 0x207f,
+        range: 0x2126..=0x2126,
     },
     XmlChSRange {
-        low: 0x2102,
-        high: 0x2102,
+        range: 0x2128..=0x2128,
     },
     XmlChSRange {
-        low: 0x2107,
-        high: 0x2107,
+        range: 0x212a..=0x212d,
     },
     XmlChSRange {
-        low: 0x210a,
-        high: 0x2113,
+        range: 0x212f..=0x2131,
     },
     XmlChSRange {
-        low: 0x2115,
-        high: 0x2115,
+        range: 0x2133..=0x2139,
     },
     XmlChSRange {
-        low: 0x2119,
-        high: 0x211d,
+        range: 0x213d..=0x213f,
     },
     XmlChSRange {
-        low: 0x2124,
-        high: 0x2124,
+        range: 0x2145..=0x2149,
     },
     XmlChSRange {
-        low: 0x2126,
-        high: 0x2126,
+        range: 0x3005..=0x3006,
     },
     XmlChSRange {
-        low: 0x2128,
-        high: 0x2128,
+        range: 0x3031..=0x3035,
     },
     XmlChSRange {
-        low: 0x212a,
-        high: 0x212d,
+        range: 0x303b..=0x303c,
     },
     XmlChSRange {
-        low: 0x212f,
-        high: 0x2131,
+        range: 0x3041..=0x3096,
     },
     XmlChSRange {
-        low: 0x2133,
-        high: 0x2139,
+        range: 0x309d..=0x309f,
     },
     XmlChSRange {
-        low: 0x213d,
-        high: 0x213f,
+        range: 0x30a1..=0x30fa,
     },
     XmlChSRange {
-        low: 0x2145,
-        high: 0x2149,
+        range: 0x30fc..=0x30ff,
     },
     XmlChSRange {
-        low: 0x3005,
-        high: 0x3006,
+        range: 0x3105..=0x312c,
     },
     XmlChSRange {
-        low: 0x3031,
-        high: 0x3035,
+        range: 0x3131..=0x318e,
     },
     XmlChSRange {
-        low: 0x303b,
-        high: 0x303c,
+        range: 0x31a0..=0x31b7,
     },
     XmlChSRange {
-        low: 0x3041,
-        high: 0x3096,
+        range: 0x31f0..=0x31ff,
     },
     XmlChSRange {
-        low: 0x309d,
-        high: 0x309f,
+        range: 0x3400..=0x3400,
     },
     XmlChSRange {
-        low: 0x30a1,
-        high: 0x30fa,
+        range: 0x4db5..=0x4db5,
     },
     XmlChSRange {
-        low: 0x30fc,
-        high: 0x30ff,
+        range: 0x4e00..=0x4e00,
     },
     XmlChSRange {
-        low: 0x3105,
-        high: 0x312c,
+        range: 0x9fa5..=0x9fa5,
     },
     XmlChSRange {
-        low: 0x3131,
-        high: 0x318e,
+        range: 0xa000..=0xa48c,
     },
     XmlChSRange {
-        low: 0x31a0,
-        high: 0x31b7,
+        range: 0xac00..=0xac00,
     },
     XmlChSRange {
-        low: 0x31f0,
-        high: 0x31ff,
+        range: 0xd7a3..=0xd7a3,
     },
     XmlChSRange {
-        low: 0x3400,
-        high: 0x3400,
+        range: 0xf900..=0xfa2d,
     },
     XmlChSRange {
-        low: 0x4db5,
-        high: 0x4db5,
+        range: 0xfa30..=0xfa6a,
     },
     XmlChSRange {
-        low: 0x4e00,
-        high: 0x4e00,
+        range: 0xfb00..=0xfb06,
     },
     XmlChSRange {
-        low: 0x9fa5,
-        high: 0x9fa5,
+        range: 0xfb13..=0xfb17,
     },
     XmlChSRange {
-        low: 0xa000,
-        high: 0xa48c,
+        range: 0xfb1d..=0xfb1d,
     },
     XmlChSRange {
-        low: 0xac00,
-        high: 0xac00,
+        range: 0xfb1f..=0xfb28,
     },
     XmlChSRange {
-        low: 0xd7a3,
-        high: 0xd7a3,
+        range: 0xfb2a..=0xfb36,
     },
     XmlChSRange {
-        low: 0xf900,
-        high: 0xfa2d,
+        range: 0xfb38..=0xfb3c,
     },
     XmlChSRange {
-        low: 0xfa30,
-        high: 0xfa6a,
+        range: 0xfb3e..=0xfb3e,
     },
     XmlChSRange {
-        low: 0xfb00,
-        high: 0xfb06,
+        range: 0xfb40..=0xfb41,
     },
     XmlChSRange {
-        low: 0xfb13,
-        high: 0xfb17,
+        range: 0xfb43..=0xfb44,
     },
     XmlChSRange {
-        low: 0xfb1d,
-        high: 0xfb1d,
+        range: 0xfb46..=0xfbb1,
     },
     XmlChSRange {
-        low: 0xfb1f,
-        high: 0xfb28,
+        range: 0xfbd3..=0xfd3d,
     },
     XmlChSRange {
-        low: 0xfb2a,
-        high: 0xfb36,
+        range: 0xfd50..=0xfd8f,
     },
     XmlChSRange {
-        low: 0xfb38,
-        high: 0xfb3c,
+        range: 0xfd92..=0xfdc7,
     },
     XmlChSRange {
-        low: 0xfb3e,
-        high: 0xfb3e,
+        range: 0xfdf0..=0xfdfb,
     },
     XmlChSRange {
-        low: 0xfb40,
-        high: 0xfb41,
+        range: 0xfe70..=0xfe74,
     },
     XmlChSRange {
-        low: 0xfb43,
-        high: 0xfb44,
+        range: 0xfe76..=0xfefc,
     },
     XmlChSRange {
-        low: 0xfb46,
-        high: 0xfbb1,
+        range: 0xff21..=0xff3a,
     },
     XmlChSRange {
-        low: 0xfbd3,
-        high: 0xfd3d,
+        range: 0xff41..=0xff5a,
     },
     XmlChSRange {
-        low: 0xfd50,
-        high: 0xfd8f,
+        range: 0xff66..=0xffbe,
     },
     XmlChSRange {
-        low: 0xfd92,
-        high: 0xfdc7,
+        range: 0xffc2..=0xffc7,
     },
     XmlChSRange {
-        low: 0xfdf0,
-        high: 0xfdfb,
+        range: 0xffca..=0xffcf,
     },
     XmlChSRange {
-        low: 0xfe70,
-        high: 0xfe74,
+        range: 0xffd2..=0xffd7,
     },
     XmlChSRange {
-        low: 0xfe76,
-        high: 0xfefc,
-    },
-    XmlChSRange {
-        low: 0xff21,
-        high: 0xff3a,
-    },
-    XmlChSRange {
-        low: 0xff41,
-        high: 0xff5a,
-    },
-    XmlChSRange {
-        low: 0xff66,
-        high: 0xffbe,
-    },
-    XmlChSRange {
-        low: 0xffc2,
-        high: 0xffc7,
-    },
-    XmlChSRange {
-        low: 0xffca,
-        high: 0xffcf,
-    },
-    XmlChSRange {
-        low: 0xffd2,
-        high: 0xffd7,
-    },
-    XmlChSRange {
-        low: 0xffda,
-        high: 0xffdc,
+        range: 0xffda..=0xffdc,
     },
 ];
 
 const XML_LL: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10000,
-        high: 0x1000b,
+        range: 0x10000..=0x1000b,
     },
     XmlChLRange {
-        low: 0x1000d,
-        high: 0x10026,
+        range: 0x1000d..=0x10026,
     },
     XmlChLRange {
-        low: 0x10028,
-        high: 0x1003a,
+        range: 0x10028..=0x1003a,
     },
     XmlChLRange {
-        low: 0x1003c,
-        high: 0x1003d,
+        range: 0x1003c..=0x1003d,
     },
     XmlChLRange {
-        low: 0x1003f,
-        high: 0x1004d,
+        range: 0x1003f..=0x1004d,
     },
     XmlChLRange {
-        low: 0x10050,
-        high: 0x1005d,
+        range: 0x10050..=0x1005d,
     },
     XmlChLRange {
-        low: 0x10080,
-        high: 0x100fa,
+        range: 0x10080..=0x100fa,
     },
     XmlChLRange {
-        low: 0x10300,
-        high: 0x1031e,
+        range: 0x10300..=0x1031e,
     },
     XmlChLRange {
-        low: 0x10330,
-        high: 0x10349,
+        range: 0x10330..=0x10349,
     },
     XmlChLRange {
-        low: 0x10380,
-        high: 0x1039d,
+        range: 0x10380..=0x1039d,
     },
     XmlChLRange {
-        low: 0x10400,
-        high: 0x1049d,
+        range: 0x10400..=0x1049d,
     },
     XmlChLRange {
-        low: 0x10800,
-        high: 0x10805,
+        range: 0x10800..=0x10805,
     },
     XmlChLRange {
-        low: 0x10808,
-        high: 0x10808,
+        range: 0x10808..=0x10808,
     },
     XmlChLRange {
-        low: 0x1080a,
-        high: 0x10835,
+        range: 0x1080a..=0x10835,
     },
     XmlChLRange {
-        low: 0x10837,
-        high: 0x10838,
+        range: 0x10837..=0x10838,
     },
     XmlChLRange {
-        low: 0x1083c,
-        high: 0x1083c,
+        range: 0x1083c..=0x1083c,
     },
     XmlChLRange {
-        low: 0x1083f,
-        high: 0x1083f,
+        range: 0x1083f..=0x1083f,
     },
     XmlChLRange {
-        low: 0x1d400,
-        high: 0x1d454,
+        range: 0x1d400..=0x1d454,
     },
     XmlChLRange {
-        low: 0x1d456,
-        high: 0x1d49c,
+        range: 0x1d456..=0x1d49c,
     },
     XmlChLRange {
-        low: 0x1d49e,
-        high: 0x1d49f,
+        range: 0x1d49e..=0x1d49f,
     },
     XmlChLRange {
-        low: 0x1d4a2,
-        high: 0x1d4a2,
+        range: 0x1d4a2..=0x1d4a2,
     },
     XmlChLRange {
-        low: 0x1d4a5,
-        high: 0x1d4a6,
+        range: 0x1d4a5..=0x1d4a6,
     },
     XmlChLRange {
-        low: 0x1d4a9,
-        high: 0x1d4ac,
+        range: 0x1d4a9..=0x1d4ac,
     },
     XmlChLRange {
-        low: 0x1d4ae,
-        high: 0x1d4b9,
+        range: 0x1d4ae..=0x1d4b9,
     },
     XmlChLRange {
-        low: 0x1d4bb,
-        high: 0x1d4bb,
+        range: 0x1d4bb..=0x1d4bb,
     },
     XmlChLRange {
-        low: 0x1d4bd,
-        high: 0x1d4c3,
+        range: 0x1d4bd..=0x1d4c3,
     },
     XmlChLRange {
-        low: 0x1d4c5,
-        high: 0x1d505,
+        range: 0x1d4c5..=0x1d505,
     },
     XmlChLRange {
-        low: 0x1d507,
-        high: 0x1d50a,
+        range: 0x1d507..=0x1d50a,
     },
     XmlChLRange {
-        low: 0x1d50d,
-        high: 0x1d514,
+        range: 0x1d50d..=0x1d514,
     },
     XmlChLRange {
-        low: 0x1d516,
-        high: 0x1d51c,
+        range: 0x1d516..=0x1d51c,
     },
     XmlChLRange {
-        low: 0x1d51e,
-        high: 0x1d539,
+        range: 0x1d51e..=0x1d539,
     },
     XmlChLRange {
-        low: 0x1d53b,
-        high: 0x1d53e,
+        range: 0x1d53b..=0x1d53e,
     },
     XmlChLRange {
-        low: 0x1d540,
-        high: 0x1d544,
+        range: 0x1d540..=0x1d544,
     },
     XmlChLRange {
-        low: 0x1d546,
-        high: 0x1d546,
+        range: 0x1d546..=0x1d546,
     },
     XmlChLRange {
-        low: 0x1d54a,
-        high: 0x1d550,
+        range: 0x1d54a..=0x1d550,
     },
     XmlChLRange {
-        low: 0x1d552,
-        high: 0x1d6a3,
+        range: 0x1d552..=0x1d6a3,
     },
     XmlChLRange {
-        low: 0x1d6a8,
-        high: 0x1d6c0,
+        range: 0x1d6a8..=0x1d6c0,
     },
     XmlChLRange {
-        low: 0x1d6c2,
-        high: 0x1d6da,
+        range: 0x1d6c2..=0x1d6da,
     },
     XmlChLRange {
-        low: 0x1d6dc,
-        high: 0x1d6fa,
+        range: 0x1d6dc..=0x1d6fa,
     },
     XmlChLRange {
-        low: 0x1d6fc,
-        high: 0x1d714,
+        range: 0x1d6fc..=0x1d714,
     },
     XmlChLRange {
-        low: 0x1d716,
-        high: 0x1d734,
+        range: 0x1d716..=0x1d734,
     },
     XmlChLRange {
-        low: 0x1d736,
-        high: 0x1d74e,
+        range: 0x1d736..=0x1d74e,
     },
     XmlChLRange {
-        low: 0x1d750,
-        high: 0x1d76e,
+        range: 0x1d750..=0x1d76e,
     },
     XmlChLRange {
-        low: 0x1d770,
-        high: 0x1d788,
+        range: 0x1d770..=0x1d788,
     },
     XmlChLRange {
-        low: 0x1d78a,
-        high: 0x1d7a8,
+        range: 0x1d78a..=0x1d7a8,
     },
     XmlChLRange {
-        low: 0x1d7aa,
-        high: 0x1d7c2,
+        range: 0x1d7aa..=0x1d7c2,
     },
     XmlChLRange {
-        low: 0x1d7c4,
-        high: 0x1d7c9,
+        range: 0x1d7c4..=0x1d7c9,
     },
     XmlChLRange {
-        low: 0x20000,
-        high: 0x20000,
+        range: 0x20000..=0x20000,
     },
     XmlChLRange {
-        low: 0x2a6d6,
-        high: 0x2a6d6,
+        range: 0x2a6d6..=0x2a6d6,
     },
     XmlChLRange {
-        low: 0x2f800,
-        high: 0x2fa1d,
+        range: 0x2f800..=0x2fa1d,
     },
 ];
 
@@ -2193,1704 +1803,1268 @@ const XML_LG: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_LL_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x61..=0x7a },
+    XmlChSRange { range: 0xaa..=0xaa },
+    XmlChSRange { range: 0xb5..=0xb5 },
+    XmlChSRange { range: 0xba..=0xba },
+    XmlChSRange { range: 0xdf..=0xf6 },
+    XmlChSRange { range: 0xf8..=0xff },
     XmlChSRange {
-        low: 0x61,
-        high: 0x7a,
+        range: 0x101..=0x101,
     },
     XmlChSRange {
-        low: 0xaa,
-        high: 0xaa,
+        range: 0x103..=0x103,
     },
     XmlChSRange {
-        low: 0xb5,
-        high: 0xb5,
+        range: 0x105..=0x105,
     },
     XmlChSRange {
-        low: 0xba,
-        high: 0xba,
+        range: 0x107..=0x107,
     },
     XmlChSRange {
-        low: 0xdf,
-        high: 0xf6,
+        range: 0x109..=0x109,
     },
     XmlChSRange {
-        low: 0xf8,
-        high: 0xff,
+        range: 0x10b..=0x10b,
     },
     XmlChSRange {
-        low: 0x101,
-        high: 0x101,
+        range: 0x10d..=0x10d,
     },
     XmlChSRange {
-        low: 0x103,
-        high: 0x103,
+        range: 0x10f..=0x10f,
     },
     XmlChSRange {
-        low: 0x105,
-        high: 0x105,
+        range: 0x111..=0x111,
     },
     XmlChSRange {
-        low: 0x107,
-        high: 0x107,
+        range: 0x113..=0x113,
     },
     XmlChSRange {
-        low: 0x109,
-        high: 0x109,
+        range: 0x115..=0x115,
     },
     XmlChSRange {
-        low: 0x10b,
-        high: 0x10b,
+        range: 0x117..=0x117,
     },
     XmlChSRange {
-        low: 0x10d,
-        high: 0x10d,
+        range: 0x119..=0x119,
     },
     XmlChSRange {
-        low: 0x10f,
-        high: 0x10f,
+        range: 0x11b..=0x11b,
     },
     XmlChSRange {
-        low: 0x111,
-        high: 0x111,
+        range: 0x11d..=0x11d,
     },
     XmlChSRange {
-        low: 0x113,
-        high: 0x113,
+        range: 0x11f..=0x11f,
     },
     XmlChSRange {
-        low: 0x115,
-        high: 0x115,
+        range: 0x121..=0x121,
     },
     XmlChSRange {
-        low: 0x117,
-        high: 0x117,
+        range: 0x123..=0x123,
     },
     XmlChSRange {
-        low: 0x119,
-        high: 0x119,
+        range: 0x125..=0x125,
     },
     XmlChSRange {
-        low: 0x11b,
-        high: 0x11b,
+        range: 0x127..=0x127,
     },
     XmlChSRange {
-        low: 0x11d,
-        high: 0x11d,
+        range: 0x129..=0x129,
     },
     XmlChSRange {
-        low: 0x11f,
-        high: 0x11f,
+        range: 0x12b..=0x12b,
     },
     XmlChSRange {
-        low: 0x121,
-        high: 0x121,
+        range: 0x12d..=0x12d,
     },
     XmlChSRange {
-        low: 0x123,
-        high: 0x123,
+        range: 0x12f..=0x12f,
     },
     XmlChSRange {
-        low: 0x125,
-        high: 0x125,
+        range: 0x131..=0x131,
     },
     XmlChSRange {
-        low: 0x127,
-        high: 0x127,
+        range: 0x133..=0x133,
     },
     XmlChSRange {
-        low: 0x129,
-        high: 0x129,
+        range: 0x135..=0x135,
     },
     XmlChSRange {
-        low: 0x12b,
-        high: 0x12b,
+        range: 0x137..=0x138,
     },
     XmlChSRange {
-        low: 0x12d,
-        high: 0x12d,
+        range: 0x13a..=0x13a,
     },
     XmlChSRange {
-        low: 0x12f,
-        high: 0x12f,
+        range: 0x13c..=0x13c,
     },
     XmlChSRange {
-        low: 0x131,
-        high: 0x131,
+        range: 0x13e..=0x13e,
     },
     XmlChSRange {
-        low: 0x133,
-        high: 0x133,
+        range: 0x140..=0x140,
     },
     XmlChSRange {
-        low: 0x135,
-        high: 0x135,
+        range: 0x142..=0x142,
     },
     XmlChSRange {
-        low: 0x137,
-        high: 0x138,
+        range: 0x144..=0x144,
     },
     XmlChSRange {
-        low: 0x13a,
-        high: 0x13a,
+        range: 0x146..=0x146,
     },
     XmlChSRange {
-        low: 0x13c,
-        high: 0x13c,
+        range: 0x148..=0x149,
     },
     XmlChSRange {
-        low: 0x13e,
-        high: 0x13e,
+        range: 0x14b..=0x14b,
     },
     XmlChSRange {
-        low: 0x140,
-        high: 0x140,
+        range: 0x14d..=0x14d,
     },
     XmlChSRange {
-        low: 0x142,
-        high: 0x142,
+        range: 0x14f..=0x14f,
     },
     XmlChSRange {
-        low: 0x144,
-        high: 0x144,
+        range: 0x151..=0x151,
     },
     XmlChSRange {
-        low: 0x146,
-        high: 0x146,
+        range: 0x153..=0x153,
     },
     XmlChSRange {
-        low: 0x148,
-        high: 0x149,
+        range: 0x155..=0x155,
     },
     XmlChSRange {
-        low: 0x14b,
-        high: 0x14b,
+        range: 0x157..=0x157,
     },
     XmlChSRange {
-        low: 0x14d,
-        high: 0x14d,
+        range: 0x159..=0x159,
     },
     XmlChSRange {
-        low: 0x14f,
-        high: 0x14f,
+        range: 0x15b..=0x15b,
     },
     XmlChSRange {
-        low: 0x151,
-        high: 0x151,
+        range: 0x15d..=0x15d,
     },
     XmlChSRange {
-        low: 0x153,
-        high: 0x153,
+        range: 0x15f..=0x15f,
     },
     XmlChSRange {
-        low: 0x155,
-        high: 0x155,
+        range: 0x161..=0x161,
     },
     XmlChSRange {
-        low: 0x157,
-        high: 0x157,
+        range: 0x163..=0x163,
     },
     XmlChSRange {
-        low: 0x159,
-        high: 0x159,
+        range: 0x165..=0x165,
     },
     XmlChSRange {
-        low: 0x15b,
-        high: 0x15b,
+        range: 0x167..=0x167,
     },
     XmlChSRange {
-        low: 0x15d,
-        high: 0x15d,
+        range: 0x169..=0x169,
     },
     XmlChSRange {
-        low: 0x15f,
-        high: 0x15f,
+        range: 0x16b..=0x16b,
     },
     XmlChSRange {
-        low: 0x161,
-        high: 0x161,
+        range: 0x16d..=0x16d,
     },
     XmlChSRange {
-        low: 0x163,
-        high: 0x163,
+        range: 0x16f..=0x16f,
     },
     XmlChSRange {
-        low: 0x165,
-        high: 0x165,
+        range: 0x171..=0x171,
     },
     XmlChSRange {
-        low: 0x167,
-        high: 0x167,
+        range: 0x173..=0x173,
     },
     XmlChSRange {
-        low: 0x169,
-        high: 0x169,
+        range: 0x175..=0x175,
     },
     XmlChSRange {
-        low: 0x16b,
-        high: 0x16b,
+        range: 0x177..=0x177,
     },
     XmlChSRange {
-        low: 0x16d,
-        high: 0x16d,
+        range: 0x17a..=0x17a,
     },
     XmlChSRange {
-        low: 0x16f,
-        high: 0x16f,
+        range: 0x17c..=0x17c,
     },
     XmlChSRange {
-        low: 0x171,
-        high: 0x171,
+        range: 0x17e..=0x180,
     },
     XmlChSRange {
-        low: 0x173,
-        high: 0x173,
+        range: 0x183..=0x183,
     },
     XmlChSRange {
-        low: 0x175,
-        high: 0x175,
+        range: 0x185..=0x185,
     },
     XmlChSRange {
-        low: 0x177,
-        high: 0x177,
+        range: 0x188..=0x188,
     },
     XmlChSRange {
-        low: 0x17a,
-        high: 0x17a,
+        range: 0x18c..=0x18d,
     },
     XmlChSRange {
-        low: 0x17c,
-        high: 0x17c,
+        range: 0x192..=0x192,
     },
     XmlChSRange {
-        low: 0x17e,
-        high: 0x180,
+        range: 0x195..=0x195,
     },
     XmlChSRange {
-        low: 0x183,
-        high: 0x183,
+        range: 0x199..=0x19b,
     },
     XmlChSRange {
-        low: 0x185,
-        high: 0x185,
+        range: 0x19e..=0x19e,
     },
     XmlChSRange {
-        low: 0x188,
-        high: 0x188,
+        range: 0x1a1..=0x1a1,
     },
     XmlChSRange {
-        low: 0x18c,
-        high: 0x18d,
+        range: 0x1a3..=0x1a3,
     },
     XmlChSRange {
-        low: 0x192,
-        high: 0x192,
+        range: 0x1a5..=0x1a5,
     },
     XmlChSRange {
-        low: 0x195,
-        high: 0x195,
+        range: 0x1a8..=0x1a8,
     },
     XmlChSRange {
-        low: 0x199,
-        high: 0x19b,
+        range: 0x1aa..=0x1ab,
     },
     XmlChSRange {
-        low: 0x19e,
-        high: 0x19e,
+        range: 0x1ad..=0x1ad,
     },
     XmlChSRange {
-        low: 0x1a1,
-        high: 0x1a1,
+        range: 0x1b0..=0x1b0,
     },
     XmlChSRange {
-        low: 0x1a3,
-        high: 0x1a3,
+        range: 0x1b4..=0x1b4,
     },
     XmlChSRange {
-        low: 0x1a5,
-        high: 0x1a5,
+        range: 0x1b6..=0x1b6,
     },
     XmlChSRange {
-        low: 0x1a8,
-        high: 0x1a8,
+        range: 0x1b9..=0x1ba,
     },
     XmlChSRange {
-        low: 0x1aa,
-        high: 0x1ab,
+        range: 0x1bd..=0x1bf,
     },
     XmlChSRange {
-        low: 0x1ad,
-        high: 0x1ad,
+        range: 0x1c6..=0x1c6,
     },
     XmlChSRange {
-        low: 0x1b0,
-        high: 0x1b0,
+        range: 0x1c9..=0x1c9,
     },
     XmlChSRange {
-        low: 0x1b4,
-        high: 0x1b4,
+        range: 0x1cc..=0x1cc,
     },
     XmlChSRange {
-        low: 0x1b6,
-        high: 0x1b6,
+        range: 0x1ce..=0x1ce,
     },
     XmlChSRange {
-        low: 0x1b9,
-        high: 0x1ba,
+        range: 0x1d0..=0x1d0,
     },
     XmlChSRange {
-        low: 0x1bd,
-        high: 0x1bf,
+        range: 0x1d2..=0x1d2,
     },
     XmlChSRange {
-        low: 0x1c6,
-        high: 0x1c6,
+        range: 0x1d4..=0x1d4,
     },
     XmlChSRange {
-        low: 0x1c9,
-        high: 0x1c9,
+        range: 0x1d6..=0x1d6,
     },
     XmlChSRange {
-        low: 0x1cc,
-        high: 0x1cc,
+        range: 0x1d8..=0x1d8,
     },
     XmlChSRange {
-        low: 0x1ce,
-        high: 0x1ce,
+        range: 0x1da..=0x1da,
     },
     XmlChSRange {
-        low: 0x1d0,
-        high: 0x1d0,
+        range: 0x1dc..=0x1dd,
     },
     XmlChSRange {
-        low: 0x1d2,
-        high: 0x1d2,
+        range: 0x1df..=0x1df,
     },
     XmlChSRange {
-        low: 0x1d4,
-        high: 0x1d4,
+        range: 0x1e1..=0x1e1,
     },
     XmlChSRange {
-        low: 0x1d6,
-        high: 0x1d6,
+        range: 0x1e3..=0x1e3,
     },
     XmlChSRange {
-        low: 0x1d8,
-        high: 0x1d8,
+        range: 0x1e5..=0x1e5,
     },
     XmlChSRange {
-        low: 0x1da,
-        high: 0x1da,
+        range: 0x1e7..=0x1e7,
     },
     XmlChSRange {
-        low: 0x1dc,
-        high: 0x1dd,
+        range: 0x1e9..=0x1e9,
     },
     XmlChSRange {
-        low: 0x1df,
-        high: 0x1df,
+        range: 0x1eb..=0x1eb,
     },
     XmlChSRange {
-        low: 0x1e1,
-        high: 0x1e1,
+        range: 0x1ed..=0x1ed,
     },
     XmlChSRange {
-        low: 0x1e3,
-        high: 0x1e3,
+        range: 0x1ef..=0x1f0,
     },
     XmlChSRange {
-        low: 0x1e5,
-        high: 0x1e5,
+        range: 0x1f3..=0x1f3,
     },
     XmlChSRange {
-        low: 0x1e7,
-        high: 0x1e7,
+        range: 0x1f5..=0x1f5,
     },
     XmlChSRange {
-        low: 0x1e9,
-        high: 0x1e9,
+        range: 0x1f9..=0x1f9,
     },
     XmlChSRange {
-        low: 0x1eb,
-        high: 0x1eb,
+        range: 0x1fb..=0x1fb,
     },
     XmlChSRange {
-        low: 0x1ed,
-        high: 0x1ed,
+        range: 0x1fd..=0x1fd,
     },
     XmlChSRange {
-        low: 0x1ef,
-        high: 0x1f0,
+        range: 0x1ff..=0x1ff,
     },
     XmlChSRange {
-        low: 0x1f3,
-        high: 0x1f3,
+        range: 0x201..=0x201,
     },
     XmlChSRange {
-        low: 0x1f5,
-        high: 0x1f5,
+        range: 0x203..=0x203,
     },
     XmlChSRange {
-        low: 0x1f9,
-        high: 0x1f9,
+        range: 0x205..=0x205,
     },
     XmlChSRange {
-        low: 0x1fb,
-        high: 0x1fb,
+        range: 0x207..=0x207,
     },
     XmlChSRange {
-        low: 0x1fd,
-        high: 0x1fd,
+        range: 0x209..=0x209,
     },
     XmlChSRange {
-        low: 0x1ff,
-        high: 0x1ff,
+        range: 0x20b..=0x20b,
     },
     XmlChSRange {
-        low: 0x201,
-        high: 0x201,
+        range: 0x20d..=0x20d,
     },
     XmlChSRange {
-        low: 0x203,
-        high: 0x203,
+        range: 0x20f..=0x20f,
     },
     XmlChSRange {
-        low: 0x205,
-        high: 0x205,
+        range: 0x211..=0x211,
     },
     XmlChSRange {
-        low: 0x207,
-        high: 0x207,
+        range: 0x213..=0x213,
     },
     XmlChSRange {
-        low: 0x209,
-        high: 0x209,
+        range: 0x215..=0x215,
     },
     XmlChSRange {
-        low: 0x20b,
-        high: 0x20b,
+        range: 0x217..=0x217,
     },
     XmlChSRange {
-        low: 0x20d,
-        high: 0x20d,
+        range: 0x219..=0x219,
     },
     XmlChSRange {
-        low: 0x20f,
-        high: 0x20f,
+        range: 0x21b..=0x21b,
     },
     XmlChSRange {
-        low: 0x211,
-        high: 0x211,
+        range: 0x21d..=0x21d,
     },
     XmlChSRange {
-        low: 0x213,
-        high: 0x213,
+        range: 0x21f..=0x21f,
     },
     XmlChSRange {
-        low: 0x215,
-        high: 0x215,
+        range: 0x221..=0x221,
     },
     XmlChSRange {
-        low: 0x217,
-        high: 0x217,
+        range: 0x223..=0x223,
     },
     XmlChSRange {
-        low: 0x219,
-        high: 0x219,
+        range: 0x225..=0x225,
     },
     XmlChSRange {
-        low: 0x21b,
-        high: 0x21b,
+        range: 0x227..=0x227,
     },
     XmlChSRange {
-        low: 0x21d,
-        high: 0x21d,
+        range: 0x229..=0x229,
     },
     XmlChSRange {
-        low: 0x21f,
-        high: 0x21f,
+        range: 0x22b..=0x22b,
     },
     XmlChSRange {
-        low: 0x221,
-        high: 0x221,
+        range: 0x22d..=0x22d,
     },
     XmlChSRange {
-        low: 0x223,
-        high: 0x223,
+        range: 0x22f..=0x22f,
     },
     XmlChSRange {
-        low: 0x225,
-        high: 0x225,
+        range: 0x231..=0x231,
     },
     XmlChSRange {
-        low: 0x227,
-        high: 0x227,
+        range: 0x233..=0x236,
     },
     XmlChSRange {
-        low: 0x229,
-        high: 0x229,
+        range: 0x250..=0x2af,
     },
     XmlChSRange {
-        low: 0x22b,
-        high: 0x22b,
+        range: 0x390..=0x390,
     },
     XmlChSRange {
-        low: 0x22d,
-        high: 0x22d,
+        range: 0x3ac..=0x3ce,
     },
     XmlChSRange {
-        low: 0x22f,
-        high: 0x22f,
+        range: 0x3d0..=0x3d1,
     },
     XmlChSRange {
-        low: 0x231,
-        high: 0x231,
+        range: 0x3d5..=0x3d7,
     },
     XmlChSRange {
-        low: 0x233,
-        high: 0x236,
+        range: 0x3d9..=0x3d9,
     },
     XmlChSRange {
-        low: 0x250,
-        high: 0x2af,
+        range: 0x3db..=0x3db,
     },
     XmlChSRange {
-        low: 0x390,
-        high: 0x390,
+        range: 0x3dd..=0x3dd,
     },
     XmlChSRange {
-        low: 0x3ac,
-        high: 0x3ce,
+        range: 0x3df..=0x3df,
     },
     XmlChSRange {
-        low: 0x3d0,
-        high: 0x3d1,
+        range: 0x3e1..=0x3e1,
     },
     XmlChSRange {
-        low: 0x3d5,
-        high: 0x3d7,
+        range: 0x3e3..=0x3e3,
     },
     XmlChSRange {
-        low: 0x3d9,
-        high: 0x3d9,
+        range: 0x3e5..=0x3e5,
     },
     XmlChSRange {
-        low: 0x3db,
-        high: 0x3db,
+        range: 0x3e7..=0x3e7,
     },
     XmlChSRange {
-        low: 0x3dd,
-        high: 0x3dd,
+        range: 0x3e9..=0x3e9,
     },
     XmlChSRange {
-        low: 0x3df,
-        high: 0x3df,
+        range: 0x3eb..=0x3eb,
     },
     XmlChSRange {
-        low: 0x3e1,
-        high: 0x3e1,
+        range: 0x3ed..=0x3ed,
     },
     XmlChSRange {
-        low: 0x3e3,
-        high: 0x3e3,
+        range: 0x3ef..=0x3f3,
     },
     XmlChSRange {
-        low: 0x3e5,
-        high: 0x3e5,
+        range: 0x3f5..=0x3f5,
     },
     XmlChSRange {
-        low: 0x3e7,
-        high: 0x3e7,
+        range: 0x3f8..=0x3f8,
     },
     XmlChSRange {
-        low: 0x3e9,
-        high: 0x3e9,
+        range: 0x3fb..=0x3fb,
     },
     XmlChSRange {
-        low: 0x3eb,
-        high: 0x3eb,
+        range: 0x430..=0x45f,
     },
     XmlChSRange {
-        low: 0x3ed,
-        high: 0x3ed,
+        range: 0x461..=0x461,
     },
     XmlChSRange {
-        low: 0x3ef,
-        high: 0x3f3,
+        range: 0x463..=0x463,
     },
     XmlChSRange {
-        low: 0x3f5,
-        high: 0x3f5,
+        range: 0x465..=0x465,
     },
     XmlChSRange {
-        low: 0x3f8,
-        high: 0x3f8,
+        range: 0x467..=0x467,
     },
     XmlChSRange {
-        low: 0x3fb,
-        high: 0x3fb,
+        range: 0x469..=0x469,
     },
     XmlChSRange {
-        low: 0x430,
-        high: 0x45f,
+        range: 0x46b..=0x46b,
     },
     XmlChSRange {
-        low: 0x461,
-        high: 0x461,
+        range: 0x46d..=0x46d,
     },
     XmlChSRange {
-        low: 0x463,
-        high: 0x463,
+        range: 0x46f..=0x46f,
     },
     XmlChSRange {
-        low: 0x465,
-        high: 0x465,
+        range: 0x471..=0x471,
     },
     XmlChSRange {
-        low: 0x467,
-        high: 0x467,
+        range: 0x473..=0x473,
     },
     XmlChSRange {
-        low: 0x469,
-        high: 0x469,
+        range: 0x475..=0x475,
     },
     XmlChSRange {
-        low: 0x46b,
-        high: 0x46b,
+        range: 0x477..=0x477,
     },
     XmlChSRange {
-        low: 0x46d,
-        high: 0x46d,
+        range: 0x479..=0x479,
     },
     XmlChSRange {
-        low: 0x46f,
-        high: 0x46f,
+        range: 0x47b..=0x47b,
     },
     XmlChSRange {
-        low: 0x471,
-        high: 0x471,
+        range: 0x47d..=0x47d,
     },
     XmlChSRange {
-        low: 0x473,
-        high: 0x473,
+        range: 0x47f..=0x47f,
     },
     XmlChSRange {
-        low: 0x475,
-        high: 0x475,
+        range: 0x481..=0x481,
     },
     XmlChSRange {
-        low: 0x477,
-        high: 0x477,
+        range: 0x48b..=0x48b,
     },
     XmlChSRange {
-        low: 0x479,
-        high: 0x479,
+        range: 0x48d..=0x48d,
     },
     XmlChSRange {
-        low: 0x47b,
-        high: 0x47b,
+        range: 0x48f..=0x48f,
     },
     XmlChSRange {
-        low: 0x47d,
-        high: 0x47d,
+        range: 0x491..=0x491,
     },
     XmlChSRange {
-        low: 0x47f,
-        high: 0x47f,
+        range: 0x493..=0x493,
     },
     XmlChSRange {
-        low: 0x481,
-        high: 0x481,
+        range: 0x495..=0x495,
     },
     XmlChSRange {
-        low: 0x48b,
-        high: 0x48b,
+        range: 0x497..=0x497,
     },
     XmlChSRange {
-        low: 0x48d,
-        high: 0x48d,
+        range: 0x499..=0x499,
     },
     XmlChSRange {
-        low: 0x48f,
-        high: 0x48f,
+        range: 0x49b..=0x49b,
     },
     XmlChSRange {
-        low: 0x491,
-        high: 0x491,
+        range: 0x49d..=0x49d,
     },
     XmlChSRange {
-        low: 0x493,
-        high: 0x493,
+        range: 0x49f..=0x49f,
     },
     XmlChSRange {
-        low: 0x495,
-        high: 0x495,
+        range: 0x4a1..=0x4a1,
     },
     XmlChSRange {
-        low: 0x497,
-        high: 0x497,
+        range: 0x4a3..=0x4a3,
     },
     XmlChSRange {
-        low: 0x499,
-        high: 0x499,
+        range: 0x4a5..=0x4a5,
     },
     XmlChSRange {
-        low: 0x49b,
-        high: 0x49b,
+        range: 0x4a7..=0x4a7,
     },
     XmlChSRange {
-        low: 0x49d,
-        high: 0x49d,
+        range: 0x4a9..=0x4a9,
     },
     XmlChSRange {
-        low: 0x49f,
-        high: 0x49f,
+        range: 0x4ab..=0x4ab,
     },
     XmlChSRange {
-        low: 0x4a1,
-        high: 0x4a1,
+        range: 0x4ad..=0x4ad,
     },
     XmlChSRange {
-        low: 0x4a3,
-        high: 0x4a3,
+        range: 0x4af..=0x4af,
     },
     XmlChSRange {
-        low: 0x4a5,
-        high: 0x4a5,
+        range: 0x4b1..=0x4b1,
     },
     XmlChSRange {
-        low: 0x4a7,
-        high: 0x4a7,
+        range: 0x4b3..=0x4b3,
     },
     XmlChSRange {
-        low: 0x4a9,
-        high: 0x4a9,
+        range: 0x4b5..=0x4b5,
     },
     XmlChSRange {
-        low: 0x4ab,
-        high: 0x4ab,
+        range: 0x4b7..=0x4b7,
     },
     XmlChSRange {
-        low: 0x4ad,
-        high: 0x4ad,
+        range: 0x4b9..=0x4b9,
     },
     XmlChSRange {
-        low: 0x4af,
-        high: 0x4af,
+        range: 0x4bb..=0x4bb,
     },
     XmlChSRange {
-        low: 0x4b1,
-        high: 0x4b1,
+        range: 0x4bd..=0x4bd,
     },
     XmlChSRange {
-        low: 0x4b3,
-        high: 0x4b3,
+        range: 0x4bf..=0x4bf,
     },
     XmlChSRange {
-        low: 0x4b5,
-        high: 0x4b5,
+        range: 0x4c2..=0x4c2,
     },
     XmlChSRange {
-        low: 0x4b7,
-        high: 0x4b7,
+        range: 0x4c4..=0x4c4,
     },
     XmlChSRange {
-        low: 0x4b9,
-        high: 0x4b9,
+        range: 0x4c6..=0x4c6,
     },
     XmlChSRange {
-        low: 0x4bb,
-        high: 0x4bb,
+        range: 0x4c8..=0x4c8,
     },
     XmlChSRange {
-        low: 0x4bd,
-        high: 0x4bd,
+        range: 0x4ca..=0x4ca,
     },
     XmlChSRange {
-        low: 0x4bf,
-        high: 0x4bf,
+        range: 0x4cc..=0x4cc,
     },
     XmlChSRange {
-        low: 0x4c2,
-        high: 0x4c2,
+        range: 0x4ce..=0x4ce,
     },
     XmlChSRange {
-        low: 0x4c4,
-        high: 0x4c4,
+        range: 0x4d1..=0x4d1,
     },
     XmlChSRange {
-        low: 0x4c6,
-        high: 0x4c6,
+        range: 0x4d3..=0x4d3,
     },
     XmlChSRange {
-        low: 0x4c8,
-        high: 0x4c8,
+        range: 0x4d5..=0x4d5,
     },
     XmlChSRange {
-        low: 0x4ca,
-        high: 0x4ca,
+        range: 0x4d7..=0x4d7,
     },
     XmlChSRange {
-        low: 0x4cc,
-        high: 0x4cc,
+        range: 0x4d9..=0x4d9,
     },
     XmlChSRange {
-        low: 0x4ce,
-        high: 0x4ce,
+        range: 0x4db..=0x4db,
     },
     XmlChSRange {
-        low: 0x4d1,
-        high: 0x4d1,
+        range: 0x4dd..=0x4dd,
     },
     XmlChSRange {
-        low: 0x4d3,
-        high: 0x4d3,
+        range: 0x4df..=0x4df,
     },
     XmlChSRange {
-        low: 0x4d5,
-        high: 0x4d5,
+        range: 0x4e1..=0x4e1,
     },
     XmlChSRange {
-        low: 0x4d7,
-        high: 0x4d7,
+        range: 0x4e3..=0x4e3,
     },
     XmlChSRange {
-        low: 0x4d9,
-        high: 0x4d9,
+        range: 0x4e5..=0x4e5,
     },
     XmlChSRange {
-        low: 0x4db,
-        high: 0x4db,
+        range: 0x4e7..=0x4e7,
     },
     XmlChSRange {
-        low: 0x4dd,
-        high: 0x4dd,
+        range: 0x4e9..=0x4e9,
     },
     XmlChSRange {
-        low: 0x4df,
-        high: 0x4df,
+        range: 0x4eb..=0x4eb,
     },
     XmlChSRange {
-        low: 0x4e1,
-        high: 0x4e1,
+        range: 0x4ed..=0x4ed,
     },
     XmlChSRange {
-        low: 0x4e3,
-        high: 0x4e3,
+        range: 0x4ef..=0x4ef,
     },
     XmlChSRange {
-        low: 0x4e5,
-        high: 0x4e5,
+        range: 0x4f1..=0x4f1,
     },
     XmlChSRange {
-        low: 0x4e7,
-        high: 0x4e7,
+        range: 0x4f3..=0x4f3,
     },
     XmlChSRange {
-        low: 0x4e9,
-        high: 0x4e9,
+        range: 0x4f5..=0x4f5,
     },
     XmlChSRange {
-        low: 0x4eb,
-        high: 0x4eb,
+        range: 0x4f9..=0x4f9,
     },
     XmlChSRange {
-        low: 0x4ed,
-        high: 0x4ed,
+        range: 0x501..=0x501,
     },
     XmlChSRange {
-        low: 0x4ef,
-        high: 0x4ef,
+        range: 0x503..=0x503,
     },
     XmlChSRange {
-        low: 0x4f1,
-        high: 0x4f1,
+        range: 0x505..=0x505,
     },
     XmlChSRange {
-        low: 0x4f3,
-        high: 0x4f3,
+        range: 0x507..=0x507,
     },
     XmlChSRange {
-        low: 0x4f5,
-        high: 0x4f5,
+        range: 0x509..=0x509,
     },
     XmlChSRange {
-        low: 0x4f9,
-        high: 0x4f9,
+        range: 0x50b..=0x50b,
     },
     XmlChSRange {
-        low: 0x501,
-        high: 0x501,
+        range: 0x50d..=0x50d,
     },
     XmlChSRange {
-        low: 0x503,
-        high: 0x503,
+        range: 0x50f..=0x50f,
     },
     XmlChSRange {
-        low: 0x505,
-        high: 0x505,
+        range: 0x561..=0x587,
     },
     XmlChSRange {
-        low: 0x507,
-        high: 0x507,
+        range: 0x1d00..=0x1d2b,
     },
     XmlChSRange {
-        low: 0x509,
-        high: 0x509,
+        range: 0x1d62..=0x1d6b,
     },
     XmlChSRange {
-        low: 0x50b,
-        high: 0x50b,
+        range: 0x1e01..=0x1e01,
     },
     XmlChSRange {
-        low: 0x50d,
-        high: 0x50d,
+        range: 0x1e03..=0x1e03,
     },
     XmlChSRange {
-        low: 0x50f,
-        high: 0x50f,
+        range: 0x1e05..=0x1e05,
     },
     XmlChSRange {
-        low: 0x561,
-        high: 0x587,
+        range: 0x1e07..=0x1e07,
     },
     XmlChSRange {
-        low: 0x1d00,
-        high: 0x1d2b,
+        range: 0x1e09..=0x1e09,
     },
     XmlChSRange {
-        low: 0x1d62,
-        high: 0x1d6b,
+        range: 0x1e0b..=0x1e0b,
     },
     XmlChSRange {
-        low: 0x1e01,
-        high: 0x1e01,
+        range: 0x1e0d..=0x1e0d,
     },
     XmlChSRange {
-        low: 0x1e03,
-        high: 0x1e03,
+        range: 0x1e0f..=0x1e0f,
     },
     XmlChSRange {
-        low: 0x1e05,
-        high: 0x1e05,
+        range: 0x1e11..=0x1e11,
     },
     XmlChSRange {
-        low: 0x1e07,
-        high: 0x1e07,
+        range: 0x1e13..=0x1e13,
     },
     XmlChSRange {
-        low: 0x1e09,
-        high: 0x1e09,
+        range: 0x1e15..=0x1e15,
     },
     XmlChSRange {
-        low: 0x1e0b,
-        high: 0x1e0b,
+        range: 0x1e17..=0x1e17,
     },
     XmlChSRange {
-        low: 0x1e0d,
-        high: 0x1e0d,
+        range: 0x1e19..=0x1e19,
     },
     XmlChSRange {
-        low: 0x1e0f,
-        high: 0x1e0f,
+        range: 0x1e1b..=0x1e1b,
     },
     XmlChSRange {
-        low: 0x1e11,
-        high: 0x1e11,
+        range: 0x1e1d..=0x1e1d,
     },
     XmlChSRange {
-        low: 0x1e13,
-        high: 0x1e13,
+        range: 0x1e1f..=0x1e1f,
     },
     XmlChSRange {
-        low: 0x1e15,
-        high: 0x1e15,
+        range: 0x1e21..=0x1e21,
     },
     XmlChSRange {
-        low: 0x1e17,
-        high: 0x1e17,
+        range: 0x1e23..=0x1e23,
     },
     XmlChSRange {
-        low: 0x1e19,
-        high: 0x1e19,
+        range: 0x1e25..=0x1e25,
     },
     XmlChSRange {
-        low: 0x1e1b,
-        high: 0x1e1b,
+        range: 0x1e27..=0x1e27,
     },
     XmlChSRange {
-        low: 0x1e1d,
-        high: 0x1e1d,
+        range: 0x1e29..=0x1e29,
     },
     XmlChSRange {
-        low: 0x1e1f,
-        high: 0x1e1f,
+        range: 0x1e2b..=0x1e2b,
     },
     XmlChSRange {
-        low: 0x1e21,
-        high: 0x1e21,
+        range: 0x1e2d..=0x1e2d,
     },
     XmlChSRange {
-        low: 0x1e23,
-        high: 0x1e23,
+        range: 0x1e2f..=0x1e2f,
     },
     XmlChSRange {
-        low: 0x1e25,
-        high: 0x1e25,
+        range: 0x1e31..=0x1e31,
     },
     XmlChSRange {
-        low: 0x1e27,
-        high: 0x1e27,
+        range: 0x1e33..=0x1e33,
     },
     XmlChSRange {
-        low: 0x1e29,
-        high: 0x1e29,
+        range: 0x1e35..=0x1e35,
     },
     XmlChSRange {
-        low: 0x1e2b,
-        high: 0x1e2b,
+        range: 0x1e37..=0x1e37,
     },
     XmlChSRange {
-        low: 0x1e2d,
-        high: 0x1e2d,
+        range: 0x1e39..=0x1e39,
     },
     XmlChSRange {
-        low: 0x1e2f,
-        high: 0x1e2f,
+        range: 0x1e3b..=0x1e3b,
     },
     XmlChSRange {
-        low: 0x1e31,
-        high: 0x1e31,
+        range: 0x1e3d..=0x1e3d,
     },
     XmlChSRange {
-        low: 0x1e33,
-        high: 0x1e33,
+        range: 0x1e3f..=0x1e3f,
     },
     XmlChSRange {
-        low: 0x1e35,
-        high: 0x1e35,
+        range: 0x1e41..=0x1e41,
     },
     XmlChSRange {
-        low: 0x1e37,
-        high: 0x1e37,
+        range: 0x1e43..=0x1e43,
     },
     XmlChSRange {
-        low: 0x1e39,
-        high: 0x1e39,
+        range: 0x1e45..=0x1e45,
     },
     XmlChSRange {
-        low: 0x1e3b,
-        high: 0x1e3b,
+        range: 0x1e47..=0x1e47,
     },
     XmlChSRange {
-        low: 0x1e3d,
-        high: 0x1e3d,
+        range: 0x1e49..=0x1e49,
     },
     XmlChSRange {
-        low: 0x1e3f,
-        high: 0x1e3f,
+        range: 0x1e4b..=0x1e4b,
     },
     XmlChSRange {
-        low: 0x1e41,
-        high: 0x1e41,
+        range: 0x1e4d..=0x1e4d,
     },
     XmlChSRange {
-        low: 0x1e43,
-        high: 0x1e43,
+        range: 0x1e4f..=0x1e4f,
     },
     XmlChSRange {
-        low: 0x1e45,
-        high: 0x1e45,
+        range: 0x1e51..=0x1e51,
     },
     XmlChSRange {
-        low: 0x1e47,
-        high: 0x1e47,
+        range: 0x1e53..=0x1e53,
     },
     XmlChSRange {
-        low: 0x1e49,
-        high: 0x1e49,
+        range: 0x1e55..=0x1e55,
     },
     XmlChSRange {
-        low: 0x1e4b,
-        high: 0x1e4b,
+        range: 0x1e57..=0x1e57,
     },
     XmlChSRange {
-        low: 0x1e4d,
-        high: 0x1e4d,
+        range: 0x1e59..=0x1e59,
     },
     XmlChSRange {
-        low: 0x1e4f,
-        high: 0x1e4f,
+        range: 0x1e5b..=0x1e5b,
     },
     XmlChSRange {
-        low: 0x1e51,
-        high: 0x1e51,
+        range: 0x1e5d..=0x1e5d,
     },
     XmlChSRange {
-        low: 0x1e53,
-        high: 0x1e53,
+        range: 0x1e5f..=0x1e5f,
     },
     XmlChSRange {
-        low: 0x1e55,
-        high: 0x1e55,
+        range: 0x1e61..=0x1e61,
     },
     XmlChSRange {
-        low: 0x1e57,
-        high: 0x1e57,
+        range: 0x1e63..=0x1e63,
     },
     XmlChSRange {
-        low: 0x1e59,
-        high: 0x1e59,
+        range: 0x1e65..=0x1e65,
     },
     XmlChSRange {
-        low: 0x1e5b,
-        high: 0x1e5b,
+        range: 0x1e67..=0x1e67,
     },
     XmlChSRange {
-        low: 0x1e5d,
-        high: 0x1e5d,
+        range: 0x1e69..=0x1e69,
     },
     XmlChSRange {
-        low: 0x1e5f,
-        high: 0x1e5f,
+        range: 0x1e6b..=0x1e6b,
     },
     XmlChSRange {
-        low: 0x1e61,
-        high: 0x1e61,
+        range: 0x1e6d..=0x1e6d,
     },
     XmlChSRange {
-        low: 0x1e63,
-        high: 0x1e63,
+        range: 0x1e6f..=0x1e6f,
     },
     XmlChSRange {
-        low: 0x1e65,
-        high: 0x1e65,
+        range: 0x1e71..=0x1e71,
     },
     XmlChSRange {
-        low: 0x1e67,
-        high: 0x1e67,
+        range: 0x1e73..=0x1e73,
     },
     XmlChSRange {
-        low: 0x1e69,
-        high: 0x1e69,
+        range: 0x1e75..=0x1e75,
     },
     XmlChSRange {
-        low: 0x1e6b,
-        high: 0x1e6b,
+        range: 0x1e77..=0x1e77,
     },
     XmlChSRange {
-        low: 0x1e6d,
-        high: 0x1e6d,
+        range: 0x1e79..=0x1e79,
     },
     XmlChSRange {
-        low: 0x1e6f,
-        high: 0x1e6f,
+        range: 0x1e7b..=0x1e7b,
     },
     XmlChSRange {
-        low: 0x1e71,
-        high: 0x1e71,
+        range: 0x1e7d..=0x1e7d,
     },
     XmlChSRange {
-        low: 0x1e73,
-        high: 0x1e73,
+        range: 0x1e7f..=0x1e7f,
     },
     XmlChSRange {
-        low: 0x1e75,
-        high: 0x1e75,
+        range: 0x1e81..=0x1e81,
     },
     XmlChSRange {
-        low: 0x1e77,
-        high: 0x1e77,
+        range: 0x1e83..=0x1e83,
     },
     XmlChSRange {
-        low: 0x1e79,
-        high: 0x1e79,
+        range: 0x1e85..=0x1e85,
     },
     XmlChSRange {
-        low: 0x1e7b,
-        high: 0x1e7b,
+        range: 0x1e87..=0x1e87,
     },
     XmlChSRange {
-        low: 0x1e7d,
-        high: 0x1e7d,
+        range: 0x1e89..=0x1e89,
     },
     XmlChSRange {
-        low: 0x1e7f,
-        high: 0x1e7f,
+        range: 0x1e8b..=0x1e8b,
     },
     XmlChSRange {
-        low: 0x1e81,
-        high: 0x1e81,
+        range: 0x1e8d..=0x1e8d,
     },
     XmlChSRange {
-        low: 0x1e83,
-        high: 0x1e83,
+        range: 0x1e8f..=0x1e8f,
     },
     XmlChSRange {
-        low: 0x1e85,
-        high: 0x1e85,
+        range: 0x1e91..=0x1e91,
     },
     XmlChSRange {
-        low: 0x1e87,
-        high: 0x1e87,
+        range: 0x1e93..=0x1e93,
     },
     XmlChSRange {
-        low: 0x1e89,
-        high: 0x1e89,
+        range: 0x1e95..=0x1e9b,
     },
     XmlChSRange {
-        low: 0x1e8b,
-        high: 0x1e8b,
+        range: 0x1ea1..=0x1ea1,
     },
     XmlChSRange {
-        low: 0x1e8d,
-        high: 0x1e8d,
+        range: 0x1ea3..=0x1ea3,
     },
     XmlChSRange {
-        low: 0x1e8f,
-        high: 0x1e8f,
+        range: 0x1ea5..=0x1ea5,
     },
     XmlChSRange {
-        low: 0x1e91,
-        high: 0x1e91,
+        range: 0x1ea7..=0x1ea7,
     },
     XmlChSRange {
-        low: 0x1e93,
-        high: 0x1e93,
+        range: 0x1ea9..=0x1ea9,
     },
     XmlChSRange {
-        low: 0x1e95,
-        high: 0x1e9b,
+        range: 0x1eab..=0x1eab,
     },
     XmlChSRange {
-        low: 0x1ea1,
-        high: 0x1ea1,
+        range: 0x1ead..=0x1ead,
     },
     XmlChSRange {
-        low: 0x1ea3,
-        high: 0x1ea3,
+        range: 0x1eaf..=0x1eaf,
     },
     XmlChSRange {
-        low: 0x1ea5,
-        high: 0x1ea5,
+        range: 0x1eb1..=0x1eb1,
     },
     XmlChSRange {
-        low: 0x1ea7,
-        high: 0x1ea7,
+        range: 0x1eb3..=0x1eb3,
     },
     XmlChSRange {
-        low: 0x1ea9,
-        high: 0x1ea9,
+        range: 0x1eb5..=0x1eb5,
     },
     XmlChSRange {
-        low: 0x1eab,
-        high: 0x1eab,
+        range: 0x1eb7..=0x1eb7,
     },
     XmlChSRange {
-        low: 0x1ead,
-        high: 0x1ead,
+        range: 0x1eb9..=0x1eb9,
     },
     XmlChSRange {
-        low: 0x1eaf,
-        high: 0x1eaf,
+        range: 0x1ebb..=0x1ebb,
     },
     XmlChSRange {
-        low: 0x1eb1,
-        high: 0x1eb1,
+        range: 0x1ebd..=0x1ebd,
     },
     XmlChSRange {
-        low: 0x1eb3,
-        high: 0x1eb3,
+        range: 0x1ebf..=0x1ebf,
     },
     XmlChSRange {
-        low: 0x1eb5,
-        high: 0x1eb5,
+        range: 0x1ec1..=0x1ec1,
     },
     XmlChSRange {
-        low: 0x1eb7,
-        high: 0x1eb7,
+        range: 0x1ec3..=0x1ec3,
     },
     XmlChSRange {
-        low: 0x1eb9,
-        high: 0x1eb9,
+        range: 0x1ec5..=0x1ec5,
     },
     XmlChSRange {
-        low: 0x1ebb,
-        high: 0x1ebb,
+        range: 0x1ec7..=0x1ec7,
     },
     XmlChSRange {
-        low: 0x1ebd,
-        high: 0x1ebd,
+        range: 0x1ec9..=0x1ec9,
     },
     XmlChSRange {
-        low: 0x1ebf,
-        high: 0x1ebf,
+        range: 0x1ecb..=0x1ecb,
     },
     XmlChSRange {
-        low: 0x1ec1,
-        high: 0x1ec1,
+        range: 0x1ecd..=0x1ecd,
     },
     XmlChSRange {
-        low: 0x1ec3,
-        high: 0x1ec3,
+        range: 0x1ecf..=0x1ecf,
     },
     XmlChSRange {
-        low: 0x1ec5,
-        high: 0x1ec5,
+        range: 0x1ed1..=0x1ed1,
     },
     XmlChSRange {
-        low: 0x1ec7,
-        high: 0x1ec7,
+        range: 0x1ed3..=0x1ed3,
     },
     XmlChSRange {
-        low: 0x1ec9,
-        high: 0x1ec9,
+        range: 0x1ed5..=0x1ed5,
     },
     XmlChSRange {
-        low: 0x1ecb,
-        high: 0x1ecb,
+        range: 0x1ed7..=0x1ed7,
     },
     XmlChSRange {
-        low: 0x1ecd,
-        high: 0x1ecd,
+        range: 0x1ed9..=0x1ed9,
     },
     XmlChSRange {
-        low: 0x1ecf,
-        high: 0x1ecf,
+        range: 0x1edb..=0x1edb,
     },
     XmlChSRange {
-        low: 0x1ed1,
-        high: 0x1ed1,
+        range: 0x1edd..=0x1edd,
     },
     XmlChSRange {
-        low: 0x1ed3,
-        high: 0x1ed3,
+        range: 0x1edf..=0x1edf,
     },
     XmlChSRange {
-        low: 0x1ed5,
-        high: 0x1ed5,
+        range: 0x1ee1..=0x1ee1,
     },
     XmlChSRange {
-        low: 0x1ed7,
-        high: 0x1ed7,
+        range: 0x1ee3..=0x1ee3,
     },
     XmlChSRange {
-        low: 0x1ed9,
-        high: 0x1ed9,
+        range: 0x1ee5..=0x1ee5,
     },
     XmlChSRange {
-        low: 0x1edb,
-        high: 0x1edb,
+        range: 0x1ee7..=0x1ee7,
     },
     XmlChSRange {
-        low: 0x1edd,
-        high: 0x1edd,
+        range: 0x1ee9..=0x1ee9,
     },
     XmlChSRange {
-        low: 0x1edf,
-        high: 0x1edf,
+        range: 0x1eeb..=0x1eeb,
     },
     XmlChSRange {
-        low: 0x1ee1,
-        high: 0x1ee1,
+        range: 0x1eed..=0x1eed,
     },
     XmlChSRange {
-        low: 0x1ee3,
-        high: 0x1ee3,
+        range: 0x1eef..=0x1eef,
     },
     XmlChSRange {
-        low: 0x1ee5,
-        high: 0x1ee5,
+        range: 0x1ef1..=0x1ef1,
     },
     XmlChSRange {
-        low: 0x1ee7,
-        high: 0x1ee7,
+        range: 0x1ef3..=0x1ef3,
     },
     XmlChSRange {
-        low: 0x1ee9,
-        high: 0x1ee9,
+        range: 0x1ef5..=0x1ef5,
     },
     XmlChSRange {
-        low: 0x1eeb,
-        high: 0x1eeb,
+        range: 0x1ef7..=0x1ef7,
     },
     XmlChSRange {
-        low: 0x1eed,
-        high: 0x1eed,
+        range: 0x1ef9..=0x1ef9,
     },
     XmlChSRange {
-        low: 0x1eef,
-        high: 0x1eef,
+        range: 0x1f00..=0x1f07,
     },
     XmlChSRange {
-        low: 0x1ef1,
-        high: 0x1ef1,
+        range: 0x1f10..=0x1f15,
     },
     XmlChSRange {
-        low: 0x1ef3,
-        high: 0x1ef3,
+        range: 0x1f20..=0x1f27,
     },
     XmlChSRange {
-        low: 0x1ef5,
-        high: 0x1ef5,
+        range: 0x1f30..=0x1f37,
     },
     XmlChSRange {
-        low: 0x1ef7,
-        high: 0x1ef7,
+        range: 0x1f40..=0x1f45,
     },
     XmlChSRange {
-        low: 0x1ef9,
-        high: 0x1ef9,
+        range: 0x1f50..=0x1f57,
     },
     XmlChSRange {
-        low: 0x1f00,
-        high: 0x1f07,
+        range: 0x1f60..=0x1f67,
     },
     XmlChSRange {
-        low: 0x1f10,
-        high: 0x1f15,
+        range: 0x1f70..=0x1f7d,
     },
     XmlChSRange {
-        low: 0x1f20,
-        high: 0x1f27,
+        range: 0x1f80..=0x1f87,
     },
     XmlChSRange {
-        low: 0x1f30,
-        high: 0x1f37,
+        range: 0x1f90..=0x1f97,
     },
     XmlChSRange {
-        low: 0x1f40,
-        high: 0x1f45,
+        range: 0x1fa0..=0x1fa7,
     },
     XmlChSRange {
-        low: 0x1f50,
-        high: 0x1f57,
+        range: 0x1fb0..=0x1fb4,
     },
     XmlChSRange {
-        low: 0x1f60,
-        high: 0x1f67,
+        range: 0x1fb6..=0x1fb7,
     },
     XmlChSRange {
-        low: 0x1f70,
-        high: 0x1f7d,
+        range: 0x1fbe..=0x1fbe,
     },
     XmlChSRange {
-        low: 0x1f80,
-        high: 0x1f87,
+        range: 0x1fc2..=0x1fc4,
     },
     XmlChSRange {
-        low: 0x1f90,
-        high: 0x1f97,
+        range: 0x1fc6..=0x1fc7,
     },
     XmlChSRange {
-        low: 0x1fa0,
-        high: 0x1fa7,
+        range: 0x1fd0..=0x1fd3,
     },
     XmlChSRange {
-        low: 0x1fb0,
-        high: 0x1fb4,
+        range: 0x1fd6..=0x1fd7,
     },
     XmlChSRange {
-        low: 0x1fb6,
-        high: 0x1fb7,
+        range: 0x1fe0..=0x1fe7,
     },
     XmlChSRange {
-        low: 0x1fbe,
-        high: 0x1fbe,
+        range: 0x1ff2..=0x1ff4,
     },
     XmlChSRange {
-        low: 0x1fc2,
-        high: 0x1fc4,
+        range: 0x1ff6..=0x1ff7,
     },
     XmlChSRange {
-        low: 0x1fc6,
-        high: 0x1fc7,
+        range: 0x2071..=0x2071,
     },
     XmlChSRange {
-        low: 0x1fd0,
-        high: 0x1fd3,
+        range: 0x207f..=0x207f,
     },
     XmlChSRange {
-        low: 0x1fd6,
-        high: 0x1fd7,
+        range: 0x210a..=0x210a,
     },
     XmlChSRange {
-        low: 0x1fe0,
-        high: 0x1fe7,
+        range: 0x210e..=0x210f,
     },
     XmlChSRange {
-        low: 0x1ff2,
-        high: 0x1ff4,
+        range: 0x2113..=0x2113,
     },
     XmlChSRange {
-        low: 0x1ff6,
-        high: 0x1ff7,
+        range: 0x212f..=0x212f,
     },
     XmlChSRange {
-        low: 0x2071,
-        high: 0x2071,
+        range: 0x2134..=0x2134,
     },
     XmlChSRange {
-        low: 0x207f,
-        high: 0x207f,
+        range: 0x2139..=0x2139,
     },
     XmlChSRange {
-        low: 0x210a,
-        high: 0x210a,
+        range: 0x213d..=0x213d,
     },
     XmlChSRange {
-        low: 0x210e,
-        high: 0x210f,
+        range: 0x2146..=0x2149,
     },
     XmlChSRange {
-        low: 0x2113,
-        high: 0x2113,
+        range: 0xfb00..=0xfb06,
     },
     XmlChSRange {
-        low: 0x212f,
-        high: 0x212f,
+        range: 0xfb13..=0xfb17,
     },
     XmlChSRange {
-        low: 0x2134,
-        high: 0x2134,
-    },
-    XmlChSRange {
-        low: 0x2139,
-        high: 0x2139,
-    },
-    XmlChSRange {
-        low: 0x213d,
-        high: 0x213d,
-    },
-    XmlChSRange {
-        low: 0x2146,
-        high: 0x2149,
-    },
-    XmlChSRange {
-        low: 0xfb00,
-        high: 0xfb06,
-    },
-    XmlChSRange {
-        low: 0xfb13,
-        high: 0xfb17,
-    },
-    XmlChSRange {
-        low: 0xff41,
-        high: 0xff5a,
+        range: 0xff41..=0xff5a,
     },
 ];
 
 const XML_LL_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10428,
-        high: 0x1044f,
+        range: 0x10428..=0x1044f,
     },
     XmlChLRange {
-        low: 0x1d41a,
-        high: 0x1d433,
+        range: 0x1d41a..=0x1d433,
     },
     XmlChLRange {
-        low: 0x1d44e,
-        high: 0x1d454,
+        range: 0x1d44e..=0x1d454,
     },
     XmlChLRange {
-        low: 0x1d456,
-        high: 0x1d467,
+        range: 0x1d456..=0x1d467,
     },
     XmlChLRange {
-        low: 0x1d482,
-        high: 0x1d49b,
+        range: 0x1d482..=0x1d49b,
     },
     XmlChLRange {
-        low: 0x1d4b6,
-        high: 0x1d4b9,
+        range: 0x1d4b6..=0x1d4b9,
     },
     XmlChLRange {
-        low: 0x1d4bb,
-        high: 0x1d4bb,
+        range: 0x1d4bb..=0x1d4bb,
     },
     XmlChLRange {
-        low: 0x1d4bd,
-        high: 0x1d4c3,
+        range: 0x1d4bd..=0x1d4c3,
     },
     XmlChLRange {
-        low: 0x1d4c5,
-        high: 0x1d4cf,
+        range: 0x1d4c5..=0x1d4cf,
     },
     XmlChLRange {
-        low: 0x1d4ea,
-        high: 0x1d503,
+        range: 0x1d4ea..=0x1d503,
     },
     XmlChLRange {
-        low: 0x1d51e,
-        high: 0x1d537,
+        range: 0x1d51e..=0x1d537,
     },
     XmlChLRange {
-        low: 0x1d552,
-        high: 0x1d56b,
+        range: 0x1d552..=0x1d56b,
     },
     XmlChLRange {
-        low: 0x1d586,
-        high: 0x1d59f,
+        range: 0x1d586..=0x1d59f,
     },
     XmlChLRange {
-        low: 0x1d5ba,
-        high: 0x1d5d3,
+        range: 0x1d5ba..=0x1d5d3,
     },
     XmlChLRange {
-        low: 0x1d5ee,
-        high: 0x1d607,
+        range: 0x1d5ee..=0x1d607,
     },
     XmlChLRange {
-        low: 0x1d622,
-        high: 0x1d63b,
+        range: 0x1d622..=0x1d63b,
     },
     XmlChLRange {
-        low: 0x1d656,
-        high: 0x1d66f,
+        range: 0x1d656..=0x1d66f,
     },
     XmlChLRange {
-        low: 0x1d68a,
-        high: 0x1d6a3,
+        range: 0x1d68a..=0x1d6a3,
     },
     XmlChLRange {
-        low: 0x1d6c2,
-        high: 0x1d6da,
+        range: 0x1d6c2..=0x1d6da,
     },
     XmlChLRange {
-        low: 0x1d6dc,
-        high: 0x1d6e1,
+        range: 0x1d6dc..=0x1d6e1,
     },
     XmlChLRange {
-        low: 0x1d6fc,
-        high: 0x1d714,
+        range: 0x1d6fc..=0x1d714,
     },
     XmlChLRange {
-        low: 0x1d716,
-        high: 0x1d71b,
+        range: 0x1d716..=0x1d71b,
     },
     XmlChLRange {
-        low: 0x1d736,
-        high: 0x1d74e,
+        range: 0x1d736..=0x1d74e,
     },
     XmlChLRange {
-        low: 0x1d750,
-        high: 0x1d755,
+        range: 0x1d750..=0x1d755,
     },
     XmlChLRange {
-        low: 0x1d770,
-        high: 0x1d788,
+        range: 0x1d770..=0x1d788,
     },
     XmlChLRange {
-        low: 0x1d78a,
-        high: 0x1d78f,
+        range: 0x1d78a..=0x1d78f,
     },
     XmlChLRange {
-        low: 0x1d7aa,
-        high: 0x1d7c2,
+        range: 0x1d7aa..=0x1d7c2,
     },
     XmlChLRange {
-        low: 0x1d7c4,
-        high: 0x1d7c9,
+        range: 0x1d7c4..=0x1d7c9,
     },
 ];
 
@@ -3901,84 +3075,64 @@ const XML_LL_G: XmlChRangeGroup = XmlChRangeGroup {
 
 const XML_LM_S: &[XmlChSRange] = &[
     XmlChSRange {
-        low: 0x2b0,
-        high: 0x2c1,
+        range: 0x2b0..=0x2c1,
     },
     XmlChSRange {
-        low: 0x2c6,
-        high: 0x2d1,
+        range: 0x2c6..=0x2d1,
     },
     XmlChSRange {
-        low: 0x2e0,
-        high: 0x2e4,
+        range: 0x2e0..=0x2e4,
     },
     XmlChSRange {
-        low: 0x2ee,
-        high: 0x2ee,
+        range: 0x2ee..=0x2ee,
     },
     XmlChSRange {
-        low: 0x37a,
-        high: 0x37a,
+        range: 0x37a..=0x37a,
     },
     XmlChSRange {
-        low: 0x559,
-        high: 0x559,
+        range: 0x559..=0x559,
     },
     XmlChSRange {
-        low: 0x640,
-        high: 0x640,
+        range: 0x640..=0x640,
     },
     XmlChSRange {
-        low: 0x6e5,
-        high: 0x6e6,
+        range: 0x6e5..=0x6e6,
     },
     XmlChSRange {
-        low: 0xe46,
-        high: 0xe46,
+        range: 0xe46..=0xe46,
     },
     XmlChSRange {
-        low: 0xec6,
-        high: 0xec6,
+        range: 0xec6..=0xec6,
     },
     XmlChSRange {
-        low: 0x17d7,
-        high: 0x17d7,
+        range: 0x17d7..=0x17d7,
     },
     XmlChSRange {
-        low: 0x1843,
-        high: 0x1843,
+        range: 0x1843..=0x1843,
     },
     XmlChSRange {
-        low: 0x1d2c,
-        high: 0x1d61,
+        range: 0x1d2c..=0x1d61,
     },
     XmlChSRange {
-        low: 0x3005,
-        high: 0x3005,
+        range: 0x3005..=0x3005,
     },
     XmlChSRange {
-        low: 0x3031,
-        high: 0x3035,
+        range: 0x3031..=0x3035,
     },
     XmlChSRange {
-        low: 0x303b,
-        high: 0x303b,
+        range: 0x303b..=0x303b,
     },
     XmlChSRange {
-        low: 0x309d,
-        high: 0x309e,
+        range: 0x309d..=0x309e,
     },
     XmlChSRange {
-        low: 0x30fc,
-        high: 0x30fe,
+        range: 0x30fc..=0x30fe,
     },
     XmlChSRange {
-        low: 0xff70,
-        high: 0xff70,
+        range: 0xff70..=0xff70,
     },
     XmlChSRange {
-        low: 0xff9e,
-        high: 0xff9f,
+        range: 0xff9e..=0xff9f,
     },
 ];
 
@@ -3989,931 +3143,700 @@ const XML_LM_G: XmlChRangeGroup = XmlChRangeGroup {
 
 const XML_LO_S: &[XmlChSRange] = &[
     XmlChSRange {
-        low: 0x1bb,
-        high: 0x1bb,
+        range: 0x1bb..=0x1bb,
     },
     XmlChSRange {
-        low: 0x1c0,
-        high: 0x1c3,
+        range: 0x1c0..=0x1c3,
     },
     XmlChSRange {
-        low: 0x5d0,
-        high: 0x5ea,
+        range: 0x5d0..=0x5ea,
     },
     XmlChSRange {
-        low: 0x5f0,
-        high: 0x5f2,
+        range: 0x5f0..=0x5f2,
     },
     XmlChSRange {
-        low: 0x621,
-        high: 0x63a,
+        range: 0x621..=0x63a,
     },
     XmlChSRange {
-        low: 0x641,
-        high: 0x64a,
+        range: 0x641..=0x64a,
     },
     XmlChSRange {
-        low: 0x66e,
-        high: 0x66f,
+        range: 0x66e..=0x66f,
     },
     XmlChSRange {
-        low: 0x671,
-        high: 0x6d3,
+        range: 0x671..=0x6d3,
     },
     XmlChSRange {
-        low: 0x6d5,
-        high: 0x6d5,
+        range: 0x6d5..=0x6d5,
     },
     XmlChSRange {
-        low: 0x6ee,
-        high: 0x6ef,
+        range: 0x6ee..=0x6ef,
     },
     XmlChSRange {
-        low: 0x6fa,
-        high: 0x6fc,
+        range: 0x6fa..=0x6fc,
     },
     XmlChSRange {
-        low: 0x6ff,
-        high: 0x6ff,
+        range: 0x6ff..=0x6ff,
     },
     XmlChSRange {
-        low: 0x710,
-        high: 0x710,
+        range: 0x710..=0x710,
     },
     XmlChSRange {
-        low: 0x712,
-        high: 0x72f,
+        range: 0x712..=0x72f,
     },
     XmlChSRange {
-        low: 0x74d,
-        high: 0x74f,
+        range: 0x74d..=0x74f,
     },
     XmlChSRange {
-        low: 0x780,
-        high: 0x7a5,
+        range: 0x780..=0x7a5,
     },
     XmlChSRange {
-        low: 0x7b1,
-        high: 0x7b1,
+        range: 0x7b1..=0x7b1,
     },
     XmlChSRange {
-        low: 0x904,
-        high: 0x939,
+        range: 0x904..=0x939,
     },
     XmlChSRange {
-        low: 0x93d,
-        high: 0x93d,
+        range: 0x93d..=0x93d,
     },
     XmlChSRange {
-        low: 0x950,
-        high: 0x950,
+        range: 0x950..=0x950,
     },
     XmlChSRange {
-        low: 0x958,
-        high: 0x961,
+        range: 0x958..=0x961,
     },
     XmlChSRange {
-        low: 0x985,
-        high: 0x98c,
+        range: 0x985..=0x98c,
     },
     XmlChSRange {
-        low: 0x98f,
-        high: 0x990,
+        range: 0x98f..=0x990,
     },
     XmlChSRange {
-        low: 0x993,
-        high: 0x9a8,
+        range: 0x993..=0x9a8,
     },
     XmlChSRange {
-        low: 0x9aa,
-        high: 0x9b0,
+        range: 0x9aa..=0x9b0,
     },
     XmlChSRange {
-        low: 0x9b2,
-        high: 0x9b2,
+        range: 0x9b2..=0x9b2,
     },
     XmlChSRange {
-        low: 0x9b6,
-        high: 0x9b9,
+        range: 0x9b6..=0x9b9,
     },
     XmlChSRange {
-        low: 0x9bd,
-        high: 0x9bd,
+        range: 0x9bd..=0x9bd,
     },
     XmlChSRange {
-        low: 0x9dc,
-        high: 0x9dd,
+        range: 0x9dc..=0x9dd,
     },
     XmlChSRange {
-        low: 0x9df,
-        high: 0x9e1,
+        range: 0x9df..=0x9e1,
     },
     XmlChSRange {
-        low: 0x9f0,
-        high: 0x9f1,
+        range: 0x9f0..=0x9f1,
     },
     XmlChSRange {
-        low: 0xa05,
-        high: 0xa0a,
+        range: 0xa05..=0xa0a,
     },
     XmlChSRange {
-        low: 0xa0f,
-        high: 0xa10,
+        range: 0xa0f..=0xa10,
     },
     XmlChSRange {
-        low: 0xa13,
-        high: 0xa28,
+        range: 0xa13..=0xa28,
     },
     XmlChSRange {
-        low: 0xa2a,
-        high: 0xa30,
+        range: 0xa2a..=0xa30,
     },
     XmlChSRange {
-        low: 0xa32,
-        high: 0xa33,
+        range: 0xa32..=0xa33,
     },
     XmlChSRange {
-        low: 0xa35,
-        high: 0xa36,
+        range: 0xa35..=0xa36,
     },
     XmlChSRange {
-        low: 0xa38,
-        high: 0xa39,
+        range: 0xa38..=0xa39,
     },
     XmlChSRange {
-        low: 0xa59,
-        high: 0xa5c,
+        range: 0xa59..=0xa5c,
     },
     XmlChSRange {
-        low: 0xa5e,
-        high: 0xa5e,
+        range: 0xa5e..=0xa5e,
     },
     XmlChSRange {
-        low: 0xa72,
-        high: 0xa74,
+        range: 0xa72..=0xa74,
     },
     XmlChSRange {
-        low: 0xa85,
-        high: 0xa8d,
+        range: 0xa85..=0xa8d,
     },
     XmlChSRange {
-        low: 0xa8f,
-        high: 0xa91,
+        range: 0xa8f..=0xa91,
     },
     XmlChSRange {
-        low: 0xa93,
-        high: 0xaa8,
+        range: 0xa93..=0xaa8,
     },
     XmlChSRange {
-        low: 0xaaa,
-        high: 0xab0,
+        range: 0xaaa..=0xab0,
     },
     XmlChSRange {
-        low: 0xab2,
-        high: 0xab3,
+        range: 0xab2..=0xab3,
     },
     XmlChSRange {
-        low: 0xab5,
-        high: 0xab9,
+        range: 0xab5..=0xab9,
     },
     XmlChSRange {
-        low: 0xabd,
-        high: 0xabd,
+        range: 0xabd..=0xabd,
     },
     XmlChSRange {
-        low: 0xad0,
-        high: 0xad0,
+        range: 0xad0..=0xad0,
     },
     XmlChSRange {
-        low: 0xae0,
-        high: 0xae1,
+        range: 0xae0..=0xae1,
     },
     XmlChSRange {
-        low: 0xb05,
-        high: 0xb0c,
+        range: 0xb05..=0xb0c,
     },
     XmlChSRange {
-        low: 0xb0f,
-        high: 0xb10,
+        range: 0xb0f..=0xb10,
     },
     XmlChSRange {
-        low: 0xb13,
-        high: 0xb28,
+        range: 0xb13..=0xb28,
     },
     XmlChSRange {
-        low: 0xb2a,
-        high: 0xb30,
+        range: 0xb2a..=0xb30,
     },
     XmlChSRange {
-        low: 0xb32,
-        high: 0xb33,
+        range: 0xb32..=0xb33,
     },
     XmlChSRange {
-        low: 0xb35,
-        high: 0xb39,
+        range: 0xb35..=0xb39,
     },
     XmlChSRange {
-        low: 0xb3d,
-        high: 0xb3d,
+        range: 0xb3d..=0xb3d,
     },
     XmlChSRange {
-        low: 0xb5c,
-        high: 0xb5d,
+        range: 0xb5c..=0xb5d,
     },
     XmlChSRange {
-        low: 0xb5f,
-        high: 0xb61,
+        range: 0xb5f..=0xb61,
     },
     XmlChSRange {
-        low: 0xb71,
-        high: 0xb71,
+        range: 0xb71..=0xb71,
     },
     XmlChSRange {
-        low: 0xb83,
-        high: 0xb83,
+        range: 0xb83..=0xb83,
     },
     XmlChSRange {
-        low: 0xb85,
-        high: 0xb8a,
+        range: 0xb85..=0xb8a,
     },
     XmlChSRange {
-        low: 0xb8e,
-        high: 0xb90,
+        range: 0xb8e..=0xb90,
     },
     XmlChSRange {
-        low: 0xb92,
-        high: 0xb95,
+        range: 0xb92..=0xb95,
     },
     XmlChSRange {
-        low: 0xb99,
-        high: 0xb9a,
+        range: 0xb99..=0xb9a,
     },
     XmlChSRange {
-        low: 0xb9c,
-        high: 0xb9c,
+        range: 0xb9c..=0xb9c,
     },
     XmlChSRange {
-        low: 0xb9e,
-        high: 0xb9f,
+        range: 0xb9e..=0xb9f,
     },
     XmlChSRange {
-        low: 0xba3,
-        high: 0xba4,
+        range: 0xba3..=0xba4,
     },
     XmlChSRange {
-        low: 0xba8,
-        high: 0xbaa,
+        range: 0xba8..=0xbaa,
     },
     XmlChSRange {
-        low: 0xbae,
-        high: 0xbb5,
+        range: 0xbae..=0xbb5,
     },
     XmlChSRange {
-        low: 0xbb7,
-        high: 0xbb9,
+        range: 0xbb7..=0xbb9,
     },
     XmlChSRange {
-        low: 0xc05,
-        high: 0xc0c,
+        range: 0xc05..=0xc0c,
     },
     XmlChSRange {
-        low: 0xc0e,
-        high: 0xc10,
+        range: 0xc0e..=0xc10,
     },
     XmlChSRange {
-        low: 0xc12,
-        high: 0xc28,
+        range: 0xc12..=0xc28,
     },
     XmlChSRange {
-        low: 0xc2a,
-        high: 0xc33,
+        range: 0xc2a..=0xc33,
     },
     XmlChSRange {
-        low: 0xc35,
-        high: 0xc39,
+        range: 0xc35..=0xc39,
     },
     XmlChSRange {
-        low: 0xc60,
-        high: 0xc61,
+        range: 0xc60..=0xc61,
     },
     XmlChSRange {
-        low: 0xc85,
-        high: 0xc8c,
+        range: 0xc85..=0xc8c,
     },
     XmlChSRange {
-        low: 0xc8e,
-        high: 0xc90,
+        range: 0xc8e..=0xc90,
     },
     XmlChSRange {
-        low: 0xc92,
-        high: 0xca8,
+        range: 0xc92..=0xca8,
     },
     XmlChSRange {
-        low: 0xcaa,
-        high: 0xcb3,
+        range: 0xcaa..=0xcb3,
     },
     XmlChSRange {
-        low: 0xcb5,
-        high: 0xcb9,
+        range: 0xcb5..=0xcb9,
     },
     XmlChSRange {
-        low: 0xcbd,
-        high: 0xcbd,
+        range: 0xcbd..=0xcbd,
     },
     XmlChSRange {
-        low: 0xcde,
-        high: 0xcde,
+        range: 0xcde..=0xcde,
     },
     XmlChSRange {
-        low: 0xce0,
-        high: 0xce1,
+        range: 0xce0..=0xce1,
     },
     XmlChSRange {
-        low: 0xd05,
-        high: 0xd0c,
+        range: 0xd05..=0xd0c,
     },
     XmlChSRange {
-        low: 0xd0e,
-        high: 0xd10,
+        range: 0xd0e..=0xd10,
     },
     XmlChSRange {
-        low: 0xd12,
-        high: 0xd28,
+        range: 0xd12..=0xd28,
     },
     XmlChSRange {
-        low: 0xd2a,
-        high: 0xd39,
+        range: 0xd2a..=0xd39,
     },
     XmlChSRange {
-        low: 0xd60,
-        high: 0xd61,
+        range: 0xd60..=0xd61,
     },
     XmlChSRange {
-        low: 0xd85,
-        high: 0xd96,
+        range: 0xd85..=0xd96,
     },
     XmlChSRange {
-        low: 0xd9a,
-        high: 0xdb1,
+        range: 0xd9a..=0xdb1,
     },
     XmlChSRange {
-        low: 0xdb3,
-        high: 0xdbb,
+        range: 0xdb3..=0xdbb,
     },
     XmlChSRange {
-        low: 0xdbd,
-        high: 0xdbd,
+        range: 0xdbd..=0xdbd,
     },
     XmlChSRange {
-        low: 0xdc0,
-        high: 0xdc6,
+        range: 0xdc0..=0xdc6,
     },
     XmlChSRange {
-        low: 0xe01,
-        high: 0xe30,
+        range: 0xe01..=0xe30,
     },
     XmlChSRange {
-        low: 0xe32,
-        high: 0xe33,
+        range: 0xe32..=0xe33,
     },
     XmlChSRange {
-        low: 0xe40,
-        high: 0xe45,
+        range: 0xe40..=0xe45,
     },
     XmlChSRange {
-        low: 0xe81,
-        high: 0xe82,
+        range: 0xe81..=0xe82,
     },
     XmlChSRange {
-        low: 0xe84,
-        high: 0xe84,
+        range: 0xe84..=0xe84,
     },
     XmlChSRange {
-        low: 0xe87,
-        high: 0xe88,
+        range: 0xe87..=0xe88,
     },
     XmlChSRange {
-        low: 0xe8a,
-        high: 0xe8a,
+        range: 0xe8a..=0xe8a,
     },
     XmlChSRange {
-        low: 0xe8d,
-        high: 0xe8d,
+        range: 0xe8d..=0xe8d,
     },
     XmlChSRange {
-        low: 0xe94,
-        high: 0xe97,
+        range: 0xe94..=0xe97,
     },
     XmlChSRange {
-        low: 0xe99,
-        high: 0xe9f,
+        range: 0xe99..=0xe9f,
     },
     XmlChSRange {
-        low: 0xea1,
-        high: 0xea3,
+        range: 0xea1..=0xea3,
     },
     XmlChSRange {
-        low: 0xea5,
-        high: 0xea5,
+        range: 0xea5..=0xea5,
     },
     XmlChSRange {
-        low: 0xea7,
-        high: 0xea7,
+        range: 0xea7..=0xea7,
     },
     XmlChSRange {
-        low: 0xeaa,
-        high: 0xeab,
+        range: 0xeaa..=0xeab,
     },
     XmlChSRange {
-        low: 0xead,
-        high: 0xeb0,
+        range: 0xead..=0xeb0,
     },
     XmlChSRange {
-        low: 0xeb2,
-        high: 0xeb3,
+        range: 0xeb2..=0xeb3,
     },
     XmlChSRange {
-        low: 0xebd,
-        high: 0xebd,
+        range: 0xebd..=0xebd,
     },
     XmlChSRange {
-        low: 0xec0,
-        high: 0xec4,
+        range: 0xec0..=0xec4,
     },
     XmlChSRange {
-        low: 0xedc,
-        high: 0xedd,
+        range: 0xedc..=0xedd,
     },
     XmlChSRange {
-        low: 0xf00,
-        high: 0xf00,
+        range: 0xf00..=0xf00,
     },
     XmlChSRange {
-        low: 0xf40,
-        high: 0xf47,
+        range: 0xf40..=0xf47,
     },
     XmlChSRange {
-        low: 0xf49,
-        high: 0xf6a,
+        range: 0xf49..=0xf6a,
     },
     XmlChSRange {
-        low: 0xf88,
-        high: 0xf8b,
+        range: 0xf88..=0xf8b,
     },
     XmlChSRange {
-        low: 0x1000,
-        high: 0x1021,
+        range: 0x1000..=0x1021,
     },
     XmlChSRange {
-        low: 0x1023,
-        high: 0x1027,
+        range: 0x1023..=0x1027,
     },
     XmlChSRange {
-        low: 0x1029,
-        high: 0x102a,
+        range: 0x1029..=0x102a,
     },
     XmlChSRange {
-        low: 0x1050,
-        high: 0x1055,
+        range: 0x1050..=0x1055,
     },
     XmlChSRange {
-        low: 0x10d0,
-        high: 0x10f8,
+        range: 0x10d0..=0x10f8,
     },
     XmlChSRange {
-        low: 0x1100,
-        high: 0x1159,
+        range: 0x1100..=0x1159,
     },
     XmlChSRange {
-        low: 0x115f,
-        high: 0x11a2,
+        range: 0x115f..=0x11a2,
     },
     XmlChSRange {
-        low: 0x11a8,
-        high: 0x11f9,
+        range: 0x11a8..=0x11f9,
     },
     XmlChSRange {
-        low: 0x1200,
-        high: 0x1206,
+        range: 0x1200..=0x1206,
     },
     XmlChSRange {
-        low: 0x1208,
-        high: 0x1246,
+        range: 0x1208..=0x1246,
     },
     XmlChSRange {
-        low: 0x1248,
-        high: 0x1248,
+        range: 0x1248..=0x1248,
     },
     XmlChSRange {
-        low: 0x124a,
-        high: 0x124d,
+        range: 0x124a..=0x124d,
     },
     XmlChSRange {
-        low: 0x1250,
-        high: 0x1256,
+        range: 0x1250..=0x1256,
     },
     XmlChSRange {
-        low: 0x1258,
-        high: 0x1258,
+        range: 0x1258..=0x1258,
     },
     XmlChSRange {
-        low: 0x125a,
-        high: 0x125d,
+        range: 0x125a..=0x125d,
     },
     XmlChSRange {
-        low: 0x1260,
-        high: 0x1286,
+        range: 0x1260..=0x1286,
     },
     XmlChSRange {
-        low: 0x1288,
-        high: 0x1288,
+        range: 0x1288..=0x1288,
     },
     XmlChSRange {
-        low: 0x128a,
-        high: 0x128d,
+        range: 0x128a..=0x128d,
     },
     XmlChSRange {
-        low: 0x1290,
-        high: 0x12ae,
+        range: 0x1290..=0x12ae,
     },
     XmlChSRange {
-        low: 0x12b0,
-        high: 0x12b0,
+        range: 0x12b0..=0x12b0,
     },
     XmlChSRange {
-        low: 0x12b2,
-        high: 0x12b5,
+        range: 0x12b2..=0x12b5,
     },
     XmlChSRange {
-        low: 0x12b8,
-        high: 0x12be,
+        range: 0x12b8..=0x12be,
     },
     XmlChSRange {
-        low: 0x12c0,
-        high: 0x12c0,
+        range: 0x12c0..=0x12c0,
     },
     XmlChSRange {
-        low: 0x12c2,
-        high: 0x12c5,
+        range: 0x12c2..=0x12c5,
     },
     XmlChSRange {
-        low: 0x12c8,
-        high: 0x12ce,
+        range: 0x12c8..=0x12ce,
     },
     XmlChSRange {
-        low: 0x12d0,
-        high: 0x12d6,
+        range: 0x12d0..=0x12d6,
     },
     XmlChSRange {
-        low: 0x12d8,
-        high: 0x12ee,
+        range: 0x12d8..=0x12ee,
     },
     XmlChSRange {
-        low: 0x12f0,
-        high: 0x130e,
+        range: 0x12f0..=0x130e,
     },
     XmlChSRange {
-        low: 0x1310,
-        high: 0x1310,
+        range: 0x1310..=0x1310,
     },
     XmlChSRange {
-        low: 0x1312,
-        high: 0x1315,
+        range: 0x1312..=0x1315,
     },
     XmlChSRange {
-        low: 0x1318,
-        high: 0x131e,
+        range: 0x1318..=0x131e,
     },
     XmlChSRange {
-        low: 0x1320,
-        high: 0x1346,
+        range: 0x1320..=0x1346,
     },
     XmlChSRange {
-        low: 0x1348,
-        high: 0x135a,
+        range: 0x1348..=0x135a,
     },
     XmlChSRange {
-        low: 0x13a0,
-        high: 0x13f4,
+        range: 0x13a0..=0x13f4,
     },
     XmlChSRange {
-        low: 0x1401,
-        high: 0x166c,
+        range: 0x1401..=0x166c,
     },
     XmlChSRange {
-        low: 0x166f,
-        high: 0x1676,
+        range: 0x166f..=0x1676,
     },
     XmlChSRange {
-        low: 0x1681,
-        high: 0x169a,
+        range: 0x1681..=0x169a,
     },
     XmlChSRange {
-        low: 0x16a0,
-        high: 0x16ea,
+        range: 0x16a0..=0x16ea,
     },
     XmlChSRange {
-        low: 0x1700,
-        high: 0x170c,
+        range: 0x1700..=0x170c,
     },
     XmlChSRange {
-        low: 0x170e,
-        high: 0x1711,
+        range: 0x170e..=0x1711,
     },
     XmlChSRange {
-        low: 0x1720,
-        high: 0x1731,
+        range: 0x1720..=0x1731,
     },
     XmlChSRange {
-        low: 0x1740,
-        high: 0x1751,
+        range: 0x1740..=0x1751,
     },
     XmlChSRange {
-        low: 0x1760,
-        high: 0x176c,
+        range: 0x1760..=0x176c,
     },
     XmlChSRange {
-        low: 0x176e,
-        high: 0x1770,
+        range: 0x176e..=0x1770,
     },
     XmlChSRange {
-        low: 0x1780,
-        high: 0x17b3,
+        range: 0x1780..=0x17b3,
     },
     XmlChSRange {
-        low: 0x17dc,
-        high: 0x17dc,
+        range: 0x17dc..=0x17dc,
     },
     XmlChSRange {
-        low: 0x1820,
-        high: 0x1842,
+        range: 0x1820..=0x1842,
     },
     XmlChSRange {
-        low: 0x1844,
-        high: 0x1877,
+        range: 0x1844..=0x1877,
     },
     XmlChSRange {
-        low: 0x1880,
-        high: 0x18a8,
+        range: 0x1880..=0x18a8,
     },
     XmlChSRange {
-        low: 0x1900,
-        high: 0x191c,
+        range: 0x1900..=0x191c,
     },
     XmlChSRange {
-        low: 0x1950,
-        high: 0x196d,
+        range: 0x1950..=0x196d,
     },
     XmlChSRange {
-        low: 0x1970,
-        high: 0x1974,
+        range: 0x1970..=0x1974,
     },
     XmlChSRange {
-        low: 0x2135,
-        high: 0x2138,
+        range: 0x2135..=0x2138,
     },
     XmlChSRange {
-        low: 0x3006,
-        high: 0x3006,
+        range: 0x3006..=0x3006,
     },
     XmlChSRange {
-        low: 0x303c,
-        high: 0x303c,
+        range: 0x303c..=0x303c,
     },
     XmlChSRange {
-        low: 0x3041,
-        high: 0x3096,
+        range: 0x3041..=0x3096,
     },
     XmlChSRange {
-        low: 0x309f,
-        high: 0x309f,
+        range: 0x309f..=0x309f,
     },
     XmlChSRange {
-        low: 0x30a1,
-        high: 0x30fa,
+        range: 0x30a1..=0x30fa,
     },
     XmlChSRange {
-        low: 0x30ff,
-        high: 0x30ff,
+        range: 0x30ff..=0x30ff,
     },
     XmlChSRange {
-        low: 0x3105,
-        high: 0x312c,
+        range: 0x3105..=0x312c,
     },
     XmlChSRange {
-        low: 0x3131,
-        high: 0x318e,
+        range: 0x3131..=0x318e,
     },
     XmlChSRange {
-        low: 0x31a0,
-        high: 0x31b7,
+        range: 0x31a0..=0x31b7,
     },
     XmlChSRange {
-        low: 0x31f0,
-        high: 0x31ff,
+        range: 0x31f0..=0x31ff,
     },
     XmlChSRange {
-        low: 0x3400,
-        high: 0x3400,
+        range: 0x3400..=0x3400,
     },
     XmlChSRange {
-        low: 0x4db5,
-        high: 0x4db5,
+        range: 0x4db5..=0x4db5,
     },
     XmlChSRange {
-        low: 0x4e00,
-        high: 0x4e00,
+        range: 0x4e00..=0x4e00,
     },
     XmlChSRange {
-        low: 0x9fa5,
-        high: 0x9fa5,
+        range: 0x9fa5..=0x9fa5,
     },
     XmlChSRange {
-        low: 0xa000,
-        high: 0xa48c,
+        range: 0xa000..=0xa48c,
     },
     XmlChSRange {
-        low: 0xac00,
-        high: 0xac00,
+        range: 0xac00..=0xac00,
     },
     XmlChSRange {
-        low: 0xd7a3,
-        high: 0xd7a3,
+        range: 0xd7a3..=0xd7a3,
     },
     XmlChSRange {
-        low: 0xf900,
-        high: 0xfa2d,
+        range: 0xf900..=0xfa2d,
     },
     XmlChSRange {
-        low: 0xfa30,
-        high: 0xfa6a,
+        range: 0xfa30..=0xfa6a,
     },
     XmlChSRange {
-        low: 0xfb1d,
-        high: 0xfb1d,
+        range: 0xfb1d..=0xfb1d,
     },
     XmlChSRange {
-        low: 0xfb1f,
-        high: 0xfb28,
+        range: 0xfb1f..=0xfb28,
     },
     XmlChSRange {
-        low: 0xfb2a,
-        high: 0xfb36,
+        range: 0xfb2a..=0xfb36,
     },
     XmlChSRange {
-        low: 0xfb38,
-        high: 0xfb3c,
+        range: 0xfb38..=0xfb3c,
     },
     XmlChSRange {
-        low: 0xfb3e,
-        high: 0xfb3e,
+        range: 0xfb3e..=0xfb3e,
     },
     XmlChSRange {
-        low: 0xfb40,
-        high: 0xfb41,
+        range: 0xfb40..=0xfb41,
     },
     XmlChSRange {
-        low: 0xfb43,
-        high: 0xfb44,
+        range: 0xfb43..=0xfb44,
     },
     XmlChSRange {
-        low: 0xfb46,
-        high: 0xfbb1,
+        range: 0xfb46..=0xfbb1,
     },
     XmlChSRange {
-        low: 0xfbd3,
-        high: 0xfd3d,
+        range: 0xfbd3..=0xfd3d,
     },
     XmlChSRange {
-        low: 0xfd50,
-        high: 0xfd8f,
+        range: 0xfd50..=0xfd8f,
     },
     XmlChSRange {
-        low: 0xfd92,
-        high: 0xfdc7,
+        range: 0xfd92..=0xfdc7,
     },
     XmlChSRange {
-        low: 0xfdf0,
-        high: 0xfdfb,
+        range: 0xfdf0..=0xfdfb,
     },
     XmlChSRange {
-        low: 0xfe70,
-        high: 0xfe74,
+        range: 0xfe70..=0xfe74,
     },
     XmlChSRange {
-        low: 0xfe76,
-        high: 0xfefc,
+        range: 0xfe76..=0xfefc,
     },
     XmlChSRange {
-        low: 0xff66,
-        high: 0xff6f,
+        range: 0xff66..=0xff6f,
     },
     XmlChSRange {
-        low: 0xff71,
-        high: 0xff9d,
+        range: 0xff71..=0xff9d,
     },
     XmlChSRange {
-        low: 0xffa0,
-        high: 0xffbe,
+        range: 0xffa0..=0xffbe,
     },
     XmlChSRange {
-        low: 0xffc2,
-        high: 0xffc7,
+        range: 0xffc2..=0xffc7,
     },
     XmlChSRange {
-        low: 0xffca,
-        high: 0xffcf,
+        range: 0xffca..=0xffcf,
     },
     XmlChSRange {
-        low: 0xffd2,
-        high: 0xffd7,
+        range: 0xffd2..=0xffd7,
     },
     XmlChSRange {
-        low: 0xffda,
-        high: 0xffdc,
+        range: 0xffda..=0xffdc,
     },
 ];
 
 const XML_LO_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10000,
-        high: 0x1000b,
+        range: 0x10000..=0x1000b,
     },
     XmlChLRange {
-        low: 0x1000d,
-        high: 0x10026,
+        range: 0x1000d..=0x10026,
     },
     XmlChLRange {
-        low: 0x10028,
-        high: 0x1003a,
+        range: 0x10028..=0x1003a,
     },
     XmlChLRange {
-        low: 0x1003c,
-        high: 0x1003d,
+        range: 0x1003c..=0x1003d,
     },
     XmlChLRange {
-        low: 0x1003f,
-        high: 0x1004d,
+        range: 0x1003f..=0x1004d,
     },
     XmlChLRange {
-        low: 0x10050,
-        high: 0x1005d,
+        range: 0x10050..=0x1005d,
     },
     XmlChLRange {
-        low: 0x10080,
-        high: 0x100fa,
+        range: 0x10080..=0x100fa,
     },
     XmlChLRange {
-        low: 0x10300,
-        high: 0x1031e,
+        range: 0x10300..=0x1031e,
     },
     XmlChLRange {
-        low: 0x10330,
-        high: 0x10349,
+        range: 0x10330..=0x10349,
     },
     XmlChLRange {
-        low: 0x10380,
-        high: 0x1039d,
+        range: 0x10380..=0x1039d,
     },
     XmlChLRange {
-        low: 0x10450,
-        high: 0x1049d,
+        range: 0x10450..=0x1049d,
     },
     XmlChLRange {
-        low: 0x10800,
-        high: 0x10805,
+        range: 0x10800..=0x10805,
     },
     XmlChLRange {
-        low: 0x10808,
-        high: 0x10808,
+        range: 0x10808..=0x10808,
     },
     XmlChLRange {
-        low: 0x1080a,
-        high: 0x10835,
+        range: 0x1080a..=0x10835,
     },
     XmlChLRange {
-        low: 0x10837,
-        high: 0x10838,
+        range: 0x10837..=0x10838,
     },
     XmlChLRange {
-        low: 0x1083c,
-        high: 0x1083c,
+        range: 0x1083c..=0x1083c,
     },
     XmlChLRange {
-        low: 0x1083f,
-        high: 0x1083f,
+        range: 0x1083f..=0x1083f,
     },
     XmlChLRange {
-        low: 0x20000,
-        high: 0x20000,
+        range: 0x20000..=0x20000,
     },
     XmlChLRange {
-        low: 0x2a6d6,
-        high: 0x2a6d6,
+        range: 0x2a6d6..=0x2a6d6,
     },
     XmlChLRange {
-        low: 0x2f800,
-        high: 0x2fa1d,
+        range: 0x2f800..=0x2fa1d,
     },
 ];
 
@@ -4924,44 +3847,34 @@ const XML_LO_G: XmlChRangeGroup = XmlChRangeGroup {
 
 const XML_LT_S: &[XmlChSRange] = &[
     XmlChSRange {
-        low: 0x1c5,
-        high: 0x1c5,
+        range: 0x1c5..=0x1c5,
     },
     XmlChSRange {
-        low: 0x1c8,
-        high: 0x1c8,
+        range: 0x1c8..=0x1c8,
     },
     XmlChSRange {
-        low: 0x1cb,
-        high: 0x1cb,
+        range: 0x1cb..=0x1cb,
     },
     XmlChSRange {
-        low: 0x1f2,
-        high: 0x1f2,
+        range: 0x1f2..=0x1f2,
     },
     XmlChSRange {
-        low: 0x1f88,
-        high: 0x1f8f,
+        range: 0x1f88..=0x1f8f,
     },
     XmlChSRange {
-        low: 0x1f98,
-        high: 0x1f9f,
+        range: 0x1f98..=0x1f9f,
     },
     XmlChSRange {
-        low: 0x1fa8,
-        high: 0x1faf,
+        range: 0x1fa8..=0x1faf,
     },
     XmlChSRange {
-        low: 0x1fbc,
-        high: 0x1fbc,
+        range: 0x1fbc..=0x1fbc,
     },
     XmlChSRange {
-        low: 0x1fcc,
-        high: 0x1fcc,
+        range: 0x1fcc..=0x1fcc,
     },
     XmlChSRange {
-        low: 0x1ffc,
-        high: 0x1ffc,
+        range: 0x1ffc..=0x1ffc,
     },
 ];
 
@@ -4971,1692 +3884,1265 @@ const XML_LT_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_LU_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x41..=0x5a },
+    XmlChSRange { range: 0xc0..=0xd6 },
+    XmlChSRange { range: 0xd8..=0xde },
     XmlChSRange {
-        low: 0x41,
-        high: 0x5a,
+        range: 0x100..=0x100,
     },
     XmlChSRange {
-        low: 0xc0,
-        high: 0xd6,
+        range: 0x102..=0x102,
     },
     XmlChSRange {
-        low: 0xd8,
-        high: 0xde,
+        range: 0x104..=0x104,
     },
     XmlChSRange {
-        low: 0x100,
-        high: 0x100,
+        range: 0x106..=0x106,
     },
     XmlChSRange {
-        low: 0x102,
-        high: 0x102,
+        range: 0x108..=0x108,
     },
     XmlChSRange {
-        low: 0x104,
-        high: 0x104,
+        range: 0x10a..=0x10a,
     },
     XmlChSRange {
-        low: 0x106,
-        high: 0x106,
+        range: 0x10c..=0x10c,
     },
     XmlChSRange {
-        low: 0x108,
-        high: 0x108,
+        range: 0x10e..=0x10e,
     },
     XmlChSRange {
-        low: 0x10a,
-        high: 0x10a,
+        range: 0x110..=0x110,
     },
     XmlChSRange {
-        low: 0x10c,
-        high: 0x10c,
+        range: 0x112..=0x112,
     },
     XmlChSRange {
-        low: 0x10e,
-        high: 0x10e,
+        range: 0x114..=0x114,
     },
     XmlChSRange {
-        low: 0x110,
-        high: 0x110,
+        range: 0x116..=0x116,
     },
     XmlChSRange {
-        low: 0x112,
-        high: 0x112,
+        range: 0x118..=0x118,
     },
     XmlChSRange {
-        low: 0x114,
-        high: 0x114,
+        range: 0x11a..=0x11a,
     },
     XmlChSRange {
-        low: 0x116,
-        high: 0x116,
+        range: 0x11c..=0x11c,
     },
     XmlChSRange {
-        low: 0x118,
-        high: 0x118,
+        range: 0x11e..=0x11e,
     },
     XmlChSRange {
-        low: 0x11a,
-        high: 0x11a,
+        range: 0x120..=0x120,
     },
     XmlChSRange {
-        low: 0x11c,
-        high: 0x11c,
+        range: 0x122..=0x122,
     },
     XmlChSRange {
-        low: 0x11e,
-        high: 0x11e,
+        range: 0x124..=0x124,
     },
     XmlChSRange {
-        low: 0x120,
-        high: 0x120,
+        range: 0x126..=0x126,
     },
     XmlChSRange {
-        low: 0x122,
-        high: 0x122,
+        range: 0x128..=0x128,
     },
     XmlChSRange {
-        low: 0x124,
-        high: 0x124,
+        range: 0x12a..=0x12a,
     },
     XmlChSRange {
-        low: 0x126,
-        high: 0x126,
+        range: 0x12c..=0x12c,
     },
     XmlChSRange {
-        low: 0x128,
-        high: 0x128,
+        range: 0x12e..=0x12e,
     },
     XmlChSRange {
-        low: 0x12a,
-        high: 0x12a,
+        range: 0x130..=0x130,
     },
     XmlChSRange {
-        low: 0x12c,
-        high: 0x12c,
+        range: 0x132..=0x132,
     },
     XmlChSRange {
-        low: 0x12e,
-        high: 0x12e,
+        range: 0x134..=0x134,
     },
     XmlChSRange {
-        low: 0x130,
-        high: 0x130,
+        range: 0x136..=0x136,
     },
     XmlChSRange {
-        low: 0x132,
-        high: 0x132,
+        range: 0x139..=0x139,
     },
     XmlChSRange {
-        low: 0x134,
-        high: 0x134,
+        range: 0x13b..=0x13b,
     },
     XmlChSRange {
-        low: 0x136,
-        high: 0x136,
+        range: 0x13d..=0x13d,
     },
     XmlChSRange {
-        low: 0x139,
-        high: 0x139,
+        range: 0x13f..=0x13f,
     },
     XmlChSRange {
-        low: 0x13b,
-        high: 0x13b,
+        range: 0x141..=0x141,
     },
     XmlChSRange {
-        low: 0x13d,
-        high: 0x13d,
+        range: 0x143..=0x143,
     },
     XmlChSRange {
-        low: 0x13f,
-        high: 0x13f,
+        range: 0x145..=0x145,
     },
     XmlChSRange {
-        low: 0x141,
-        high: 0x141,
+        range: 0x147..=0x147,
     },
     XmlChSRange {
-        low: 0x143,
-        high: 0x143,
+        range: 0x14a..=0x14a,
     },
     XmlChSRange {
-        low: 0x145,
-        high: 0x145,
+        range: 0x14c..=0x14c,
     },
     XmlChSRange {
-        low: 0x147,
-        high: 0x147,
+        range: 0x14e..=0x14e,
     },
     XmlChSRange {
-        low: 0x14a,
-        high: 0x14a,
+        range: 0x150..=0x150,
     },
     XmlChSRange {
-        low: 0x14c,
-        high: 0x14c,
+        range: 0x152..=0x152,
     },
     XmlChSRange {
-        low: 0x14e,
-        high: 0x14e,
+        range: 0x154..=0x154,
     },
     XmlChSRange {
-        low: 0x150,
-        high: 0x150,
+        range: 0x156..=0x156,
     },
     XmlChSRange {
-        low: 0x152,
-        high: 0x152,
+        range: 0x158..=0x158,
     },
     XmlChSRange {
-        low: 0x154,
-        high: 0x154,
+        range: 0x15a..=0x15a,
     },
     XmlChSRange {
-        low: 0x156,
-        high: 0x156,
+        range: 0x15c..=0x15c,
     },
     XmlChSRange {
-        low: 0x158,
-        high: 0x158,
+        range: 0x15e..=0x15e,
     },
     XmlChSRange {
-        low: 0x15a,
-        high: 0x15a,
+        range: 0x160..=0x160,
     },
     XmlChSRange {
-        low: 0x15c,
-        high: 0x15c,
+        range: 0x162..=0x162,
     },
     XmlChSRange {
-        low: 0x15e,
-        high: 0x15e,
+        range: 0x164..=0x164,
     },
     XmlChSRange {
-        low: 0x160,
-        high: 0x160,
+        range: 0x166..=0x166,
     },
     XmlChSRange {
-        low: 0x162,
-        high: 0x162,
+        range: 0x168..=0x168,
     },
     XmlChSRange {
-        low: 0x164,
-        high: 0x164,
+        range: 0x16a..=0x16a,
     },
     XmlChSRange {
-        low: 0x166,
-        high: 0x166,
+        range: 0x16c..=0x16c,
     },
     XmlChSRange {
-        low: 0x168,
-        high: 0x168,
+        range: 0x16e..=0x16e,
     },
     XmlChSRange {
-        low: 0x16a,
-        high: 0x16a,
+        range: 0x170..=0x170,
     },
     XmlChSRange {
-        low: 0x16c,
-        high: 0x16c,
+        range: 0x172..=0x172,
     },
     XmlChSRange {
-        low: 0x16e,
-        high: 0x16e,
+        range: 0x174..=0x174,
     },
     XmlChSRange {
-        low: 0x170,
-        high: 0x170,
+        range: 0x176..=0x176,
     },
     XmlChSRange {
-        low: 0x172,
-        high: 0x172,
+        range: 0x178..=0x179,
     },
     XmlChSRange {
-        low: 0x174,
-        high: 0x174,
+        range: 0x17b..=0x17b,
     },
     XmlChSRange {
-        low: 0x176,
-        high: 0x176,
+        range: 0x17d..=0x17d,
     },
     XmlChSRange {
-        low: 0x178,
-        high: 0x179,
+        range: 0x181..=0x182,
     },
     XmlChSRange {
-        low: 0x17b,
-        high: 0x17b,
+        range: 0x184..=0x184,
     },
     XmlChSRange {
-        low: 0x17d,
-        high: 0x17d,
+        range: 0x186..=0x187,
     },
     XmlChSRange {
-        low: 0x181,
-        high: 0x182,
+        range: 0x189..=0x18b,
     },
     XmlChSRange {
-        low: 0x184,
-        high: 0x184,
+        range: 0x18e..=0x191,
     },
     XmlChSRange {
-        low: 0x186,
-        high: 0x187,
+        range: 0x193..=0x194,
     },
     XmlChSRange {
-        low: 0x189,
-        high: 0x18b,
+        range: 0x196..=0x198,
     },
     XmlChSRange {
-        low: 0x18e,
-        high: 0x191,
+        range: 0x19c..=0x19d,
     },
     XmlChSRange {
-        low: 0x193,
-        high: 0x194,
+        range: 0x19f..=0x1a0,
     },
     XmlChSRange {
-        low: 0x196,
-        high: 0x198,
+        range: 0x1a2..=0x1a2,
     },
     XmlChSRange {
-        low: 0x19c,
-        high: 0x19d,
+        range: 0x1a4..=0x1a4,
     },
     XmlChSRange {
-        low: 0x19f,
-        high: 0x1a0,
+        range: 0x1a6..=0x1a7,
     },
     XmlChSRange {
-        low: 0x1a2,
-        high: 0x1a2,
+        range: 0x1a9..=0x1a9,
     },
     XmlChSRange {
-        low: 0x1a4,
-        high: 0x1a4,
+        range: 0x1ac..=0x1ac,
     },
     XmlChSRange {
-        low: 0x1a6,
-        high: 0x1a7,
+        range: 0x1ae..=0x1af,
     },
     XmlChSRange {
-        low: 0x1a9,
-        high: 0x1a9,
+        range: 0x1b1..=0x1b3,
     },
     XmlChSRange {
-        low: 0x1ac,
-        high: 0x1ac,
+        range: 0x1b5..=0x1b5,
     },
     XmlChSRange {
-        low: 0x1ae,
-        high: 0x1af,
+        range: 0x1b7..=0x1b8,
     },
     XmlChSRange {
-        low: 0x1b1,
-        high: 0x1b3,
+        range: 0x1bc..=0x1bc,
     },
     XmlChSRange {
-        low: 0x1b5,
-        high: 0x1b5,
+        range: 0x1c4..=0x1c4,
     },
     XmlChSRange {
-        low: 0x1b7,
-        high: 0x1b8,
+        range: 0x1c7..=0x1c7,
     },
     XmlChSRange {
-        low: 0x1bc,
-        high: 0x1bc,
+        range: 0x1ca..=0x1ca,
     },
     XmlChSRange {
-        low: 0x1c4,
-        high: 0x1c4,
+        range: 0x1cd..=0x1cd,
     },
     XmlChSRange {
-        low: 0x1c7,
-        high: 0x1c7,
+        range: 0x1cf..=0x1cf,
     },
     XmlChSRange {
-        low: 0x1ca,
-        high: 0x1ca,
+        range: 0x1d1..=0x1d1,
     },
     XmlChSRange {
-        low: 0x1cd,
-        high: 0x1cd,
+        range: 0x1d3..=0x1d3,
     },
     XmlChSRange {
-        low: 0x1cf,
-        high: 0x1cf,
+        range: 0x1d5..=0x1d5,
     },
     XmlChSRange {
-        low: 0x1d1,
-        high: 0x1d1,
+        range: 0x1d7..=0x1d7,
     },
     XmlChSRange {
-        low: 0x1d3,
-        high: 0x1d3,
+        range: 0x1d9..=0x1d9,
     },
     XmlChSRange {
-        low: 0x1d5,
-        high: 0x1d5,
+        range: 0x1db..=0x1db,
     },
     XmlChSRange {
-        low: 0x1d7,
-        high: 0x1d7,
+        range: 0x1de..=0x1de,
     },
     XmlChSRange {
-        low: 0x1d9,
-        high: 0x1d9,
+        range: 0x1e0..=0x1e0,
     },
     XmlChSRange {
-        low: 0x1db,
-        high: 0x1db,
+        range: 0x1e2..=0x1e2,
     },
     XmlChSRange {
-        low: 0x1de,
-        high: 0x1de,
+        range: 0x1e4..=0x1e4,
     },
     XmlChSRange {
-        low: 0x1e0,
-        high: 0x1e0,
+        range: 0x1e6..=0x1e6,
     },
     XmlChSRange {
-        low: 0x1e2,
-        high: 0x1e2,
+        range: 0x1e8..=0x1e8,
     },
     XmlChSRange {
-        low: 0x1e4,
-        high: 0x1e4,
+        range: 0x1ea..=0x1ea,
     },
     XmlChSRange {
-        low: 0x1e6,
-        high: 0x1e6,
+        range: 0x1ec..=0x1ec,
     },
     XmlChSRange {
-        low: 0x1e8,
-        high: 0x1e8,
+        range: 0x1ee..=0x1ee,
     },
     XmlChSRange {
-        low: 0x1ea,
-        high: 0x1ea,
+        range: 0x1f1..=0x1f1,
     },
     XmlChSRange {
-        low: 0x1ec,
-        high: 0x1ec,
+        range: 0x1f4..=0x1f4,
     },
     XmlChSRange {
-        low: 0x1ee,
-        high: 0x1ee,
+        range: 0x1f6..=0x1f8,
     },
     XmlChSRange {
-        low: 0x1f1,
-        high: 0x1f1,
+        range: 0x1fa..=0x1fa,
     },
     XmlChSRange {
-        low: 0x1f4,
-        high: 0x1f4,
+        range: 0x1fc..=0x1fc,
     },
     XmlChSRange {
-        low: 0x1f6,
-        high: 0x1f8,
+        range: 0x1fe..=0x1fe,
     },
     XmlChSRange {
-        low: 0x1fa,
-        high: 0x1fa,
+        range: 0x200..=0x200,
     },
     XmlChSRange {
-        low: 0x1fc,
-        high: 0x1fc,
+        range: 0x202..=0x202,
     },
     XmlChSRange {
-        low: 0x1fe,
-        high: 0x1fe,
+        range: 0x204..=0x204,
     },
     XmlChSRange {
-        low: 0x200,
-        high: 0x200,
+        range: 0x206..=0x206,
     },
     XmlChSRange {
-        low: 0x202,
-        high: 0x202,
+        range: 0x208..=0x208,
     },
     XmlChSRange {
-        low: 0x204,
-        high: 0x204,
+        range: 0x20a..=0x20a,
     },
     XmlChSRange {
-        low: 0x206,
-        high: 0x206,
+        range: 0x20c..=0x20c,
     },
     XmlChSRange {
-        low: 0x208,
-        high: 0x208,
+        range: 0x20e..=0x20e,
     },
     XmlChSRange {
-        low: 0x20a,
-        high: 0x20a,
+        range: 0x210..=0x210,
     },
     XmlChSRange {
-        low: 0x20c,
-        high: 0x20c,
+        range: 0x212..=0x212,
     },
     XmlChSRange {
-        low: 0x20e,
-        high: 0x20e,
+        range: 0x214..=0x214,
     },
     XmlChSRange {
-        low: 0x210,
-        high: 0x210,
+        range: 0x216..=0x216,
     },
     XmlChSRange {
-        low: 0x212,
-        high: 0x212,
+        range: 0x218..=0x218,
     },
     XmlChSRange {
-        low: 0x214,
-        high: 0x214,
+        range: 0x21a..=0x21a,
     },
     XmlChSRange {
-        low: 0x216,
-        high: 0x216,
+        range: 0x21c..=0x21c,
     },
     XmlChSRange {
-        low: 0x218,
-        high: 0x218,
+        range: 0x21e..=0x21e,
     },
     XmlChSRange {
-        low: 0x21a,
-        high: 0x21a,
+        range: 0x220..=0x220,
     },
     XmlChSRange {
-        low: 0x21c,
-        high: 0x21c,
+        range: 0x222..=0x222,
     },
     XmlChSRange {
-        low: 0x21e,
-        high: 0x21e,
+        range: 0x224..=0x224,
     },
     XmlChSRange {
-        low: 0x220,
-        high: 0x220,
+        range: 0x226..=0x226,
     },
     XmlChSRange {
-        low: 0x222,
-        high: 0x222,
+        range: 0x228..=0x228,
     },
     XmlChSRange {
-        low: 0x224,
-        high: 0x224,
+        range: 0x22a..=0x22a,
     },
     XmlChSRange {
-        low: 0x226,
-        high: 0x226,
+        range: 0x22c..=0x22c,
     },
     XmlChSRange {
-        low: 0x228,
-        high: 0x228,
+        range: 0x22e..=0x22e,
     },
     XmlChSRange {
-        low: 0x22a,
-        high: 0x22a,
+        range: 0x230..=0x230,
     },
     XmlChSRange {
-        low: 0x22c,
-        high: 0x22c,
+        range: 0x232..=0x232,
     },
     XmlChSRange {
-        low: 0x22e,
-        high: 0x22e,
+        range: 0x386..=0x386,
     },
     XmlChSRange {
-        low: 0x230,
-        high: 0x230,
+        range: 0x388..=0x38a,
     },
     XmlChSRange {
-        low: 0x232,
-        high: 0x232,
+        range: 0x38c..=0x38c,
     },
     XmlChSRange {
-        low: 0x386,
-        high: 0x386,
+        range: 0x38e..=0x38f,
     },
     XmlChSRange {
-        low: 0x388,
-        high: 0x38a,
+        range: 0x391..=0x3a1,
     },
     XmlChSRange {
-        low: 0x38c,
-        high: 0x38c,
+        range: 0x3a3..=0x3ab,
     },
     XmlChSRange {
-        low: 0x38e,
-        high: 0x38f,
+        range: 0x3d2..=0x3d4,
     },
     XmlChSRange {
-        low: 0x391,
-        high: 0x3a1,
+        range: 0x3d8..=0x3d8,
     },
     XmlChSRange {
-        low: 0x3a3,
-        high: 0x3ab,
+        range: 0x3da..=0x3da,
     },
     XmlChSRange {
-        low: 0x3d2,
-        high: 0x3d4,
+        range: 0x3dc..=0x3dc,
     },
     XmlChSRange {
-        low: 0x3d8,
-        high: 0x3d8,
+        range: 0x3de..=0x3de,
     },
     XmlChSRange {
-        low: 0x3da,
-        high: 0x3da,
+        range: 0x3e0..=0x3e0,
     },
     XmlChSRange {
-        low: 0x3dc,
-        high: 0x3dc,
+        range: 0x3e2..=0x3e2,
     },
     XmlChSRange {
-        low: 0x3de,
-        high: 0x3de,
+        range: 0x3e4..=0x3e4,
     },
     XmlChSRange {
-        low: 0x3e0,
-        high: 0x3e0,
+        range: 0x3e6..=0x3e6,
     },
     XmlChSRange {
-        low: 0x3e2,
-        high: 0x3e2,
+        range: 0x3e8..=0x3e8,
     },
     XmlChSRange {
-        low: 0x3e4,
-        high: 0x3e4,
+        range: 0x3ea..=0x3ea,
     },
     XmlChSRange {
-        low: 0x3e6,
-        high: 0x3e6,
+        range: 0x3ec..=0x3ec,
     },
     XmlChSRange {
-        low: 0x3e8,
-        high: 0x3e8,
+        range: 0x3ee..=0x3ee,
     },
     XmlChSRange {
-        low: 0x3ea,
-        high: 0x3ea,
+        range: 0x3f4..=0x3f4,
     },
     XmlChSRange {
-        low: 0x3ec,
-        high: 0x3ec,
+        range: 0x3f7..=0x3f7,
     },
     XmlChSRange {
-        low: 0x3ee,
-        high: 0x3ee,
+        range: 0x3f9..=0x3fa,
     },
     XmlChSRange {
-        low: 0x3f4,
-        high: 0x3f4,
+        range: 0x400..=0x42f,
     },
     XmlChSRange {
-        low: 0x3f7,
-        high: 0x3f7,
+        range: 0x460..=0x460,
     },
     XmlChSRange {
-        low: 0x3f9,
-        high: 0x3fa,
+        range: 0x462..=0x462,
     },
     XmlChSRange {
-        low: 0x400,
-        high: 0x42f,
+        range: 0x464..=0x464,
     },
     XmlChSRange {
-        low: 0x460,
-        high: 0x460,
+        range: 0x466..=0x466,
     },
     XmlChSRange {
-        low: 0x462,
-        high: 0x462,
+        range: 0x468..=0x468,
     },
     XmlChSRange {
-        low: 0x464,
-        high: 0x464,
+        range: 0x46a..=0x46a,
     },
     XmlChSRange {
-        low: 0x466,
-        high: 0x466,
+        range: 0x46c..=0x46c,
     },
     XmlChSRange {
-        low: 0x468,
-        high: 0x468,
+        range: 0x46e..=0x46e,
     },
     XmlChSRange {
-        low: 0x46a,
-        high: 0x46a,
+        range: 0x470..=0x470,
     },
     XmlChSRange {
-        low: 0x46c,
-        high: 0x46c,
+        range: 0x472..=0x472,
     },
     XmlChSRange {
-        low: 0x46e,
-        high: 0x46e,
+        range: 0x474..=0x474,
     },
     XmlChSRange {
-        low: 0x470,
-        high: 0x470,
+        range: 0x476..=0x476,
     },
     XmlChSRange {
-        low: 0x472,
-        high: 0x472,
+        range: 0x478..=0x478,
     },
     XmlChSRange {
-        low: 0x474,
-        high: 0x474,
+        range: 0x47a..=0x47a,
     },
     XmlChSRange {
-        low: 0x476,
-        high: 0x476,
+        range: 0x47c..=0x47c,
     },
     XmlChSRange {
-        low: 0x478,
-        high: 0x478,
+        range: 0x47e..=0x47e,
     },
     XmlChSRange {
-        low: 0x47a,
-        high: 0x47a,
+        range: 0x480..=0x480,
     },
     XmlChSRange {
-        low: 0x47c,
-        high: 0x47c,
+        range: 0x48a..=0x48a,
     },
     XmlChSRange {
-        low: 0x47e,
-        high: 0x47e,
+        range: 0x48c..=0x48c,
     },
     XmlChSRange {
-        low: 0x480,
-        high: 0x480,
+        range: 0x48e..=0x48e,
     },
     XmlChSRange {
-        low: 0x48a,
-        high: 0x48a,
+        range: 0x490..=0x490,
     },
     XmlChSRange {
-        low: 0x48c,
-        high: 0x48c,
+        range: 0x492..=0x492,
     },
     XmlChSRange {
-        low: 0x48e,
-        high: 0x48e,
+        range: 0x494..=0x494,
     },
     XmlChSRange {
-        low: 0x490,
-        high: 0x490,
+        range: 0x496..=0x496,
     },
     XmlChSRange {
-        low: 0x492,
-        high: 0x492,
+        range: 0x498..=0x498,
     },
     XmlChSRange {
-        low: 0x494,
-        high: 0x494,
+        range: 0x49a..=0x49a,
     },
     XmlChSRange {
-        low: 0x496,
-        high: 0x496,
+        range: 0x49c..=0x49c,
     },
     XmlChSRange {
-        low: 0x498,
-        high: 0x498,
+        range: 0x49e..=0x49e,
     },
     XmlChSRange {
-        low: 0x49a,
-        high: 0x49a,
+        range: 0x4a0..=0x4a0,
     },
     XmlChSRange {
-        low: 0x49c,
-        high: 0x49c,
+        range: 0x4a2..=0x4a2,
     },
     XmlChSRange {
-        low: 0x49e,
-        high: 0x49e,
+        range: 0x4a4..=0x4a4,
     },
     XmlChSRange {
-        low: 0x4a0,
-        high: 0x4a0,
+        range: 0x4a6..=0x4a6,
     },
     XmlChSRange {
-        low: 0x4a2,
-        high: 0x4a2,
+        range: 0x4a8..=0x4a8,
     },
     XmlChSRange {
-        low: 0x4a4,
-        high: 0x4a4,
+        range: 0x4aa..=0x4aa,
     },
     XmlChSRange {
-        low: 0x4a6,
-        high: 0x4a6,
+        range: 0x4ac..=0x4ac,
     },
     XmlChSRange {
-        low: 0x4a8,
-        high: 0x4a8,
+        range: 0x4ae..=0x4ae,
     },
     XmlChSRange {
-        low: 0x4aa,
-        high: 0x4aa,
+        range: 0x4b0..=0x4b0,
     },
     XmlChSRange {
-        low: 0x4ac,
-        high: 0x4ac,
+        range: 0x4b2..=0x4b2,
     },
     XmlChSRange {
-        low: 0x4ae,
-        high: 0x4ae,
+        range: 0x4b4..=0x4b4,
     },
     XmlChSRange {
-        low: 0x4b0,
-        high: 0x4b0,
+        range: 0x4b6..=0x4b6,
     },
     XmlChSRange {
-        low: 0x4b2,
-        high: 0x4b2,
+        range: 0x4b8..=0x4b8,
     },
     XmlChSRange {
-        low: 0x4b4,
-        high: 0x4b4,
+        range: 0x4ba..=0x4ba,
     },
     XmlChSRange {
-        low: 0x4b6,
-        high: 0x4b6,
+        range: 0x4bc..=0x4bc,
     },
     XmlChSRange {
-        low: 0x4b8,
-        high: 0x4b8,
+        range: 0x4be..=0x4be,
     },
     XmlChSRange {
-        low: 0x4ba,
-        high: 0x4ba,
+        range: 0x4c0..=0x4c1,
     },
     XmlChSRange {
-        low: 0x4bc,
-        high: 0x4bc,
+        range: 0x4c3..=0x4c3,
     },
     XmlChSRange {
-        low: 0x4be,
-        high: 0x4be,
+        range: 0x4c5..=0x4c5,
     },
     XmlChSRange {
-        low: 0x4c0,
-        high: 0x4c1,
+        range: 0x4c7..=0x4c7,
     },
     XmlChSRange {
-        low: 0x4c3,
-        high: 0x4c3,
+        range: 0x4c9..=0x4c9,
     },
     XmlChSRange {
-        low: 0x4c5,
-        high: 0x4c5,
+        range: 0x4cb..=0x4cb,
     },
     XmlChSRange {
-        low: 0x4c7,
-        high: 0x4c7,
+        range: 0x4cd..=0x4cd,
     },
     XmlChSRange {
-        low: 0x4c9,
-        high: 0x4c9,
+        range: 0x4d0..=0x4d0,
     },
     XmlChSRange {
-        low: 0x4cb,
-        high: 0x4cb,
+        range: 0x4d2..=0x4d2,
     },
     XmlChSRange {
-        low: 0x4cd,
-        high: 0x4cd,
+        range: 0x4d4..=0x4d4,
     },
     XmlChSRange {
-        low: 0x4d0,
-        high: 0x4d0,
+        range: 0x4d6..=0x4d6,
     },
     XmlChSRange {
-        low: 0x4d2,
-        high: 0x4d2,
+        range: 0x4d8..=0x4d8,
     },
     XmlChSRange {
-        low: 0x4d4,
-        high: 0x4d4,
+        range: 0x4da..=0x4da,
     },
     XmlChSRange {
-        low: 0x4d6,
-        high: 0x4d6,
+        range: 0x4dc..=0x4dc,
     },
     XmlChSRange {
-        low: 0x4d8,
-        high: 0x4d8,
+        range: 0x4de..=0x4de,
     },
     XmlChSRange {
-        low: 0x4da,
-        high: 0x4da,
+        range: 0x4e0..=0x4e0,
     },
     XmlChSRange {
-        low: 0x4dc,
-        high: 0x4dc,
+        range: 0x4e2..=0x4e2,
     },
     XmlChSRange {
-        low: 0x4de,
-        high: 0x4de,
+        range: 0x4e4..=0x4e4,
     },
     XmlChSRange {
-        low: 0x4e0,
-        high: 0x4e0,
+        range: 0x4e6..=0x4e6,
     },
     XmlChSRange {
-        low: 0x4e2,
-        high: 0x4e2,
+        range: 0x4e8..=0x4e8,
     },
     XmlChSRange {
-        low: 0x4e4,
-        high: 0x4e4,
+        range: 0x4ea..=0x4ea,
     },
     XmlChSRange {
-        low: 0x4e6,
-        high: 0x4e6,
+        range: 0x4ec..=0x4ec,
     },
     XmlChSRange {
-        low: 0x4e8,
-        high: 0x4e8,
+        range: 0x4ee..=0x4ee,
     },
     XmlChSRange {
-        low: 0x4ea,
-        high: 0x4ea,
+        range: 0x4f0..=0x4f0,
     },
     XmlChSRange {
-        low: 0x4ec,
-        high: 0x4ec,
+        range: 0x4f2..=0x4f2,
     },
     XmlChSRange {
-        low: 0x4ee,
-        high: 0x4ee,
+        range: 0x4f4..=0x4f4,
     },
     XmlChSRange {
-        low: 0x4f0,
-        high: 0x4f0,
+        range: 0x4f8..=0x4f8,
     },
     XmlChSRange {
-        low: 0x4f2,
-        high: 0x4f2,
+        range: 0x500..=0x500,
     },
     XmlChSRange {
-        low: 0x4f4,
-        high: 0x4f4,
+        range: 0x502..=0x502,
     },
     XmlChSRange {
-        low: 0x4f8,
-        high: 0x4f8,
+        range: 0x504..=0x504,
     },
     XmlChSRange {
-        low: 0x500,
-        high: 0x500,
+        range: 0x506..=0x506,
     },
     XmlChSRange {
-        low: 0x502,
-        high: 0x502,
+        range: 0x508..=0x508,
     },
     XmlChSRange {
-        low: 0x504,
-        high: 0x504,
+        range: 0x50a..=0x50a,
     },
     XmlChSRange {
-        low: 0x506,
-        high: 0x506,
+        range: 0x50c..=0x50c,
     },
     XmlChSRange {
-        low: 0x508,
-        high: 0x508,
+        range: 0x50e..=0x50e,
     },
     XmlChSRange {
-        low: 0x50a,
-        high: 0x50a,
+        range: 0x531..=0x556,
     },
     XmlChSRange {
-        low: 0x50c,
-        high: 0x50c,
+        range: 0x10a0..=0x10c5,
     },
     XmlChSRange {
-        low: 0x50e,
-        high: 0x50e,
+        range: 0x1e00..=0x1e00,
     },
     XmlChSRange {
-        low: 0x531,
-        high: 0x556,
+        range: 0x1e02..=0x1e02,
     },
     XmlChSRange {
-        low: 0x10a0,
-        high: 0x10c5,
+        range: 0x1e04..=0x1e04,
     },
     XmlChSRange {
-        low: 0x1e00,
-        high: 0x1e00,
+        range: 0x1e06..=0x1e06,
     },
     XmlChSRange {
-        low: 0x1e02,
-        high: 0x1e02,
+        range: 0x1e08..=0x1e08,
     },
     XmlChSRange {
-        low: 0x1e04,
-        high: 0x1e04,
+        range: 0x1e0a..=0x1e0a,
     },
     XmlChSRange {
-        low: 0x1e06,
-        high: 0x1e06,
+        range: 0x1e0c..=0x1e0c,
     },
     XmlChSRange {
-        low: 0x1e08,
-        high: 0x1e08,
+        range: 0x1e0e..=0x1e0e,
     },
     XmlChSRange {
-        low: 0x1e0a,
-        high: 0x1e0a,
+        range: 0x1e10..=0x1e10,
     },
     XmlChSRange {
-        low: 0x1e0c,
-        high: 0x1e0c,
+        range: 0x1e12..=0x1e12,
     },
     XmlChSRange {
-        low: 0x1e0e,
-        high: 0x1e0e,
+        range: 0x1e14..=0x1e14,
     },
     XmlChSRange {
-        low: 0x1e10,
-        high: 0x1e10,
+        range: 0x1e16..=0x1e16,
     },
     XmlChSRange {
-        low: 0x1e12,
-        high: 0x1e12,
+        range: 0x1e18..=0x1e18,
     },
     XmlChSRange {
-        low: 0x1e14,
-        high: 0x1e14,
+        range: 0x1e1a..=0x1e1a,
     },
     XmlChSRange {
-        low: 0x1e16,
-        high: 0x1e16,
+        range: 0x1e1c..=0x1e1c,
     },
     XmlChSRange {
-        low: 0x1e18,
-        high: 0x1e18,
+        range: 0x1e1e..=0x1e1e,
     },
     XmlChSRange {
-        low: 0x1e1a,
-        high: 0x1e1a,
+        range: 0x1e20..=0x1e20,
     },
     XmlChSRange {
-        low: 0x1e1c,
-        high: 0x1e1c,
+        range: 0x1e22..=0x1e22,
     },
     XmlChSRange {
-        low: 0x1e1e,
-        high: 0x1e1e,
+        range: 0x1e24..=0x1e24,
     },
     XmlChSRange {
-        low: 0x1e20,
-        high: 0x1e20,
+        range: 0x1e26..=0x1e26,
     },
     XmlChSRange {
-        low: 0x1e22,
-        high: 0x1e22,
+        range: 0x1e28..=0x1e28,
     },
     XmlChSRange {
-        low: 0x1e24,
-        high: 0x1e24,
+        range: 0x1e2a..=0x1e2a,
     },
     XmlChSRange {
-        low: 0x1e26,
-        high: 0x1e26,
+        range: 0x1e2c..=0x1e2c,
     },
     XmlChSRange {
-        low: 0x1e28,
-        high: 0x1e28,
+        range: 0x1e2e..=0x1e2e,
     },
     XmlChSRange {
-        low: 0x1e2a,
-        high: 0x1e2a,
+        range: 0x1e30..=0x1e30,
     },
     XmlChSRange {
-        low: 0x1e2c,
-        high: 0x1e2c,
+        range: 0x1e32..=0x1e32,
     },
     XmlChSRange {
-        low: 0x1e2e,
-        high: 0x1e2e,
+        range: 0x1e34..=0x1e34,
     },
     XmlChSRange {
-        low: 0x1e30,
-        high: 0x1e30,
+        range: 0x1e36..=0x1e36,
     },
     XmlChSRange {
-        low: 0x1e32,
-        high: 0x1e32,
+        range: 0x1e38..=0x1e38,
     },
     XmlChSRange {
-        low: 0x1e34,
-        high: 0x1e34,
+        range: 0x1e3a..=0x1e3a,
     },
     XmlChSRange {
-        low: 0x1e36,
-        high: 0x1e36,
+        range: 0x1e3c..=0x1e3c,
     },
     XmlChSRange {
-        low: 0x1e38,
-        high: 0x1e38,
+        range: 0x1e3e..=0x1e3e,
     },
     XmlChSRange {
-        low: 0x1e3a,
-        high: 0x1e3a,
+        range: 0x1e40..=0x1e40,
     },
     XmlChSRange {
-        low: 0x1e3c,
-        high: 0x1e3c,
+        range: 0x1e42..=0x1e42,
     },
     XmlChSRange {
-        low: 0x1e3e,
-        high: 0x1e3e,
+        range: 0x1e44..=0x1e44,
     },
     XmlChSRange {
-        low: 0x1e40,
-        high: 0x1e40,
+        range: 0x1e46..=0x1e46,
     },
     XmlChSRange {
-        low: 0x1e42,
-        high: 0x1e42,
+        range: 0x1e48..=0x1e48,
     },
     XmlChSRange {
-        low: 0x1e44,
-        high: 0x1e44,
+        range: 0x1e4a..=0x1e4a,
     },
     XmlChSRange {
-        low: 0x1e46,
-        high: 0x1e46,
+        range: 0x1e4c..=0x1e4c,
     },
     XmlChSRange {
-        low: 0x1e48,
-        high: 0x1e48,
+        range: 0x1e4e..=0x1e4e,
     },
     XmlChSRange {
-        low: 0x1e4a,
-        high: 0x1e4a,
+        range: 0x1e50..=0x1e50,
     },
     XmlChSRange {
-        low: 0x1e4c,
-        high: 0x1e4c,
+        range: 0x1e52..=0x1e52,
     },
     XmlChSRange {
-        low: 0x1e4e,
-        high: 0x1e4e,
+        range: 0x1e54..=0x1e54,
     },
     XmlChSRange {
-        low: 0x1e50,
-        high: 0x1e50,
+        range: 0x1e56..=0x1e56,
     },
     XmlChSRange {
-        low: 0x1e52,
-        high: 0x1e52,
+        range: 0x1e58..=0x1e58,
     },
     XmlChSRange {
-        low: 0x1e54,
-        high: 0x1e54,
+        range: 0x1e5a..=0x1e5a,
     },
     XmlChSRange {
-        low: 0x1e56,
-        high: 0x1e56,
+        range: 0x1e5c..=0x1e5c,
     },
     XmlChSRange {
-        low: 0x1e58,
-        high: 0x1e58,
+        range: 0x1e5e..=0x1e5e,
     },
     XmlChSRange {
-        low: 0x1e5a,
-        high: 0x1e5a,
+        range: 0x1e60..=0x1e60,
     },
     XmlChSRange {
-        low: 0x1e5c,
-        high: 0x1e5c,
+        range: 0x1e62..=0x1e62,
     },
     XmlChSRange {
-        low: 0x1e5e,
-        high: 0x1e5e,
+        range: 0x1e64..=0x1e64,
     },
     XmlChSRange {
-        low: 0x1e60,
-        high: 0x1e60,
+        range: 0x1e66..=0x1e66,
     },
     XmlChSRange {
-        low: 0x1e62,
-        high: 0x1e62,
+        range: 0x1e68..=0x1e68,
     },
     XmlChSRange {
-        low: 0x1e64,
-        high: 0x1e64,
+        range: 0x1e6a..=0x1e6a,
     },
     XmlChSRange {
-        low: 0x1e66,
-        high: 0x1e66,
+        range: 0x1e6c..=0x1e6c,
     },
     XmlChSRange {
-        low: 0x1e68,
-        high: 0x1e68,
+        range: 0x1e6e..=0x1e6e,
     },
     XmlChSRange {
-        low: 0x1e6a,
-        high: 0x1e6a,
+        range: 0x1e70..=0x1e70,
     },
     XmlChSRange {
-        low: 0x1e6c,
-        high: 0x1e6c,
+        range: 0x1e72..=0x1e72,
     },
     XmlChSRange {
-        low: 0x1e6e,
-        high: 0x1e6e,
+        range: 0x1e74..=0x1e74,
     },
     XmlChSRange {
-        low: 0x1e70,
-        high: 0x1e70,
+        range: 0x1e76..=0x1e76,
     },
     XmlChSRange {
-        low: 0x1e72,
-        high: 0x1e72,
+        range: 0x1e78..=0x1e78,
     },
     XmlChSRange {
-        low: 0x1e74,
-        high: 0x1e74,
+        range: 0x1e7a..=0x1e7a,
     },
     XmlChSRange {
-        low: 0x1e76,
-        high: 0x1e76,
+        range: 0x1e7c..=0x1e7c,
     },
     XmlChSRange {
-        low: 0x1e78,
-        high: 0x1e78,
+        range: 0x1e7e..=0x1e7e,
     },
     XmlChSRange {
-        low: 0x1e7a,
-        high: 0x1e7a,
+        range: 0x1e80..=0x1e80,
     },
     XmlChSRange {
-        low: 0x1e7c,
-        high: 0x1e7c,
+        range: 0x1e82..=0x1e82,
     },
     XmlChSRange {
-        low: 0x1e7e,
-        high: 0x1e7e,
+        range: 0x1e84..=0x1e84,
     },
     XmlChSRange {
-        low: 0x1e80,
-        high: 0x1e80,
+        range: 0x1e86..=0x1e86,
     },
     XmlChSRange {
-        low: 0x1e82,
-        high: 0x1e82,
+        range: 0x1e88..=0x1e88,
     },
     XmlChSRange {
-        low: 0x1e84,
-        high: 0x1e84,
+        range: 0x1e8a..=0x1e8a,
     },
     XmlChSRange {
-        low: 0x1e86,
-        high: 0x1e86,
+        range: 0x1e8c..=0x1e8c,
     },
     XmlChSRange {
-        low: 0x1e88,
-        high: 0x1e88,
+        range: 0x1e8e..=0x1e8e,
     },
     XmlChSRange {
-        low: 0x1e8a,
-        high: 0x1e8a,
+        range: 0x1e90..=0x1e90,
     },
     XmlChSRange {
-        low: 0x1e8c,
-        high: 0x1e8c,
+        range: 0x1e92..=0x1e92,
     },
     XmlChSRange {
-        low: 0x1e8e,
-        high: 0x1e8e,
+        range: 0x1e94..=0x1e94,
     },
     XmlChSRange {
-        low: 0x1e90,
-        high: 0x1e90,
+        range: 0x1ea0..=0x1ea0,
     },
     XmlChSRange {
-        low: 0x1e92,
-        high: 0x1e92,
+        range: 0x1ea2..=0x1ea2,
     },
     XmlChSRange {
-        low: 0x1e94,
-        high: 0x1e94,
+        range: 0x1ea4..=0x1ea4,
     },
     XmlChSRange {
-        low: 0x1ea0,
-        high: 0x1ea0,
+        range: 0x1ea6..=0x1ea6,
     },
     XmlChSRange {
-        low: 0x1ea2,
-        high: 0x1ea2,
+        range: 0x1ea8..=0x1ea8,
     },
     XmlChSRange {
-        low: 0x1ea4,
-        high: 0x1ea4,
+        range: 0x1eaa..=0x1eaa,
     },
     XmlChSRange {
-        low: 0x1ea6,
-        high: 0x1ea6,
+        range: 0x1eac..=0x1eac,
     },
     XmlChSRange {
-        low: 0x1ea8,
-        high: 0x1ea8,
+        range: 0x1eae..=0x1eae,
     },
     XmlChSRange {
-        low: 0x1eaa,
-        high: 0x1eaa,
+        range: 0x1eb0..=0x1eb0,
     },
     XmlChSRange {
-        low: 0x1eac,
-        high: 0x1eac,
+        range: 0x1eb2..=0x1eb2,
     },
     XmlChSRange {
-        low: 0x1eae,
-        high: 0x1eae,
+        range: 0x1eb4..=0x1eb4,
     },
     XmlChSRange {
-        low: 0x1eb0,
-        high: 0x1eb0,
+        range: 0x1eb6..=0x1eb6,
     },
     XmlChSRange {
-        low: 0x1eb2,
-        high: 0x1eb2,
+        range: 0x1eb8..=0x1eb8,
     },
     XmlChSRange {
-        low: 0x1eb4,
-        high: 0x1eb4,
+        range: 0x1eba..=0x1eba,
     },
     XmlChSRange {
-        low: 0x1eb6,
-        high: 0x1eb6,
+        range: 0x1ebc..=0x1ebc,
     },
     XmlChSRange {
-        low: 0x1eb8,
-        high: 0x1eb8,
+        range: 0x1ebe..=0x1ebe,
     },
     XmlChSRange {
-        low: 0x1eba,
-        high: 0x1eba,
+        range: 0x1ec0..=0x1ec0,
     },
     XmlChSRange {
-        low: 0x1ebc,
-        high: 0x1ebc,
+        range: 0x1ec2..=0x1ec2,
     },
     XmlChSRange {
-        low: 0x1ebe,
-        high: 0x1ebe,
+        range: 0x1ec4..=0x1ec4,
     },
     XmlChSRange {
-        low: 0x1ec0,
-        high: 0x1ec0,
+        range: 0x1ec6..=0x1ec6,
     },
     XmlChSRange {
-        low: 0x1ec2,
-        high: 0x1ec2,
+        range: 0x1ec8..=0x1ec8,
     },
     XmlChSRange {
-        low: 0x1ec4,
-        high: 0x1ec4,
+        range: 0x1eca..=0x1eca,
     },
     XmlChSRange {
-        low: 0x1ec6,
-        high: 0x1ec6,
+        range: 0x1ecc..=0x1ecc,
     },
     XmlChSRange {
-        low: 0x1ec8,
-        high: 0x1ec8,
+        range: 0x1ece..=0x1ece,
     },
     XmlChSRange {
-        low: 0x1eca,
-        high: 0x1eca,
+        range: 0x1ed0..=0x1ed0,
     },
     XmlChSRange {
-        low: 0x1ecc,
-        high: 0x1ecc,
+        range: 0x1ed2..=0x1ed2,
     },
     XmlChSRange {
-        low: 0x1ece,
-        high: 0x1ece,
+        range: 0x1ed4..=0x1ed4,
     },
     XmlChSRange {
-        low: 0x1ed0,
-        high: 0x1ed0,
+        range: 0x1ed6..=0x1ed6,
     },
     XmlChSRange {
-        low: 0x1ed2,
-        high: 0x1ed2,
+        range: 0x1ed8..=0x1ed8,
     },
     XmlChSRange {
-        low: 0x1ed4,
-        high: 0x1ed4,
+        range: 0x1eda..=0x1eda,
     },
     XmlChSRange {
-        low: 0x1ed6,
-        high: 0x1ed6,
+        range: 0x1edc..=0x1edc,
     },
     XmlChSRange {
-        low: 0x1ed8,
-        high: 0x1ed8,
+        range: 0x1ede..=0x1ede,
     },
     XmlChSRange {
-        low: 0x1eda,
-        high: 0x1eda,
+        range: 0x1ee0..=0x1ee0,
     },
     XmlChSRange {
-        low: 0x1edc,
-        high: 0x1edc,
+        range: 0x1ee2..=0x1ee2,
     },
     XmlChSRange {
-        low: 0x1ede,
-        high: 0x1ede,
+        range: 0x1ee4..=0x1ee4,
     },
     XmlChSRange {
-        low: 0x1ee0,
-        high: 0x1ee0,
+        range: 0x1ee6..=0x1ee6,
     },
     XmlChSRange {
-        low: 0x1ee2,
-        high: 0x1ee2,
+        range: 0x1ee8..=0x1ee8,
     },
     XmlChSRange {
-        low: 0x1ee4,
-        high: 0x1ee4,
+        range: 0x1eea..=0x1eea,
     },
     XmlChSRange {
-        low: 0x1ee6,
-        high: 0x1ee6,
+        range: 0x1eec..=0x1eec,
     },
     XmlChSRange {
-        low: 0x1ee8,
-        high: 0x1ee8,
+        range: 0x1eee..=0x1eee,
     },
     XmlChSRange {
-        low: 0x1eea,
-        high: 0x1eea,
+        range: 0x1ef0..=0x1ef0,
     },
     XmlChSRange {
-        low: 0x1eec,
-        high: 0x1eec,
+        range: 0x1ef2..=0x1ef2,
     },
     XmlChSRange {
-        low: 0x1eee,
-        high: 0x1eee,
+        range: 0x1ef4..=0x1ef4,
     },
     XmlChSRange {
-        low: 0x1ef0,
-        high: 0x1ef0,
+        range: 0x1ef6..=0x1ef6,
     },
     XmlChSRange {
-        low: 0x1ef2,
-        high: 0x1ef2,
+        range: 0x1ef8..=0x1ef8,
     },
     XmlChSRange {
-        low: 0x1ef4,
-        high: 0x1ef4,
+        range: 0x1f08..=0x1f0f,
     },
     XmlChSRange {
-        low: 0x1ef6,
-        high: 0x1ef6,
+        range: 0x1f18..=0x1f1d,
     },
     XmlChSRange {
-        low: 0x1ef8,
-        high: 0x1ef8,
+        range: 0x1f28..=0x1f2f,
     },
     XmlChSRange {
-        low: 0x1f08,
-        high: 0x1f0f,
+        range: 0x1f38..=0x1f3f,
     },
     XmlChSRange {
-        low: 0x1f18,
-        high: 0x1f1d,
+        range: 0x1f48..=0x1f4d,
     },
     XmlChSRange {
-        low: 0x1f28,
-        high: 0x1f2f,
+        range: 0x1f59..=0x1f59,
     },
     XmlChSRange {
-        low: 0x1f38,
-        high: 0x1f3f,
+        range: 0x1f5b..=0x1f5b,
     },
     XmlChSRange {
-        low: 0x1f48,
-        high: 0x1f4d,
+        range: 0x1f5d..=0x1f5d,
     },
     XmlChSRange {
-        low: 0x1f59,
-        high: 0x1f59,
+        range: 0x1f5f..=0x1f5f,
     },
     XmlChSRange {
-        low: 0x1f5b,
-        high: 0x1f5b,
+        range: 0x1f68..=0x1f6f,
     },
     XmlChSRange {
-        low: 0x1f5d,
-        high: 0x1f5d,
+        range: 0x1fb8..=0x1fbb,
     },
     XmlChSRange {
-        low: 0x1f5f,
-        high: 0x1f5f,
+        range: 0x1fc8..=0x1fcb,
     },
     XmlChSRange {
-        low: 0x1f68,
-        high: 0x1f6f,
+        range: 0x1fd8..=0x1fdb,
     },
     XmlChSRange {
-        low: 0x1fb8,
-        high: 0x1fbb,
+        range: 0x1fe8..=0x1fec,
     },
     XmlChSRange {
-        low: 0x1fc8,
-        high: 0x1fcb,
+        range: 0x1ff8..=0x1ffb,
     },
     XmlChSRange {
-        low: 0x1fd8,
-        high: 0x1fdb,
+        range: 0x2102..=0x2102,
     },
     XmlChSRange {
-        low: 0x1fe8,
-        high: 0x1fec,
+        range: 0x2107..=0x2107,
     },
     XmlChSRange {
-        low: 0x1ff8,
-        high: 0x1ffb,
+        range: 0x210b..=0x210d,
     },
     XmlChSRange {
-        low: 0x2102,
-        high: 0x2102,
+        range: 0x2110..=0x2112,
     },
     XmlChSRange {
-        low: 0x2107,
-        high: 0x2107,
+        range: 0x2115..=0x2115,
     },
     XmlChSRange {
-        low: 0x210b,
-        high: 0x210d,
+        range: 0x2119..=0x211d,
     },
     XmlChSRange {
-        low: 0x2110,
-        high: 0x2112,
+        range: 0x2124..=0x2124,
     },
     XmlChSRange {
-        low: 0x2115,
-        high: 0x2115,
+        range: 0x2126..=0x2126,
     },
     XmlChSRange {
-        low: 0x2119,
-        high: 0x211d,
+        range: 0x2128..=0x2128,
     },
     XmlChSRange {
-        low: 0x2124,
-        high: 0x2124,
+        range: 0x212a..=0x212d,
     },
     XmlChSRange {
-        low: 0x2126,
-        high: 0x2126,
+        range: 0x2130..=0x2131,
     },
     XmlChSRange {
-        low: 0x2128,
-        high: 0x2128,
+        range: 0x2133..=0x2133,
     },
     XmlChSRange {
-        low: 0x212a,
-        high: 0x212d,
+        range: 0x213e..=0x213f,
     },
     XmlChSRange {
-        low: 0x2130,
-        high: 0x2131,
+        range: 0x2145..=0x2145,
     },
     XmlChSRange {
-        low: 0x2133,
-        high: 0x2133,
-    },
-    XmlChSRange {
-        low: 0x213e,
-        high: 0x213f,
-    },
-    XmlChSRange {
-        low: 0x2145,
-        high: 0x2145,
-    },
-    XmlChSRange {
-        low: 0xff21,
-        high: 0xff3a,
+        range: 0xff21..=0xff3a,
     },
 ];
 
 const XML_LU_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10400,
-        high: 0x10427,
+        range: 0x10400..=0x10427,
     },
     XmlChLRange {
-        low: 0x1d400,
-        high: 0x1d419,
+        range: 0x1d400..=0x1d419,
     },
     XmlChLRange {
-        low: 0x1d434,
-        high: 0x1d44d,
+        range: 0x1d434..=0x1d44d,
     },
     XmlChLRange {
-        low: 0x1d468,
-        high: 0x1d481,
+        range: 0x1d468..=0x1d481,
     },
     XmlChLRange {
-        low: 0x1d49c,
-        high: 0x1d49c,
+        range: 0x1d49c..=0x1d49c,
     },
     XmlChLRange {
-        low: 0x1d49e,
-        high: 0x1d49f,
+        range: 0x1d49e..=0x1d49f,
     },
     XmlChLRange {
-        low: 0x1d4a2,
-        high: 0x1d4a2,
+        range: 0x1d4a2..=0x1d4a2,
     },
     XmlChLRange {
-        low: 0x1d4a5,
-        high: 0x1d4a6,
+        range: 0x1d4a5..=0x1d4a6,
     },
     XmlChLRange {
-        low: 0x1d4a9,
-        high: 0x1d4ac,
+        range: 0x1d4a9..=0x1d4ac,
     },
     XmlChLRange {
-        low: 0x1d4ae,
-        high: 0x1d4b5,
+        range: 0x1d4ae..=0x1d4b5,
     },
     XmlChLRange {
-        low: 0x1d4d0,
-        high: 0x1d4e9,
+        range: 0x1d4d0..=0x1d4e9,
     },
     XmlChLRange {
-        low: 0x1d504,
-        high: 0x1d505,
+        range: 0x1d504..=0x1d505,
     },
     XmlChLRange {
-        low: 0x1d507,
-        high: 0x1d50a,
+        range: 0x1d507..=0x1d50a,
     },
     XmlChLRange {
-        low: 0x1d50d,
-        high: 0x1d514,
+        range: 0x1d50d..=0x1d514,
     },
     XmlChLRange {
-        low: 0x1d516,
-        high: 0x1d51c,
+        range: 0x1d516..=0x1d51c,
     },
     XmlChLRange {
-        low: 0x1d538,
-        high: 0x1d539,
+        range: 0x1d538..=0x1d539,
     },
     XmlChLRange {
-        low: 0x1d53b,
-        high: 0x1d53e,
+        range: 0x1d53b..=0x1d53e,
     },
     XmlChLRange {
-        low: 0x1d540,
-        high: 0x1d544,
+        range: 0x1d540..=0x1d544,
     },
     XmlChLRange {
-        low: 0x1d546,
-        high: 0x1d546,
+        range: 0x1d546..=0x1d546,
     },
     XmlChLRange {
-        low: 0x1d54a,
-        high: 0x1d550,
+        range: 0x1d54a..=0x1d550,
     },
     XmlChLRange {
-        low: 0x1d56c,
-        high: 0x1d585,
+        range: 0x1d56c..=0x1d585,
     },
     XmlChLRange {
-        low: 0x1d5a0,
-        high: 0x1d5b9,
+        range: 0x1d5a0..=0x1d5b9,
     },
     XmlChLRange {
-        low: 0x1d5d4,
-        high: 0x1d5ed,
+        range: 0x1d5d4..=0x1d5ed,
     },
     XmlChLRange {
-        low: 0x1d608,
-        high: 0x1d621,
+        range: 0x1d608..=0x1d621,
     },
     XmlChLRange {
-        low: 0x1d63c,
-        high: 0x1d655,
+        range: 0x1d63c..=0x1d655,
     },
     XmlChLRange {
-        low: 0x1d670,
-        high: 0x1d689,
+        range: 0x1d670..=0x1d689,
     },
     XmlChLRange {
-        low: 0x1d6a8,
-        high: 0x1d6c0,
+        range: 0x1d6a8..=0x1d6c0,
     },
     XmlChLRange {
-        low: 0x1d6e2,
-        high: 0x1d6fa,
+        range: 0x1d6e2..=0x1d6fa,
     },
     XmlChLRange {
-        low: 0x1d71c,
-        high: 0x1d734,
+        range: 0x1d71c..=0x1d734,
     },
     XmlChLRange {
-        low: 0x1d756,
-        high: 0x1d76e,
+        range: 0x1d756..=0x1d76e,
     },
     XmlChLRange {
-        low: 0x1d790,
-        high: 0x1d7a8,
+        range: 0x1d790..=0x1d7a8,
     },
 ];
 
@@ -6667,483 +5153,364 @@ const XML_LU_G: XmlChRangeGroup = XmlChRangeGroup {
 
 const XML_MS: &[XmlChSRange] = &[
     XmlChSRange {
-        low: 0x300,
-        high: 0x357,
+        range: 0x300..=0x357,
     },
     XmlChSRange {
-        low: 0x35d,
-        high: 0x36f,
+        range: 0x35d..=0x36f,
     },
     XmlChSRange {
-        low: 0x483,
-        high: 0x486,
+        range: 0x483..=0x486,
     },
     XmlChSRange {
-        low: 0x488,
-        high: 0x489,
+        range: 0x488..=0x489,
     },
     XmlChSRange {
-        low: 0x591,
-        high: 0x5a1,
+        range: 0x591..=0x5a1,
     },
     XmlChSRange {
-        low: 0x5a3,
-        high: 0x5b9,
+        range: 0x5a3..=0x5b9,
     },
     XmlChSRange {
-        low: 0x5bb,
-        high: 0x5bd,
+        range: 0x5bb..=0x5bd,
     },
     XmlChSRange {
-        low: 0x5bf,
-        high: 0x5bf,
+        range: 0x5bf..=0x5bf,
     },
     XmlChSRange {
-        low: 0x5c1,
-        high: 0x5c2,
+        range: 0x5c1..=0x5c2,
     },
     XmlChSRange {
-        low: 0x5c4,
-        high: 0x5c4,
+        range: 0x5c4..=0x5c4,
     },
     XmlChSRange {
-        low: 0x610,
-        high: 0x615,
+        range: 0x610..=0x615,
     },
     XmlChSRange {
-        low: 0x64b,
-        high: 0x658,
+        range: 0x64b..=0x658,
     },
     XmlChSRange {
-        low: 0x670,
-        high: 0x670,
+        range: 0x670..=0x670,
     },
     XmlChSRange {
-        low: 0x6d6,
-        high: 0x6dc,
+        range: 0x6d6..=0x6dc,
     },
     XmlChSRange {
-        low: 0x6de,
-        high: 0x6e4,
+        range: 0x6de..=0x6e4,
     },
     XmlChSRange {
-        low: 0x6e7,
-        high: 0x6e8,
+        range: 0x6e7..=0x6e8,
     },
     XmlChSRange {
-        low: 0x6ea,
-        high: 0x6ed,
+        range: 0x6ea..=0x6ed,
     },
     XmlChSRange {
-        low: 0x711,
-        high: 0x711,
+        range: 0x711..=0x711,
     },
     XmlChSRange {
-        low: 0x730,
-        high: 0x74a,
+        range: 0x730..=0x74a,
     },
     XmlChSRange {
-        low: 0x7a6,
-        high: 0x7b0,
+        range: 0x7a6..=0x7b0,
     },
     XmlChSRange {
-        low: 0x901,
-        high: 0x903,
+        range: 0x901..=0x903,
     },
     XmlChSRange {
-        low: 0x93c,
-        high: 0x93c,
+        range: 0x93c..=0x93c,
     },
     XmlChSRange {
-        low: 0x93e,
-        high: 0x94d,
+        range: 0x93e..=0x94d,
     },
     XmlChSRange {
-        low: 0x951,
-        high: 0x954,
+        range: 0x951..=0x954,
     },
     XmlChSRange {
-        low: 0x962,
-        high: 0x963,
+        range: 0x962..=0x963,
     },
     XmlChSRange {
-        low: 0x981,
-        high: 0x983,
+        range: 0x981..=0x983,
     },
     XmlChSRange {
-        low: 0x9bc,
-        high: 0x9bc,
+        range: 0x9bc..=0x9bc,
     },
     XmlChSRange {
-        low: 0x9be,
-        high: 0x9c4,
+        range: 0x9be..=0x9c4,
     },
     XmlChSRange {
-        low: 0x9c7,
-        high: 0x9c8,
+        range: 0x9c7..=0x9c8,
     },
     XmlChSRange {
-        low: 0x9cb,
-        high: 0x9cd,
+        range: 0x9cb..=0x9cd,
     },
     XmlChSRange {
-        low: 0x9d7,
-        high: 0x9d7,
+        range: 0x9d7..=0x9d7,
     },
     XmlChSRange {
-        low: 0x9e2,
-        high: 0x9e3,
+        range: 0x9e2..=0x9e3,
     },
     XmlChSRange {
-        low: 0xa01,
-        high: 0xa03,
+        range: 0xa01..=0xa03,
     },
     XmlChSRange {
-        low: 0xa3c,
-        high: 0xa3c,
+        range: 0xa3c..=0xa3c,
     },
     XmlChSRange {
-        low: 0xa3e,
-        high: 0xa42,
+        range: 0xa3e..=0xa42,
     },
     XmlChSRange {
-        low: 0xa47,
-        high: 0xa48,
+        range: 0xa47..=0xa48,
     },
     XmlChSRange {
-        low: 0xa4b,
-        high: 0xa4d,
+        range: 0xa4b..=0xa4d,
     },
     XmlChSRange {
-        low: 0xa70,
-        high: 0xa71,
+        range: 0xa70..=0xa71,
     },
     XmlChSRange {
-        low: 0xa81,
-        high: 0xa83,
+        range: 0xa81..=0xa83,
     },
     XmlChSRange {
-        low: 0xabc,
-        high: 0xabc,
+        range: 0xabc..=0xabc,
     },
     XmlChSRange {
-        low: 0xabe,
-        high: 0xac5,
+        range: 0xabe..=0xac5,
     },
     XmlChSRange {
-        low: 0xac7,
-        high: 0xac9,
+        range: 0xac7..=0xac9,
     },
     XmlChSRange {
-        low: 0xacb,
-        high: 0xacd,
+        range: 0xacb..=0xacd,
     },
     XmlChSRange {
-        low: 0xae2,
-        high: 0xae3,
+        range: 0xae2..=0xae3,
     },
     XmlChSRange {
-        low: 0xb01,
-        high: 0xb03,
+        range: 0xb01..=0xb03,
     },
     XmlChSRange {
-        low: 0xb3c,
-        high: 0xb3c,
+        range: 0xb3c..=0xb3c,
     },
     XmlChSRange {
-        low: 0xb3e,
-        high: 0xb43,
+        range: 0xb3e..=0xb43,
     },
     XmlChSRange {
-        low: 0xb47,
-        high: 0xb48,
+        range: 0xb47..=0xb48,
     },
     XmlChSRange {
-        low: 0xb4b,
-        high: 0xb4d,
+        range: 0xb4b..=0xb4d,
     },
     XmlChSRange {
-        low: 0xb56,
-        high: 0xb57,
+        range: 0xb56..=0xb57,
     },
     XmlChSRange {
-        low: 0xb82,
-        high: 0xb82,
+        range: 0xb82..=0xb82,
     },
     XmlChSRange {
-        low: 0xbbe,
-        high: 0xbc2,
+        range: 0xbbe..=0xbc2,
     },
     XmlChSRange {
-        low: 0xbc6,
-        high: 0xbc8,
+        range: 0xbc6..=0xbc8,
     },
     XmlChSRange {
-        low: 0xbca,
-        high: 0xbcd,
+        range: 0xbca..=0xbcd,
     },
     XmlChSRange {
-        low: 0xbd7,
-        high: 0xbd7,
+        range: 0xbd7..=0xbd7,
     },
     XmlChSRange {
-        low: 0xc01,
-        high: 0xc03,
+        range: 0xc01..=0xc03,
     },
     XmlChSRange {
-        low: 0xc3e,
-        high: 0xc44,
+        range: 0xc3e..=0xc44,
     },
     XmlChSRange {
-        low: 0xc46,
-        high: 0xc48,
+        range: 0xc46..=0xc48,
     },
     XmlChSRange {
-        low: 0xc4a,
-        high: 0xc4d,
+        range: 0xc4a..=0xc4d,
     },
     XmlChSRange {
-        low: 0xc55,
-        high: 0xc56,
+        range: 0xc55..=0xc56,
     },
     XmlChSRange {
-        low: 0xc82,
-        high: 0xc83,
+        range: 0xc82..=0xc83,
     },
     XmlChSRange {
-        low: 0xcbc,
-        high: 0xcbc,
+        range: 0xcbc..=0xcbc,
     },
     XmlChSRange {
-        low: 0xcbe,
-        high: 0xcc4,
+        range: 0xcbe..=0xcc4,
     },
     XmlChSRange {
-        low: 0xcc6,
-        high: 0xcc8,
+        range: 0xcc6..=0xcc8,
     },
     XmlChSRange {
-        low: 0xcca,
-        high: 0xccd,
+        range: 0xcca..=0xccd,
     },
     XmlChSRange {
-        low: 0xcd5,
-        high: 0xcd6,
+        range: 0xcd5..=0xcd6,
     },
     XmlChSRange {
-        low: 0xd02,
-        high: 0xd03,
+        range: 0xd02..=0xd03,
     },
     XmlChSRange {
-        low: 0xd3e,
-        high: 0xd43,
+        range: 0xd3e..=0xd43,
     },
     XmlChSRange {
-        low: 0xd46,
-        high: 0xd48,
+        range: 0xd46..=0xd48,
     },
     XmlChSRange {
-        low: 0xd4a,
-        high: 0xd4d,
+        range: 0xd4a..=0xd4d,
     },
     XmlChSRange {
-        low: 0xd57,
-        high: 0xd57,
+        range: 0xd57..=0xd57,
     },
     XmlChSRange {
-        low: 0xd82,
-        high: 0xd83,
+        range: 0xd82..=0xd83,
     },
     XmlChSRange {
-        low: 0xdca,
-        high: 0xdca,
+        range: 0xdca..=0xdca,
     },
     XmlChSRange {
-        low: 0xdcf,
-        high: 0xdd4,
+        range: 0xdcf..=0xdd4,
     },
     XmlChSRange {
-        low: 0xdd6,
-        high: 0xdd6,
+        range: 0xdd6..=0xdd6,
     },
     XmlChSRange {
-        low: 0xdd8,
-        high: 0xddf,
+        range: 0xdd8..=0xddf,
     },
     XmlChSRange {
-        low: 0xdf2,
-        high: 0xdf3,
+        range: 0xdf2..=0xdf3,
     },
     XmlChSRange {
-        low: 0xe31,
-        high: 0xe31,
+        range: 0xe31..=0xe31,
     },
     XmlChSRange {
-        low: 0xe34,
-        high: 0xe3a,
+        range: 0xe34..=0xe3a,
     },
     XmlChSRange {
-        low: 0xe47,
-        high: 0xe4e,
+        range: 0xe47..=0xe4e,
     },
     XmlChSRange {
-        low: 0xeb1,
-        high: 0xeb1,
+        range: 0xeb1..=0xeb1,
     },
     XmlChSRange {
-        low: 0xeb4,
-        high: 0xeb9,
+        range: 0xeb4..=0xeb9,
     },
     XmlChSRange {
-        low: 0xebb,
-        high: 0xebc,
+        range: 0xebb..=0xebc,
     },
     XmlChSRange {
-        low: 0xec8,
-        high: 0xecd,
+        range: 0xec8..=0xecd,
     },
     XmlChSRange {
-        low: 0xf18,
-        high: 0xf19,
+        range: 0xf18..=0xf19,
     },
     XmlChSRange {
-        low: 0xf35,
-        high: 0xf35,
+        range: 0xf35..=0xf35,
     },
     XmlChSRange {
-        low: 0xf37,
-        high: 0xf37,
+        range: 0xf37..=0xf37,
     },
     XmlChSRange {
-        low: 0xf39,
-        high: 0xf39,
+        range: 0xf39..=0xf39,
     },
     XmlChSRange {
-        low: 0xf3e,
-        high: 0xf3f,
+        range: 0xf3e..=0xf3f,
     },
     XmlChSRange {
-        low: 0xf71,
-        high: 0xf84,
+        range: 0xf71..=0xf84,
     },
     XmlChSRange {
-        low: 0xf86,
-        high: 0xf87,
+        range: 0xf86..=0xf87,
     },
     XmlChSRange {
-        low: 0xf90,
-        high: 0xf97,
+        range: 0xf90..=0xf97,
     },
     XmlChSRange {
-        low: 0xf99,
-        high: 0xfbc,
+        range: 0xf99..=0xfbc,
     },
     XmlChSRange {
-        low: 0xfc6,
-        high: 0xfc6,
+        range: 0xfc6..=0xfc6,
     },
     XmlChSRange {
-        low: 0x102c,
-        high: 0x1032,
+        range: 0x102c..=0x1032,
     },
     XmlChSRange {
-        low: 0x1036,
-        high: 0x1039,
+        range: 0x1036..=0x1039,
     },
     XmlChSRange {
-        low: 0x1056,
-        high: 0x1059,
+        range: 0x1056..=0x1059,
     },
     XmlChSRange {
-        low: 0x1712,
-        high: 0x1714,
+        range: 0x1712..=0x1714,
     },
     XmlChSRange {
-        low: 0x1732,
-        high: 0x1734,
+        range: 0x1732..=0x1734,
     },
     XmlChSRange {
-        low: 0x1752,
-        high: 0x1753,
+        range: 0x1752..=0x1753,
     },
     XmlChSRange {
-        low: 0x1772,
-        high: 0x1773,
+        range: 0x1772..=0x1773,
     },
     XmlChSRange {
-        low: 0x17b6,
-        high: 0x17d3,
+        range: 0x17b6..=0x17d3,
     },
     XmlChSRange {
-        low: 0x17dd,
-        high: 0x17dd,
+        range: 0x17dd..=0x17dd,
     },
     XmlChSRange {
-        low: 0x180b,
-        high: 0x180d,
+        range: 0x180b..=0x180d,
     },
     XmlChSRange {
-        low: 0x18a9,
-        high: 0x18a9,
+        range: 0x18a9..=0x18a9,
     },
     XmlChSRange {
-        low: 0x1920,
-        high: 0x192b,
+        range: 0x1920..=0x192b,
     },
     XmlChSRange {
-        low: 0x1930,
-        high: 0x193b,
+        range: 0x1930..=0x193b,
     },
     XmlChSRange {
-        low: 0x20d0,
-        high: 0x20ea,
+        range: 0x20d0..=0x20ea,
     },
     XmlChSRange {
-        low: 0x302a,
-        high: 0x302f,
+        range: 0x302a..=0x302f,
     },
     XmlChSRange {
-        low: 0x3099,
-        high: 0x309a,
+        range: 0x3099..=0x309a,
     },
     XmlChSRange {
-        low: 0xfb1e,
-        high: 0xfb1e,
+        range: 0xfb1e..=0xfb1e,
     },
     XmlChSRange {
-        low: 0xfe00,
-        high: 0xfe0f,
+        range: 0xfe00..=0xfe0f,
     },
     XmlChSRange {
-        low: 0xfe20,
-        high: 0xfe23,
+        range: 0xfe20..=0xfe23,
     },
 ];
 
 const XML_ML: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x1d165,
-        high: 0x1d169,
+        range: 0x1d165..=0x1d169,
     },
     XmlChLRange {
-        low: 0x1d16d,
-        high: 0x1d172,
+        range: 0x1d16d..=0x1d172,
     },
     XmlChLRange {
-        low: 0x1d17b,
-        high: 0x1d182,
+        range: 0x1d17b..=0x1d182,
     },
     XmlChLRange {
-        low: 0x1d185,
-        high: 0x1d18b,
+        range: 0x1d185..=0x1d18b,
     },
     XmlChLRange {
-        low: 0x1d1aa,
-        high: 0x1d1ad,
+        range: 0x1d1aa..=0x1d1ad,
     },
     XmlChLRange {
-        low: 0xe0100,
-        high: 0xe01ef,
+        range: 0xe0100..=0xe01ef,
     },
 ];
 
@@ -7154,235 +5521,178 @@ const XML_MG: XmlChRangeGroup = XmlChRangeGroup {
 
 const XML_MC_S: &[XmlChSRange] = &[
     XmlChSRange {
-        low: 0x903,
-        high: 0x903,
+        range: 0x903..=0x903,
     },
     XmlChSRange {
-        low: 0x93e,
-        high: 0x940,
+        range: 0x93e..=0x940,
     },
     XmlChSRange {
-        low: 0x949,
-        high: 0x94c,
+        range: 0x949..=0x94c,
     },
     XmlChSRange {
-        low: 0x982,
-        high: 0x983,
+        range: 0x982..=0x983,
     },
     XmlChSRange {
-        low: 0x9be,
-        high: 0x9c0,
+        range: 0x9be..=0x9c0,
     },
     XmlChSRange {
-        low: 0x9c7,
-        high: 0x9c8,
+        range: 0x9c7..=0x9c8,
     },
     XmlChSRange {
-        low: 0x9cb,
-        high: 0x9cc,
+        range: 0x9cb..=0x9cc,
     },
     XmlChSRange {
-        low: 0x9d7,
-        high: 0x9d7,
+        range: 0x9d7..=0x9d7,
     },
     XmlChSRange {
-        low: 0xa03,
-        high: 0xa03,
+        range: 0xa03..=0xa03,
     },
     XmlChSRange {
-        low: 0xa3e,
-        high: 0xa40,
+        range: 0xa3e..=0xa40,
     },
     XmlChSRange {
-        low: 0xa83,
-        high: 0xa83,
+        range: 0xa83..=0xa83,
     },
     XmlChSRange {
-        low: 0xabe,
-        high: 0xac0,
+        range: 0xabe..=0xac0,
     },
     XmlChSRange {
-        low: 0xac9,
-        high: 0xac9,
+        range: 0xac9..=0xac9,
     },
     XmlChSRange {
-        low: 0xacb,
-        high: 0xacc,
+        range: 0xacb..=0xacc,
     },
     XmlChSRange {
-        low: 0xb02,
-        high: 0xb03,
+        range: 0xb02..=0xb03,
     },
     XmlChSRange {
-        low: 0xb3e,
-        high: 0xb3e,
+        range: 0xb3e..=0xb3e,
     },
     XmlChSRange {
-        low: 0xb40,
-        high: 0xb40,
+        range: 0xb40..=0xb40,
     },
     XmlChSRange {
-        low: 0xb47,
-        high: 0xb48,
+        range: 0xb47..=0xb48,
     },
     XmlChSRange {
-        low: 0xb4b,
-        high: 0xb4c,
+        range: 0xb4b..=0xb4c,
     },
     XmlChSRange {
-        low: 0xb57,
-        high: 0xb57,
+        range: 0xb57..=0xb57,
     },
     XmlChSRange {
-        low: 0xbbe,
-        high: 0xbbf,
+        range: 0xbbe..=0xbbf,
     },
     XmlChSRange {
-        low: 0xbc1,
-        high: 0xbc2,
+        range: 0xbc1..=0xbc2,
     },
     XmlChSRange {
-        low: 0xbc6,
-        high: 0xbc8,
+        range: 0xbc6..=0xbc8,
     },
     XmlChSRange {
-        low: 0xbca,
-        high: 0xbcc,
+        range: 0xbca..=0xbcc,
     },
     XmlChSRange {
-        low: 0xbd7,
-        high: 0xbd7,
+        range: 0xbd7..=0xbd7,
     },
     XmlChSRange {
-        low: 0xc01,
-        high: 0xc03,
+        range: 0xc01..=0xc03,
     },
     XmlChSRange {
-        low: 0xc41,
-        high: 0xc44,
+        range: 0xc41..=0xc44,
     },
     XmlChSRange {
-        low: 0xc82,
-        high: 0xc83,
+        range: 0xc82..=0xc83,
     },
     XmlChSRange {
-        low: 0xcbe,
-        high: 0xcbe,
+        range: 0xcbe..=0xcbe,
     },
     XmlChSRange {
-        low: 0xcc0,
-        high: 0xcc4,
+        range: 0xcc0..=0xcc4,
     },
     XmlChSRange {
-        low: 0xcc7,
-        high: 0xcc8,
+        range: 0xcc7..=0xcc8,
     },
     XmlChSRange {
-        low: 0xcca,
-        high: 0xccb,
+        range: 0xcca..=0xccb,
     },
     XmlChSRange {
-        low: 0xcd5,
-        high: 0xcd6,
+        range: 0xcd5..=0xcd6,
     },
     XmlChSRange {
-        low: 0xd02,
-        high: 0xd03,
+        range: 0xd02..=0xd03,
     },
     XmlChSRange {
-        low: 0xd3e,
-        high: 0xd40,
+        range: 0xd3e..=0xd40,
     },
     XmlChSRange {
-        low: 0xd46,
-        high: 0xd48,
+        range: 0xd46..=0xd48,
     },
     XmlChSRange {
-        low: 0xd4a,
-        high: 0xd4c,
+        range: 0xd4a..=0xd4c,
     },
     XmlChSRange {
-        low: 0xd57,
-        high: 0xd57,
+        range: 0xd57..=0xd57,
     },
     XmlChSRange {
-        low: 0xd82,
-        high: 0xd83,
+        range: 0xd82..=0xd83,
     },
     XmlChSRange {
-        low: 0xdcf,
-        high: 0xdd1,
+        range: 0xdcf..=0xdd1,
     },
     XmlChSRange {
-        low: 0xdd8,
-        high: 0xddf,
+        range: 0xdd8..=0xddf,
     },
     XmlChSRange {
-        low: 0xdf2,
-        high: 0xdf3,
+        range: 0xdf2..=0xdf3,
     },
     XmlChSRange {
-        low: 0xf3e,
-        high: 0xf3f,
+        range: 0xf3e..=0xf3f,
     },
     XmlChSRange {
-        low: 0xf7f,
-        high: 0xf7f,
+        range: 0xf7f..=0xf7f,
     },
     XmlChSRange {
-        low: 0x102c,
-        high: 0x102c,
+        range: 0x102c..=0x102c,
     },
     XmlChSRange {
-        low: 0x1031,
-        high: 0x1031,
+        range: 0x1031..=0x1031,
     },
     XmlChSRange {
-        low: 0x1038,
-        high: 0x1038,
+        range: 0x1038..=0x1038,
     },
     XmlChSRange {
-        low: 0x1056,
-        high: 0x1057,
+        range: 0x1056..=0x1057,
     },
     XmlChSRange {
-        low: 0x17b6,
-        high: 0x17b6,
+        range: 0x17b6..=0x17b6,
     },
     XmlChSRange {
-        low: 0x17be,
-        high: 0x17c5,
+        range: 0x17be..=0x17c5,
     },
     XmlChSRange {
-        low: 0x17c7,
-        high: 0x17c8,
+        range: 0x17c7..=0x17c8,
     },
     XmlChSRange {
-        low: 0x1923,
-        high: 0x1926,
+        range: 0x1923..=0x1926,
     },
     XmlChSRange {
-        low: 0x1929,
-        high: 0x192b,
+        range: 0x1929..=0x192b,
     },
     XmlChSRange {
-        low: 0x1930,
-        high: 0x1931,
+        range: 0x1930..=0x1931,
     },
     XmlChSRange {
-        low: 0x1933,
-        high: 0x1938,
+        range: 0x1933..=0x1938,
     },
 ];
 
 const XML_MC_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x1d165,
-        high: 0x1d166,
+        range: 0x1d165..=0x1d166,
     },
     XmlChLRange {
-        low: 0x1d16d,
-        high: 0x1d172,
+        range: 0x1d16d..=0x1d172,
     },
 ];
 
@@ -7393,459 +5703,346 @@ const XML_MC_G: XmlChRangeGroup = XmlChRangeGroup {
 
 const XML_MN_S: &[XmlChSRange] = &[
     XmlChSRange {
-        low: 0x300,
-        high: 0x357,
+        range: 0x300..=0x357,
     },
     XmlChSRange {
-        low: 0x35d,
-        high: 0x36f,
+        range: 0x35d..=0x36f,
     },
     XmlChSRange {
-        low: 0x483,
-        high: 0x486,
+        range: 0x483..=0x486,
     },
     XmlChSRange {
-        low: 0x591,
-        high: 0x5a1,
+        range: 0x591..=0x5a1,
     },
     XmlChSRange {
-        low: 0x5a3,
-        high: 0x5b9,
+        range: 0x5a3..=0x5b9,
     },
     XmlChSRange {
-        low: 0x5bb,
-        high: 0x5bd,
+        range: 0x5bb..=0x5bd,
     },
     XmlChSRange {
-        low: 0x5bf,
-        high: 0x5bf,
+        range: 0x5bf..=0x5bf,
     },
     XmlChSRange {
-        low: 0x5c1,
-        high: 0x5c2,
+        range: 0x5c1..=0x5c2,
     },
     XmlChSRange {
-        low: 0x5c4,
-        high: 0x5c4,
+        range: 0x5c4..=0x5c4,
     },
     XmlChSRange {
-        low: 0x610,
-        high: 0x615,
+        range: 0x610..=0x615,
     },
     XmlChSRange {
-        low: 0x64b,
-        high: 0x658,
+        range: 0x64b..=0x658,
     },
     XmlChSRange {
-        low: 0x670,
-        high: 0x670,
+        range: 0x670..=0x670,
     },
     XmlChSRange {
-        low: 0x6d6,
-        high: 0x6dc,
+        range: 0x6d6..=0x6dc,
     },
     XmlChSRange {
-        low: 0x6df,
-        high: 0x6e4,
+        range: 0x6df..=0x6e4,
     },
     XmlChSRange {
-        low: 0x6e7,
-        high: 0x6e8,
+        range: 0x6e7..=0x6e8,
     },
     XmlChSRange {
-        low: 0x6ea,
-        high: 0x6ed,
+        range: 0x6ea..=0x6ed,
     },
     XmlChSRange {
-        low: 0x711,
-        high: 0x711,
+        range: 0x711..=0x711,
     },
     XmlChSRange {
-        low: 0x730,
-        high: 0x74a,
+        range: 0x730..=0x74a,
     },
     XmlChSRange {
-        low: 0x7a6,
-        high: 0x7b0,
+        range: 0x7a6..=0x7b0,
     },
     XmlChSRange {
-        low: 0x901,
-        high: 0x902,
+        range: 0x901..=0x902,
     },
     XmlChSRange {
-        low: 0x93c,
-        high: 0x93c,
+        range: 0x93c..=0x93c,
     },
     XmlChSRange {
-        low: 0x941,
-        high: 0x948,
+        range: 0x941..=0x948,
     },
     XmlChSRange {
-        low: 0x94d,
-        high: 0x94d,
+        range: 0x94d..=0x94d,
     },
     XmlChSRange {
-        low: 0x951,
-        high: 0x954,
+        range: 0x951..=0x954,
     },
     XmlChSRange {
-        low: 0x962,
-        high: 0x963,
+        range: 0x962..=0x963,
     },
     XmlChSRange {
-        low: 0x981,
-        high: 0x981,
+        range: 0x981..=0x981,
     },
     XmlChSRange {
-        low: 0x9bc,
-        high: 0x9bc,
+        range: 0x9bc..=0x9bc,
     },
     XmlChSRange {
-        low: 0x9c1,
-        high: 0x9c4,
+        range: 0x9c1..=0x9c4,
     },
     XmlChSRange {
-        low: 0x9cd,
-        high: 0x9cd,
+        range: 0x9cd..=0x9cd,
     },
     XmlChSRange {
-        low: 0x9e2,
-        high: 0x9e3,
+        range: 0x9e2..=0x9e3,
     },
     XmlChSRange {
-        low: 0xa01,
-        high: 0xa02,
+        range: 0xa01..=0xa02,
     },
     XmlChSRange {
-        low: 0xa3c,
-        high: 0xa3c,
+        range: 0xa3c..=0xa3c,
     },
     XmlChSRange {
-        low: 0xa41,
-        high: 0xa42,
+        range: 0xa41..=0xa42,
     },
     XmlChSRange {
-        low: 0xa47,
-        high: 0xa48,
+        range: 0xa47..=0xa48,
     },
     XmlChSRange {
-        low: 0xa4b,
-        high: 0xa4d,
+        range: 0xa4b..=0xa4d,
     },
     XmlChSRange {
-        low: 0xa70,
-        high: 0xa71,
+        range: 0xa70..=0xa71,
     },
     XmlChSRange {
-        low: 0xa81,
-        high: 0xa82,
+        range: 0xa81..=0xa82,
     },
     XmlChSRange {
-        low: 0xabc,
-        high: 0xabc,
+        range: 0xabc..=0xabc,
     },
     XmlChSRange {
-        low: 0xac1,
-        high: 0xac5,
+        range: 0xac1..=0xac5,
     },
     XmlChSRange {
-        low: 0xac7,
-        high: 0xac8,
+        range: 0xac7..=0xac8,
     },
     XmlChSRange {
-        low: 0xacd,
-        high: 0xacd,
+        range: 0xacd..=0xacd,
     },
     XmlChSRange {
-        low: 0xae2,
-        high: 0xae3,
+        range: 0xae2..=0xae3,
     },
     XmlChSRange {
-        low: 0xb01,
-        high: 0xb01,
+        range: 0xb01..=0xb01,
     },
     XmlChSRange {
-        low: 0xb3c,
-        high: 0xb3c,
+        range: 0xb3c..=0xb3c,
     },
     XmlChSRange {
-        low: 0xb3f,
-        high: 0xb3f,
+        range: 0xb3f..=0xb3f,
     },
     XmlChSRange {
-        low: 0xb41,
-        high: 0xb43,
+        range: 0xb41..=0xb43,
     },
     XmlChSRange {
-        low: 0xb4d,
-        high: 0xb4d,
+        range: 0xb4d..=0xb4d,
     },
     XmlChSRange {
-        low: 0xb56,
-        high: 0xb56,
+        range: 0xb56..=0xb56,
     },
     XmlChSRange {
-        low: 0xb82,
-        high: 0xb82,
+        range: 0xb82..=0xb82,
     },
     XmlChSRange {
-        low: 0xbc0,
-        high: 0xbc0,
+        range: 0xbc0..=0xbc0,
     },
     XmlChSRange {
-        low: 0xbcd,
-        high: 0xbcd,
+        range: 0xbcd..=0xbcd,
     },
     XmlChSRange {
-        low: 0xc3e,
-        high: 0xc40,
+        range: 0xc3e..=0xc40,
     },
     XmlChSRange {
-        low: 0xc46,
-        high: 0xc48,
+        range: 0xc46..=0xc48,
     },
     XmlChSRange {
-        low: 0xc4a,
-        high: 0xc4d,
+        range: 0xc4a..=0xc4d,
     },
     XmlChSRange {
-        low: 0xc55,
-        high: 0xc56,
+        range: 0xc55..=0xc56,
     },
     XmlChSRange {
-        low: 0xcbc,
-        high: 0xcbc,
+        range: 0xcbc..=0xcbc,
     },
     XmlChSRange {
-        low: 0xcbf,
-        high: 0xcbf,
+        range: 0xcbf..=0xcbf,
     },
     XmlChSRange {
-        low: 0xcc6,
-        high: 0xcc6,
+        range: 0xcc6..=0xcc6,
     },
     XmlChSRange {
-        low: 0xccc,
-        high: 0xccd,
+        range: 0xccc..=0xccd,
     },
     XmlChSRange {
-        low: 0xd41,
-        high: 0xd43,
+        range: 0xd41..=0xd43,
     },
     XmlChSRange {
-        low: 0xd4d,
-        high: 0xd4d,
+        range: 0xd4d..=0xd4d,
     },
     XmlChSRange {
-        low: 0xdca,
-        high: 0xdca,
+        range: 0xdca..=0xdca,
     },
     XmlChSRange {
-        low: 0xdd2,
-        high: 0xdd4,
+        range: 0xdd2..=0xdd4,
     },
     XmlChSRange {
-        low: 0xdd6,
-        high: 0xdd6,
+        range: 0xdd6..=0xdd6,
     },
     XmlChSRange {
-        low: 0xe31,
-        high: 0xe31,
+        range: 0xe31..=0xe31,
     },
     XmlChSRange {
-        low: 0xe34,
-        high: 0xe3a,
+        range: 0xe34..=0xe3a,
     },
     XmlChSRange {
-        low: 0xe47,
-        high: 0xe4e,
+        range: 0xe47..=0xe4e,
     },
     XmlChSRange {
-        low: 0xeb1,
-        high: 0xeb1,
+        range: 0xeb1..=0xeb1,
     },
     XmlChSRange {
-        low: 0xeb4,
-        high: 0xeb9,
+        range: 0xeb4..=0xeb9,
     },
     XmlChSRange {
-        low: 0xebb,
-        high: 0xebc,
+        range: 0xebb..=0xebc,
     },
     XmlChSRange {
-        low: 0xec8,
-        high: 0xecd,
+        range: 0xec8..=0xecd,
     },
     XmlChSRange {
-        low: 0xf18,
-        high: 0xf19,
+        range: 0xf18..=0xf19,
     },
     XmlChSRange {
-        low: 0xf35,
-        high: 0xf35,
+        range: 0xf35..=0xf35,
     },
     XmlChSRange {
-        low: 0xf37,
-        high: 0xf37,
+        range: 0xf37..=0xf37,
     },
     XmlChSRange {
-        low: 0xf39,
-        high: 0xf39,
+        range: 0xf39..=0xf39,
     },
     XmlChSRange {
-        low: 0xf71,
-        high: 0xf7e,
+        range: 0xf71..=0xf7e,
     },
     XmlChSRange {
-        low: 0xf80,
-        high: 0xf84,
+        range: 0xf80..=0xf84,
     },
     XmlChSRange {
-        low: 0xf86,
-        high: 0xf87,
+        range: 0xf86..=0xf87,
     },
     XmlChSRange {
-        low: 0xf90,
-        high: 0xf97,
+        range: 0xf90..=0xf97,
     },
     XmlChSRange {
-        low: 0xf99,
-        high: 0xfbc,
+        range: 0xf99..=0xfbc,
     },
     XmlChSRange {
-        low: 0xfc6,
-        high: 0xfc6,
+        range: 0xfc6..=0xfc6,
     },
     XmlChSRange {
-        low: 0x102d,
-        high: 0x1030,
+        range: 0x102d..=0x1030,
     },
     XmlChSRange {
-        low: 0x1032,
-        high: 0x1032,
+        range: 0x1032..=0x1032,
     },
     XmlChSRange {
-        low: 0x1036,
-        high: 0x1037,
+        range: 0x1036..=0x1037,
     },
     XmlChSRange {
-        low: 0x1039,
-        high: 0x1039,
+        range: 0x1039..=0x1039,
     },
     XmlChSRange {
-        low: 0x1058,
-        high: 0x1059,
+        range: 0x1058..=0x1059,
     },
     XmlChSRange {
-        low: 0x1712,
-        high: 0x1714,
+        range: 0x1712..=0x1714,
     },
     XmlChSRange {
-        low: 0x1732,
-        high: 0x1734,
+        range: 0x1732..=0x1734,
     },
     XmlChSRange {
-        low: 0x1752,
-        high: 0x1753,
+        range: 0x1752..=0x1753,
     },
     XmlChSRange {
-        low: 0x1772,
-        high: 0x1773,
+        range: 0x1772..=0x1773,
     },
     XmlChSRange {
-        low: 0x17b7,
-        high: 0x17bd,
+        range: 0x17b7..=0x17bd,
     },
     XmlChSRange {
-        low: 0x17c6,
-        high: 0x17c6,
+        range: 0x17c6..=0x17c6,
     },
     XmlChSRange {
-        low: 0x17c9,
-        high: 0x17d3,
+        range: 0x17c9..=0x17d3,
     },
     XmlChSRange {
-        low: 0x17dd,
-        high: 0x17dd,
+        range: 0x17dd..=0x17dd,
     },
     XmlChSRange {
-        low: 0x180b,
-        high: 0x180d,
+        range: 0x180b..=0x180d,
     },
     XmlChSRange {
-        low: 0x18a9,
-        high: 0x18a9,
+        range: 0x18a9..=0x18a9,
     },
     XmlChSRange {
-        low: 0x1920,
-        high: 0x1922,
+        range: 0x1920..=0x1922,
     },
     XmlChSRange {
-        low: 0x1927,
-        high: 0x1928,
+        range: 0x1927..=0x1928,
     },
     XmlChSRange {
-        low: 0x1932,
-        high: 0x1932,
+        range: 0x1932..=0x1932,
     },
     XmlChSRange {
-        low: 0x1939,
-        high: 0x193b,
+        range: 0x1939..=0x193b,
     },
     XmlChSRange {
-        low: 0x20d0,
-        high: 0x20dc,
+        range: 0x20d0..=0x20dc,
     },
     XmlChSRange {
-        low: 0x20e1,
-        high: 0x20e1,
+        range: 0x20e1..=0x20e1,
     },
     XmlChSRange {
-        low: 0x20e5,
-        high: 0x20ea,
+        range: 0x20e5..=0x20ea,
     },
     XmlChSRange {
-        low: 0x302a,
-        high: 0x302f,
+        range: 0x302a..=0x302f,
     },
     XmlChSRange {
-        low: 0x3099,
-        high: 0x309a,
+        range: 0x3099..=0x309a,
     },
     XmlChSRange {
-        low: 0xfb1e,
-        high: 0xfb1e,
+        range: 0xfb1e..=0xfb1e,
     },
     XmlChSRange {
-        low: 0xfe00,
-        high: 0xfe0f,
+        range: 0xfe00..=0xfe0f,
     },
     XmlChSRange {
-        low: 0xfe20,
-        high: 0xfe23,
+        range: 0xfe20..=0xfe23,
     },
 ];
 
 const XML_MN_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x1d167,
-        high: 0x1d169,
+        range: 0x1d167..=0x1d169,
     },
     XmlChLRange {
-        low: 0x1d17b,
-        high: 0x1d182,
+        range: 0x1d17b..=0x1d182,
     },
     XmlChLRange {
-        low: 0x1d185,
-        high: 0x1d18b,
+        range: 0x1d185..=0x1d18b,
     },
     XmlChLRange {
-        low: 0x1d1aa,
-        high: 0x1d1ad,
+        range: 0x1d1aa..=0x1d1ad,
     },
     XmlChLRange {
-        low: 0xe0100,
-        high: 0xe01ef,
+        range: 0xe0100..=0xe01ef,
     },
 ];
 
@@ -7855,196 +6052,141 @@ const XML_MN_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_NS: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x30..=0x39 },
+    XmlChSRange { range: 0xb2..=0xb3 },
+    XmlChSRange { range: 0xb9..=0xb9 },
+    XmlChSRange { range: 0xbc..=0xbe },
     XmlChSRange {
-        low: 0x30,
-        high: 0x39,
+        range: 0x660..=0x669,
     },
     XmlChSRange {
-        low: 0xb2,
-        high: 0xb3,
+        range: 0x6f0..=0x6f9,
     },
     XmlChSRange {
-        low: 0xb9,
-        high: 0xb9,
+        range: 0x966..=0x96f,
     },
     XmlChSRange {
-        low: 0xbc,
-        high: 0xbe,
+        range: 0x9e6..=0x9ef,
     },
     XmlChSRange {
-        low: 0x660,
-        high: 0x669,
+        range: 0x9f4..=0x9f9,
     },
     XmlChSRange {
-        low: 0x6f0,
-        high: 0x6f9,
+        range: 0xa66..=0xa6f,
     },
     XmlChSRange {
-        low: 0x966,
-        high: 0x96f,
+        range: 0xae6..=0xaef,
     },
     XmlChSRange {
-        low: 0x9e6,
-        high: 0x9ef,
+        range: 0xb66..=0xb6f,
     },
     XmlChSRange {
-        low: 0x9f4,
-        high: 0x9f9,
+        range: 0xbe7..=0xbf2,
     },
     XmlChSRange {
-        low: 0xa66,
-        high: 0xa6f,
+        range: 0xc66..=0xc6f,
     },
     XmlChSRange {
-        low: 0xae6,
-        high: 0xaef,
+        range: 0xce6..=0xcef,
     },
     XmlChSRange {
-        low: 0xb66,
-        high: 0xb6f,
+        range: 0xd66..=0xd6f,
     },
     XmlChSRange {
-        low: 0xbe7,
-        high: 0xbf2,
+        range: 0xe50..=0xe59,
     },
     XmlChSRange {
-        low: 0xc66,
-        high: 0xc6f,
+        range: 0xed0..=0xed9,
     },
     XmlChSRange {
-        low: 0xce6,
-        high: 0xcef,
+        range: 0xf20..=0xf33,
     },
     XmlChSRange {
-        low: 0xd66,
-        high: 0xd6f,
+        range: 0x1040..=0x1049,
     },
     XmlChSRange {
-        low: 0xe50,
-        high: 0xe59,
+        range: 0x1369..=0x137c,
     },
     XmlChSRange {
-        low: 0xed0,
-        high: 0xed9,
+        range: 0x16ee..=0x16f0,
     },
     XmlChSRange {
-        low: 0xf20,
-        high: 0xf33,
+        range: 0x17e0..=0x17e9,
     },
     XmlChSRange {
-        low: 0x1040,
-        high: 0x1049,
+        range: 0x17f0..=0x17f9,
     },
     XmlChSRange {
-        low: 0x1369,
-        high: 0x137c,
+        range: 0x1810..=0x1819,
     },
     XmlChSRange {
-        low: 0x16ee,
-        high: 0x16f0,
+        range: 0x1946..=0x194f,
     },
     XmlChSRange {
-        low: 0x17e0,
-        high: 0x17e9,
+        range: 0x2070..=0x2070,
     },
     XmlChSRange {
-        low: 0x17f0,
-        high: 0x17f9,
+        range: 0x2074..=0x2079,
     },
     XmlChSRange {
-        low: 0x1810,
-        high: 0x1819,
+        range: 0x2080..=0x2089,
     },
     XmlChSRange {
-        low: 0x1946,
-        high: 0x194f,
+        range: 0x2153..=0x2183,
     },
     XmlChSRange {
-        low: 0x2070,
-        high: 0x2070,
+        range: 0x2460..=0x249b,
     },
     XmlChSRange {
-        low: 0x2074,
-        high: 0x2079,
+        range: 0x24ea..=0x24ff,
     },
     XmlChSRange {
-        low: 0x2080,
-        high: 0x2089,
+        range: 0x2776..=0x2793,
     },
     XmlChSRange {
-        low: 0x2153,
-        high: 0x2183,
+        range: 0x3007..=0x3007,
     },
     XmlChSRange {
-        low: 0x2460,
-        high: 0x249b,
+        range: 0x3021..=0x3029,
     },
     XmlChSRange {
-        low: 0x24ea,
-        high: 0x24ff,
+        range: 0x3038..=0x303a,
     },
     XmlChSRange {
-        low: 0x2776,
-        high: 0x2793,
+        range: 0x3192..=0x3195,
     },
     XmlChSRange {
-        low: 0x3007,
-        high: 0x3007,
+        range: 0x3220..=0x3229,
     },
     XmlChSRange {
-        low: 0x3021,
-        high: 0x3029,
+        range: 0x3251..=0x325f,
     },
     XmlChSRange {
-        low: 0x3038,
-        high: 0x303a,
+        range: 0x3280..=0x3289,
     },
     XmlChSRange {
-        low: 0x3192,
-        high: 0x3195,
+        range: 0x32b1..=0x32bf,
     },
     XmlChSRange {
-        low: 0x3220,
-        high: 0x3229,
-    },
-    XmlChSRange {
-        low: 0x3251,
-        high: 0x325f,
-    },
-    XmlChSRange {
-        low: 0x3280,
-        high: 0x3289,
-    },
-    XmlChSRange {
-        low: 0x32b1,
-        high: 0x32bf,
-    },
-    XmlChSRange {
-        low: 0xff10,
-        high: 0xff19,
+        range: 0xff10..=0xff19,
     },
 ];
 
 const XML_NL: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10107,
-        high: 0x10133,
+        range: 0x10107..=0x10133,
     },
     XmlChLRange {
-        low: 0x10320,
-        high: 0x10323,
+        range: 0x10320..=0x10323,
     },
     XmlChLRange {
-        low: 0x1034a,
-        high: 0x1034a,
+        range: 0x1034a..=0x1034a,
     },
     XmlChLRange {
-        low: 0x104a0,
-        high: 0x104a9,
+        range: 0x104a0..=0x104a9,
     },
     XmlChLRange {
-        low: 0x1d7ce,
-        high: 0x1d7ff,
+        range: 0x1d7ce..=0x1d7ff,
     },
 ];
 
@@ -8054,100 +6196,75 @@ const XML_NG: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_ND_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x30..=0x39 },
     XmlChSRange {
-        low: 0x30,
-        high: 0x39,
+        range: 0x660..=0x669,
     },
     XmlChSRange {
-        low: 0x660,
-        high: 0x669,
+        range: 0x6f0..=0x6f9,
     },
     XmlChSRange {
-        low: 0x6f0,
-        high: 0x6f9,
+        range: 0x966..=0x96f,
     },
     XmlChSRange {
-        low: 0x966,
-        high: 0x96f,
+        range: 0x9e6..=0x9ef,
     },
     XmlChSRange {
-        low: 0x9e6,
-        high: 0x9ef,
+        range: 0xa66..=0xa6f,
     },
     XmlChSRange {
-        low: 0xa66,
-        high: 0xa6f,
+        range: 0xae6..=0xaef,
     },
     XmlChSRange {
-        low: 0xae6,
-        high: 0xaef,
+        range: 0xb66..=0xb6f,
     },
     XmlChSRange {
-        low: 0xb66,
-        high: 0xb6f,
+        range: 0xbe7..=0xbef,
     },
     XmlChSRange {
-        low: 0xbe7,
-        high: 0xbef,
+        range: 0xc66..=0xc6f,
     },
     XmlChSRange {
-        low: 0xc66,
-        high: 0xc6f,
+        range: 0xce6..=0xcef,
     },
     XmlChSRange {
-        low: 0xce6,
-        high: 0xcef,
+        range: 0xd66..=0xd6f,
     },
     XmlChSRange {
-        low: 0xd66,
-        high: 0xd6f,
+        range: 0xe50..=0xe59,
     },
     XmlChSRange {
-        low: 0xe50,
-        high: 0xe59,
+        range: 0xed0..=0xed9,
     },
     XmlChSRange {
-        low: 0xed0,
-        high: 0xed9,
+        range: 0xf20..=0xf29,
     },
     XmlChSRange {
-        low: 0xf20,
-        high: 0xf29,
+        range: 0x1040..=0x1049,
     },
     XmlChSRange {
-        low: 0x1040,
-        high: 0x1049,
+        range: 0x1369..=0x1371,
     },
     XmlChSRange {
-        low: 0x1369,
-        high: 0x1371,
+        range: 0x17e0..=0x17e9,
     },
     XmlChSRange {
-        low: 0x17e0,
-        high: 0x17e9,
+        range: 0x1810..=0x1819,
     },
     XmlChSRange {
-        low: 0x1810,
-        high: 0x1819,
+        range: 0x1946..=0x194f,
     },
     XmlChSRange {
-        low: 0x1946,
-        high: 0x194f,
-    },
-    XmlChSRange {
-        low: 0xff10,
-        high: 0xff19,
+        range: 0xff10..=0xff19,
     },
 ];
 
 const XML_ND_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x104a0,
-        high: 0x104a9,
+        range: 0x104a0..=0x104a9,
     },
     XmlChLRange {
-        low: 0x1d7ce,
-        high: 0x1d7ff,
+        range: 0x1d7ce..=0x1d7ff,
     },
 ];
 
@@ -8157,96 +6274,68 @@ const XML_ND_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_NO_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0xb2..=0xb3 },
+    XmlChSRange { range: 0xb9..=0xb9 },
+    XmlChSRange { range: 0xbc..=0xbe },
     XmlChSRange {
-        low: 0xb2,
-        high: 0xb3,
+        range: 0x9f4..=0x9f9,
     },
     XmlChSRange {
-        low: 0xb9,
-        high: 0xb9,
+        range: 0xbf0..=0xbf2,
     },
     XmlChSRange {
-        low: 0xbc,
-        high: 0xbe,
+        range: 0xf2a..=0xf33,
     },
     XmlChSRange {
-        low: 0x9f4,
-        high: 0x9f9,
+        range: 0x1372..=0x137c,
     },
     XmlChSRange {
-        low: 0xbf0,
-        high: 0xbf2,
+        range: 0x17f0..=0x17f9,
     },
     XmlChSRange {
-        low: 0xf2a,
-        high: 0xf33,
+        range: 0x2070..=0x2070,
     },
     XmlChSRange {
-        low: 0x1372,
-        high: 0x137c,
+        range: 0x2074..=0x2079,
     },
     XmlChSRange {
-        low: 0x17f0,
-        high: 0x17f9,
+        range: 0x2080..=0x2089,
     },
     XmlChSRange {
-        low: 0x2070,
-        high: 0x2070,
+        range: 0x2153..=0x215f,
     },
     XmlChSRange {
-        low: 0x2074,
-        high: 0x2079,
+        range: 0x2460..=0x249b,
     },
     XmlChSRange {
-        low: 0x2080,
-        high: 0x2089,
+        range: 0x24ea..=0x24ff,
     },
     XmlChSRange {
-        low: 0x2153,
-        high: 0x215f,
+        range: 0x2776..=0x2793,
     },
     XmlChSRange {
-        low: 0x2460,
-        high: 0x249b,
+        range: 0x3192..=0x3195,
     },
     XmlChSRange {
-        low: 0x24ea,
-        high: 0x24ff,
+        range: 0x3220..=0x3229,
     },
     XmlChSRange {
-        low: 0x2776,
-        high: 0x2793,
+        range: 0x3251..=0x325f,
     },
     XmlChSRange {
-        low: 0x3192,
-        high: 0x3195,
+        range: 0x3280..=0x3289,
     },
     XmlChSRange {
-        low: 0x3220,
-        high: 0x3229,
-    },
-    XmlChSRange {
-        low: 0x3251,
-        high: 0x325f,
-    },
-    XmlChSRange {
-        low: 0x3280,
-        high: 0x3289,
-    },
-    XmlChSRange {
-        low: 0x32b1,
-        high: 0x32bf,
+        range: 0x32b1..=0x32bf,
     },
 ];
 
 const XML_NO_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10107,
-        high: 0x10133,
+        range: 0x10107..=0x10133,
     },
     XmlChLRange {
-        low: 0x10320,
-        high: 0x10323,
+        range: 0x10320..=0x10323,
     },
 ];
 
@@ -8256,352 +6345,238 @@ const XML_NO_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_PS: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x21..=0x23 },
+    XmlChSRange { range: 0x25..=0x2a },
+    XmlChSRange { range: 0x2c..=0x2f },
+    XmlChSRange { range: 0x3a..=0x3b },
+    XmlChSRange { range: 0x3f..=0x40 },
+    XmlChSRange { range: 0x5b..=0x5d },
+    XmlChSRange { range: 0x5f..=0x5f },
+    XmlChSRange { range: 0x7b..=0x7b },
+    XmlChSRange { range: 0x7d..=0x7d },
+    XmlChSRange { range: 0xa1..=0xa1 },
+    XmlChSRange { range: 0xab..=0xab },
+    XmlChSRange { range: 0xb7..=0xb7 },
+    XmlChSRange { range: 0xbb..=0xbb },
+    XmlChSRange { range: 0xbf..=0xbf },
     XmlChSRange {
-        low: 0x21,
-        high: 0x23,
+        range: 0x37e..=0x37e,
     },
     XmlChSRange {
-        low: 0x25,
-        high: 0x2a,
+        range: 0x387..=0x387,
     },
     XmlChSRange {
-        low: 0x2c,
-        high: 0x2f,
+        range: 0x55a..=0x55f,
     },
     XmlChSRange {
-        low: 0x3a,
-        high: 0x3b,
+        range: 0x589..=0x58a,
     },
     XmlChSRange {
-        low: 0x3f,
-        high: 0x40,
+        range: 0x5be..=0x5be,
     },
     XmlChSRange {
-        low: 0x5b,
-        high: 0x5d,
+        range: 0x5c0..=0x5c0,
     },
     XmlChSRange {
-        low: 0x5f,
-        high: 0x5f,
+        range: 0x5c3..=0x5c3,
     },
     XmlChSRange {
-        low: 0x7b,
-        high: 0x7b,
+        range: 0x5f3..=0x5f4,
     },
     XmlChSRange {
-        low: 0x7d,
-        high: 0x7d,
+        range: 0x60c..=0x60d,
     },
     XmlChSRange {
-        low: 0xa1,
-        high: 0xa1,
+        range: 0x61b..=0x61b,
     },
     XmlChSRange {
-        low: 0xab,
-        high: 0xab,
+        range: 0x61f..=0x61f,
     },
     XmlChSRange {
-        low: 0xb7,
-        high: 0xb7,
+        range: 0x66a..=0x66d,
     },
     XmlChSRange {
-        low: 0xbb,
-        high: 0xbb,
+        range: 0x6d4..=0x6d4,
     },
     XmlChSRange {
-        low: 0xbf,
-        high: 0xbf,
+        range: 0x700..=0x70d,
     },
     XmlChSRange {
-        low: 0x37e,
-        high: 0x37e,
+        range: 0x964..=0x965,
     },
     XmlChSRange {
-        low: 0x387,
-        high: 0x387,
+        range: 0x970..=0x970,
     },
     XmlChSRange {
-        low: 0x55a,
-        high: 0x55f,
+        range: 0xdf4..=0xdf4,
     },
     XmlChSRange {
-        low: 0x589,
-        high: 0x58a,
+        range: 0xe4f..=0xe4f,
     },
     XmlChSRange {
-        low: 0x5be,
-        high: 0x5be,
+        range: 0xe5a..=0xe5b,
     },
     XmlChSRange {
-        low: 0x5c0,
-        high: 0x5c0,
+        range: 0xf04..=0xf12,
     },
     XmlChSRange {
-        low: 0x5c3,
-        high: 0x5c3,
+        range: 0xf3a..=0xf3d,
     },
     XmlChSRange {
-        low: 0x5f3,
-        high: 0x5f4,
+        range: 0xf85..=0xf85,
     },
     XmlChSRange {
-        low: 0x60c,
-        high: 0x60d,
+        range: 0x104a..=0x104f,
     },
     XmlChSRange {
-        low: 0x61b,
-        high: 0x61b,
+        range: 0x10fb..=0x10fb,
     },
     XmlChSRange {
-        low: 0x61f,
-        high: 0x61f,
+        range: 0x1361..=0x1368,
     },
     XmlChSRange {
-        low: 0x66a,
-        high: 0x66d,
+        range: 0x166d..=0x166e,
     },
     XmlChSRange {
-        low: 0x6d4,
-        high: 0x6d4,
+        range: 0x169b..=0x169c,
     },
     XmlChSRange {
-        low: 0x700,
-        high: 0x70d,
+        range: 0x16eb..=0x16ed,
     },
     XmlChSRange {
-        low: 0x964,
-        high: 0x965,
+        range: 0x1735..=0x1736,
     },
     XmlChSRange {
-        low: 0x970,
-        high: 0x970,
+        range: 0x17d4..=0x17d6,
     },
     XmlChSRange {
-        low: 0xdf4,
-        high: 0xdf4,
+        range: 0x17d8..=0x17da,
     },
     XmlChSRange {
-        low: 0xe4f,
-        high: 0xe4f,
+        range: 0x1800..=0x180a,
     },
     XmlChSRange {
-        low: 0xe5a,
-        high: 0xe5b,
+        range: 0x1944..=0x1945,
     },
     XmlChSRange {
-        low: 0xf04,
-        high: 0xf12,
+        range: 0x2010..=0x2027,
     },
     XmlChSRange {
-        low: 0xf3a,
-        high: 0xf3d,
+        range: 0x2030..=0x2043,
     },
     XmlChSRange {
-        low: 0xf85,
-        high: 0xf85,
+        range: 0x2045..=0x2051,
     },
     XmlChSRange {
-        low: 0x104a,
-        high: 0x104f,
+        range: 0x2053..=0x2054,
     },
     XmlChSRange {
-        low: 0x10fb,
-        high: 0x10fb,
+        range: 0x2057..=0x2057,
     },
     XmlChSRange {
-        low: 0x1361,
-        high: 0x1368,
+        range: 0x207d..=0x207e,
     },
     XmlChSRange {
-        low: 0x166d,
-        high: 0x166e,
+        range: 0x208d..=0x208e,
     },
     XmlChSRange {
-        low: 0x169b,
-        high: 0x169c,
+        range: 0x2329..=0x232a,
     },
     XmlChSRange {
-        low: 0x16eb,
-        high: 0x16ed,
+        range: 0x23b4..=0x23b6,
     },
     XmlChSRange {
-        low: 0x1735,
-        high: 0x1736,
+        range: 0x2768..=0x2775,
     },
     XmlChSRange {
-        low: 0x17d4,
-        high: 0x17d6,
+        range: 0x27e6..=0x27eb,
     },
     XmlChSRange {
-        low: 0x17d8,
-        high: 0x17da,
+        range: 0x2983..=0x2998,
     },
     XmlChSRange {
-        low: 0x1800,
-        high: 0x180a,
+        range: 0x29d8..=0x29db,
     },
     XmlChSRange {
-        low: 0x1944,
-        high: 0x1945,
+        range: 0x29fc..=0x29fd,
     },
     XmlChSRange {
-        low: 0x2010,
-        high: 0x2027,
+        range: 0x3001..=0x3003,
     },
     XmlChSRange {
-        low: 0x2030,
-        high: 0x2043,
+        range: 0x3008..=0x3011,
     },
     XmlChSRange {
-        low: 0x2045,
-        high: 0x2051,
+        range: 0x3014..=0x301f,
     },
     XmlChSRange {
-        low: 0x2053,
-        high: 0x2054,
+        range: 0x3030..=0x3030,
     },
     XmlChSRange {
-        low: 0x2057,
-        high: 0x2057,
+        range: 0x303d..=0x303d,
     },
     XmlChSRange {
-        low: 0x207d,
-        high: 0x207e,
+        range: 0x30a0..=0x30a0,
     },
     XmlChSRange {
-        low: 0x208d,
-        high: 0x208e,
+        range: 0x30fb..=0x30fb,
     },
     XmlChSRange {
-        low: 0x2329,
-        high: 0x232a,
+        range: 0xfd3e..=0xfd3f,
     },
     XmlChSRange {
-        low: 0x23b4,
-        high: 0x23b6,
+        range: 0xfe30..=0xfe52,
     },
     XmlChSRange {
-        low: 0x2768,
-        high: 0x2775,
+        range: 0xfe54..=0xfe61,
     },
     XmlChSRange {
-        low: 0x27e6,
-        high: 0x27eb,
+        range: 0xfe63..=0xfe63,
     },
     XmlChSRange {
-        low: 0x2983,
-        high: 0x2998,
+        range: 0xfe68..=0xfe68,
     },
     XmlChSRange {
-        low: 0x29d8,
-        high: 0x29db,
+        range: 0xfe6a..=0xfe6b,
     },
     XmlChSRange {
-        low: 0x29fc,
-        high: 0x29fd,
+        range: 0xff01..=0xff03,
     },
     XmlChSRange {
-        low: 0x3001,
-        high: 0x3003,
+        range: 0xff05..=0xff0a,
     },
     XmlChSRange {
-        low: 0x3008,
-        high: 0x3011,
+        range: 0xff0c..=0xff0f,
     },
     XmlChSRange {
-        low: 0x3014,
-        high: 0x301f,
+        range: 0xff1a..=0xff1b,
     },
     XmlChSRange {
-        low: 0x3030,
-        high: 0x3030,
+        range: 0xff1f..=0xff20,
     },
     XmlChSRange {
-        low: 0x303d,
-        high: 0x303d,
+        range: 0xff3b..=0xff3d,
     },
     XmlChSRange {
-        low: 0x30a0,
-        high: 0x30a0,
+        range: 0xff3f..=0xff3f,
     },
     XmlChSRange {
-        low: 0x30fb,
-        high: 0x30fb,
+        range: 0xff5b..=0xff5b,
     },
     XmlChSRange {
-        low: 0xfd3e,
-        high: 0xfd3f,
+        range: 0xff5d..=0xff5d,
     },
     XmlChSRange {
-        low: 0xfe30,
-        high: 0xfe52,
-    },
-    XmlChSRange {
-        low: 0xfe54,
-        high: 0xfe61,
-    },
-    XmlChSRange {
-        low: 0xfe63,
-        high: 0xfe63,
-    },
-    XmlChSRange {
-        low: 0xfe68,
-        high: 0xfe68,
-    },
-    XmlChSRange {
-        low: 0xfe6a,
-        high: 0xfe6b,
-    },
-    XmlChSRange {
-        low: 0xff01,
-        high: 0xff03,
-    },
-    XmlChSRange {
-        low: 0xff05,
-        high: 0xff0a,
-    },
-    XmlChSRange {
-        low: 0xff0c,
-        high: 0xff0f,
-    },
-    XmlChSRange {
-        low: 0xff1a,
-        high: 0xff1b,
-    },
-    XmlChSRange {
-        low: 0xff1f,
-        high: 0xff20,
-    },
-    XmlChSRange {
-        low: 0xff3b,
-        high: 0xff3d,
-    },
-    XmlChSRange {
-        low: 0xff3f,
-        high: 0xff3f,
-    },
-    XmlChSRange {
-        low: 0xff5b,
-        high: 0xff5b,
-    },
-    XmlChSRange {
-        low: 0xff5d,
-        high: 0xff5d,
-    },
-    XmlChSRange {
-        low: 0xff5f,
-        high: 0xff65,
+        range: 0xff5f..=0xff65,
     },
 ];
 
 const XML_PL: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10100,
-        high: 0x10101,
+        range: 0x10100..=0x10101,
     },
     XmlChLRange {
-        low: 0x1039f,
-        high: 0x1039f,
+        range: 0x1039f..=0x1039f,
     },
 ];
 
@@ -8611,49 +6586,36 @@ const XML_PG: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_PD_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x2d..=0x2d },
     XmlChSRange {
-        low: 0x2d,
-        high: 0x2d,
+        range: 0x58a..=0x58a,
     },
     XmlChSRange {
-        low: 0x58a,
-        high: 0x58a,
+        range: 0x1806..=0x1806,
     },
     XmlChSRange {
-        low: 0x1806,
-        high: 0x1806,
+        range: 0x2010..=0x2015,
     },
     XmlChSRange {
-        low: 0x2010,
-        high: 0x2015,
+        range: 0x301c..=0x301c,
     },
     XmlChSRange {
-        low: 0x301c,
-        high: 0x301c,
+        range: 0x3030..=0x3030,
     },
     XmlChSRange {
-        low: 0x3030,
-        high: 0x3030,
+        range: 0x30a0..=0x30a0,
     },
     XmlChSRange {
-        low: 0x30a0,
-        high: 0x30a0,
+        range: 0xfe31..=0xfe32,
     },
     XmlChSRange {
-        low: 0xfe31,
-        high: 0xfe32,
+        range: 0xfe58..=0xfe58,
     },
     XmlChSRange {
-        low: 0xfe58,
-        high: 0xfe58,
+        range: 0xfe63..=0xfe63,
     },
     XmlChSRange {
-        low: 0xfe63,
-        high: 0xfe63,
-    },
-    XmlChSRange {
-        low: 0xff0d,
-        high: 0xff0d,
+        range: 0xff0d..=0xff0d,
     },
 ];
 
@@ -8663,257 +6625,188 @@ const XML_PD_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_PE_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x29..=0x29 },
+    XmlChSRange { range: 0x5d..=0x5d },
+    XmlChSRange { range: 0x7d..=0x7d },
     XmlChSRange {
-        low: 0x29,
-        high: 0x29,
+        range: 0xf3b..=0xf3b,
     },
     XmlChSRange {
-        low: 0x5d,
-        high: 0x5d,
+        range: 0xf3d..=0xf3d,
     },
     XmlChSRange {
-        low: 0x7d,
-        high: 0x7d,
+        range: 0x169c..=0x169c,
     },
     XmlChSRange {
-        low: 0xf3b,
-        high: 0xf3b,
+        range: 0x2046..=0x2046,
     },
     XmlChSRange {
-        low: 0xf3d,
-        high: 0xf3d,
+        range: 0x207e..=0x207e,
     },
     XmlChSRange {
-        low: 0x169c,
-        high: 0x169c,
+        range: 0x208e..=0x208e,
     },
     XmlChSRange {
-        low: 0x2046,
-        high: 0x2046,
+        range: 0x232a..=0x232a,
     },
     XmlChSRange {
-        low: 0x207e,
-        high: 0x207e,
+        range: 0x23b5..=0x23b5,
     },
     XmlChSRange {
-        low: 0x208e,
-        high: 0x208e,
+        range: 0x2769..=0x2769,
     },
     XmlChSRange {
-        low: 0x232a,
-        high: 0x232a,
+        range: 0x276b..=0x276b,
     },
     XmlChSRange {
-        low: 0x23b5,
-        high: 0x23b5,
+        range: 0x276d..=0x276d,
     },
     XmlChSRange {
-        low: 0x2769,
-        high: 0x2769,
+        range: 0x276f..=0x276f,
     },
     XmlChSRange {
-        low: 0x276b,
-        high: 0x276b,
+        range: 0x2771..=0x2771,
     },
     XmlChSRange {
-        low: 0x276d,
-        high: 0x276d,
+        range: 0x2773..=0x2773,
     },
     XmlChSRange {
-        low: 0x276f,
-        high: 0x276f,
+        range: 0x2775..=0x2775,
     },
     XmlChSRange {
-        low: 0x2771,
-        high: 0x2771,
+        range: 0x27e7..=0x27e7,
     },
     XmlChSRange {
-        low: 0x2773,
-        high: 0x2773,
+        range: 0x27e9..=0x27e9,
     },
     XmlChSRange {
-        low: 0x2775,
-        high: 0x2775,
+        range: 0x27eb..=0x27eb,
     },
     XmlChSRange {
-        low: 0x27e7,
-        high: 0x27e7,
+        range: 0x2984..=0x2984,
     },
     XmlChSRange {
-        low: 0x27e9,
-        high: 0x27e9,
+        range: 0x2986..=0x2986,
     },
     XmlChSRange {
-        low: 0x27eb,
-        high: 0x27eb,
+        range: 0x2988..=0x2988,
     },
     XmlChSRange {
-        low: 0x2984,
-        high: 0x2984,
+        range: 0x298a..=0x298a,
     },
     XmlChSRange {
-        low: 0x2986,
-        high: 0x2986,
+        range: 0x298c..=0x298c,
     },
     XmlChSRange {
-        low: 0x2988,
-        high: 0x2988,
+        range: 0x298e..=0x298e,
     },
     XmlChSRange {
-        low: 0x298a,
-        high: 0x298a,
+        range: 0x2990..=0x2990,
     },
     XmlChSRange {
-        low: 0x298c,
-        high: 0x298c,
+        range: 0x2992..=0x2992,
     },
     XmlChSRange {
-        low: 0x298e,
-        high: 0x298e,
+        range: 0x2994..=0x2994,
     },
     XmlChSRange {
-        low: 0x2990,
-        high: 0x2990,
+        range: 0x2996..=0x2996,
     },
     XmlChSRange {
-        low: 0x2992,
-        high: 0x2992,
+        range: 0x2998..=0x2998,
     },
     XmlChSRange {
-        low: 0x2994,
-        high: 0x2994,
+        range: 0x29d9..=0x29d9,
     },
     XmlChSRange {
-        low: 0x2996,
-        high: 0x2996,
+        range: 0x29db..=0x29db,
     },
     XmlChSRange {
-        low: 0x2998,
-        high: 0x2998,
+        range: 0x29fd..=0x29fd,
     },
     XmlChSRange {
-        low: 0x29d9,
-        high: 0x29d9,
+        range: 0x3009..=0x3009,
     },
     XmlChSRange {
-        low: 0x29db,
-        high: 0x29db,
+        range: 0x300b..=0x300b,
     },
     XmlChSRange {
-        low: 0x29fd,
-        high: 0x29fd,
+        range: 0x300d..=0x300d,
     },
     XmlChSRange {
-        low: 0x3009,
-        high: 0x3009,
+        range: 0x300f..=0x300f,
     },
     XmlChSRange {
-        low: 0x300b,
-        high: 0x300b,
+        range: 0x3011..=0x3011,
     },
     XmlChSRange {
-        low: 0x300d,
-        high: 0x300d,
+        range: 0x3015..=0x3015,
     },
     XmlChSRange {
-        low: 0x300f,
-        high: 0x300f,
+        range: 0x3017..=0x3017,
     },
     XmlChSRange {
-        low: 0x3011,
-        high: 0x3011,
+        range: 0x3019..=0x3019,
     },
     XmlChSRange {
-        low: 0x3015,
-        high: 0x3015,
+        range: 0x301b..=0x301b,
     },
     XmlChSRange {
-        low: 0x3017,
-        high: 0x3017,
+        range: 0x301e..=0x301f,
     },
     XmlChSRange {
-        low: 0x3019,
-        high: 0x3019,
+        range: 0xfd3f..=0xfd3f,
     },
     XmlChSRange {
-        low: 0x301b,
-        high: 0x301b,
+        range: 0xfe36..=0xfe36,
     },
     XmlChSRange {
-        low: 0x301e,
-        high: 0x301f,
+        range: 0xfe38..=0xfe38,
     },
     XmlChSRange {
-        low: 0xfd3f,
-        high: 0xfd3f,
+        range: 0xfe3a..=0xfe3a,
     },
     XmlChSRange {
-        low: 0xfe36,
-        high: 0xfe36,
+        range: 0xfe3c..=0xfe3c,
     },
     XmlChSRange {
-        low: 0xfe38,
-        high: 0xfe38,
+        range: 0xfe3e..=0xfe3e,
     },
     XmlChSRange {
-        low: 0xfe3a,
-        high: 0xfe3a,
+        range: 0xfe40..=0xfe40,
     },
     XmlChSRange {
-        low: 0xfe3c,
-        high: 0xfe3c,
+        range: 0xfe42..=0xfe42,
     },
     XmlChSRange {
-        low: 0xfe3e,
-        high: 0xfe3e,
+        range: 0xfe44..=0xfe44,
     },
     XmlChSRange {
-        low: 0xfe40,
-        high: 0xfe40,
+        range: 0xfe48..=0xfe48,
     },
     XmlChSRange {
-        low: 0xfe42,
-        high: 0xfe42,
+        range: 0xfe5a..=0xfe5a,
     },
     XmlChSRange {
-        low: 0xfe44,
-        high: 0xfe44,
+        range: 0xfe5c..=0xfe5c,
     },
     XmlChSRange {
-        low: 0xfe48,
-        high: 0xfe48,
+        range: 0xfe5e..=0xfe5e,
     },
     XmlChSRange {
-        low: 0xfe5a,
-        high: 0xfe5a,
+        range: 0xff09..=0xff09,
     },
     XmlChSRange {
-        low: 0xfe5c,
-        high: 0xfe5c,
+        range: 0xff3d..=0xff3d,
     },
     XmlChSRange {
-        low: 0xfe5e,
-        high: 0xfe5e,
+        range: 0xff5d..=0xff5d,
     },
     XmlChSRange {
-        low: 0xff09,
-        high: 0xff09,
+        range: 0xff60..=0xff60,
     },
     XmlChSRange {
-        low: 0xff3d,
-        high: 0xff3d,
-    },
-    XmlChSRange {
-        low: 0xff5d,
-        high: 0xff5d,
-    },
-    XmlChSRange {
-        low: 0xff60,
-        high: 0xff60,
-    },
-    XmlChSRange {
-        low: 0xff63,
-        high: 0xff63,
+        range: 0xff63..=0xff63,
     },
 ];
 
@@ -8923,304 +6816,208 @@ const XML_PE_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_PO_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x21..=0x23 },
+    XmlChSRange { range: 0x25..=0x27 },
+    XmlChSRange { range: 0x2a..=0x2a },
+    XmlChSRange { range: 0x2c..=0x2c },
+    XmlChSRange { range: 0x2e..=0x2f },
+    XmlChSRange { range: 0x3a..=0x3b },
+    XmlChSRange { range: 0x3f..=0x40 },
+    XmlChSRange { range: 0x5c..=0x5c },
+    XmlChSRange { range: 0xa1..=0xa1 },
+    XmlChSRange { range: 0xb7..=0xb7 },
+    XmlChSRange { range: 0xbf..=0xbf },
     XmlChSRange {
-        low: 0x21,
-        high: 0x23,
+        range: 0x37e..=0x37e,
     },
     XmlChSRange {
-        low: 0x25,
-        high: 0x27,
+        range: 0x387..=0x387,
     },
     XmlChSRange {
-        low: 0x2a,
-        high: 0x2a,
+        range: 0x55a..=0x55f,
     },
     XmlChSRange {
-        low: 0x2c,
-        high: 0x2c,
+        range: 0x589..=0x589,
     },
     XmlChSRange {
-        low: 0x2e,
-        high: 0x2f,
+        range: 0x5be..=0x5be,
     },
     XmlChSRange {
-        low: 0x3a,
-        high: 0x3b,
+        range: 0x5c0..=0x5c0,
     },
     XmlChSRange {
-        low: 0x3f,
-        high: 0x40,
+        range: 0x5c3..=0x5c3,
     },
     XmlChSRange {
-        low: 0x5c,
-        high: 0x5c,
+        range: 0x5f3..=0x5f4,
     },
     XmlChSRange {
-        low: 0xa1,
-        high: 0xa1,
+        range: 0x60c..=0x60d,
     },
     XmlChSRange {
-        low: 0xb7,
-        high: 0xb7,
+        range: 0x61b..=0x61b,
     },
     XmlChSRange {
-        low: 0xbf,
-        high: 0xbf,
+        range: 0x61f..=0x61f,
     },
     XmlChSRange {
-        low: 0x37e,
-        high: 0x37e,
+        range: 0x66a..=0x66d,
     },
     XmlChSRange {
-        low: 0x387,
-        high: 0x387,
+        range: 0x6d4..=0x6d4,
     },
     XmlChSRange {
-        low: 0x55a,
-        high: 0x55f,
+        range: 0x700..=0x70d,
     },
     XmlChSRange {
-        low: 0x589,
-        high: 0x589,
+        range: 0x964..=0x965,
     },
     XmlChSRange {
-        low: 0x5be,
-        high: 0x5be,
+        range: 0x970..=0x970,
     },
     XmlChSRange {
-        low: 0x5c0,
-        high: 0x5c0,
+        range: 0xdf4..=0xdf4,
     },
     XmlChSRange {
-        low: 0x5c3,
-        high: 0x5c3,
+        range: 0xe4f..=0xe4f,
     },
     XmlChSRange {
-        low: 0x5f3,
-        high: 0x5f4,
+        range: 0xe5a..=0xe5b,
     },
     XmlChSRange {
-        low: 0x60c,
-        high: 0x60d,
+        range: 0xf04..=0xf12,
     },
     XmlChSRange {
-        low: 0x61b,
-        high: 0x61b,
+        range: 0xf85..=0xf85,
     },
     XmlChSRange {
-        low: 0x61f,
-        high: 0x61f,
+        range: 0x104a..=0x104f,
     },
     XmlChSRange {
-        low: 0x66a,
-        high: 0x66d,
+        range: 0x10fb..=0x10fb,
     },
     XmlChSRange {
-        low: 0x6d4,
-        high: 0x6d4,
+        range: 0x1361..=0x1368,
     },
     XmlChSRange {
-        low: 0x700,
-        high: 0x70d,
+        range: 0x166d..=0x166e,
     },
     XmlChSRange {
-        low: 0x964,
-        high: 0x965,
+        range: 0x16eb..=0x16ed,
     },
     XmlChSRange {
-        low: 0x970,
-        high: 0x970,
+        range: 0x1735..=0x1736,
     },
     XmlChSRange {
-        low: 0xdf4,
-        high: 0xdf4,
+        range: 0x17d4..=0x17d6,
     },
     XmlChSRange {
-        low: 0xe4f,
-        high: 0xe4f,
+        range: 0x17d8..=0x17da,
     },
     XmlChSRange {
-        low: 0xe5a,
-        high: 0xe5b,
+        range: 0x1800..=0x1805,
     },
     XmlChSRange {
-        low: 0xf04,
-        high: 0xf12,
+        range: 0x1807..=0x180a,
     },
     XmlChSRange {
-        low: 0xf85,
-        high: 0xf85,
+        range: 0x1944..=0x1945,
     },
     XmlChSRange {
-        low: 0x104a,
-        high: 0x104f,
+        range: 0x2016..=0x2017,
     },
     XmlChSRange {
-        low: 0x10fb,
-        high: 0x10fb,
+        range: 0x2020..=0x2027,
     },
     XmlChSRange {
-        low: 0x1361,
-        high: 0x1368,
+        range: 0x2030..=0x2038,
     },
     XmlChSRange {
-        low: 0x166d,
-        high: 0x166e,
+        range: 0x203b..=0x203e,
     },
     XmlChSRange {
-        low: 0x16eb,
-        high: 0x16ed,
+        range: 0x2041..=0x2043,
     },
     XmlChSRange {
-        low: 0x1735,
-        high: 0x1736,
+        range: 0x2047..=0x2051,
     },
     XmlChSRange {
-        low: 0x17d4,
-        high: 0x17d6,
+        range: 0x2053..=0x2053,
     },
     XmlChSRange {
-        low: 0x17d8,
-        high: 0x17da,
+        range: 0x2057..=0x2057,
     },
     XmlChSRange {
-        low: 0x1800,
-        high: 0x1805,
+        range: 0x23b6..=0x23b6,
     },
     XmlChSRange {
-        low: 0x1807,
-        high: 0x180a,
+        range: 0x3001..=0x3003,
     },
     XmlChSRange {
-        low: 0x1944,
-        high: 0x1945,
+        range: 0x303d..=0x303d,
     },
     XmlChSRange {
-        low: 0x2016,
-        high: 0x2017,
+        range: 0xfe30..=0xfe30,
     },
     XmlChSRange {
-        low: 0x2020,
-        high: 0x2027,
+        range: 0xfe45..=0xfe46,
     },
     XmlChSRange {
-        low: 0x2030,
-        high: 0x2038,
+        range: 0xfe49..=0xfe4c,
     },
     XmlChSRange {
-        low: 0x203b,
-        high: 0x203e,
+        range: 0xfe50..=0xfe52,
     },
     XmlChSRange {
-        low: 0x2041,
-        high: 0x2043,
+        range: 0xfe54..=0xfe57,
     },
     XmlChSRange {
-        low: 0x2047,
-        high: 0x2051,
+        range: 0xfe5f..=0xfe61,
     },
     XmlChSRange {
-        low: 0x2053,
-        high: 0x2053,
+        range: 0xfe68..=0xfe68,
     },
     XmlChSRange {
-        low: 0x2057,
-        high: 0x2057,
+        range: 0xfe6a..=0xfe6b,
     },
     XmlChSRange {
-        low: 0x23b6,
-        high: 0x23b6,
+        range: 0xff01..=0xff03,
     },
     XmlChSRange {
-        low: 0x3001,
-        high: 0x3003,
+        range: 0xff05..=0xff07,
     },
     XmlChSRange {
-        low: 0x303d,
-        high: 0x303d,
+        range: 0xff0a..=0xff0a,
     },
     XmlChSRange {
-        low: 0xfe30,
-        high: 0xfe30,
+        range: 0xff0c..=0xff0c,
     },
     XmlChSRange {
-        low: 0xfe45,
-        high: 0xfe46,
+        range: 0xff0e..=0xff0f,
     },
     XmlChSRange {
-        low: 0xfe49,
-        high: 0xfe4c,
+        range: 0xff1a..=0xff1b,
     },
     XmlChSRange {
-        low: 0xfe50,
-        high: 0xfe52,
+        range: 0xff1f..=0xff20,
     },
     XmlChSRange {
-        low: 0xfe54,
-        high: 0xfe57,
+        range: 0xff3c..=0xff3c,
     },
     XmlChSRange {
-        low: 0xfe5f,
-        high: 0xfe61,
+        range: 0xff61..=0xff61,
     },
     XmlChSRange {
-        low: 0xfe68,
-        high: 0xfe68,
-    },
-    XmlChSRange {
-        low: 0xfe6a,
-        high: 0xfe6b,
-    },
-    XmlChSRange {
-        low: 0xff01,
-        high: 0xff03,
-    },
-    XmlChSRange {
-        low: 0xff05,
-        high: 0xff07,
-    },
-    XmlChSRange {
-        low: 0xff0a,
-        high: 0xff0a,
-    },
-    XmlChSRange {
-        low: 0xff0c,
-        high: 0xff0c,
-    },
-    XmlChSRange {
-        low: 0xff0e,
-        high: 0xff0f,
-    },
-    XmlChSRange {
-        low: 0xff1a,
-        high: 0xff1b,
-    },
-    XmlChSRange {
-        low: 0xff1f,
-        high: 0xff20,
-    },
-    XmlChSRange {
-        low: 0xff3c,
-        high: 0xff3c,
-    },
-    XmlChSRange {
-        low: 0xff61,
-        high: 0xff61,
-    },
-    XmlChSRange {
-        low: 0xff64,
-        high: 0xff64,
+        range: 0xff64..=0xff64,
     },
 ];
 
 const XML_PO_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10100,
-        high: 0x10101,
+        range: 0x10100..=0x10101,
     },
     XmlChLRange {
-        low: 0x1039f,
-        high: 0x1039f,
+        range: 0x1039f..=0x1039f,
     },
 ];
 
@@ -9230,265 +7027,194 @@ const XML_PO_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_PS_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x28..=0x28 },
+    XmlChSRange { range: 0x5b..=0x5b },
+    XmlChSRange { range: 0x7b..=0x7b },
     XmlChSRange {
-        low: 0x28,
-        high: 0x28,
+        range: 0xf3a..=0xf3a,
     },
     XmlChSRange {
-        low: 0x5b,
-        high: 0x5b,
+        range: 0xf3c..=0xf3c,
     },
     XmlChSRange {
-        low: 0x7b,
-        high: 0x7b,
+        range: 0x169b..=0x169b,
     },
     XmlChSRange {
-        low: 0xf3a,
-        high: 0xf3a,
+        range: 0x201a..=0x201a,
     },
     XmlChSRange {
-        low: 0xf3c,
-        high: 0xf3c,
+        range: 0x201e..=0x201e,
     },
     XmlChSRange {
-        low: 0x169b,
-        high: 0x169b,
+        range: 0x2045..=0x2045,
     },
     XmlChSRange {
-        low: 0x201a,
-        high: 0x201a,
+        range: 0x207d..=0x207d,
     },
     XmlChSRange {
-        low: 0x201e,
-        high: 0x201e,
+        range: 0x208d..=0x208d,
     },
     XmlChSRange {
-        low: 0x2045,
-        high: 0x2045,
+        range: 0x2329..=0x2329,
     },
     XmlChSRange {
-        low: 0x207d,
-        high: 0x207d,
+        range: 0x23b4..=0x23b4,
     },
     XmlChSRange {
-        low: 0x208d,
-        high: 0x208d,
+        range: 0x2768..=0x2768,
     },
     XmlChSRange {
-        low: 0x2329,
-        high: 0x2329,
+        range: 0x276a..=0x276a,
     },
     XmlChSRange {
-        low: 0x23b4,
-        high: 0x23b4,
+        range: 0x276c..=0x276c,
     },
     XmlChSRange {
-        low: 0x2768,
-        high: 0x2768,
+        range: 0x276e..=0x276e,
     },
     XmlChSRange {
-        low: 0x276a,
-        high: 0x276a,
+        range: 0x2770..=0x2770,
     },
     XmlChSRange {
-        low: 0x276c,
-        high: 0x276c,
+        range: 0x2772..=0x2772,
     },
     XmlChSRange {
-        low: 0x276e,
-        high: 0x276e,
+        range: 0x2774..=0x2774,
     },
     XmlChSRange {
-        low: 0x2770,
-        high: 0x2770,
+        range: 0x27e6..=0x27e6,
     },
     XmlChSRange {
-        low: 0x2772,
-        high: 0x2772,
+        range: 0x27e8..=0x27e8,
     },
     XmlChSRange {
-        low: 0x2774,
-        high: 0x2774,
+        range: 0x27ea..=0x27ea,
     },
     XmlChSRange {
-        low: 0x27e6,
-        high: 0x27e6,
+        range: 0x2983..=0x2983,
     },
     XmlChSRange {
-        low: 0x27e8,
-        high: 0x27e8,
+        range: 0x2985..=0x2985,
     },
     XmlChSRange {
-        low: 0x27ea,
-        high: 0x27ea,
+        range: 0x2987..=0x2987,
     },
     XmlChSRange {
-        low: 0x2983,
-        high: 0x2983,
+        range: 0x2989..=0x2989,
     },
     XmlChSRange {
-        low: 0x2985,
-        high: 0x2985,
+        range: 0x298b..=0x298b,
     },
     XmlChSRange {
-        low: 0x2987,
-        high: 0x2987,
+        range: 0x298d..=0x298d,
     },
     XmlChSRange {
-        low: 0x2989,
-        high: 0x2989,
+        range: 0x298f..=0x298f,
     },
     XmlChSRange {
-        low: 0x298b,
-        high: 0x298b,
+        range: 0x2991..=0x2991,
     },
     XmlChSRange {
-        low: 0x298d,
-        high: 0x298d,
+        range: 0x2993..=0x2993,
     },
     XmlChSRange {
-        low: 0x298f,
-        high: 0x298f,
+        range: 0x2995..=0x2995,
     },
     XmlChSRange {
-        low: 0x2991,
-        high: 0x2991,
+        range: 0x2997..=0x2997,
     },
     XmlChSRange {
-        low: 0x2993,
-        high: 0x2993,
+        range: 0x29d8..=0x29d8,
     },
     XmlChSRange {
-        low: 0x2995,
-        high: 0x2995,
+        range: 0x29da..=0x29da,
     },
     XmlChSRange {
-        low: 0x2997,
-        high: 0x2997,
+        range: 0x29fc..=0x29fc,
     },
     XmlChSRange {
-        low: 0x29d8,
-        high: 0x29d8,
+        range: 0x3008..=0x3008,
     },
     XmlChSRange {
-        low: 0x29da,
-        high: 0x29da,
+        range: 0x300a..=0x300a,
     },
     XmlChSRange {
-        low: 0x29fc,
-        high: 0x29fc,
+        range: 0x300c..=0x300c,
     },
     XmlChSRange {
-        low: 0x3008,
-        high: 0x3008,
+        range: 0x300e..=0x300e,
     },
     XmlChSRange {
-        low: 0x300a,
-        high: 0x300a,
+        range: 0x3010..=0x3010,
     },
     XmlChSRange {
-        low: 0x300c,
-        high: 0x300c,
+        range: 0x3014..=0x3014,
     },
     XmlChSRange {
-        low: 0x300e,
-        high: 0x300e,
+        range: 0x3016..=0x3016,
     },
     XmlChSRange {
-        low: 0x3010,
-        high: 0x3010,
+        range: 0x3018..=0x3018,
     },
     XmlChSRange {
-        low: 0x3014,
-        high: 0x3014,
+        range: 0x301a..=0x301a,
     },
     XmlChSRange {
-        low: 0x3016,
-        high: 0x3016,
+        range: 0x301d..=0x301d,
     },
     XmlChSRange {
-        low: 0x3018,
-        high: 0x3018,
+        range: 0xfd3e..=0xfd3e,
     },
     XmlChSRange {
-        low: 0x301a,
-        high: 0x301a,
+        range: 0xfe35..=0xfe35,
     },
     XmlChSRange {
-        low: 0x301d,
-        high: 0x301d,
+        range: 0xfe37..=0xfe37,
     },
     XmlChSRange {
-        low: 0xfd3e,
-        high: 0xfd3e,
+        range: 0xfe39..=0xfe39,
     },
     XmlChSRange {
-        low: 0xfe35,
-        high: 0xfe35,
+        range: 0xfe3b..=0xfe3b,
     },
     XmlChSRange {
-        low: 0xfe37,
-        high: 0xfe37,
+        range: 0xfe3d..=0xfe3d,
     },
     XmlChSRange {
-        low: 0xfe39,
-        high: 0xfe39,
+        range: 0xfe3f..=0xfe3f,
     },
     XmlChSRange {
-        low: 0xfe3b,
-        high: 0xfe3b,
+        range: 0xfe41..=0xfe41,
     },
     XmlChSRange {
-        low: 0xfe3d,
-        high: 0xfe3d,
+        range: 0xfe43..=0xfe43,
     },
     XmlChSRange {
-        low: 0xfe3f,
-        high: 0xfe3f,
+        range: 0xfe47..=0xfe47,
     },
     XmlChSRange {
-        low: 0xfe41,
-        high: 0xfe41,
+        range: 0xfe59..=0xfe59,
     },
     XmlChSRange {
-        low: 0xfe43,
-        high: 0xfe43,
+        range: 0xfe5b..=0xfe5b,
     },
     XmlChSRange {
-        low: 0xfe47,
-        high: 0xfe47,
+        range: 0xfe5d..=0xfe5d,
     },
     XmlChSRange {
-        low: 0xfe59,
-        high: 0xfe59,
+        range: 0xff08..=0xff08,
     },
     XmlChSRange {
-        low: 0xfe5b,
-        high: 0xfe5b,
+        range: 0xff3b..=0xff3b,
     },
     XmlChSRange {
-        low: 0xfe5d,
-        high: 0xfe5d,
+        range: 0xff5b..=0xff5b,
     },
     XmlChSRange {
-        low: 0xff08,
-        high: 0xff08,
+        range: 0xff5f..=0xff5f,
     },
     XmlChSRange {
-        low: 0xff3b,
-        high: 0xff3b,
-    },
-    XmlChSRange {
-        low: 0xff5b,
-        high: 0xff5b,
-    },
-    XmlChSRange {
-        low: 0xff5f,
-        high: 0xff5f,
-    },
-    XmlChSRange {
-        low: 0xff62,
-        high: 0xff62,
+        range: 0xff62..=0xff62,
     },
 ];
 
@@ -9498,620 +7224,437 @@ const XML_PS_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_SS: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x24..=0x24 },
+    XmlChSRange { range: 0x2b..=0x2b },
+    XmlChSRange { range: 0x3c..=0x3e },
+    XmlChSRange { range: 0x5e..=0x5e },
+    XmlChSRange { range: 0x60..=0x60 },
+    XmlChSRange { range: 0x7c..=0x7c },
+    XmlChSRange { range: 0x7e..=0x7e },
+    XmlChSRange { range: 0xa2..=0xa9 },
+    XmlChSRange { range: 0xac..=0xac },
+    XmlChSRange { range: 0xae..=0xb1 },
+    XmlChSRange { range: 0xb4..=0xb4 },
+    XmlChSRange { range: 0xb6..=0xb6 },
+    XmlChSRange { range: 0xb8..=0xb8 },
+    XmlChSRange { range: 0xd7..=0xd7 },
+    XmlChSRange { range: 0xf7..=0xf7 },
     XmlChSRange {
-        low: 0x24,
-        high: 0x24,
+        range: 0x2c2..=0x2c5,
     },
     XmlChSRange {
-        low: 0x2b,
-        high: 0x2b,
+        range: 0x2d2..=0x2df,
     },
     XmlChSRange {
-        low: 0x3c,
-        high: 0x3e,
+        range: 0x2e5..=0x2ed,
     },
     XmlChSRange {
-        low: 0x5e,
-        high: 0x5e,
+        range: 0x2ef..=0x2ff,
     },
     XmlChSRange {
-        low: 0x60,
-        high: 0x60,
+        range: 0x374..=0x375,
     },
     XmlChSRange {
-        low: 0x7c,
-        high: 0x7c,
+        range: 0x384..=0x385,
     },
     XmlChSRange {
-        low: 0x7e,
-        high: 0x7e,
+        range: 0x3f6..=0x3f6,
     },
     XmlChSRange {
-        low: 0xa2,
-        high: 0xa9,
+        range: 0x482..=0x482,
     },
     XmlChSRange {
-        low: 0xac,
-        high: 0xac,
+        range: 0x60e..=0x60f,
     },
     XmlChSRange {
-        low: 0xae,
-        high: 0xb1,
+        range: 0x6e9..=0x6e9,
     },
     XmlChSRange {
-        low: 0xb4,
-        high: 0xb4,
+        range: 0x6fd..=0x6fe,
     },
     XmlChSRange {
-        low: 0xb6,
-        high: 0xb6,
+        range: 0x9f2..=0x9f3,
     },
     XmlChSRange {
-        low: 0xb8,
-        high: 0xb8,
+        range: 0x9fa..=0x9fa,
     },
     XmlChSRange {
-        low: 0xd7,
-        high: 0xd7,
+        range: 0xaf1..=0xaf1,
     },
     XmlChSRange {
-        low: 0xf7,
-        high: 0xf7,
+        range: 0xb70..=0xb70,
     },
     XmlChSRange {
-        low: 0x2c2,
-        high: 0x2c5,
+        range: 0xbf3..=0xbfa,
     },
     XmlChSRange {
-        low: 0x2d2,
-        high: 0x2df,
+        range: 0xe3f..=0xe3f,
     },
     XmlChSRange {
-        low: 0x2e5,
-        high: 0x2ed,
+        range: 0xf01..=0xf03,
     },
     XmlChSRange {
-        low: 0x2ef,
-        high: 0x2ff,
+        range: 0xf13..=0xf17,
     },
     XmlChSRange {
-        low: 0x374,
-        high: 0x375,
+        range: 0xf1a..=0xf1f,
     },
     XmlChSRange {
-        low: 0x384,
-        high: 0x385,
+        range: 0xf34..=0xf34,
     },
     XmlChSRange {
-        low: 0x3f6,
-        high: 0x3f6,
+        range: 0xf36..=0xf36,
     },
     XmlChSRange {
-        low: 0x482,
-        high: 0x482,
+        range: 0xf38..=0xf38,
     },
     XmlChSRange {
-        low: 0x60e,
-        high: 0x60f,
+        range: 0xfbe..=0xfc5,
     },
     XmlChSRange {
-        low: 0x6e9,
-        high: 0x6e9,
+        range: 0xfc7..=0xfcc,
     },
     XmlChSRange {
-        low: 0x6fd,
-        high: 0x6fe,
+        range: 0xfcf..=0xfcf,
     },
     XmlChSRange {
-        low: 0x9f2,
-        high: 0x9f3,
+        range: 0x17db..=0x17db,
     },
     XmlChSRange {
-        low: 0x9fa,
-        high: 0x9fa,
+        range: 0x1940..=0x1940,
     },
     XmlChSRange {
-        low: 0xaf1,
-        high: 0xaf1,
+        range: 0x19e0..=0x19ff,
     },
     XmlChSRange {
-        low: 0xb70,
-        high: 0xb70,
+        range: 0x1fbd..=0x1fbd,
     },
     XmlChSRange {
-        low: 0xbf3,
-        high: 0xbfa,
+        range: 0x1fbf..=0x1fc1,
     },
     XmlChSRange {
-        low: 0xe3f,
-        high: 0xe3f,
+        range: 0x1fcd..=0x1fcf,
     },
     XmlChSRange {
-        low: 0xf01,
-        high: 0xf03,
+        range: 0x1fdd..=0x1fdf,
     },
     XmlChSRange {
-        low: 0xf13,
-        high: 0xf17,
+        range: 0x1fed..=0x1fef,
     },
     XmlChSRange {
-        low: 0xf1a,
-        high: 0xf1f,
+        range: 0x1ffd..=0x1ffe,
     },
     XmlChSRange {
-        low: 0xf34,
-        high: 0xf34,
+        range: 0x2044..=0x2044,
     },
     XmlChSRange {
-        low: 0xf36,
-        high: 0xf36,
+        range: 0x2052..=0x2052,
     },
     XmlChSRange {
-        low: 0xf38,
-        high: 0xf38,
+        range: 0x207a..=0x207c,
     },
     XmlChSRange {
-        low: 0xfbe,
-        high: 0xfc5,
+        range: 0x208a..=0x208c,
     },
     XmlChSRange {
-        low: 0xfc7,
-        high: 0xfcc,
+        range: 0x20a0..=0x20b1,
     },
     XmlChSRange {
-        low: 0xfcf,
-        high: 0xfcf,
+        range: 0x2100..=0x2101,
     },
     XmlChSRange {
-        low: 0x17db,
-        high: 0x17db,
+        range: 0x2103..=0x2106,
     },
     XmlChSRange {
-        low: 0x1940,
-        high: 0x1940,
+        range: 0x2108..=0x2109,
     },
     XmlChSRange {
-        low: 0x19e0,
-        high: 0x19ff,
+        range: 0x2114..=0x2114,
     },
     XmlChSRange {
-        low: 0x1fbd,
-        high: 0x1fbd,
+        range: 0x2116..=0x2118,
     },
     XmlChSRange {
-        low: 0x1fbf,
-        high: 0x1fc1,
+        range: 0x211e..=0x2123,
     },
     XmlChSRange {
-        low: 0x1fcd,
-        high: 0x1fcf,
+        range: 0x2125..=0x2125,
     },
     XmlChSRange {
-        low: 0x1fdd,
-        high: 0x1fdf,
+        range: 0x2127..=0x2127,
     },
     XmlChSRange {
-        low: 0x1fed,
-        high: 0x1fef,
+        range: 0x2129..=0x2129,
     },
     XmlChSRange {
-        low: 0x1ffd,
-        high: 0x1ffe,
+        range: 0x212e..=0x212e,
     },
     XmlChSRange {
-        low: 0x2044,
-        high: 0x2044,
+        range: 0x2132..=0x2132,
     },
     XmlChSRange {
-        low: 0x2052,
-        high: 0x2052,
+        range: 0x213a..=0x213b,
     },
     XmlChSRange {
-        low: 0x207a,
-        high: 0x207c,
+        range: 0x2140..=0x2144,
     },
     XmlChSRange {
-        low: 0x208a,
-        high: 0x208c,
+        range: 0x214a..=0x214b,
     },
     XmlChSRange {
-        low: 0x20a0,
-        high: 0x20b1,
+        range: 0x2190..=0x2328,
     },
     XmlChSRange {
-        low: 0x2100,
-        high: 0x2101,
+        range: 0x232b..=0x23b3,
     },
     XmlChSRange {
-        low: 0x2103,
-        high: 0x2106,
+        range: 0x23b7..=0x23d0,
     },
     XmlChSRange {
-        low: 0x2108,
-        high: 0x2109,
+        range: 0x2400..=0x2426,
     },
     XmlChSRange {
-        low: 0x2114,
-        high: 0x2114,
+        range: 0x2440..=0x244a,
     },
     XmlChSRange {
-        low: 0x2116,
-        high: 0x2118,
+        range: 0x249c..=0x24e9,
     },
     XmlChSRange {
-        low: 0x211e,
-        high: 0x2123,
+        range: 0x2500..=0x2617,
     },
     XmlChSRange {
-        low: 0x2125,
-        high: 0x2125,
+        range: 0x2619..=0x267d,
     },
     XmlChSRange {
-        low: 0x2127,
-        high: 0x2127,
+        range: 0x2680..=0x2691,
     },
     XmlChSRange {
-        low: 0x2129,
-        high: 0x2129,
+        range: 0x26a0..=0x26a1,
     },
     XmlChSRange {
-        low: 0x212e,
-        high: 0x212e,
+        range: 0x2701..=0x2704,
     },
     XmlChSRange {
-        low: 0x2132,
-        high: 0x2132,
+        range: 0x2706..=0x2709,
     },
     XmlChSRange {
-        low: 0x213a,
-        high: 0x213b,
+        range: 0x270c..=0x2727,
     },
     XmlChSRange {
-        low: 0x2140,
-        high: 0x2144,
+        range: 0x2729..=0x274b,
     },
     XmlChSRange {
-        low: 0x214a,
-        high: 0x214b,
+        range: 0x274d..=0x274d,
     },
     XmlChSRange {
-        low: 0x2190,
-        high: 0x2328,
+        range: 0x274f..=0x2752,
     },
     XmlChSRange {
-        low: 0x232b,
-        high: 0x23b3,
+        range: 0x2756..=0x2756,
     },
     XmlChSRange {
-        low: 0x23b7,
-        high: 0x23d0,
+        range: 0x2758..=0x275e,
     },
     XmlChSRange {
-        low: 0x2400,
-        high: 0x2426,
+        range: 0x2761..=0x2767,
     },
     XmlChSRange {
-        low: 0x2440,
-        high: 0x244a,
+        range: 0x2794..=0x2794,
     },
     XmlChSRange {
-        low: 0x249c,
-        high: 0x24e9,
+        range: 0x2798..=0x27af,
     },
     XmlChSRange {
-        low: 0x2500,
-        high: 0x2617,
+        range: 0x27b1..=0x27be,
     },
     XmlChSRange {
-        low: 0x2619,
-        high: 0x267d,
+        range: 0x27d0..=0x27e5,
     },
     XmlChSRange {
-        low: 0x2680,
-        high: 0x2691,
+        range: 0x27f0..=0x2982,
     },
     XmlChSRange {
-        low: 0x26a0,
-        high: 0x26a1,
+        range: 0x2999..=0x29d7,
     },
     XmlChSRange {
-        low: 0x2701,
-        high: 0x2704,
+        range: 0x29dc..=0x29fb,
     },
     XmlChSRange {
-        low: 0x2706,
-        high: 0x2709,
+        range: 0x29fe..=0x2b0d,
     },
     XmlChSRange {
-        low: 0x270c,
-        high: 0x2727,
+        range: 0x2e80..=0x2e99,
     },
     XmlChSRange {
-        low: 0x2729,
-        high: 0x274b,
+        range: 0x2e9b..=0x2ef3,
     },
     XmlChSRange {
-        low: 0x274d,
-        high: 0x274d,
+        range: 0x2f00..=0x2fd5,
     },
     XmlChSRange {
-        low: 0x274f,
-        high: 0x2752,
+        range: 0x2ff0..=0x2ffb,
     },
     XmlChSRange {
-        low: 0x2756,
-        high: 0x2756,
+        range: 0x3004..=0x3004,
     },
     XmlChSRange {
-        low: 0x2758,
-        high: 0x275e,
+        range: 0x3012..=0x3013,
     },
     XmlChSRange {
-        low: 0x2761,
-        high: 0x2767,
+        range: 0x3020..=0x3020,
     },
     XmlChSRange {
-        low: 0x2794,
-        high: 0x2794,
+        range: 0x3036..=0x3037,
     },
     XmlChSRange {
-        low: 0x2798,
-        high: 0x27af,
+        range: 0x303e..=0x303f,
     },
     XmlChSRange {
-        low: 0x27b1,
-        high: 0x27be,
+        range: 0x309b..=0x309c,
     },
     XmlChSRange {
-        low: 0x27d0,
-        high: 0x27e5,
+        range: 0x3190..=0x3191,
     },
     XmlChSRange {
-        low: 0x27f0,
-        high: 0x2982,
+        range: 0x3196..=0x319f,
     },
     XmlChSRange {
-        low: 0x2999,
-        high: 0x29d7,
+        range: 0x3200..=0x321e,
     },
     XmlChSRange {
-        low: 0x29dc,
-        high: 0x29fb,
+        range: 0x322a..=0x3243,
     },
     XmlChSRange {
-        low: 0x29fe,
-        high: 0x2b0d,
+        range: 0x3250..=0x3250,
     },
     XmlChSRange {
-        low: 0x2e80,
-        high: 0x2e99,
+        range: 0x3260..=0x327d,
     },
     XmlChSRange {
-        low: 0x2e9b,
-        high: 0x2ef3,
+        range: 0x327f..=0x327f,
     },
     XmlChSRange {
-        low: 0x2f00,
-        high: 0x2fd5,
+        range: 0x328a..=0x32b0,
     },
     XmlChSRange {
-        low: 0x2ff0,
-        high: 0x2ffb,
+        range: 0x32c0..=0x32fe,
     },
     XmlChSRange {
-        low: 0x3004,
-        high: 0x3004,
+        range: 0x3300..=0x33ff,
     },
     XmlChSRange {
-        low: 0x3012,
-        high: 0x3013,
+        range: 0x4dc0..=0x4dff,
     },
     XmlChSRange {
-        low: 0x3020,
-        high: 0x3020,
+        range: 0xa490..=0xa4c6,
     },
     XmlChSRange {
-        low: 0x3036,
-        high: 0x3037,
+        range: 0xfb29..=0xfb29,
     },
     XmlChSRange {
-        low: 0x303e,
-        high: 0x303f,
+        range: 0xfdfc..=0xfdfd,
     },
     XmlChSRange {
-        low: 0x309b,
-        high: 0x309c,
+        range: 0xfe62..=0xfe62,
     },
     XmlChSRange {
-        low: 0x3190,
-        high: 0x3191,
+        range: 0xfe64..=0xfe66,
     },
     XmlChSRange {
-        low: 0x3196,
-        high: 0x319f,
+        range: 0xfe69..=0xfe69,
     },
     XmlChSRange {
-        low: 0x3200,
-        high: 0x321e,
+        range: 0xff04..=0xff04,
     },
     XmlChSRange {
-        low: 0x322a,
-        high: 0x3243,
+        range: 0xff0b..=0xff0b,
     },
     XmlChSRange {
-        low: 0x3250,
-        high: 0x3250,
+        range: 0xff1c..=0xff1e,
     },
     XmlChSRange {
-        low: 0x3260,
-        high: 0x327d,
+        range: 0xff3e..=0xff3e,
     },
     XmlChSRange {
-        low: 0x327f,
-        high: 0x327f,
+        range: 0xff40..=0xff40,
     },
     XmlChSRange {
-        low: 0x328a,
-        high: 0x32b0,
+        range: 0xff5c..=0xff5c,
     },
     XmlChSRange {
-        low: 0x32c0,
-        high: 0x32fe,
+        range: 0xff5e..=0xff5e,
     },
     XmlChSRange {
-        low: 0x3300,
-        high: 0x33ff,
+        range: 0xffe0..=0xffe6,
     },
     XmlChSRange {
-        low: 0x4dc0,
-        high: 0x4dff,
+        range: 0xffe8..=0xffee,
     },
     XmlChSRange {
-        low: 0xa490,
-        high: 0xa4c6,
-    },
-    XmlChSRange {
-        low: 0xfb29,
-        high: 0xfb29,
-    },
-    XmlChSRange {
-        low: 0xfdfc,
-        high: 0xfdfd,
-    },
-    XmlChSRange {
-        low: 0xfe62,
-        high: 0xfe62,
-    },
-    XmlChSRange {
-        low: 0xfe64,
-        high: 0xfe66,
-    },
-    XmlChSRange {
-        low: 0xfe69,
-        high: 0xfe69,
-    },
-    XmlChSRange {
-        low: 0xff04,
-        high: 0xff04,
-    },
-    XmlChSRange {
-        low: 0xff0b,
-        high: 0xff0b,
-    },
-    XmlChSRange {
-        low: 0xff1c,
-        high: 0xff1e,
-    },
-    XmlChSRange {
-        low: 0xff3e,
-        high: 0xff3e,
-    },
-    XmlChSRange {
-        low: 0xff40,
-        high: 0xff40,
-    },
-    XmlChSRange {
-        low: 0xff5c,
-        high: 0xff5c,
-    },
-    XmlChSRange {
-        low: 0xff5e,
-        high: 0xff5e,
-    },
-    XmlChSRange {
-        low: 0xffe0,
-        high: 0xffe6,
-    },
-    XmlChSRange {
-        low: 0xffe8,
-        high: 0xffee,
-    },
-    XmlChSRange {
-        low: 0xfffc,
-        high: 0xfffd,
+        range: 0xfffc..=0xfffd,
     },
 ];
 
 const XML_SL: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10102,
-        high: 0x10102,
+        range: 0x10102..=0x10102,
     },
     XmlChLRange {
-        low: 0x10137,
-        high: 0x1013f,
+        range: 0x10137..=0x1013f,
     },
     XmlChLRange {
-        low: 0x1d000,
-        high: 0x1d0f5,
+        range: 0x1d000..=0x1d0f5,
     },
     XmlChLRange {
-        low: 0x1d100,
-        high: 0x1d126,
+        range: 0x1d100..=0x1d126,
     },
     XmlChLRange {
-        low: 0x1d12a,
-        high: 0x1d164,
+        range: 0x1d12a..=0x1d164,
     },
     XmlChLRange {
-        low: 0x1d16a,
-        high: 0x1d16c,
+        range: 0x1d16a..=0x1d16c,
     },
     XmlChLRange {
-        low: 0x1d183,
-        high: 0x1d184,
+        range: 0x1d183..=0x1d184,
     },
     XmlChLRange {
-        low: 0x1d18c,
-        high: 0x1d1a9,
+        range: 0x1d18c..=0x1d1a9,
     },
     XmlChLRange {
-        low: 0x1d1ae,
-        high: 0x1d1dd,
+        range: 0x1d1ae..=0x1d1dd,
     },
     XmlChLRange {
-        low: 0x1d300,
-        high: 0x1d356,
+        range: 0x1d300..=0x1d356,
     },
     XmlChLRange {
-        low: 0x1d6c1,
-        high: 0x1d6c1,
+        range: 0x1d6c1..=0x1d6c1,
     },
     XmlChLRange {
-        low: 0x1d6db,
-        high: 0x1d6db,
+        range: 0x1d6db..=0x1d6db,
     },
     XmlChLRange {
-        low: 0x1d6fb,
-        high: 0x1d6fb,
+        range: 0x1d6fb..=0x1d6fb,
     },
     XmlChLRange {
-        low: 0x1d715,
-        high: 0x1d715,
+        range: 0x1d715..=0x1d715,
     },
     XmlChLRange {
-        low: 0x1d735,
-        high: 0x1d735,
+        range: 0x1d735..=0x1d735,
     },
     XmlChLRange {
-        low: 0x1d74f,
-        high: 0x1d74f,
+        range: 0x1d74f..=0x1d74f,
     },
     XmlChLRange {
-        low: 0x1d76f,
-        high: 0x1d76f,
+        range: 0x1d76f..=0x1d76f,
     },
     XmlChLRange {
-        low: 0x1d789,
-        high: 0x1d789,
+        range: 0x1d789..=0x1d789,
     },
     XmlChLRange {
-        low: 0x1d7a9,
-        high: 0x1d7a9,
+        range: 0x1d7a9..=0x1d7a9,
     },
     XmlChLRange {
-        low: 0x1d7c3,
-        high: 0x1d7c3,
+        range: 0x1d7c3..=0x1d7c3,
     },
 ];
 
@@ -10121,57 +7664,40 @@ const XML_SG: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_SC_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x24..=0x24 },
+    XmlChSRange { range: 0xa2..=0xa5 },
     XmlChSRange {
-        low: 0x24,
-        high: 0x24,
+        range: 0x9f2..=0x9f3,
     },
     XmlChSRange {
-        low: 0xa2,
-        high: 0xa5,
+        range: 0xaf1..=0xaf1,
     },
     XmlChSRange {
-        low: 0x9f2,
-        high: 0x9f3,
+        range: 0xbf9..=0xbf9,
     },
     XmlChSRange {
-        low: 0xaf1,
-        high: 0xaf1,
+        range: 0xe3f..=0xe3f,
     },
     XmlChSRange {
-        low: 0xbf9,
-        high: 0xbf9,
+        range: 0x17db..=0x17db,
     },
     XmlChSRange {
-        low: 0xe3f,
-        high: 0xe3f,
+        range: 0x20a0..=0x20b1,
     },
     XmlChSRange {
-        low: 0x17db,
-        high: 0x17db,
+        range: 0xfdfc..=0xfdfc,
     },
     XmlChSRange {
-        low: 0x20a0,
-        high: 0x20b1,
+        range: 0xfe69..=0xfe69,
     },
     XmlChSRange {
-        low: 0xfdfc,
-        high: 0xfdfc,
+        range: 0xff04..=0xff04,
     },
     XmlChSRange {
-        low: 0xfe69,
-        high: 0xfe69,
+        range: 0xffe0..=0xffe1,
     },
     XmlChSRange {
-        low: 0xff04,
-        high: 0xff04,
-    },
-    XmlChSRange {
-        low: 0xffe0,
-        high: 0xffe1,
-    },
-    XmlChSRange {
-        low: 0xffe5,
-        high: 0xffe6,
+        range: 0xffe5..=0xffe6,
     },
 ];
 
@@ -10181,93 +7707,59 @@ const XML_SC_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_SK_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x5e..=0x5e },
+    XmlChSRange { range: 0x60..=0x60 },
+    XmlChSRange { range: 0xa8..=0xa8 },
+    XmlChSRange { range: 0xaf..=0xaf },
+    XmlChSRange { range: 0xb4..=0xb4 },
+    XmlChSRange { range: 0xb8..=0xb8 },
     XmlChSRange {
-        low: 0x5e,
-        high: 0x5e,
+        range: 0x2c2..=0x2c5,
     },
     XmlChSRange {
-        low: 0x60,
-        high: 0x60,
+        range: 0x2d2..=0x2df,
     },
     XmlChSRange {
-        low: 0xa8,
-        high: 0xa8,
+        range: 0x2e5..=0x2ed,
     },
     XmlChSRange {
-        low: 0xaf,
-        high: 0xaf,
+        range: 0x2ef..=0x2ff,
     },
     XmlChSRange {
-        low: 0xb4,
-        high: 0xb4,
+        range: 0x374..=0x375,
     },
     XmlChSRange {
-        low: 0xb8,
-        high: 0xb8,
+        range: 0x384..=0x385,
     },
     XmlChSRange {
-        low: 0x2c2,
-        high: 0x2c5,
+        range: 0x1fbd..=0x1fbd,
     },
     XmlChSRange {
-        low: 0x2d2,
-        high: 0x2df,
+        range: 0x1fbf..=0x1fc1,
     },
     XmlChSRange {
-        low: 0x2e5,
-        high: 0x2ed,
+        range: 0x1fcd..=0x1fcf,
     },
     XmlChSRange {
-        low: 0x2ef,
-        high: 0x2ff,
+        range: 0x1fdd..=0x1fdf,
     },
     XmlChSRange {
-        low: 0x374,
-        high: 0x375,
+        range: 0x1fed..=0x1fef,
     },
     XmlChSRange {
-        low: 0x384,
-        high: 0x385,
+        range: 0x1ffd..=0x1ffe,
     },
     XmlChSRange {
-        low: 0x1fbd,
-        high: 0x1fbd,
+        range: 0x309b..=0x309c,
     },
     XmlChSRange {
-        low: 0x1fbf,
-        high: 0x1fc1,
+        range: 0xff3e..=0xff3e,
     },
     XmlChSRange {
-        low: 0x1fcd,
-        high: 0x1fcf,
+        range: 0xff40..=0xff40,
     },
     XmlChSRange {
-        low: 0x1fdd,
-        high: 0x1fdf,
-    },
-    XmlChSRange {
-        low: 0x1fed,
-        high: 0x1fef,
-    },
-    XmlChSRange {
-        low: 0x1ffd,
-        high: 0x1ffe,
-    },
-    XmlChSRange {
-        low: 0x309b,
-        high: 0x309c,
-    },
-    XmlChSRange {
-        low: 0xff3e,
-        high: 0xff3e,
-    },
-    XmlChSRange {
-        low: 0xff40,
-        high: 0xff40,
-    },
-    XmlChSRange {
-        low: 0xffe3,
-        high: 0xffe3,
+        range: 0xffe3..=0xffe3,
     },
 ];
 
@@ -10277,240 +7769,166 @@ const XML_SK_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_SM_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x2b..=0x2b },
+    XmlChSRange { range: 0x3c..=0x3e },
+    XmlChSRange { range: 0x7c..=0x7c },
+    XmlChSRange { range: 0x7e..=0x7e },
+    XmlChSRange { range: 0xac..=0xac },
+    XmlChSRange { range: 0xb1..=0xb1 },
+    XmlChSRange { range: 0xd7..=0xd7 },
+    XmlChSRange { range: 0xf7..=0xf7 },
     XmlChSRange {
-        low: 0x2b,
-        high: 0x2b,
+        range: 0x3f6..=0x3f6,
     },
     XmlChSRange {
-        low: 0x3c,
-        high: 0x3e,
+        range: 0x2044..=0x2044,
     },
     XmlChSRange {
-        low: 0x7c,
-        high: 0x7c,
+        range: 0x2052..=0x2052,
     },
     XmlChSRange {
-        low: 0x7e,
-        high: 0x7e,
+        range: 0x207a..=0x207c,
     },
     XmlChSRange {
-        low: 0xac,
-        high: 0xac,
+        range: 0x208a..=0x208c,
     },
     XmlChSRange {
-        low: 0xb1,
-        high: 0xb1,
+        range: 0x2140..=0x2144,
     },
     XmlChSRange {
-        low: 0xd7,
-        high: 0xd7,
+        range: 0x214b..=0x214b,
     },
     XmlChSRange {
-        low: 0xf7,
-        high: 0xf7,
+        range: 0x2190..=0x2194,
     },
     XmlChSRange {
-        low: 0x3f6,
-        high: 0x3f6,
+        range: 0x219a..=0x219b,
     },
     XmlChSRange {
-        low: 0x2044,
-        high: 0x2044,
+        range: 0x21a0..=0x21a0,
     },
     XmlChSRange {
-        low: 0x2052,
-        high: 0x2052,
+        range: 0x21a3..=0x21a3,
     },
     XmlChSRange {
-        low: 0x207a,
-        high: 0x207c,
+        range: 0x21a6..=0x21a6,
     },
     XmlChSRange {
-        low: 0x208a,
-        high: 0x208c,
+        range: 0x21ae..=0x21ae,
     },
     XmlChSRange {
-        low: 0x2140,
-        high: 0x2144,
+        range: 0x21ce..=0x21cf,
     },
     XmlChSRange {
-        low: 0x214b,
-        high: 0x214b,
+        range: 0x21d2..=0x21d2,
     },
     XmlChSRange {
-        low: 0x2190,
-        high: 0x2194,
+        range: 0x21d4..=0x21d4,
     },
     XmlChSRange {
-        low: 0x219a,
-        high: 0x219b,
+        range: 0x21f4..=0x22ff,
     },
     XmlChSRange {
-        low: 0x21a0,
-        high: 0x21a0,
+        range: 0x2308..=0x230b,
     },
     XmlChSRange {
-        low: 0x21a3,
-        high: 0x21a3,
+        range: 0x2320..=0x2321,
     },
     XmlChSRange {
-        low: 0x21a6,
-        high: 0x21a6,
+        range: 0x237c..=0x237c,
     },
     XmlChSRange {
-        low: 0x21ae,
-        high: 0x21ae,
+        range: 0x239b..=0x23b3,
     },
     XmlChSRange {
-        low: 0x21ce,
-        high: 0x21cf,
+        range: 0x25b7..=0x25b7,
     },
     XmlChSRange {
-        low: 0x21d2,
-        high: 0x21d2,
+        range: 0x25c1..=0x25c1,
     },
     XmlChSRange {
-        low: 0x21d4,
-        high: 0x21d4,
+        range: 0x25f8..=0x25ff,
     },
     XmlChSRange {
-        low: 0x21f4,
-        high: 0x22ff,
+        range: 0x266f..=0x266f,
     },
     XmlChSRange {
-        low: 0x2308,
-        high: 0x230b,
+        range: 0x27d0..=0x27e5,
     },
     XmlChSRange {
-        low: 0x2320,
-        high: 0x2321,
+        range: 0x27f0..=0x27ff,
     },
     XmlChSRange {
-        low: 0x237c,
-        high: 0x237c,
+        range: 0x2900..=0x2982,
     },
     XmlChSRange {
-        low: 0x239b,
-        high: 0x23b3,
+        range: 0x2999..=0x29d7,
     },
     XmlChSRange {
-        low: 0x25b7,
-        high: 0x25b7,
+        range: 0x29dc..=0x29fb,
     },
     XmlChSRange {
-        low: 0x25c1,
-        high: 0x25c1,
+        range: 0x29fe..=0x2aff,
     },
     XmlChSRange {
-        low: 0x25f8,
-        high: 0x25ff,
+        range: 0xfb29..=0xfb29,
     },
     XmlChSRange {
-        low: 0x266f,
-        high: 0x266f,
+        range: 0xfe62..=0xfe62,
     },
     XmlChSRange {
-        low: 0x27d0,
-        high: 0x27e5,
+        range: 0xfe64..=0xfe66,
     },
     XmlChSRange {
-        low: 0x27f0,
-        high: 0x27ff,
+        range: 0xff0b..=0xff0b,
     },
     XmlChSRange {
-        low: 0x2900,
-        high: 0x2982,
+        range: 0xff1c..=0xff1e,
     },
     XmlChSRange {
-        low: 0x2999,
-        high: 0x29d7,
+        range: 0xff5c..=0xff5c,
     },
     XmlChSRange {
-        low: 0x29dc,
-        high: 0x29fb,
+        range: 0xff5e..=0xff5e,
     },
     XmlChSRange {
-        low: 0x29fe,
-        high: 0x2aff,
+        range: 0xffe2..=0xffe2,
     },
     XmlChSRange {
-        low: 0xfb29,
-        high: 0xfb29,
-    },
-    XmlChSRange {
-        low: 0xfe62,
-        high: 0xfe62,
-    },
-    XmlChSRange {
-        low: 0xfe64,
-        high: 0xfe66,
-    },
-    XmlChSRange {
-        low: 0xff0b,
-        high: 0xff0b,
-    },
-    XmlChSRange {
-        low: 0xff1c,
-        high: 0xff1e,
-    },
-    XmlChSRange {
-        low: 0xff5c,
-        high: 0xff5c,
-    },
-    XmlChSRange {
-        low: 0xff5e,
-        high: 0xff5e,
-    },
-    XmlChSRange {
-        low: 0xffe2,
-        high: 0xffe2,
-    },
-    XmlChSRange {
-        low: 0xffe9,
-        high: 0xffec,
+        range: 0xffe9..=0xffec,
     },
 ];
 
 const XML_SM_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x1d6c1,
-        high: 0x1d6c1,
+        range: 0x1d6c1..=0x1d6c1,
     },
     XmlChLRange {
-        low: 0x1d6db,
-        high: 0x1d6db,
+        range: 0x1d6db..=0x1d6db,
     },
     XmlChLRange {
-        low: 0x1d6fb,
-        high: 0x1d6fb,
+        range: 0x1d6fb..=0x1d6fb,
     },
     XmlChLRange {
-        low: 0x1d715,
-        high: 0x1d715,
+        range: 0x1d715..=0x1d715,
     },
     XmlChLRange {
-        low: 0x1d735,
-        high: 0x1d735,
+        range: 0x1d735..=0x1d735,
     },
     XmlChLRange {
-        low: 0x1d74f,
-        high: 0x1d74f,
+        range: 0x1d74f..=0x1d74f,
     },
     XmlChLRange {
-        low: 0x1d76f,
-        high: 0x1d76f,
+        range: 0x1d76f..=0x1d76f,
     },
     XmlChLRange {
-        low: 0x1d789,
-        high: 0x1d789,
+        range: 0x1d789..=0x1d789,
     },
     XmlChLRange {
-        low: 0x1d7a9,
-        high: 0x1d7a9,
+        range: 0x1d7a9..=0x1d7a9,
     },
     XmlChLRange {
-        low: 0x1d7c3,
-        high: 0x1d7c3,
+        range: 0x1d7c3..=0x1d7c3,
     },
 ];
 
@@ -10520,460 +7938,337 @@ const XML_SM_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_SO_S: &[XmlChSRange] = &[
+    XmlChSRange { range: 0xa6..=0xa7 },
+    XmlChSRange { range: 0xa9..=0xa9 },
+    XmlChSRange { range: 0xae..=0xae },
+    XmlChSRange { range: 0xb0..=0xb0 },
+    XmlChSRange { range: 0xb6..=0xb6 },
     XmlChSRange {
-        low: 0xa6,
-        high: 0xa7,
+        range: 0x482..=0x482,
     },
     XmlChSRange {
-        low: 0xa9,
-        high: 0xa9,
+        range: 0x60e..=0x60f,
     },
     XmlChSRange {
-        low: 0xae,
-        high: 0xae,
+        range: 0x6e9..=0x6e9,
     },
     XmlChSRange {
-        low: 0xb0,
-        high: 0xb0,
+        range: 0x6fd..=0x6fe,
     },
     XmlChSRange {
-        low: 0xb6,
-        high: 0xb6,
+        range: 0x9fa..=0x9fa,
     },
     XmlChSRange {
-        low: 0x482,
-        high: 0x482,
+        range: 0xb70..=0xb70,
     },
     XmlChSRange {
-        low: 0x60e,
-        high: 0x60f,
+        range: 0xbf3..=0xbf8,
     },
     XmlChSRange {
-        low: 0x6e9,
-        high: 0x6e9,
+        range: 0xbfa..=0xbfa,
     },
     XmlChSRange {
-        low: 0x6fd,
-        high: 0x6fe,
+        range: 0xf01..=0xf03,
     },
     XmlChSRange {
-        low: 0x9fa,
-        high: 0x9fa,
+        range: 0xf13..=0xf17,
     },
     XmlChSRange {
-        low: 0xb70,
-        high: 0xb70,
+        range: 0xf1a..=0xf1f,
     },
     XmlChSRange {
-        low: 0xbf3,
-        high: 0xbf8,
+        range: 0xf34..=0xf34,
     },
     XmlChSRange {
-        low: 0xbfa,
-        high: 0xbfa,
+        range: 0xf36..=0xf36,
     },
     XmlChSRange {
-        low: 0xf01,
-        high: 0xf03,
+        range: 0xf38..=0xf38,
     },
     XmlChSRange {
-        low: 0xf13,
-        high: 0xf17,
+        range: 0xfbe..=0xfc5,
     },
     XmlChSRange {
-        low: 0xf1a,
-        high: 0xf1f,
+        range: 0xfc7..=0xfcc,
     },
     XmlChSRange {
-        low: 0xf34,
-        high: 0xf34,
+        range: 0xfcf..=0xfcf,
     },
     XmlChSRange {
-        low: 0xf36,
-        high: 0xf36,
+        range: 0x1940..=0x1940,
     },
     XmlChSRange {
-        low: 0xf38,
-        high: 0xf38,
+        range: 0x19e0..=0x19ff,
     },
     XmlChSRange {
-        low: 0xfbe,
-        high: 0xfc5,
+        range: 0x2100..=0x2101,
     },
     XmlChSRange {
-        low: 0xfc7,
-        high: 0xfcc,
+        range: 0x2103..=0x2106,
     },
     XmlChSRange {
-        low: 0xfcf,
-        high: 0xfcf,
+        range: 0x2108..=0x2109,
     },
     XmlChSRange {
-        low: 0x1940,
-        high: 0x1940,
+        range: 0x2114..=0x2114,
     },
     XmlChSRange {
-        low: 0x19e0,
-        high: 0x19ff,
+        range: 0x2116..=0x2118,
     },
     XmlChSRange {
-        low: 0x2100,
-        high: 0x2101,
+        range: 0x211e..=0x2123,
     },
     XmlChSRange {
-        low: 0x2103,
-        high: 0x2106,
+        range: 0x2125..=0x2125,
     },
     XmlChSRange {
-        low: 0x2108,
-        high: 0x2109,
+        range: 0x2127..=0x2127,
     },
     XmlChSRange {
-        low: 0x2114,
-        high: 0x2114,
+        range: 0x2129..=0x2129,
     },
     XmlChSRange {
-        low: 0x2116,
-        high: 0x2118,
+        range: 0x212e..=0x212e,
     },
     XmlChSRange {
-        low: 0x211e,
-        high: 0x2123,
+        range: 0x2132..=0x2132,
     },
     XmlChSRange {
-        low: 0x2125,
-        high: 0x2125,
+        range: 0x213a..=0x213b,
     },
     XmlChSRange {
-        low: 0x2127,
-        high: 0x2127,
+        range: 0x214a..=0x214a,
     },
     XmlChSRange {
-        low: 0x2129,
-        high: 0x2129,
+        range: 0x2195..=0x2199,
     },
     XmlChSRange {
-        low: 0x212e,
-        high: 0x212e,
+        range: 0x219c..=0x219f,
     },
     XmlChSRange {
-        low: 0x2132,
-        high: 0x2132,
+        range: 0x21a1..=0x21a2,
     },
     XmlChSRange {
-        low: 0x213a,
-        high: 0x213b,
+        range: 0x21a4..=0x21a5,
     },
     XmlChSRange {
-        low: 0x214a,
-        high: 0x214a,
+        range: 0x21a7..=0x21ad,
     },
     XmlChSRange {
-        low: 0x2195,
-        high: 0x2199,
+        range: 0x21af..=0x21cd,
     },
     XmlChSRange {
-        low: 0x219c,
-        high: 0x219f,
+        range: 0x21d0..=0x21d1,
     },
     XmlChSRange {
-        low: 0x21a1,
-        high: 0x21a2,
+        range: 0x21d3..=0x21d3,
     },
     XmlChSRange {
-        low: 0x21a4,
-        high: 0x21a5,
+        range: 0x21d5..=0x21f3,
     },
     XmlChSRange {
-        low: 0x21a7,
-        high: 0x21ad,
+        range: 0x2300..=0x2307,
     },
     XmlChSRange {
-        low: 0x21af,
-        high: 0x21cd,
+        range: 0x230c..=0x231f,
     },
     XmlChSRange {
-        low: 0x21d0,
-        high: 0x21d1,
+        range: 0x2322..=0x2328,
     },
     XmlChSRange {
-        low: 0x21d3,
-        high: 0x21d3,
+        range: 0x232b..=0x237b,
     },
     XmlChSRange {
-        low: 0x21d5,
-        high: 0x21f3,
+        range: 0x237d..=0x239a,
     },
     XmlChSRange {
-        low: 0x2300,
-        high: 0x2307,
+        range: 0x23b7..=0x23d0,
     },
     XmlChSRange {
-        low: 0x230c,
-        high: 0x231f,
+        range: 0x2400..=0x2426,
     },
     XmlChSRange {
-        low: 0x2322,
-        high: 0x2328,
+        range: 0x2440..=0x244a,
     },
     XmlChSRange {
-        low: 0x232b,
-        high: 0x237b,
+        range: 0x249c..=0x24e9,
     },
     XmlChSRange {
-        low: 0x237d,
-        high: 0x239a,
+        range: 0x2500..=0x25b6,
     },
     XmlChSRange {
-        low: 0x23b7,
-        high: 0x23d0,
+        range: 0x25b8..=0x25c0,
     },
     XmlChSRange {
-        low: 0x2400,
-        high: 0x2426,
+        range: 0x25c2..=0x25f7,
     },
     XmlChSRange {
-        low: 0x2440,
-        high: 0x244a,
+        range: 0x2600..=0x2617,
     },
     XmlChSRange {
-        low: 0x249c,
-        high: 0x24e9,
+        range: 0x2619..=0x266e,
     },
     XmlChSRange {
-        low: 0x2500,
-        high: 0x25b6,
+        range: 0x2670..=0x267d,
     },
     XmlChSRange {
-        low: 0x25b8,
-        high: 0x25c0,
+        range: 0x2680..=0x2691,
     },
     XmlChSRange {
-        low: 0x25c2,
-        high: 0x25f7,
+        range: 0x26a0..=0x26a1,
     },
     XmlChSRange {
-        low: 0x2600,
-        high: 0x2617,
+        range: 0x2701..=0x2704,
     },
     XmlChSRange {
-        low: 0x2619,
-        high: 0x266e,
+        range: 0x2706..=0x2709,
     },
     XmlChSRange {
-        low: 0x2670,
-        high: 0x267d,
+        range: 0x270c..=0x2727,
     },
     XmlChSRange {
-        low: 0x2680,
-        high: 0x2691,
+        range: 0x2729..=0x274b,
     },
     XmlChSRange {
-        low: 0x26a0,
-        high: 0x26a1,
+        range: 0x274d..=0x274d,
     },
     XmlChSRange {
-        low: 0x2701,
-        high: 0x2704,
+        range: 0x274f..=0x2752,
     },
     XmlChSRange {
-        low: 0x2706,
-        high: 0x2709,
+        range: 0x2756..=0x2756,
     },
     XmlChSRange {
-        low: 0x270c,
-        high: 0x2727,
+        range: 0x2758..=0x275e,
     },
     XmlChSRange {
-        low: 0x2729,
-        high: 0x274b,
+        range: 0x2761..=0x2767,
     },
     XmlChSRange {
-        low: 0x274d,
-        high: 0x274d,
+        range: 0x2794..=0x2794,
     },
     XmlChSRange {
-        low: 0x274f,
-        high: 0x2752,
+        range: 0x2798..=0x27af,
     },
     XmlChSRange {
-        low: 0x2756,
-        high: 0x2756,
+        range: 0x27b1..=0x27be,
     },
     XmlChSRange {
-        low: 0x2758,
-        high: 0x275e,
+        range: 0x2800..=0x28ff,
     },
     XmlChSRange {
-        low: 0x2761,
-        high: 0x2767,
+        range: 0x2b00..=0x2b0d,
     },
     XmlChSRange {
-        low: 0x2794,
-        high: 0x2794,
+        range: 0x2e80..=0x2e99,
     },
     XmlChSRange {
-        low: 0x2798,
-        high: 0x27af,
+        range: 0x2e9b..=0x2ef3,
     },
     XmlChSRange {
-        low: 0x27b1,
-        high: 0x27be,
+        range: 0x2f00..=0x2fd5,
     },
     XmlChSRange {
-        low: 0x2800,
-        high: 0x28ff,
+        range: 0x2ff0..=0x2ffb,
     },
     XmlChSRange {
-        low: 0x2b00,
-        high: 0x2b0d,
+        range: 0x3004..=0x3004,
     },
     XmlChSRange {
-        low: 0x2e80,
-        high: 0x2e99,
+        range: 0x3012..=0x3013,
     },
     XmlChSRange {
-        low: 0x2e9b,
-        high: 0x2ef3,
+        range: 0x3020..=0x3020,
     },
     XmlChSRange {
-        low: 0x2f00,
-        high: 0x2fd5,
+        range: 0x3036..=0x3037,
     },
     XmlChSRange {
-        low: 0x2ff0,
-        high: 0x2ffb,
+        range: 0x303e..=0x303f,
     },
     XmlChSRange {
-        low: 0x3004,
-        high: 0x3004,
+        range: 0x3190..=0x3191,
     },
     XmlChSRange {
-        low: 0x3012,
-        high: 0x3013,
+        range: 0x3196..=0x319f,
     },
     XmlChSRange {
-        low: 0x3020,
-        high: 0x3020,
+        range: 0x3200..=0x321e,
     },
     XmlChSRange {
-        low: 0x3036,
-        high: 0x3037,
+        range: 0x322a..=0x3243,
     },
     XmlChSRange {
-        low: 0x303e,
-        high: 0x303f,
+        range: 0x3250..=0x3250,
     },
     XmlChSRange {
-        low: 0x3190,
-        high: 0x3191,
+        range: 0x3260..=0x327d,
     },
     XmlChSRange {
-        low: 0x3196,
-        high: 0x319f,
+        range: 0x327f..=0x327f,
     },
     XmlChSRange {
-        low: 0x3200,
-        high: 0x321e,
+        range: 0x328a..=0x32b0,
     },
     XmlChSRange {
-        low: 0x322a,
-        high: 0x3243,
+        range: 0x32c0..=0x32fe,
     },
     XmlChSRange {
-        low: 0x3250,
-        high: 0x3250,
+        range: 0x3300..=0x33ff,
     },
     XmlChSRange {
-        low: 0x3260,
-        high: 0x327d,
+        range: 0x4dc0..=0x4dff,
     },
     XmlChSRange {
-        low: 0x327f,
-        high: 0x327f,
+        range: 0xa490..=0xa4c6,
     },
     XmlChSRange {
-        low: 0x328a,
-        high: 0x32b0,
+        range: 0xfdfd..=0xfdfd,
     },
     XmlChSRange {
-        low: 0x32c0,
-        high: 0x32fe,
+        range: 0xffe4..=0xffe4,
     },
     XmlChSRange {
-        low: 0x3300,
-        high: 0x33ff,
+        range: 0xffe8..=0xffe8,
     },
     XmlChSRange {
-        low: 0x4dc0,
-        high: 0x4dff,
+        range: 0xffed..=0xffee,
     },
     XmlChSRange {
-        low: 0xa490,
-        high: 0xa4c6,
-    },
-    XmlChSRange {
-        low: 0xfdfd,
-        high: 0xfdfd,
-    },
-    XmlChSRange {
-        low: 0xffe4,
-        high: 0xffe4,
-    },
-    XmlChSRange {
-        low: 0xffe8,
-        high: 0xffe8,
-    },
-    XmlChSRange {
-        low: 0xffed,
-        high: 0xffee,
-    },
-    XmlChSRange {
-        low: 0xfffc,
-        high: 0xfffd,
+        range: 0xfffc..=0xfffd,
     },
 ];
 
 const XML_SO_L: &[XmlChLRange] = &[
     XmlChLRange {
-        low: 0x10102,
-        high: 0x10102,
+        range: 0x10102..=0x10102,
     },
     XmlChLRange {
-        low: 0x10137,
-        high: 0x1013f,
+        range: 0x10137..=0x1013f,
     },
     XmlChLRange {
-        low: 0x1d000,
-        high: 0x1d0f5,
+        range: 0x1d000..=0x1d0f5,
     },
     XmlChLRange {
-        low: 0x1d100,
-        high: 0x1d126,
+        range: 0x1d100..=0x1d126,
     },
     XmlChLRange {
-        low: 0x1d12a,
-        high: 0x1d164,
+        range: 0x1d12a..=0x1d164,
     },
     XmlChLRange {
-        low: 0x1d16a,
-        high: 0x1d16c,
+        range: 0x1d16a..=0x1d16c,
     },
     XmlChLRange {
-        low: 0x1d183,
-        high: 0x1d184,
+        range: 0x1d183..=0x1d184,
     },
     XmlChLRange {
-        low: 0x1d18c,
-        high: 0x1d1a9,
+        range: 0x1d18c..=0x1d1a9,
     },
     XmlChLRange {
-        low: 0x1d1ae,
-        high: 0x1d1dd,
+        range: 0x1d1ae..=0x1d1dd,
     },
     XmlChLRange {
-        low: 0x1d300,
-        high: 0x1d356,
+        range: 0x1d300..=0x1d356,
     },
 ];
 
@@ -10983,41 +8278,28 @@ const XML_SO_G: XmlChRangeGroup = XmlChRangeGroup {
 };
 
 const XML_ZS: &[XmlChSRange] = &[
+    XmlChSRange { range: 0x20..=0x20 },
+    XmlChSRange { range: 0xa0..=0xa0 },
     XmlChSRange {
-        low: 0x20,
-        high: 0x20,
+        range: 0x1680..=0x1680,
     },
     XmlChSRange {
-        low: 0xa0,
-        high: 0xa0,
+        range: 0x180e..=0x180e,
     },
     XmlChSRange {
-        low: 0x1680,
-        high: 0x1680,
+        range: 0x2000..=0x200a,
     },
     XmlChSRange {
-        low: 0x180e,
-        high: 0x180e,
+        range: 0x2028..=0x2029,
     },
     XmlChSRange {
-        low: 0x2000,
-        high: 0x200a,
+        range: 0x202f..=0x202f,
     },
     XmlChSRange {
-        low: 0x2028,
-        high: 0x2029,
+        range: 0x205f..=0x205f,
     },
     XmlChSRange {
-        low: 0x202f,
-        high: 0x202f,
-    },
-    XmlChSRange {
-        low: 0x205f,
-        high: 0x205f,
-    },
-    XmlChSRange {
-        low: 0x3000,
-        high: 0x3000,
+        range: 0x3000..=0x3000,
     },
 ];
 

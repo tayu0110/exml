@@ -55,6 +55,7 @@ use crate::private::parser::{__xml_err_encoding, xml_err_memory};
 use crate::{__xml_raise_error, generic_error};
 
 use super::catalog::xml_catalog_add_local;
+use super::chvalid::xml_is_base_char;
 use super::dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, xml_dict_set_limit};
 use super::entities::XmlEntityType;
 use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
@@ -254,21 +255,6 @@ macro_rules! IS_BLANK_CH {
 }
 
 /**
- * IS_BASECHAR:
- * @c:  an UNICODE value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- * [85] BaseChar ::= ... long list see REC ...
- */
-#[macro_export]
-macro_rules! IS_BASECHAR {
-    ( $c:expr ) => {
-        $crate::xml_is_base_char_q!($c)
-    };
-}
-
-/**
  * IS_DIGIT:
  * @c:  an UNICODE value (c_int)
  *
@@ -380,7 +366,7 @@ macro_rules! IS_IDEOGRAPHIC {
 #[macro_export]
 macro_rules! IS_LETTER {
     ( $c:expr ) => {
-        $crate::IS_BASECHAR!($c) || $crate::IS_IDEOGRAPHIC!($c)
+        $crate::libxml::chvalid::xml_is_base_char($c) || $crate::IS_IDEOGRAPHIC!($c)
     };
 }
 
@@ -502,7 +488,7 @@ pub static XML_STRING_COMMENT: &CStr = c"comment";
  * Returns 0 if not, non-zero otherwise
  */
 pub unsafe extern "C" fn xml_is_letter(c: c_int) -> c_int {
-    (IS_BASECHAR!(c as u32) || IS_IDEOGRAPHIC!(c as u32)) as i32
+    (xml_is_base_char(c as u32) || IS_IDEOGRAPHIC!(c as u32)) as i32
 }
 
 /**
