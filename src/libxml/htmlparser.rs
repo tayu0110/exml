@@ -53,7 +53,7 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER,
 };
 
 use super::{
@@ -7984,7 +7984,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
     #[allow(clippy::while_immutable_condition)]
     while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() as i32 != quote {
         /* TODO: Handle UTF-8 */
-        if !IS_CHAR_CH!((*ctxt).current_byte()) {
+        if !xml_is_char((*ctxt).current_byte() as u32) {
             html_parse_err_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,

@@ -85,11 +85,6 @@ use super::xmlstring::{
     xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
 };
 
-// #[cfg(target_os = "windows")]
-// const XML_DIR_SEP: c_char = b'\\' as _;
-// #[cfg(not(target_os = "windows"))]
-// const XML_DIR_SEP: c_char = b'/' as _;
-
 macro_rules! VALID_CTXT {
     ($ctxt:expr) => {
         (*(*$ctxt).input).cur <= (*(*$ctxt).input).end
@@ -181,19 +176,6 @@ pub const INPUT_CHUNK: usize = 250;
  * UNICODE version of the macros.					*
  *									*
  ************************************************************************/
-
-/**
- * IS_CHAR_CH:
- * @c: an xmlChar (usually an c_uchar)
- *
- * Behaves like IS_CHAR on single-byte value
- */
-#[macro_export]
-macro_rules! IS_CHAR_CH {
-    ( $c:expr ) => {
-        $crate::libxml::chvalid::xml_is_char($c as u32)
-    };
-}
 
 /**
  * IS_ASCII_LETTER:

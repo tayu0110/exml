@@ -71,7 +71,7 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER,
 };
 
 use super::{
@@ -4782,10 +4782,10 @@ unsafe extern "C" fn xml_xpath_parse_literal(ctxt: XmlXPathParserContextPtr) -> 
     if CUR!(ctxt) == b'"' {
         NEXT!(ctxt);
         q = CUR_PTR!(ctxt);
-        while IS_CHAR_CH!(CUR!(ctxt)) && CUR!(ctxt) != b'"' {
+        while xml_is_char(CUR!(ctxt) as u32) && CUR!(ctxt) != b'"' {
             NEXT!(ctxt);
         }
-        if !IS_CHAR_CH!(CUR!(ctxt)) {
+        if !xml_is_char(CUR!(ctxt) as u32) {
             XP_ERRORNULL!(ctxt, XmlXPathError::XpathUnfinishedLiteralError as i32);
         } else {
             ret = xml_strndup(q, CUR_PTR!(ctxt).offset_from(q) as _);
@@ -4794,10 +4794,10 @@ unsafe extern "C" fn xml_xpath_parse_literal(ctxt: XmlXPathParserContextPtr) -> 
     } else if CUR!(ctxt) == b'\'' {
         NEXT!(ctxt);
         q = CUR_PTR!(ctxt);
-        while IS_CHAR_CH!(CUR!(ctxt)) && CUR!(ctxt) != b'\'' {
+        while xml_is_char(CUR!(ctxt) as u32) && CUR!(ctxt) != b'\'' {
             NEXT!(ctxt);
         }
-        if !IS_CHAR_CH!(CUR!(ctxt)) {
+        if !xml_is_char(CUR!(ctxt) as u32) {
             XP_ERRORNULL!(ctxt, XmlXPathError::XpathUnfinishedLiteralError as i32);
         } else {
             ret = xml_strndup(q, CUR_PTR!(ctxt).offset_from(q) as _);
@@ -5163,25 +5163,8 @@ unsafe extern "C" fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
             {
                 xml_xpath_err(ctxt, XmlXPathError::XpathUndefPrefixError as i32);
             }
-            // #ifdef DEBUG_STEP
-            // 	xmlGenericError(xmlGenericErrorContext(),
-            // 		"Basis : computing new set\n");
-            // #endif
-
-            // #ifdef DEBUG_STEP
-            // 	xmlGenericError(xmlGenericErrorContext, "Basis : ");
-            // 	if (*ctxt).value.is_null()
-            // 	    xmlGenericError(xmlGenericErrorContext, "no value\n");
-            // 	else if ((*(*ctxt).value).nodesetval.is_null())
-            // 	    xmlGenericError(xmlGenericErrorContext, "Empty\n");
-            // 	else
-            // 	    xmlGenericErrorContextNodeSet(stdout, (*(*ctxt).value).nodesetval);
-            // #endif
         }
 
-        // #ifdef LIBXML_XPTR_LOCS_ENABLED
-        // eval_predicates:
-        // #endif
         let op1: c_int = (*(*ctxt).comp).last;
         (*(*ctxt).comp).last = -1;
 
@@ -5217,16 +5200,6 @@ unsafe extern "C" fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
             xml_free(name as _);
         }
     }
-    // #ifdef DEBUG_STEP
-    //     xmlGenericError(xmlGenericErrorContext, "Step : ");
-    //     if (*ctxt).value.is_null()
-    // 	xmlGenericError(xmlGenericErrorContext, "no value\n");
-    //     else if ((*(*ctxt).value).nodesetval.is_null())
-    // 	xmlGenericError(xmlGenericErrorContext, "Empty\n");
-    //     else
-    // 	xmlGenericErrorContextNodeSet(xmlGenericErrorContext,
-    // 		(*(*ctxt).value).nodesetval);
-    // #endif
 }
 
 /**
@@ -5532,10 +5505,10 @@ unsafe extern "C" fn xml_xpath_comp_literal(ctxt: XmlXPathParserContextPtr) {
     if CUR!(ctxt) == b'"' {
         NEXT!(ctxt);
         q = CUR_PTR!(ctxt);
-        while IS_CHAR_CH!(CUR!(ctxt)) && CUR!(ctxt) != b'"' {
+        while xml_is_char(CUR!(ctxt) as u32) && CUR!(ctxt) != b'"' {
             NEXT!(ctxt);
         }
-        if !IS_CHAR_CH!(CUR!(ctxt)) {
+        if !xml_is_char(CUR!(ctxt) as u32) {
             XP_ERROR!(ctxt, XmlXPathError::XpathUnfinishedLiteralError as i32);
         } else {
             ret = xml_strndup(q, CUR_PTR!(ctxt).offset_from(q) as _);
@@ -5544,10 +5517,10 @@ unsafe extern "C" fn xml_xpath_comp_literal(ctxt: XmlXPathParserContextPtr) {
     } else if CUR!(ctxt) == b'\'' {
         NEXT!(ctxt);
         q = CUR_PTR!(ctxt);
-        while IS_CHAR_CH!(CUR!(ctxt)) && CUR!(ctxt) != b'\'' {
+        while xml_is_char(CUR!(ctxt) as u32) && CUR!(ctxt) != b'\'' {
             NEXT!(ctxt);
         }
-        if !IS_CHAR_CH!(CUR!(ctxt)) {
+        if !xml_is_char(CUR!(ctxt) as u32) {
             XP_ERROR!(ctxt, XmlXPathError::XpathUnfinishedLiteralError as i32);
         } else {
             ret = xml_strndup(q, CUR_PTR!(ctxt).offset_from(q) as _);
@@ -5599,14 +5572,6 @@ unsafe extern "C" fn xml_xpath_comp_function_call(ctxt: XmlXPathParserContextPtr
         XP_ERROR!(ctxt, XmlXPathError::XpathExprError as i32);
     }
     SKIP_BLANKS!(ctxt);
-    // #ifdef DEBUG_EXPR
-    //     if prefix.is_null()
-    // 	xmlGenericError(xmlGenericErrorContext, "Calling function %s\n",
-    // 			name);
-    //     else
-    // 	xmlGenericError(xmlGenericErrorContext, "Calling function %s:%s\n",
-    // 			prefix, name);
-    // #endif
 
     if CUR!(ctxt) != b'(' {
         xml_free(name as _);
@@ -6318,9 +6283,6 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
     if from_root < 0 {
         return -1;
     }
-    // #if 0
-    //     prc_intf("stream eval: depth %d from root %d\n", max_depth, from_root);
-    // #endif
 
     if to_bool == 0 {
         if result_seq.is_null() {
@@ -7375,10 +7337,6 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
     let prefix: *const XmlChar = (*op).value4 as _;
     let name: *const XmlChar = (*op).value5 as _;
     let mut uri: *const XmlChar = null();
-
-    // #ifdef DEBUG_STEP
-    //     let nbMatches: c_int = 0, prevMatches = 0;
-    // #endif
     let mut total: c_int = 0;
     let mut has_ns_nodes: c_int;
 
@@ -7501,11 +7459,6 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
             merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
         }
     }
-
-    // #ifdef DEBUG_STEP
-    //     xmlXPathDebugDumpStepAxis(op,
-    // 	((*obj).nodesetval != NULL) ? (*(*obj).nodesetval).nodeNr : 0);
-    // #endif
 
     let Some(next) = next else {
         xml_xpath_release_object(xpctxt, obj);
@@ -7634,10 +7587,6 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
             }
 
             total += 1;
-
-            // #ifdef DEBUG_STEP
-            //             xmlGenericError(xmlGenericErrorContext, " %s", (*cur).name);
-            // #endif
 
             match test {
                 XmlXPathTestVal::NodeTestNone => {
@@ -7914,12 +7863,6 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
         xml_free((*xpctxt).tmp_ns_list as _);
         (*xpctxt).tmp_ns_list = null_mut();
     }
-
-    // #ifdef DEBUG_STEP
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	"\nExamined %d nodes, found %d nodes at that step\n",
-    // 	total, nbMatches);
-    // #endif
 
     total
 }
@@ -9824,9 +9767,6 @@ unsafe extern "C" fn xml_xpath_cache_wrap_string(
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XpathString;
             (*ret).stringval = val;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathString);
-            // #endif
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             /*
@@ -9840,9 +9780,6 @@ unsafe extern "C" fn xml_xpath_cache_wrap_string(
 
             (*ret).typ = XmlXPathObjectType::XpathString;
             (*ret).stringval = val;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathString);
-            // #endif
             return ret;
         }
     }
@@ -10417,9 +10354,6 @@ pub unsafe extern "C" fn xml_xpath_wrap_node_set(val: XmlNodeSetPtr) -> XmlXPath
     memset(ret as _, 0, size_of::<XmlXPathObject>());
     (*ret).typ = XmlXPathObjectType::XpathNodeset;
     (*ret).nodesetval = val;
-    // #ifdef XP_DEBUG_OBJ_USAGE
-    //     xmlXPathDebugObjUsageRequested(NULL, XpathNodeset);
-    // #endif
     ret
 }
 
@@ -10440,9 +10374,6 @@ pub unsafe extern "C" fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathOb
     memset(ret as _, 0, size_of::<XmlXPathObject>());
     (*ret).typ = XmlXPathObjectType::XpathUsers;
     (*ret).user = val;
-    // #ifdef XP_DEBUG_OBJ_USAGE
-    //     xmlXPathDebugObjUsageRequested(NULL, XPATH_USERS);
-    // #endif
     ret
 }
 
@@ -10893,60 +10824,38 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
      *is a nodeset, so we can just pick the appropriate routine.
      */
     match (*arg1).typ {
-        XmlXPathObjectType::XpathUndefined => {
-            // #ifdef DEBUG_EXPR
-            // 	    xmlGenericError(xmlGenericErrorContext(),
-            // 		    "Equal: undefined\n");
-            // #endif
-        }
-        XmlXPathObjectType::XpathBoolean => {
-            match (*arg2).typ {
-                XmlXPathObjectType::XpathUndefined => {
-                    // #ifdef DEBUG_EXPR
-                    // 		    xmlGenericError(xmlGenericErrorContext(),
-                    // 			    "Equal: undefined\n");
-                    // #endif
-                }
-                XmlXPathObjectType::XpathBoolean => {
-                    // #ifdef DEBUG_EXPR
-                    // 		    xmlGenericError(xmlGenericErrorContext(),
-                    // 			    "Equal: %d boolean %d \n",
-                    // 			    (*arg1).boolval, (*arg2).boolval);
-                    // #endif
-                    ret = ((*arg1).boolval == (*arg2).boolval) as i32;
-                }
-                XmlXPathObjectType::XpathNumber => {
-                    ret = ((*arg1).boolval == xml_xpath_cast_number_to_boolean((*arg2).floatval))
-                        as i32;
-                }
-                XmlXPathObjectType::XpathString => {
-                    if (*arg2).stringval.is_null() || *(*arg2).stringval.add(0) == 0 {
-                        ret = 0;
-                    } else {
-                        ret = 1;
-                    }
-                    ret = ((*arg1).boolval == ret) as i32;
-                }
-                XmlXPathObjectType::XpathUsers => {
-                    todo!()
-                }
-                #[cfg(feature = "libxml_xptr_locs")]
-                XmlXPathObjectType::XpathPoint
-                | XmlXPathObjectType::XpathRange
-                | XmlXPathObjectType::XpathLocationset => {
-                    todo!()
-                }
-                XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {}
+        XmlXPathObjectType::XpathUndefined => {}
+        XmlXPathObjectType::XpathBoolean => match (*arg2).typ {
+            XmlXPathObjectType::XpathUndefined => {}
+            XmlXPathObjectType::XpathBoolean => {
+                ret = ((*arg1).boolval == (*arg2).boolval) as i32;
             }
-        }
+            XmlXPathObjectType::XpathNumber => {
+                ret =
+                    ((*arg1).boolval == xml_xpath_cast_number_to_boolean((*arg2).floatval)) as i32;
+            }
+            XmlXPathObjectType::XpathString => {
+                if (*arg2).stringval.is_null() || *(*arg2).stringval.add(0) == 0 {
+                    ret = 0;
+                } else {
+                    ret = 1;
+                }
+                ret = ((*arg1).boolval == ret) as i32;
+            }
+            XmlXPathObjectType::XpathUsers => {
+                todo!()
+            }
+            #[cfg(feature = "libxml_xptr_locs")]
+            XmlXPathObjectType::XpathPoint
+            | XmlXPathObjectType::XpathRange
+            | XmlXPathObjectType::XpathLocationset => {
+                todo!()
+            }
+            XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {}
+        },
         XmlXPathObjectType::XpathNumber => {
             match (*arg2).typ {
-                XmlXPathObjectType::XpathUndefined => {
-                    // #ifdef DEBUG_EXPR
-                    // 		    xmlGenericError(xmlGenericErrorContext(),
-                    // 			    "Equal: undefined\n");
-                    // #endif
-                }
+                XmlXPathObjectType::XpathUndefined => {}
                 XmlXPathObjectType::XpathBoolean => {
                     ret = ((*arg2).boolval == xml_xpath_cast_number_to_boolean((*arg1).floatval))
                         as i32;
@@ -11011,12 +10920,7 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
         }
         XmlXPathObjectType::XpathString => {
             match (*arg2).typ {
-                XmlXPathObjectType::XpathUndefined => {
-                    // #ifdef DEBUG_EXPR
-                    // 		    xmlGenericError(xmlGenericErrorContext(),
-                    // 			    "Equal: undefined\n");
-                    // #endif
-                }
+                XmlXPathObjectType::XpathUndefined => {}
                 XmlXPathObjectType::XpathBoolean => {
                     if (*arg1).stringval.is_null() || *(*arg1).stringval.add(0) == 0 {
                         ret = 0;
@@ -11126,10 +11030,6 @@ pub unsafe extern "C" fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) 
     }
 
     if arg1 == arg2 {
-        // #ifdef DEBUG_EXPR
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		"Equal: by poc_inter\n");
-        // #endif
         xml_xpath_free_object(arg1);
         return 1;
     }
@@ -11156,12 +11056,7 @@ pub unsafe extern "C" fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) 
             arg1 = argtmp;
         }
         match (*arg2).typ {
-            XmlXPathObjectType::XpathUndefined => {
-                // #ifdef DEBUG_EXPR
-                // 		xmlGenericError(xmlGenericErrorContext(),
-                // 			"Equal: undefined\n");
-                // #endif
-            }
+            XmlXPathObjectType::XpathUndefined => {}
             XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
                 ret = xml_xpath_equal_node_sets(arg1, arg2, 0);
             }
@@ -11225,10 +11120,6 @@ pub unsafe extern "C" fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextP
     }
 
     if arg1 == arg2 {
-        // #ifdef DEBUG_EXPR
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		"NotEqual: by poc_inter\n");
-        // #endif
         xml_xpath_release_object((*ctxt).context, arg1);
         return 0;
     }
@@ -11255,12 +11146,7 @@ pub unsafe extern "C" fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextP
             arg1 = argtmp;
         }
         match (*arg2).typ {
-            XmlXPathObjectType::XpathUndefined => {
-                // #ifdef DEBUG_EXPR
-                // 		xmlGenericError(xmlGenericErrorContext(),
-                // 			"NotEqual: undefined\n");
-                // #endif
-            }
+            XmlXPathObjectType::XpathUndefined => {}
             XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
                 ret = xml_xpath_equal_node_sets(arg1, arg2, 1);
             }
@@ -12752,10 +12638,6 @@ pub unsafe extern "C" fn xml_xpath_last_function(ctxt: XmlXPathParserContextPtr,
             ctxt,
             xml_xpath_cache_new_float((*ctxt).context, (*(*ctxt).context).context_size as f64),
         );
-    // #ifdef DEBUG_EXPR
-    // 	xmlGenericError(xmlGenericErrorContext,
-    // 		"last() : %d\n", (*(*ctxt).context).contextSize);
-    // #endif
     } else {
         XP_ERROR!(ctxt, XmlXPathError::XpathInvalidCtxtSize as i32);
     }
@@ -12782,10 +12664,6 @@ pub unsafe extern "C" fn xml_xpath_position_function(ctxt: XmlXPathParserContext
                 (*(*ctxt).context).proximity_position as f64,
             ),
         );
-    // #ifdef DEBUG_EXPR
-    // 	xmlGenericError(xmlGenericErrorContext, "position() : %d\n",
-    // 		(*(*ctxt).context).proximityPosition);
-    // #endif
     } else {
         XP_ERROR!(ctxt, XmlXPathError::XpathInvalidCtxtPosition as i32);
     }
@@ -12914,11 +12792,7 @@ unsafe extern "C" fn xml_xpath_cache_convert_string(
     }
 
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => {
-            // #ifdef DEBUG_EXPR
-            // 	xmlGenericError(xmlGenericErrorContext, "STRING: undefined\n");
-            // #endif
-        }
+        XmlXPathObjectType::XpathUndefined => {}
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
             res = xml_xpath_cast_node_set_to_string((*val).nodesetval);
         }

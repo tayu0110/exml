@@ -3546,23 +3546,14 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
 
             if (!inc.is_null() && !(*inc).doc.is_null() && !(*(*inc).doc).children.is_null())
                 && xml_str_equal((*(*(*inc).doc).children).name, c"grammar".as_ptr() as _)
-            {
-                // #ifdef DEBUG_INCLUDE
-                //                     href = xmlGetProp(tmp, c"href".as_ptr() as _);
-                // #endif
-                if xml_relaxng_remove_redefine(
+                && xml_relaxng_remove_redefine(
                     _ctxt,
                     href,
                     (*xml_doc_get_root_element((*inc).doc)).children,
                     name,
                 ) == 1
-                {
-                    found = 1;
-                }
-                // #ifdef DEBUG_INCLUDE
-                //                     if !href.is_null()
-                //                         xmlFree(href as _);
-                // #endif
+            {
+                found = 1;
             }
             if xml_relaxng_remove_redefine(_ctxt, _url, (*tmp).children, name) == 1 {
                 found = 1;
@@ -9902,11 +9893,6 @@ unsafe extern "C" fn xml_relaxng_validate_value(
             let mut list: XmlRelaxNGDefinePtr = (*define).content;
             let mut val: *mut XmlChar;
             let mut cur: *mut XmlChar;
-
-            // #ifdef DEBUG_LIST
-            //                 c_int nb_values = 0;
-            // #endif
-
             let oldvalue: *mut XmlChar = (*(*ctxt).state).value;
             let oldend: *mut XmlChar = (*(*ctxt).state).endvalue;
 
@@ -9923,9 +9909,6 @@ unsafe extern "C" fn xml_relaxng_validate_value(
                 if xml_is_blank_char(*cur as u32) {
                     *cur = 0;
                     cur = cur.add(1);
-                    // #ifdef DEBUG_LIST
-                    //                         nb_values++;
-                    // #endif
                     while xml_is_blank_char(*cur as u32) {
                         *cur = 0;
                         cur = cur.add(1);
@@ -9950,9 +9933,6 @@ unsafe extern "C" fn xml_relaxng_validate_value(
                 if ret != 0 {
                     break;
                 }
-                // #ifdef DEBUG_LIST
-                //                     nb_values++;
-                // #endif
                 list = (*list).next;
             }
 

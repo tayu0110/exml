@@ -545,10 +545,6 @@ pub struct XmlXPathCompExpr {
     pub(crate) last: c_int,     /* index of last step in expression */
     pub(crate) expr: *mut XmlChar, /* the expression being computed */
     pub(crate) dict: XmlDictPtr, /* the dictionary to use if any */
-    // #ifdef DEBUG_EVAL_COUNTS
-    //     nb: c_int,
-    //     string: *mut xmlChar,
-    // #endif
     #[cfg(feature = "libxml_pattern")]
     pub(crate) stream: XmlPatternPtr,
 }
@@ -703,12 +699,6 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree
     ) {
         if (*obj).boolval != 0 {
-            // #if 0
-            // 	    if (!(*obj).user.is_null()) {
-            //                 xmlXPathFreeNodeSet((*obj).nodesetval);
-            // 		xmlFreeNodeList((xmlNodePtr) (*obj).user);
-            // 	    } else
-            // #endif
             (*obj).typ = XmlXPathObjectType::XpathXsltTree; /* TODO: Just for debugging. */
             if !(*obj).nodesetval.is_null() {
                 xml_xpath_free_value_tree((*obj).nodesetval);
@@ -724,9 +714,6 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
             xml_xptr_free_location_set((*obj).user as _);
         }
     }
-    // #ifdef XP_DEBUG_OBJ_USAGE
-    //     xmlXPathDebugObjUsageReleased(NULL, (*obj).typ);
-    // #endif
     xml_free(obj as _);
 }
 
@@ -738,7 +725,7 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
  *
  * Returns the newly created object.
  */
-// #[cfg(feature = "xpath")]
+#[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSetPtr {
     let ret: XmlNodeSetPtr = xml_malloc(size_of::<XmlNodeSet>()) as XmlNodeSetPtr;
     if ret.is_null() {
@@ -791,9 +778,6 @@ pub unsafe extern "C" fn xml_xpath_free_node_set_list(obj: XmlXPathObjectPtr) {
     if obj.is_null() {
         return;
     }
-    // #ifdef XP_DEBUG_OBJ_USAGE
-    //     xmlXPathDebugObjUsageReleased(NULL, (*obj).typ);
-    // #endif
     xml_free(obj as _);
 }
 
@@ -847,9 +831,6 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
         return null_mut();
     }
     memcpy(ret as _, val as _, size_of::<XmlXPathObject>());
-    // #ifdef XP_DEBUG_OBJ_USAGE
-    //     xmlXPathDebugObjUsageRequested(NULL, (*val).typ);
-    // #endif
     match (*val).typ {
         XmlXPathObjectType::XpathBoolean | XmlXPathObjectType::XpathNumber => {}
         #[cfg(feature = "libxml_xptr_locs")]
@@ -1130,12 +1111,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> c_
         return 0;
     }
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => {
-            // #ifdef DEBUG_EXPR
-            // 	xmlGenericError(xmlGenericErrorContext, "BOOLEAN: undefined\n");
-            // #endif
-            0
-        }
+        XmlXPathObjectType::XpathUndefined => 0,
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
             xml_xpath_cast_node_set_to_boolean((*val).nodesetval)
         }
@@ -1241,12 +1217,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
         return XML_XPATH_NAN;
     }
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => {
-            // #ifdef DEBUG_EXPR
-            // 	xmlGenericError(xmlGenericErrorContext, "NUMBER: undefined\n");
-            // #endif
-            XML_XPATH_NAN
-        }
+        XmlXPathObjectType::XpathUndefined => XML_XPATH_NAN,
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
             xml_xpath_cast_node_set_to_number((*val).nodesetval)
         }
@@ -1537,12 +1508,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mu
         return xml_strdup(c"".as_ptr() as *const XmlChar);
     }
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => {
-            // #ifdef DEBUG_EXPR
-            // 	    xmlGenericError(xmlGenericErrorContext, "String: undefined\n");
-            // #endif
-            xml_strdup(c"".as_ptr() as *const XmlChar)
-        }
+        XmlXPathObjectType::XpathUndefined => xml_strdup(c"".as_ptr() as *const XmlChar),
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
             xml_xpath_cast_node_set_to_string((*val).nodesetval)
         }
@@ -1625,11 +1591,7 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
     }
 
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => {
-            // #ifdef DEBUG_EXPR
-            // 	xmlGenericError(xmlGenericErrorContext, "STRING: undefined\n");
-            // #endif
-        }
+        XmlXPathObjectType::XpathUndefined => {}
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
             res = xml_xpath_cast_node_set_to_string((*val).nodesetval);
         }
@@ -1747,9 +1709,6 @@ unsafe extern "C" fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
             xml_free((*obj).nodesetval as _);
         }
         xml_free(obj as _);
-        // #ifdef XP_DEBUG_OBJ_USAGE
-        // 	xmlXPathDebugObjCounterAll-=1;
-        // #endif
     }
     xml_pointer_list_free(list);
 }
@@ -2334,13 +2293,6 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
         }
     }
 
-    // #ifdef DEBUG_EVAL_COUNTS
-    //     (*comp).nb+=1;
-    //     if (!(*comp).string.is_null() && ((*comp).nb > 100)) {
-    // 	fprc_intf(stderr, "100 x %s\n", (*comp).string);
-    // 	(*comp).nb = 0;
-    //     }
-    // #endif
     let pctxt: XmlXPathParserContextPtr = xml_xpath_comp_parser_context(comp, ctxt);
     if pctxt.is_null() {
         return -1;
@@ -2458,11 +2410,6 @@ pub unsafe extern "C" fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
     if !(*comp).steps.is_null() {
         xml_free((*comp).steps as _);
     }
-    // #ifdef DEBUG_EVAL_COUNTS
-    //     if !(*comp).string.is_null() {
-    //         xmlFree((*comp).string as _);
-    //     }
-    // #endif
     #[cfg(feature = "libxml_pattern")]
     {
         if !(*comp).stream.is_null() {
@@ -2522,19 +2469,10 @@ pub unsafe extern "C" fn xml_xpath_is_inf(val: f64) -> c_int {
  *
  * Initialize the XPath environment
  */
-// ATTRIBUTE_NO_SANITIZE("float-divide-by-zero")
 pub(crate) unsafe extern "C" fn xml_init_xpath_internal() {
-    // #if defined(NAN) && defined(INFINITY)
     XML_XPATH_NAN = f64::NAN;
     XML_XPATH_PINF = f64::INFINITY;
     XML_XPATH_NINF = f64::NEG_INFINITY;
-    // #else
-    //     /* MSVC doesn't allow division by zero in constant expressions. */
-    //     f64 zero = 0.0;
-    //     xmlXPathNAN = 0.0 / zero;
-    //     xmlXPathPINF = 1.0 / zero;
-    //     xmlXPathNINF = -xmlXPathPINF;
-    // #endif
 }
 
 #[cfg(test)]

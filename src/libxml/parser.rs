@@ -2904,27 +2904,6 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
 }
 
 /**
- * xmlCleanSpecialAttrCallback:
- *
- * Removes CDATA attributes from the special attribute table
- */
-// This is used the callback for xml_hash_scan_full on xml_clean_special_attr,
-// but no longer needed.
-// unsafe extern "C" fn xml_clean_special_attr_callback(
-//     payload: *mut c_void,
-//     data: *mut c_void,
-//     fullname: *const XmlChar,
-//     fullattr: *const XmlChar,
-//     _unused: *const XmlChar,
-// ) {
-//     let ctxt: XmlParserCtxtPtr = data as XmlParserCtxtPtr;
-
-//     if payload as isize == XmlAttributeType::XmlAttributeCdata as isize {
-//         xml_hash_remove_entry2((*ctxt).atts_special, fullname, fullattr, None);
-//     }
-// }
-
-/**
  * xmlCleanSpecialAttr:
  * @ctxt:  an XML parser context
  *
@@ -2945,21 +2924,6 @@ unsafe extern "C" fn xml_clean_special_attr(ctxt: XmlParserCtxtPtr) {
         atts.free();
         (*ctxt).atts_special = null_mut();
     }
-
-    // if (*ctxt).atts_special.is_null() {
-    //     return;
-    // }
-
-    // xml_hash_scan_full(
-    //     (*ctxt).atts_special,
-    //     Some(xml_clean_special_attr_callback),
-    //     ctxt as _,
-    // );
-
-    // if xml_hash_size((*ctxt).atts_special) == 0 {
-    //     xml_hash_free((*ctxt).atts_special, None);
-    //     (*ctxt).atts_special = null_mut();
-    // }
 }
 
 pub(crate) const SAX_COMPAT_MODE: &CStr = c"SAX compatibility mode document";
@@ -3899,13 +3863,8 @@ pub unsafe fn xml_io_parse_dtd(
     let mut ret: XmlDtdPtr = null_mut();
     let mut start: [XmlChar; 4] = [0; 4];
 
-    // if input.is_null() {
-    //     return null_mut();
-    // }
-
     let ctxt: XmlParserCtxtPtr = xml_new_sax_parser_ctxt(sax, None);
     if ctxt.is_null() {
-        // xml_free_parser_input_buffer(input);
         return null_mut();
     }
 
@@ -3921,7 +3880,6 @@ pub unsafe fn xml_io_parse_dtd(
     let pinput: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if pinput.is_null() {
-        // xml_free_parser_input_buffer(input);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -5328,24 +5286,6 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
             cur = next;
         }
     }
-    /*
-     * cleanup the error strings
-     */
-    // if !(*ctxt).last_error.message.is_null() {
-    //     xml_free((*ctxt).last_error.message as _);
-    // }
-    // if !(*ctxt).last_error.file.is_null() {
-    //     xml_free((*ctxt).last_error.file as _);
-    // }
-    // if !(*ctxt).last_error.str1.is_null() {
-    //     xml_free((*ctxt).last_error.str1 as _);
-    // }
-    // if !(*ctxt).last_error.str2.is_null() {
-    //     xml_free((*ctxt).last_error.str2 as _);
-    // }
-    // if !(*ctxt).last_error.str3.is_null() {
-    //     xml_free((*ctxt).last_error.str3 as _);
-    // }
 
     #[cfg(feature = "catalog")]
     {
@@ -5762,7 +5702,6 @@ pub unsafe fn xml_create_push_parser_ctxt(
             null_mut(),
             c"creating parser: out of memory\n".as_ptr() as _,
         );
-        // xml_free_parser_input_buffer(buf);
         return null_mut();
     }
     (*ctxt).dict_names = 1;
@@ -5775,7 +5714,6 @@ pub unsafe fn xml_create_push_parser_ctxt(
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
-        // xml_free_parser_input_buffer(buf);
         return null_mut();
     }
 
@@ -5786,7 +5724,6 @@ pub unsafe fn xml_create_push_parser_ctxt(
         if (*input_stream).filename.is_null() {
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(ctxt);
-            // xml_free_parser_input_buffer(buf);
             return null_mut();
         }
     }
@@ -11038,9 +10975,6 @@ pub unsafe fn xml_new_io_input_stream(
     input: Rc<RefCell<XmlParserInputBuffer>>,
     enc: XmlCharEncoding,
 ) -> XmlParserInputPtr {
-    // if input.is_null() {
-    //     return null_mut();
-    // }
     if get_parser_debug_entities() != 0 {
         generic_error!("new input from I/O\n");
     }
@@ -11355,35 +11289,6 @@ pub unsafe extern "C" fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> c_long {
                 unused += w as u32;
                 read += r;
             }
-
-            // let mut convbuf: [c_uchar; 32000] = [0; 32000];
-            // let mut cur: *const c_uchar = (*input).cur as *const c_uchar;
-            // let mut toconv: c_int;
-            // let mut written: c_int;
-            // let mut ret: c_int;
-
-            // while {
-            //     toconv = (*input).end.offset_from(cur) as _;
-            //     written = 32000;
-            //     ret = xml_enc_output_chunk(
-            //         handler,
-            //         addr_of_mut!(convbuf[0]),
-            //         addr_of_mut!(written),
-            //         cur,
-            //         addr_of_mut!(toconv),
-            //     );
-            //     if ret < 0 {
-            //         if written > 0 {
-            //             ret = -2;
-            //         } else {
-            //             return -1;
-            //         }
-            //     }
-            //     unused += written as u32;
-            //     cur = cur.add(toconv as usize);
-
-            //     ret == -2
-            // } {}
         }
         if (*input).buf.as_ref().unwrap().borrow().rawconsumed < unused as u64 {
             return -1;
@@ -11511,16 +11416,10 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     (*ctxt).external = 0;
     (*ctxt).instate = XmlParserInputState::XmlParserStart;
     (*ctxt).token = 0;
-
     (*ctxt).well_formed = 1;
     (*ctxt).ns_well_formed = 1;
     (*ctxt).disable_sax = 0;
     (*ctxt).valid = 1;
-    // #if 0
-    //     (*ctxt).vctxt.userData = ctxt;
-    //     (*ctxt).vctxt.error = xmlParserValidityError;
-    //     (*ctxt).vctxt.warning = xmlParserValidityWarning;
-    // #endif
     (*ctxt).record_info = 0;
     (*ctxt).check_index = 0;
     (*ctxt).end_check_state = 0;
@@ -11589,7 +11488,6 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
     // }
 
     if ctxt.is_null() {
-        // xml_free_parser_input_buffer(buf);
         return 1;
     }
 
@@ -11603,7 +11501,6 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input_stream.is_null() {
-        // xml_free_parser_input_buffer(buf);
         return 1;
     }
 

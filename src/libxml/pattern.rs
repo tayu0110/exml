@@ -1361,9 +1361,6 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> c_int {
         if root != 0 {
             (*(*stream).steps.add(0)).flags |= XML_STREAM_STEP_ROOT as i32;
         }
-        // #ifdef DEBUG_STREAMING
-        //     xmlDebugStreamComp(stream);
-        // #endif
         (*comp).stream = stream;
         return 0;
     }
@@ -1599,9 +1596,6 @@ unsafe extern "C" fn xml_pat_push_state(
     (*(*states).states.add((*states).nbstates as usize)).step = step;
     (*(*states).states.add((*states).nbstates as usize)).node = node;
     (*states).nbstates += 1;
-    // #if 0
-    //     fprintf(stderr, "Push: %d, %s\n", step, (*node).name);
-    // #endif
     0
 }
 
@@ -1896,9 +1890,6 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
         states.nbstates -= 1;
         i = (*states.states.add(states.nbstates as usize)).step;
         node = (*states.states.add(states.nbstates as usize)).node;
-        // #if 0
-        //     fprintf(stderr, "Pop: %d, %s\n", i, (*node).name);
-        // #endif
         // goto restart;
     }
 }
@@ -2217,9 +2208,6 @@ unsafe extern "C" fn xml_stream_push_internal(
     let mut desc: c_int;
     let mut comp: XmlStreamCompPtr;
     let mut step: XmlStreamStep;
-    // #ifdef DEBUG_STREAMING
-    //     xmlStreamCtxtPtr orig = stream;
-    // #endif
 
     if stream.is_null() || (*stream).nb_state < 0 {
         return -1;
@@ -2557,9 +2545,6 @@ unsafe extern "C" fn xml_stream_push_internal(
     if err > 0 {
         ret = -1;
     }
-    // #ifdef DEBUG_STREAMING
-    //     xmlDebugStreamCtxt(orig, ret);
-    // #endif
     ret
 }
 
