@@ -3056,27 +3056,18 @@ unsafe extern "C" fn xml_shell_rng_validate(
     xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
     let ret: c_int = xml_relaxng_validate_doc(vctxt, (*sctxt).doc);
 
-    extern "C" {
-        static stderr: *mut FILE;
-    }
-
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {
-            fprintf(stderr, c"%s validates\n".as_ptr(), (*sctxt).filename);
+            let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
+            eprintln!("{filename} validates");
         }
         std::cmp::Ordering::Greater => {
-            fprintf(
-                stderr,
-                c"%s fails to validate\n".as_ptr(),
-                (*sctxt).filename,
-            );
+            let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
+            eprintln!("{filename} fails to validate");
         }
         std::cmp::Ordering::Less => {
-            fprintf(
-                stderr,
-                c"%s validation generated an internal error\n".as_ptr(),
-                (*sctxt).filename,
-            );
+            let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
+            eprintln!("{filename} validation generated an internal error");
         }
     }
     xml_relaxng_free_valid_ctxt(vctxt);
