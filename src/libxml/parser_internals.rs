@@ -27,6 +27,7 @@ use crate::io::{
 };
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
+use crate::libxml::chvalid::xml_is_combining;
 use crate::libxml::dict::xml_dict_owns;
 use crate::libxml::entities::{xml_get_predefined_entity, XmlEntityPtr};
 use crate::libxml::parser::{
@@ -219,33 +220,6 @@ macro_rules! IS_DIGIT {
 // 	( $( $c:tt )* ) =>{
 // 		  xmlIsDigit_ch($( $c )*)
 // 	}
-// }
-
-/**
- * IS_COMBINING:
- * @c:  an UNICODE value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- * [87] CombiningChar ::= ... long list see REC ...
- */
-#[macro_export]
-macro_rules! IS_COMBINING {
-    ( $c:expr ) => {
-        $crate::xml_is_combining_q!($c)
-    };
-}
-
-/**
- * IS_COMBINING_CH:
- * @c:  an xmlChar (usually an c_uchar)
- *
- * Always false (all combining chars > 0xff)
- */
-// macro_rules! IS_COMBINING_CH {
-//     ( $( $c:tt )* ) => {
-//         0
-//     };
 // }
 
 /**
@@ -2014,7 +1988,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
                 || c == '-'
                 || c == '_'
                 || c == ':'
-                || IS_COMBINING!(c as u32)
+                || xml_is_combining(c as u32)
                 || IS_EXTENDER!(c as u32))
         {
             if len <= INT_MAX - l {

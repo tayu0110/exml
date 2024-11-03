@@ -849,7 +849,8 @@ macro_rules! CUR_SCHAR {
 ))]
 pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::xml_is_blank_char, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining},
+        IS_DIGIT, IS_EXTENDER, IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -915,7 +916,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
         || c == b'.' as i32
         || c == b'-' as i32
         || c == b'_' as i32
-        || IS_COMBINING!(c as u32)
+        || xml_is_combining(c as u32)
         || IS_EXTENDER!(c as u32)
     {
         cur = cur.add(l as usize);
@@ -947,7 +948,8 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::xml_is_blank_char, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining},
+        IS_DIGIT, IS_EXTENDER, IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1030,7 +1032,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
         || c == b'.' as i32
         || c == b'-' as i32
         || c == b'_' as i32
-        || IS_COMBINING!(c as u32)
+        || xml_is_combining(c as u32)
         || IS_EXTENDER!(c as u32)
     {
         cur = cur.add(l as usize);
@@ -1049,7 +1051,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
             || c == b'.' as i32
             || c == b'-' as i32
             || c == b'_' as i32
-            || IS_COMBINING!(c as u32)
+            || xml_is_combining(c as u32)
             || IS_EXTENDER!(c as u32)
         {
             cur = cur.add(l as usize);
@@ -1081,7 +1083,8 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::xml_is_blank_char, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining},
+        IS_DIGIT, IS_EXTENDER, IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1150,7 +1153,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
         || c == b':' as i32
         || c == b'-' as i32
         || c == b'_' as i32
-        || IS_COMBINING!(c as u32)
+        || xml_is_combining(c as u32)
         || IS_EXTENDER!(c as u32)
     {
         cur = cur.add(l as usize);
@@ -1181,7 +1184,8 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::xml_is_blank_char, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining},
+        IS_DIGIT, IS_EXTENDER, IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1248,7 +1252,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
         || c == b':' as i32
         || c == b'-' as i32
         || c == b'_' as i32
-        || IS_COMBINING!(c as u32)
+        || xml_is_combining(c as u32)
         || IS_EXTENDER!(c as u32))
     {
         return 1;
@@ -1261,7 +1265,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
         || c == b':' as i32
         || c == b'-' as i32
         || c == b'_' as i32
-        || IS_COMBINING!(c as u32)
+        || xml_is_combining(c as u32)
         || IS_EXTENDER!(c as u32)
     {
         cur = cur.add(l as usize);
@@ -1453,711 +1457,6 @@ pub unsafe extern "C" fn xml_split_qname3(name: *const XmlChar, len: *mut c_int)
 }
 
 /*
- * Handling Buffers, the old ones see @xmlBuf for the new ones.
- */
-
-// /**
-//  * xmlBufferCreate:
-//  *
-//  * routine to create an XML buffer.
-//  * returns the new structure.
-//  */
-// pub unsafe extern "C" fn xml_buffer_create() -> XmlBufferPtr {
-//     let ret: XmlBufferPtr = xml_malloc(size_of::<XmlBuffer>()) as _;
-//     if ret.is_null() {
-//         xml_tree_err_memory(c"creating buffer".as_ptr() as _);
-//         return null_mut();
-//     }
-//     (*ret).using = 0;
-//     (*ret).size = *xml_default_buffer_size() as _;
-//     (*ret).alloc = *xml_buffer_alloc_scheme();
-//     (*ret).content = xml_malloc_atomic((*ret).size as usize) as _;
-//     if (*ret).content.is_null() {
-//         xml_tree_err_memory(c"creating buffer".as_ptr() as _);
-//         xml_free(ret as _);
-//         return null_mut();
-//     }
-//     *(*ret).content.add(0) = 0;
-//     (*ret).content_io = null_mut();
-//     ret
-// }
-
-// /**
-//  * xmlBufferCreateSize:
-//  * @size: initial size of buffer
-//  *
-//  * routine to create an XML buffer.
-//  * returns the new structure.
-//  */
-// pub unsafe extern "C" fn xml_buffer_create_size(size: size_t) -> XmlBufferPtr {
-//     if size >= u32::MAX as usize {
-//         return null_mut();
-//     }
-//     let ret: XmlBufferPtr = xml_malloc(size_of::<XmlBuffer>()) as _;
-//     if ret.is_null() {
-//         xml_tree_err_memory(c"creating buffer".as_ptr() as _);
-//         return null_mut();
-//     }
-//     (*ret).using = 0;
-//     (*ret).alloc = *xml_buffer_alloc_scheme();
-//     (*ret).size = if size != 0 { size as u32 + 1 } else { 0 }; /* +1 for ending null */
-//     if (*ret).size != 0 {
-//         (*ret).content = xml_malloc_atomic((*ret).size as usize) as _;
-//         if (*ret).content.is_null() {
-//             xml_tree_err_memory(c"creating buffer".as_ptr() as _);
-//             xml_free(ret as _);
-//             return null_mut();
-//         }
-//         *(*ret).content.add(0) = 0;
-//     } else {
-//         (*ret).content = null_mut();
-//     }
-//     (*ret).content_io = null_mut();
-//     ret
-// }
-
-// /**
-//  * xmlBufferCreateStatic:
-//  * @mem: the memory area
-//  * @size:  the size in byte
-//  *
-//  * Create an XML buffer initialized with bytes.
-//  */
-// pub unsafe extern "C" fn xml_buffer_create_static(mem: *mut c_void, size: size_t) -> XmlBufferPtr {
-//     let buf: XmlBufferPtr = xml_buffer_create_size(size);
-
-//     xml_buffer_add(buf, mem as _, size as _);
-//     buf
-// }
-
-// /**
-//  * xmlBufferResize:
-//  * @buf:  the buffer to resize
-//  * @size:  the desired size
-//  *
-//  * Resize a buffer to accommodate minimum size of @size.
-//  *
-//  * Returns  0 in case of problems, 1 otherwise
-//  */
-// pub unsafe extern "C" fn xml_buffer_resize(buf: XmlBufferPtr, size: c_uint) -> c_int {
-//     let mut new_size: c_uint;
-//     let rebuf: *mut XmlChar;
-//     let start_buf: size_t;
-
-//     if buf.is_null() {
-//         return 0;
-//     }
-
-//     /* Don't resize if we don't have to */
-//     if size < (*buf).size {
-//         return 1;
-//     }
-
-//     if size > u32::MAX - 10 {
-//         xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
-//         return 0;
-//     }
-
-//     /* figure out new size */
-//     match (*buf).alloc {
-//         XmlBufferAllocationScheme::XmlBufferAllocIo
-//         | XmlBufferAllocationScheme::XmlBufferAllocDoubleit => {
-//             /*take care of empty case*/
-//             if (*buf).size == 0 {
-//                 new_size = if size > u32::MAX - 10 {
-//                     u32::MAX
-//                 } else {
-//                     size + 10
-//                 };
-//             } else {
-//                 new_size = (*buf).size;
-//             }
-//             while size > new_size {
-//                 if new_size > u32::MAX / 2 {
-//                     xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-//                     return 0;
-//                 }
-//                 new_size *= 2;
-//             }
-//         }
-//         XmlBufferAllocationScheme::XmlBufferAllocExact => {
-//             new_size = if size > u32::MAX - 10 {
-//                 u32::MAX
-//             } else {
-//                 size + 10
-//             };
-//         }
-//         XmlBufferAllocationScheme::XmlBufferAllocHybrid => {
-//             if (*buf).using < BASE_BUFFER_SIZE as u32 {
-//                 new_size = size;
-//             } else {
-//                 new_size = (*buf).size;
-//                 while size > new_size {
-//                     if new_size > u32::MAX / 2 {
-//                         xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-//                         return 0;
-//                     }
-//                     new_size *= 2;
-//                 }
-//             }
-//         }
-//         _ => {
-//             new_size = if size > u32::MAX - 10 {
-//                 u32::MAX
-//             } else {
-//                 size + 10
-//             };
-//         }
-//     }
-
-//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-//         && !(*buf).content_io.is_null()
-//     {
-//         start_buf = (*buf).content.offset_from((*buf).content_io) as _;
-
-//         if start_buf > new_size as usize {
-//             /* move data back to start */
-//             memmove(
-//                 (*buf).content_io as _,
-//                 (*buf).content as _,
-//                 (*buf).using as usize,
-//             );
-//             (*buf).content = (*buf).content_io;
-//             *(*buf).content.add((*buf).using as usize) = 0;
-//             (*buf).size += start_buf as u32;
-//         } else {
-//             rebuf = xml_realloc((*buf).content_io as _, start_buf + new_size as usize) as _;
-//             if rebuf.is_null() {
-//                 xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-//                 return 0;
-//             }
-//             (*buf).content_io = rebuf;
-//             (*buf).content = rebuf.add(start_buf as usize);
-//         }
-//     } else {
-//         if (*buf).content.is_null() {
-//             rebuf = xml_malloc_atomic(new_size as usize) as _;
-//             (*buf).using = 0;
-//             *rebuf.add((*buf).using as usize) = 0;
-//         } else if (*buf).size - (*buf).using < 100 {
-//             rebuf = xml_realloc((*buf).content as _, new_size as usize) as _;
-//         } else {
-//             /*
-//              * if we are reallocating a buffer far from being full, it's
-//              * better to make a new allocation and copy only the used range
-//              * and free the old one.
-//              */
-//             rebuf = xml_malloc_atomic(new_size as usize) as _;
-//             if !rebuf.is_null() {
-//                 memcpy(rebuf as _, (*buf).content as _, (*buf).using as usize);
-//                 xml_free((*buf).content as _);
-//                 *rebuf.add((*buf).using as usize) = 0;
-//             }
-//         }
-//         if rebuf.is_null() {
-//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-//             return 0;
-//         }
-//         (*buf).content = rebuf;
-//     }
-//     (*buf).size = new_size;
-
-//     1
-// }
-
-// /**
-//  * xmlBufferFree:
-//  * @buf:  the buffer to free
-//  *
-//  * Frees an XML buffer. It frees both the content and the structure which
-//  * encapsulate it.
-//  */
-// pub unsafe extern "C" fn xml_buffer_free(buf: XmlBufferPtr) {
-//     if buf.is_null() {
-//         // #ifdef DEBUG_BUFFER
-//         //         xmlGenericError(xmlGenericErrorContext,
-//         // 		c"xmlBufferFree: buf.is_null()\n".as_ptr() as _);
-//         // #endif
-//         return;
-//     }
-
-//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-//         && !(*buf).content_io.is_null()
-//     {
-//         xml_free((*buf).content_io as _);
-//     } else if !(*buf).content.is_null() {
-//         xml_free((*buf).content as _);
-//     }
-//     xml_free(buf as _);
-// }
-
-// /**
-//  * xmlBufferDump:
-//  * @file:  the file output
-//  * @buf:  the buffer to dump
-//  *
-//  * Dumps an XML buffer to  a FILE *.
-//  * Returns the number of #XmlChar written
-//  */
-// pub unsafe extern "C" fn xml_buffer_dump(mut file: *mut FILE, buf: XmlBufferPtr) -> c_int {
-//     if buf.is_null() {
-//         // #ifdef DEBUG_BUFFER
-//         //         xmlGenericError(xmlGenericErrorContext,
-//         // 		c"xmlBufferDump: buf.is_null()\n".as_ptr() as _);
-//         // #endif
-//         return 0;
-//     }
-//     if (*buf).content.is_null() {
-//         // #ifdef DEBUG_BUFFER
-//         //         xmlGenericError(xmlGenericErrorContext,
-//         // 		c"xmlBufferDump: (*buf).content.is_null()\n".as_ptr() as _);
-//         // #endif
-//         return 0;
-//     }
-//     if file.is_null() {
-//         extern "C" {
-//             // Does it work ?????
-//             static stdout: *mut FILE;
-//         }
-//         file = stdout;
-//     }
-//     let ret: size_t = fwrite((*buf).content as _, 1, (*buf).using as _, file);
-//     if ret > i32::MAX as usize {
-//         i32::MAX
-//     } else {
-//         ret as _
-//     }
-// }
-
-// /**
-//  * xmlBufferAdd:
-//  * @buf:  the buffer to dump
-//  * @str:  the #XmlChar string
-//  * @len:  the number of #XmlChar to add
-//  *
-//  * Add a string range to an XML buffer. if len == -1, the length of
-//  * str is recomputed.
-//  *
-//  * Returns 0 successful, a positive error code number otherwise
-//  *         and -1 in case of internal or API error.
-//  */
-// pub unsafe extern "C" fn xml_buffer_add(
-//     buf: XmlBufferPtr,
-//     str: *const XmlChar,
-//     mut len: c_int,
-// ) -> c_int {
-//     let need_size: c_uint;
-
-//     if str.is_null() || buf.is_null() {
-//         return -1;
-//     }
-//     if len < -1 {
-//         // #ifdef DEBUG_BUFFER
-//         //         xmlGenericError(xmlGenericErrorContext,
-//         // 		c"xmlBufferAdd: len < 0\n".as_ptr() as _);
-//         // #endif
-//         return -1;
-//     }
-//     if len == 0 {
-//         return 0;
-//     }
-
-//     if len < 0 {
-//         len = xml_strlen(str);
-//     }
-
-//     if len < 0 {
-//         return -1;
-//     }
-//     if len == 0 {
-//         return 0;
-//     }
-
-//     /* Note that both (*buf).size and (*buf).using can be zero here. */
-//     if len as u32 >= (*buf).size - (*buf).using {
-//         if len as u32 >= u32::MAX - (*buf).using {
-//             xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
-//             return XmlParserErrors::XmlErrNoMemory as i32;
-//         }
-//         need_size = (*buf).using + len as u32 + 1;
-//         if xml_buffer_resize(buf, need_size) == 0 {
-//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-//             return XmlParserErrors::XmlErrNoMemory as i32;
-//         }
-//     }
-
-//     memmove(
-//         (*buf).content.add((*buf).using as usize) as _,
-//         str as _,
-//         len as usize,
-//     );
-//     (*buf).using += len as u32;
-//     *(*buf).content.add((*buf).using as usize) = 0;
-//     0
-// }
-
-// /**
-//  * xmlBufferAddHead:
-//  * @buf:  the buffer
-//  * @str:  the #XmlChar string
-//  * @len:  the number of #XmlChar to add
-//  *
-//  * Add a string range to the beginning of an XML buffer.
-//  * if len == -1, the length of @str is recomputed.
-//  *
-//  * Returns 0 successful, a positive error code number otherwise
-//  *         and -1 in case of internal or API error.
-//  */
-// pub unsafe extern "C" fn xml_buffer_add_head(
-//     buf: XmlBufferPtr,
-//     str: *const XmlChar,
-//     mut len: c_int,
-// ) -> c_int {
-//     let need_size: c_uint;
-
-//     if buf.is_null() {
-//         return -1;
-//     }
-//     if str.is_null() {
-//         // #ifdef DEBUG_BUFFER
-//         //         xmlGenericError(xmlGenericErrorContext,
-//         // 		c"xmlBufferAddHead: str.is_null()\n".as_ptr() as _);
-//         // #endif
-//         return -1;
-//     }
-//     if len < -1 {
-//         // #ifdef DEBUG_BUFFER
-//         //         xmlGenericError(xmlGenericErrorContext,
-//         // 		c"xmlBufferAddHead: len < 0\n".as_ptr() as _);
-//         // #endif
-//         return -1;
-//     }
-//     if len == 0 {
-//         return 0;
-//     }
-
-//     if len < 0 {
-//         len = xml_strlen(str);
-//     }
-
-//     if len <= 0 {
-//         return -1;
-//     }
-
-//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-//         && !(*buf).content_io.is_null()
-//     {
-//         let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
-
-//         if start_buf > len as usize {
-//             /*
-//              * We can add it in the space previously shrunk
-//              */
-//             (*buf).content = (*buf).content.sub(len as usize);
-//             memmove((*buf).content.add(0) as _, str as _, len as _);
-//             (*buf).using += len as u32;
-//             (*buf).size += len as u32;
-//             *(*buf).content.add((*buf).using as usize) = 0;
-//             return 0;
-//         }
-//     }
-//     /* Note that both (*buf).size and (*buf).using can be zero here. */
-//     if len as u32 >= (*buf).size - (*buf).using {
-//         if len as u32 >= u32::MAX - (*buf).using {
-//             xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
-//             return -1;
-//         }
-//         need_size = (*buf).using + len as u32 + 1;
-//         if xml_buffer_resize(buf, need_size) == 0 {
-//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-//             return XmlParserErrors::XmlErrNoMemory as i32;
-//         }
-//     }
-
-//     memmove(
-//         (*buf).content.add(len as usize) as _,
-//         (*buf).content.add(0) as _,
-//         (*buf).using as usize,
-//     );
-//     memmove((*buf).content.add(0) as _, str as _, len as usize);
-//     (*buf).using += len as u32;
-//     *(*buf).content.add((*buf).using as usize) = 0;
-//     0
-// }
-
-// /**
-//  * xmlBufferCat:
-//  * @buf:  the buffer to add to
-//  * @str:  the #XmlChar string
-//  *
-//  * Append a zero terminated string to an XML buffer.
-//  *
-//  * Returns 0 successful, a positive error code number otherwise
-//  *         and -1 in case of internal or API error.
-//  */
-// pub unsafe extern "C" fn xml_buffer_cat(buf: XmlBufferPtr, str: *const XmlChar) -> c_int {
-//     if buf.is_null() {
-//         return -1;
-//     }
-//     if str.is_null() {
-//         return -1;
-//     }
-//     xml_buffer_add(buf, str, -1)
-// }
-
-// /**
-//  * xmlBufferCCat:
-//  * @buf:  the buffer to dump
-//  * @str:  the C c_char string
-//  *
-//  * Append a zero terminated C string to an XML buffer.
-//  *
-//  * Returns 0 successful, a positive error code number otherwise
-//  *         and -1 in case of internal or API error.
-//  */
-// pub unsafe extern "C" fn xml_buffer_ccat(buf: XmlBufferPtr, str: *const c_char) -> c_int {
-//     xml_buffer_cat(buf, str as _)
-// }
-
-// /**
-//  * xmlBufferShrink:
-//  * @buf:  the buffer to dump
-//  * @len:  the number of XmlChar to remove
-//  *
-//  * Remove the beginning of an XML buffer.
-//  *
-//  * Returns the number of #XmlChar removed, or -1 in case of failure.
-//  */
-// pub unsafe extern "C" fn xml_buffer_shrink(buf: XmlBufferPtr, len: c_uint) -> c_int {
-//     if buf.is_null() {
-//         return -1;
-//     }
-//     if len == 0 {
-//         return 0;
-//     }
-//     if len > (*buf).using {
-//         return -1;
-//     }
-
-//     (*buf).using -= len;
-//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-//         && !(*buf).content_io.is_null()
-//     {
-//         /*
-//          * we just move the content pointer, but also make sure
-//          * the perceived buffer size has shrunk accordingly
-//          */
-//         (*buf).content = (*buf).content.add(len as usize);
-//         (*buf).size -= len;
-
-//         /*
-//          * sometimes though it maybe be better to really shrink
-//          * on IO buffers
-//          */
-//         if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-//             && !(*buf).content_io.is_null()
-//         {
-//             let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
-//             if start_buf >= (*buf).size as usize {
-//                 memmove(
-//                     (*buf).content_io as _,
-//                     (*buf).content.add(0) as _,
-//                     (*buf).using as usize,
-//                 );
-//                 (*buf).content = (*buf).content_io;
-//                 *(*buf).content.add((*buf).using as usize) = 0;
-//                 (*buf).size += start_buf as u32;
-//             }
-//         }
-//     } else {
-//         memmove(
-//             (*buf).content as _,
-//             (*buf).content.add(len as usize) as _,
-//             (*buf).using as usize,
-//         );
-//         *(*buf).content.add((*buf).using as usize) = 0;
-//     }
-//     len as _
-// }
-
-// /**
-//  * xmlBufferGrow:
-//  * @buf:  the buffer
-//  * @len:  the minimum free size to allocate
-//  *
-//  * Grow the available space of an XML buffer.
-//  *
-//  * Returns the new available space or -1 in case of error
-//  */
-// pub unsafe extern "C" fn xml_buffer_grow(buf: XmlBufferPtr, len: c_uint) -> c_int {
-//     let mut size: c_uint;
-//     let newbuf: *mut XmlChar;
-
-//     if buf.is_null() {
-//         return -1;
-//     }
-
-//     if len < (*buf).size - (*buf).using {
-//         return 0;
-//     }
-//     if len >= u32::MAX - (*buf).using {
-//         xml_tree_err_memory(c"growing buffer past UINT_MAX".as_ptr() as _);
-//         return -1;
-//     }
-
-//     if (*buf).size > len {
-//         size = if (*buf).size > u32::MAX / 2 {
-//             u32::MAX
-//         } else {
-//             (*buf).size * 2
-//         };
-//     } else {
-//         size = (*buf).using + len;
-//         size = if size > u32::MAX - 100 {
-//             u32::MAX
-//         } else {
-//             size + 100
-//         };
-//     }
-
-//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-//         && !(*buf).content_io.is_null()
-//     {
-//         let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
-
-//         newbuf = xml_realloc((*buf).content_io as _, start_buf + size as usize) as _;
-//         if newbuf.is_null() {
-//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-//             return -1;
-//         }
-//         (*buf).content_io = newbuf;
-//         (*buf).content = newbuf.add(start_buf);
-//     } else {
-//         newbuf = xml_realloc((*buf).content as _, size as usize) as _;
-//         if newbuf.is_null() {
-//             xml_tree_err_memory(c"growing buffer".as_ptr() as _);
-//             return -1;
-//         }
-//         (*buf).content = newbuf;
-//     }
-//     (*buf).size = size;
-//     ((*buf).size - (*buf).using - 1) as i32
-// }
-
-// /**
-//  * xmlBufferEmpty:
-//  * @buf:  the buffer
-//  *
-//  * empty a buffer.
-//  */
-// pub unsafe extern "C" fn xml_buffer_empty(buf: XmlBufferPtr) {
-//     if buf.is_null() {
-//         return;
-//     }
-//     if (*buf).content.is_null() {
-//         return;
-//     }
-//     (*buf).using = 0;
-//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo)
-//         && !(*buf).content_io.is_null()
-//     {
-//         let start_buf: size_t = (*buf).content.offset_from((*buf).content_io) as _;
-
-//         (*buf).size += start_buf as u32;
-//         (*buf).content = (*buf).content_io;
-//         *(*buf).content.add(0) = 0;
-//     } else {
-//         *(*buf).content.add(0) = 0;
-//     }
-// }
-
-// /**
-//  * xmlBufferContent:
-//  * @buf:  the buffer
-//  *
-//  * Function to extract the content of a buffer
-//  *
-//  * Returns the internal content
-//  */
-// pub unsafe extern "C" fn xml_buffer_content(buf: *const XmlBuffer) -> *const XmlChar {
-//     if buf.is_null() {
-//         return null_mut();
-//     }
-
-//     (*buf).content
-// }
-
-// /**
-//  * xmlBufferDetach:
-//  * @buf:  the buffer
-//  *
-//  * Remove the string contained in a buffer and gie it back to the
-//  * caller. The buffer is reset to an empty content.
-//  * This doesn't work with immutable buffers as they can't be reset.
-//  *
-//  * Returns the previous string contained by the buffer.
-//  */
-// pub unsafe extern "C" fn xml_buffer_detach(buf: XmlBufferPtr) -> *mut XmlChar {
-//     if buf.is_null() {
-//         return null_mut();
-//     }
-
-//     let ret: *mut XmlChar = (*buf).content;
-//     (*buf).content = null_mut();
-//     (*buf).size = 0;
-//     (*buf).using = 0;
-
-//     ret
-// }
-
-// /**
-//  * xmlBufferSetAllocationScheme:
-//  * @buf:  the buffer to tune
-//  * @scheme:  allocation scheme to use
-//  *
-//  * Sets the allocation scheme for this buffer
-//  */
-// pub unsafe extern "C" fn xml_buffer_set_allocation_scheme(
-//     buf: XmlBufferPtr,
-//     scheme: XmlBufferAllocationScheme,
-// ) {
-//     if buf.is_null() {
-//         // #ifdef DEBUG_BUFFER
-//         //         xmlGenericError(xmlGenericErrorContext,
-//         // 		c"xmlBufferSetAllocationScheme: buf.is_null()\n".as_ptr() as _);
-//         // #endif
-//         return;
-//     }
-//     if matches!((*buf).alloc, XmlBufferAllocationScheme::XmlBufferAllocIo) {
-//         return;
-//     }
-//     if matches!(
-//         scheme,
-//         XmlBufferAllocationScheme::XmlBufferAllocDoubleit
-//             | XmlBufferAllocationScheme::XmlBufferAllocExact
-//             | XmlBufferAllocationScheme::XmlBufferAllocHybrid
-//     ) {
-//         (*buf).alloc = scheme;
-//     }
-// }
-
-// /**
-//  * xmlBufferLength:
-//  * @buf:  the buffer
-//  *
-//  * Function to get the length of a buffer
-//  *
-//  * Returns the length of data in the internal content
-//  */
-// pub unsafe extern "C" fn xml_buffer_length(buf: *const XmlBuffer) -> c_int {
-//     if buf.is_null() {
-//         return 0;
-//     }
-
-//     (*buf).using as _
-// }
-
-/*
  * Creating/freeing new structures.
  */
 /**
@@ -2177,12 +1476,6 @@ pub unsafe extern "C" fn xml_create_int_subset(
     system_id: *const XmlChar,
 ) -> XmlDtdPtr {
     if !doc.is_null() && !xml_get_int_subset(doc).is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-
-        //      "xmlCreateIntSubset(): document %s already have an internal subset\n",
-        // 	    (*doc).name);
-        // #endif
         return null_mut();
     }
 

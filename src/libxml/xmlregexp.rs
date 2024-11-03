@@ -36,10 +36,10 @@ use crate::{
             xml_ucs_is_cat_z, xml_ucs_is_cat_zl, xml_ucs_is_cat_zp, xml_ucs_is_cat_zs,
         },
     },
-    IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    IS_DIGIT, IS_EXTENDER, IS_LETTER,
 };
 
-use super::chvalid::xml_is_char;
+use super::chvalid::{xml_is_char, xml_is_combining};
 
 const SIZE_MAX: size_t = size_t::MAX;
 const MAX_PUSH: usize = 10000000;
@@ -3143,7 +3143,7 @@ unsafe extern "C" fn xml_reg_check_character_range(
                 || codepoint == '-' as i32
                 || codepoint == '_' as i32
                 || codepoint == ':' as i32
-                || IS_COMBINING!(codepoint as u32)
+                || xml_is_combining(codepoint as u32)
                 || IS_EXTENDER!(codepoint as u32)) as _;
         }
         XmlRegAtomType::XmlRegexpNamechar => {
@@ -3153,7 +3153,7 @@ unsafe extern "C" fn xml_reg_check_character_range(
                 || codepoint == '-' as i32
                 || codepoint == '_' as i32
                 || codepoint == ':' as i32
-                || IS_COMBINING!(codepoint as u32)
+                || xml_is_combining(codepoint as u32)
                 || IS_EXTENDER!(codepoint as u32)) as _;
         }
         XmlRegAtomType::XmlRegexpNotdecimal => {
