@@ -26,6 +26,7 @@ use crate::{
     error::{XmlErrorDomain, XmlErrorLevel},
     generic_error,
     libxml::{
+        chvalid::xml_is_blank_char,
         dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
@@ -70,8 +71,8 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH, IS_COMBINING, IS_DIGIT,
-    IS_EXTENDER, IS_LETTER,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR, IS_CHAR_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER,
+    IS_LETTER,
 };
 
 /************************************************************************
@@ -4221,7 +4222,7 @@ macro_rules! NEXT {
 
 macro_rules! SKIP_BLANKS {
     ($ctxt:expr) => {
-        while $crate::IS_BLANK_CH!(*(*$ctxt).cur) {
+        while $crate::libxml::chvalid::xml_is_blank_char(*(*$ctxt).cur as u32) {
             NEXT!($ctxt);
         }
     };
@@ -4857,7 +4858,7 @@ unsafe extern "C" fn xml_xpath_comp_node_test(
         XP_ERRORNULL!(ctxt, XmlXPathError::XpathExprError as i32);
     }
 
-    let blanks: c_int = IS_BLANK_CH!(CUR!(ctxt)) as i32;
+    let blanks: c_int = xml_is_blank_char(CUR!(ctxt) as u32) as i32;
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'(' {
         NEXT!(ctxt);
@@ -5781,10 +5782,6 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
         SKIP_BLANKS!(ctxt);
         name = xml_xpath_scan_name(ctxt);
         if !name.is_null() && !xml_strstr(name, c"::".as_ptr() as _).is_null() {
-            //  #ifdef DEBUG_STEP
-            // 		 xmlGenericError(xmlGenericErrorContext(),
-            // 			 "PathExpr: Axis\n");
-            //  #endif
             lc = 1;
             xml_free(name as _);
         } else if !name.is_null() {
@@ -5793,28 +5790,16 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
             while NXT!(ctxt, len as usize) != 0 {
                 if NXT!(ctxt, len as usize) == b'/' {
                     /* element name */
-                    //  #ifdef DEBUG_STEP
-                    // 			 xmlGenericError(xmlGenericErrorContext(),
-                    // 				 "PathExpr: AbbrRelLocation\n");
-                    //  #endif
                     lc = 1;
                     break;
-                } else if IS_BLANK_CH!(NXT!(ctxt, len as usize)) {
+                } else if xml_is_blank_char(NXT!(ctxt, len as usize) as u32) {
                     /* ignore blanks */
                 } else if NXT!(ctxt, len as usize) == b':' {
-                    //  #ifdef DEBUG_STEP
-                    // 			 xmlGenericError(xmlGenericErrorContext(),
-                    // 				 "PathExpr: AbbrRelLocation\n");
-                    //  #endif
                     lc = 1;
                     break;
                 } else if NXT!(ctxt, len as usize) == b'(' {
                     /* Node Type or Function */
                     if xml_xpath_is_node_type(name) != 0 {
-                        //  #ifdef DEBUG_STEP
-                        // 				 xmlGenericError(xmlGenericErrorContext(),
-                        // 				 "PathExpr: Type search\n");
-                        //  #endif
                         lc = 1;
                     } else {
                         #[cfg(feature = "libxml_xptr_locs")]
@@ -5822,10 +5807,6 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
                         {
                             lc = 1;
                         } else {
-                            //  #ifdef DEBUG_STEP
-                            // 				 xmlGenericError(xmlGenericErrorContext(),
-                            // 				 "PathExpr: function call\n");
-                            //  #endif
                             lc = 0;
                         }
                         #[cfg(not(feature = "libxml_xptr_locs"))]
@@ -5836,10 +5817,6 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
                     break;
                 } else if NXT!(ctxt, len as usize) == b'[' {
                     /* element name */
-                    //  #ifdef DEBUG_STEP
-                    // 			 xmlGenericError(xmlGenericErrorContext(),
-                    // 				 "PathExpr: AbbrRelLocation\n");
-                    //  #endif
                     lc = 1;
                     break;
                 // } else if NXT!(ctxt, len as usize) == b'<'
@@ -5855,10 +5832,6 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
                 len += 1;
             }
             if NXT!(ctxt, len as usize) == 0 {
-                //  #ifdef DEBUG_STEP
-                // 		 xmlGenericError(xmlGenericErrorContext(),
-                // 			 "PathExpr: AbbrRelLocation\n");
-                //  #endif
                 /* element name */
                 lc = 1;
             }
@@ -9676,7 +9649,7 @@ pub unsafe extern "C" fn xml_xpath_string_eval_number(str: *const XmlChar) -> f6
     if cur.is_null() {
         return 0.;
     }
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
     }
     if *cur == b'-' {
@@ -9735,7 +9708,7 @@ pub unsafe extern "C" fn xml_xpath_string_eval_number(str: *const XmlChar) -> f6
             cur = cur.add(1);
         }
     }
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
     }
     if *cur != 0 {
@@ -12872,11 +12845,11 @@ unsafe extern "C" fn xml_xpath_get_elements_by_ids(
         return ret;
     }
 
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
     }
     while *cur != 0 {
-        while !IS_BLANK_CH!(*cur) && *cur != 0 {
+        while !xml_is_blank_char(*cur as u32) && *cur != 0 {
             cur = cur.add(1);
         }
 
@@ -12906,7 +12879,7 @@ unsafe extern "C" fn xml_xpath_get_elements_by_ids(
             xml_free(id as _);
         }
 
-        while IS_BLANK_CH!(*cur) {
+        while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
         }
         ids = cur;
@@ -13679,14 +13652,14 @@ pub unsafe extern "C" fn xml_xpath_normalize_function(
     target = source;
 
     /* Skip leading whitespaces */
-    while IS_BLANK_CH!(*source) {
+    while xml_is_blank_char(*source as u32) {
         source = source.add(1);
     }
 
     /* Collapse c_intermediate whitespaces, and skip trailing whitespaces */
     blank = 0;
     while *source != 0 {
-        if IS_BLANK_CH!(*source) {
+        if xml_is_blank_char(*source as u32) {
             blank = 1;
         } else {
             if blank != 0 {

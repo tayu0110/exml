@@ -53,10 +53,10 @@ use crate::{
         xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
     },
     private::error::__xml_simple_error,
-    xml_is_digit_ch, IS_BLANK_CH,
+    xml_is_digit_ch,
 };
 
-use super::hash::CVoidWrapper;
+use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,7 +83,7 @@ macro_rules! IS_WSP_SPACE_CH {
 
 macro_rules! IS_WSP_BLANK_CH {
     ($c:expr) => {
-        $crate::IS_BLANK_CH!($c)
+        $crate::libxml::chvalid::xml_is_blank_char($c as u32)
     };
 }
 
@@ -2271,22 +2271,22 @@ unsafe extern "C" fn xml_schema_val_atomic_list_node(
     /*
      * Split the list
      */
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         *cur = 0;
         cur = cur.add(1);
     }
     while *cur != 0 {
-        if IS_BLANK_CH!(*cur) {
+        if xml_is_blank_char(*cur as u32) {
             *cur = 0;
             cur = cur.add(1);
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 *cur = 0;
                 cur = cur.add(1);
             }
         } else {
             nb_values += 1;
             cur = cur.add(1);
-            while *cur != 0 && !IS_BLANK_CH!(*cur) {
+            while *cur != 0 && !xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
@@ -2338,7 +2338,7 @@ unsafe extern "C" fn xml_schema_strip(value: *const XmlChar) -> *mut XmlChar {
     if value.is_null() {
         return null_mut();
     }
-    while *start != 0 && IS_BLANK_CH!(*start) {
+    while *start != 0 && xml_is_blank_char(*start as u32) {
         start = start.add(1);
     }
     end = start;
@@ -2347,7 +2347,7 @@ unsafe extern "C" fn xml_schema_strip(value: *const XmlChar) -> *mut XmlChar {
     }
     let f: *const XmlChar = end;
     end = end.sub(1);
-    while end > start && IS_BLANK_CH!(*end) {
+    while end > start && xml_is_blank_char(*end as u32) {
         end = end.sub(1);
     }
     end = end.add(1);
@@ -3107,11 +3107,11 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     if !v.is_null() {
                                         let mut start: *const XmlChar = value;
                                         let mut end: *const XmlChar;
-                                        while IS_BLANK_CH!(*start) {
+                                        while xml_is_blank_char(*start as u32) {
                                             start = start.add(1);
                                         }
                                         end = start;
-                                        while *end != 0 && !IS_BLANK_CH!(*end) {
+                                        while *end != 0 && !xml_is_blank_char(*end as u32) {
                                             end = end.add(1);
                                         }
                                         (*v).value.str =
@@ -5248,22 +5248,22 @@ unsafe extern "C" fn xml_schema_compare_norm_strings(
 ) -> c_int {
     let mut tmp: c_int;
 
-    while IS_BLANK_CH!(*x) {
+    while xml_is_blank_char(*x as u32) {
         x = x.add(1);
     }
-    while IS_BLANK_CH!(*y) {
+    while xml_is_blank_char(*y as u32) {
         y = y.add(1);
     }
     while *x != 0 && *y != 0 {
-        if IS_BLANK_CH!(*x) {
-            if !IS_BLANK_CH!(*y) {
+        if xml_is_blank_char(*x as u32) {
+            if !xml_is_blank_char(*y as u32) {
                 tmp = *x as i32 - *y as i32;
                 return tmp;
             }
-            while IS_BLANK_CH!(*x) {
+            while xml_is_blank_char(*x as u32) {
                 x = x.add(1);
             }
-            while IS_BLANK_CH!(*y) {
+            while xml_is_blank_char(*y as u32) {
                 y = y.add(1);
             }
         } else {
@@ -5279,7 +5279,7 @@ unsafe extern "C" fn xml_schema_compare_norm_strings(
         }
     }
     if *x != 0 {
-        while IS_BLANK_CH!(*x) {
+        while xml_is_blank_char(*x as u32) {
             x = x.add(1);
         }
         if *x != 0 {
@@ -5287,7 +5287,7 @@ unsafe extern "C" fn xml_schema_compare_norm_strings(
         }
     }
     if *y != 0 {
-        while IS_BLANK_CH!(*y) {
+        while xml_is_blank_char(*y as u32) {
             y = y.add(1);
         }
         if *y != 0 {
@@ -5720,7 +5720,7 @@ unsafe extern "C" fn xml_schema_norm_len(value: *const XmlChar) -> c_int {
         return -1;
     }
     utf = value;
-    while IS_BLANK_CH!(*utf) {
+    while xml_is_blank_char(*utf as u32) {
         utf = utf.add(1);
     }
     while *utf != 0 {
@@ -5743,8 +5743,8 @@ unsafe extern "C" fn xml_schema_norm_len(value: *const XmlChar) -> c_int {
             } else {
                 utf = utf.add(2);
             }
-        } else if IS_BLANK_CH!(*utf) {
-            while IS_BLANK_CH!(*utf) {
+        } else if xml_is_blank_char(*utf as u32) {
+            while xml_is_blank_char(*utf as u32) {
                 utf = utf.add(1);
             }
             if *utf == 0 {
@@ -6866,12 +6866,12 @@ pub unsafe extern "C" fn xml_schema_collapse_string(value: *const XmlChar) -> *m
     if value.is_null() {
         return null_mut();
     }
-    while *start != 0 && IS_BLANK_CH!(*start) {
+    while *start != 0 && xml_is_blank_char(*start as u32) {
         start = start.add(1);
     }
     end = start;
     while *end != 0 {
-        if (*end == b' ' && IS_BLANK_CH!(*end.add(1)))
+        if (*end == b' ' && xml_is_blank_char(*end.add(1) as u32))
             || (*end == 0xa || *end == 0x9 || *end == 0xd)
         {
             col = end.offset_from(start) as _;
@@ -6882,7 +6882,7 @@ pub unsafe extern "C" fn xml_schema_collapse_string(value: *const XmlChar) -> *m
     if col == 0 {
         f = end;
         end = end.sub(1);
-        while end > start && IS_BLANK_CH!(*end) {
+        while end > start && xml_is_blank_char(*end as u32) {
             end = end.sub(1);
         }
         end = end.add(1);
@@ -6898,9 +6898,9 @@ pub unsafe extern "C" fn xml_schema_collapse_string(value: *const XmlChar) -> *m
     g = start.add(col as usize) as _;
     end = g;
     while *end != 0 {
-        if IS_BLANK_CH!(*end) {
+        if xml_is_blank_char(*end as u32) {
             end = end.add(1);
-            while IS_BLANK_CH!(*end) {
+            while xml_is_blank_char(*end as u32) {
                 end = end.add(1);
             }
             if *end != 0 {

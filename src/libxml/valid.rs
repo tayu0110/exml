@@ -65,10 +65,10 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_BLANK, IS_BLANK_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
 };
 
-use super::hash::CVoidWrapper;
+use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
 
 /*
  * Validation state added for non-determinist content model.
@@ -2011,6 +2011,8 @@ unsafe extern "C" fn xml_validate_nmtokens_value_internal(
     doc: XmlDocPtr,
     value: *const XmlChar,
 ) -> c_int {
+    use super::chvalid::xml_is_blank_char;
+
     let mut cur: *const XmlChar;
     let mut val: c_int;
     let mut len: c_int = 0;
@@ -2022,7 +2024,7 @@ unsafe extern "C" fn xml_validate_nmtokens_value_internal(
     val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
     cur = cur.add(len as usize);
 
-    while IS_BLANK!(val) {
+    while xml_is_blank_char(val as u32) {
         val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
         cur = cur.add(len as usize);
     }
@@ -4568,7 +4570,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
             cur = dup;
             while *cur != 0 {
                 nam = cur;
-                while *cur != 0 && !IS_BLANK_CH!(*cur) {
+                while *cur != 0 && !xml_is_blank_char(*cur as u32) {
                     cur = cur.add(1);
                 }
                 save = *cur;
@@ -4605,7 +4607,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                     break;
                 }
                 *cur = save;
-                while IS_BLANK_CH!(*cur) {
+                while xml_is_blank_char(*cur as u32) {
                     cur = cur.add(1);
                 }
             }
@@ -6574,7 +6576,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         if matches!((*child).typ, XmlElementType::XmlTextNode) {
                             let mut content: *const XmlChar = (*child).content;
 
-                            while IS_BLANK_CH!(*content) {
+                            while xml_is_blank_char(*content as u32) {
                                 content = content.add(1);
                             }
                             if *content == 0 {
@@ -7423,7 +7425,7 @@ unsafe extern "C" fn xml_validate_ref(
         cur = dup;
         while *cur != 0 {
             str = cur;
-            while *cur != 0 && !IS_BLANK_CH!(*cur) {
+            while *cur != 0 && !xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             save = *cur;
@@ -7445,7 +7447,7 @@ unsafe extern "C" fn xml_validate_ref(
                 break;
             }
             *cur = save;
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
@@ -7478,7 +7480,7 @@ unsafe extern "C" fn xml_validate_ref(
         cur = dup;
         while *cur != 0 {
             str = cur;
-            while *cur != 0 && !IS_BLANK_CH!(*cur) {
+            while *cur != 0 && !xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             save = *cur;
@@ -7500,7 +7502,7 @@ unsafe extern "C" fn xml_validate_ref(
                 break;
             }
             *cur = save;
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
@@ -8819,7 +8821,7 @@ pub unsafe extern "C" fn xml_validate_push_cdata(
                 XmlElementTypeVal::XmlElementTypeMixed => {}
                 XmlElementTypeVal::XmlElementTypeElement => {
                     for i in 0..len {
-                        if !IS_BLANK_CH!(*data.add(i as usize)) {
+                        if !xml_is_blank_char(*data.add(i as usize) as u32) {
                             xml_err_valid_node(
                                 ctxt,
                                 (*state).node,

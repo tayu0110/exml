@@ -2355,7 +2355,7 @@ macro_rules! NXT {
 
 macro_rules! SKIP_BLANKS {
     ($ctxt:expr) => {
-        while $crate::IS_BLANK_CH!(*(*$ctxt).cur) {
+        while $crate::libxml::chvalid::xml_is_blank_char(*(*$ctxt).cur as u32) {
             NEXT!($ctxt);
         }
     };

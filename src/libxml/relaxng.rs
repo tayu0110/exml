@@ -60,10 +60,9 @@ use crate::{
             xml_strlen, XmlChar,
         },
     },
-    IS_BLANK_CH,
 };
 
-use super::hash::CVoidWrapper;
+use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
 
 /**
  * xmlRelaxNGValidityErrorFunc:
@@ -1667,12 +1666,12 @@ unsafe extern "C" fn xml_relaxng_normalize(
         return null_mut();
     }
     p = ret;
-    while IS_BLANK_CH!(*str) {
+    while xml_is_blank_char(*str as u32) {
         str = str.add(1);
     }
     while *str != 0 {
-        if IS_BLANK_CH!(*str) {
-            while IS_BLANK_CH!(*str) {
+        if xml_is_blank_char(*str as u32) {
+            while xml_is_blank_char(*str as u32) {
                 str = str.add(1);
             }
             if *str == 0 {
@@ -3061,7 +3060,7 @@ unsafe extern "C" fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> c_int {
         return 1;
     }
     while *str != 0 {
-        if !IS_BLANK_CH!(*str) {
+        if !xml_is_blank_char(*str as u32) {
             return 0;
         }
         str = str.add(1);
@@ -3455,19 +3454,19 @@ unsafe extern "C" fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
         return;
     }
 
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
     }
     if cur == start {
         loop {
-            while *cur != 0 && !IS_BLANK_CH!(*cur) {
+            while *cur != 0 && !xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             if *cur == 0 {
                 return;
             }
             start = cur;
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             if *cur == 0 {
@@ -3477,7 +3476,7 @@ unsafe extern "C" fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
         }
     } else {
         loop {
-            while *cur != 0 && !IS_BLANK_CH!(*cur) {
+            while *cur != 0 && !xml_is_blank_char(*cur as u32) {
                 *start = *cur;
                 start = start.add(1);
                 cur = cur.add(1);
@@ -3487,7 +3486,7 @@ unsafe extern "C" fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
                 return;
             }
             /* don't try to normalize the inner spaces */
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             if *cur == 0 {
@@ -9808,7 +9807,7 @@ unsafe extern "C" fn xml_relaxng_validate_value(
             if !value.is_null() && *value.add(0) != 0 {
                 let mut idx: c_int = 0;
 
-                while IS_BLANK_CH!(*value.add(idx as usize)) {
+                while xml_is_blank_char(*value.add(idx as usize) as u32) {
                     idx += 1;
                 }
                 if *value.add(idx as usize) != 0 {
@@ -9921,13 +9920,13 @@ unsafe extern "C" fn xml_relaxng_validate_value(
             }
             cur = val;
             while *cur != 0 {
-                if IS_BLANK_CH!(*cur) {
+                if xml_is_blank_char(*cur as u32) {
                     *cur = 0;
                     cur = cur.add(1);
                     // #ifdef DEBUG_LIST
                     //                         nb_values++;
                     // #endif
-                    while IS_BLANK_CH!(*cur) {
+                    while xml_is_blank_char(*cur as u32) {
                         *cur = 0;
                         cur = cur.add(1);
                     }
@@ -12618,7 +12617,7 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_cdata(
     }
 
     while *data != 0 {
-        if !IS_BLANK_CH!(*data) {
+        if !xml_is_blank_char(*data as u32) {
             break;
         }
         data = data.add(1);

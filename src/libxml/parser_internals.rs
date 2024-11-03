@@ -55,7 +55,7 @@ use crate::private::parser::{__xml_err_encoding, xml_err_memory};
 use crate::{__xml_raise_error, generic_error};
 
 use super::catalog::xml_catalog_add_local;
-use super::chvalid::xml_is_base_char;
+use super::chvalid::{xml_is_base_char, xml_is_blank_char};
 use super::dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, xml_dict_set_limit};
 use super::entities::XmlEntityType;
 use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
@@ -223,34 +223,6 @@ macro_rules! IS_CHAR {
 macro_rules! IS_CHAR_CH {
     ( $c:expr ) => {
         $crate::xml_is_char_ch!($c)
-    };
-}
-
-/**
- * IS_BLANK:
- * @c:  an UNICODE value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- * [3] S ::= (#x20 | #x9 | #xD | #xA)+
- */
-#[macro_export]
-macro_rules! IS_BLANK {
-    ( $c:expr ) => {
-        $crate::xml_is_blank_q!($c)
-    };
-}
-
-/**
- * IS_BLANK_CH:
- * @c:  an xmlChar value (normally c_uchar)
- *
- * Behaviour same as IS_BLANK
- */
-#[macro_export]
-macro_rules! IS_BLANK_CH {
-    ( $c:expr ) => {
-        $crate::xml_is_blank_ch!($c)
     };
 }
 
@@ -904,17 +876,6 @@ unsafe fn xml_detect_ebcdic(input: XmlParserInputPtr) -> Option<XmlCharEncodingH
      */
     let mut handler = get_encoding_handler(XmlCharEncoding::EBCDIC)?;
     let inlen = (*input).end.offset_from((*input).cur) as usize;
-    // let res: c_int = xml_enc_input_chunk(
-    //     handler,
-    //     out.as_mut_ptr() as _,
-    //     addr_of_mut!(outlen) as _,
-    //     (*input).cur,
-    //     addr_of_mut!(inlen) as _,
-    //     0,
-    // );
-    // if res < 0 {
-    //     return Some(handler);
-    // }
     let outstr = from_utf8_mut(&mut out).ok()?;
     let Ok((_, outlen)) = handler.decode(from_raw_parts((*input).cur, inlen), outstr) else {
         return Some(handler);
@@ -932,14 +893,14 @@ unsafe fn xml_detect_ebcdic(input: XmlParserInputPtr) -> Option<XmlCharEncodingH
             let mut cur: u8;
 
             i += 8;
-            while IS_BLANK_CH!(out[i]) {
+            while xml_is_blank_char(out[i] as u32) {
                 i += 1;
             }
             i += 1;
             if out[i - 1] != b'=' {
                 break;
             }
-            while IS_BLANK_CH!(out[i]) {
+            while xml_is_blank_char(out[i] as u32) {
                 i += 1;
             }
             let quote: u8 = out[i];
@@ -3113,7 +3074,7 @@ unsafe extern "C" fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *cons
     let marker: XmlChar;
 
     tmp = catalog;
-    while IS_BLANK_CH!(*tmp) {
+    while xml_is_blank_char(*tmp as u32) {
         tmp = tmp.add(1);
     }
     'error: {
@@ -3121,14 +3082,14 @@ unsafe extern "C" fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *cons
             break 'error;
         }
         tmp = tmp.add(7);
-        while IS_BLANK_CH!(*tmp) {
+        while xml_is_blank_char(*tmp as u32) {
             tmp = tmp.add(1);
         }
         if *tmp != b'=' {
             return;
         }
         tmp = tmp.add(1);
-        while IS_BLANK_CH!(*tmp) {
+        while xml_is_blank_char(*tmp as u32) {
             tmp = tmp.add(1);
         }
         marker = *tmp;
@@ -3145,7 +3106,7 @@ unsafe extern "C" fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *cons
         }
         url = xml_strndup(base, tmp.offset_from(base) as _);
         tmp = tmp.add(1);
-        while IS_BLANK_CH!(*tmp) {
+        while xml_is_blank_char(*tmp as u32) {
             tmp = tmp.add(1);
         }
         if *tmp != 0 {
@@ -5347,7 +5308,9 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     }
                 }
 
-                if (*ctxt).content_bytes().starts_with(b"<?xml") && IS_BLANK_CH!(NXT!(ctxt, 5)) {
+                if (*ctxt).content_bytes().starts_with(b"<?xml")
+                    && xml_is_blank_char(NXT!(ctxt, 5) as u32)
+                {
                     xml_parse_text_decl(ctxt);
                 }
             }
@@ -6996,7 +6959,7 @@ pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtx
             if (*ctxt).external == 0 && (*ctxt).input_nr == 1 {
                 return;
             }
-            if IS_BLANK_CH!(NXT!(ctxt, 1)) || NXT!(ctxt, 1) == 0 {
+            if xml_is_blank_char(NXT!(ctxt, 1) as u32) || NXT!(ctxt, 1) == 0 {
                 return;
             }
         }

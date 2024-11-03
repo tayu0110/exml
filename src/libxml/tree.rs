@@ -32,10 +32,10 @@ use crate::{
         entities::{xml_encode_attribute_entities, XML_ENT_EXPANDING, XML_ENT_PARSED},
         error::__xml_simple_error,
     },
-    IS_BLANK_CH,
 };
 
 use super::{
+    chvalid::xml_is_blank_char,
     dict::{xml_dict_lookup, xml_dict_owns, XmlDict, XmlDictPtr},
     entities::{
         xml_encode_entities_reentrant, xml_free_entities_table, xml_get_doc_entity,
@@ -848,7 +848,9 @@ macro_rules! CUR_SCHAR {
     feature = "legacy"
 ))]
 pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int) -> c_int {
-    use crate::{IS_BLANK, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER};
+    use crate::{
+        libxml::chvalid::xml_is_blank_char, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    };
 
     let mut cur: *const XmlChar = value;
     let mut c: i32;
@@ -862,7 +864,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
      * First quick algorithm for ASCII range
      */
     if space != 0 {
-        while IS_BLANK_CH!(*cur) {
+        while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
         }
     }
@@ -879,7 +881,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
             cur = cur.add(1);
         }
         if space != 0 {
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
@@ -898,7 +900,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
     cur = value;
     c = CUR_SCHAR!(cur, l);
     if space != 0 {
-        while IS_BLANK!(c) {
+        while xml_is_blank_char(c as u32) {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
@@ -920,7 +922,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
         c = CUR_SCHAR!(cur, l);
     }
     if space != 0 {
-        while IS_BLANK!(c) {
+        while xml_is_blank_char(c as u32) {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
@@ -944,7 +946,9 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int) -> c_int {
-    use crate::{IS_BLANK, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER};
+    use crate::{
+        libxml::chvalid::xml_is_blank_char, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    };
 
     let mut cur: *const XmlChar = value;
     let mut c: c_int;
@@ -957,7 +961,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
      * First quick algorithm for ASCII range
      */
     if space != 0 {
-        while IS_BLANK_CH!(*cur) {
+        while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
         }
     }
@@ -995,7 +999,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
             }
         }
         if space != 0 {
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
@@ -1011,7 +1015,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
     cur = value;
     c = CUR_SCHAR!(cur, l);
     if space != 0 {
-        while IS_BLANK!(c) {
+        while xml_is_blank_char(c as u32) {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
@@ -1053,7 +1057,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
         }
     }
     if space != 0 {
-        while IS_BLANK!(c) {
+        while xml_is_blank_char(c as u32) {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
@@ -1076,7 +1080,9 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) -> c_int {
-    use crate::{IS_BLANK, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER};
+    use crate::{
+        libxml::chvalid::xml_is_blank_char, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    };
 
     let mut cur: *const XmlChar = value;
     let mut c: c_int;
@@ -1089,7 +1095,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
      * First quick algorithm for ASCII range
      */
     if space != 0 {
-        while IS_BLANK_CH!(*cur) {
+        while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
         }
     }
@@ -1110,7 +1116,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
             cur = cur.add(1);
         }
         if space != 0 {
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
@@ -1128,7 +1134,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
     cur = value;
     c = CUR_SCHAR!(cur, l);
     if space != 0 {
-        while IS_BLANK!(c) {
+        while xml_is_blank_char(c as u32) {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
@@ -1151,7 +1157,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
         c = CUR_SCHAR!(cur, l);
     }
     if space != 0 {
-        while IS_BLANK!(c) {
+        while xml_is_blank_char(c as u32) {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
@@ -1174,7 +1180,9 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_int) -> c_int {
-    use crate::{IS_BLANK, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER};
+    use crate::{
+        libxml::chvalid::xml_is_blank_char, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    };
 
     let mut cur: *const XmlChar = value;
     let mut c: c_int;
@@ -1187,7 +1195,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
      * First quick algorithm for ASCII range
      */
     if space != 0 {
-        while IS_BLANK_CH!(*cur) {
+        while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
         }
     }
@@ -1211,7 +1219,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
             cur = cur.add(1);
         }
         if space != 0 {
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
@@ -1229,7 +1237,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
     cur = value;
     c = CUR_SCHAR!(cur, l);
     if space != 0 {
-        while IS_BLANK!(c) {
+        while xml_is_blank_char(c as u32) {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
@@ -1260,7 +1268,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
         c = CUR_SCHAR!(cur, l);
     }
     if space != 0 {
-        while IS_BLANK!(c) {
+        while xml_is_blank_char(c as u32) {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
@@ -5179,7 +5187,7 @@ pub unsafe extern "C" fn xml_is_blank_node(node: *const XmlNode) -> c_int {
     }
     cur = (*node).content;
     while *cur != 0 {
-        if !IS_BLANK_CH!(*cur) {
+        if !xml_is_blank_char(*cur as u32) {
             return 0;
         }
         cur = cur.add(1);

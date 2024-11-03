@@ -21,6 +21,7 @@ use crate::{
     hash::XmlHashTableRef,
     io::{xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
+        chvalid::xml_is_blank_char,
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_create, xml_hash_free, xml_hash_lookup,
@@ -47,7 +48,7 @@ use crate::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
     },
-    xml_is_blank_ch, IS_BLANK_CH, IS_DIGIT, IS_LETTER, IS_PUBIDCHAR_CH, SYSCONFDIR,
+    IS_DIGIT, IS_LETTER, IS_PUBIDCHAR_CH, SYSCONFDIR,
 };
 
 use super::hash::CVoidWrapper;
@@ -317,7 +318,7 @@ macro_rules! SKIP {
 
 macro_rules! SKIP_BLANKS {
     ($cur:expr) => {
-        while IS_BLANK_CH!(*$cur) {
+        while xml_is_blank_char(*$cur as u32) {
             NEXT!($cur);
         }
     };
@@ -430,7 +431,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog_pubid(
         if *cur == stop && stop != b' ' {
             break;
         }
-        if stop == b' ' && IS_BLANK_CH!(*cur) {
+        if stop == b' ' && xml_is_blank_char(*cur as u32) {
             break;
         }
         if len + 1 >= size {
@@ -449,7 +450,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog_pubid(
     }
     *buf.add(len) = 0;
     if stop == b' ' {
-        if !IS_BLANK_CH!(*cur) {
+        if !xml_is_blank_char(*cur as u32) {
             xml_free(buf as _);
             return null_mut();
         }
@@ -488,7 +489,7 @@ unsafe extern "C" fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mu
     white = 1;
     let mut p = pub_id;
     while *p != 0 && ok != 0 {
-        if !xml_is_blank_ch!(*p) {
+        if !xml_is_blank_char(*p as u32) {
             white = 0;
         } else if *p == 0x20 && white == 0 {
             white = 1;
@@ -507,7 +508,7 @@ unsafe extern "C" fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mu
     white = 0;
     p = pub_id;
     while *p != 0 {
-        if xml_is_blank_ch!(*p) {
+        if xml_is_blank_char(*p as u32) {
             if q != ret {
                 white = 1;
             }
@@ -746,7 +747,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                 /* error */
                 break;
             }
-            if !IS_BLANK_CH!(*cur) {
+            if !xml_is_blank_char(*cur as u32) {
                 /* error */
                 xml_free(name as _);
                 break;
@@ -801,7 +802,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                         /* error */
                         break 'to_break;
                     }
-                    if !IS_BLANK_CH!(*cur) {
+                    if !xml_is_blank_char(*cur as u32) {
                         /* error */
                         break 'to_break;
                     }
@@ -834,7 +835,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                             }
                         }
                     }
-                    if !IS_BLANK_CH!(*cur) {
+                    if !xml_is_blank_char(*cur as u32) {
                         /* error */
                         break 'to_break;
                     }
@@ -3569,12 +3570,12 @@ pub unsafe extern "C" fn xml_initialize_catalog() {
             cur = catalogs;
             nextent = addr_of_mut!((*catal).xml);
             while *cur != b'\0' as i8 {
-                while xml_is_blank_ch!(*cur) {
+                while xml_is_blank_char(*cur as u32) {
                     cur = cur.add(1);
                 }
                 if *cur != 0 {
                     paths = cur;
-                    while *cur != 0 && !xml_is_blank_ch!(*cur) {
+                    while *cur != 0 && !xml_is_blank_char(*cur as u32) {
                         cur = cur.add(1);
                     }
                     path = xml_strndup(paths as _, cur.offset_from(paths) as _) as _;
@@ -3669,12 +3670,12 @@ pub unsafe extern "C" fn xml_load_catalogs(pathss: *const c_char) {
 
     cur = pathss;
     while *cur != 0 {
-        while xml_is_blank_ch!(*cur) {
+        while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
         }
         if *cur != 0 {
             paths = cur;
-            while *cur != 0 && *cur != PATH_SEPARATOR as i8 && !xml_is_blank_ch!(*cur) {
+            while *cur != 0 && *cur != PATH_SEPARATOR as i8 && !xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             path = xml_strndup(paths as _, cur.offset_from(paths) as _);

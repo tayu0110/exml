@@ -15,13 +15,14 @@ use libc::memset;
 
 use crate::{
     libxml::{
+        chvalid::xml_is_blank_char,
         dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDict, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_realloc},
         parser_internals::xml_string_current_char,
         tree::{XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
         xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
     },
-    IS_BLANK_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
 };
 
 const XML_STREAM_STEP_DESC: usize = 1;
@@ -331,7 +332,7 @@ macro_rules! NEXT {
 
 macro_rules! SKIP_BLANKS {
     ($ctxt:expr) => {
-        while $crate::IS_BLANK_CH!(CUR!($ctxt)) {
+        while xml_is_blank_char(CUR!($ctxt) as u32) {
             NEXT!($ctxt);
         }
     };
@@ -544,7 +545,7 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
 
             NEXT!(ctxt);
 
-            if IS_BLANK_CH!(CUR!(ctxt)) {
+            if xml_is_blank_char(CUR!(ctxt) as u32) {
                 // ERROR5(NULL, NULL, NULL, "Invalid QName.\n", NULL);
                 XML_PAT_FREE_STRING!(ctxt, prefix);
                 (*ctxt).error = 1;
@@ -663,7 +664,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                 return;
             }
         }
-        if IS_BLANK_CH!(CUR!(ctxt)) {
+        if xml_is_blank_char(CUR!(ctxt) as u32) {
             has_blanks = 1;
             SKIP_BLANKS!(ctxt);
         }
@@ -673,7 +674,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                 let prefix: *mut XmlChar = name;
                 let mut i: c_int;
 
-                if has_blanks != 0 || IS_BLANK_CH!(CUR!(ctxt)) {
+                if has_blanks != 0 || xml_is_blank_char(CUR!(ctxt) as u32) {
                     //  ERROR5(NULL, NULL, NULL, "Invalid QName.\n", NULL);
                     (*ctxt).error = 1;
                     break 'error;
@@ -746,7 +747,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                         let mut i: c_int;
 
                         NEXT!(ctxt);
-                        if IS_BLANK_CH!(CUR!(ctxt)) {
+                        if xml_is_blank_char(CUR!(ctxt) as u32) {
                             //  ERROR5(NULL, NULL, NULL, "Invalid QName.\n", NULL);
                             (*ctxt).error = 1;
                             break 'error;
@@ -890,7 +891,7 @@ unsafe extern "C" fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
                 NEXT!(ctxt);
                 SKIP_BLANKS!(ctxt);
                 if CUR!(ctxt) == b'/' {
-                    if IS_BLANK_CH!(PEEKPREV!(ctxt, 1)) {
+                    if xml_is_blank_char(PEEKPREV!(ctxt, 1) as u32) {
                         /*
                          * Disallow "./ /"
                          */

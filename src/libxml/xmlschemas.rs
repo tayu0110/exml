@@ -24,6 +24,7 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     io::XmlParserInputBuffer,
     libxml::{
+        chvalid::xml_is_blank_char,
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         entities::XmlEntityPtr,
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -132,7 +133,6 @@ use crate::{
         },
     },
     private::error::__xml_simple_error,
-    IS_BLANK_CH,
 };
 
 /**
@@ -4075,11 +4075,11 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
             let item_type: XmlSchemaTypePtr = WXS_LIST_ITEMTYPE!(typ);
             cur = value;
             loop {
-                while IS_BLANK_CH!(*cur) {
+                while xml_is_blank_char(*cur as u32) {
                     cur = cur.add(1);
                 }
                 end = cur;
-                while *end != 0 && !IS_BLANK_CH!(*end) {
+                while *end != 0 && !xml_is_blank_char(*end as u32) {
                     end = end.add(1);
                 }
                 if end == cur {
@@ -5010,14 +5010,14 @@ unsafe extern "C" fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: c_int) 
     }
     if len < 0 {
         while *str != 0 {
-            if !IS_BLANK_CH!(*str) {
+            if !xml_is_blank_char(*str as u32) {
                 return 0;
             }
             str = str.add(1);
         }
     } else {
         while *str != 0 && len != 0 {
-            if !IS_BLANK_CH!(*str) {
+            if !xml_is_blank_char(*str as u32) {
                 return 0;
             }
             str = str.add(1);
@@ -6660,11 +6660,11 @@ unsafe extern "C" fn xml_schema_pval_attr_block_final(
         let mut item: *mut XmlChar;
 
         loop {
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             end = cur;
-            while *end != 0 && !IS_BLANK_CH!(*end) {
+            while *end != 0 && !xml_is_blank_char(*end as u32) {
                 end = end.add(1);
             }
             if end == cur {
@@ -8108,7 +8108,7 @@ unsafe extern "C" fn xml_get_min_occurs(
         return def;
     }
     cur = val;
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
     }
     if *cur == 0 {
@@ -8141,7 +8141,7 @@ unsafe extern "C" fn xml_get_min_occurs(
         }
         cur = cur.add(1);
     }
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
     }
     /*
@@ -8217,7 +8217,7 @@ unsafe extern "C" fn xml_get_max_occurs(
     }
 
     cur = val;
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
     }
     if *cur == 0 {
@@ -8250,7 +8250,7 @@ unsafe extern "C" fn xml_get_max_occurs(
         }
         cur = cur.add(1);
     }
-    while IS_BLANK_CH!(*cur) {
+    while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
     }
     /*
@@ -9762,11 +9762,11 @@ unsafe extern "C" fn xml_schema_parse_wildcard_ns(
 
         cur = ns;
         loop {
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             end = cur;
-            while *end != 0 && !IS_BLANK_CH!(*end) {
+            while *end != 0 && !xml_is_blank_char(*end as u32) {
                 end = end.add(1);
             }
             if end == cur {
@@ -13022,11 +13022,11 @@ unsafe extern "C" fn xml_schema_parse_union(
         }
         (*typ).base = cur;
         loop {
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             end = cur;
-            while *end != 0 && !IS_BLANK_CH!(*end) {
+            while *end != 0 && !xml_is_blank_char(*end as u32) {
                 end = end.add(1);
             }
             if end == cur {
@@ -25523,11 +25523,11 @@ unsafe extern "C" fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) ->
             /*
              * Get the namespace name.
              */
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
             end = cur;
-            while *end != 0 && !IS_BLANK_CH!(*end) {
+            while *end != 0 && !xml_is_blank_char(*end as u32) {
                 end = end.add(1);
             }
             if end == cur {
@@ -25540,11 +25540,11 @@ unsafe extern "C" fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) ->
         /*
          * Get the URI.
          */
-        while IS_BLANK_CH!(*cur) {
+        while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
         }
         end = cur;
-        while *end != 0 && !IS_BLANK_CH!(*end) {
+        while *end != 0 && !xml_is_blank_char(*end as u32) {
             end = end.add(1);
         }
         if end == cur {

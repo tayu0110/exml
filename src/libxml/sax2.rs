@@ -32,10 +32,10 @@ use crate::{
         xmlstring::XmlChar,
     },
     private::parser::{xml_err_memory, XML_VCTXT_DTD_VALIDATED},
-    IS_BLANK_CH,
 };
 
 use super::{
+    chvalid::xml_is_blank_char,
     dict::{xml_dict_lookup, xml_dict_owns, xml_dict_qlookup, xml_dict_reference},
     entities::{
         xml_add_doc_entity, xml_add_dtd_entity, xml_get_doc_entity, xml_get_parameter_entity,
@@ -2874,14 +2874,14 @@ unsafe extern "C" fn xml_sax2_text_node(
             && (cur == b'"' || cur == b'\'' || (cur == b'<' && *str.add(len as usize + 1) != b'!'))
         {
             intern = xml_dict_lookup((*ctxt).dict, str, len);
-        } else if IS_BLANK_CH!(*str)
+        } else if xml_is_blank_char(*str as u32)
             && len < 60
             && cur == b'<'
             && *str.add(len as usize + 1) != b'!'
         {
             let mut skip = false;
             for i in 1..len {
-                if !IS_BLANK_CH!(*str.add(i as usize)) {
+                if !xml_is_blank_char(*str.add(i as usize) as u32) {
                     // goto skip;
                     skip = true;
                     break;

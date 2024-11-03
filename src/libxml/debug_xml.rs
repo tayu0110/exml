@@ -13,7 +13,10 @@ use std::{
 
 use libc::{fprintf, fputc, strlen, FILE};
 
-use crate::{__xml_raise_error, generic_error, libxml::entities::XmlEntityPtr, IS_BLANK_CH};
+use crate::{
+    __xml_raise_error, generic_error,
+    libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
+};
 
 #[cfg(feature = "xpath")]
 use super::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr};
@@ -73,7 +76,7 @@ pub unsafe extern "C" fn xml_debug_dump_string(mut output: *mut FILE, str: *cons
     for i in 0..40 {
         if *str.add(i) == 0 {
             return;
-        } else if IS_BLANK_CH!(*str.add(i)) {
+        } else if xml_is_blank_char(*str.add(i) as u32) {
             fputc(b' ' as i32, output);
         } else if *str.add(i) >= 0x80 {
             fprintf(output, c"#%X".as_ptr(), *str.add(i) as i32);
@@ -134,7 +137,7 @@ unsafe extern "C" fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, str: *const Xml
     for i in 0..40 {
         if *str.add(i) == 0 {
             return;
-        } else if IS_BLANK_CH!(*str.add(i)) {
+        } else if xml_is_blank_char(*str.add(i) as u32) {
             fputc(b' ' as i32, (*ctxt).output);
         } else if *str.add(i) >= 0x80 {
             fprintf((*ctxt).output, c"#%X".as_ptr(), *str.add(i) as i32);

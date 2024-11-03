@@ -53,9 +53,11 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_BLANK, IS_BLANK_CH, IS_CHAR, IS_CHAR_CH, IS_COMBINING,
-    IS_DIGIT, IS_EXTENDER, IS_LETTER, IS_PUBIDCHAR_CH,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR, IS_CHAR_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER,
+    IS_LETTER, IS_PUBIDCHAR_CH,
 };
+
+use super::chvalid::xml_is_blank_char;
 
 /*
  * Most of the back-end structures from XML and HTML are shared.
@@ -5654,7 +5656,7 @@ pub(crate) unsafe extern "C" fn __html_parse_content(ctxt: *mut c_void) {
 unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> c_int {
     let mut res: c_int = 0;
 
-    while IS_BLANK_CH!(*(*(*ctxt).input).cur) {
+    while xml_is_blank_char(*(*(*ctxt).input).cur as u32) {
         if *(*(*ctxt).input).cur == b'\n' {
             (*(*ctxt).input).line += 1;
             (*(*ctxt).input).col = 1;
@@ -6771,7 +6773,7 @@ unsafe extern "C" fn html_parse_html_attribute(
         if stop == 0 && (*ctxt).current_byte() == b'>' {
             break;
         }
-        if stop == 0 && IS_BLANK_CH!((*ctxt).current_byte()) {
+        if stop == 0 && xml_is_blank_char((*ctxt).current_byte() as u32) {
             break;
         }
         if (*ctxt).current_byte() == b'&' {
@@ -7212,7 +7214,7 @@ unsafe extern "C" fn html_check_encoding(ctxt: HtmlParserCtxtPtr, attvalue: *con
     /*
      * skip blank
      */
-    if !encoding.is_null() && IS_BLANK_CH!(*encoding) {
+    if !encoding.is_null() && xml_is_blank_char(*encoding as u32) {
         encoding = xml_strcasestr(attvalue, c"=".as_ptr() as _);
     }
     if !encoding.is_null() && *encoding == b'=' {
@@ -7470,7 +7472,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
             /* Dump the bogus attribute string up to the next blank or
              * the end of the tag. */
             while (*ctxt).current_byte() != 0
-                && !IS_BLANK_CH!((*ctxt).current_byte())
+                && !xml_is_blank_char((*ctxt).current_byte() as u32)
                 && (*ctxt).current_byte() != b'>'
                 && ((*ctxt).current_byte() != b'/' || NXT!(ctxt, 1) != b'>')
                 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
@@ -8107,7 +8109,7 @@ unsafe extern "C" fn html_parse_external_id(
         && UPP!(ctxt, 5) == b'M'
     {
         (*ctxt).advance(6);
-        if !IS_BLANK_CH!((*ctxt).current_byte()) {
+        if !xml_is_blank_char((*ctxt).current_byte() as u32) {
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -8135,7 +8137,7 @@ unsafe extern "C" fn html_parse_external_id(
         && UPP!(ctxt, 5) == b'C'
     {
         (*ctxt).advance(6);
-        if !IS_BLANK_CH!((*ctxt).current_byte()) {
+        if !xml_is_blank_char((*ctxt).current_byte() as u32) {
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
@@ -8520,7 +8522,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                 return;
             }
             cur = (*ctxt).current_byte() as _;
-            if !IS_BLANK!(cur) {
+            if !xml_is_blank_char(cur as u32) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -8867,7 +8869,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
     let dtd: XmlDtdPtr;
 
     for j in 0..len {
-        if !IS_BLANK_CH!(*str.add(j as usize)) {
+        if !xml_is_blank_char(*str.add(j as usize) as u32) {
             return 0;
         }
     }
@@ -11016,7 +11018,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                  * Very first chars read from the document flow.
                  */
                 cur = *(*input).cur.add(0);
-                if IS_BLANK_CH!(cur) {
+                if xml_is_blank_char(cur as u32) {
                     SKIP_BLANKS!(ctxt);
                     avail = (*input).end.offset_from((*input).cur) as _;
                 }
@@ -11161,7 +11163,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     break 'done;
                 }
                 cur = *(*input).cur.add(0);
-                if IS_BLANK_CH!(cur) {
+                if xml_is_blank_char(cur as u32) {
                     html_parse_char_data(ctxt);
                     // goto done;
                     break 'done;
@@ -11353,7 +11355,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     if cur != b'<' && cur != b'&' {
                         if !(*ctxt).sax.is_null() {
                             chr[0] = cur;
-                            if IS_BLANK_CH!(cur) {
+                            if xml_is_blank_char(cur as u32) {
                                 if (*ctxt).keep_blanks != 0 {
                                     if let Some(characters) = (*(*ctxt).sax).characters {
                                         characters((*ctxt).user_data.clone(), chr.as_ptr(), 1);

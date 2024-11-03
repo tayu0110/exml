@@ -1077,9 +1077,9 @@ unsafe extern "C" fn html_attr_dump_output(
 ) {
     use std::ffi::CStr;
 
-    use crate::{
-        libxml::{globals::xml_free, tree::xml_node_list_get_string, uri::xml_uri_escape_str},
-        IS_BLANK_CH,
+    use crate::libxml::{
+        chvalid::xml_is_blank_char, globals::xml_free, tree::xml_node_list_get_string,
+        uri::xml_uri_escape_str,
     };
 
     let value: *mut XmlChar;
@@ -1120,7 +1120,7 @@ unsafe extern "C" fn html_attr_dump_output(
             {
                 let mut tmp: *mut XmlChar = value;
 
-                while IS_BLANK_CH!(*tmp) {
+                while xml_is_blank_char(*tmp as u32) {
                     tmp = tmp.add(1);
                 }
 

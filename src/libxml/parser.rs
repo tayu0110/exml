@@ -116,11 +116,13 @@ use crate::{
             xml_cleanup_threads_internal, xml_init_threads_internal,
         },
     },
-    IS_BLANK_CH, IS_BYTE_CHAR, IS_CHAR, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
-    IS_PUBIDCHAR_CH,
+    IS_BYTE_CHAR, IS_CHAR, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER, IS_PUBIDCHAR_CH,
 };
 
-use super::parser_internals::{xml_err_encoding_int, LINE_LEN, XML_MAX_LOOKUP_LIMIT};
+use super::{
+    chvalid::xml_is_blank_char,
+    parser_internals::{xml_err_encoding_int, LINE_LEN, XML_MAX_LOOKUP_LIMIT},
+};
 
 /**
  * XML_DEFAULT_VERSION:
@@ -857,7 +859,7 @@ impl XmlParserCtxt {
              * if we are in the document content, go really fast
              */
             let mut cur = (*self.input).cur;
-            while IS_BLANK_CH!(*cur) {
+            while xml_is_blank_char(*cur as u32) {
                 if *cur == b'\n' {
                     (*self.input).line += 1;
                     (*self.input).col = 1;
@@ -877,14 +879,17 @@ impl XmlParserCtxt {
             let expand_pe = self.external != 0 || self.input_nr != 1;
 
             while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
-                if IS_BLANK_CH!(self.current_byte()) {
+                if xml_is_blank_char(self.current_byte() as u32) {
                     /* CHECKED tstblanks.xml */
                     self.skip_char();
                 } else if self.current_byte() == b'%' {
                     /*
                      * Need to handle support of entities branching here
                      */
-                    if !expand_pe || IS_BLANK_CH!(self.nth_byte(1)) || self.nth_byte(1) == 0 {
+                    if !expand_pe
+                        || xml_is_blank_char(self.nth_byte(1) as u32)
+                        || self.nth_byte(1) == 0
+                    {
                         break;
                     }
                     xml_parse_pe_reference(self);
@@ -3019,7 +3024,9 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
     }
 
     (*ctxt).grow();
-    if (*ctxt).content_bytes().starts_with(b"<?xml") && IS_BLANK_CH!((*ctxt).nth_byte(5)) {
+    if (*ctxt).content_bytes().starts_with(b"<?xml")
+        && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
+    {
         /*
          * Note that we will switch encoding on the fly.
          */
@@ -3220,7 +3227,9 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> c_i
      * Check for the XMLDecl in the Prolog.
      */
     (*ctxt).grow();
-    if (*ctxt).content_bytes().starts_with(b"<?xml") && IS_BLANK_CH!((*ctxt).nth_byte(5)) {
+    if (*ctxt).content_bytes().starts_with(b"<?xml")
+        && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
+    {
         /*
          * Note that we will switch encoding on the fly.
          */
@@ -4685,7 +4694,9 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     /*
      * Parse a possible text declaration first
      */
-    if (*ctxt).content_bytes().starts_with(b"<?xml") && IS_BLANK_CH!((*ctxt).nth_byte(5)) {
+    if (*ctxt).content_bytes().starts_with(b"<?xml")
+        && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
+    {
         xml_parse_text_decl(ctxt);
         /*
          * An XML-1.0 document can't reference an entity not XML-1.0
@@ -9231,7 +9242,7 @@ unsafe extern "C" fn are_blanks(
      */
     if blank_chars == 0 {
         for i in 0..len {
-            if !IS_BLANK_CH!(*str.add(i as usize)) {
+            if !xml_is_blank_char(*str.add(i as usize) as u32) {
                 return 0;
             }
         }
@@ -9513,7 +9524,7 @@ pub(crate) unsafe extern "C" fn xml_parse_char_data_internal(
         if nbchar > 0 {
             if !(*ctxt).sax.is_null()
                 && (*(*ctxt).sax).ignorable_whitespace != (*(*ctxt).sax).characters
-                && IS_BLANK_CH!(*(*(*ctxt).input).cur)
+                && xml_is_blank_char(*(*(*ctxt).input).cur as u32)
             {
                 let tmp: *const XmlChar = (*(*ctxt).input).cur;
                 (*(*ctxt).input).cur = input;
@@ -9603,7 +9614,7 @@ unsafe extern "C" fn xml_parse_name_and_compare(
         input = input.add(1);
         cmp = cmp.add(1);
     }
-    if *cmp == 0 && (*input == b'>' || IS_BLANK_CH!(*input)) {
+    if *cmp == 0 && (*input == b'>' || xml_is_blank_char(*input as u32)) {
         /* success */
         (*(*ctxt).input).col += input.offset_from((*(*ctxt).input).cur) as i32;
         (*(*ctxt).input).cur = input;
@@ -9658,7 +9669,7 @@ unsafe extern "C" fn xml_parse_qname_and_compare(
             input = input.add(1);
             cmp = cmp.add(1);
         }
-        if *cmp == 0 && (*input == b'>' || IS_BLANK_CH!(*input)) {
+        if *cmp == 0 && (*input == b'>' || xml_is_blank_char(*input as u32)) {
             /* success */
             (*(*ctxt).input).col += input.offset_from((*(*ctxt).input).cur) as i32;
             (*(*ctxt).input).cur = input;
@@ -9996,7 +10007,7 @@ unsafe extern "C" fn xml_parse_lookup_internal_subset(ctxt: XmlParserCtxtPtr) ->
                 (*ctxt).end_check_state = 0;
                 return 1;
             }
-            if IS_BLANK_CH!(*cur) {
+            if xml_is_blank_char(*cur as u32) {
                 state = b' ' as i32;
             } else if *cur != b']' {
                 state = 0;
@@ -10009,7 +10020,7 @@ unsafe extern "C" fn xml_parse_lookup_internal_subset(ctxt: XmlParserCtxtPtr) ->
                 (*ctxt).end_check_state = 0;
                 return 1;
             }
-            if !IS_BLANK_CH!(*cur) {
+            if !xml_is_blank_char(*cur as u32) {
                 state = 0;
                 start = cur;
                 continue;
@@ -10196,7 +10207,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         if *(*(*ctxt).input).cur.add(2) == b'x'
                             && *(*(*ctxt).input).cur.add(3) == b'm'
                             && *(*(*ctxt).input).cur.add(4) == b'l'
-                            && IS_BLANK_CH!(*(*(*ctxt).input).cur.add(5))
+                            && xml_is_blank_char(*(*(*ctxt).input).cur.add(5) as u32)
                         {
                             ret += 5;
                             xml_parse_xmldecl(ctxt);
@@ -14039,7 +14050,7 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
      */
     (*ctxt).advance(5);
 
-    if !IS_BLANK_CH!((*ctxt).current_byte()) {
+    if !xml_is_blank_char((*ctxt).current_byte() as u32) {
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrSpaceRequired,
@@ -14092,7 +14103,7 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
     /*
      * We may have the encoding declaration
      */
-    if !IS_BLANK_CH!((*ctxt).current_byte()) {
+    if !xml_is_blank_char((*ctxt).current_byte() as u32) {
         if (*ctxt).current_byte() == b'?' && (*ctxt).nth_byte(1) == b'>' {
             (*ctxt).advance(2);
             return;
@@ -14116,7 +14127,7 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
     /*
      * We may have the standalone status.
      */
-    if !(*(*ctxt).input).encoding.is_null() && !IS_BLANK_CH!((*ctxt).current_byte()) {
+    if !(*(*ctxt).input).encoding.is_null() && !xml_is_blank_char((*ctxt).current_byte() as u32) {
         if (*ctxt).current_byte() == b'?' && (*ctxt).nth_byte(1) == b'>' {
             (*ctxt).advance(2);
             return;
@@ -14175,7 +14186,9 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
     /*
      * We know that '<?xml' is here.
      */
-    if (*ctxt).content_bytes().starts_with(b"<?xml") && IS_BLANK_CH!((*ctxt).nth_byte(5)) {
+    if (*ctxt).content_bytes().starts_with(b"<?xml")
+        && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
+    {
         (*ctxt).advance(5);
     } else {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotStarted, null());
