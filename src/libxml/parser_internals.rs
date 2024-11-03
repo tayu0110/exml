@@ -55,7 +55,7 @@ use crate::private::parser::{__xml_err_encoding, xml_err_memory};
 use crate::{__xml_raise_error, generic_error};
 
 use super::catalog::xml_catalog_add_local;
-use super::chvalid::{xml_is_base_char, xml_is_blank_char};
+use super::chvalid::{xml_is_base_char, xml_is_blank_char, xml_is_char};
 use super::dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, xml_dict_set_limit};
 use super::entities::XmlEntityType;
 use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
@@ -180,38 +180,6 @@ pub const INPUT_CHUNK: usize = 250;
  * UNICODE version of the macros.					*
  *									*
  ************************************************************************/
-/**
- * IS_BYTE_CHAR:
- * @c:  an byte value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- * [2] Char ::= #x9 | #xA | #xD | [#x20...]
- * any byte character in the accepted range
- */
-#[macro_export]
-macro_rules! IS_BYTE_CHAR {
-    ( $c:expr ) => {
-        $crate::xml_is_char_ch!($c)
-    };
-}
-
-/**
- * IS_CHAR:
- * @c:  an UNICODE value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- * [2] Char ::= #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD]
- *                  | [#x10000-#x10FFFF]
- * any Unicode character, excluding the surrogate blocks, FFFE, and FFFF.
- */
-#[macro_export]
-macro_rules! IS_CHAR {
-    (  $c:expr ) => {
-        $crate::xml_is_char_q!($c)
-    };
-}
 
 /**
  * IS_CHAR_CH:
@@ -222,7 +190,7 @@ macro_rules! IS_CHAR {
 #[macro_export]
 macro_rules! IS_CHAR_CH {
     ( $c:expr ) => {
-        $crate::xml_is_char_ch!($c)
+        $crate::libxml::chvalid::xml_is_char($c as u32)
     };
 }
 
@@ -2332,7 +2300,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
      * In practice it means we stop the loop only when back at parsing
      * the initial entity and the quote is found
      */
-    while (IS_CHAR!(c as i32) && (c as i32 != stop as i32 || (*ctxt).input != input))
+    while (xml_is_char(c as u32) && (c as i32 != stop as i32 || (*ctxt).input != input))
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
         if len + 5 >= size {
@@ -2551,7 +2519,7 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
     }
     (*ctxt).instate = XmlParserInputState::XmlParserSystemLiteral;
     let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-    while IS_CHAR!(cur as i32) && cur as i32 != stop as i32 {
+    while xml_is_char(cur as u32) && cur as i32 != stop as i32 {
         if len + 5 >= size {
             size *= 2;
             let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as *mut XmlChar;
@@ -2583,7 +2551,7 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
         return null_mut();
     }
     (*ctxt).instate = XmlParserInputState::try_from(state).unwrap();
-    if !IS_CHAR!(cur as i32) {
+    if !xml_is_char(cur as u32) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrLiteralNotFinished, null());
     } else {
         (*ctxt).skip_char();
@@ -2647,7 +2615,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
         if q == '\0' {
             break 'not_terminated;
         }
-        if !IS_CHAR!(q as i32) {
+        if !xml_is_char(q as u32) {
             xml_fatal_err_msg_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -2662,7 +2630,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
         if r == '\0' {
             break 'not_terminated;
         }
-        if !IS_CHAR!(r as i32) {
+        if !xml_is_char(r as u32) {
             xml_fatal_err_msg_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -2677,7 +2645,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
         if cur == '\0' {
             break 'not_terminated;
         }
-        while IS_CHAR!(cur as i32) && (cur != '>' || r != '-' || q != '-') {
+        while xml_is_char(cur as u32) && (cur != '>' || r != '-' || q != '-') {
             if r == '-' && q == '-' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrHyphenInComment, null());
             }
@@ -2724,7 +2692,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
                 c"Comment not terminated \n<!--%.50s\n".as_ptr() as _,
                 buf,
             );
-        } else if !IS_CHAR!(cur as i32) {
+        } else if !xml_is_char(cur as u32) {
             xml_fatal_err_msg_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -3215,7 +3183,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 );
             }
             let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-            while IS_CHAR!(cur as i32) && (cur != '?' || NXT!(ctxt, 1) != b'>') {
+            while xml_is_char(cur as u32) && (cur != '?' || NXT!(ctxt, 1) != b'>') {
                 if len + 5 >= size {
                     let new_size: size_t = size * 2;
                     let tmp: *mut XmlChar = xml_realloc(buf as _, new_size) as *mut XmlChar;
@@ -5578,7 +5546,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
 
     while RAW!(ctxt) != b'>'
         && (RAW!(ctxt) != b'/' || NXT!(ctxt, 1) != b'>')
-        && IS_BYTE_CHAR!(RAW!(ctxt))
+        && xml_is_char(RAW!(ctxt) as u32)
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
         attname = xml_parse_attribute(ctxt, addr_of_mut!(attvalue));
@@ -6799,7 +6767,7 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
                     val = (*cur.add(0) as u32 & 0x1f) << 6;
                     val |= *cur.add(1) as u32 & 0x3f;
                 }
-                if !IS_CHAR!(val) {
+                if !xml_is_char(val as u32) {
                     xml_err_encoding_int(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,

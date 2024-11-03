@@ -26,7 +26,7 @@ use crate::{
     error::{XmlErrorDomain, XmlErrorLevel},
     generic_error,
     libxml::{
-        chvalid::xml_is_blank_char,
+        chvalid::{xml_is_blank_char, xml_is_char},
         dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
@@ -71,8 +71,7 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR, IS_CHAR_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER,
-    IS_LETTER,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
 };
 
 /************************************************************************
@@ -4589,7 +4588,7 @@ unsafe extern "C" fn xml_xpath_current_char(
                 val |= *cur.add(1) as u32 & 0x3f;
             }
 
-            if !IS_CHAR!(val) {
+            if !xml_is_char(val as u32) {
                 XP_ERROR0!(ctxt, XmlXPathError::XpathInvalidCharError as i32);
             }
             return val as _;

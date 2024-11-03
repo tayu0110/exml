@@ -116,11 +116,11 @@ use crate::{
             xml_cleanup_threads_internal, xml_init_threads_internal,
         },
     },
-    IS_BYTE_CHAR, IS_CHAR, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER, IS_PUBIDCHAR_CH,
+    IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER, IS_PUBIDCHAR_CH,
 };
 
 use super::{
-    chvalid::xml_is_blank_char,
+    chvalid::{xml_is_blank_char, xml_is_char},
     parser_internals::{xml_err_encoding_int, LINE_LEN, XML_MAX_LOOKUP_LIMIT},
 };
 
@@ -1050,7 +1050,7 @@ impl XmlParserCtxt {
                 }
             }
         };
-        if (*len > 1 && !IS_CHAR!(c as i32))
+        if (*len > 1 && !xml_is_char(c as u32))
             || (*len == 1 && c == '\0' && (*self.input).cur < (*self.input).end)
         {
             xml_err_encoding_int(
@@ -6406,7 +6406,7 @@ unsafe extern "C" fn xml_parse_string_char_ref(
             c"xmlParseStringCharRef: character reference out of bounds\n".as_ptr() as _,
             val,
         );
-    } else if IS_CHAR!(val) {
+    } else if xml_is_char(val as u32) {
         return val;
     } else {
         xml_fatal_err_msg_int(
@@ -7008,7 +7008,7 @@ unsafe extern "C" fn xml_load_entity_content(
     let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     while (*ctxt).input == input
         && (*(*ctxt).input).cur < (*(*ctxt).input).end
-        && IS_CHAR!(c as i32)
+        && xml_is_char(c as u32)
     {
         xml_buf_add(buf, (*(*ctxt).input).cur, l);
         (*ctxt).advance_with_line_handling(l as usize);
@@ -7024,7 +7024,7 @@ unsafe extern "C" fn xml_load_entity_content(
             .sizeentities
             .saturating_add((*(*ctxt).input).consumed);
         xml_pop_input(ctxt);
-    } else if !IS_CHAR!(c as i32) {
+    } else if !xml_is_char(c as u32) {
         xml_fatal_err_msg_int(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
@@ -7444,7 +7444,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
              * OK loop until we reach one of the ending c_char or a size limit.
              */
             let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-            while ((*ctxt).current_byte() != limit /* checked */ && IS_CHAR!(c as i32) && c != '<')
+            while ((*ctxt).current_byte() != limit /* checked */ && xml_is_char(c as u32) && c != '<')
                 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
             {
                 if c == '&' {
@@ -7683,7 +7683,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
             if (*ctxt).current_byte() == b'<' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrLtInAttribute, null());
             } else if (*ctxt).current_byte() != limit {
-                if c != '\0' && !IS_CHAR!(c as i32) {
+                if c != '\0' && !xml_is_char(c as u32) {
                     xml_fatal_err_msg(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
@@ -8500,7 +8500,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     'done: {
         while ((*ctxt).current_byte() != b'>'
             && ((*ctxt).current_byte() != b'/' || (*ctxt).nth_byte(1) != b'>')
-            && IS_BYTE_CHAR!((*ctxt).current_byte()))
+            && xml_is_char((*ctxt).current_byte() as u32))
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             let mut len: c_int = -1;
@@ -9310,7 +9310,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
     let mut l: c_int = 0;
 
     let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
-    while cur != '<' /* checked */ && cur != '&' && IS_CHAR!(cur as i32)
+    while cur != '<' /* checked */ && cur != '&' && xml_is_char(cur as u32)
     /* test also done in xmlCurrentChar() */
     {
         if cur == ']' && (*ctxt).nth_byte(1) == b']' && (*ctxt).nth_byte(2) == b'>' {
@@ -9727,7 +9727,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
         return;
     }
     (*ctxt).skip_blanks();
-    if !IS_BYTE_CHAR!((*ctxt).current_byte()) || (*ctxt).current_byte() != b'>' {
+    if !xml_is_char((*ctxt).current_byte() as u32) || (*ctxt).current_byte() != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, null());
     } else {
         (*ctxt).advance(1);
@@ -9832,7 +9832,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
      */
     (*ctxt).grow();
     (*ctxt).skip_blanks();
-    if !IS_BYTE_CHAR!((*ctxt).current_byte()) || (*ctxt).current_byte() != b'>' {
+    if !xml_is_char((*ctxt).current_byte() as u32) || (*ctxt).current_byte() != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, null());
     } else {
         (*ctxt).advance(1);
@@ -9886,7 +9886,7 @@ unsafe extern "C" fn xml_check_cdata_push(
     len: c_int,
     complete: c_int,
 ) -> c_int {
-    use crate::xml_is_char_q;
+    use super::chvalid::xml_is_char;
 
     let mut ix: c_int;
     let mut c: c_uchar;
@@ -9917,7 +9917,7 @@ unsafe extern "C" fn xml_check_cdata_push(
             }
             codepoint = (*utf.add(ix as usize) as i32 & 0x1f) << 6;
             codepoint |= *utf.add(ix as usize + 1) as i32 & 0x3f;
-            if !xml_is_char_q!(codepoint) {
+            if !xml_is_char(codepoint as u32) {
                 return -ix;
             }
             ix += 2;
@@ -9933,7 +9933,7 @@ unsafe extern "C" fn xml_check_cdata_push(
             codepoint = (*utf.add(ix as usize) as i32 & 0xf) << 12;
             codepoint |= (*utf.add(ix as usize + 1) as i32 & 0x3f) << 6;
             codepoint |= *utf.add(ix as usize + 2) as i32 & 0x3f;
-            if !xml_is_char_q!(codepoint) {
+            if !xml_is_char(codepoint as u32) {
                 return -ix;
             }
             ix += 3;
@@ -9952,7 +9952,7 @@ unsafe extern "C" fn xml_check_cdata_push(
             codepoint |= (*utf.add(ix as usize + 1) as i32 & 0x3f) << 12;
             codepoint |= (*utf.add(ix as usize + 2) as i32 & 0x3f) << 6;
             codepoint |= *utf.add(ix as usize + 3) as i32 & 0x3f;
-            if !xml_is_char_q!(codepoint) {
+            if !xml_is_char(codepoint as u32) {
                 return -ix;
             }
             ix += 4;
@@ -13688,7 +13688,7 @@ pub(crate) unsafe extern "C" fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> c_
             c"xmlParseCharRef: character reference out of bounds\n".as_ptr() as _,
             val,
         );
-    } else if IS_CHAR!(val) {
+    } else if xml_is_char(val as u32) {
         return val;
     } else {
         xml_fatal_err_msg_int(
@@ -13743,7 +13743,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
 
     (*ctxt).instate = XmlParserInputState::XmlParserCDATASection;
     let mut r = (*ctxt).current_char(&mut rl).unwrap_or('\0');
-    if !IS_CHAR!(r as i32) {
+    if !xml_is_char(r as u32) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, null());
         // goto out;
         if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -13754,7 +13754,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
     }
     (*ctxt).advance_with_line_handling(rl as usize);
     let mut s = (*ctxt).current_char(&mut sl).unwrap_or('\0');
-    if !IS_CHAR!(s as i32) {
+    if !xml_is_char(s as u32) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrCDATANotFinished, null());
         // goto out;
         if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -13775,7 +13775,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         xml_free(buf as _);
         return;
     }
-    while IS_CHAR!(cur as i32) && (r != ']' || s != ']' || cur != '>') {
+    while xml_is_char(cur as u32) && (r != ']' || s != ']' || cur != '>') {
         if len + 5 >= size {
             let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize * 2) as *mut XmlChar;
             if tmp.is_null() {

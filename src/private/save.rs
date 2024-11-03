@@ -8,12 +8,12 @@ use std::{ffi::c_int, ptr::null_mut, sync::atomic::Ordering};
 use crate::{
     io::XmlOutputBufferPtr,
     libxml::{
+        chvalid::xml_is_char,
         tree::{XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlNsPtr},
         xmlerror::XmlParserErrors,
         xmlsave::{xml_ns_dump_output, xml_save_err, xml_serialize_hex_char_ref},
         xmlstring::XmlChar,
     },
-    IS_CHAR,
 };
 
 use super::buf::xml_buf_add;
@@ -131,7 +131,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
                 val |= *cur.add(3) as i32 & 0x3F;
                 l = 4;
             }
-            if l == 1 || !IS_CHAR!(val) {
+            if l == 1 || !xml_is_char(val as u32) {
                 xml_save_err(
                     XmlParserErrors::XmlSaveCharInvalid as _,
                     attr as _,

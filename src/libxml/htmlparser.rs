@@ -53,11 +53,11 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR, IS_CHAR_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER,
-    IS_LETTER, IS_PUBIDCHAR_CH,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH, IS_COMBINING, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    IS_PUBIDCHAR_CH,
 };
 
-use super::chvalid::xml_is_blank_char;
+use super::chvalid::{xml_is_blank_char, xml_is_char};
 
 /*
  * Most of the back-end structures from XML and HTML are shared.
@@ -5995,7 +5995,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
                 }
             }
 
-            if !IS_CHAR!(val) {
+            if !xml_is_char(val as u32) {
                 html_parse_err_int(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
@@ -6373,7 +6373,7 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
     /*
      * Check the value IS_CHAR ...
      */
-    if IS_CHAR!(val) {
+    if xml_is_char(val as u32) {
         return val;
     } else if val >= 0x110000 {
         html_parse_err(
@@ -7898,7 +7898,7 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                 break; /* while */
             }
         }
-        if IS_CHAR!(cur) {
+        if xml_is_char(cur as u32) {
             COPY_BUF!(ctxt, l, buf.as_mut_ptr(), nbchar, cur);
         } else {
             html_parse_err_int(
@@ -8377,7 +8377,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                         }
                         buf = tmp;
                     }
-                    if IS_CHAR!(q) {
+                    if xml_is_char(q as u32) {
                         COPY_BUF!(ctxt, ql, buf, len, q);
                     } else {
                         html_parse_err_int(
@@ -8545,7 +8545,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     }
                     buf = tmp;
                 }
-                if IS_CHAR!(cur) {
+                if xml_is_char(cur as u32) {
                     COPY_BUF!(ctxt, l, buf, len, cur);
                 } else {
                     html_parse_err_int(
@@ -8965,7 +8965,7 @@ unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, read
         && (cur != b'&' as i32 || (*ctxt).token == b'&' as i32)
         && cur != 0
     {
-        if !IS_CHAR!(cur) {
+        if !xml_is_char(cur as u32) {
             html_parse_err_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,

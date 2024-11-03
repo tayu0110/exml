@@ -50,8 +50,9 @@ use crate::{
         },
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
-    IS_CHAR,
 };
+
+use super::chvalid::xml_is_char;
 
 /**
  * XINCLUDE_NS:
@@ -2274,7 +2275,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
 
         let cur: c_int =
             xml_string_current_char(null_mut(), content.add(i as usize), addr_of_mut!(l));
-        if !IS_CHAR!(cur) {
+        if !xml_is_char(cur as u32) {
             xml_xinclude_err(
                 ctxt,
                 (*refe).elem,

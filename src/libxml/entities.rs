@@ -40,10 +40,9 @@ use crate::{
         },
     },
     private::error::__xml_simple_error,
-    IS_BYTE_CHAR, IS_CHAR,
 };
 
-use super::hash::CVoidWrapper;
+use super::{chvalid::xml_is_char, hash::CVoidWrapper};
 
 /*
  * The different valid entity types.
@@ -1119,7 +1118,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                         val |= *cur.add(3) as i32 & 0x3F;
                         l = 4;
                     }
-                    if l == 1 || !IS_CHAR!(val) {
+                    if l == 1 || !xml_is_char(val as u32) {
                         xml_entities_err(
                             XmlParserErrors::XmlErrInvalidChar,
                             c"xmlEncodeEntities: char out of range\n".as_ptr() as _,
@@ -1162,7 +1161,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                     cur = cur.add(l as usize);
                     continue;
                 }
-            } else if IS_BYTE_CHAR!(*cur) {
+            } else if xml_is_char(*cur as u32) {
                 let mut buf: [c_char; 11] = [0; 11];
                 let mut ptr: *mut c_char;
 
