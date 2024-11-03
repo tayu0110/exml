@@ -116,11 +116,14 @@ use crate::{
             xml_cleanup_threads_internal, xml_init_threads_internal,
         },
     },
-    IS_LETTER, IS_PUBIDCHAR_CH,
+    IS_LETTER,
 };
 
 use super::{
-    chvalid::{xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
+    chvalid::{
+        xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
+        xml_is_pubid_char,
+    },
     parser_internals::{xml_err_encoding_int, LINE_LEN, XML_MAX_LOOKUP_LIMIT},
 };
 
@@ -12257,7 +12260,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pubid_literal(ctxt: XmlParserCtxtPtr) 
     }
     (*ctxt).instate = XmlParserInputState::XmlParserPublicLiteral;
     cur = (*ctxt).current_byte();
-    while IS_PUBIDCHAR_CH!(cur) && cur != stop {
+    while xml_is_pubid_char(cur as u32) && cur != stop {
         /* checked */
         if len + 1 >= size {
             size *= 2;

@@ -48,10 +48,13 @@ use crate::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
     },
-    IS_LETTER, IS_PUBIDCHAR_CH, SYSCONFDIR,
+    IS_LETTER, SYSCONFDIR,
 };
 
-use super::{chvalid::xml_is_digit, hash::CVoidWrapper};
+use super::{
+    chvalid::{xml_is_digit, xml_is_pubid_char},
+    hash::CVoidWrapper,
+};
 
 /**
  * XML_CATALOGS_NAMESPACE:
@@ -427,7 +430,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog_pubid(
         xml_catalog_err_memory(c"allocating public ID".as_ptr() as _);
         return null_mut();
     }
-    while IS_PUBIDCHAR_CH!(*cur) || *cur == b'?' {
+    while xml_is_pubid_char(*cur as u32) || *cur == b'?' {
         if *cur == stop && stop != b' ' {
             break;
         }

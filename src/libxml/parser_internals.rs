@@ -253,33 +253,6 @@ macro_rules! IS_ASCII_DIGIT {
 	}
 }
 
-/**
- * IS_PUBIDCHAR:
- * @c:  an UNICODE value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- *
- * [13] PubidChar ::= #x20 | #xD | #xA | [a-zA-Z0-9] | [-'()+,./:=?;!*#@$_%]
- */
-// macro_rules! IS_PUBIDCHAR {
-// 	($( $c:tt )*) => {	xmlIsPubidCharQ($( $c )*)
-// 	}
-// }
-
-/**
- * IS_PUBIDCHAR_CH:
- * @c:  an xmlChar value (normally c_uchar)
- *
- * Same as IS_PUBIDCHAR but for single-byte value
- */
-#[macro_export]
-macro_rules! IS_PUBIDCHAR_CH {
-    ( $c:expr ) => {
-        $crate::xml_is_pubid_char_ch!($c)
-    };
-}
-
 macro_rules! RAW {
     ($ctxt:expr) => {
         *(*(*$ctxt).input).cur
