@@ -56,7 +56,7 @@ use crate::private::parser::{__xml_err_encoding, xml_err_memory};
 use crate::{__xml_raise_error, generic_error};
 
 use super::catalog::xml_catalog_add_local;
-use super::chvalid::{xml_is_base_char, xml_is_blank_char, xml_is_char};
+use super::chvalid::{xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_ideographic};
 use super::dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, xml_dict_set_limit};
 use super::entities::XmlEntityType;
 use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
@@ -196,22 +196,6 @@ macro_rules! IS_CHAR_CH {
 }
 
 /**
- * IS_IDEOGRAPHIC:
- * @c:  an UNICODE value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- *
- * [86] Ideographic ::= [#x4E00-#x9FA5] | #x3007 | [#x3021-#x3029]
- */
-#[macro_export]
-macro_rules! IS_IDEOGRAPHIC {
-    ( $c:expr ) => {
-        $crate::xml_is_ideographic_q!($c)
-    };
-}
-
-/**
  * IS_LETTER:
  * @c:  an UNICODE value (c_int)
  *
@@ -223,7 +207,8 @@ macro_rules! IS_IDEOGRAPHIC {
 #[macro_export]
 macro_rules! IS_LETTER {
     ( $c:expr ) => {
-        $crate::libxml::chvalid::xml_is_base_char($c) || $crate::IS_IDEOGRAPHIC!($c)
+        $crate::libxml::chvalid::xml_is_base_char($c)
+            || $crate::libxml::chvalid::xml_is_ideographic($c)
     };
 }
 
@@ -345,7 +330,7 @@ pub static XML_STRING_COMMENT: &CStr = c"comment";
  * Returns 0 if not, non-zero otherwise
  */
 pub unsafe extern "C" fn xml_is_letter(c: c_int) -> c_int {
-    (xml_is_base_char(c as u32) || IS_IDEOGRAPHIC!(c as u32)) as i32
+    (xml_is_base_char(c as u32) || xml_is_ideographic(c as u32)) as i32
 }
 
 /**
