@@ -48,10 +48,10 @@ use crate::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
     },
-    IS_DIGIT, IS_LETTER, IS_PUBIDCHAR_CH, SYSCONFDIR,
+    IS_LETTER, IS_PUBIDCHAR_CH, SYSCONFDIR,
 };
 
-use super::hash::CVoidWrapper;
+use super::{chvalid::xml_is_digit, hash::CVoidWrapper};
 
 /**
  * XML_CATALOGS_NAMESPACE:
@@ -374,7 +374,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog_name(
     }
 
     while IS_LETTER!(c)
-        || IS_DIGIT!(c)
+        || xml_is_digit(c)
         || c == b'.' as u32
         || c == b'-' as u32
         || c == b'_' as u32

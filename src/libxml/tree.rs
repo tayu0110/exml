@@ -849,8 +849,8 @@ macro_rules! CUR_SCHAR {
 ))]
 pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining},
-        IS_DIGIT, IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
+        IS_EXTENDER, IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -912,7 +912,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
     cur = cur.add(l as usize);
     c = CUR_SCHAR!(cur, l);
     while IS_LETTER!(c as u32)
-        || IS_DIGIT!(c as u32)
+        || xml_is_digit(c as u32)
         || c == b'.' as i32
         || c == b'-' as i32
         || c == b'_' as i32
@@ -948,8 +948,8 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining},
-        IS_DIGIT, IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
+        IS_EXTENDER, IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1028,7 +1028,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
     cur = cur.add(l as usize);
     c = CUR_SCHAR!(cur, l);
     while IS_LETTER!(c as u32)
-        || IS_DIGIT!(c as u32)
+        || xml_is_digit(c as u32)
         || c == b'.' as i32
         || c == b'-' as i32
         || c == b'_' as i32
@@ -1047,7 +1047,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
         cur = cur.add(l as usize);
         c = CUR_SCHAR!(cur, l);
         while IS_LETTER!(c as u32)
-            || IS_DIGIT!(c as u32)
+            || xml_is_digit(c as u32)
             || c == b'.' as i32
             || c == b'-' as i32
             || c == b'_' as i32
@@ -1083,8 +1083,8 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining},
-        IS_DIGIT, IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
+        IS_EXTENDER, IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1148,7 +1148,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
     cur = cur.add(l as usize);
     c = CUR_SCHAR!(cur, l);
     while IS_LETTER!(c as u32)
-        || IS_DIGIT!(c as u32)
+        || xml_is_digit(c as u32)
         || c == b'.' as i32
         || c == b':' as i32
         || c == b'-' as i32
@@ -1184,8 +1184,8 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining},
-        IS_DIGIT, IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
+        IS_EXTENDER, IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1247,7 +1247,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
         }
     }
     if !(IS_LETTER!(c as u32)
-        || IS_DIGIT!(c as u32)
+        || xml_is_digit(c as u32)
         || c == b'.' as i32
         || c == b':' as i32
         || c == b'-' as i32
@@ -1260,7 +1260,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
     cur = cur.add(l as usize);
     c = CUR_SCHAR!(cur, l);
     while IS_LETTER!(c as u32)
-        || IS_DIGIT!(c as u32)
+        || xml_is_digit(c as u32)
         || c == b'.' as i32
         || c == b':' as i32
         || c == b'-' as i32

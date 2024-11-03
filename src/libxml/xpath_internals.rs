@@ -71,10 +71,10 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH, IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH, IS_EXTENDER, IS_LETTER,
 };
 
-use super::chvalid::xml_is_combining;
+use super::chvalid::{xml_is_combining, xml_is_digit};
 
 /************************************************************************
  *									*
@@ -4648,7 +4648,7 @@ unsafe extern "C" fn xml_xpath_scan_name(ctxt: XmlXPathParserContextPtr) -> *mut
         && c != '>' as i32
         && c != '/' as i32   /* test bigname.xml */
         && (IS_LETTER!(c as u32)
-            || IS_DIGIT!(c as u32)
+            || xml_is_digit(c as u32)
             || c == '.' as i32
             || c == '-' as i32
             || c == '_' as i32
@@ -9444,7 +9444,7 @@ unsafe extern "C" fn xml_xpath_parse_name_complex(
         && c != '>' as i32
         && c != '/' as i32  /* test bigname.xml */
         && (IS_LETTER!(c as u32)
-            || IS_DIGIT!(c as u32)
+            || xml_is_digit(c as u32)
             || c == '.' as i32
             || c == '-' as i32
             || c == '_' as i32
@@ -9472,7 +9472,7 @@ unsafe extern "C" fn xml_xpath_parse_name_complex(
             }
             memcpy(buffer as _, buf.as_ptr() as _, len as usize);
             while IS_LETTER!(c as u32)
-                || IS_DIGIT!(c as u32)  /* test bigname.xml */
+                || xml_is_digit(c as u32)  /* test bigname.xml */
                 || c == '.' as i32
                 || c == '-' as i32
                 || c == '_' as i32

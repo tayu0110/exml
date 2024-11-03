@@ -65,7 +65,7 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_DIGIT, IS_EXTENDER, IS_LETTER,
+    IS_EXTENDER, IS_LETTER,
 };
 
 use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
@@ -1855,6 +1855,8 @@ unsafe extern "C" fn xml_is_doc_name_start_char(doc: XmlDocPtr, c: c_int) -> c_i
 
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_is_doc_name_char(doc: XmlDocPtr, c: c_int) -> c_int {
+    use crate::libxml::chvalid::xml_is_digit;
+
     use super::chvalid::xml_is_combining;
 
     if doc.is_null() || (*doc).properties & XmlDocProperties::XmlDocOld10 as i32 == 0 {
@@ -1888,7 +1890,7 @@ unsafe extern "C" fn xml_is_doc_name_char(doc: XmlDocPtr, c: c_int) -> c_int {
             return 1;
         }
     } else if IS_LETTER!(c as u32)
-        || IS_DIGIT!(c as u32)
+        || xml_is_digit(c as u32)
         || c == b'.' as i32
         || c == b'-' as i32
         || c == b'_' as i32
