@@ -10,7 +10,7 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
 };
 
-use libc::{fprintf, memcpy, memset, printf, size_t, snprintf, strlen, FILE, INT_MAX};
+use libc::{fprintf, memcpy, memset, size_t, snprintf, strlen, FILE, INT_MAX};
 
 use crate::{
     __xml_raise_error,
@@ -678,10 +678,6 @@ pub(crate) unsafe extern "C" fn xml_reg_state_add_trans(
             && (*trans).counter == counter
             && (*trans).count == count
         {
-            // #ifdef DEBUG_REGEXP_GRAPH
-            // 	    printf("Ignoring duplicate transition from %d to %d\n",
-            // 		    (*state).no, (*target).no);
-            // #endif
             return;
         }
     }
@@ -708,19 +704,6 @@ pub(crate) unsafe extern "C" fn xml_reg_state_add_trans(
         }
         (*state).trans = tmp;
     }
-    // #ifdef DEBUG_REGEXP_GRAPH
-    //     printf("Add trans from %d to %d ", (*state).no, (*target).no);
-    //     if (count == REGEXP_ALL_COUNTER)
-    // 	printf("all transition\n");
-    //     else if (count >= 0)
-    // 	printf("count based %d\n", count);
-    //     else if (counter >= 0)
-    // 	printf("counted %d\n", counter);
-    //     else if (atom.is_null())
-    // 	printf("epsilon transition\n");
-    //     else if (atom != NULL)
-    //         xmlRegPrintAtom(stdout, atom);
-    // #endif
 
     (*(*state).trans.add((*state).nb_trans as usize)).atom = atom;
     (*(*state).trans.add((*state).nb_trans as usize)).to = (*target).no;
@@ -2245,9 +2228,6 @@ unsafe extern "C" fn xml_fa_parse_reg_exp(ctxt: XmlRegParserCtxtPtr, top: c_int)
     (*ctxt).end = null_mut();
     xml_fa_parse_branch(ctxt, null_mut());
     if top != 0 {
-        // #ifdef DEBUG_REGEXP_GRAPH
-        // 	printf("State %d is final\n", (*ctxt).(*state).no);
-        // #endif
         (*(*ctxt).state).typ = XmlRegStateType::XmlRegexpFinalState;
     }
     if CUR!(ctxt) != b'|' as _ {
@@ -2317,25 +2297,13 @@ unsafe extern "C" fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegPar
             newto = (*(*state).trans.add(0)).to;
 
             if matches!((*state).typ, XmlRegStateType::XmlRegexpStartState) {
-                // #ifdef DEBUG_REGEXP_GRAPH
-                // 		printf("Found simple epsilon trans from start %d to %d\n",
-                // 		       statenr, newto);
-                // #endif
             } else {
-                // #ifdef DEBUG_REGEXP_GRAPH
-                // 		printf("Found simple epsilon trans from %d to %d\n",
-                // 		       statenr, newto);
-                // #endif
                 for i in 0..(*state).nb_trans_to {
                     tmp = *(*ctxt)
                         .states
                         .add(*(*state).trans_to.add(i as usize) as usize);
                     for j in 0..(*tmp).nb_trans {
                         if (*(*tmp).trans.add(j as usize)).to == statenr {
-                            // #ifdef DEBUG_REGEXP_GRAPH
-                            // 			    printf("Changed transition %d on %d to go to %d\n",
-                            // 				   j, (*tmp).no, newto);
-                            // #endif
                             (*(*tmp).trans.add(j as usize)).to = -1;
                             xml_reg_state_add_trans(
                                 ctxt,
@@ -2375,9 +2343,6 @@ unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
     tonr: c_int,
     counter: c_int,
 ) {
-    // #ifdef DEBUG_REGEXP_GRAPH
-    //     printf("xmlFAReduceEpsilonTransitions(%d, %d)\n", fromnr, tonr);
-    // #endif
     let from: XmlRegStatePtr = *(*ctxt).states.add(fromnr as usize);
     if from.is_null() {
         return;
@@ -2395,9 +2360,6 @@ unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
 
     (*to).mark = XmlRegMarkedType::XmlRegexpMarkVisited;
     if matches!((*to).typ, XmlRegStateType::XmlRegexpFinalState) {
-        // #ifdef DEBUG_REGEXP_GRAPH
-        // 	printf("State %d is final, so %d becomes final\n", tonr, fromnr);
-        // #endif
         (*from).typ = XmlRegStateType::XmlRegexpFinalState;
     }
     for transnr in 0..(*to).nb_trans {
@@ -2421,26 +2383,20 @@ unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
                         -1,
                         (*(*to).trans.add(transnr as usize)).count,
                     );
+                } else if (*(*to).trans.add(transnr as usize)).counter >= 0 {
+                    xml_fa_reduce_epsilon_transitions(
+                        ctxt,
+                        fromnr,
+                        (*(*to).trans.add(transnr as usize)).to,
+                        (*(*to).trans.add(transnr as usize)).counter,
+                    );
                 } else {
-                    // #ifdef DEBUG_REGEXP_GRAPH
-                    // 		    printf("Found epsilon trans %d from %d to %d\n",
-                    // 			   transnr, tonr, (*(*to).trans.add(transnr as usize)).to);
-                    // #endif
-                    if (*(*to).trans.add(transnr as usize)).counter >= 0 {
-                        xml_fa_reduce_epsilon_transitions(
-                            ctxt,
-                            fromnr,
-                            (*(*to).trans.add(transnr as usize)).to,
-                            (*(*to).trans.add(transnr as usize)).counter,
-                        );
-                    } else {
-                        xml_fa_reduce_epsilon_transitions(
-                            ctxt,
-                            fromnr,
-                            (*(*to).trans.add(transnr as usize)).to,
-                            counter,
-                        );
-                    }
+                    xml_fa_reduce_epsilon_transitions(
+                        ctxt,
+                        fromnr,
+                        (*(*to).trans.add(transnr as usize)).to,
+                        counter,
+                    );
                 }
             }
         } else {
@@ -2491,9 +2447,6 @@ pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRe
     for statenr in 0..(*ctxt).nb_states {
         state = *(*ctxt).states.add(statenr as usize);
         if !state.is_null() && matches!((*state).typ, XmlRegStateType::XmlRegexpUnreachState) {
-            // #ifdef DEBUG_REGEXP_GRAPH
-            // 	    printf("Removed unreachable state %d\n", statenr);
-            // #endif
             xml_reg_free_state(state);
             *(*ctxt).states.add(statenr as usize) = null_mut();
         }
@@ -2523,17 +2476,9 @@ pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRe
             {
                 if (*(*state).trans.add(transnr as usize)).to == statenr {
                     (*(*state).trans.add(transnr as usize)).to = -1;
-                // #ifdef DEBUG_REGEXP_GRAPH
-                // 		    printf("Removed loopback epsilon trans %d on %d\n",
-                // 			   transnr, statenr);
-                // #endif
                 } else if (*(*state).trans.add(transnr as usize)).count < 0 {
                     let newto: c_int = (*(*state).trans.add(transnr as usize)).to;
 
-                    // #ifdef DEBUG_REGEXP_GRAPH
-                    // 		    printf("Found epsilon trans %d from %d to %d\n",
-                    // 			   transnr, statenr, newto);
-                    // #endif
                     has_epsilon = 1;
                     (*(*state).trans.add(transnr as usize)).to = -2;
                     (*state).mark = XmlRegMarkedType::XmlRegexpMarkStart;
@@ -2544,11 +2489,6 @@ pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRe
                         (*(*state).trans.add(transnr as usize)).counter,
                     );
                     (*state).mark = XmlRegMarkedType::XmlRegexpMarkNormal;
-                    // #ifdef DEBUG_REGEXP_GRAPH
-                    // 		} else {
-                    // 		    printf("Found counted transition %d on %d\n",
-                    // 			   transnr, statenr);
-                    // #endif
                 }
             }
         }
@@ -2630,9 +2570,6 @@ pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRe
     for statenr in 0..(*ctxt).nb_states {
         state = *(*ctxt).states.add(statenr as usize);
         if !state.is_null() && matches!((*state).reached, XmlRegMarkedType::XmlRegexpMarkNormal) {
-            // #ifdef DEBUG_REGEXP_GRAPH
-            // 	    printf("Removed unreachable state %d\n", statenr);
-            // #endif
             xml_reg_free_state(state);
             *(*ctxt).states.add(statenr as usize) = null_mut();
         }
@@ -2728,9 +2665,6 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
                 *state_remap.add(i as usize) = -1;
             }
         }
-        // #ifdef DEBUG_COMPACTION
-        // 	printf("Final: %d states\n", nbstates);
-        // #endif
         let string_map: *mut *mut XmlChar =
             xml_malloc((*ret).nb_atoms as usize * size_of::<*mut c_char>()) as _;
         if string_map.is_null() {
@@ -2791,9 +2725,6 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
                 return null_mut();
             }
         }
-        // #ifdef DEBUG_COMPACTION
-        // 	printf("Final: %d atoms\n", nbatoms);
-        // #endif
         let transitions: *mut c_int = xml_reg_calloc2(
             (nbstates + 1) as usize,
             (nbatoms + 1) as usize,
@@ -2857,11 +2788,6 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
                 if prev != 0 {
                     if prev != targetno + 1 {
                         (*ret).determinist = 0;
-                        // #ifdef DEBUG_COMPACTION
-                        // 			printf("Indet: state %d trans %d, atom %d to %d : %d to %d\n",
-                        // 			       i, j, (*(*trans).atom).no, (*trans).to, atomno, targetno);
-                        // 			printf("       previous to is %d\n", prev);
-                        // #endif
                         if !transdata.is_null() {
                             xml_free(transdata as _);
                         }
@@ -2883,10 +2809,6 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
                         return ret;
                     }
                 } else {
-                    // #if 0
-                    // 		    printf("State %d trans %d: atom %d to %d : %d to %d\n",
-                    // 			   i, j, (*(*trans).atom).no, (*trans).to, atomno, targetno);
-                    // #endif
                     *transitions.add((stateno * (nbatoms + 1) + atomno + 1) as usize) =
                         targetno + 1; /* to avoid 0 */
                     if !transdata.is_null() {
@@ -2897,18 +2819,6 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
             }
         }
         (*ret).determinist = 1;
-        // #ifdef DEBUG_COMPACTION
-        // 	/*
-        // 	 * Debug
-        // 	 */
-        // 	for (i = 0;i < nbstates;i++) {
-        // 	    for (j = 0;j < nbatoms + 1;j++) {
-        //                 printf("%02d ", transitions[i * (nbatoms + 1) + j]);
-        // 	    }
-        // 	    printf("\n");
-        // 	}
-        // 	printf("\n");
-        // #endif
         /*
          * Cleanup of the old data
          */
@@ -3056,9 +2966,6 @@ pub unsafe extern "C" fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
 unsafe extern "C" fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
     if (*exec).nb_rollbacks <= 0 {
         (*exec).status = -1;
-        // #ifdef DEBUG_REGEXP_EXEC
-        // 	printf("rollback failed on empty stack\n");
-        // #endif
         return;
     }
     (*exec).nb_rollbacks -= 1;
@@ -3070,7 +2977,6 @@ unsafe extern "C" fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
             .counts
             .is_null()
         {
-            // fprintf(stderr, c"exec save: allocation failed".as_ptr());
             eprint!("exec save: allocation failed");
             (*exec).status = -6;
             return;
@@ -3083,11 +2989,6 @@ unsafe extern "C" fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
             );
         }
     }
-
-    // #ifdef DEBUG_REGEXP_EXEC
-    //     printf("restored ");
-    //     xmlFARegDebugExec(exec);
-    // #endif
 }
 
 unsafe extern "C" fn xml_reg_check_character_range(
@@ -3367,7 +3268,7 @@ unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: c_i
             return accept;
         }
         XmlRegAtomType::XmlRegexpString => {
-            printf(c"TODO: XML_REGEXP_STRING\n".as_ptr());
+            println!("TODO: XML_REGEXP_STRING");
             return -1;
         }
         XmlRegAtomType::XmlRegexpAnychar
@@ -3435,18 +3336,10 @@ unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: c_i
 }
 
 unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
-    // #ifdef DEBUG_REGEXP_EXEC
-    //     printf("saving ");
-    //     (*exec).transno++;
-    //     xmlFARegDebugExec(exec);
-    //     (*exec).transno--;
-    // #endif
-    // #ifdef MAX_PUSH
     if (*exec).nb_push as usize > MAX_PUSH {
         return;
     }
     (*exec).nb_push += 1;
-    // #endif
 
     if (*exec).max_rollbacks == 0 {
         (*exec).max_rollbacks = 4;
@@ -3616,16 +3509,11 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
                         let count: c_int = *(*exec).counts.add((*trans).count as usize);
                         let counter: XmlRegCounterPtr =
                             (*(*exec).comp).counters.add((*trans).count as usize);
-                        // #ifdef DEBUG_REGEXP_EXEC
-                        // 		printf("testing count %d: val %d, min %d, max %d\n",
-                        // 		       (*trans).count, count, (*counter).min,  (*counter).max);
-                        // #endif
                         ret = (count >= (*counter).min && count <= (*counter).max) as i32;
                         if ret != 0 && (*counter).min != (*counter).max {
                             deter = 0;
                         }
                     } else if atom.is_null() {
-                        // fprintf(stderr, c"epsilon transition left at runtime\n".as_ptr());
                         eprintln!("epsilon transition left at runtime");
                         (*exec).status = -2;
                         break;
@@ -3662,9 +3550,6 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
                                 xml_fa_reg_exec_save(exec);
                             }
                             if (*trans).counter >= 0 {
-                                // #ifdef DEBUG_REGEXP_EXEC
-                                // 			printf("Increasing count %d\n", (*trans).counter);
-                                // #endif
                                 *(*exec).counts.add((*trans).counter as usize) += 1;
                             }
                             (*exec).transcount = 1;
@@ -3723,9 +3608,6 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
                                     (*exec).status = -1;
                                     break 'error;
                                 }
-                                // #ifdef DEBUG_REGEXP_EXEC
-                                // 			printf("Decreasing count %d\n", (*trans).counter);
-                                // #endif
                                 *(*exec).counts.add((*trans).counter as usize) -= 1;
                             }
                         } else if ret == 0 && (*atom).min == 0 && (*atom).max > 0 {
@@ -3750,14 +3632,6 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
                                 && deter == 0
                                 && (*(*exec).state).nb_trans > (*exec).transno + 1)
                         {
-                            // #ifdef DEBUG_REGEXP_EXEC
-                            // 		    if ((*trans).nd == 1)
-                            // 		        printf("Saving on nd transition atom %d for %c at %d\n",
-                            // 			       (*trans).(*atom).no, codepoint, (*exec).index);
-                            // 		    else
-                            // 		        printf("Saving on counted transition count %d for %c at %d\n",
-                            // 			       (*trans).count, codepoint, (*exec).index);
-                            // #endif
                             xml_fa_reg_exec_save(exec);
                         }
                         if (*trans).counter >= 0 {
@@ -3774,9 +3648,6 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
                             if *(*exec).counts.add((*trans).counter as usize) >= (*counter).max {
                                 continue; /* for loop on transitions */
                             }
-                            // #ifdef DEBUG_REGEXP_EXEC
-                            // 		    printf("Increasing count %d\n", (*trans).counter);
-                            // #endif
                             *(*exec).counts.add((*trans).counter as usize) += 1;
                         }
                         if (*trans).count >= 0 && ((*trans).count as usize) < REGEXP_ALL_COUNTER {
@@ -3784,15 +3655,8 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
                                 (*exec).status = -1;
                                 break 'error;
                             }
-                            // #ifdef DEBUG_REGEXP_EXEC
-                            // 		    printf("resetting count %d on transition\n",
-                            // 		           (*trans).count);
-                            // #endif
                             *(*exec).counts.add((*trans).count as usize) = 0;
                         }
-                        // #ifdef DEBUG_REGEXP_EXEC
-                        // 		printf("entering state %d\n", (*trans).to);
-                        // #endif
                         (*exec).state = *(*comp).states.add((*trans).to as usize);
                         (*exec).transno = 0;
                         if !(*trans).atom.is_null() {
@@ -3814,10 +3678,6 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
              * Failed to find a way out
              */
             (*exec).determinist = 0;
-            // #ifdef DEBUG_REGEXP_EXEC
-            // 	    printf("rollback from state %d on %d:%c\n", (*(*exec).state).no,
-            // 	           codepoint,codepoint);
-            // #endif
             xml_fa_reg_exec_roll_back(exec);
         }
     }
@@ -4993,10 +4853,6 @@ pub(crate) unsafe extern "C" fn xml_fa_computes_determinism(ctxt: XmlRegParserCt
     let mut ret: c_int = 1;
     let mut deep: c_int = 1;
 
-    // #ifdef DEBUG_REGEXP_GRAPH
-    //     printf("xmlFAComputesDeterminism\n");
-    //     xmlRegPrintCtxt(stdout, ctxt);
-    // #endif
     if (*ctxt).determinist != -1 {
         return (*ctxt).determinist;
     }
@@ -5356,10 +5212,6 @@ unsafe extern "C" fn xml_reg_compact_push_string(
         return 0;
     }
 
-    // #ifdef DEBUG_PUSH
-    //     printf("value pushed: %s\n", value);
-    // #endif
-
     /*
      * Examine all outside transitions from current state
      */
@@ -5383,9 +5235,6 @@ unsafe extern "C" fn xml_reg_compact_push_string(
                         );
                     }
                 }
-                // #ifdef DEBUG_PUSH
-                // 		printf("entering state %d\n", target);
-                // #endif
                 if *(*comp)
                     .compact
                     .add(target as usize * ((*comp).nbstrings + 1) as usize)
@@ -5410,9 +5259,6 @@ unsafe extern "C" fn xml_reg_compact_push_string(
      * Failed to find an exit transition out from current state for the
      * current token
      */
-    // #ifdef DEBUG_PUSH
-    //     printf("failed to find a transition for %s on state %d\n", value, state);
-    // #endif
     // error:
     if !(*exec).err_string.is_null() {
         xml_free((*exec).err_string as _);
@@ -5420,9 +5266,6 @@ unsafe extern "C" fn xml_reg_compact_push_string(
     (*exec).err_string = xml_strdup(value);
     (*exec).err_state_no = state;
     (*exec).status = -1;
-    // #ifdef DEBUG_ERR
-    //     testerr(exec);
-    // #endif
     -1
 }
 
@@ -5431,9 +5274,6 @@ unsafe extern "C" fn xml_fareg_exec_save_input_string(
     value: *const XmlChar,
     data: *mut c_void,
 ) {
-    // #ifdef DEBUG_PUSH
-    //     printf("saving value: %d:%s\n", (*exec).inputStackNr, value);
-    // #endif
     if (*exec).input_stack_max == 0 {
         (*exec).input_stack_max = 4;
         (*exec).input_stack =
@@ -5509,9 +5349,6 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
         is_final = 1;
     }
 
-    // #ifdef DEBUG_PUSH
-    //     printf("value pushed: %s\n", value);
-    // #endif
     /*
      * If we have an active rollback stack push the new value there
      * and get back to where we were left
@@ -5520,9 +5357,6 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
         xml_fareg_exec_save_input_string(exec, value, data);
         value = (*(*exec).input_stack.add((*exec).index as usize)).value;
         data = (*(*exec).input_stack.add((*exec).index as usize)).data;
-        // #ifdef DEBUG_PUSH
-        // 	printf("value loaded: %s\n", value);
-        // #endif
     }
 
     'b: while (*exec).status == 0
@@ -5560,9 +5394,6 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
 
                         ret = 0;
 
-                        // #ifdef DEBUG_PUSH
-                        // 		printf("testing all lax %d\n", (*trans).count);
-                        // #endif
                         /*
                          * Check all counted transitions from the current state
                          */
@@ -5600,9 +5431,6 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
 
                         ret = 1;
 
-                        // #ifdef DEBUG_PUSH
-                        // 		printf("testing all %d\n", (*trans).count);
-                        // #endif
                         /*
                          * Check all counted transitions from the current state
                          */
@@ -5626,13 +5454,8 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                         let count: c_int = *(*exec).counts.add((*trans).count as usize);
                         let counter: XmlRegCounterPtr =
                             (*(*exec).comp).counters.add((*trans).count as usize);
-                        // #ifdef DEBUG_PUSH
-                        // 		printf("testing count %d: val %d, min %d, max %d\n",
-                        // 		       (*trans).count, count, (*counter).min,  (*counter).max);
-                        // #endif
                         ret = (count >= (*counter).min && count <= (*counter).max) as _;
                     } else if atom.is_null() {
-                        // fprintf(stderr, "epsilon transition left at runtime\n");
                         eprintln!("epsilon transition left at runtime");
                         (*exec).status = -2;
                         break;
@@ -5677,9 +5500,6 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                                 (*exec).index += 1;
                                 value = (*(*exec).input_stack.add((*exec).index as usize)).value;
                                 data = (*(*exec).input_stack.add((*exec).index as usize)).data;
-                                // #ifdef DEBUG_PUSH
-                                // 			printf("value loaded: %s\n", value);
-                                // #endif
 
                                 /*
                                  * End of input: stop here
@@ -5742,21 +5562,11 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                             xml_fa_reg_exec_save(exec);
                         }
                         if (*trans).counter >= 0 {
-                            // #ifdef DEBUG_PUSH
-                            // 		    printf("Increasing count %d\n", (*trans).counter);
-                            // #endif
                             *(*exec).counts.add((*trans).counter as usize) += 1;
                         }
                         if (*trans).count >= 0 && ((*trans).count as usize) < REGEXP_ALL_COUNTER {
-                            // #ifdef DEBUG_REGEXP_EXEC
-                            // 		    printf("resetting count %d on transition\n",
-                            // 		           (*trans).count);
-                            // #endif
                             *(*exec).counts.add((*trans).count as usize) = 0;
                         }
-                        // #ifdef DEBUG_PUSH
-                        // 		printf("entering state %d\n", (*trans).to);
-                        // #endif
                         if !(*(*(*exec).comp).states.add((*trans).to as usize)).is_null()
                             && matches!(
                                 (*(*(*(*exec).comp).states.add((*trans).to as usize))).typ,
@@ -5787,22 +5597,13 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                                     value =
                                         (*(*exec).input_stack.add((*exec).index as usize)).value;
                                     data = (*(*exec).input_stack.add((*exec).index as usize)).data;
-                                // #ifdef DEBUG_PUSH
-                                // 			    printf("value loaded: %s\n", value);
-                                // #endif
                                 } else {
                                     value = null_mut();
                                     data = null_mut();
-                                    // #ifdef DEBUG_PUSH
-                                    // 			    printf("end of input\n");
-                                    // #endif
                                 }
                             } else {
                                 value = null_mut();
                                 data = null_mut();
-                                // #ifdef DEBUG_PUSH
-                                // 			printf("end of input\n");
-                                // #endif
                             }
                         }
                         break 'progress;
@@ -5851,19 +5652,11 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
         if !(*exec).input_stack.is_null() && (*exec).status == 0 {
             value = (*(*exec).input_stack.add((*exec).index as usize)).value;
             data = (*(*exec).input_stack.add((*exec).index as usize)).data;
-            // #ifdef DEBUG_PUSH
-            // 		printf("value loaded: %s\n", value);
-            // #endif
         }
     }
     if (*exec).status == 0 {
         return matches!((*(*exec).state).typ, XmlRegStateType::XmlRegexpFinalState) as _;
     }
-    // #ifdef DEBUG_ERR
-    //     if ((*exec).status < 0) {
-    // 	testerr(exec);
-    //     }
-    // #endif
     (*exec).status
 }
 
@@ -6523,7 +6316,6 @@ unsafe extern "C" fn xml_exp_parse_or(ctxt: XmlExpCtxtPtr) -> XmlExpNodePtr {
         ret = xml_exp_parse_expr(ctxt);
         SKIP_BLANKS!(ctxt);
         if *(*ctxt).cur != b')' as i8 {
-            // fprintf(stderr, "unbalanced '(' : %s\n", base);
             eprintln!(
                 "unbalanced '(' : {}",
                 CStr::from_ptr(base as _).to_string_lossy()
@@ -7431,22 +7223,13 @@ unsafe extern "C" fn xml_exp_string_derive_int(
         return FORBIDDEN_EXP;
     } else if (*exp).typ == XmlExpNodeType::XmlExpAtom as u8 {
         if (*exp).field.f_str == str {
-            // #ifdef DEBUG_DERIV
-            // 		printf("deriv atom: equal => Empty\n");
-            // #endif
             ret = EMPTY_EXP;
         } else {
-            // #ifdef DEBUG_DERIV
-            // 		printf("deriv atom: mismatch => forbid\n");
-            // #endif
             /* TODO wildcards here */
             ret = FORBIDDEN_EXP;
         }
         return ret;
     } else if (*exp).typ == XmlExpNodeType::XmlExpOr as u8 {
-        // #ifdef DEBUG_DERIV
-        // 	    printf("deriv or: => or(derivs)\n");
-        // #endif
         let tmp: XmlExpNodePtr = xml_exp_string_derive_int(ctxt, (*exp).exp_left, str);
         if tmp.is_null() {
             return null_mut();
@@ -7459,23 +7242,14 @@ unsafe extern "C" fn xml_exp_string_derive_int(
         ret = xml_exp_hash_get_entry(ctxt, XmlExpNodeType::XmlExpOr, tmp, ret, null(), 0, 0);
         return ret;
     } else if (*exp).typ == XmlExpNodeType::XmlExpSeq as u8 {
-        // #ifdef DEBUG_DERIV
-        // 	    printf("deriv seq: starting with left\n");
-        // #endif
         ret = xml_exp_string_derive_int(ctxt, (*exp).exp_left, str);
         if ret.is_null() {
             return null_mut();
         } else if ret == FORBIDDEN_EXP {
             if IS_NILLABLE!((*exp).exp_left) != 0 {
-                // #ifdef DEBUG_DERIV
-                // 		    printf("deriv seq: left failed but nillable\n");
-                // #endif
                 ret = xml_exp_string_derive_int(ctxt, (*exp).field.children.f_right, str);
             }
         } else {
-            // #ifdef DEBUG_DERIV
-            // 		printf("deriv seq: left match => sequence\n");
-            // #endif
             (*(*exp).field.children.f_right).refe += 1;
             ret = xml_exp_hash_get_entry(
                 ctxt,
@@ -7497,9 +7271,6 @@ unsafe extern "C" fn xml_exp_string_derive_int(
             return null_mut();
         }
         if ret == FORBIDDEN_EXP {
-            // #ifdef DEBUG_DERIV
-            // 		printf("deriv count: pattern mismatch => forbid\n");
-            // #endif
             return ret;
         }
         if (*exp).field.count.f_max == 1 {
@@ -7528,14 +7299,8 @@ unsafe extern "C" fn xml_exp_string_derive_int(
             max,
         );
         if ret == EMPTY_EXP {
-            // #ifdef DEBUG_DERIV
-            // 		printf("deriv count: match to empty => new count\n");
-            // #endif
             return tmp;
         }
-        // #ifdef DEBUG_DERIV
-        // 	    printf("deriv count: match => sequence with new count\n");
-        // #endif
         return xml_exp_hash_get_entry(ctxt, XmlExpNodeType::XmlExpSeq, ret, tmp, null(), 0, 0);
     }
     null_mut()
@@ -7666,17 +7431,11 @@ unsafe extern "C" fn xml_exp_divide(
             } else {
                 xml_exp_free(ctxt, tmp);
             }
-            //  #ifdef DEBUG_DERIV
-            //          printf("Divide succeeded %d\n", i);
-            //  #endif
             return i;
         }
         xml_exp_free(ctxt, tmp);
         xml_exp_free(ctxt, tmp2);
     }
-    //  #ifdef DEBUG_DERIV
-    //      printf("Divide failed\n");
-    //  #endif
     0
 }
 
@@ -7708,25 +7467,16 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
      * amount, then the derivation is empty
      */
     if exp == sub && (*exp).c_max >= 0 {
-        // #ifdef DEBUG_DERIV
-        //         printf("Equal(exp, sub) and finite -> Empty\n");
-        // #endif
         return EMPTY_EXP;
     }
     /*
      * decompose sub sequence first
      */
     if (*sub).typ == XmlExpNodeType::XmlExpEmpty as u8 {
-        // #ifdef DEBUG_DERIV
-        //         printf("Empty(sub) -> Empty\n");
-        // #endif
         (*exp).refe += 1;
         return exp;
     }
     if (*sub).typ == XmlExpNodeType::XmlExpSeq as u8 {
-        // #ifdef DEBUG_DERIV
-        //         printf("Seq(sub) -> decompose\n");
-        // #endif
         tmp = xml_exp_exp_derive_int(ctxt, exp, (*sub).exp_left);
         if tmp.is_null() {
             return null_mut();
@@ -7739,9 +7489,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
         return ret;
     }
     if (*sub).typ == XmlExpNodeType::XmlExpOr as u8 {
-        // #ifdef DEBUG_DERIV
-        //         printf("Or(sub) -> decompose\n");
-        // #endif
         tmp = xml_exp_exp_derive_int(ctxt, exp, (*sub).exp_left);
         if tmp == FORBIDDEN_EXP {
             return tmp;
@@ -7757,36 +7504,21 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
         return xml_exp_hash_get_entry(ctxt, XmlExpNodeType::XmlExpOr, tmp, ret, null(), 0, 0);
     }
     if xml_exp_check_card(exp, sub) == 0 {
-        // #ifdef DEBUG_DERIV
-        //         printf("CheckCard(exp, sub) failed -> Forbid\n");
-        // #endif
         return FORBIDDEN_EXP;
     }
     if (*exp).typ == XmlExpNodeType::XmlExpEmpty as u8 {
         if sub == EMPTY_EXP {
             return EMPTY_EXP;
         }
-        // #ifdef DEBUG_DERIV
-        // 	    printf("Empty(exp) -> Forbid\n");
-        // #endif
         return FORBIDDEN_EXP;
     } else if (*exp).typ == XmlExpNodeType::XmlExpForbid as u8 {
-        // #ifdef DEBUG_DERIV
-        // 	    printf("Forbid(exp) -> Forbid\n");
-        // #endif
         return FORBIDDEN_EXP;
     } else if (*exp).typ == XmlExpNodeType::XmlExpAtom as u8 {
         if (*sub).typ == XmlExpNodeType::XmlExpAtom as u8 {
             /* TODO: handle wildcards */
             if (*exp).field.f_str == (*sub).field.f_str {
-                // #ifdef DEBUG_DERIV
-                // 		    printf("Atom match -> Empty\n");
-                // #endif
                 return EMPTY_EXP;
             }
-            // #ifdef DEBUG_DERIV
-            // 		printf("Atom mismatch -> Forbid\n");
-            // #endif
             return FORBIDDEN_EXP;
         }
         if (*sub).typ == XmlExpNodeType::XmlExpCount as u8
@@ -7795,32 +7527,17 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
         {
             /* TODO: handle wildcards */
             if (*exp).field.f_str == (*(*sub).exp_left).field.f_str {
-                // #ifdef DEBUG_DERIV
-                // 		    printf("Atom match -> Empty\n");
-                // #endif
                 return EMPTY_EXP;
             }
-            // #ifdef DEBUG_DERIV
-            // 		printf("Atom mismatch -> Forbid\n");
-            // #endif
             return FORBIDDEN_EXP;
         }
-        // #ifdef DEBUG_DERIV
-        // 	    printf("Complex exp vs Atom -> Forbid\n");
-        // #endif
         return FORBIDDEN_EXP;
     } else if (*exp).typ == XmlExpNodeType::XmlExpSeq as u8 {
         /* try to get the sequence consumed only if possible */
         if xml_exp_check_card((*exp).exp_left, sub) != 0 {
             /* See if the sequence can be consumed directly */
-            // #ifdef DEBUG_DERIV
-            // 		printf("Seq trying left only\n");
-            // #endif
             ret = xml_exp_exp_derive_int(ctxt, (*exp).exp_left, sub);
             if ret != FORBIDDEN_EXP && !ret.is_null() {
-                // #ifdef DEBUG_DERIV
-                // 		    printf("Seq trying left only worked\n");
-                // #endif
                 /*
                  * TODO: assumption here that we are determinist
                  *       i.e. we won't get to a nillable exp left
@@ -7839,27 +7556,17 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                     0,
                 );
             }
-            // #ifdef DEBUG_DERIV
-            // 	    } else {
-            // 		printf("Seq: left too short\n");
-            // #endif
         }
         /* Try instead to decompose */
         if (*sub).typ == XmlExpNodeType::XmlExpCount as u8 {
             let min: c_int;
             let max: c_int;
 
-            // #ifdef DEBUG_DERIV
-            // 		printf("Seq: sub is a count\n");
-            // #endif
             ret = xml_exp_exp_derive_int(ctxt, (*exp).exp_left, (*sub).exp_left);
             if ret.is_null() {
                 return null_mut();
             }
             if ret != FORBIDDEN_EXP {
-                // #ifdef DEBUG_DERIV
-                // 		    printf("Seq , Count match on left\n");
-                // #endif
                 if (*sub).field.count.f_max < 0 {
                     max = -1;
                 } else {
@@ -7906,9 +7613,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
         }
         /* we made no progress on structured operations */
     } else if (*exp).typ == XmlExpNodeType::XmlExpOr as u8 {
-        // #ifdef DEBUG_DERIV
-        // 	    printf("Or , trying both side\n");
-        // #endif
         ret = xml_exp_exp_derive_int(ctxt, (*exp).exp_left, sub);
         if ret.is_null() {
             return null_mut();
@@ -7932,9 +7636,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                 return null_mut();
             }
             if tmp == FORBIDDEN_EXP {
-                // #ifdef DEBUG_DERIV
-                // 		    printf("Count, Count inner don't subsume\n");
-                // #endif
                 let mult: c_int = xml_exp_divide(
                     ctxt,
                     (*sub).exp_left,
@@ -7943,9 +7644,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                     addr_of_mut!(tmp),
                 );
                 if mult <= 0 {
-                    // #ifdef DEBUG_DERIV
-                    // 			printf("Count, Count not multiple => forbidden\n");
-                    // #endif
                     return FORBIDDEN_EXP;
                 }
                 if (*sub).field.count.f_max == -1 {
@@ -7957,16 +7655,10 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                             min = (*exp).field.count.f_min - (*sub).field.count.f_min * mult;
                         }
                     } else {
-                        // #ifdef DEBUG_DERIV
-                        // 			    printf("Count, Count finite can't subsume infinite\n");
-                        // #endif
                         xml_exp_free(ctxt, tmp);
                         return FORBIDDEN_EXP;
                     }
                 } else if (*exp).field.count.f_max == -1 {
-                    // #ifdef DEBUG_DERIV
-                    // 			    printf("Infinite loop consume mult finite loop\n");
-                    // #endif
                     if (*exp).field.count.f_min > (*sub).field.count.f_min * mult {
                         max = -1;
                         min = (*exp).field.count.f_min - (*sub).field.count.f_min * mult;
@@ -7976,9 +7668,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                     }
                 } else {
                     if (*exp).field.count.f_max < (*sub).field.count.f_max * mult {
-                        // #ifdef DEBUG_DERIV
-                        // 				printf("loops max mult mismatch => forbidden\n");
-                        // #endif
                         xml_exp_free(ctxt, tmp);
                         return FORBIDDEN_EXP;
                     }
@@ -7994,30 +7683,18 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                  * TODO: loop here to try to grow if working on finite
                  *       blocks.
                  */
-                // #ifdef DEBUG_DERIV
-                // 		    printf("Count, Count remain not nillable => forbidden\n");
-                // #endif
                 xml_exp_free(ctxt, tmp);
                 return FORBIDDEN_EXP;
             } else if (*sub).field.count.f_max == -1 {
                 if (*exp).field.count.f_max == -1 {
                     if (*exp).field.count.f_min <= (*sub).field.count.f_min {
-                        // #ifdef DEBUG_DERIV
-                        // 			    printf("Infinite loops Okay => COUNT(0,Inf)\n");
-                        // #endif
                         max = -1;
                         min = 0;
                     } else {
-                        // #ifdef DEBUG_DERIV
-                        // 			    printf("Infinite loops min => Count(X,Inf)\n");
-                        // #endif
                         max = -1;
                         min = (*exp).field.count.f_min - (*sub).field.count.f_min;
                     }
                 } else if (*exp).field.count.f_min > (*sub).field.count.f_min {
-                    // #ifdef DEBUG_DERIV
-                    // 			printf("loops min mismatch 1 => forbidden ???\n");
-                    // #endif
                     xml_exp_free(ctxt, tmp);
                     return FORBIDDEN_EXP;
                 } else {
@@ -8025,9 +7702,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                     min = 0;
                 }
             } else if (*exp).field.count.f_max == -1 {
-                // #ifdef DEBUG_DERIV
-                // 			printf("Infinite loop consume finite loop\n");
-                // #endif
                 if (*exp).field.count.f_min > (*sub).field.count.f_min {
                     max = -1;
                     min = (*exp).field.count.f_min - (*sub).field.count.f_min;
@@ -8037,9 +7711,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                 }
             } else {
                 if (*exp).field.count.f_max < (*sub).field.count.f_max {
-                    // #ifdef DEBUG_DERIV
-                    // 			    printf("loops max mismatch => forbidden\n");
-                    // #endif
                     xml_exp_free(ctxt, tmp);
                     return FORBIDDEN_EXP;
                 }
@@ -8050,9 +7721,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                 }
                 max = (*exp).field.count.f_max - (*sub).field.count.f_max;
             }
-            // #ifdef DEBUG_DERIV
-            // 		printf("loops match => SEQ(COUNT())\n");
-            // #endif
             (*(*exp).exp_left).refe += 1;
             tmp2 = xml_exp_hash_get_entry(
                 ctxt,
@@ -8074,9 +7742,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
             return null_mut();
         }
         if tmp == FORBIDDEN_EXP {
-            // #ifdef DEBUG_DERIV
-            // 		printf("loop mismatch => forbidden\n");
-            // #endif
             return FORBIDDEN_EXP;
         }
         if (*exp).field.count.f_min > 0 {
@@ -8090,9 +7755,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
             max = (*exp).field.count.f_max - 1;
         }
 
-        // #ifdef DEBUG_DERIV
-        // 	    printf("loop match => SEQ(COUNT())\n");
-        // #endif
         (*(*exp).exp_left).refe += 1;
         tmp2 = xml_exp_hash_get_entry(
             ctxt,
@@ -8110,9 +7772,6 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
         return ret;
     }
 
-    // #ifdef DEBUG_DERIV
-    //     printf("Fallback to derivative\n");
-    // #endif
     if IS_NILLABLE!(sub) != 0 {
         if IS_NILLABLE!(exp) == 0 {
             return FORBIDDEN_EXP;
@@ -8219,15 +7878,9 @@ pub unsafe extern "C" fn xml_exp_exp_derive(
      * O(1) speedups
      */
     if IS_NILLABLE!(sub) != 0 && IS_NILLABLE!(exp) == 0 {
-        // #ifdef DEBUG_DERIV
-        // 	printf("Sub nillable and not exp : can't subsume\n");
-        // #endif
         return FORBIDDEN_EXP;
     }
     if xml_exp_check_card(exp, sub) == 0 {
-        // #ifdef DEBUG_DERIV
-        // 	printf("sub generate longer sequences than exp : can't subsume\n");
-        // #endif
         return FORBIDDEN_EXP;
     }
     xml_exp_exp_derive_int(ctxt, exp, sub)
@@ -8262,22 +7915,12 @@ pub unsafe extern "C" fn xml_exp_subsume(
      * O(1) speedups
      */
     if IS_NILLABLE!(sub) != 0 && IS_NILLABLE!(exp) == 0 {
-        // #ifdef DEBUG_DERIV
-        // 	printf("Sub nillable and not exp : can't subsume\n");
-        // #endif
         return 0;
     }
     if xml_exp_check_card(exp, sub) == 0 {
-        // #ifdef DEBUG_DERIV
-        // 	printf("sub generate longer sequences than exp : can't subsume\n");
-        // #endif
         return 0;
     }
     let tmp: XmlExpNodePtr = xml_exp_exp_derive_int(ctxt, exp, sub);
-    // #ifdef DEBUG_DERIV
-    //     printf("Result derivation :\n");
-    //     PRINT_EXP(tmp);
-    // #endif
     if tmp.is_null() {
         return -1;
     }
@@ -8388,7 +8031,6 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob:
         xml_buf_ccat(buf, rep.as_ptr());
     } else {
         eprintln!("Error in tree");
-        // fprintf(stderr, "Error in tree\n");
     }
     if glob != 0 {
         xml_buf_ccat(buf, c")".as_ptr());

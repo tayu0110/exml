@@ -8419,9 +8419,6 @@ unsafe extern "C" fn xml_schema_add_particle(
         return null_mut();
     }
 
-    // #ifdef DEBUG
-    //     fprintf(stderr, "Adding particle component\n".as_ptr() as _);
-    // #endif
     ret = xml_malloc(size_of::<XmlSchemaParticle>()) as XmlSchemaParticlePtr;
     if ret.is_null() {
         xml_schema_perr_memory(
@@ -15277,15 +15274,6 @@ unsafe extern "C" fn xml_schema_get_type(
         ret = xml_schema_get_predefined_type(name, ns_name);
         if !ret.is_null() {
             // goto exit;
-            // #ifdef DEBUG
-            //     if ret.is_null() {
-            //         if nsName.is_null() {
-            //             fprintf(stderr, "Unable to lookup type %s", name);}
-            //         else {
-            //     }
-
-            //             fprintf(stderr, "Unable to lookup type %s:%s", name,      nsName);
-            // #endif
             return ret;
         }
         /*
@@ -15300,15 +15288,6 @@ unsafe extern "C" fn xml_schema_get_type(
     }
     // exit:
 
-    // #ifdef DEBUG
-    //     if ret.is_null() {
-    //         if nsName.is_null() {
-    //             fprintf(stderr, "Unable to lookup type %s", name);}
-    //         else {
-    //     }
-
-    //             fprintf(stderr, "Unable to lookup type %s:%s", name,      nsName);
-    // #endif
     ret
 }
 
@@ -15386,15 +15365,7 @@ unsafe extern "C" fn xml_schema_get_elem(
         WXS_FIND_GLOBAL_ITEM!(schema, elem_decl, ns_name, name, ret);
     }
     // exit:
-    // #ifdef DEBUG
-    //     if ret.is_null() {
-    //         if nsName.is_null() {
-    //             fprintf(stderr, "Unable to lookup element decl. %s", name);}
-    //         else {
-    //     }
 
-    //             fprintf(stderr, "Unable to lookup element decl. %s:%s", name,      nsName);
-    // #endif
     ret
 }
 
@@ -15620,15 +15591,6 @@ unsafe extern "C" fn xml_schema_get_group(
     }
     // exit:
 
-    // #ifdef DEBUG
-    //     if ret.is_null() {
-    //         if nsName.is_null() {
-    //             fprintf(stderr, "Unable to lookup group %s", name);}
-    //         else {
-    //     }
-
-    //             fprintf(stderr, "Unable to lookup group %s:%s", name,      nsName);
-    // #endif
     ret
 }
 
@@ -15872,15 +15834,7 @@ unsafe extern "C" fn xml_schema_get_attribute_decl(
         WXS_FIND_GLOBAL_ITEM!(schema, attr_decl, ns_name, name, ret);
     }
     // exit:
-    // #ifdef DEBUG
-    //     if ret.is_null() {
-    //         if nsName.is_null() {
-    //             fprintf(stderr, "Unable to lookup attribute %s", name);}
-    //         else {
-    //     }
 
-    //             fprintf(stderr, "Unable to lookup attribute %s:%s", name,      nsName);
-    // #endif
     ret
 }
 
@@ -15960,15 +15914,7 @@ unsafe extern "C" fn xml_schema_get_attribute_group(
     ret = (*ret).redef;
     }
     */
-    // #ifdef DEBUG
-    //     if ret.is_null() {
-    //         if nsName.is_null() {
-    //             fprintf(stderr, "Unable to lookup attribute group %s", name);}
-    //         else {
-    //     }
 
-    //             fprintf(stderr, "Unable to lookup attribute group %s:%s", name,      nsName);
-    // #endif
     ret
 }
 

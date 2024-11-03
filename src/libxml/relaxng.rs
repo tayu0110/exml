@@ -10325,39 +10325,25 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_callback(
     let ctxt: XmlRelaxNGValidCtxtPtr = inputdata as _;
     let define: XmlRelaxNGDefinePtr = transdata as _;
 
-    extern "C" {
-        // Does it work ???
-        static stderr: *mut FILE;
-    }
-
     if ctxt.is_null() {
-        fprintf(
-            stderr,
-            c"callback on %s missing context\n".as_ptr() as _,
-            token,
-        );
+        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
+        eprintln!("callback on {token} missing context");
         return;
     }
     if define.is_null() {
         if *token.add(0) == b'#' {
             return;
         }
-        fprintf(
-            stderr,
-            c"callback on %s missing define\n".as_ptr() as _,
-            token,
-        );
+        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
+        eprintln!("callback on {token} missing define");
         if !ctxt.is_null() && (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
         }
         return;
     }
     if (*define).typ != XmlRelaxNGType::Element {
-        fprintf(
-            stderr,
-            c"callback on %s define is not element\n".as_ptr() as _,
-            token,
-        );
+        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
+        eprintln!("callback on {token} define is not element");
         if (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
         }
@@ -12309,21 +12295,12 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
     let ctxt: XmlRelaxNGValidCtxtPtr = inputdata as _;
     let define: XmlRelaxNGDefinePtr = transdata as _;
     let mut state: XmlRelaxNGValidStatePtr;
-
     let mut ret: c_int = 0;
     let oldflags: c_int;
 
-    extern "C" {
-        // Does it work ???
-        static stderr: *mut FILE;
-    }
-
     if ctxt.is_null() {
-        fprintf(
-            stderr,
-            c"callback on %s missing context\n".as_ptr() as _,
-            token,
-        );
+        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
+        eprintln!("callback on {token} missing context");
         return;
     }
     let node: XmlNodePtr = (*ctxt).pnode;
@@ -12332,11 +12309,8 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
         if *token.add(0) == b'#' {
             return;
         }
-        fprintf(
-            stderr,
-            c"callback on %s missing define\n".as_ptr() as _,
-            token,
-        );
+        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
+        eprintln!("callback on {token} missing define");
         if !ctxt.is_null() && (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
         }
@@ -12344,22 +12318,16 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
         return;
     }
     if ctxt.is_null() || define.is_null() {
-        fprintf(
-            stderr,
-            c"callback on %s missing info\n".as_ptr() as _,
-            token,
-        );
+        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
+        eprintln!("callback on {token} missing info");
         if !ctxt.is_null() && (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
         }
         (*ctxt).pstate = -1;
         return;
     } else if (*define).typ != XmlRelaxNGType::Element {
-        fprintf(
-            stderr,
-            c"callback on %s define is not element\n".as_ptr() as _,
-            token,
-        );
+        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
+        eprintln!("callback on {token} define is not element");
         if (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
         }

@@ -5714,13 +5714,6 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> c_int {
                         ret = 1;
                     }
                     XmlElementContentOccur::XmlElementContentMult => {
-                        //  #ifdef DEBUG_VALID_ALGO
-                        //              if (((*(*ctxt).vstate).occurs & (1 << (*(*ctxt).vstate).depth)) == 0) {
-                        //              DEBUG_VALID_MSG!(c"Mult branch failed".as_ptr());
-                        //              } else {
-                        //              DEBUG_VALID_MSG!(c"Mult branch found".as_ptr());
-                        //              }
-                        //  #endif
                         ret = 1;
                     }
                     XmlElementContentOccur::XmlElementContentOpt => {
@@ -8419,9 +8412,6 @@ pub unsafe extern "C" fn xml_valid_build_content_model(
             expr.as_ptr() as _,
             null_mut(),
         );
-        // #ifdef DEBUG_REGEXP_ALGO
-        //         xmlRegexpPrint(stderr, (*elem).contModel);
-        // #endif
         (*ctxt).valid = 0;
         (*ctxt).state = null_mut();
         xml_free_automata((*ctxt).am);
