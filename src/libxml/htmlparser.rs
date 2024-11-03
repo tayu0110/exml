@@ -53,7 +53,6 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_ASCII_DIGIT,
 };
 
 use super::{
@@ -6487,7 +6486,7 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
 
     while i < HTML_PARSER_BUFFER_SIZE
         && ((*ctxt).current_byte().is_ascii_alphabetic()
-            || IS_ASCII_DIGIT!((*ctxt).current_byte())
+            || (*ctxt).current_byte().is_ascii_digit()
             || (*ctxt).current_byte() == b':'
             || (*ctxt).current_byte() == b'-'
             || (*ctxt).current_byte() == b'_'
@@ -7823,7 +7822,7 @@ unsafe extern "C" fn html_parse_html_name_non_invasive(ctxt: HtmlParserCtxtPtr) 
 
     while i < HTML_PARSER_BUFFER_SIZE
         && (NXT!(ctxt, 1 + i).is_ascii_alphabetic()
-            || IS_ASCII_DIGIT!(NXT!(ctxt, 1 + i))
+            || NXT!(ctxt, 1 + i).is_ascii_digit()
             || NXT!(ctxt, 1 + i) == b':'
             || NXT!(ctxt, 1 + i) == b'-'
             || NXT!(ctxt, 1 + i) == b'_')

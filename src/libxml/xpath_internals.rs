@@ -71,7 +71,6 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
-    IS_ASCII_DIGIT,
 };
 
 use super::{
@@ -5662,7 +5661,7 @@ unsafe extern "C" fn xml_xpath_comp_primary_expr(ctxt: XmlXPathParserContextPtr)
         }
         NEXT!(ctxt);
         SKIP_BLANKS!(ctxt);
-    } else if IS_ASCII_DIGIT!(CUR!(ctxt)) || (CUR!(ctxt) == b'.' && IS_ASCII_DIGIT!(NXT!(ctxt, 1)))
+    } else if CUR!(ctxt).is_ascii_digit() || (CUR!(ctxt) == b'.' && NXT!(ctxt, 1).is_ascii_digit())
     {
         xml_xpath_comp_number(ctxt);
     } else if CUR!(ctxt) == b'\'' || CUR!(ctxt) == b'"' {
@@ -5724,10 +5723,10 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'$'
         || CUR!(ctxt) == b'('
-        || IS_ASCII_DIGIT!(CUR!(ctxt))
+        || CUR!(ctxt).is_ascii_digit()
         || CUR!(ctxt) == b'\''
         || CUR!(ctxt) == b'"'
-        || (CUR!(ctxt) == b'.' && IS_ASCII_DIGIT!(NXT!(ctxt, 1)))
+        || (CUR!(ctxt) == b'.' && NXT!(ctxt, 1).is_ascii_digit())
     {
         lc = 0;
     } else if CUR!(ctxt) == b'*' || CUR!(ctxt) == b'/' {

@@ -177,20 +177,6 @@ pub const INPUT_CHUNK: usize = 250;
  *									*
  ************************************************************************/
 
-/**
- * IS_ASCII_DIGIT:
- * @c: an xmlChar value
- *
- * Macro to check [0-9]
- *
- */
-#[macro_export]
-macro_rules! IS_ASCII_DIGIT {
-	( $( $c:tt )*) =>{
-		(0x30 <= ($( $c )*)) && (($( $c )*) <= 0x39)
-	}
-}
-
 macro_rules! RAW {
     ($ctxt:expr) => {
         *(*(*$ctxt).input).cur
