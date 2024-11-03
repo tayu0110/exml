@@ -53,10 +53,12 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH, IS_EXTENDER, IS_LETTER, IS_PUBIDCHAR_CH,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH, IS_LETTER, IS_PUBIDCHAR_CH,
 };
 
-use super::chvalid::{xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit};
+use super::chvalid::{
+    xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
+};
 
 /*
  * Most of the back-end structures from XML and HTML are shared.
@@ -6113,7 +6115,7 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
             || c == b'_' as i32
             || c == b':' as i32
             || xml_is_combining(c as u32)
-            || IS_EXTENDER!(c as u32))
+            || xml_is_extender(c as u32))
     {
         len += l;
         if len > max_length {

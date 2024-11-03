@@ -27,7 +27,7 @@ use crate::io::{
 };
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
-use crate::libxml::chvalid::{xml_is_combining, xml_is_digit};
+use crate::libxml::chvalid::{xml_is_combining, xml_is_digit, xml_is_extender};
 use crate::libxml::dict::xml_dict_owns;
 use crate::libxml::entities::{xml_get_predefined_entity, XmlEntityPtr};
 use crate::libxml::parser::{
@@ -194,36 +194,6 @@ macro_rules! IS_CHAR_CH {
         $crate::libxml::chvalid::xml_is_char($c as u32)
     };
 }
-
-/**
- * IS_EXTENDER:
- * @c:  an UNICODE value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- *
- * [89] Extender ::= #x00B7 | #x02D0 | #x02D1 | #x0387 | #x0640 |
- *                   #x0E46 | #x0EC6 | #x3005 | [#x3031-#x3035] |
- *                   [#x309D-#x309E] | [#x30FC-#x30FE]
- */
-#[macro_export]
-macro_rules! IS_EXTENDER {
-    ( $c:expr ) => {
-        $crate::xml_is_extender_q!($c)
-    };
-}
-
-/**
- * IS_EXTENDER_CH:
- * @c:  an xmlChar value (usually an c_uchar)
- *
- * Behaves like IS_EXTENDER but with a single-byte argument
- */
-// macro_rules! IS_EXTENDER_CH {
-//     ( $c:expr ) => {
-//         xmlIsExtender_ch($c)
-//     };
-// }
 
 /**
  * IS_IDEOGRAPHIC:
@@ -1962,7 +1932,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
                 || c == '_'
                 || c == ':'
                 || xml_is_combining(c as u32)
-                || IS_EXTENDER!(c as u32))
+                || xml_is_extender(c as u32))
         {
             if len <= INT_MAX - l {
                 len += l;

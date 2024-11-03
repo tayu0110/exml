@@ -849,8 +849,8 @@ macro_rules! CUR_SCHAR {
 ))]
 pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
-        IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -917,7 +917,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
         || c == b'-' as i32
         || c == b'_' as i32
         || xml_is_combining(c as u32)
-        || IS_EXTENDER!(c as u32)
+        || xml_is_extender(c as u32)
     {
         cur = cur.add(l as usize);
         c = CUR_SCHAR!(cur, l);
@@ -948,8 +948,8 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
-        IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1033,7 +1033,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
         || c == b'-' as i32
         || c == b'_' as i32
         || xml_is_combining(c as u32)
-        || IS_EXTENDER!(c as u32)
+        || xml_is_extender(c as u32)
     {
         cur = cur.add(l as usize);
         c = CUR_SCHAR!(cur, l);
@@ -1052,7 +1052,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
             || c == b'-' as i32
             || c == b'_' as i32
             || xml_is_combining(c as u32)
-            || IS_EXTENDER!(c as u32)
+            || xml_is_extender(c as u32)
         {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
@@ -1083,8 +1083,8 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
-        IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1154,7 +1154,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
         || c == b'-' as i32
         || c == b'_' as i32
         || xml_is_combining(c as u32)
-        || IS_EXTENDER!(c as u32)
+        || xml_is_extender(c as u32)
     {
         cur = cur.add(l as usize);
         c = CUR_SCHAR!(cur, l);
@@ -1184,8 +1184,8 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_int) -> c_int {
     use crate::{
-        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
-        IS_EXTENDER, IS_LETTER,
+        libxml::chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        IS_LETTER,
     };
 
     let mut cur: *const XmlChar = value;
@@ -1253,7 +1253,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
         || c == b'-' as i32
         || c == b'_' as i32
         || xml_is_combining(c as u32)
-        || IS_EXTENDER!(c as u32))
+        || xml_is_extender(c as u32))
     {
         return 1;
     }
@@ -1266,7 +1266,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_in
         || c == b'-' as i32
         || c == b'_' as i32
         || xml_is_combining(c as u32)
-        || IS_EXTENDER!(c as u32)
+        || xml_is_extender(c as u32)
     {
         cur = cur.add(l as usize);
         c = CUR_SCHAR!(cur, l);

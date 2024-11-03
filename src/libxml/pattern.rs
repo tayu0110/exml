@@ -15,14 +15,14 @@ use libc::memset;
 
 use crate::{
     libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit},
+        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDict, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_realloc},
         parser_internals::xml_string_current_char,
         tree::{XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
         xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
     },
-    IS_EXTENDER, IS_LETTER,
+    IS_LETTER,
 };
 
 const XML_STREAM_STEP_DESC: usize = 1;
@@ -453,7 +453,7 @@ unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut X
         || val == b'-' as i32
         || val == b'_' as i32
         || xml_is_combining(val as u32)
-        || IS_EXTENDER!(val as u32)
+        || xml_is_extender(val as u32)
     {
         cur = cur.add(len as usize);
         val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
@@ -501,7 +501,7 @@ unsafe extern "C" fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut Xml
         || val == b'-' as i32
         || val == b'_' as i32
         || xml_is_combining(val as u32)
-        || IS_EXTENDER!(val as u32)
+        || xml_is_extender(val as u32)
     {
         cur = cur.add(len as usize);
         val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
