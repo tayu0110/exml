@@ -48,12 +48,13 @@ use crate::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
     },
-    IS_LETTER, SYSCONFDIR,
+    SYSCONFDIR,
 };
 
 use super::{
     chvalid::{xml_is_digit, xml_is_pubid_char},
     hash::CVoidWrapper,
+    parser_internals::xml_is_letter,
 };
 
 /**
@@ -372,11 +373,11 @@ unsafe extern "C" fn xml_parse_sgml_catalog_name(
      * Handler for more complex cases
      */
     c = *cur as _;
-    if !IS_LETTER!(c) && c != b'_' as u32 && c != b':' as u32 {
+    if !xml_is_letter(c) && c != b'_' as u32 && c != b':' as u32 {
         return null_mut();
     }
 
-    while IS_LETTER!(c)
+    while xml_is_letter(c)
         || xml_is_digit(c)
         || c == b'.' as u32
         || c == b'-' as u32

@@ -196,36 +196,6 @@ macro_rules! IS_CHAR_CH {
 }
 
 /**
- * IS_LETTER:
- * @c:  an UNICODE value (c_int)
- *
- * Macro to check the following production in the XML spec:
- *
- *
- * [84] Letter ::= BaseChar | Ideographic
- */
-#[macro_export]
-macro_rules! IS_LETTER {
-    ( $c:expr ) => {
-        $crate::libxml::chvalid::xml_is_base_char($c)
-            || $crate::libxml::chvalid::xml_is_ideographic($c)
-    };
-}
-
-/**
- * IS_LETTER_CH:
- * @c:  an xmlChar value (normally c_uchar)
- *
- * Macro behaves like IS_LETTER, but only check base chars
- *
- */
-// macro_rules! IS_LETTER_CH {
-// 	( $( $c:tt )* ) =>{
-// 		 xmlIsBaseChar_ch( $( $c )*)
-// 	}
-// }
-
-/**
  * IS_ASCII_LETTER:
  * @c: an xmlChar value
  *
@@ -293,17 +263,11 @@ pub static XML_STRING_COMMENT: &CStr = c"comment";
 /*
  * Function to finish the work of the macros where needed.
  */
-/**
- * xmlIsLetter:
- * @c:  an unicode character (c_int)
- *
- * Check whether the character is allowed by the production
- * [84] Letter ::= BaseChar | Ideographic
- *
- * Returns 0 if not, non-zero otherwise
- */
-pub unsafe extern "C" fn xml_is_letter(c: c_int) -> c_int {
-    (xml_is_base_char(c as u32) || xml_is_ideographic(c as u32)) as i32
+/// Check whether the character is allowed by the production
+/// [84] Letter ::= BaseChar | Ideographic
+#[doc(alias = "xmlIsLetter")]
+pub fn xml_is_letter(c: u32) -> bool {
+    xml_is_base_char(c) || xml_is_ideographic(c)
 }
 
 /**
@@ -1728,7 +1692,7 @@ pub unsafe extern "C" fn xml_split_qname(
             let mut l: c_int = 0;
             let first: c_int = CUR_SCHAR!(ctxt, cur, l);
 
-            if !IS_LETTER!(first as u32) && first != b'_' as i32 {
+            if !xml_is_letter(first as u32) && first != b'_' as i32 {
                 xml_fatal_err_msg_str(
                     ctxt,
                     XmlParserErrors::XmlNsErrQname,
@@ -1872,7 +1836,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
         if c == ' '
             || c == '>'
             || c == '/' /* accelerators */
-            || (!IS_LETTER!(c as u32) && c != '_' && c != ':')
+            || (!xml_is_letter(c as u32) && c != '_' && c != ':')
         {
             return null_mut();
         }
@@ -1883,7 +1847,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
         while c != ' '
             && c != '>'
             && c != '/' /* test bigname.xml */
-            && (IS_LETTER!(c as u32)
+            && (xml_is_letter(c as u32)
                 || xml_is_digit(c as u32)
                 || c == '.'
                 || c == '-'
@@ -7917,32 +7881,6 @@ mod tests {
                         eprint!(" {}", n_filename);
                         eprintln!(" {}", n_options);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_is_letter() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_c in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let c = gen_int(n_c, 0);
-
-                let ret_val = xml_is_letter(c);
-                desret_int(ret_val);
-                des_int(n_c, c, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlIsLetter",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlIsLetter()");
-                    eprintln!(" {}", n_c);
                 }
             }
         }

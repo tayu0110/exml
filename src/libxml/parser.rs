@@ -116,7 +116,6 @@ use crate::{
             xml_cleanup_threads_internal, xml_init_threads_internal,
         },
     },
-    IS_LETTER,
 };
 
 use super::{
@@ -124,7 +123,7 @@ use super::{
         xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         xml_is_pubid_char,
     },
-    parser_internals::{xml_err_encoding_int, LINE_LEN, XML_MAX_LOOKUP_LIMIT},
+    parser_internals::{xml_err_encoding_int, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT},
 };
 
 /**
@@ -2202,7 +2201,7 @@ pub(crate) unsafe extern "C" fn xml_is_name_char(ctxt: XmlParserCtxtPtr, c: c_in
         {
             return 1;
         }
-    } else if IS_LETTER!(c as u32)
+    } else if xml_is_letter(c as u32)
         || xml_is_digit(c as u32)
         || c == b'.' as i32
         || c == b'-' as i32
@@ -5968,7 +5967,7 @@ unsafe extern "C" fn xml_is_name_start_char(ctxt: XmlParserCtxtPtr, c: c_int) ->
         {
             return 1;
         }
-    } else if IS_LETTER!(c as u32) || c == b'_' as i32 || c == b':' as i32 {
+    } else if xml_is_letter(c as u32) || c == b'_' as i32 || c == b':' as i32 {
         return 1;
     }
     0

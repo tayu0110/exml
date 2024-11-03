@@ -65,7 +65,6 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_LETTER,
 };
 
 use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
@@ -1823,6 +1822,8 @@ pub unsafe extern "C" fn xml_copy_enumeration(cur: XmlEnumerationPtr) -> XmlEnum
 
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_is_doc_name_start_char(doc: XmlDocPtr, c: c_int) -> c_int {
+    use super::parser_internals::xml_is_letter;
+
     if doc.is_null() || (*doc).properties & XmlDocProperties::XmlDocOld10 as i32 == 0 {
         /*
          * Use the new checks of production [4] [4a] amd [5] of the
@@ -1847,7 +1848,7 @@ unsafe extern "C" fn xml_is_doc_name_start_char(doc: XmlDocPtr, c: c_int) -> c_i
         {
             return 1;
         }
-    } else if IS_LETTER!(c as u32) || c == b'_' as i32 || c == b':' as i32 {
+    } else if xml_is_letter(c as u32) || c == b'_' as i32 || c == b':' as i32 {
         return 1;
     }
     0
@@ -1855,7 +1856,10 @@ unsafe extern "C" fn xml_is_doc_name_start_char(doc: XmlDocPtr, c: c_int) -> c_i
 
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_is_doc_name_char(doc: XmlDocPtr, c: c_int) -> c_int {
-    use crate::libxml::chvalid::{xml_is_digit, xml_is_extender};
+    use crate::libxml::{
+        chvalid::{xml_is_digit, xml_is_extender},
+        parser_internals::xml_is_letter,
+    };
 
     use super::chvalid::xml_is_combining;
 
@@ -1889,7 +1893,7 @@ unsafe extern "C" fn xml_is_doc_name_char(doc: XmlDocPtr, c: c_int) -> c_int {
         {
             return 1;
         }
-    } else if IS_LETTER!(c as u32)
+    } else if xml_is_letter(c as u32)
         || xml_is_digit(c as u32)
         || c == b'.' as i32
         || c == b'-' as i32

@@ -53,12 +53,15 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH, IS_LETTER,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH,
 };
 
-use super::chvalid::{
-    xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
-    xml_is_pubid_char,
+use super::{
+    chvalid::{
+        xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
+        xml_is_pubid_char,
+    },
+    parser_internals::xml_is_letter,
 };
 
 /*
@@ -6101,7 +6104,7 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
     if c == b' ' as i32
         || c == b'>' as i32
         || c == b'/' as i32  /* accelerators */
-        || (!IS_LETTER!(c as u32) && c != b'_' as i32 && c != b':' as i32)
+        || (!xml_is_letter(c as u32) && c != b'_' as i32 && c != b':' as i32)
     {
         return null_mut();
     }
@@ -6109,7 +6112,7 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
     while c != b' ' as i32
         && c != b'>' as i32
         && c != b'/' as i32 /* test bigname.xml */
-        && (IS_LETTER!(c as u32)
+        && (xml_is_letter(c as u32)
             || xml_is_digit(c as u32)
             || c == b'.' as i32
             || c == b'-' as i32

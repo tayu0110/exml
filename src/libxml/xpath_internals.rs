@@ -71,10 +71,13 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH, IS_LETTER,
+    IS_ASCII_DIGIT, IS_ASCII_LETTER, IS_CHAR_CH,
 };
 
-use super::chvalid::{xml_is_combining, xml_is_digit, xml_is_extender};
+use super::{
+    chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
+    parser_internals::xml_is_letter,
+};
 
 /************************************************************************
  *									*
@@ -4639,7 +4642,7 @@ unsafe extern "C" fn xml_xpath_scan_name(ctxt: XmlXPathParserContextPtr) -> *mut
     if c == ' ' as i32
         || c == '>' as i32
         || c == '/' as i32 /* accelerators */
-        || (!IS_LETTER!(c as u32) && c != '_' as i32 && c != ':' as i32)
+        || (!xml_is_letter(c as u32) && c != '_' as i32 && c != ':' as i32)
     {
         return null_mut();
     }
@@ -4647,7 +4650,7 @@ unsafe extern "C" fn xml_xpath_scan_name(ctxt: XmlXPathParserContextPtr) -> *mut
     while c != ' ' as i32
         && c != '>' as i32
         && c != '/' as i32   /* test bigname.xml */
-        && (IS_LETTER!(c as u32)
+        && (xml_is_letter(c as u32)
             || xml_is_digit(c as u32)
             || c == '.' as i32
             || c == '-' as i32
@@ -9435,7 +9438,7 @@ unsafe extern "C" fn xml_xpath_parse_name_complex(
         || c == ']' as i32
         || c == '@' as i32
         || c == '*' as i32  /* accelerators */
-        || (!IS_LETTER!(c as u32) && c != '_' as i32 && (qualified == 0 || c != ':' as i32))
+        || (!xml_is_letter(c as u32) && c != '_' as i32 && (qualified == 0 || c != ':' as i32))
     {
         return null_mut();
     }
@@ -9443,7 +9446,7 @@ unsafe extern "C" fn xml_xpath_parse_name_complex(
     while c != ' ' as i32
         && c != '>' as i32
         && c != '/' as i32  /* test bigname.xml */
-        && (IS_LETTER!(c as u32)
+        && (xml_is_letter(c as u32)
             || xml_is_digit(c as u32)
             || c == '.' as i32
             || c == '-' as i32
@@ -9471,7 +9474,7 @@ unsafe extern "C" fn xml_xpath_parse_name_complex(
                 XP_ERRORNULL!(ctxt, XmlXPathError::XpathMemoryError as i32);
             }
             memcpy(buffer as _, buf.as_ptr() as _, len as usize);
-            while IS_LETTER!(c as u32)
+            while xml_is_letter(c as u32)
                 || xml_is_digit(c as u32)  /* test bigname.xml */
                 || c == '.' as i32
                 || c == '-' as i32

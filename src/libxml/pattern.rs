@@ -13,16 +13,13 @@ use std::{
 
 use libc::memset;
 
-use crate::{
-    libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDict, XmlDictPtr},
-        globals::{xml_free, xml_malloc, xml_realloc},
-        parser_internals::xml_string_current_char,
-        tree::{XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
-        xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
-    },
-    IS_LETTER,
+use crate::libxml::{
+    chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+    dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDict, XmlDictPtr},
+    globals::{xml_free, xml_malloc, xml_realloc},
+    parser_internals::{xml_is_letter, xml_string_current_char},
+    tree::{XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
+    xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
 };
 
 const XML_STREAM_STEP_DESC: usize = 1;
@@ -443,11 +440,11 @@ unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut X
     cur = CUR_PTR!(ctxt);
     let q: *const XmlChar = cur;
     val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
-    if !IS_LETTER!(val as u32) && val != '_' as i32 {
+    if !xml_is_letter(val as u32) && val != '_' as i32 {
         return null_mut();
     }
 
-    while IS_LETTER!(val as u32)
+    while xml_is_letter(val as u32)
         || xml_is_digit(val as u32)
         || val == b'.' as i32
         || val == b'-' as i32
@@ -491,11 +488,11 @@ unsafe extern "C" fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut Xml
     cur = CUR_PTR!(ctxt);
     let q: *const XmlChar = cur;
     val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
-    if !IS_LETTER!(val as u32) && val != b'_' as i32 && val != b':' as i32 {
+    if !xml_is_letter(val as u32) && val != b'_' as i32 && val != b':' as i32 {
         return null_mut();
     }
 
-    while IS_LETTER!(val as u32)
+    while xml_is_letter(val as u32)
         || xml_is_digit(val as u32)
         || val == b'.' as i32
         || val == b'-' as i32
