@@ -177,12 +177,6 @@ pub const INPUT_CHUNK: usize = 250;
  *									*
  ************************************************************************/
 
-macro_rules! RAW {
-    ($ctxt:expr) => {
-        *(*(*$ctxt).input).cur
-    };
-}
-
 macro_rules! COPY_BUF {
     ($l:expr, $b:expr, $i:expr, $v:expr) => {
         if $l == 1 {
@@ -2054,9 +2048,9 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
     let mut ret: *mut XmlChar = null_mut();
     let mut cur: *const XmlChar;
 
-    if RAW!(ctxt) == b'"' {
+    if (*ctxt).current_byte() == b'"' {
         stop = b'"';
-    } else if RAW!(ctxt) == b'\'' {
+    } else if (*ctxt).current_byte() == b'\'' {
         stop = b'\'';
     } else {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityNotStarted, null_mut());
@@ -2294,10 +2288,10 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
     };
     let state: c_int = (*ctxt).instate as i32;
 
-    let stop = if RAW!(ctxt) == b'"' {
+    let stop = if (*ctxt).current_byte() == b'"' {
         (*ctxt).skip_char();
         b'"'
-    } else if RAW!(ctxt) == b'\'' {
+    } else if (*ctxt).current_byte() == b'\'' {
         (*ctxt).skip_char();
         b'\''
     } else {
@@ -2550,11 +2544,11 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
     /*
      * Check that there is a comment right here.
      */
-    if RAW!(ctxt) != b'<' || NXT!(ctxt, 1) != b'!' {
+    if (*ctxt).current_byte() != b'<' || NXT!(ctxt, 1) != b'!' {
         return;
     }
     (*ctxt).advance(2);
-    if RAW!(ctxt) != b'-' || NXT!(ctxt, 1) != b'-' {
+    if (*ctxt).current_byte() != b'-' || NXT!(ctxt, 1) != b'-' {
         return;
     }
     let state: XmlParserInputState = (*ctxt).instate;
@@ -2918,7 +2912,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
     let target: *const XmlChar;
     let state: XmlParserInputState;
 
-    if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'?' {
+    if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
         let inputid: c_int = (*(*ctxt).input).id;
         state = (*ctxt).instate;
         (*ctxt).instate = XmlParserInputState::XmlParserPI;
@@ -2933,7 +2927,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
          */
         target = xml_parse_pi_target(ctxt);
         if !target.is_null() {
-            if RAW!(ctxt) == b'?' && NXT!(ctxt, 1) == b'>' {
+            if (*ctxt).current_byte() == b'?' && NXT!(ctxt, 1) == b'>' {
                 if inputid != (*(*ctxt).input).id {
                     xml_fatal_err_msg(
                         ctxt,
@@ -3155,7 +3149,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
     let mut cur: XmlEnumerationPtr;
     let mut tmp: XmlEnumerationPtr;
 
-    if RAW!(ctxt) != b'(' {
+    if (*ctxt).current_byte() != b'(' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotationNotStarted, null());
         return null_mut();
     }
@@ -3205,9 +3199,9 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
         }
         (*ctxt).skip_blanks();
 
-        RAW!(ctxt) == b'|'
+        (*ctxt).current_byte() == b'|'
     } {}
-    if RAW!(ctxt) != b')' {
+    if (*ctxt).current_byte() != b')' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotationNotFinished, null());
         xml_free_enumeration(ret);
         return null_mut();
@@ -3241,7 +3235,7 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
     let mut cur: XmlEnumerationPtr;
     let mut tmp: XmlEnumerationPtr;
 
-    if RAW!(ctxt) != b'(' {
+    if (*ctxt).current_byte() != b'(' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrAttlistNotStarted, null());
         return null_mut();
     }
@@ -3289,9 +3283,9 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
         }
         (*ctxt).skip_blanks();
 
-        RAW!(ctxt) == b'|'
+        (*ctxt).current_byte() == b'|'
     } {}
-    if RAW!(ctxt) != b')' {
+    if (*ctxt).current_byte() != b')' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrAttlistNotFinished, null());
         return ret;
     }
@@ -3402,7 +3396,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
     } else if (*ctxt).content_bytes().starts_with(b"IDREF") {
         (*ctxt).advance(5);
         return XmlAttributeType::XmlAttributeIdref as i32;
-    } else if RAW!(ctxt) == b'I' && NXT!(ctxt, 1) == b'D' {
+    } else if (*ctxt).current_byte() == b'I' && NXT!(ctxt, 1) == b'D' {
         (*ctxt).advance(2);
         return XmlAttributeType::XmlAttributeId as i32;
     } else if (*ctxt).content_bytes().starts_with(b"ENTITY") {
@@ -3626,7 +3620,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
     if (*ctxt).content_bytes().starts_with(b"#PCDATA") {
         (*ctxt).advance(7);
         (*ctxt).skip_blanks();
-        if RAW!(ctxt) == b')' {
+        if (*ctxt).current_byte() == b')' {
             if (*(*ctxt).input).id != inputchk {
                 xml_fatal_err_msg(
                     ctxt,
@@ -3644,13 +3638,13 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
             if ret.is_null() {
                 return null_mut();
             }
-            if RAW!(ctxt) == b'*' {
+            if (*ctxt).current_byte() == b'*' {
                 (*ret).ocur = XmlElementContentOccur::XmlElementContentMult;
                 (*ctxt).skip_char();
             }
             return ret;
         }
-        if RAW!(ctxt) == b'(' || RAW!(ctxt) == b'|' {
+        if (*ctxt).current_byte() == b'(' || (*ctxt).current_byte() == b'|' {
             ret = xml_new_doc_element_content(
                 (*ctxt).my_doc,
                 null(),
@@ -3662,7 +3656,9 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
             }
         }
         #[allow(clippy::while_immutable_condition)]
-        while RAW!(ctxt) == b'|' && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+        while (*ctxt).current_byte() == b'|'
+            && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
             (*ctxt).skip_char();
             if elem.is_null() {
                 ret = xml_new_doc_element_content(
@@ -3717,7 +3713,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
             (*ctxt).skip_blanks();
             (*ctxt).grow();
         }
-        if RAW!(ctxt) == b')' && NXT!(ctxt, 1) == b'*' {
+        if (*ctxt).current_byte() == b')' && NXT!(ctxt, 1) == b'*' {
             if !elem.is_null() {
                 (*cur).c2 = xml_new_doc_element_content(
                     (*ctxt).my_doc,
@@ -3817,7 +3813,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
 
     *result = null_mut();
 
-    if RAW!(ctxt) != b'(' {
+    if (*ctxt).current_byte() != b'(' {
         xml_fatal_err_msg_str(
             ctxt,
             XmlParserErrors::XmlErrElemcontentNotStarted,
@@ -3882,7 +3878,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
         return null_mut();
     }
 
-    if RAW!(ctxt) != b'&' {
+    if (*ctxt).current_byte() != b'&' {
         return null_mut();
     }
     (*ctxt).skip_char();
@@ -3895,7 +3891,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
         );
         return null_mut();
     }
-    if RAW!(ctxt) != b';' {
+    if (*ctxt).current_byte() != b';' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityRefSemicolMissing, null());
         return null_mut();
     }
@@ -4215,9 +4211,9 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     (*ctxt).atts_special = (*oldctxt).atts_special;
 
     xml_parse_content(ctxt);
-    if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'/' {
+    if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, null());
-    } else if RAW!(ctxt) != 0 {
+    } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, null());
     }
     if (*ctxt).node != (*(*ctxt).my_doc).children {
@@ -4330,7 +4326,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     let mut list: XmlNodePtr = null_mut();
     let mut ret: XmlParserErrors;
 
-    if RAW!(ctxt) != b'&' {
+    if (*ctxt).current_byte() != b'&' {
         return;
     }
 
@@ -4897,7 +4893,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
     let mut entity: XmlEntityPtr = null_mut();
     let input: XmlParserInputPtr;
 
-    if RAW!(ctxt) != b'%' {
+    if (*ctxt).current_byte() != b'%' {
         return;
     }
     (*ctxt).skip_char();
@@ -4916,7 +4912,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
             CStr::from_ptr(name as *const i8).to_string_lossy()
         );
     }
-    if RAW!(ctxt) != b';' {
+    if (*ctxt).current_byte() != b';' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefSemicolMissing, null());
         return;
     }
@@ -5059,7 +5055,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     return;
                 }
                 if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
-                    start[0] = RAW!(ctxt);
+                    start[0] = (*ctxt).current_byte();
                     start[1] = NXT!(ctxt, 1);
                     start[2] = NXT!(ctxt, 2);
                     start[3] = NXT!(ctxt, 3);
@@ -5149,14 +5145,14 @@ pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) 
      * Is there any internal subset declarations ?
      * they are handled separately in xmlParseInternalSubset()
      */
-    if RAW!(ctxt) == b'[' {
+    if (*ctxt).current_byte() == b'[' {
         return;
     }
 
     /*
      * We should be at the end of the DOCTYPE declaration.
      */
-    if RAW!(ctxt) != b'>' {
+    if (*ctxt).current_byte() != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrDoctypeNotFinished, null());
     }
     (*ctxt).skip_char();
@@ -5219,7 +5215,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
      * read the value
      */
     (*ctxt).skip_blanks();
-    if RAW!(ctxt) == b'=' {
+    if (*ctxt).current_byte() == b'=' {
         (*ctxt).skip_char();
         (*ctxt).skip_blanks();
         val = xml_parse_att_value(ctxt);
@@ -5314,7 +5310,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
     let mut nbatts: c_int = 0;
     let mut maxatts: c_int = (*ctxt).maxatts;
 
-    if RAW!(ctxt) != b'<' {
+    if (*ctxt).current_byte() != b'<' {
         return null_mut();
     }
     (*ctxt).advance(1);
@@ -5337,9 +5333,9 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
     (*ctxt).skip_blanks();
     (*ctxt).grow();
 
-    while RAW!(ctxt) != b'>'
-        && (RAW!(ctxt) != b'/' || NXT!(ctxt, 1) != b'>')
-        && xml_is_char(RAW!(ctxt) as u32)
+    while (*ctxt).current_byte() != b'>'
+        && ((*ctxt).current_byte() != b'/' || NXT!(ctxt, 1) != b'>')
+        && xml_is_char((*ctxt).current_byte() as u32)
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
         attname = xml_parse_attribute(ctxt, addr_of_mut!(attvalue));
@@ -5413,7 +5409,9 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
         // failed:
 
         (*ctxt).grow();
-        if RAW!(ctxt) == b'>' || (RAW!(ctxt) == b'/' && NXT!(ctxt, 1) == b'>') {
+        if (*ctxt).current_byte() == b'>'
+            || ((*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>')
+        {
             break;
         }
         if (*ctxt).skip_blanks() == 0 {
@@ -5565,7 +5563,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     /*
      * Check for an Empty Element.
      */
-    if RAW!(ctxt) == b'/' && NXT!(ctxt, 1) == b'>' {
+    if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
         (*ctxt).advance(2);
         if (*ctxt).sax2 != 0 {
             if !(*ctxt).sax.is_null()
@@ -5602,7 +5600,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         }
         return 1;
     }
-    if RAW!(ctxt) == b'>' {
+    if (*ctxt).current_byte() == b'>' {
         (*ctxt).advance(1);
         if !cur.is_null() && (*ctxt).record_info != 0 {
             node_info.node = cur;
@@ -5645,7 +5643,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
     let cur: XmlNodePtr = (*ctxt).node;
 
     if (*ctxt).name_nr <= 0 {
-        if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'/' {
+        if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
             (*ctxt).advance(2);
         }
         return;
@@ -5689,7 +5687,9 @@ pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPt
     let name_nr: c_int = (*ctxt).name_nr;
 
     (*ctxt).grow();
-    while RAW!(ctxt) != 0 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+    while (*ctxt).current_byte() != 0
+        && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
         let cur: *const XmlChar = (*(*ctxt).input).cur;
 
         /*
@@ -5795,24 +5795,24 @@ pub(crate) unsafe extern "C" fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -
     if (*ctxt).content_bytes().starts_with(b"version") {
         (*ctxt).advance(7);
         (*ctxt).skip_blanks();
-        if RAW!(ctxt) != b'=' {
+        if (*ctxt).current_byte() != b'=' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
             return null_mut();
         }
         (*ctxt).skip_char();
         (*ctxt).skip_blanks();
-        if RAW!(ctxt) == b'"' {
+        if (*ctxt).current_byte() == b'"' {
             (*ctxt).skip_char();
             version = xml_parse_version_num(ctxt);
-            if RAW!(ctxt) != b'"' {
+            if (*ctxt).current_byte() != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
                 (*ctxt).skip_char();
             }
-        } else if RAW!(ctxt) == b'\'' {
+        } else if (*ctxt).current_byte() == b'\'' {
             (*ctxt).skip_char();
             version = xml_parse_version_num(ctxt);
-            if RAW!(ctxt) != b'\'' {
+            if (*ctxt).current_byte() != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
                 (*ctxt).skip_char();
@@ -5845,26 +5845,26 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
     if (*ctxt).content_bytes().starts_with(b"encoding") {
         (*ctxt).advance(8);
         (*ctxt).skip_blanks();
-        if RAW!(ctxt) != b'=' {
+        if (*ctxt).current_byte() != b'=' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
             return null_mut();
         }
         (*ctxt).skip_char();
         (*ctxt).skip_blanks();
-        if RAW!(ctxt) == b'"' {
+        if (*ctxt).current_byte() == b'"' {
             (*ctxt).skip_char();
             encoding = xml_parse_enc_name(ctxt);
-            if RAW!(ctxt) != b'"' {
+            if (*ctxt).current_byte() != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
                 xml_free(encoding as _);
                 return null_mut();
             } else {
                 (*ctxt).skip_char();
             }
-        } else if RAW!(ctxt) == b'\'' {
+        } else if (*ctxt).current_byte() == b'\'' {
             (*ctxt).skip_char();
             encoding = xml_parse_enc_name(ctxt);
-            if RAW!(ctxt) != b'\'' {
+            if (*ctxt).current_byte() != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
                 xml_free(encoding as _);
                 return null_mut();
@@ -5997,40 +5997,46 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> c_in
     if (*ctxt).content_bytes().starts_with(b"standalone") {
         (*ctxt).advance(10);
         (*ctxt).skip_blanks();
-        if RAW!(ctxt) != b'=' {
+        if (*ctxt).current_byte() != b'=' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
             return standalone;
         }
         (*ctxt).skip_char();
         (*ctxt).skip_blanks();
-        if RAW!(ctxt) == b'\'' {
+        if (*ctxt).current_byte() == b'\'' {
             (*ctxt).skip_char();
-            if RAW!(ctxt) == b'n' && NXT!(ctxt, 1) == b'o' {
+            if (*ctxt).current_byte() == b'n' && NXT!(ctxt, 1) == b'o' {
                 standalone = 0;
                 (*ctxt).advance(2);
-            } else if RAW!(ctxt) == b'y' && NXT!(ctxt, 1) == b'e' && NXT!(ctxt, 2) == b's' {
+            } else if (*ctxt).current_byte() == b'y'
+                && NXT!(ctxt, 1) == b'e'
+                && NXT!(ctxt, 2) == b's'
+            {
                 standalone = 1;
                 (*ctxt).advance(3);
             } else {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStandaloneValue, null());
             }
-            if RAW!(ctxt) != b'\'' {
+            if (*ctxt).current_byte() != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
                 (*ctxt).skip_char();
             }
-        } else if RAW!(ctxt) == b'"' {
+        } else if (*ctxt).current_byte() == b'"' {
             (*ctxt).skip_char();
-            if RAW!(ctxt) == b'n' && NXT!(ctxt, 1) == b'o' {
+            if (*ctxt).current_byte() == b'n' && NXT!(ctxt, 1) == b'o' {
                 standalone = 0;
                 (*ctxt).advance(2);
-            } else if RAW!(ctxt) == b'y' && NXT!(ctxt, 1) == b'e' && NXT!(ctxt, 2) == b's' {
+            } else if (*ctxt).current_byte() == b'y'
+                && NXT!(ctxt, 1) == b'e'
+                && NXT!(ctxt, 2) == b's'
+            {
                 standalone = 1;
                 (*ctxt).advance(3);
             } else {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStandaloneValue, null());
             }
-            if RAW!(ctxt) != b'"' {
+            if (*ctxt).current_byte() != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
             } else {
                 (*ctxt).skip_char();
@@ -6057,7 +6063,7 @@ pub(crate) unsafe extern "C" fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
     while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         (*ctxt).skip_blanks();
         (*ctxt).grow();
-        if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'?' {
+        if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
             xml_parse_pi(ctxt);
         } else if (*ctxt).content_bytes().starts_with(b"<!--") {
             xml_parse_comment(ctxt);
@@ -6090,7 +6096,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
     if (*ctxt).encoding.is_null() && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
         let mut start: [XmlChar; 4] = [0; 4];
 
-        start[0] = RAW!(ctxt);
+        start[0] = (*ctxt).current_byte();
         start[1] = NXT!(ctxt, 1);
         start[2] = NXT!(ctxt, 2);
         start[3] = NXT!(ctxt, 3);
@@ -6126,11 +6132,14 @@ pub unsafe extern "C" fn xml_parse_external_subset(
     (*ctxt).external = 1;
     (*ctxt).skip_blanks();
     #[allow(clippy::while_immutable_condition)]
-    while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) && RAW!(ctxt) != 0 {
+    while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        && (*ctxt).current_byte() != 0
+    {
         (*ctxt).grow();
-        if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'!' && NXT!(ctxt, 2) == b'[' {
+        if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'!' && NXT!(ctxt, 2) == b'[' {
             xml_parse_conditional_sections(ctxt);
-        } else if RAW!(ctxt) == b'<' && (NXT!(ctxt, 1) == b'!' || NXT!(ctxt, 1) == b'?') {
+        } else if (*ctxt).current_byte() == b'<' && (NXT!(ctxt, 1) == b'!' || NXT!(ctxt, 1) == b'?')
+        {
             xml_parse_markup_decl(ctxt);
         } else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, null());
@@ -6141,7 +6150,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
         (*ctxt).shrink();
     }
 
-    if RAW!(ctxt) != 0 {
+    if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtSubsetNotFinished, null());
     }
 }
