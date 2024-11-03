@@ -178,20 +178,6 @@ pub const INPUT_CHUNK: usize = 250;
  ************************************************************************/
 
 /**
- * IS_ASCII_LETTER:
- * @c: an xmlChar value
- *
- * Macro to check [a-zA-Z]
- *
- */
-#[macro_export]
-macro_rules! IS_ASCII_LETTER {
-    ( $c:expr ) => {
-        (0x41..=0x5a).contains(&$c) || (0x61..=0x7a).contains(&$c)
-    };
-}
-
-/**
  * IS_ASCII_DIGIT:
  * @c: an xmlChar value
  *

@@ -71,7 +71,7 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER,
+    IS_ASCII_DIGIT,
 };
 
 use super::{
@@ -5301,7 +5301,7 @@ unsafe extern "C" fn xml_xpath_comp_location_path(ctxt: XmlXPathParserContextPtr
                 NEXT!(ctxt);
                 SKIP_BLANKS!(ctxt);
                 if CUR!(ctxt) != 0
-                    && (IS_ASCII_LETTER!(CUR!(ctxt))
+                    && (CUR!(ctxt).is_ascii_alphabetic()
                         || CUR!(ctxt) == b'_'
                         || CUR!(ctxt) == b'.'
                         || CUR!(ctxt) == b'@'

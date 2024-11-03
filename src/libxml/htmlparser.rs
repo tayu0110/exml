@@ -53,7 +53,7 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    IS_ASCII_DIGIT, IS_ASCII_LETTER,
+    IS_ASCII_DIGIT,
 };
 
 use super::{
@@ -6477,7 +6477,7 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
     let mut i: usize = 0;
     let mut loc: [XmlChar; HTML_PARSER_BUFFER_SIZE] = [0; HTML_PARSER_BUFFER_SIZE];
 
-    if !IS_ASCII_LETTER!((*ctxt).current_byte())
+    if !(*ctxt).current_byte().is_ascii_alphabetic()
         && (*ctxt).current_byte() != b'_'
         && (*ctxt).current_byte() != b':'
         && (*ctxt).current_byte() != b'.'
@@ -6486,7 +6486,7 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
     }
 
     while i < HTML_PARSER_BUFFER_SIZE
-        && (IS_ASCII_LETTER!((*ctxt).current_byte())
+        && ((*ctxt).current_byte().is_ascii_alphabetic()
             || IS_ASCII_DIGIT!((*ctxt).current_byte())
             || (*ctxt).current_byte() == b':'
             || (*ctxt).current_byte() == b'-'
@@ -7817,12 +7817,12 @@ unsafe extern "C" fn html_parse_html_name_non_invasive(ctxt: HtmlParserCtxtPtr) 
     let mut i: usize = 0;
     let mut loc: [XmlChar; HTML_PARSER_BUFFER_SIZE] = [0; HTML_PARSER_BUFFER_SIZE];
 
-    if !IS_ASCII_LETTER!(NXT!(ctxt, 1)) && NXT!(ctxt, 1) != b'_' && NXT!(ctxt, 1) != b':' {
+    if !NXT!(ctxt, 1).is_ascii_alphabetic() && NXT!(ctxt, 1) != b'_' && NXT!(ctxt, 1) != b':' {
         return null_mut();
     }
 
     while i < HTML_PARSER_BUFFER_SIZE
-        && (IS_ASCII_LETTER!(NXT!(ctxt, 1 + i))
+        && (NXT!(ctxt, 1 + i).is_ascii_alphabetic()
             || IS_ASCII_DIGIT!(NXT!(ctxt, 1 + i))
             || NXT!(ctxt, 1 + i) == b':'
             || NXT!(ctxt, 1 + i) == b'-'
@@ -9080,7 +9080,9 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
             }
             continue; /* while */
         } else if (*ctxt).current_byte() == b'<'
-            && (IS_ASCII_LETTER!(NXT!(ctxt, 1)) || NXT!(ctxt, 1) == b'_' || NXT!(ctxt, 1) == b':')
+            && (NXT!(ctxt, 1).is_ascii_alphabetic()
+                || NXT!(ctxt, 1) == b'_'
+                || NXT!(ctxt, 1) == b':')
         {
             name = html_parse_html_name_non_invasive(ctxt);
             if name.is_null() {
@@ -9170,7 +9172,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
         /*
          * Third case :  a sub-element.
          */
-        else if (*ctxt).current_byte() == b'<' && IS_ASCII_LETTER!(NXT!(ctxt, 1)) {
+        else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1).is_ascii_alphabetic() {
             html_parse_element(ctxt);
         } else if (*ctxt).current_byte() == b'<' {
             if !(*ctxt).sax.is_null()
@@ -9798,7 +9800,9 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
             }
             continue; /* while */
         } else if (*ctxt).current_byte() == b'<'
-            && (IS_ASCII_LETTER!(NXT!(ctxt, 1)) || NXT!(ctxt, 1) == b'_' || NXT!(ctxt, 1) == b':')
+            && (NXT!(ctxt, 1).is_ascii_alphabetic()
+                || NXT!(ctxt, 1) == b'_'
+                || NXT!(ctxt, 1) == b':')
         {
             name = html_parse_html_name_non_invasive(ctxt);
             if name.is_null() {
@@ -9904,7 +9908,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
         /*
          * Third case :  a sub-element.
          */
-        else if (*ctxt).current_byte() == b'<' && IS_ASCII_LETTER!(NXT!(ctxt, 1)) {
+        else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1).is_ascii_alphabetic() {
             html_parse_element_internal(ctxt);
             if !current_node.is_null() {
                 xml_free(current_node as _);
@@ -11476,7 +11480,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     (*ctxt).instate = XmlParserInputState::XmlParserEndTag;
                     (*ctxt).check_index = 0;
                     break 'to_break;
-                } else if cur == b'<' && IS_ASCII_LETTER!(next) {
+                } else if cur == b'<' && next.is_ascii_alphabetic() {
                     if terminate == 0 && (next == 0) {
                         // goto done;
                         break 'done;
