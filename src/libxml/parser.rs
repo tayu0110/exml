@@ -1218,6 +1218,44 @@ impl XmlParserCtxt {
         *self.name_tab.add(self.name_nr as usize) = null_mut();
         ret
     }
+
+    #[doc(alias = "spacePush")]
+    pub(crate) unsafe fn space_push(&mut self, val: i32) -> i32 {
+        if self.space_nr >= self.space_max {
+            self.space_max *= 2;
+            let tmp: *mut c_int = xml_realloc(
+                self.space_tab as _,
+                self.space_max as usize * size_of_val(&*self.space_tab.add(0)),
+            ) as _;
+            if tmp.is_null() {
+                xml_err_memory(self, null());
+                self.space_max /= 2;
+                return -1;
+            }
+            self.space_tab = tmp;
+        }
+        *self.space_tab.add(self.space_nr as usize) = val;
+        self.space = self.space_tab.add(self.space_nr as usize);
+        let res = self.space_nr;
+        self.space_nr += 1;
+        res
+    }
+
+    #[doc(alias = "spacePop")]
+    pub(crate) unsafe fn space_pop(&mut self) -> i32 {
+        if self.space_nr <= 0 {
+            return 0;
+        }
+        self.space_nr -= 1;
+        if self.space_nr > 0 {
+            self.space = self.space_tab.add(self.space_nr as usize - 1);
+        } else {
+            self.space = self.space_tab.add(0);
+        }
+        let ret: c_int = *self.space_tab.add(self.space_nr as usize);
+        *self.space_tab.add(self.space_nr as usize) = -1;
+        ret
+    }
 }
 /**
  * xmlSAXLocator:
@@ -5992,27 +6030,6 @@ unsafe extern "C" fn xml_parse_lookup_gt(ctxt: XmlParserCtxtPtr) -> c_int {
     0
 }
 
-pub(crate) unsafe extern "C" fn space_push(ctxt: XmlParserCtxtPtr, val: c_int) -> c_int {
-    if (*ctxt).space_nr >= (*ctxt).space_max {
-        (*ctxt).space_max *= 2;
-        let tmp: *mut c_int = xml_realloc(
-            (*ctxt).space_tab as _,
-            (*ctxt).space_max as usize * size_of_val(&*(*ctxt).space_tab.add(0)),
-        ) as _;
-        if tmp.is_null() {
-            xml_err_memory(ctxt, null());
-            (*ctxt).space_max /= 2;
-            return -1;
-        }
-        (*ctxt).space_tab = tmp;
-    }
-    *(*ctxt).space_tab.add((*ctxt).space_nr as usize) = val;
-    (*ctxt).space = (*ctxt).space_tab.add((*ctxt).space_nr as usize);
-    let res = (*ctxt).space_nr;
-    (*ctxt).space_nr += 1;
-    res
-}
-
 /*
  * The two following functions are related to the change of accepted
  * characters for Name and NmToken in the Revision 5 of XML-1.0
@@ -9127,21 +9144,6 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     localname
 }
 
-pub(crate) unsafe extern "C" fn space_pop(ctxt: XmlParserCtxtPtr) -> c_int {
-    if (*ctxt).space_nr <= 0 {
-        return 0;
-    }
-    (*ctxt).space_nr -= 1;
-    if (*ctxt).space_nr > 0 {
-        (*ctxt).space = (*ctxt).space_tab.add((*ctxt).space_nr as usize - 1);
-    } else {
-        (*ctxt).space = (*ctxt).space_tab.add(0);
-    }
-    let ret: c_int = *(*ctxt).space_tab.add((*ctxt).space_nr as usize);
-    *(*ctxt).space_tab.add((*ctxt).space_nr as usize) = -1;
-    ret
-}
-
 /**
  * nameNsPush:
  * @ctxt:  an XML parser context
@@ -9852,7 +9854,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
         );
     }
 
-    space_pop(ctxt);
+    (*ctxt).space_pop();
     if (*tag).ns_nr != 0 {
         ns_pop(ctxt, (*tag).ns_nr);
     }
@@ -9952,7 +9954,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
     }
 
     (*ctxt).name_pop();
-    space_pop(ctxt);
+    (*ctxt).space_pop();
 }
 
 /**
@@ -10373,9 +10375,9 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         return ret;
                     }
                     if (*ctxt).space_nr == 0 || *(*ctxt).space == -2 {
-                        space_push(ctxt, -1);
+                        (*ctxt).space_push(-1);
                     } else {
-                        space_push(ctxt, *(*ctxt).space);
+                        (*ctxt).space_push(*(*ctxt).space);
                     }
                     #[cfg(feature = "sax1")]
                     {
@@ -10404,7 +10406,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         return ret;
                     }
                     if name.is_null() {
-                        space_pop(ctxt);
+                        (*ctxt).space_pop();
                         (*ctxt).halt();
                         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_document.is_some() {
                             ((*(*ctxt).sax).end_document.unwrap())((*ctxt).user_data.clone());
@@ -10465,7 +10467,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             // goto done;
                             return ret;
                         }
-                        space_pop(ctxt);
+                        (*ctxt).space_pop();
                         if (*ctxt).name_nr == 0 {
                             (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
                         } else {
@@ -10483,7 +10485,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                                 name,
                             );
                             (*ctxt).node_pop();
-                            space_pop(ctxt);
+                            (*ctxt).space_pop();
                         }
                         name_ns_push(ctxt, name, prefix, uri, line, (*ctxt).ns_nr - ns_nr);
 

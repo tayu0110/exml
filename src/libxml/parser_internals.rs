@@ -64,15 +64,15 @@ use super::hash::{
     xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
 };
 use super::parser::{
-    name_ns_push, ns_push, space_pop, space_push, xml_detect_sax2, xml_fatal_err_msg_str,
-    xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_is_name_char,
-    xml_load_external_entity, xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
-    xml_parse_att_value_internal, xml_parse_char_data_internal, xml_parse_char_ref,
-    xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
-    xml_parse_external_entity_private, xml_parser_entity_check, xml_parser_find_node_info,
-    xml_stop_parser, xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr,
-    XmlParserInput, XmlParserInputPtr, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr,
-    XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SKIP_IDS,
+    name_ns_push, ns_push, xml_detect_sax2, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+    xml_free_parser_ctxt, xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt,
+    xml_new_sax_parser_ctxt, xml_ns_err, xml_parse_att_value_internal,
+    xml_parse_char_data_internal, xml_parse_char_ref, xml_parse_element_children_content_decl_priv,
+    xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
+    xml_parser_entity_check, xml_parser_find_node_info, xml_stop_parser, xml_warning_msg,
+    XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr,
+    XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption, XML_COMPLETE_ATTRS,
+    XML_DETECT_IDS, XML_SKIP_IDS,
 };
 use super::sax2::xml_sax2_ignorable_whitespace;
 use super::tree::{
@@ -5507,9 +5507,9 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     }
 
     if (*ctxt).space_nr == 0 || *(*ctxt).space == -2 {
-        space_push(ctxt, -1);
+        (*ctxt).space_push(-1);
     } else {
-        space_push(ctxt, *(*ctxt).space);
+        (*ctxt).space_push(*(*ctxt).space);
     }
 
     let line: c_int = (*(*ctxt).input).line;
@@ -5539,7 +5539,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         return -1;
     }
     if name.is_null() {
-        space_pop(ctxt);
+        (*ctxt).space_pop();
         return -1;
     }
     name_ns_push(ctxt, name, prefix, uri, line, (*ctxt).ns_nr - ns_nr);
@@ -5587,7 +5587,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
             }
         }
         (*ctxt).name_pop();
-        space_pop(ctxt);
+        (*ctxt).space_pop();
         if ns_nr != (*ctxt).ns_nr {
             ns_pop(ctxt, (*ctxt).ns_nr - ns_nr);
         }
@@ -5623,7 +5623,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
          */
         (*ctxt).node_pop();
         (*ctxt).name_pop();
-        space_pop(ctxt);
+        (*ctxt).space_pop();
         if ns_nr != (*ctxt).ns_nr {
             ns_pop(ctxt, (*ctxt).ns_nr - ns_nr);
         }
