@@ -149,8 +149,8 @@ macro_rules! __xml_raise_error {
                     if !ctxt.is_null() {
                         if file.is_null() {
                             input = (*ctxt).input;
-                            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-                                input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+                            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+                                input = (*ctxt).input_tab[(*ctxt).input_tab.len() as usize - 2];
                             }
                             if !input.is_null() {
                                 file = (*input).filename;

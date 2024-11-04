@@ -769,7 +769,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
                 return 0;
             }
             XmlCharEncoding::ISO8859_1 => {
-                if (*ctxt).input_nr == 1
+                if (*ctxt).input_tab.len() == 1
                     && (*ctxt).encoding.is_null()
                     && !(*ctxt).input.is_null()
                     && !(*(*ctxt).input).encoding.is_null()
@@ -1327,16 +1327,16 @@ pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParser
         let cur = CStr::from_ptr((*input).cur as *const i8).to_string_lossy();
         generic_error!(
             "Pushing input {} : {}\n",
-            (*ctxt).input_nr + 1,
+            (*ctxt).input_tab.len() + 1,
             &cur[..cur.len().min(30)]
         );
     }
-    if ((*ctxt).input_nr > 40 && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0)
-        || (*ctxt).input_nr > 100
+    if ((*ctxt).input_tab.len() > 40 && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0)
+        || (*ctxt).input_tab.len() > 100
     {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, null());
         #[allow(clippy::while_immutable_condition)]
-        while (*ctxt).input_nr > 1 {
+        while (*ctxt).input_tab.len() > 1 {
             xml_free_input_stream((*ctxt).input_pop());
         }
         return -1;
@@ -2174,7 +2174,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
                 }
                 return ret;
             }
-            if tmp == b'%' && (*ctxt).in_subset == 1 && (*ctxt).input_nr == 1 {
+            if tmp == b'%' && (*ctxt).in_subset == 1 && (*ctxt).input_tab.len() == 1 {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityPEInternal, null());
                 //  goto error;
                 if !buf.is_null() {
@@ -4774,7 +4774,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 ) {
                     xml_add_entity_reference(ent, first_child, nw);
                 }
-            } else if list.is_null() || (*ctxt).input_nr > 0 {
+            } else if list.is_null() || !(*ctxt).input_tab.is_empty() {
                 let mut nw: XmlNodePtr;
                 let mut cur: XmlNodePtr;
                 let mut next: XmlNodePtr;
@@ -6531,7 +6531,7 @@ pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtx
              * within markup declarations.
              * In that case this is handled in xmlParseMarkupDecl
              */
-            if (*ctxt).external == 0 && (*ctxt).input_nr == 1 {
+            if (*ctxt).external == 0 && (*ctxt).input_tab.len() == 1 {
                 return;
             }
             if xml_is_blank_char(NXT!(ctxt, 1) as u32) || NXT!(ctxt, 1) == 0 {

@@ -484,9 +484,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
          */
         if !ctxt.is_null() {
             input = (*ctxt).input;
-            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
-                input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
             }
             if !input.is_null() {
                 if !(*input).filename.is_null() {

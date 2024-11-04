@@ -5,7 +5,7 @@
 
 use std::{
     ffi::{c_char, c_int, c_uint, c_ulong, c_void, CStr},
-    mem::size_of,
+    mem::{replace, size_of},
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
     sync::atomic::Ordering,
@@ -380,30 +380,12 @@ pub unsafe fn xml_sax2_external_subset(
          * Try to fetch and parse the external subset.
          */
         let oldinput: XmlParserInputPtr = (*ctxt).input;
-        let oldinput_nr: c_int = (*ctxt).input_nr;
-        let oldinput_max: c_int = (*ctxt).input_max;
-        let oldinput_tab: *mut XmlParserInputPtr = (*ctxt).input_tab;
+        let oldinput_tab = replace(&mut (*ctxt).input_tab, Vec::with_capacity(5));
         let oldcharset = (*ctxt).charset;
         let oldencoding: *const XmlChar = (*ctxt).encoding;
         let oldprogressive: c_int = (*ctxt).progressive;
         (*ctxt).encoding = null();
         (*ctxt).progressive = 0;
-
-        (*ctxt).input_tab = xml_malloc(5 * size_of::<XmlParserInputPtr>()) as _;
-        if (*ctxt).input_tab.is_null() {
-            xml_sax2_err_memory(ctxt, c"xmlSAX2ExternalSubset".as_ptr() as _);
-            xml_free_input_stream(input);
-            (*ctxt).input = oldinput;
-            (*ctxt).input_nr = oldinput_nr;
-            (*ctxt).input_max = oldinput_max;
-            (*ctxt).input_tab = oldinput_tab;
-            (*ctxt).charset = oldcharset;
-            (*ctxt).encoding = oldencoding;
-            (*ctxt).progressive = oldprogressive;
-            return;
-        }
-        (*ctxt).input_nr = 0;
-        (*ctxt).input_max = 5;
         (*ctxt).input = null_mut();
         xml_push_input(ctxt, input);
 
@@ -434,7 +416,7 @@ pub unsafe fn xml_sax2_external_subset(
          * Free up the external entities
          */
         #[allow(clippy::while_immutable_condition)]
-        while (*ctxt).input_nr > 1 {
+        while (*ctxt).input_tab.len() > 1 {
             xml_pop_input(ctxt);
         }
 
@@ -452,14 +434,11 @@ pub unsafe fn xml_sax2_external_subset(
         }
 
         xml_free_input_stream((*ctxt).input);
-        xml_free((*ctxt).input_tab as _);
 
         /*
          * Restore the parsing context of the main entity
          */
         (*ctxt).input = oldinput;
-        (*ctxt).input_nr = oldinput_nr;
-        (*ctxt).input_max = oldinput_max;
         (*ctxt).input_tab = oldinput_tab;
         (*ctxt).charset = oldcharset;
         if !(*ctxt).encoding.is_null()
@@ -1367,14 +1346,13 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
         (*(*ctxt).my_doc).encoding = (*ctxt).encoding;
         (*ctxt).encoding = null();
     }
-    if !(*ctxt).input_tab.is_null()
-        && (*ctxt).input_nr > 0
-        && !(*(*ctxt).input_tab.add(0)).is_null()
-        && !(*(*(*ctxt).input_tab.add(0))).encoding.is_null()
+    if !(*ctxt).input_tab.is_empty()
+        && !(*ctxt).input_tab[0].is_null()
+        && !(*(*ctxt).input_tab[0]).encoding.is_null()
         && !(*ctxt).my_doc.is_null()
         && (*(*ctxt).my_doc).encoding.is_null()
     {
-        (*(*ctxt).my_doc).encoding = xml_strdup((*(*(*ctxt).input_tab.add(0))).encoding);
+        (*(*ctxt).my_doc).encoding = xml_strdup((*(*ctxt).input_tab[0]).encoding);
     }
     if (*ctxt).charset != crate::encoding::XmlCharEncoding::None
         && !(*ctxt).my_doc.is_null()

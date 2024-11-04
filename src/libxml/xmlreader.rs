@@ -6230,8 +6230,8 @@ pub unsafe extern "C" fn xml_text_reader_locator_line_number(
         /* inspired from error.c */
         let mut input: XmlParserInputPtr;
         input = (*ctx).input;
-        if (*input).filename.is_null() && (*ctx).input_nr > 1 {
-            input = *(*ctx).input_tab.add((*ctx).input_nr as usize - 2);
+        if (*input).filename.is_null() && (*ctx).input_tab.len() > 1 {
+            input = (*ctx).input_tab[(*ctx).input_tab.len() as usize - 2];
         }
         if !input.is_null() {
             ret = (*input).line;
@@ -6269,8 +6269,8 @@ pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
         /* inspired from error.c */
         let mut input: XmlParserInputPtr;
         input = (*ctx).input;
-        if (*input).filename.is_null() && (*ctx).input_nr > 1 {
-            input = *(*ctx).input_tab.add((*ctx).input_nr as usize - 2);
+        if (*input).filename.is_null() && (*ctx).input_tab.len() > 1 {
+            input = (*ctx).input_tab[(*ctx).input_tab.len() as usize - 2];
         }
         if !input.is_null() {
             ret = xml_strdup((*input).filename as _);

@@ -9398,6 +9398,7 @@ unsafe fn html_init_parser_ctxt(
         return -1;
     }
     memset(ctxt as _, 0, size_of::<HtmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
 
     (*ctxt).dict = xml_dict_create();
@@ -9429,19 +9430,7 @@ unsafe fn html_init_parser_ctxt(
     }
 
     /* Allocate the Input stack */
-    (*ctxt).input_tab = xml_malloc(5 * size_of::<HtmlParserInputPtr>()) as _;
-    if (*ctxt).input_tab.is_null() {
-        html_err_memory(
-            null_mut(),
-            c"htmlInitParserCtxt: out of memory\n".as_ptr() as _,
-        );
-        (*ctxt).input_nr = 0;
-        (*ctxt).input_max = 0;
-        (*ctxt).input = null_mut();
-        return -1;
-    }
-    (*ctxt).input_nr = 0;
-    (*ctxt).input_max = 5;
+    (*ctxt).input_tab.shrink_to(5);
     (*ctxt).input = null_mut();
     (*ctxt).version = null_mut();
     (*ctxt).encoding = null_mut();
@@ -9458,8 +9447,6 @@ unsafe fn html_init_parser_ctxt(
         (*ctxt).node_nr = 0;
         (*ctxt).node_max = 0;
         (*ctxt).node = null_mut();
-        (*ctxt).input_nr = 0;
-        (*ctxt).input_max = 0;
         (*ctxt).input = null_mut();
         return -1;
     }
@@ -9480,8 +9467,6 @@ unsafe fn html_init_parser_ctxt(
         (*ctxt).node_nr = 0;
         (*ctxt).node_max = 0;
         (*ctxt).node = null_mut();
-        (*ctxt).input_nr = 0;
-        (*ctxt).input_max = 0;
         (*ctxt).input = null_mut();
         return -1;
     }
@@ -9531,6 +9516,7 @@ pub unsafe fn html_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
     if html_init_parser_ctxt(ctxt, sax, user_data) < 0 {
         html_free_parser_ctxt(ctxt);
@@ -11855,7 +11841,6 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
         /* Non consuming */
         xml_free_input_stream(input);
     }
-    (*ctxt).input_nr = 0;
     (*ctxt).input = null_mut();
 
     (*ctxt).space_nr = 0;

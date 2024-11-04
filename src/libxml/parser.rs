@@ -430,9 +430,7 @@ pub struct XmlParserCtxt {
 
     /* Input stream stack */
     pub input: XmlParserInputPtr,          /* Current input stream */
-    pub input_nr: c_int,                   /* Number of current input streams */
-    pub(crate) input_max: c_int,           /* Max number of input streams */
-    pub input_tab: *mut XmlParserInputPtr, /* stack of inputs */
+    pub input_tab: Vec<XmlParserInputPtr>, /* stack of inputs */
 
     /* Node analysis stack only used for DOM building */
     pub(crate) node: XmlNodePtr,          /* Current parsed Node */
@@ -674,7 +672,7 @@ impl XmlParserCtxt {
     pub(crate) unsafe fn halt(&mut self) {
         self.instate = XmlParserInputState::XmlParserEOF;
         self.disable_sax = 1;
-        while self.input_nr > 1 {
+        while self.input_tab.len() > 1 {
             xml_free_input_stream(self.input_pop());
         }
         if !self.input.is_null() {
@@ -855,7 +853,7 @@ impl XmlParserCtxt {
          * It's Okay to use CUR/NEXT here since all the blanks are on
          * the ASCII range.
          */
-        if (self.input_nr == 1 && !matches!(self.instate, XmlParserInputState::XmlParserDTD))
+        if (self.input_tab.len() == 1 && !matches!(self.instate, XmlParserInputState::XmlParserDTD))
             || matches!(self.instate, XmlParserInputState::XmlParserStart)
         {
             /*
@@ -879,7 +877,7 @@ impl XmlParserCtxt {
             }
             (*self.input).cur = cur;
         } else {
-            let expand_pe = self.external != 0 || self.input_nr != 1;
+            let expand_pe = self.external != 0 || self.input_tab.len() != 1;
 
             while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 if xml_is_blank_char(self.current_byte() as u32) {
@@ -899,7 +897,7 @@ impl XmlParserCtxt {
                 } else if self.current_byte() == 0 {
                     let mut consumed: c_ulong;
 
-                    if self.input_nr <= 1 {
+                    if self.input_tab.len() <= 1 {
                         break;
                     }
 
@@ -1077,29 +1075,13 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "inputPush")]
-    pub unsafe fn input_push(&mut self, value: XmlParserInputPtr) -> c_int {
+    pub unsafe fn input_push(&mut self, value: XmlParserInputPtr) -> i32 {
         if value.is_null() {
             return -1;
         }
-        if self.input_nr >= self.input_max {
-            let new_size: size_t = self.input_max as usize * 2;
-
-            let tmp: *mut XmlParserInputPtr = xml_realloc(
-                self.input_tab as _,
-                new_size * size_of::<XmlParserInputPtr>(),
-            ) as *mut XmlParserInputPtr;
-            if tmp.is_null() {
-                xml_err_memory(self, null());
-                return -1;
-            }
-            self.input_tab = tmp;
-            self.input_max = new_size as _;
-        }
-        *self.input_tab.add(self.input_nr as usize) = value;
         self.input = value;
-        let res = self.input_nr;
-        self.input_nr += 1;
-        res
+        self.input_tab.push(value);
+        self.input_tab.len() as i32 - 1
     }
 
     /// Pops the top parser input from the input stack
@@ -1107,18 +1089,12 @@ impl XmlParserCtxt {
     /// Returns the input just removed
     #[doc(alias = "inputPop")]
     pub unsafe fn input_pop(&mut self) -> XmlParserInputPtr {
-        if self.input_nr <= 0 {
+        if self.input_tab.is_empty() {
             return null_mut();
         }
-        self.input_nr -= 1;
-        if self.input_nr > 0 {
-            self.input = *self.input_tab.add(self.input_nr as usize - 1);
-        } else {
-            self.input = null_mut();
-        }
-        let ret: XmlParserInputPtr = *self.input_tab.add(self.input_nr as usize);
-        *self.input_tab.add(self.input_nr as usize) = null_mut();
-        ret
+        let res = self.input_tab.pop().unwrap_or(null_mut());
+        self.input = *self.input_tab.last().unwrap_or(&null_mut());
+        res
     }
 
     /// Pushes a new element node on top of the node stack
@@ -3174,7 +3150,7 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
      * Is there any DTD definition ?
      */
     if (*ctxt).current_byte() == b'[' {
-        let base_input_nr: c_int = (*ctxt).input_nr;
+        let base_input_nr = (*ctxt).input_tab.len();
         (*ctxt).instate = XmlParserInputState::XmlParserDTD;
         (*ctxt).skip_char();
         /*
@@ -3184,14 +3160,14 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
          */
         (*ctxt).skip_blanks();
         #[allow(clippy::while_immutable_condition)]
-        while ((*ctxt).current_byte() != b']' || (*ctxt).input_nr > base_input_nr)
+        while ((*ctxt).current_byte() != b']' || (*ctxt).input_tab.len() > base_input_nr)
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             /*
              * Conditional sections are allowed from external entities included
              * by PE References in the internal subset.
              */
-            if (*ctxt).input_nr > 1
+            if (*ctxt).input_tab.len() > 1
                 && !(*(*ctxt).input).filename.is_null()
                 && (*ctxt).current_byte() == b'<'
                 && (*ctxt).nth_byte(1) == b'!'
@@ -5204,20 +5180,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).maxatts = 0;
     (*ctxt).atts = null_mut();
     /* Allocate the Input stack */
-    if (*ctxt).input_tab.is_null() {
-        (*ctxt).input_tab = xml_malloc(5 * size_of::<XmlParserInputPtr>()) as _;
-        (*ctxt).input_max = 5;
-    }
-    if (*ctxt).input_tab.is_null() {
-        xml_err_memory(
-            null_mut(),
-            c"cannot initialize parser context\n".as_ptr() as _,
-        );
-        (*ctxt).input_nr = 0;
-        (*ctxt).input_max = 0;
-        (*ctxt).input = null_mut();
-        return -1;
-    }
+    (*ctxt).input_tab.shrink_to(5);
     while {
         input = (*ctxt).input_pop();
         !input.is_null()
@@ -5225,9 +5188,7 @@ unsafe fn xml_init_sax_parser_ctxt(
         /* Non consuming */
         xml_free_input_stream(input);
     }
-    (*ctxt).input_nr = 0;
     (*ctxt).input = null_mut();
-
     (*ctxt).version = null_mut();
     (*ctxt).encoding = null_mut();
     (*ctxt).standalone = -1;
@@ -5252,8 +5213,6 @@ unsafe fn xml_init_sax_parser_ctxt(
         (*ctxt).node_nr = 0;
         (*ctxt).node_max = 0;
         (*ctxt).node = null_mut();
-        (*ctxt).input_nr = 0;
-        (*ctxt).input_max = 0;
         (*ctxt).input = null_mut();
         return -1;
     }
@@ -5273,8 +5232,6 @@ unsafe fn xml_init_sax_parser_ctxt(
         (*ctxt).node_nr = 0;
         (*ctxt).node_max = 0;
         (*ctxt).node = null_mut();
-        (*ctxt).input_nr = 0;
-        (*ctxt).input_max = 0;
         (*ctxt).input = null_mut();
         (*ctxt).name_nr = 0;
         (*ctxt).name_max = 0;
@@ -5297,8 +5254,6 @@ unsafe fn xml_init_sax_parser_ctxt(
         (*ctxt).node_nr = 0;
         (*ctxt).node_max = 0;
         (*ctxt).node = null_mut();
-        (*ctxt).input_nr = 0;
-        (*ctxt).input_max = 0;
         (*ctxt).input = null_mut();
         (*ctxt).name_nr = 0;
         (*ctxt).name_max = 0;
@@ -5386,6 +5341,7 @@ pub unsafe fn xml_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
     if xml_init_sax_parser_ctxt(ctxt, sax, user_data) < 0 {
         xml_free_parser_ctxt(ctxt);
@@ -5456,9 +5412,8 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     if !(*ctxt).node_info_tab.is_null() {
         xml_free((*ctxt).node_info_tab as _);
     }
-    if !(*ctxt).input_tab.is_null() {
-        xml_free((*ctxt).input_tab as _);
-    }
+    (*ctxt).input_tab.clear();
+    (*ctxt).input_tab.shrink_to_fit();
     if !(*ctxt).version.is_null() {
         xml_free((*ctxt).version as _);
     }
@@ -7068,13 +7023,13 @@ unsafe extern "C" fn xml_parse_string_pereference(
  * Returns the current XmlChar in the parser context
  */
 pub unsafe extern "C" fn xml_pop_input(ctxt: XmlParserCtxtPtr) -> XmlChar {
-    if ctxt.is_null() || (*ctxt).input_nr <= 1 {
+    if ctxt.is_null() || (*ctxt).input_tab.len() <= 1 {
         return 0;
     }
     if get_parser_debug_entities() != 0 {
-        generic_error!("Popping input {}\n", (*ctxt).input_nr);
+        generic_error!("Popping input {}\n", (*ctxt).input_tab.len());
     }
-    if (*ctxt).input_nr > 1
+    if (*ctxt).input_tab.len() > 1
         && (*ctxt).in_subset == 0
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
@@ -10326,7 +10281,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     let line: c_int = (*(*ctxt).input).line;
                     let ns_nr: c_int = (*ctxt).ns_nr;
 
-                    if avail < 2 && (*ctxt).input_nr == 1 {
+                    if avail < 2 && (*ctxt).input_tab.len() == 1 {
                         // goto done;
                         return ret;
                     }
@@ -10464,7 +10419,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     }
                 }
                 XmlParserInputState::XmlParserContent => 'to_break: {
-                    if avail < 2 && (*ctxt).input_nr == 1 {
+                    if avail < 2 && (*ctxt).input_tab.len() == 1 {
                         // goto done;
                         return ret;
                     }
@@ -10541,7 +10496,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                          *    callbacks between the push and pull versions
                          *    of the parser.
                          */
-                        if ((*ctxt).input_nr == 1 && avail < XML_PARSER_BIG_BUFFER_SIZE)
+                        if ((*ctxt).input_tab.len() == 1 && avail < XML_PARSER_BIG_BUFFER_SIZE)
                             && (terminate == 0 && xml_parse_lookup_char_data(ctxt) == 0)
                         {
                             // goto done;
@@ -11494,7 +11449,6 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
         /* Non consuming */
         xml_free_input_stream(input);
     }
-    (*ctxt).input_nr = 0;
     (*ctxt).input = null_mut();
 
     (*ctxt).space_nr = 0;
@@ -13446,7 +13400,10 @@ pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -
             /*
              * [ WFC: PEs in Internal Subset ] error handling.
              */
-            if (*ctxt).current_byte() == b'%' && (*ctxt).external == 0 && (*ctxt).input_nr == 1 {
+            if (*ctxt).current_byte() == b'%'
+                && (*ctxt).external == 0
+                && (*ctxt).input_tab.len() == 1
+            {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrPERefInIntSubset,

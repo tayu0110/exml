@@ -299,9 +299,9 @@ pub unsafe fn report_error(
      */
     if !ctxt.is_null() {
         input = (*ctxt).input;
-        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
             cur = input;
-            input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+            input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
         }
         if !input.is_null() {
             if !(*input).filename.is_null() {
@@ -430,9 +430,9 @@ pub(crate) fn parser_error(ctx: Option<GenericErrorContext>, msg: &str) {
                 .downcast_ref::<Box<XmlParserCtxtPtr>>()
                 .expect("ctxt is not XmlParserCtxtPtr");
             let mut input = (*ctxt).input;
-            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
-                input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
             }
             parser_print_file_info(input);
 
@@ -459,9 +459,9 @@ pub(crate) fn parser_warning(ctx: Option<GenericErrorContext>, msg: &str) {
             .expect("ctxt is not XmlParserCtxtPtr");
         unsafe {
             let mut input = (*ctxt).input;
-            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_nr > 1 {
+            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
-                input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
             }
             parser_print_file_info(input);
 
@@ -492,8 +492,8 @@ pub(crate) fn parser_validity_error(ctx: Option<GenericErrorContext>, msg: &str)
                 .expect("ctxt is not XmlParserCtxtPtr");
             if len > 1 && msg.as_bytes()[len - 2] != b':' {
                 input = (*ctxt).input;
-                if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-                    input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+                if (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+                    input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
                 }
 
                 if !HAD_INFO.load(Ordering::Acquire) {
@@ -533,8 +533,8 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
         unsafe {
             if len != 0 && msg.as_bytes()[len - 1] != b':' {
                 input = (*ctxt).input;
-                if (*input).filename.is_null() && (*ctxt).input_nr > 1 {
-                    input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 2);
+                if (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+                    input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
                 }
 
                 parser_print_file_info(input);
