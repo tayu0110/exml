@@ -2026,7 +2026,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> c_i
     use crate::libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS};
 
     let mut val: c_int;
-    let mut olddepth: c_int = 0;
+    let mut olddepth = 0;
     let mut oldstate: XmlTextReaderState = XmlTextReaderState::Start;
     let mut oldnode: XmlNodePtr = null_mut();
 
@@ -2070,7 +2070,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> c_i
                 reader.node = (*(*reader.ctxt).my_doc).children;
             }
             if reader.node.is_null() {
-                reader.node = *(*reader.ctxt).node_tab.add(0);
+                reader.node = (*reader.ctxt).node_tab[0];
             }
             reader.state = XmlTextReaderState::Element;
         }
@@ -2080,7 +2080,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> c_i
         node_found = true;
     } else {
         oldstate = reader.state;
-        olddepth = (*reader.ctxt).node_nr;
+        olddepth = (*reader.ctxt).node_tab.len();
         oldnode = reader.node;
     }
 
@@ -2103,7 +2103,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> c_i
                  */
                 while !reader.node.is_null()
                     && (*reader.node).next.is_null()
-                    && (*reader.ctxt).node_nr == olddepth
+                    && (*reader.ctxt).node_tab.len() == olddepth
                     && (oldstate == XmlTextReaderState::Backtrack
                         || (*reader.node).children.is_null()
                         || (*reader.node).typ == XmlElementType::XmlEntityRefNode
@@ -2629,7 +2629,7 @@ unsafe extern "C" fn xml_text_reader_do_expand(reader: &mut XmlTextReader) -> c_
         if !xml_text_reader_get_successor(reader.node).is_null() {
             return 1;
         }
-        if (*reader.ctxt).node_nr < reader.depth {
+        if ((*reader.ctxt).node_tab.len() as i32) < reader.depth {
             return 1;
         }
         if reader.mode == XmlTextReaderMode::XmlTextreaderModeEof as i32 {

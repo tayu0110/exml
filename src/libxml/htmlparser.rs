@@ -9398,6 +9398,7 @@ unsafe fn html_init_parser_ctxt(
         return -1;
     }
     memset(ctxt as _, 0, size_of::<HtmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).node_tab, vec![]);
     std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
 
@@ -9430,6 +9431,7 @@ unsafe fn html_init_parser_ctxt(
     }
 
     /* Allocate the Input stack */
+    (*ctxt).input_tab.clear();
     (*ctxt).input_tab.shrink_to(5);
     (*ctxt).input = null_mut();
     (*ctxt).version = null_mut();
@@ -9438,20 +9440,8 @@ unsafe fn html_init_parser_ctxt(
     (*ctxt).instate = XmlParserInputState::XmlParserStart;
 
     /* Allocate the Node stack */
-    (*ctxt).node_tab = xml_malloc(10 * size_of::<HtmlNodePtr>()) as _;
-    if (*ctxt).node_tab.is_null() {
-        html_err_memory(
-            null_mut(),
-            c"htmlInitParserCtxt: out of memory\n".as_ptr() as _,
-        );
-        (*ctxt).node_nr = 0;
-        (*ctxt).node_max = 0;
-        (*ctxt).node = null_mut();
-        (*ctxt).input = null_mut();
-        return -1;
-    }
-    (*ctxt).node_nr = 0;
-    (*ctxt).node_max = 10;
+    (*ctxt).input_tab.clear();
+    (*ctxt).node_tab.shrink_to(10);
     (*ctxt).node = null_mut();
 
     /* Allocate the Name stack */
@@ -9464,8 +9454,6 @@ unsafe fn html_init_parser_ctxt(
         (*ctxt).name_nr = 0;
         (*ctxt).name_max = 0;
         (*ctxt).name = null_mut();
-        (*ctxt).node_nr = 0;
-        (*ctxt).node_max = 0;
         (*ctxt).node = null_mut();
         (*ctxt).input = null_mut();
         return -1;
@@ -9516,6 +9504,7 @@ pub unsafe fn html_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).node_tab, vec![]);
     std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
     if html_init_parser_ctxt(ctxt, sax, user_data) < 0 {
@@ -11841,6 +11830,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
         /* Non consuming */
         xml_free_input_stream(input);
     }
+    (*ctxt).input_tab.clear();
     (*ctxt).input = null_mut();
 
     (*ctxt).space_nr = 0;
@@ -11851,7 +11841,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
         (*ctxt).space = null_mut();
     }
 
-    (*ctxt).node_nr = 0;
+    (*ctxt).node_tab.clear();
     (*ctxt).node = null_mut();
 
     (*ctxt).name_nr = 0;

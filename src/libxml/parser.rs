@@ -434,9 +434,7 @@ pub struct XmlParserCtxt {
 
     /* Node analysis stack only used for DOM building */
     pub(crate) node: XmlNodePtr,          /* Current parsed Node */
-    pub(crate) node_nr: c_int,            /* Depth of the parsing stack */
-    pub(crate) node_max: c_int,           /* Max depth of the parsing stack */
-    pub(crate) node_tab: *mut XmlNodePtr, /* array of nodes */
+    pub(crate) node_tab: Vec<XmlNodePtr>, /* array of nodes */
 
     pub(crate) record_info: c_int, /* Whether node info should be kept */
     pub(crate) node_seq: XmlParserNodeInfoSeq, /* info about each node parsed */
@@ -1102,19 +1100,7 @@ impl XmlParserCtxt {
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "nodePush")]
     pub(crate) unsafe fn node_push(&mut self, value: XmlNodePtr) -> i32 {
-        if self.node_nr >= self.node_max {
-            let tmp: *mut XmlNodePtr = xml_realloc(
-                self.node_tab as _,
-                self.node_max as usize * 2 * size_of::<XmlNodePtr>(),
-            ) as *mut XmlNodePtr;
-            if tmp.is_null() {
-                xml_err_memory(self, null());
-                return -1;
-            }
-            self.node_tab = tmp;
-            self.node_max *= 2;
-        }
-        if self.node_nr as c_uint > XML_PARSER_MAX_DEPTH
+        if self.node_tab.len() as c_uint > XML_PARSER_MAX_DEPTH
             && self.options & XmlParserOption::XmlParseHuge as i32 == 0
         {
             xml_fatal_err_msg_int(
@@ -1126,11 +1112,9 @@ impl XmlParserCtxt {
             self.halt();
             return -1;
         }
-        *self.node_tab.add(self.node_nr as usize) = value;
         self.node = value;
-        let res = self.node_nr;
-        self.node_nr += 1;
-        res
+        self.node_tab.push(value);
+        self.node_tab.len() as i32 - 1
     }
 
     /// Pops the top element node from the node stack
@@ -1138,18 +1122,9 @@ impl XmlParserCtxt {
     /// Returns the node just removed
     #[doc(alias = "nodePop")]
     pub(crate) unsafe fn node_pop(&mut self) -> XmlNodePtr {
-        if self.node_nr <= 0 {
-            return null_mut();
-        }
-        self.node_nr -= 1;
-        if self.node_nr > 0 {
-            self.node = *self.node_tab.add(self.node_nr as usize - 1);
-        } else {
-            self.node = null_mut();
-        }
-        let ret: XmlNodePtr = *self.node_tab.add(self.node_nr as usize);
-        *self.node_tab.add(self.node_nr as usize) = null_mut();
-        ret
+        let res = self.node_tab.pop().unwrap_or(null_mut());
+        self.node = *self.node_tab.last().unwrap_or(&null_mut());
+        res
     }
 
     /// Pushes a new element name on top of the name stack
@@ -5201,22 +5176,8 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).directory = null_mut();
 
     /* Allocate the Node stack */
-    if (*ctxt).node_tab.is_null() {
-        (*ctxt).node_tab = xml_malloc(10 * size_of::<XmlNodePtr>()) as _;
-        (*ctxt).node_max = 10;
-    }
-    if (*ctxt).node_tab.is_null() {
-        xml_err_memory(
-            null_mut(),
-            c"cannot initialize parser context\n".as_ptr() as _,
-        );
-        (*ctxt).node_nr = 0;
-        (*ctxt).node_max = 0;
-        (*ctxt).node = null_mut();
-        (*ctxt).input = null_mut();
-        return -1;
-    }
-    (*ctxt).node_nr = 0;
+    (*ctxt).node_tab.clear();
+    (*ctxt).node_tab.shrink_to(10);
     (*ctxt).node = null_mut();
 
     /* Allocate the Name stack */
@@ -5229,8 +5190,6 @@ unsafe fn xml_init_sax_parser_ctxt(
             null_mut(),
             c"cannot initialize parser context\n".as_ptr() as _,
         );
-        (*ctxt).node_nr = 0;
-        (*ctxt).node_max = 0;
         (*ctxt).node = null_mut();
         (*ctxt).input = null_mut();
         (*ctxt).name_nr = 0;
@@ -5251,8 +5210,6 @@ unsafe fn xml_init_sax_parser_ctxt(
             null_mut(),
             c"cannot initialize parser context\n".as_ptr() as _,
         );
-        (*ctxt).node_nr = 0;
-        (*ctxt).node_max = 0;
         (*ctxt).node = null_mut();
         (*ctxt).input = null_mut();
         (*ctxt).name_nr = 0;
@@ -5341,6 +5298,7 @@ pub unsafe fn xml_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).node_tab, vec![]);
     std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
     if xml_init_sax_parser_ctxt(ctxt, sax, user_data) < 0 {
@@ -5406,9 +5364,8 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     if !(*ctxt).name_tab.is_null() {
         xml_free((*ctxt).name_tab as _);
     }
-    if !(*ctxt).node_tab.is_null() {
-        xml_free((*ctxt).node_tab as _);
-    }
+    (*ctxt).node_tab.clear();
+    (*ctxt).node_tab.shrink_to_fit();
     if !(*ctxt).node_info_tab.is_null() {
         xml_free((*ctxt).node_info_tab as _);
     }
@@ -11449,6 +11406,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
         /* Non consuming */
         xml_free_input_stream(input);
     }
+    (*ctxt).input_tab.clear();
     (*ctxt).input = null_mut();
 
     (*ctxt).space_nr = 0;
@@ -11459,7 +11417,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
         (*ctxt).space = null_mut();
     }
 
-    (*ctxt).node_nr = 0;
+    (*ctxt).node_tab.clear();
     (*ctxt).node = null_mut();
 
     (*ctxt).name_nr = 0;
