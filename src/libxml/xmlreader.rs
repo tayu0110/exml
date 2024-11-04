@@ -33,7 +33,7 @@ use crate::{
             XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
             XML_SAX2_MAGIC,
         },
-        parser_internals::{xml_new_input_stream, xml_switch_to_encoding},
+        parser_internals::xml_new_input_stream,
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
         relaxng::{
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
@@ -1114,7 +1114,7 @@ pub unsafe fn xml_text_reader_setup(
     xml_ctxt_use_options((*reader).ctxt, options);
     if !encoding.is_null() {
         if let Some(handler) = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap()) {
-            xml_switch_to_encoding((*reader).ctxt, handler);
+            (*(*reader).ctxt).switch_to_encoding(handler);
         }
     }
     if !url.is_null()

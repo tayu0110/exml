@@ -16,7 +16,6 @@ use std::sync::atomic::Ordering;
 pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, size_t, snprintf, INT_MAX};
 
-use crate::buf::XmlBufRef;
 use crate::encoding::{
     detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncoding,
     XmlCharEncodingHandler,
@@ -644,7 +643,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
             }
         }
     };
-    let ret: c_int = xml_switch_input_encoding(ctxt, (*ctxt).input, handler);
+    let ret: c_int = (*ctxt).switch_input_encoding((*ctxt).input, handler);
     if ret < 0 || (*ctxt).err_no == XmlParserErrors::XmlI18NConvFailed as i32 {
         /*
          * on encoding conversion errors, stop the parser
@@ -653,153 +652,6 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
         (*ctxt).err_no = XmlParserErrors::XmlI18NConvFailed as i32;
     }
     ret
-}
-
-/**
- * xmlSwitchToEncoding:
- * @ctxt:  the parser context
- * @handler:  the encoding handler
- *
- * change the input functions when discovering the character encoding
- * of a given entity.
- *
- * Returns 0 in case of success, -1 otherwise
- */
-pub unsafe fn xml_switch_to_encoding(
-    ctxt: XmlParserCtxtPtr,
-    handler: XmlCharEncodingHandler,
-) -> c_int {
-    if ctxt.is_null() {
-        return -1;
-    }
-    xml_switch_input_encoding(ctxt, (*ctxt).input, handler)
-}
-
-/**
- * xmlSwitchInputEncoding:
- * @ctxt:  the parser context
- * @input:  the input stream
- * @handler:  the encoding handler
- *
- * change the input functions when discovering the character encoding
- * of a given entity.
- *
- * Returns 0 in case of success, -1 otherwise
- */
-pub(crate) unsafe fn xml_switch_input_encoding(
-    ctxt: XmlParserCtxtPtr,
-    input: XmlParserInputPtr,
-    handler: XmlCharEncodingHandler,
-) -> c_int {
-    if input.is_null() {
-        return -1;
-    }
-    let Some(input_buf) = (*input).buf.as_mut() else {
-        xml_err_internal(
-            ctxt,
-            c"static memory buffer doesn't support encoding\n".as_ptr() as _,
-            null(),
-        );
-        return -1;
-    };
-
-    if input_buf.borrow_mut().encoder.replace(handler).is_some() {
-        /*
-         * Switching encodings during parsing is a really bad idea,
-         * but Chromium can match between ISO-8859-1 and UTF-16 before
-         * separate calls to xmlParseChunk.
-         *
-         * TODO: We should check whether the "raw" input buffer is empty and
-         * convert the old content using the old encoder.
-         */
-        return 0;
-    }
-
-    (*ctxt).charset = XmlCharEncoding::UTF8;
-
-    /*
-     * Is there already some content down the pipe to convert ?
-     */
-    let Some(mut buf) = input_buf.borrow().buffer.filter(|buf| !buf.is_empty()) else {
-        return 0;
-    };
-    /*
-     * FIXME: The BOM shouldn't be skipped here, but in the parsing code.
-     */
-
-    /*
-     * Specific handling of the Byte Order Mark for
-     * UTF-16
-     */
-    if matches!(
-        (*input_buf).borrow().encoder.as_ref().unwrap().name(),
-        "UTF-16LE" | "UTF-16"
-    ) && *(*input).cur.add(0) == 0xFF
-        && *(*input).cur.add(1) == 0xFE
-    {
-        (*input).cur = (*input).cur.add(2);
-    }
-    if (*input_buf).borrow().encoder.as_ref().unwrap().name() == "UTF-16BE"
-        && *(*input).cur.add(0) == 0xFE
-        && *(*input).cur.add(1) == 0xFF
-    {
-        (*input).cur = (*input).cur.add(2);
-    }
-    /*
-     * Errata on XML-1.0 June 20 2001
-     * Specific handling of the Byte Order Mark for
-     * UTF-8
-     */
-    if (*input_buf).borrow().encoder.as_ref().unwrap().name() == "UTF-8"
-        && *(*input).cur.add(0) == 0xEF
-        && *(*input).cur.add(1) == 0xBB
-        && *(*input).cur.add(2) == 0xBF
-    {
-        (*input).cur = (*input).cur.add(3);
-    }
-
-    /*
-     * Shrink the current input buffer.
-     * Move it as the raw buffer and create a new input buffer
-     */
-    let processed: size_t = (*input).cur.offset_from((*input).base) as usize;
-    buf.trim_head(processed as usize);
-    (*input).consumed += processed as u64;
-    input_buf.borrow_mut().raw = Some(buf);
-    input_buf.borrow_mut().buffer = XmlBufRef::new();
-    assert!(input_buf.borrow_mut().buffer.is_some());
-    input_buf.borrow_mut().rawconsumed = processed as u64;
-    let using: size_t = buf.len();
-
-    /*
-     * TODO: We must flush and decode the whole buffer to make functions
-     * like xmlReadMemory work with a user-provided encoding. If the
-     * encoding is specified directly, we should probably set
-     * XML_PARSE_IGNORE_ENC in xmlDoRead to avoid switching encodings
-     * twice. Then we could set "flush" to false which should save
-     * a considerable amount of memory when parsing from memory.
-     * It's probably even possible to remove this whole if-block
-     * completely.
-     */
-    let res = input_buf.borrow_mut().decode(true);
-    (*input).reset_base();
-    if res.is_err() {
-        /* TODO: This could be an out of memory or an encoding error. */
-        xml_err_internal(
-            ctxt,
-            c"switching encoding: encoder error\n".as_ptr() as _,
-            null(),
-        );
-        (*ctxt).halt();
-        return -1;
-    }
-    let consumed: size_t = using - (*input_buf).borrow().raw.map_or(0, |raw| raw.len());
-    let rawconsumed = (*input_buf)
-        .borrow()
-        .rawconsumed
-        .saturating_add(consumed as u64);
-    (*input_buf).borrow_mut().rawconsumed = rawconsumed;
-    0
 }
 
 /**
@@ -5787,7 +5639,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
             if let Some(handler) =
                 find_encoding_handler(CStr::from_ptr(encoding as *const i8).to_str().unwrap())
             {
-                if xml_switch_to_encoding(ctxt, handler) < 0 {
+                if (*ctxt).switch_to_encoding(handler) < 0 {
                     /* failed to convert */
                     (*ctxt).err_no = XmlParserErrors::XmlErrUnsupportedEncoding as i32;
                     return null_mut();
@@ -7788,7 +7640,7 @@ mod tests {
     //                     let input = gen_xml_parser_input_ptr(n_input, 1);
     //                     let handler = gen_xml_char_encoding_handler_ptr(n_handler, 2);
 
-    //                     let ret_val = xml_switch_input_encoding(ctxt, input, handler);
+    //                     let ret_val = (*ctxt).switch_input_encoding(input, handler);
     //                     desret_int(ret_val);
     //                     des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
     //                     des_xml_parser_input_ptr(n_input, input, 1);

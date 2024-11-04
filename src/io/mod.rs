@@ -53,9 +53,7 @@ use crate::{
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption,
             XML_SAX2_MAGIC,
         },
-        parser_internals::{
-            xml_free_input_stream, xml_new_input_from_file, xml_switch_input_encoding,
-        },
+        parser_internals::{xml_free_input_stream, xml_new_input_from_file},
         tree::XmlBufferAllocationScheme,
         uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
         xmlerror::XmlParserErrors,
@@ -1288,7 +1286,7 @@ pub unsafe extern "C" fn xml_check_http_input(
                             if let Some(encoding) = context.encoding() {
                                 let enc = CString::new(encoding).unwrap();
                                 if let Some(handler) = find_encoding_handler(encoding) {
-                                    xml_switch_input_encoding(ctxt, ret, handler);
+                                    (*ctxt).switch_input_encoding(ret, handler);
                                 } else {
                                     __xml_err_encoding(
                                         ctxt,

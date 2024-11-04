@@ -36,9 +36,8 @@ use crate::{
             XmlSAXHandlerPtr,
         },
         parser_internals::{
-            xml_free_input_stream, xml_new_input_stream, xml_switch_encoding,
-            xml_switch_to_encoding, INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH,
-            XML_MAX_TEXT_LENGTH,
+            xml_free_input_stream, xml_new_input_stream, xml_switch_encoding, INPUT_CHUNK,
+            XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         tree::{
@@ -5924,7 +5923,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
                  * can produce invalid UTF-8.
                  */
                 if handler.name() != "UTF-8" {
-                    xml_switch_to_encoding(ctxt, handler);
+                    (*ctxt).switch_to_encoding(handler);
                 }
             } else {
                 html_parse_err(
@@ -7098,7 +7097,7 @@ unsafe extern "C" fn html_check_encoding_direct(
             if let Some(handler) =
                 find_encoding_handler(CStr::from_ptr(encoding as *const i8).to_str().unwrap())
             {
-                xml_switch_to_encoding(ctxt, handler);
+                (*ctxt).switch_to_encoding(handler);
                 (*ctxt).charset = XmlCharEncoding::UTF8;
             } else {
                 html_parse_err(
@@ -10117,7 +10116,7 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
              */
             if let Some(handler) = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
             {
-                xml_switch_to_encoding(ctxt, handler);
+                (*ctxt).switch_to_encoding(handler);
             } else {
                 html_parse_err(
                     ctxt,
@@ -11973,7 +11972,7 @@ unsafe extern "C" fn html_do_read(
     (*ctxt).html = 1;
     if !encoding.is_null() {
         if let Some(handler) = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap()) {
-            xml_switch_to_encoding(ctxt, handler);
+            (*ctxt).switch_to_encoding(handler);
             if !(*(*ctxt).input).encoding.is_null() {
                 xml_free((*(*ctxt).input).encoding as _);
             }
