@@ -1256,6 +1256,82 @@ impl XmlParserCtxt {
         *self.space_tab.add(self.space_nr as usize) = -1;
         ret
     }
+
+    /// Pushes a new element name/prefix/URL on top of the name stack
+    ///
+    /// Returns -1 in case of error, the index in the stack otherwise
+    #[doc(alias = "nameNsPush")]
+    pub(crate) unsafe fn name_ns_push(
+        &mut self,
+        value: *const XmlChar,
+        prefix: *const XmlChar,
+        uri: *const XmlChar,
+        line: i32,
+        ns_nr: i32,
+    ) -> i32 {
+        'mem_error: {
+            if self.name_nr >= self.name_max {
+                self.name_max *= 2;
+                let tmp: *mut *const XmlChar = xml_realloc(
+                    self.name_tab as _,
+                    self.name_max as usize * size_of_val(&*self.name_tab.add(0)),
+                ) as _;
+                if tmp.is_null() {
+                    self.name_max /= 2;
+                    break 'mem_error;
+                }
+                self.name_tab = tmp;
+                let tmp2: *mut XmlStartTag = xml_realloc(
+                    self.push_tab as _,
+                    self.name_max as usize * size_of_val(&*self.push_tab.add(0)),
+                ) as _;
+                if tmp2.is_null() {
+                    self.name_max /= 2;
+                    break 'mem_error;
+                }
+                self.push_tab = tmp2;
+            } else if self.push_tab.is_null() {
+                self.push_tab =
+                    xml_malloc(self.name_max as usize * size_of_val(&*self.push_tab.add(0))) as _;
+                if self.push_tab.is_null() {
+                    break 'mem_error;
+                }
+            }
+            *self.name_tab.add(self.name_nr as usize) = value;
+            self.name = value;
+            let tag: *mut XmlStartTag = self.push_tab.add(self.name_nr as usize);
+            (*tag).prefix = prefix;
+            (*tag).uri = uri;
+            (*tag).line = line;
+            (*tag).ns_nr = ns_nr;
+            let res = self.name_nr;
+            self.name_nr += 1;
+            return res;
+        }
+        // mem_error:
+        xml_err_memory(self, null());
+        -1
+    }
+
+    /// Pops the top element/prefix/URI name from the name stack
+    ///
+    /// Returns the name just removed
+    #[doc(alias = "nameNsPop")]
+    #[cfg(feature = "push")]
+    pub(crate) unsafe fn name_ns_pop(&mut self) -> *const XmlChar {
+        if self.name_nr <= 0 {
+            return null_mut();
+        }
+        self.name_nr -= 1;
+        if self.name_nr > 0 {
+            self.name = *self.name_tab.add(self.name_nr as usize - 1);
+        } else {
+            self.name = null_mut();
+        }
+        let ret: *const XmlChar = *self.name_tab.add(self.name_nr as usize);
+        *self.name_tab.add(self.name_nr as usize) = null_mut();
+        ret
+    }
 }
 /**
  * xmlSAXLocator:
@@ -9145,71 +9221,6 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
 }
 
 /**
- * nameNsPush:
- * @ctxt:  an XML parser context
- * @value:  the element name
- * @prefix:  the element prefix
- * @URI:  the element namespace name
- * @line:  the current line number for error messages
- * @nsNr:  the number of namespaces pushed on the namespace table
- *
- * Pushes a new element name/prefix/URL on top of the name stack
- *
- * Returns -1 in case of error, the index in the stack otherwise
- */
-pub(crate) unsafe extern "C" fn name_ns_push(
-    ctxt: XmlParserCtxtPtr,
-    value: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
-    line: c_int,
-    ns_nr: c_int,
-) -> c_int {
-    'mem_error: {
-        if (*ctxt).name_nr >= (*ctxt).name_max {
-            (*ctxt).name_max *= 2;
-            let tmp: *mut *const XmlChar = xml_realloc(
-                (*ctxt).name_tab as _,
-                (*ctxt).name_max as usize * size_of_val(&*(*ctxt).name_tab.add(0)),
-            ) as _;
-            if tmp.is_null() {
-                (*ctxt).name_max /= 2;
-                break 'mem_error;
-            }
-            (*ctxt).name_tab = tmp;
-            let tmp2: *mut XmlStartTag = xml_realloc(
-                (*ctxt).push_tab as _,
-                (*ctxt).name_max as usize * size_of_val(&*(*ctxt).push_tab.add(0)),
-            ) as _;
-            if tmp2.is_null() {
-                (*ctxt).name_max /= 2;
-                break 'mem_error;
-            }
-            (*ctxt).push_tab = tmp2;
-        } else if (*ctxt).push_tab.is_null() {
-            (*ctxt).push_tab =
-                xml_malloc((*ctxt).name_max as usize * size_of_val(&*(*ctxt).push_tab.add(0))) as _;
-            if (*ctxt).push_tab.is_null() {
-                break 'mem_error;
-            }
-        }
-        *(*ctxt).name_tab.add((*ctxt).name_nr as usize) = value;
-        (*ctxt).name = value;
-        let tag: *mut XmlStartTag = (*ctxt).push_tab.add((*ctxt).name_nr as usize);
-        (*tag).prefix = prefix;
-        (*tag).uri = uri;
-        (*tag).line = line;
-        (*tag).ns_nr = ns_nr;
-        let res = (*ctxt).name_nr;
-        (*ctxt).name_nr += 1;
-        return res;
-    }
-    // mem_error:
-    xml_err_memory(ctxt, null());
-    -1
-}
-
-/**
  * xmlParseLookupChar:
  * @ctxt:  an XML parser context
  * @c:  character
@@ -9861,30 +9872,6 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
 }
 
 /**
- * nameNsPop:
- * @ctxt: an XML parser context
- *
- * Pops the top element/prefix/URI name from the name stack
- *
- * Returns the name just removed
- */
-#[cfg(feature = "push")]
-unsafe extern "C" fn name_ns_pop(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    if (*ctxt).name_nr <= 0 {
-        return null_mut();
-    }
-    (*ctxt).name_nr -= 1;
-    if (*ctxt).name_nr > 0 {
-        (*ctxt).name = *(*ctxt).name_tab.add((*ctxt).name_nr as usize - 1);
-    } else {
-        (*ctxt).name = null_mut();
-    }
-    let ret: *const XmlChar = *(*ctxt).name_tab.add((*ctxt).name_nr as usize);
-    *(*ctxt).name_tab.add((*ctxt).name_nr as usize) = null_mut();
-    ret
-}
-
-/**
  * xmlParseEndTag1:
  * @ctxt:  an XML parser context
  * @line:  line of the start tag
@@ -10487,7 +10474,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             (*ctxt).node_pop();
                             (*ctxt).space_pop();
                         }
-                        name_ns_push(ctxt, name, prefix, uri, line, (*ctxt).ns_nr - ns_nr);
+                        (*ctxt).name_ns_push(name, prefix, uri, line, (*ctxt).ns_nr - ns_nr);
 
                         (*ctxt).instate = XmlParserInputState::XmlParserContent;
                         // break;
@@ -10595,7 +10582,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             ctxt,
                             (*ctxt).push_tab.add((*ctxt).name_nr as usize - 1),
                         );
-                        name_ns_pop(ctxt);
+                        (*ctxt).name_ns_pop();
                     } else {
                         #[cfg(feature = "sax1")]
                         {

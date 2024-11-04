@@ -64,7 +64,7 @@ use super::hash::{
     xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
 };
 use super::parser::{
-    name_ns_push, ns_push, xml_detect_sax2, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+    ns_push, xml_detect_sax2, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
     xml_free_parser_ctxt, xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt,
     xml_new_sax_parser_ctxt, xml_ns_err, xml_parse_att_value_internal,
     xml_parse_char_data_internal, xml_parse_char_ref, xml_parse_element_children_content_decl_priv,
@@ -5542,7 +5542,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         (*ctxt).space_pop();
         return -1;
     }
-    name_ns_push(ctxt, name, prefix, uri, line, (*ctxt).ns_nr - ns_nr);
+    (*ctxt).name_ns_push(name, prefix, uri, line, (*ctxt).ns_nr - ns_nr);
     let cur: XmlNodePtr = (*ctxt).node;
 
     /*
