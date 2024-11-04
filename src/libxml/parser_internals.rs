@@ -31,7 +31,7 @@ use crate::libxml::chvalid::{xml_is_combining, xml_is_digit, xml_is_extender};
 use crate::libxml::dict::xml_dict_owns;
 use crate::libxml::entities::{xml_get_predefined_entity, XmlEntityPtr};
 use crate::libxml::parser::{
-    ns_pop, xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_parse_cdsect,
+    xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_parse_cdsect,
     xml_parse_conditional_sections, xml_parse_enc_name, xml_parse_external_id,
     xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name, xml_parse_text_decl,
     xml_parse_version_num, xml_parser_add_node_info, xml_string_decode_entities_int,
@@ -64,15 +64,14 @@ use super::hash::{
     xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
 };
 use super::parser::{
-    ns_push, xml_detect_sax2, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-    xml_free_parser_ctxt, xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt,
-    xml_new_sax_parser_ctxt, xml_ns_err, xml_parse_att_value_internal,
-    xml_parse_char_data_internal, xml_parse_char_ref, xml_parse_element_children_content_decl_priv,
-    xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
-    xml_parser_entity_check, xml_parser_find_node_info, xml_stop_parser, xml_warning_msg,
-    XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr,
-    XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption, XML_COMPLETE_ATTRS,
-    XML_DETECT_IDS, XML_SKIP_IDS,
+    xml_detect_sax2, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
+    xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
+    xml_ns_err, xml_parse_att_value_internal, xml_parse_char_data_internal, xml_parse_char_ref,
+    xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
+    xml_parse_external_entity_private, xml_parser_entity_check, xml_parser_find_node_info,
+    xml_stop_parser, xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr,
+    XmlParserInput, XmlParserInputPtr, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr,
+    XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SKIP_IDS,
 };
 use super::sax2::xml_sax2_ignorable_whitespace;
 use super::tree::{
@@ -4145,8 +4144,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
 
     /* propagate namespaces down the entity */
     for i in (0..(*oldctxt).ns_nr).step_by(2) {
-        ns_push(
-            ctxt,
+        (*ctxt).ns_push(
             *(*oldctxt).ns_tab.add(i as usize),
             *(*oldctxt).ns_tab.add(i as usize + 1),
         );
@@ -5589,7 +5587,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         (*ctxt).name_pop();
         (*ctxt).space_pop();
         if ns_nr != (*ctxt).ns_nr {
-            ns_pop(ctxt, (*ctxt).ns_nr - ns_nr);
+            (*ctxt).ns_pop((*ctxt).ns_nr - ns_nr);
         }
         if !cur.is_null() && (*ctxt).record_info != 0 {
             node_info.node = cur;
@@ -5625,7 +5623,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         (*ctxt).name_pop();
         (*ctxt).space_pop();
         if ns_nr != (*ctxt).ns_nr {
-            ns_pop(ctxt, (*ctxt).ns_nr - ns_nr);
+            (*ctxt).ns_pop((*ctxt).ns_nr - ns_nr);
         }
         return -1;
     }
