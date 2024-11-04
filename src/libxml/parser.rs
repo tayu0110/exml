@@ -59,8 +59,8 @@ use crate::{
         },
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
-            name_pop, xml_add_def_attrs, xml_add_special_attr, xml_check_language_id,
-            xml_copy_char, xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
+            xml_add_def_attrs, xml_add_special_attr, xml_check_language_id, xml_copy_char,
+            xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
             xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt,
             xml_ctxt_use_options_internal, xml_err_internal, xml_fatal_err, xml_free_input_stream,
             xml_new_entity_input_stream, xml_new_input_stream, xml_parse_attribute_type,
@@ -1173,6 +1173,49 @@ impl XmlParserCtxt {
         }
         let ret: XmlNodePtr = *self.node_tab.add(self.node_nr as usize);
         *self.node_tab.add(self.node_nr as usize) = null_mut();
+        ret
+    }
+
+    /// Pushes a new element name on top of the name stack
+    ///
+    /// Returns -1 in case of error, the index in the stack otherwise
+    #[doc(alias = "namePush")]
+    pub(crate) unsafe fn name_push(&mut self, value: *const XmlChar) -> i32 {
+        if self.name_nr >= self.name_max {
+            let tmp: *mut *const XmlChar = xml_realloc(
+                self.name_tab as _,
+                self.name_max as usize * 2 * size_of_val(&*self.name_tab.add(0)),
+            ) as *mut *const XmlChar;
+            if tmp.is_null() {
+                xml_err_memory(self, null());
+                return -1;
+            }
+            self.name_tab = tmp;
+            self.name_max *= 2;
+        }
+        *self.name_tab.add(self.name_nr as usize) = value;
+        self.name = value;
+        let res = self.name_nr;
+        self.name_nr += 1;
+        res
+    }
+
+    /// Pops the top element name from the name stack
+    ///
+    /// Returns the name just removed
+    #[doc(alias = "namePop")]
+    pub(crate) unsafe fn name_pop(&mut self) -> *const XmlChar {
+        if self.name_nr <= 0 {
+            return null_mut();
+        }
+        self.name_nr -= 1;
+        if self.name_nr > 0 {
+            self.name = *self.name_tab.add(self.name_nr as usize - 1);
+        } else {
+            self.name = null_mut();
+        }
+        let ret: *const XmlChar = *self.name_tab.add(self.name_nr as usize);
+        *self.name_tab.add(self.name_nr as usize) = null_mut();
         ret
     }
 }
@@ -9908,7 +9951,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
         ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), (*ctxt).name);
     }
 
-    name_pop(ctxt);
+    (*ctxt).name_pop();
     space_pop(ctxt);
 }
 
