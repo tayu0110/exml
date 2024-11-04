@@ -3309,7 +3309,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
     /*
      * load the document
      */
-    doc = xml_read_file(url as _, null_mut(), 0);
+    doc = xml_read_file(url as _, None, 0);
     if doc.is_null() {
         xml_rng_perr(
             ctxt,
@@ -3607,7 +3607,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
     /*
      * load the document
      */
-    doc = xml_read_file(url as _, null_mut(), 0);
+    doc = xml_read_file(url as _, None, 0);
     if doc.is_null() {
         xml_rng_perr(
             ctxt,
@@ -8681,7 +8681,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
      * First step is to parse the input document into an DOM/Infoset
      */
     if !(*ctxt).url.is_null() {
-        doc = xml_read_file((*ctxt).url as _, null_mut(), 0);
+        doc = xml_read_file((*ctxt).url as _, None, 0);
         if doc.is_null() {
             xml_rng_perr(
                 ctxt,
@@ -8695,7 +8695,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
         }
     } else if !(*ctxt).buffer.is_null() {
         let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize).to_vec();
-        doc = xml_read_memory(mem, null_mut(), null_mut(), 0);
+        doc = xml_read_memory(mem, null_mut(), None, 0);
         if doc.is_null() {
             xml_rng_perr(
                 ctxt,

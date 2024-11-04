@@ -2574,7 +2574,7 @@ pub unsafe extern "C" fn xml_shell_load(
             doc = null_mut();
         }
     } else {
-        doc = xml_read_file(filename, null_mut(), 0);
+        doc = xml_read_file(filename, None, 0);
     }
     if !doc.is_null() {
         if (*ctxt).loaded == 1 {

@@ -37,7 +37,7 @@ use crate::libxml::parser::{
     xml_parse_version_num, xml_parser_add_node_info, xml_string_decode_entities_int,
     xml_validity_error, XmlParserInputState, XmlSAXHandlerPtr,
 };
-use crate::libxml::sax2::{xml_sax2_end_element, xml_sax2_get_entity, xml_sax2_start_element};
+use crate::libxml::sax2::xml_sax2_get_entity;
 use crate::libxml::tree::{
     xml_create_int_subset, xml_new_doc, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
     XmlElementContentOccur, XmlElementContentType, XmlElementTypeVal,
@@ -57,7 +57,7 @@ use crate::{__xml_raise_error, generic_error};
 
 use super::catalog::xml_catalog_add_local;
 use super::chvalid::{xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_ideographic};
-use super::dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, xml_dict_set_limit};
+use super::dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference};
 use super::entities::XmlEntityType;
 use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
 use super::hash::{
@@ -71,9 +71,8 @@ use super::parser::{
     xml_parse_external_entity_private, xml_parser_entity_check, xml_parser_find_node_info,
     xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput,
     XmlParserInputPtr, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption,
-    XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SKIP_IDS,
+    XML_SKIP_IDS,
 };
-use super::sax2::xml_sax2_ignorable_whitespace;
 use super::tree::{
     xml_add_child, xml_add_child_list, xml_doc_copy_node, xml_free_doc, xml_free_node,
     xml_free_node_list, xml_new_doc_node, xml_set_tree_doc, xml_split_qname3, XmlDocPtr,
@@ -287,160 +286,6 @@ pub unsafe extern "C" fn xml_create_file_parser_ctxt(filename: *const c_char) ->
 }
 
 /**
- * xmlCtxtUseOptionsInternal:
- * @ctxt: an XML parser context
- * @options:  a combination of xmlParserOption
- * @encoding:  the user provided encoding to use
- *
- * Applies the options to the parser context
- *
- * Returns 0 in case of success, the set of unknown or unimplemented options
- *         in case of error.
- */
-pub(crate) unsafe extern "C" fn xml_ctxt_use_options_internal(
-    ctxt: XmlParserCtxtPtr,
-    mut options: c_int,
-    encoding: *const c_char,
-) -> c_int {
-    if ctxt.is_null() {
-        return -1;
-    }
-    if !encoding.is_null() {
-        if !(*ctxt).encoding.is_null() {
-            xml_free((*ctxt).encoding as _);
-        }
-        (*ctxt).encoding = xml_strdup(encoding as *const XmlChar);
-    }
-    if options & XmlParserOption::XmlParseRecover as i32 != 0 {
-        (*ctxt).recovery = 1;
-        options -= XmlParserOption::XmlParseRecover as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseRecover as i32;
-    } else {
-        (*ctxt).recovery = 0;
-    }
-    if options & XmlParserOption::XmlParseDtdload as i32 != 0 {
-        (*ctxt).loadsubset = XML_DETECT_IDS as i32;
-        options -= XmlParserOption::XmlParseDtdload as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
-    } else {
-        (*ctxt).loadsubset = 0;
-    }
-    if options & XmlParserOption::XmlParseDtdattr as i32 != 0 {
-        (*ctxt).loadsubset |= XML_COMPLETE_ATTRS as i32;
-        options -= XmlParserOption::XmlParseDtdattr as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseDtdattr as i32;
-    }
-    if options & XmlParserOption::XmlParseNoent as i32 != 0 {
-        (*ctxt).replace_entities = 1;
-        /* (*ctxt).loadsubset |= XML_DETECT_IDS; */
-        options -= XmlParserOption::XmlParseNoent as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseNoent as i32;
-    } else {
-        (*ctxt).replace_entities = 0;
-    }
-    if options & XmlParserOption::XmlParsePedantic as i32 != 0 {
-        (*ctxt).pedantic = 1;
-        options -= XmlParserOption::XmlParsePedantic as i32;
-        (*ctxt).options |= XmlParserOption::XmlParsePedantic as i32;
-    } else {
-        (*ctxt).pedantic = 0;
-    }
-    if options & XmlParserOption::XmlParseNoblanks as i32 != 0 {
-        (*ctxt).keep_blanks = 0;
-        (*(*ctxt).sax).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
-        options -= XmlParserOption::XmlParseNoblanks as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
-    } else {
-        (*ctxt).keep_blanks = 1;
-    }
-    if options & XmlParserOption::XmlParseDtdvalid as i32 != 0 {
-        (*ctxt).validate = 1;
-        if options & XmlParserOption::XmlParseNowarning as i32 != 0 {
-            (*ctxt).vctxt.warning = None;
-        }
-        if options & XmlParserOption::XmlParseNoerror as i32 != 0 {
-            (*ctxt).vctxt.error = None;
-        }
-        options -= XmlParserOption::XmlParseDtdvalid as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseDtdvalid as i32;
-    } else {
-        (*ctxt).validate = 0;
-    }
-    if options & XmlParserOption::XmlParseNowarning as i32 != 0 {
-        (*(*ctxt).sax).warning = None;
-        options -= XmlParserOption::XmlParseNowarning as i32;
-    }
-    if options & XmlParserOption::XmlParseNoerror as i32 != 0 {
-        (*(*ctxt).sax).error = None;
-        (*(*ctxt).sax).fatal_error = None;
-        options -= XmlParserOption::XmlParseNoerror as i32;
-    }
-    #[cfg(feature = "sax1")]
-    if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
-        (*(*ctxt).sax).start_element = Some(xml_sax2_start_element);
-        (*(*ctxt).sax).end_element = Some(xml_sax2_end_element);
-        (*(*ctxt).sax).start_element_ns = None;
-        (*(*ctxt).sax).end_element_ns = None;
-        (*(*ctxt).sax).initialized = 1;
-        options -= XmlParserOption::XmlParseSax1 as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseSax1 as i32;
-    }
-    if options & XmlParserOption::XmlParseNodict as i32 != 0 {
-        (*ctxt).dict_names = 0;
-        options -= XmlParserOption::XmlParseNodict as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseNodict as i32;
-    } else {
-        (*ctxt).dict_names = 1;
-    }
-    if options & XmlParserOption::XmlParseNocdata as i32 != 0 {
-        (*(*ctxt).sax).cdata_block = None;
-        options -= XmlParserOption::XmlParseNocdata as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseNocdata as i32;
-    }
-    if options & XmlParserOption::XmlParseNsclean as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseNsclean as i32;
-        options -= XmlParserOption::XmlParseNsclean as i32;
-    }
-    if options & XmlParserOption::XmlParseNonet as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseNonet as i32;
-        options -= XmlParserOption::XmlParseNonet as i32;
-    }
-    if options & XmlParserOption::XmlParseCompact as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseCompact as i32;
-        options -= XmlParserOption::XmlParseCompact as i32;
-    }
-    if options & XmlParserOption::XmlParseOld10 as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseOld10 as i32;
-        options -= XmlParserOption::XmlParseOld10 as i32;
-    }
-    if options & XmlParserOption::XmlParseNobasefix as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseNobasefix as i32;
-        options -= XmlParserOption::XmlParseNobasefix as i32;
-    }
-    if options & XmlParserOption::XmlParseHuge as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseHuge as i32;
-        options -= XmlParserOption::XmlParseHuge as i32;
-        if !(*ctxt).dict.is_null() {
-            xml_dict_set_limit((*ctxt).dict, 0);
-        }
-    }
-    if options & XmlParserOption::XmlParseOldsax as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseOldsax as i32;
-        options -= XmlParserOption::XmlParseOldsax as i32;
-    }
-    if options & XmlParserOption::XmlParseIgnoreEnc as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseIgnoreEnc as i32;
-        options -= XmlParserOption::XmlParseIgnoreEnc as i32;
-    }
-    if options & XmlParserOption::XmlParseBigLines as i32 != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseBigLines as i32;
-        options -= XmlParserOption::XmlParseBigLines as i32;
-    }
-    (*ctxt).linenumbers = 1;
-    options
-}
-
-/**
  * xmlCreateURLParserCtxt:
  * @filename:  the filename or URL
  * @options:  a combination of xmlParserOption
@@ -464,7 +309,7 @@ pub unsafe extern "C" fn xml_create_url_parser_ctxt(
     }
 
     if options != 0 {
-        xml_ctxt_use_options_internal(ctxt, options, null_mut());
+        (*ctxt).ctxt_use_options_internal(options, None);
     }
     (*ctxt).linenumbers = 1;
 

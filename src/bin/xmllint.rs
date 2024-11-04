@@ -1795,7 +1795,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
             PROGRESULT = XmllintReturnCode::ErrMem;
             return;
         }
-        xml_ctxt_read_file(ctxt, filename, null_mut(), OPTIONS);
+        xml_ctxt_read_file(ctxt, filename, None, OPTIONS);
 
         if !(*ctxt).my_doc.is_null() {
             eprintln!("SAX generated a doc !");
@@ -2536,14 +2536,14 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         }
     } else if TEST_IO != 0 {
         if *filename.add(0) == b'-' as i8 && *filename.add(1) == 0 {
-            doc = xml_read_io(stdin(), null_mut(), null_mut(), OPTIONS);
+            doc = xml_read_io(stdin(), null_mut(), None, OPTIONS);
         } else {
             let f: *mut FILE = fopen(filename, c"rb".as_ptr());
             if let Ok(f) = File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
                 if rectxt.is_null() {
-                    doc = xml_read_io(f, filename, null_mut(), OPTIONS);
+                    doc = xml_read_io(f, filename, None, OPTIONS);
                 } else {
-                    doc = xml_ctxt_read_io(rectxt, f, filename, null_mut(), OPTIONS);
+                    doc = xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS);
                 }
             } else {
                 doc = null_mut();
@@ -2567,7 +2567,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         (*ctxt).vctxt.error = Some(xml_html_validity_error);
         (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 
-        doc = xml_ctxt_read_file(ctxt, filename, null_mut(), OPTIONS);
+        doc = xml_ctxt_read_file(ctxt, filename, None, OPTIONS);
 
         if rectxt.is_null() {
             xml_free_parser_ctxt(ctxt);
@@ -2596,9 +2596,9 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
 
         let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
         if rectxt.is_null() {
-            doc = xml_read_memory(mem, filename, null_mut(), OPTIONS);
+            doc = xml_read_memory(mem, filename, None, OPTIONS);
         } else {
-            doc = xml_ctxt_read_memory(rectxt, mem, filename, null_mut(), OPTIONS);
+            doc = xml_ctxt_read_memory(rectxt, mem, filename, None, OPTIONS);
         }
 
         munmap(base as _, info.st_size as _);
@@ -2618,7 +2618,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 ctxt = rectxt;
             }
 
-            doc = xml_ctxt_read_file(ctxt, filename, null_mut(), OPTIONS);
+            doc = xml_ctxt_read_file(ctxt, filename, None, OPTIONS);
 
             if (*ctxt).valid == 0 {
                 PROGRESULT = XmllintReturnCode::ErrRdfile;
@@ -2628,9 +2628,9 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             }
         }
     } else if !rectxt.is_null() {
-        doc = xml_ctxt_read_file(rectxt, filename, null_mut(), OPTIONS);
+        doc = xml_ctxt_read_file(rectxt, filename, None, OPTIONS);
     } else {
-        doc = xml_read_file(filename, null_mut(), OPTIONS);
+        doc = xml_read_file(filename, None, OPTIONS);
     }
 
     /*

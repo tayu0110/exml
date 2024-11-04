@@ -5895,7 +5895,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                         doc = xml_ctxt_read_file(
                             parser_ctxt,
                             schema_location as _,
-                            null_mut(),
+                            None,
                             SCHEMAS_PARSE_OPTIONS,
                         );
                     } else if !schema_buffer.is_null() {
@@ -5907,7 +5907,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                             parser_ctxt,
                             mem,
                             null_mut(),
-                            null_mut(),
+                            None,
                             SCHEMAS_PARSE_OPTIONS,
                         );
                         schema_location = c"in_memory_buffer".as_ptr() as _;

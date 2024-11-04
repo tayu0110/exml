@@ -1694,7 +1694,7 @@ unsafe extern "C" fn get_api_root() -> XmlNodePtr {
 
 unsafe extern "C" fn get_api_doc() -> XmlDocPtr {
     if API_DOC.load(Ordering::Relaxed).is_null() {
-        API_DOC.store(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), c"root_test".as_ptr() as _, null_mut(), 0), Ordering::Relaxed);
+        API_DOC.store(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), c"root_test".as_ptr() as _, None, 0), Ordering::Relaxed);
         API_ROOT.store(null_mut(), Ordering::Relaxed);
         API_ATTR.store(null_mut(), Ordering::Relaxed);
     }
@@ -1985,18 +1985,13 @@ pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: c_int, _nr: c_int) -> XmlDoc
         return xml_new_doc(c"1.0".as_ptr() as _);
     }
     if no == 1 {
-        return xml_read_memory(
-            "<foo/>".as_bytes().to_vec(),
-            c"test".as_ptr() as _,
-            null_mut(),
-            0,
-        );
+        return xml_read_memory("<foo/>".as_bytes().to_vec(), c"test".as_ptr() as _, None, 0);
     }
     if no == 2 {
         return xml_read_memory(
             "<!DOCTYPE foo []> <foo/>".as_bytes().to_vec(),
             c"test".as_ptr() as _,
-            null_mut(),
+            None,
             0,
         );
     }

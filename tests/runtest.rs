@@ -2575,7 +2575,7 @@ unsafe fn mem_parse_test(
     }
 
     let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
-    let doc: XmlDocPtr = xml_read_memory(buffer, cfilename.as_ptr(), null_mut(), 0);
+    let doc: XmlDocPtr = xml_read_memory(buffer, cfilename.as_ptr(), None, 0);
     unload_mem(base);
     if doc.is_null() {
         return 1;
@@ -2627,7 +2627,7 @@ unsafe fn noent_parse_test(
     /*
      * base of the test, parse with the old API
      */
-    doc = xml_read_file(cfilename.as_ptr(), null_mut(), options);
+    doc = xml_read_file(cfilename.as_ptr(), None, options);
     if doc.is_null() {
         return 1;
     }
@@ -2646,7 +2646,7 @@ unsafe fn noent_parse_test(
     /*
      * Parse the saved result to make sure the round trip is okay
      */
-    doc = xml_read_file(cfilename.as_ptr(), null_mut(), options);
+    doc = xml_read_file(cfilename.as_ptr(), None, options);
     if doc.is_null() {
         return 1;
     }
@@ -2693,14 +2693,14 @@ unsafe fn err_parse_test(
     {
         #[cfg(feature = "xinclude")]
         {
-            doc = xml_read_file(cfilename.as_ptr(), null_mut(), options);
+            doc = xml_read_file(cfilename.as_ptr(), None, options);
             if xml_xinclude_process_flags(doc, options) < 0 {
                 xml_free_doc(doc);
                 doc = null_mut();
             }
         }
     } else {
-        doc = xml_read_file(cfilename.as_ptr(), null_mut(), options);
+        doc = xml_read_file(cfilename.as_ptr(), None, options);
     }
     if let Some(result) = cresult {
         if doc.is_null() {
@@ -2942,7 +2942,7 @@ unsafe fn walker_parse_test(
 
     let cfilename = CString::new(filename).unwrap();
 
-    let doc: XmlDocPtr = xml_read_file(cfilename.as_ptr(), null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(cfilename.as_ptr(), None, options);
     if doc.is_null() {
         eprintln!("Failed to parse {filename}",);
         return -1;
@@ -3202,7 +3202,7 @@ unsafe fn xpath_doc_test(
 
     let xpath_document = xml_read_file(
         cfilename.as_ptr(),
-        null_mut(),
+        None,
         options | XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if xpath_document.is_null() {
@@ -3289,7 +3289,7 @@ unsafe fn xptr_doc_test(
 
     let xpath_document = xml_read_file(
         cfilename.as_ptr(),
-        null_mut(),
+        None,
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if xpath_document.is_null() {
@@ -3368,7 +3368,7 @@ unsafe fn xmlid_doc_test(
 
     let xpath_document = xml_read_file(
         cfilename.as_ptr(),
-        null_mut(),
+        None,
         options | XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if xpath_document.is_null() {
@@ -3718,7 +3718,7 @@ unsafe extern "C" fn urip_read(context: *mut c_void, buffer: *mut c_char, mut le
 }
 
 unsafe extern "C" fn urip_check_url(url: *const c_char) -> c_int {
-    let doc: XmlDocPtr = xml_read_file(url, null_mut(), 0);
+    let doc: XmlDocPtr = xml_read_file(url, None, 0);
     if doc.is_null() {
         return -1;
     }
@@ -3828,7 +3828,7 @@ unsafe fn schemas_one_test(
 
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
         eprintln!(
             "failed to parse instance {} for {}",
@@ -4080,7 +4080,7 @@ unsafe fn rng_one_test(
 
     let mut ret: c_int;
 
-    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
         eprintln!(
             "failed to parse instance {} for {}",
@@ -4647,7 +4647,7 @@ unsafe fn pattern_test(
                     size -= 1;
                     str[size] = 0;
                 }
-                doc = xml_read_file(xml.as_ptr(), null_mut(), options);
+                doc = xml_read_file(xml.as_ptr(), None, options);
                 if doc.is_null() {
                     eprintln!(
                         "Failed to parse {}",
@@ -4763,7 +4763,7 @@ unsafe extern "C" fn load_xpath_expr(
 
     let doc: XmlDocPtr = xml_read_file(
         filename,
-        null_mut(),
+        None,
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if doc.is_null() {
@@ -4968,7 +4968,7 @@ unsafe extern "C" fn c14n_run_test(
 
     let doc: XmlDocPtr = xml_read_file(
         xml_filename,
-        null_mut(),
+        None,
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if doc.is_null() {

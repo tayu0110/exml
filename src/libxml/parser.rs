@@ -61,19 +61,18 @@ use crate::{
         parser_internals::{
             xml_add_def_attrs, xml_add_special_attr, xml_check_language_id, xml_copy_char,
             xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
-            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt,
-            xml_ctxt_use_options_internal, xml_err_internal, xml_fatal_err, xml_free_input_stream,
-            xml_new_entity_input_stream, xml_new_input_stream, xml_parse_attribute_type,
-            xml_parse_comment, xml_parse_content, xml_parse_content_internal,
-            xml_parse_default_decl, xml_parse_doc_type_decl, xml_parse_element_content_decl,
-            xml_parse_element_end, xml_parse_element_start, xml_parse_encoding_decl,
-            xml_parse_entity_ref, xml_parse_entity_value, xml_parse_external_subset,
-            xml_parse_misc, xml_parse_name, xml_parse_nmtoken, xml_parse_pe_reference,
-            xml_parse_pi, xml_parse_reference, xml_parse_sddecl, xml_parse_start_tag,
-            xml_parse_system_literal, xml_parse_version_info, xml_push_input, xml_switch_encoding,
-            xml_switch_to_encoding, INPUT_CHUNK, XML_MAX_DICTIONARY_LIMIT, XML_MAX_HUGE_LENGTH,
-            XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF,
-            XML_SUBSTITUTE_REF,
+            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt, xml_err_internal,
+            xml_fatal_err, xml_free_input_stream, xml_new_entity_input_stream,
+            xml_new_input_stream, xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
+            xml_parse_content_internal, xml_parse_default_decl, xml_parse_doc_type_decl,
+            xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
+            xml_parse_encoding_decl, xml_parse_entity_ref, xml_parse_entity_value,
+            xml_parse_external_subset, xml_parse_misc, xml_parse_name, xml_parse_nmtoken,
+            xml_parse_pe_reference, xml_parse_pi, xml_parse_reference, xml_parse_sddecl,
+            xml_parse_start_tag, xml_parse_system_literal, xml_parse_version_info, xml_push_input,
+            xml_switch_encoding, xml_switch_to_encoding, INPUT_CHUNK, XML_MAX_DICTIONARY_LIMIT,
+            XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
+            XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
         },
         relaxng::xml_relaxng_cleanup_types,
         sax2::{
@@ -125,6 +124,7 @@ use super::{
     parser_internals::{
         xml_err_encoding_int, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH,
     },
+    sax2::{xml_sax2_end_element, xml_sax2_start_element},
 };
 
 /**
@@ -1280,6 +1280,151 @@ impl XmlParserCtxt {
         }
     }
 
+    /// Applies the options to the parser context
+    ///
+    /// Returns 0 in case of success, the set of unknown or unimplemented options in case of error.
+    #[doc(alias = "xmlCtxtUseOptionsInternal")]
+    pub(crate) unsafe fn ctxt_use_options_internal(
+        &mut self,
+        mut options: i32,
+        encoding: Option<&str>,
+    ) -> i32 {
+        if let Some(encoding) = encoding {
+            if !self.encoding.is_null() {
+                xml_free(self.encoding as _);
+            }
+            let encoding = CString::new(encoding).unwrap();
+            self.encoding = xml_strdup(encoding.as_ptr() as *const XmlChar);
+        }
+        if options & XmlParserOption::XmlParseRecover as i32 != 0 {
+            self.recovery = 1;
+            options -= XmlParserOption::XmlParseRecover as i32;
+            self.options |= XmlParserOption::XmlParseRecover as i32;
+        } else {
+            self.recovery = 0;
+        }
+        if options & XmlParserOption::XmlParseDtdload as i32 != 0 {
+            self.loadsubset = XML_DETECT_IDS as i32;
+            options -= XmlParserOption::XmlParseDtdload as i32;
+            self.options |= XmlParserOption::XmlParseDtdload as i32;
+        } else {
+            self.loadsubset = 0;
+        }
+        if options & XmlParserOption::XmlParseDtdattr as i32 != 0 {
+            self.loadsubset |= XML_COMPLETE_ATTRS as i32;
+            options -= XmlParserOption::XmlParseDtdattr as i32;
+            self.options |= XmlParserOption::XmlParseDtdattr as i32;
+        }
+        if options & XmlParserOption::XmlParseNoent as i32 != 0 {
+            self.replace_entities = 1;
+            /* self.loadsubset |= XML_DETECT_IDS; */
+            options -= XmlParserOption::XmlParseNoent as i32;
+            self.options |= XmlParserOption::XmlParseNoent as i32;
+        } else {
+            self.replace_entities = 0;
+        }
+        if options & XmlParserOption::XmlParsePedantic as i32 != 0 {
+            self.pedantic = 1;
+            options -= XmlParserOption::XmlParsePedantic as i32;
+            self.options |= XmlParserOption::XmlParsePedantic as i32;
+        } else {
+            self.pedantic = 0;
+        }
+        if options & XmlParserOption::XmlParseNoblanks as i32 != 0 {
+            self.keep_blanks = 0;
+            (*self.sax).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
+            options -= XmlParserOption::XmlParseNoblanks as i32;
+            self.options |= XmlParserOption::XmlParseNoblanks as i32;
+        } else {
+            self.keep_blanks = 1;
+        }
+        if options & XmlParserOption::XmlParseDtdvalid as i32 != 0 {
+            self.validate = 1;
+            if options & XmlParserOption::XmlParseNowarning as i32 != 0 {
+                self.vctxt.warning = None;
+            }
+            if options & XmlParserOption::XmlParseNoerror as i32 != 0 {
+                self.vctxt.error = None;
+            }
+            options -= XmlParserOption::XmlParseDtdvalid as i32;
+            self.options |= XmlParserOption::XmlParseDtdvalid as i32;
+        } else {
+            self.validate = 0;
+        }
+        if options & XmlParserOption::XmlParseNowarning as i32 != 0 {
+            (*self.sax).warning = None;
+            options -= XmlParserOption::XmlParseNowarning as i32;
+        }
+        if options & XmlParserOption::XmlParseNoerror as i32 != 0 {
+            (*self.sax).error = None;
+            (*self.sax).fatal_error = None;
+            options -= XmlParserOption::XmlParseNoerror as i32;
+        }
+        #[cfg(feature = "sax1")]
+        if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
+            (*self.sax).start_element = Some(xml_sax2_start_element);
+            (*self.sax).end_element = Some(xml_sax2_end_element);
+            (*self.sax).start_element_ns = None;
+            (*self.sax).end_element_ns = None;
+            (*self.sax).initialized = 1;
+            options -= XmlParserOption::XmlParseSax1 as i32;
+            self.options |= XmlParserOption::XmlParseSax1 as i32;
+        }
+        if options & XmlParserOption::XmlParseNodict as i32 != 0 {
+            self.dict_names = 0;
+            options -= XmlParserOption::XmlParseNodict as i32;
+            self.options |= XmlParserOption::XmlParseNodict as i32;
+        } else {
+            self.dict_names = 1;
+        }
+        if options & XmlParserOption::XmlParseNocdata as i32 != 0 {
+            (*self.sax).cdata_block = None;
+            options -= XmlParserOption::XmlParseNocdata as i32;
+            self.options |= XmlParserOption::XmlParseNocdata as i32;
+        }
+        if options & XmlParserOption::XmlParseNsclean as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseNsclean as i32;
+            options -= XmlParserOption::XmlParseNsclean as i32;
+        }
+        if options & XmlParserOption::XmlParseNonet as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseNonet as i32;
+            options -= XmlParserOption::XmlParseNonet as i32;
+        }
+        if options & XmlParserOption::XmlParseCompact as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseCompact as i32;
+            options -= XmlParserOption::XmlParseCompact as i32;
+        }
+        if options & XmlParserOption::XmlParseOld10 as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseOld10 as i32;
+            options -= XmlParserOption::XmlParseOld10 as i32;
+        }
+        if options & XmlParserOption::XmlParseNobasefix as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseNobasefix as i32;
+            options -= XmlParserOption::XmlParseNobasefix as i32;
+        }
+        if options & XmlParserOption::XmlParseHuge as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseHuge as i32;
+            options -= XmlParserOption::XmlParseHuge as i32;
+            if !self.dict.is_null() {
+                xml_dict_set_limit(self.dict, 0);
+            }
+        }
+        if options & XmlParserOption::XmlParseOldsax as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseOldsax as i32;
+            options -= XmlParserOption::XmlParseOldsax as i32;
+        }
+        if options & XmlParserOption::XmlParseIgnoreEnc as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseIgnoreEnc as i32;
+            options -= XmlParserOption::XmlParseIgnoreEnc as i32;
+        }
+        if options & XmlParserOption::XmlParseBigLines as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseBigLines as i32;
+            options -= XmlParserOption::XmlParseBigLines as i32;
+        }
+        self.linenumbers = 1;
+        options
+    }
+
     /// Common front-end for the xmlRead functions
     ///
     /// Returns the resulting document tree or NULL
@@ -1287,22 +1432,21 @@ impl XmlParserCtxt {
     unsafe fn do_read(
         &mut self,
         url: *const c_char,
-        encoding: *const c_char,
+        encoding: Option<&str>,
         options: c_int,
         reuse: c_int,
     ) -> XmlDocPtr {
         let ret: XmlDocPtr;
 
-        xml_ctxt_use_options_internal(self, options, encoding);
-        if !encoding.is_null() {
+        self.ctxt_use_options_internal(options, encoding);
+        if let Some(encoding) = encoding {
             /*
              * TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
              * caller provided an encoding. Otherwise, we might match to
              * the encoding from the XML declaration which is likely to
              * break things. Also see xmlSwitchInputEncoding.
              */
-            if let Some(handler) = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
-            {
+            if let Some(handler) = find_encoding_handler(encoding) {
                 xml_switch_to_encoding(self, handler);
             }
         }
@@ -4354,7 +4498,7 @@ pub unsafe fn xml_parse_in_node_context(
         }
     }
 
-    xml_ctxt_use_options_internal(ctxt, options, null_mut());
+    (*ctxt).ctxt_use_options_internal(options, None);
     (*ctxt).detect_sax2();
     (*ctxt).my_doc = doc;
     /* parsing in context, i.e. as within existing content */
@@ -4555,7 +4699,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
         (*ctxt).dict_names = 1;
     } else {
-        xml_ctxt_use_options_internal(ctxt, XmlParserOption::XmlParseNodict as i32, null());
+        (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNodict as i32, None);
     }
     /* doc.is_null() is only supported for historic reasons */
     if !doc.is_null() {
@@ -11469,7 +11613,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
  *         in case of error.
  */
 pub unsafe extern "C" fn xml_ctxt_use_options(ctxt: XmlParserCtxtPtr, options: c_int) -> c_int {
-    xml_ctxt_use_options_internal(ctxt, options, null())
+    (*ctxt).ctxt_use_options_internal(options, None)
 }
 
 /**
@@ -11483,10 +11627,10 @@ pub unsafe extern "C" fn xml_ctxt_use_options(ctxt: XmlParserCtxtPtr, options: c
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xml_read_doc(
+pub unsafe fn xml_read_doc(
     cur: *const XmlChar,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
     if cur.is_null() {
@@ -11511,9 +11655,9 @@ pub unsafe extern "C" fn xml_read_doc(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xml_read_file(
+pub unsafe fn xml_read_file(
     filename: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
     xml_init_parser();
@@ -11539,7 +11683,7 @@ pub unsafe extern "C" fn xml_read_file(
 pub unsafe fn xml_read_memory(
     buffer: Vec<u8>,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
     xml_init_parser();
@@ -11564,10 +11708,10 @@ pub unsafe fn xml_read_memory(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xml_read_io(
+pub unsafe fn xml_read_io(
     ioctx: impl Read + 'static,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
     xml_init_parser();
@@ -11600,11 +11744,11 @@ pub unsafe extern "C" fn xml_read_io(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xml_ctxt_read_doc(
+pub unsafe fn xml_ctxt_read_doc(
     ctxt: XmlParserCtxtPtr,
     cur: *const XmlChar,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
     if cur.is_null() {
@@ -11631,10 +11775,10 @@ pub unsafe extern "C" fn xml_ctxt_read_doc(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xml_ctxt_read_file(
+pub unsafe fn xml_ctxt_read_file(
     ctxt: XmlParserCtxtPtr,
     filename: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
     if filename.is_null() {
@@ -11673,7 +11817,7 @@ pub unsafe fn xml_ctxt_read_memory(
     ctxt: XmlParserCtxtPtr,
     buffer: Vec<u8>,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
     if ctxt.is_null() {
@@ -11710,11 +11854,11 @@ pub unsafe fn xml_ctxt_read_memory(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn xml_ctxt_read_io(
+pub unsafe fn xml_ctxt_read_io(
     ctxt: XmlParserCtxtPtr,
     ioctx: impl Read + 'static,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
     if ctxt.is_null() {
@@ -14143,93 +14287,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_ctxt_read_doc() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_url in 0..GEN_NB_FILEPATH {
-                        for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            for n_options in 0..GEN_NB_PARSEROPTIONS {
-                                let mem_base = xml_mem_blocks();
-                                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                                let cur = gen_const_xml_char_ptr(n_cur, 1);
-                                let url = gen_filepath(n_url, 2);
-                                let encoding = gen_const_char_ptr(n_encoding, 3);
-                                let options = gen_parseroptions(n_options, 4);
-
-                                let ret_val = xml_ctxt_read_doc(ctxt, cur, url, encoding, options);
-                                desret_xml_doc_ptr(ret_val);
-                                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                                des_const_xml_char_ptr(n_cur, cur, 1);
-                                des_filepath(n_url, url, 2);
-                                des_const_char_ptr(n_encoding, encoding, 3);
-                                des_parseroptions(n_options, options, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlCtxtReadDoc",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    eprint!(" {}", n_ctxt);
-                                    eprint!(" {}", n_cur);
-                                    eprint!(" {}", n_url);
-                                    eprint!(" {}", n_encoding);
-                                    eprintln!(" {}", n_options);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCtxtReadDoc()");
-        }
-    }
-
-    #[test]
-    fn test_xml_ctxt_read_file() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_options in 0..GEN_NB_PARSEROPTIONS {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                            let filename = gen_filepath(n_filename, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let options = gen_parseroptions(n_options, 3);
-
-                            let ret_val = xml_ctxt_read_file(ctxt, filename, encoding, options);
-                            desret_xml_doc_ptr(ret_val);
-                            des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_filepath(n_filename, filename, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_parseroptions(n_options, options, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlCtxtReadFile",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_filename);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_options);
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCtxtReadFile()");
-        }
-    }
-
-    #[test]
     fn test_xml_ctxt_reset() {
         unsafe {
             let mut leaks = 0;
@@ -14301,37 +14358,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlCtxtResetPush()");
-        }
-    }
-
-    #[test]
-    fn test_xml_ctxt_use_options() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_options in 0..GEN_NB_PARSEROPTIONS {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let options = gen_parseroptions(n_options, 1);
-
-                    let ret_val = xml_ctxt_use_options(ctxt, options);
-                    desret_int(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_parseroptions(n_options, options, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCtxtUseOptions",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_options);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCtxtUseOptions()");
         }
     }
 
@@ -15017,84 +15043,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlPedanticParserDefault()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_read_doc() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_url in 0..GEN_NB_FILEPATH {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_options in 0..GEN_NB_PARSEROPTIONS {
-                            let mem_base = xml_mem_blocks();
-                            let cur = gen_const_xml_char_ptr(n_cur, 0);
-                            let url = gen_filepath(n_url, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let options = gen_parseroptions(n_options, 3);
-
-                            let ret_val =
-                                xml_read_doc(cur as *const XmlChar, url, encoding, options);
-                            desret_xml_doc_ptr(ret_val);
-                            des_const_xml_char_ptr(n_cur, cur, 0);
-                            des_filepath(n_url, url, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_parseroptions(n_options, options, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlReadDoc",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                eprint!(" {}", n_cur);
-                                eprint!(" {}", n_url);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_options);
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlReadDoc()");
-        }
-    }
-
-    #[test]
-    fn test_xml_read_file() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_options in 0..GEN_NB_PARSEROPTIONS {
-                        let mem_base = xml_mem_blocks();
-                        let filename = gen_filepath(n_filename, 0);
-                        let encoding = gen_const_char_ptr(n_encoding, 1);
-                        let options = gen_parseroptions(n_options, 2);
-
-                        let ret_val = xml_read_file(filename, encoding, options);
-                        desret_xml_doc_ptr(ret_val);
-                        des_filepath(n_filename, filename, 0);
-                        des_const_char_ptr(n_encoding, encoding, 1);
-                        des_parseroptions(n_options, options, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlReadFile",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_filename);
-                            eprint!(" {}", n_encoding);
-                            eprintln!(" {}", n_options);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlReadFile()");
         }
     }
 

@@ -536,7 +536,7 @@ unsafe extern "C" fn recursive_detect_test(
     /*
      * base of the test, parse with the old API
      */
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), parser_options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, parser_options);
     if !doc.is_null() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
         eprintln!(
             "Failed to detect recursion in {}",
@@ -583,7 +583,7 @@ unsafe extern "C" fn not_recursive_detect_test(
     /*
      * base of the test, parse with the old API
      */
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), parser_options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, parser_options);
     if doc.is_null() {
         eprintln!(
             "Failed to parse correct file {}",
@@ -630,7 +630,7 @@ unsafe extern "C" fn not_recursive_huge_test(
     let doc: XmlDocPtr = xml_ctxt_read_file(
         ctxt,
         c"test/recurse/huge.xml".as_ptr(),
-        null_mut(),
+        None,
         parser_options,
     );
     if doc.is_null() {
@@ -750,7 +750,7 @@ unsafe extern "C" fn huge_dtd_test(
     let doc: XmlDocPtr = xml_ctxt_read_file(
         ctxt,
         c"test/recurse/huge_dtd.xml".as_ptr(),
-        null_mut(),
+        None,
         parser_options,
     );
     if doc.is_null() {

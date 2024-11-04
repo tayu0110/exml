@@ -1152,7 +1152,7 @@ unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, f
         eprintln!("Failed to create parser context");
         return 1;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
 
     if !doc.is_null() {
         eprintln!("SAX parsing generated a document !");

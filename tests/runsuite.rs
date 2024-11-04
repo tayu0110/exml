@@ -579,7 +579,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
             let buffer = from_raw_parts(xml_buf_content(buf), xml_buf_use(buf)).to_vec();
-            doc = xml_read_memory(buffer, c"test".as_ptr(), null_mut(), 0);
+            doc = xml_read_memory(buffer, c"test".as_ptr(), None, 0);
             if doc.is_null() {
                 test_log!(
                     logfile,
@@ -657,7 +657,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
             let buffer = from_raw_parts(xml_buf_content(buf), xml_buf_use(buf)).to_vec();
-            doc = xml_read_memory(buffer, c"test".as_ptr() as _, null_mut(), 0);
+            doc = xml_read_memory(buffer, c"test".as_ptr() as _, None, 0);
             if doc.is_null() {
                 test_log!(
                     logfile,
@@ -756,7 +756,7 @@ unsafe extern "C" fn xsd_test(logfile: &mut Option<File>) -> c_int {
 
     let doc: XmlDocPtr = xml_read_file(
         filename.as_ptr() as _,
-        null_mut(),
+        None,
         XmlParserOption::XmlParseNoent as _,
     );
     if doc.is_null() {
@@ -827,7 +827,7 @@ unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
 
     let doc: XmlDocPtr = xml_read_file(
         filename.as_ptr() as _,
-        null_mut(),
+        None,
         XmlParserOption::XmlParseNoent as _,
     );
     if doc.is_null() {
@@ -874,7 +874,7 @@ unsafe extern "C" fn rng_test2(logfile: &mut Option<File>) -> c_int {
 
     let doc: XmlDocPtr = xml_read_file(
         filename.as_ptr() as _,
-        null_mut(),
+        None,
         XmlParserOption::XmlParseNoent as _,
     );
     if doc.is_null() {
@@ -979,7 +979,7 @@ unsafe extern "C" fn xstc_test_instance(
                 NB_TESTS += 1;
                 doc = xml_read_file(
                     path as *const c_char,
-                    null_mut(),
+                    None,
                     XmlParserOption::XmlParseNoent as i32,
                 );
                 if doc.is_null() {
@@ -1275,7 +1275,7 @@ unsafe extern "C" fn xstc_metadata(
     let mut name: *mut XmlChar;
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(metadata, null_mut(), XmlParserOption::XmlParseNoent as _);
+    let doc: XmlDocPtr = xml_read_file(metadata, None, XmlParserOption::XmlParseNoent as _);
     if doc.is_null() {
         eprintln!(
             "Failed to parse {}",

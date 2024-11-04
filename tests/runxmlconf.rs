@@ -220,7 +220,7 @@ unsafe extern "C" fn xmlconf_test_invalid(
         );
         return 0;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -264,7 +264,7 @@ unsafe extern "C" fn xmlconf_test_valid(
         );
         return 0;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -304,7 +304,7 @@ unsafe extern "C" fn xmlconf_test_not_nswf(
      * In case of Namespace errors, libxml2 will still parse the document
      * but log a Namespace error.
      */
-    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -341,7 +341,7 @@ unsafe extern "C" fn xmlconf_test_not_wf(
 ) -> c_int {
     let mut ret: c_int = 1;
 
-    let doc: XmlDocPtr = xml_read_file(filename, null_mut(), options);
+    let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if !doc.is_null() {
         test_log!(
             logfile,
@@ -840,7 +840,7 @@ unsafe extern "C" fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
     }
     let doc: XmlDocPtr = xml_read_file(
         confxml.as_ptr(),
-        null_mut(),
+        None,
         XmlParserOption::XmlParseNoent as i32,
     );
     if doc.is_null() {
