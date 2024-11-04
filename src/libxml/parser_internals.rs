@@ -5651,10 +5651,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
      * parse the end of tag: '</' should be here.
      */
     if (*ctxt).sax2 != 0 {
-        xml_parse_end_tag2(
-            ctxt,
-            &raw const (*ctxt).push_tab[(*ctxt).name_tab.len() - 1],
-        );
+        xml_parse_end_tag2(ctxt, &(*ctxt).push_tab[(*ctxt).name_tab.len() - 1]);
         (*ctxt).name_pop();
     } else {
         #[cfg(feature = "sax1")]

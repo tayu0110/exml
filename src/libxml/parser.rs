@@ -9623,10 +9623,7 @@ unsafe extern "C" fn xml_parse_qname_and_compare(
  *
  * [NS 9] ETag ::= '</' QName S? '>'
  */
-pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
-    ctxt: XmlParserCtxtPtr,
-    tag: *const XmlStartTag,
-) {
+pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: &XmlStartTag) {
     let mut name: *const XmlChar;
 
     (*ctxt).grow();
@@ -9636,10 +9633,10 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
     }
     (*ctxt).advance(2);
 
-    if (*tag).prefix.is_null() {
+    if tag.prefix.is_null() {
         name = xml_parse_name_and_compare(ctxt, (*ctxt).name as _);
     } else {
-        name = xml_parse_qname_and_compare(ctxt, (*ctxt).name as _, (*tag).prefix as _);
+        name = xml_parse_qname_and_compare(ctxt, (*ctxt).name as _, tag.prefix as _);
     }
 
     /*
@@ -9671,7 +9668,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
             XmlParserErrors::XmlErrTagNameMismatch,
             c"Opening and ending tag mismatch: %s line %d and %s\n".as_ptr() as _,
             (*ctxt).name,
-            (*tag).line,
+            tag.line,
             name,
         );
     }
@@ -9684,14 +9681,14 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(
         ((*(*ctxt).sax).end_element_ns.unwrap())(
             (*ctxt).user_data.clone(),
             (*ctxt).name,
-            (*tag).prefix,
-            (*tag).uri,
+            tag.prefix,
+            tag.uri,
         );
     }
 
     (*ctxt).space_pop();
-    if (*tag).ns_nr != 0 {
-        (*ctxt).ns_pop((*tag).ns_nr);
+    if tag.ns_nr != 0 {
+        (*ctxt).ns_pop(tag.ns_nr);
     }
 }
 
@@ -10402,10 +10399,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         return ret;
                     }
                     if (*ctxt).sax2 != 0 {
-                        xml_parse_end_tag2(
-                            ctxt,
-                            &raw const (*ctxt).push_tab[(*ctxt).name_tab.len() - 1],
-                        );
+                        xml_parse_end_tag2(ctxt, &(*ctxt).push_tab[(*ctxt).name_tab.len() - 1]);
                         (*ctxt).name_ns_pop();
                     } else {
                         #[cfg(feature = "sax1")]
