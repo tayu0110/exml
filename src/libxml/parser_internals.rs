@@ -5483,7 +5483,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     let mut tlen: c_int = 0;
     let ns_nr: c_int = (*ctxt).ns_nr;
 
-    if (*ctxt).name_nr as c_uint > XML_PARSER_MAX_DEPTH
+    if (*ctxt).name_tab.len() as c_uint > XML_PARSER_MAX_DEPTH
         && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
     {
         xml_fatal_err_msg_int(
@@ -5640,7 +5640,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
 pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
     let cur: XmlNodePtr = (*ctxt).node;
 
-    if (*ctxt).name_nr <= 0 {
+    if (*ctxt).name_tab.is_empty() {
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
             (*ctxt).advance(2);
         }
@@ -5651,7 +5651,10 @@ pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
      * parse the end of tag: '</' should be here.
      */
     if (*ctxt).sax2 != 0 {
-        xml_parse_end_tag2(ctxt, (*ctxt).push_tab.add((*ctxt).name_nr as usize - 1));
+        xml_parse_end_tag2(
+            ctxt,
+            &raw const (*ctxt).push_tab[(*ctxt).name_tab.len() - 1],
+        );
         (*ctxt).name_pop();
     } else {
         #[cfg(feature = "sax1")]
@@ -5682,7 +5685,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
  * unexpected EOF to the caller.
  */
 pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
-    let name_nr: c_int = (*ctxt).name_nr;
+    let name_nr = (*ctxt).name_tab.len();
 
     (*ctxt).grow();
     while (*ctxt).current_byte() != 0
@@ -5719,7 +5722,7 @@ pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPt
          */
         else if *cur == b'<' {
             if NXT!(ctxt, 1) == b'/' {
-                if (*ctxt).name_nr <= name_nr {
+                if (*ctxt).name_tab.len() <= name_nr {
                     break;
                 }
                 xml_parse_element_end(ctxt);
@@ -5755,13 +5758,15 @@ pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPt
  * [43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*
  */
 pub unsafe extern "C" fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
-    let name_nr: c_int = (*ctxt).name_nr;
+    let name_nr = (*ctxt).name_tab.len();
 
     xml_parse_content_internal(ctxt);
 
-    if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) && (*ctxt).name_nr > name_nr {
-        let name: *const XmlChar = *(*ctxt).name_tab.add((*ctxt).name_nr as usize - 1);
-        let line: c_int = (*(*ctxt).push_tab.add((*ctxt).name_nr as usize - 1)).line;
+    if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        && (*ctxt).name_tab.len() > name_nr
+    {
+        let name: *const XmlChar = (*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
+        let line: c_int = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
         xml_fatal_err_msg_str_int_str(
             ctxt,
             XmlParserErrors::XmlErrTagNotFinished,

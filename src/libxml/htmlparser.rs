@@ -6518,22 +6518,10 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
  *
  * Returns the name just removed
  */
-unsafe extern "C" fn html_name_pop(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
-    if (*ctxt).name_nr <= 0 {
-        return null_mut();
-    }
-    (*ctxt).name_nr -= 1;
-    if (*ctxt).name_nr < 0 {
-        return null_mut();
-    }
-    if (*ctxt).name_nr > 0 {
-        (*ctxt).name = *(*ctxt).name_tab.add((*ctxt).name_nr as usize - 1);
-    } else {
-        (*ctxt).name = null_mut();
-    }
-    let ret: *const XmlChar = *(*ctxt).name_tab.add((*ctxt).name_nr as usize);
-    *(*ctxt).name_tab.add((*ctxt).name_nr as usize) = null_mut();
-    ret
+unsafe fn html_name_pop(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
+    let res = (*ctxt).name_tab.pop().unwrap_or(null());
+    (*ctxt).name = *(*ctxt).name_tab.last().unwrap_or(&null());
+    res
 }
 
 /**
@@ -6543,10 +6531,10 @@ unsafe extern "C" fn html_name_pop(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
  * Close all remaining tags at the end of the stream
  */
 unsafe extern "C" fn html_auto_close_on_end(ctxt: HtmlParserCtxtPtr) {
-    if (*ctxt).name_nr == 0 {
+    if (*ctxt).name_tab.is_empty() {
         return;
     }
-    for _ in (0..(*ctxt).name_nr).rev() {
+    for _ in (0..(*ctxt).name_tab.len()).rev() {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
             ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), (*ctxt).name);
         }
@@ -6604,32 +6592,16 @@ static HTML_OMITTED_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
  *
  * Returns -1 in case of error, the index in the stack otherwise
  */
-unsafe extern "C" fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlChar) -> c_int {
+unsafe extern "C" fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlChar) -> i32 {
     if (*ctxt).html < 3 && xml_str_equal(value, c"head".as_ptr() as _) {
         (*ctxt).html = 3;
     }
     if (*ctxt).html < 10 && xml_str_equal(value, c"body".as_ptr() as _) {
         (*ctxt).html = 10;
     }
-    if (*ctxt).name_nr >= (*ctxt).name_max {
-        let new_size: size_t = (*ctxt).name_max as usize * 2;
-
-        let tmp: *mut *const XmlChar = xml_realloc(
-            (*ctxt).name_tab as _,
-            new_size * size_of_val(&*(*ctxt).name_tab.add(0)),
-        ) as _;
-        if tmp.is_null() {
-            html_err_memory(ctxt, null());
-            return -1;
-        }
-        (*ctxt).name_tab = tmp;
-        (*ctxt).name_max = new_size as _;
-    }
-    *(*ctxt).name_tab.add((*ctxt).name_nr as usize) = value;
     (*ctxt).name = value;
-    let res = (*ctxt).name_nr;
-    (*ctxt).name_nr += 1;
-    res
+    (*ctxt).name_tab.push(value);
+    (*ctxt).name_tab.len() as i32 - 1
 }
 
 /**
@@ -6651,7 +6623,7 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
     if xml_str_equal(newtag, c"html".as_ptr() as _) {
         return;
     }
-    if (*ctxt).name_nr <= 0 {
+    if (*ctxt).name_tab.is_empty() {
         html_name_push(ctxt, c"html".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
             ((*(*ctxt).sax).start_element.unwrap())(
@@ -6665,7 +6637,7 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
     {
         return;
     }
-    if (*ctxt).name_nr <= 1
+    if (*ctxt).name_tab.len() <= 1
         && (xml_str_equal(newtag, c"script".as_ptr() as _)
             || xml_str_equal(newtag, c"style".as_ptr() as _)
             || xml_str_equal(newtag, c"meta".as_ptr() as _)
@@ -6697,11 +6669,11 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
             /* we already saw or generated a <body> before */
             return;
         }
-        for i in 0..(*ctxt).name_nr {
-            if xml_str_equal(*(*ctxt).name_tab.add(i as usize), c"body".as_ptr() as _) {
+        for i in 0..(*ctxt).name_tab.len() {
+            if xml_str_equal((*ctxt).name_tab[i], c"body".as_ptr() as _) {
                 return;
             }
-            if xml_str_equal(*(*ctxt).name_tab.add(i as usize), c"head".as_ptr() as _) {
+            if xml_str_equal((*ctxt).name_tab[i], c"head".as_ptr() as _) {
                 return;
             }
         }
@@ -7356,7 +7328,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
      * Avoid html at any level > 0, head at any level != 1
      * or any attempt to recurse body
      */
-    if (*ctxt).name_nr > 0 && xml_str_equal(name, c"html".as_ptr() as _) {
+    if !(*ctxt).name_tab.is_empty() && xml_str_equal(name, c"html".as_ptr() as _) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHTMLStrucureError,
@@ -7367,7 +7339,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
         discardtag = 1;
         (*ctxt).depth += 1;
     }
-    if (*ctxt).name_nr != 1 && xml_str_equal(name, c"head".as_ptr() as _) {
+    if (*ctxt).name_tab.len() != 1 && xml_str_equal(name, c"head".as_ptr() as _) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHTMLStrucureError,
@@ -7379,8 +7351,8 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
         (*ctxt).depth += 1;
     }
     if xml_str_equal(name, c"body".as_ptr() as _) {
-        for indx in 0..(*ctxt).name_nr {
-            if xml_str_equal(*(*ctxt).name_tab.add(indx as usize), c"body".as_ptr() as _) {
+        for indx in 0..(*ctxt).name_tab.len() {
+            if xml_str_equal((*ctxt).name_tab[indx], c"body".as_ptr() as _) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlHTMLStrucureError,
@@ -7619,8 +7591,8 @@ unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *
 
     let priority: c_int = html_get_end_priority(newtag);
 
-    for i in (0..(*ctxt).name_nr).rev() {
-        if xml_str_equal(newtag, *(*ctxt).name_tab.add(i as usize)) {
+    for i in (0..(*ctxt).name_tab.len()).rev() {
+        if xml_str_equal(newtag, (*ctxt).name_tab[i]) {
             while !xml_str_equal(newtag, (*ctxt).name) {
                 info = html_tag_lookup((*ctxt).name);
                 if !info.is_null() && (*info).end_tag == 3 {
@@ -7646,7 +7618,7 @@ unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *
          * priority before we find an element with
          * matching name, we just ignore this endtag
          */
-        if html_get_end_priority(*(*ctxt).name_tab.add(i as usize)) > priority {
+        if html_get_end_priority((*ctxt).name_tab[i]) > priority {
             return;
         }
     }
@@ -7750,8 +7722,8 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
      * If the name read is not one of the element in the parsing stack
      * then return, it's just an error.
      */
-    for i in (0..(*ctxt).name_nr).rev() {
-        if xml_str_equal(name, *(*ctxt).name_tab.add(i as usize)) {
+    for i in (0..(*ctxt).name_tab.len()).rev() {
+        if xml_str_equal(name, (*ctxt).name_tab[i]) {
             /*
              * Check for auto-closure of HTML elements.
              */
@@ -9059,7 +9031,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
     let mut name: *const XmlChar;
 
     let current_node: *mut XmlChar = xml_strdup((*ctxt).name);
-    let depth: c_int = (*ctxt).name_nr;
+    let depth = (*ctxt).name_tab.len();
     loop {
         (*ctxt).grow();
 
@@ -9071,7 +9043,9 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
          * Our tag or one of it's parent or children is ending.
          */
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
-            if html_parse_end_tag(ctxt) != 0 && (!current_node.is_null() || (*ctxt).name_nr == 0) {
+            if html_parse_end_tag(ctxt) != 0
+                && (!current_node.is_null() || (*ctxt).name_tab.is_empty())
+            {
                 if !current_node.is_null() {
                     xml_free(current_node as _);
                 }
@@ -9114,8 +9088,8 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
          * Has this node been popped out during parsing of
          * the next element
          */
-        if (*ctxt).name_nr > 0
-            && depth >= (*ctxt).name_nr
+        if !(*ctxt).name_tab.is_empty()
+            && depth >= (*ctxt).name_tab.len()
             && !xml_str_equal(current_node, (*ctxt).name)
         {
             if !current_node.is_null() {
@@ -9336,7 +9310,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
      * Parse the content of the element:
      */
     let current_node: *mut XmlChar = xml_strdup((*ctxt).name);
-    let depth: c_int = (*ctxt).name_nr;
+    let depth = (*ctxt).name_tab.len();
     #[allow(clippy::while_immutable_condition)]
     while (*ctxt).current_byte() != 0 {
         oldptr = (*(*ctxt).input).cur;
@@ -9344,7 +9318,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         if oldptr == (*(*ctxt).input).cur {
             break;
         }
-        if (*ctxt).name_nr < depth {
+        if (*ctxt).name_tab.len() < depth {
             break;
         }
     }
@@ -9398,6 +9372,8 @@ unsafe fn html_init_parser_ctxt(
         return -1;
     }
     memset(ctxt as _, 0, size_of::<HtmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).name_tab, vec![]);
+    std::ptr::write(&mut (*ctxt).push_tab, vec![]);
     std::ptr::write(&mut (*ctxt).node_tab, vec![]);
     std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
@@ -9445,21 +9421,8 @@ unsafe fn html_init_parser_ctxt(
     (*ctxt).node = null_mut();
 
     /* Allocate the Name stack */
-    (*ctxt).name_tab = xml_malloc(10 * size_of::<*mut XmlChar>()) as _;
-    if (*ctxt).name_tab.is_null() {
-        html_err_memory(
-            null_mut(),
-            c"htmlInitParserCtxt: out of memory\n".as_ptr() as _,
-        );
-        (*ctxt).name_nr = 0;
-        (*ctxt).name_max = 0;
-        (*ctxt).name = null_mut();
-        (*ctxt).node = null_mut();
-        (*ctxt).input = null_mut();
-        return -1;
-    }
-    (*ctxt).name_nr = 0;
-    (*ctxt).name_max = 10;
+    (*ctxt).name_tab.clear();
+    (*ctxt).name_tab.shrink_to(10);
     (*ctxt).name = null_mut();
 
     (*ctxt).node_info_tab = null_mut();
@@ -9504,6 +9467,8 @@ pub unsafe fn html_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).name_tab, vec![]);
+    std::ptr::write(&mut (*ctxt).push_tab, vec![]);
     std::ptr::write(&mut (*ctxt).node_tab, vec![]);
     std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
@@ -9730,11 +9695,10 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
  */
 unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
     let mut current_node: *mut XmlChar;
-    let mut depth: c_int;
     let mut name: *const XmlChar;
 
-    depth = (*ctxt).name_nr;
-    if depth <= 0 {
+    let mut depth = (*ctxt).name_tab.len();
+    if depth == 0 {
         current_node = null_mut();
     } else {
         current_node = xml_strdup((*ctxt).name);
@@ -9754,13 +9718,15 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
          * Our tag or one of it's parent or children is ending.
          */
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
-            if html_parse_end_tag(ctxt) != 0 && (!current_node.is_null() || (*ctxt).name_nr == 0) {
+            if html_parse_end_tag(ctxt) != 0
+                && (!current_node.is_null() || (*ctxt).name_tab.is_empty())
+            {
                 if !current_node.is_null() {
                     xml_free(current_node as _);
                 }
 
-                depth = (*ctxt).name_nr;
-                if depth <= 0 {
+                depth = (*ctxt).name_tab.len();
+                if depth == 0 {
                     current_node = null_mut();
                 } else {
                     current_node = xml_strdup((*ctxt).name);
@@ -9801,7 +9767,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                     html_err_memory(ctxt, null());
                     break;
                 }
-                depth = (*ctxt).name_nr;
+                depth = (*ctxt).name_tab.len();
                 continue;
             }
 
@@ -9815,8 +9781,8 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
          * Has this node been popped out during parsing of
          * the next element
          */
-        if (*ctxt).name_nr > 0
-            && depth >= (*ctxt).name_nr
+        if !(*ctxt).name_tab.is_empty()
+            && depth >= (*ctxt).name_tab.len()
             && !xml_str_equal(current_node, (*ctxt).name)
         {
             html_parser_finish_element_parsing(ctxt);
@@ -9829,7 +9795,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 html_err_memory(ctxt, null());
                 break;
             }
-            depth = (*ctxt).name_nr;
+            depth = (*ctxt).name_tab.len();
             continue;
         }
 
@@ -9891,7 +9857,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 html_err_memory(ctxt, null());
                 break;
             }
-            depth = (*ctxt).name_nr;
+            depth = (*ctxt).name_tab.len();
         } else if (*ctxt).current_byte() == b'<' {
             if !(*ctxt).sax.is_null()
                 && (*ctxt).disable_sax == 0
@@ -10959,7 +10925,8 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
         avail = (*input).end.offset_from((*input).cur) as _;
         if avail == 0 && terminate != 0 {
             html_auto_close_on_end(ctxt);
-            if (*ctxt).name_nr == 0 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+            if (*ctxt).name_tab.is_empty()
+                && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
             {
                 /*
                  * SAX: end of the document processing.
@@ -11507,7 +11474,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     break 'done;
                 }
                 html_parse_end_tag(ctxt);
-                if (*ctxt).name_nr == 0 {
+                if (*ctxt).name_tab.is_empty() {
                     (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
                 } else {
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -11629,7 +11596,9 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
     // done:
     if avail == 0 && terminate != 0 {
         html_auto_close_on_end(ctxt);
-        if (*ctxt).name_nr == 0 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+        if (*ctxt).name_tab.is_empty()
+            && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
             /*
              * SAX: end of the document processing.
              */
@@ -11844,7 +11813,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).node_tab.clear();
     (*ctxt).node = null_mut();
 
-    (*ctxt).name_nr = 0;
+    (*ctxt).name_tab.clear();
     (*ctxt).name = null_mut();
 
     (*ctxt).ns_nr = 0;

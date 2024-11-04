@@ -393,11 +393,23 @@ pub enum XmlParserMode {
 }
 
 #[repr(C)]
+#[derive(Clone)]
 pub(crate) struct XmlStartTag {
     pub(crate) prefix: *const XmlChar,
     pub(crate) uri: *const XmlChar,
     pub(crate) line: c_int,
     pub(crate) ns_nr: c_int,
+}
+
+impl Default for XmlStartTag {
+    fn default() -> Self {
+        Self {
+            prefix: null(),
+            uri: null(),
+            line: 0,
+            ns_nr: 0,
+        }
+    }
 }
 
 /**
@@ -456,9 +468,7 @@ pub struct XmlParserCtxt {
 
     /* Node name stack */
     pub(crate) name: *const XmlChar, /* Current parsed Node */
-    pub(crate) name_nr: c_int,       /* Depth of the parsing stack */
-    pub(crate) name_max: c_int,      /* Max depth of the parsing stack */
-    pub(crate) name_tab: *mut *const XmlChar, /* array of nodes */
+    pub(crate) name_tab: Vec<*const XmlChar>, /* array of nodes */
 
     nb_chars: c_long,                        /* unused */
     pub(crate) check_index: c_long,          /* used by progressive parsing lookup */
@@ -509,7 +519,7 @@ pub struct XmlParserCtxt {
     ns_max: c_int,                          /* the size of the arrays */
     pub(crate) ns_tab: *mut *const XmlChar, /* the array of prefix/namespace name */
     pub(crate) attallocs: *mut c_int,       /* which attribute were allocated */
-    pub(crate) push_tab: *mut XmlStartTag,  /* array of data for push */
+    pub(crate) push_tab: Vec<XmlStartTag>,  /* array of data for push */
     pub(crate) atts_default: XmlHashTablePtr, /* defaulted attributes if any */
     pub(crate) atts_special: XmlHashTablePtr, /* non-CDATA attributes if any */
     pub(crate) ns_well_formed: c_int,       /* is the document XML Namespace okay */
@@ -1132,23 +1142,9 @@ impl XmlParserCtxt {
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "namePush")]
     pub(crate) unsafe fn name_push(&mut self, value: *const XmlChar) -> i32 {
-        if self.name_nr >= self.name_max {
-            let tmp: *mut *const XmlChar = xml_realloc(
-                self.name_tab as _,
-                self.name_max as usize * 2 * size_of_val(&*self.name_tab.add(0)),
-            ) as *mut *const XmlChar;
-            if tmp.is_null() {
-                xml_err_memory(self, null());
-                return -1;
-            }
-            self.name_tab = tmp;
-            self.name_max *= 2;
-        }
-        *self.name_tab.add(self.name_nr as usize) = value;
         self.name = value;
-        let res = self.name_nr;
-        self.name_nr += 1;
-        res
+        self.name_tab.push(value);
+        self.name_tab.len() as i32 - 1
     }
 
     /// Pops the top element name from the name stack
@@ -1156,18 +1152,9 @@ impl XmlParserCtxt {
     /// Returns the name just removed
     #[doc(alias = "namePop")]
     pub(crate) unsafe fn name_pop(&mut self) -> *const XmlChar {
-        if self.name_nr <= 0 {
-            return null_mut();
-        }
-        self.name_nr -= 1;
-        if self.name_nr > 0 {
-            self.name = *self.name_tab.add(self.name_nr as usize - 1);
-        } else {
-            self.name = null_mut();
-        }
-        let ret: *const XmlChar = *self.name_tab.add(self.name_nr as usize);
-        *self.name_tab.add(self.name_nr as usize) = null_mut();
-        ret
+        let res = self.name_tab.pop().unwrap_or(null_mut());
+        self.name = *self.name_tab.last().unwrap_or(&null());
+        res
     }
 
     #[doc(alias = "spacePush")]
@@ -1220,48 +1207,16 @@ impl XmlParserCtxt {
         line: i32,
         ns_nr: i32,
     ) -> i32 {
-        'mem_error: {
-            if self.name_nr >= self.name_max {
-                self.name_max *= 2;
-                let tmp: *mut *const XmlChar = xml_realloc(
-                    self.name_tab as _,
-                    self.name_max as usize * size_of_val(&*self.name_tab.add(0)),
-                ) as _;
-                if tmp.is_null() {
-                    self.name_max /= 2;
-                    break 'mem_error;
-                }
-                self.name_tab = tmp;
-                let tmp2: *mut XmlStartTag = xml_realloc(
-                    self.push_tab as _,
-                    self.name_max as usize * size_of_val(&*self.push_tab.add(0)),
-                ) as _;
-                if tmp2.is_null() {
-                    self.name_max /= 2;
-                    break 'mem_error;
-                }
-                self.push_tab = tmp2;
-            } else if self.push_tab.is_null() {
-                self.push_tab =
-                    xml_malloc(self.name_max as usize * size_of_val(&*self.push_tab.add(0))) as _;
-                if self.push_tab.is_null() {
-                    break 'mem_error;
-                }
-            }
-            *self.name_tab.add(self.name_nr as usize) = value;
-            self.name = value;
-            let tag: *mut XmlStartTag = self.push_tab.add(self.name_nr as usize);
-            (*tag).prefix = prefix;
-            (*tag).uri = uri;
-            (*tag).line = line;
-            (*tag).ns_nr = ns_nr;
-            let res = self.name_nr;
-            self.name_nr += 1;
-            return res;
-        }
-        // mem_error:
-        xml_err_memory(self, null());
-        -1
+        self.name = value;
+        self.name_tab.push(value);
+        self.push_tab
+            .resize(self.name_tab.len(), XmlStartTag::default());
+        let res = self.name_tab.len() - 1;
+        self.push_tab[res].prefix = prefix;
+        self.push_tab[res].uri = uri;
+        self.push_tab[res].line = line;
+        self.push_tab[res].ns_nr = ns_nr;
+        res as i32
     }
 
     /// Pops the top element/prefix/URI name from the name stack
@@ -1270,18 +1225,9 @@ impl XmlParserCtxt {
     #[doc(alias = "nameNsPop")]
     #[cfg(feature = "push")]
     pub(crate) unsafe fn name_ns_pop(&mut self) -> *const XmlChar {
-        if self.name_nr <= 0 {
-            return null_mut();
-        }
-        self.name_nr -= 1;
-        if self.name_nr > 0 {
-            self.name = *self.name_tab.add(self.name_nr as usize - 1);
-        } else {
-            self.name = null_mut();
-        }
-        let ret: *const XmlChar = *self.name_tab.add(self.name_nr as usize);
-        *self.name_tab.add(self.name_nr as usize) = null_mut();
-        ret
+        let res = self.name_tab.pop().unwrap_or(null_mut());
+        self.name = *self.name_tab.last().unwrap_or(&null());
+        res
     }
 
     /// Pushes a new parser namespace on top of the ns stack
@@ -5181,23 +5127,8 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).node = null_mut();
 
     /* Allocate the Name stack */
-    if (*ctxt).name_tab.is_null() {
-        (*ctxt).name_tab = xml_malloc(10 * size_of::<*mut XmlChar>()) as _;
-        (*ctxt).name_max = 10;
-    }
-    if (*ctxt).name_tab.is_null() {
-        xml_err_memory(
-            null_mut(),
-            c"cannot initialize parser context\n".as_ptr() as _,
-        );
-        (*ctxt).node = null_mut();
-        (*ctxt).input = null_mut();
-        (*ctxt).name_nr = 0;
-        (*ctxt).name_max = 0;
-        (*ctxt).name = null_mut();
-        return -1;
-    }
-    (*ctxt).name_nr = 0;
+    (*ctxt).name_tab.clear();
+    (*ctxt).name_tab.shrink_to(10);
     (*ctxt).name = null_mut();
 
     /* Allocate the space stack */
@@ -5212,8 +5143,6 @@ unsafe fn xml_init_sax_parser_ctxt(
         );
         (*ctxt).node = null_mut();
         (*ctxt).input = null_mut();
-        (*ctxt).name_nr = 0;
-        (*ctxt).name_max = 0;
         (*ctxt).name = null_mut();
         (*ctxt).space_nr = 0;
         (*ctxt).space_max = 0;
@@ -5298,6 +5227,8 @@ pub unsafe fn xml_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).name_tab, vec![]);
+    std::ptr::write(&mut (*ctxt).push_tab, vec![]);
     std::ptr::write(&mut (*ctxt).node_tab, vec![]);
     std::ptr::write(&mut (*ctxt).input_tab, vec![]);
     std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
@@ -5361,9 +5292,8 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     if !(*ctxt).space_tab.is_null() {
         xml_free((*ctxt).space_tab as _);
     }
-    if !(*ctxt).name_tab.is_null() {
-        xml_free((*ctxt).name_tab as _);
-    }
+    (*ctxt).name_tab.clear();
+    (*ctxt).name_tab.shrink_to_fit();
     (*ctxt).node_tab.clear();
     (*ctxt).node_tab.shrink_to_fit();
     if !(*ctxt).node_info_tab.is_null() {
@@ -5410,9 +5340,8 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     if !(*ctxt).ns_tab.is_null() {
         xml_free((*ctxt).ns_tab as _);
     }
-    if !(*ctxt).push_tab.is_null() {
-        xml_free((*ctxt).push_tab as _);
-    }
+    (*ctxt).push_tab.clear();
+    (*ctxt).push_tab.shrink_to_fit();
     if !(*ctxt).attallocs.is_null() {
         xml_free((*ctxt).attallocs as _);
     }
@@ -10350,7 +10279,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             return ret;
                         }
                         (*ctxt).space_pop();
-                        if (*ctxt).name_nr == 0 {
+                        if (*ctxt).name_tab.is_empty() {
                             (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
                         } else {
                             (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -10475,7 +10404,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     if (*ctxt).sax2 != 0 {
                         xml_parse_end_tag2(
                             ctxt,
-                            (*ctxt).push_tab.add((*ctxt).name_nr as usize - 1),
+                            &raw const (*ctxt).push_tab[(*ctxt).name_tab.len() - 1],
                         );
                         (*ctxt).name_ns_pop();
                     } else {
@@ -10486,7 +10415,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     }
                     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                         /* Nothing */
-                    } else if (*ctxt).name_nr == 0 {
+                    } else if (*ctxt).name_tab.is_empty() {
                         (*ctxt).instate = XmlParserInputState::XmlParserEpilog;
                     } else {
                         (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -11420,7 +11349,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     (*ctxt).node_tab.clear();
     (*ctxt).node = null_mut();
 
-    (*ctxt).name_nr = 0;
+    (*ctxt).name_tab.clear();
     (*ctxt).name = null_mut();
 
     (*ctxt).ns_nr = 0;
@@ -13809,8 +13738,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
     }
 
     if (*ctxt).current_byte() == 0 {
-        let name: *const XmlChar = *(*ctxt).name_tab.add((*ctxt).name_nr as usize - 1);
-        let line: c_int = (*(*ctxt).push_tab.add((*ctxt).name_nr as usize - 1)).line;
+        let name: *const XmlChar = (*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
+        let line: c_int = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
         xml_fatal_err_msg_str_int_str(
             ctxt,
             XmlParserErrors::XmlErrTagNotFinished,
