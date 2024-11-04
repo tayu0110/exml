@@ -59,9 +59,9 @@ use crate::{
         },
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
-            name_pop, node_pop, node_push, xml_add_def_attrs, xml_add_special_attr,
-            xml_check_language_id, xml_copy_char, xml_create_entity_parser_ctxt_internal,
-            xml_create_file_parser_ctxt, xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt,
+            name_pop, xml_add_def_attrs, xml_add_special_attr, xml_check_language_id,
+            xml_copy_char, xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
+            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt,
             xml_ctxt_use_options_internal, xml_err_internal, xml_fatal_err, xml_free_input_stream,
             xml_new_entity_input_stream, xml_new_input_stream, xml_parse_attribute_type,
             xml_parse_comment, xml_parse_content, xml_parse_content_internal,
@@ -122,7 +122,9 @@ use super::{
         xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         xml_is_pubid_char,
     },
-    parser_internals::{xml_err_encoding_int, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT},
+    parser_internals::{
+        xml_err_encoding_int, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH,
+    },
 };
 
 /**
@@ -1116,6 +1118,61 @@ impl XmlParserCtxt {
         }
         let ret: XmlParserInputPtr = *self.input_tab.add(self.input_nr as usize);
         *self.input_tab.add(self.input_nr as usize) = null_mut();
+        ret
+    }
+
+    /// Pushes a new element node on top of the node stack
+    ///
+    /// Returns -1 in case of error, the index in the stack otherwise
+    #[doc(alias = "nodePush")]
+    pub(crate) unsafe fn node_push(&mut self, value: XmlNodePtr) -> i32 {
+        if self.node_nr >= self.node_max {
+            let tmp: *mut XmlNodePtr = xml_realloc(
+                self.node_tab as _,
+                self.node_max as usize * 2 * size_of::<XmlNodePtr>(),
+            ) as *mut XmlNodePtr;
+            if tmp.is_null() {
+                xml_err_memory(self, null());
+                return -1;
+            }
+            self.node_tab = tmp;
+            self.node_max *= 2;
+        }
+        if self.node_nr as c_uint > XML_PARSER_MAX_DEPTH
+            && self.options & XmlParserOption::XmlParseHuge as i32 == 0
+        {
+            xml_fatal_err_msg_int(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                c"Excessive depth in document: %d use XML_PARSE_HUGE option\n".as_ptr() as _,
+                XML_PARSER_MAX_DEPTH as i32,
+            );
+            self.halt();
+            return -1;
+        }
+        *self.node_tab.add(self.node_nr as usize) = value;
+        self.node = value;
+        let res = self.node_nr;
+        self.node_nr += 1;
+        res
+    }
+
+    /// Pops the top element node from the node stack
+    ///
+    /// Returns the node just removed
+    #[doc(alias = "nodePop")]
+    pub(crate) unsafe fn node_pop(&mut self) -> XmlNodePtr {
+        if self.node_nr <= 0 {
+            return null_mut();
+        }
+        self.node_nr -= 1;
+        if self.node_nr > 0 {
+            self.node = *self.node_tab.add(self.node_nr as usize - 1);
+        } else {
+            self.node = null_mut();
+        }
+        let ret: XmlNodePtr = *self.node_tab.add(self.node_nr as usize);
+        *self.node_tab.add(self.node_nr as usize) = null_mut();
         ret
     }
 }
@@ -4296,7 +4353,7 @@ pub unsafe fn xml_parse_in_node_context(
     xml_add_child(node, fake);
 
     if (*node).typ == XmlElementType::XmlElementNode {
-        node_push(ctxt, node);
+        (*ctxt).node_push(node);
         /*
          * initialize the SAX2 namespaces stack
          */
@@ -4502,7 +4559,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         return -1;
     }
     xml_add_child(new_doc as XmlNodePtr, new_root);
-    node_push(ctxt, new_root);
+    (*ctxt).node_push(new_root);
     /* doc.is_null() is only supported for historic reasons */
     if doc.is_null() {
         (*ctxt).my_doc = new_doc;
@@ -4673,7 +4730,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         return XmlParserErrors::XmlErrInternalError;
     }
     xml_add_child(new_doc as XmlNodePtr, new_root);
-    node_push(ctxt, (*new_doc).children);
+    (*ctxt).node_push((*new_doc).children);
     if doc.is_null() {
         (*ctxt).my_doc = new_doc;
     } else {
@@ -10382,7 +10439,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                                 c"Couldn't find end of Start Tag %s\n".as_ptr() as _,
                                 name,
                             );
-                            node_pop(ctxt);
+                            (*ctxt).node_pop();
                             space_pop(ctxt);
                         }
                         name_ns_push(ctxt, name, prefix, uri, line, (*ctxt).ns_nr - ns_nr);

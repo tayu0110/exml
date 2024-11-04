@@ -47,9 +47,9 @@ use super::{
         XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS,
     },
     parser_internals::{
-        node_pop, node_push, xml_free_input_stream, xml_parse_external_subset, xml_push_input,
-        xml_split_qname, xml_string_decode_entities, xml_string_len_decode_entities,
-        xml_switch_encoding, XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
+        xml_free_input_stream, xml_parse_external_subset, xml_push_input, xml_split_qname,
+        xml_string_decode_entities, xml_string_len_decode_entities, xml_switch_encoding,
+        XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
     },
     tree::{
         xml_add_child, xml_add_sibling, xml_build_qname, xml_create_int_subset, xml_free_dtd,
@@ -2311,7 +2311,7 @@ pub unsafe fn xml_sax2_start_element(
     /*
      * We are parsing a new node.
      */
-    if node_push(ctxt, ret) < 0 {
+    if (*ctxt).node_push(ret) < 0 {
         xml_unlink_node(ret);
         xml_free_node(ret);
         if !prefix.is_null() {
@@ -2503,7 +2503,7 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: *con
     /*
      * end of parsing of this node.
      */
-    node_pop(ctxt);
+    (*ctxt).node_pop();
 }
 
 /**
@@ -2694,7 +2694,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     /*
      * We are parsing a new node.
      */
-    if node_push(ctxt, ret) < 0 {
+    if (*ctxt).node_push(ret) < 0 {
         xml_unlink_node(ret);
         xml_free_node(ret);
         return;
@@ -3309,7 +3309,7 @@ pub unsafe fn xml_sax2_end_element_ns(
     /*
      * end of parsing of this node.
      */
-    node_pop(ctxt);
+    (*ctxt).node_pop();
 }
 
 /**

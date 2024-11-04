@@ -36,7 +36,7 @@ use crate::{
             XmlSAXHandlerPtr,
         },
         parser_internals::{
-            node_pop, xml_free_input_stream, xml_new_input_stream, xml_switch_encoding,
+            xml_free_input_stream, xml_new_input_stream, xml_switch_encoding,
             xml_switch_to_encoding, INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH,
             XML_MAX_TEXT_LENGTH,
         },
@@ -9304,7 +9304,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
          * end of parsing of this node.
          */
         if xml_str_equal(name, (*ctxt).name) {
-            node_pop(ctxt);
+            (*ctxt).node_pop();
             html_name_pop(ctxt);
         }
 
@@ -9719,7 +9719,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
          * end of parsing of this node.
          */
         if xml_str_equal(name, (*ctxt).name) {
-            node_pop(ctxt);
+            (*ctxt).node_pop();
             html_name_pop(ctxt);
         }
 
@@ -11305,7 +11305,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                      * end of parsing of this node.
                      */
                     if xml_str_equal(name, (*ctxt).name) {
-                        node_pop(ctxt);
+                        (*ctxt).node_pop();
                         html_name_pop(ctxt);
                     }
 
