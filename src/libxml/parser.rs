@@ -1251,6 +1251,34 @@ impl XmlParserCtxt {
         self.ns_tab.truncate(rem);
         nr
     }
+
+    /// Do the SAX2 detection and specific initialization
+    #[doc(alias = "xmlDetectSAX2")]
+    pub(crate) unsafe fn detect_sax2(&mut self) {
+        let sax: XmlSAXHandlerPtr = self.sax;
+        #[cfg(feature = "sax1")]
+        {
+            if !sax.is_null()
+                && (*sax).initialized == XML_SAX2_MAGIC as u32
+                && ((*sax).start_element_ns.is_some()
+                    || (*sax).end_element_ns.is_some()
+                    || ((*sax).start_element.is_none() && (*sax).end_element.is_none()))
+            {
+                self.sax2 = 1;
+            }
+        }
+        #[cfg(not(feature = "sax1"))]
+        {
+            self.sax2 = 1;
+        }
+
+        self.str_xml = xml_dict_lookup(self.dict, c"xml".as_ptr() as _, 3);
+        self.str_xmlns = xml_dict_lookup(self.dict, c"xmlns".as_ptr() as _, 5);
+        self.str_xml_ns = xml_dict_lookup(self.dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
+        if self.str_xml.is_null() || self.str_xmlns.is_null() || self.str_xml_ns.is_null() {
+            xml_err_memory(self, null());
+        }
+    }
 }
 /**
  * xmlSAXLocator:
@@ -2639,8 +2667,8 @@ pub unsafe fn xml_parse_memory(buffer: Vec<u8>) -> XmlDocPtr {
  *
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
-pub unsafe extern "C" fn xml_substitute_entities_default(val: c_int) -> c_int {
-    let old: c_int = get_substitute_entities_default_value();
+pub unsafe extern "C" fn xml_substitute_entities_default(val: i32) -> i32 {
+    let old = get_substitute_entities_default_value();
 
     set_substitute_entities_default_value(val);
     old
@@ -2671,8 +2699,8 @@ pub unsafe extern "C" fn xml_substitute_entities_default(val: c_int) -> c_int {
  *
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
-pub unsafe extern "C" fn xml_keep_blanks_default(val: c_int) -> c_int {
-    let old: c_int = get_keep_blanks_default_value();
+pub unsafe extern "C" fn xml_keep_blanks_default(val: i32) -> i32 {
+    let old = get_keep_blanks_default_value();
 
     set_keep_blanks_default_value(val);
     if val == 0 {
@@ -2691,8 +2719,8 @@ pub unsafe extern "C" fn xml_keep_blanks_default(val: c_int) -> c_int {
  *
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
-pub unsafe extern "C" fn xml_pedantic_parser_default(val: c_int) -> c_int {
-    let old: c_int = get_pedantic_parser_default_value();
+pub unsafe extern "C" fn xml_pedantic_parser_default(val: i32) -> i32 {
+    let old = get_pedantic_parser_default_value();
 
     set_pedantic_parser_default_value(val);
     old
@@ -2709,8 +2737,8 @@ pub unsafe extern "C" fn xml_pedantic_parser_default(val: c_int) -> c_int {
  *
  * Returns the last value for 0 for no substitution, 1 for substitution.
  */
-pub unsafe extern "C" fn xml_line_numbers_default(val: c_int) -> c_int {
-    let old: c_int = get_line_numbers_default_value();
+pub unsafe extern "C" fn xml_line_numbers_default(val: i32) -> i32 {
+    let old = get_line_numbers_default_value();
 
     set_line_numbers_default_value(val);
     old
@@ -2773,41 +2801,6 @@ pub unsafe fn xml_recover_memory(buffer: Vec<u8>) -> XmlDocPtr {
 #[cfg(feature = "sax1")]
 pub unsafe extern "C" fn xml_recover_file(filename: *const c_char) -> XmlDocPtr {
     xml_sax_parse_file(null_mut(), filename, 1)
-}
-
-/**
- * xmlDetectSAX2:
- * @ctxt:  an XML parser context
- *
- * Do the SAX2 detection and specific initialization
- */
-pub(crate) unsafe extern "C" fn xml_detect_sax2(ctxt: XmlParserCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    let sax: XmlSAXHandlerPtr = (*ctxt).sax;
-    #[cfg(feature = "sax1")]
-    {
-        if !sax.is_null()
-            && (*sax).initialized == XML_SAX2_MAGIC as u32
-            && ((*sax).start_element_ns.is_some()
-                || (*sax).end_element_ns.is_some()
-                || ((*sax).start_element.is_none() && (*sax).end_element.is_none()))
-        {
-            (*ctxt).sax2 = 1;
-        }
-    }
-    #[cfg(not(feature = "sax1"))]
-    {
-        (*ctxt).sax2 = 1;
-    }
-
-    (*ctxt).str_xml = xml_dict_lookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
-    (*ctxt).str_xmlns = xml_dict_lookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
-    (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
-    if (*ctxt).str_xml.is_null() || (*ctxt).str_xmlns.is_null() || (*ctxt).str_xml_ns.is_null() {
-        xml_err_memory(ctxt, null());
-    }
 }
 
 pub type XmlDefAttrsPtr = *mut XmlDefAttrs;
@@ -3124,7 +3117,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
     /*
      * SAX: detecting the level.
      */
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
 
     /*
      * SAX: beginning of the document processing.
@@ -3321,7 +3314,7 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> c_i
         return -1;
     }
 
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
 
     (*ctxt).grow();
 
@@ -3448,7 +3441,7 @@ pub unsafe fn xml_sax_user_parse_file(
         xml_free((*ctxt).sax as _);
     }
     (*ctxt).sax = sax;
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
 
     // if !user_data.is_null() {
     (*ctxt).user_data = user_data;
@@ -3507,7 +3500,7 @@ pub unsafe fn xml_sax_user_parse_memory(
         xml_free((*ctxt).sax as _);
     }
     (*ctxt).sax = sax;
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
 
     // if !user_data.is_null() {
     (*ctxt).user_data = user_data;
@@ -3573,7 +3566,7 @@ pub unsafe extern "C" fn xml_sax_parse_doc(
         (*ctxt).sax = sax;
         (*ctxt).user_data = None;
     }
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
 
     xml_parse_document(ctxt);
     if (*ctxt).well_formed != 0 || recovery != 0 {
@@ -3659,7 +3652,7 @@ pub unsafe fn xml_sax_parse_memory_with_data(
         }
         (*ctxt).sax = sax;
     }
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
     if !data.is_null() {
         (*ctxt)._private = data;
     }
@@ -3753,7 +3746,7 @@ pub unsafe extern "C" fn xml_sax_parse_file_with_data(
         }
         (*ctxt).sax = sax;
     }
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
     if !data.is_null() {
         (*ctxt)._private = data;
     }
@@ -4036,7 +4029,7 @@ pub unsafe fn xml_io_parse_dtd(
     /* We are loading a DTD */
     (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
 
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
 
     /*
      * generate a parser input from the I/O handler
@@ -4316,7 +4309,7 @@ pub unsafe fn xml_parse_in_node_context(
     }
 
     xml_ctxt_use_options_internal(ctxt, options, null_mut());
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
     (*ctxt).my_doc = doc;
     /* parsing in context, i.e. as within existing content */
     (*ctxt).input_id = 2;
@@ -4556,7 +4549,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
      */
     (*ctxt).validate = 0;
     (*ctxt).loadsubset = 0;
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
 
     if !doc.is_null() {
         content = (*doc).children;
@@ -4676,7 +4669,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         (*ctxt).nb_errors = (*oldctxt).nb_errors;
         (*ctxt).nb_warnings = (*oldctxt).nb_warnings;
     }
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
 
     let new_doc: XmlDocPtr = xml_new_doc(c"1.0".as_ptr() as _);
     if new_doc.is_null() {
@@ -10676,7 +10669,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
 
     (*ctxt).progressive = 1;
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserStart) {
-        xml_detect_sax2(ctxt);
+        (*ctxt).detect_sax2();
     }
     if size > 0
         && !chunk.is_null()

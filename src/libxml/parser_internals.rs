@@ -64,9 +64,9 @@ use super::hash::{
     xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
 };
 use super::parser::{
-    xml_detect_sax2, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
-    xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
-    xml_ns_err, xml_parse_att_value_internal, xml_parse_char_data_internal, xml_parse_char_ref,
+    xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_is_name_char,
+    xml_load_external_entity, xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
+    xml_parse_att_value_internal, xml_parse_char_data_internal, xml_parse_char_ref,
     xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
     xml_parse_external_entity_private, xml_parser_entity_check, xml_parser_find_node_info,
     xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput,
@@ -4149,7 +4149,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
 
     let oldsax: XmlSAXHandlerPtr = (*ctxt).sax;
     (*ctxt).sax = (*oldctxt).sax;
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
     (*ctxt).replace_entities = (*oldctxt).replace_entities;
     (*ctxt).options = (*oldctxt).options;
 
@@ -6093,7 +6093,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
     external_id: *const XmlChar,
     system_id: *const XmlChar,
 ) {
-    xml_detect_sax2(ctxt);
+    (*ctxt).detect_sax2();
     (*ctxt).grow();
 
     if (*ctxt).encoding.is_null() && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
