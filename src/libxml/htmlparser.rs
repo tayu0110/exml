@@ -9372,6 +9372,7 @@ unsafe fn html_init_parser_ctxt(
         return -1;
     }
     memset(ctxt as _, 0, size_of::<HtmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).space_tab, vec![]);
     std::ptr::write(&mut (*ctxt).ns_tab, vec![]);
     std::ptr::write(&mut (*ctxt).name_tab, vec![]);
     std::ptr::write(&mut (*ctxt).push_tab, vec![]);
@@ -9468,6 +9469,7 @@ pub unsafe fn html_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).space_tab, vec![]);
     std::ptr::write(&mut (*ctxt).ns_tab, vec![]);
     std::ptr::write(&mut (*ctxt).name_tab, vec![]);
     std::ptr::write(&mut (*ctxt).push_tab, vec![]);
@@ -11804,13 +11806,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).input_tab.clear();
     (*ctxt).input = null_mut();
 
-    (*ctxt).space_nr = 0;
-    if !(*ctxt).space_tab.is_null() {
-        *(*ctxt).space_tab.add(0) = -1;
-        (*ctxt).space = (*ctxt).space_tab.add(0);
-    } else {
-        (*ctxt).space = null_mut();
-    }
+    (*ctxt).space_tab.clear();
 
     (*ctxt).node_tab.clear();
     (*ctxt).node = null_mut();

@@ -5248,9 +5248,9 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
      */
     if xml_str_equal(name, c"xml:space".as_ptr() as _) {
         if xml_str_equal(val, c"default".as_ptr() as _) {
-            *(*ctxt).space = 0;
+            *(*ctxt).space_mut() = 0;
         } else if xml_str_equal(val, c"preserve".as_ptr() as _) {
-            *(*ctxt).space = 1;
+            *(*ctxt).space_mut() = 1;
         } else {
             xml_warning_msg(
                 ctxt,
@@ -5501,10 +5501,10 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         node_info.begin_line = (*(*ctxt).input).line as _;
     }
 
-    if (*ctxt).space_nr == 0 || *(*ctxt).space == -2 {
+    if (*ctxt).space_tab.is_empty() || (*ctxt).space() == -2 {
         (*ctxt).space_push(-1);
     } else {
-        (*ctxt).space_push(*(*ctxt).space);
+        (*ctxt).space_push((*ctxt).space());
     }
 
     let line: c_int = (*(*ctxt).input).line;

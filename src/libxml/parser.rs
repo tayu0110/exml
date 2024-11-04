@@ -480,10 +480,7 @@ pub struct XmlParserCtxt {
     pub(crate) ext_sub_system: *mut XmlChar, /* SYSTEM ID of external subset */
 
     /* xml:space values */
-    pub(crate) space: *mut c_int, /* Should the parser preserve spaces */
-    pub(crate) space_nr: c_int,   /* Depth of the parsing stack */
-    space_max: c_int,             /* Max depth of the parsing stack */
-    pub(crate) space_tab: *mut c_int, /* array of space infos */
+    pub(crate) space_tab: Vec<i32>, /* array of space infos */
 
     pub(crate) depth: c_int, /* to prevent entity substitution loops */
     pub(crate) entity: XmlParserInputPtr, /* used to check entities boundaries */
@@ -1157,40 +1154,21 @@ impl XmlParserCtxt {
 
     #[doc(alias = "spacePush")]
     pub(crate) unsafe fn space_push(&mut self, val: i32) -> i32 {
-        if self.space_nr >= self.space_max {
-            self.space_max *= 2;
-            let tmp: *mut c_int = xml_realloc(
-                self.space_tab as _,
-                self.space_max as usize * size_of_val(&*self.space_tab.add(0)),
-            ) as _;
-            if tmp.is_null() {
-                xml_err_memory(self, null());
-                self.space_max /= 2;
-                return -1;
-            }
-            self.space_tab = tmp;
-        }
-        *self.space_tab.add(self.space_nr as usize) = val;
-        self.space = self.space_tab.add(self.space_nr as usize);
-        let res = self.space_nr;
-        self.space_nr += 1;
-        res
+        self.space_tab.push(val);
+        self.space_tab.len() as i32 - 1
     }
 
     #[doc(alias = "spacePop")]
     pub(crate) unsafe fn space_pop(&mut self) -> i32 {
-        if self.space_nr <= 0 {
-            return 0;
-        }
-        self.space_nr -= 1;
-        if self.space_nr > 0 {
-            self.space = self.space_tab.add(self.space_nr as usize - 1);
-        } else {
-            self.space = self.space_tab.add(0);
-        }
-        let ret: c_int = *self.space_tab.add(self.space_nr as usize);
-        *self.space_tab.add(self.space_nr as usize) = -1;
-        ret
+        self.space_tab.pop().unwrap_or(-1)
+    }
+
+    pub(crate) fn space(&self) -> i32 {
+        *self.space_tab.last().unwrap_or(&-1)
+    }
+
+    pub(crate) fn space_mut(&mut self) -> &mut i32 {
+        self.space_tab.last_mut().expect("Internal Error")
     }
 
     /// Pushes a new element name/prefix/URL on top of the name stack
@@ -5100,27 +5078,10 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).name = null_mut();
 
     /* Allocate the space stack */
-    if (*ctxt).space_tab.is_null() {
-        (*ctxt).space_tab = xml_malloc(10 * size_of::<c_int>()) as _;
-        (*ctxt).space_max = 10;
-    }
-    if (*ctxt).space_tab.is_null() {
-        xml_err_memory(
-            null_mut(),
-            c"cannot initialize parser context\n".as_ptr() as _,
-        );
-        (*ctxt).node = null_mut();
-        (*ctxt).input = null_mut();
-        (*ctxt).name = null_mut();
-        (*ctxt).space_nr = 0;
-        (*ctxt).space_max = 0;
-        (*ctxt).space = null_mut();
-        return -1;
-    }
-    (*ctxt).space_nr = 1;
-    (*ctxt).space_max = 10;
-    *(*ctxt).space_tab.add(0) = -1;
-    (*ctxt).space = (*ctxt).space_tab.add(0);
+    (*ctxt).space_tab.clear();
+    (*ctxt).space_tab.shrink_to(10);
+    (*ctxt).space_tab.push(-1);
+
     (*ctxt).my_doc = null_mut();
     (*ctxt).well_formed = 1;
     (*ctxt).ns_well_formed = 1;
@@ -5195,6 +5156,7 @@ pub unsafe fn xml_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
+    std::ptr::write(&mut (*ctxt).space_tab, vec![]);
     std::ptr::write(&mut (*ctxt).ns_tab, vec![]);
     std::ptr::write(&mut (*ctxt).name_tab, vec![]);
     std::ptr::write(&mut (*ctxt).push_tab, vec![]);
@@ -5258,9 +5220,8 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         /* Non consuming */
         xml_free_input_stream(input);
     }
-    if !(*ctxt).space_tab.is_null() {
-        xml_free((*ctxt).space_tab as _);
-    }
+    (*ctxt).space_tab.clear();
+    (*ctxt).space_tab.shrink_to_fit();
     (*ctxt).name_tab.clear();
     (*ctxt).name_tab.shrink_to_fit();
     (*ctxt).node_tab.clear();
@@ -8186,9 +8147,9 @@ unsafe extern "C" fn xml_parse_attribute2(
         if xml_str_equal(name, c"space".as_ptr() as _) {
             internal_val = xml_strndup(val, *len);
             if xml_str_equal(internal_val, c"default".as_ptr() as _) {
-                *(*ctxt).space = 0;
+                *(*ctxt).space_mut() = 0;
             } else if xml_str_equal(internal_val, c"preserve".as_ptr() as _) {
-                *(*ctxt).space = 1;
+                *(*ctxt).space_mut() = 1;
             } else {
                 xml_warning_msg(
                     ctxt,
@@ -9118,7 +9079,7 @@ unsafe extern "C" fn are_blanks(
     /*
      * Check for xml:space value.
      */
-    if (*ctxt).space.is_null() || *(*ctxt).space == 1 || *(*ctxt).space == -2 {
+    if (*ctxt).space() == 1 || (*ctxt).space() == -2 {
         return 0;
     }
 
@@ -9220,9 +9181,9 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
                         characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar);
                     }
                     if (*(*ctxt).sax).characters != (*(*ctxt).sax).ignorable_whitespace
-                        && *(*ctxt).space == -1
+                        && (*ctxt).space() == -1
                     {
-                        *(*ctxt).space = -2;
+                        *(*ctxt).space_mut() = -2;
                     }
                 }
             }
@@ -9253,9 +9214,9 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
                     characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar);
                 }
                 if (*(*ctxt).sax).characters != (*(*ctxt).sax).ignorable_whitespace
-                    && *(*ctxt).space == -1
+                    && (*ctxt).space() == -1
                 {
-                    *(*ctxt).space = -2;
+                    *(*ctxt).space_mut() = -2;
                 }
             }
         }
@@ -9360,8 +9321,8 @@ pub(crate) unsafe extern "C" fn xml_parse_char_data_internal(
                         if let Some(characters) = (*(*ctxt).sax).characters {
                             characters((*ctxt).user_data.clone(), tmp, nbchar);
                         }
-                        if *(*ctxt).space == -1 {
-                            *(*ctxt).space = -2;
+                        if (*ctxt).space() == -1 {
+                            *(*ctxt).space_mut() = -2;
                         }
                     }
                 } else if !(*ctxt).sax.is_null() && (*(*ctxt).sax).characters.is_some() {
@@ -9422,8 +9383,8 @@ pub(crate) unsafe extern "C" fn xml_parse_char_data_internal(
                     if let Some(characters) = (*(*ctxt).sax).characters {
                         characters((*ctxt).user_data.clone(), tmp, nbchar);
                     }
-                    if *(*ctxt).space == -1 {
-                        *(*ctxt).space = -2;
+                    if (*ctxt).space() == -1 {
+                        *(*ctxt).space_mut() = -2;
                     }
                 }
                 line = (*(*ctxt).input).line;
@@ -10144,10 +10105,10 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         // goto done;
                         return ret;
                     }
-                    if (*ctxt).space_nr == 0 || *(*ctxt).space == -2 {
+                    if (*ctxt).space_tab.is_empty() || (*ctxt).space() == -2 {
                         (*ctxt).space_push(-1);
                     } else {
-                        (*ctxt).space_push(*(*ctxt).space);
+                        (*ctxt).space_push((*ctxt).space());
                     }
                     #[cfg(feature = "sax1")]
                     {
@@ -11300,13 +11261,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     (*ctxt).input_tab.clear();
     (*ctxt).input = null_mut();
 
-    (*ctxt).space_nr = 0;
-    if !(*ctxt).space_tab.is_null() {
-        *(*ctxt).space_tab.add(0) = -1;
-        (*ctxt).space = (*ctxt).space_tab.add(0);
-    } else {
-        (*ctxt).space = null_mut();
-    }
+    (*ctxt).space_tab.clear();
 
     (*ctxt).node_tab.clear();
     (*ctxt).node = null_mut();
