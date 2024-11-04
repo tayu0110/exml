@@ -36,9 +36,9 @@ use crate::{
             XmlSAXHandlerPtr,
         },
         parser_internals::{
-            input_pop, input_push, node_pop, xml_free_input_stream, xml_new_input_stream,
-            xml_switch_encoding, xml_switch_to_encoding, INPUT_CHUNK, XML_MAX_HUGE_LENGTH,
-            XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
+            node_pop, xml_free_input_stream, xml_new_input_stream, xml_switch_encoding,
+            xml_switch_to_encoding, INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH,
+            XML_MAX_TEXT_LENGTH,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         tree::{
@@ -9565,17 +9565,15 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
 
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
-        // xml_free_parser_input_buffer(buf);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
 
     (*input).filename = null_mut();
-    // (*input).buf = Some(buf);
     std::ptr::write(&raw mut (*input).buf, Some(Rc::new(RefCell::new(buf))));
     (*input).reset_base();
 
-    input_push(ctxt, input);
+    (*ctxt).input_push(input);
     ctxt
 }
 
@@ -10298,7 +10296,7 @@ pub unsafe extern "C" fn html_create_file_parser_ctxt(
         return null_mut();
     }
 
-    input_push(ctxt, input_stream);
+    (*ctxt).input_push(input_stream);
 
     /* set encoding */
     if !encoding.is_null() {
@@ -10803,7 +10801,7 @@ pub unsafe fn html_create_push_parser_ctxt(
     );
     (*input_stream).reset_base();
 
-    input_push(ctxt, input_stream);
+    (*ctxt).input_push(input_stream);
 
     if size > 0 && !chunk.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
         let base: size_t = (*(*ctxt).input).get_base();
@@ -11851,7 +11849,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     let dict: XmlDictPtr = (*ctxt).dict;
 
     while {
-        input = input_pop(ctxt);
+        input = (*ctxt).input_pop();
         !input.is_null()
     } {
         /* Non consuming */
@@ -12165,7 +12163,7 @@ pub unsafe fn html_read_io(
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
-    input_push(ctxt, stream);
+    (*ctxt).input_push(stream);
     html_do_read(ctxt, url, encoding, options, 0)
 }
 
@@ -12233,7 +12231,7 @@ pub unsafe extern "C" fn html_ctxt_read_file(
     if stream.is_null() {
         return null_mut();
     }
-    input_push(ctxt, stream);
+    (*ctxt).input_push(stream);
     html_do_read(ctxt, null_mut(), encoding, options, 1)
 }
 
@@ -12276,7 +12274,7 @@ pub unsafe fn html_ctxt_read_memory(
         return null_mut();
     }
 
-    input_push(ctxt, stream);
+    (*ctxt).input_push(stream);
     html_do_read(ctxt, url, encoding, options, 1)
 }
 
@@ -12315,7 +12313,7 @@ pub unsafe fn html_ctxt_read_io(
     if stream.is_null() {
         return null_mut();
     }
-    input_push(ctxt, stream);
+    (*ctxt).input_push(stream);
     html_do_read(ctxt, url, encoding, options, 1)
 }
 

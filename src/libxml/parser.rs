@@ -59,10 +59,9 @@ use crate::{
         },
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
-            input_pop, input_push, name_pop, node_pop, node_push, xml_add_def_attrs,
-            xml_add_special_attr, xml_check_language_id, xml_copy_char,
-            xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
-            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt,
+            name_pop, node_pop, node_push, xml_add_def_attrs, xml_add_special_attr,
+            xml_check_language_id, xml_copy_char, xml_create_entity_parser_ctxt_internal,
+            xml_create_file_parser_ctxt, xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt,
             xml_ctxt_use_options_internal, xml_err_internal, xml_fatal_err, xml_free_input_stream,
             xml_new_entity_input_stream, xml_new_input_stream, xml_parse_attribute_type,
             xml_parse_comment, xml_parse_content, xml_parse_content_internal,
@@ -674,7 +673,7 @@ impl XmlParserCtxt {
         self.instate = XmlParserInputState::XmlParserEOF;
         self.disable_sax = 1;
         while self.input_nr > 1 {
-            xml_free_input_stream(input_pop(self));
+            xml_free_input_stream(self.input_pop());
         }
         if !self.input.is_null() {
             /*
@@ -1070,6 +1069,54 @@ impl XmlParserCtxt {
             return Some('\n');
         }
         Some(c)
+    }
+
+    /// Pushes a new parser input on top of the input stack
+    ///
+    /// Returns -1 in case of error, the index in the stack otherwise
+    #[doc(alias = "inputPush")]
+    pub unsafe fn input_push(&mut self, value: XmlParserInputPtr) -> c_int {
+        if value.is_null() {
+            return -1;
+        }
+        if self.input_nr >= self.input_max {
+            let new_size: size_t = self.input_max as usize * 2;
+
+            let tmp: *mut XmlParserInputPtr = xml_realloc(
+                self.input_tab as _,
+                new_size * size_of::<XmlParserInputPtr>(),
+            ) as *mut XmlParserInputPtr;
+            if tmp.is_null() {
+                xml_err_memory(self, null());
+                return -1;
+            }
+            self.input_tab = tmp;
+            self.input_max = new_size as _;
+        }
+        *self.input_tab.add(self.input_nr as usize) = value;
+        self.input = value;
+        let res = self.input_nr;
+        self.input_nr += 1;
+        res
+    }
+
+    /// Pops the top parser input from the input stack
+    ///
+    /// Returns the input just removed
+    #[doc(alias = "inputPop")]
+    pub unsafe fn input_pop(&mut self) -> XmlParserInputPtr {
+        if self.input_nr <= 0 {
+            return null_mut();
+        }
+        self.input_nr -= 1;
+        if self.input_nr > 0 {
+            self.input = *self.input_tab.add(self.input_nr as usize - 1);
+        } else {
+            self.input = null_mut();
+        }
+        let ret: XmlParserInputPtr = *self.input_tab.add(self.input_nr as usize);
+        *self.input_tab.add(self.input_nr as usize) = null_mut();
+        ret
     }
 }
 /**
@@ -4973,7 +5020,7 @@ unsafe fn xml_init_sax_parser_ctxt(
         return -1;
     }
     while {
-        input = input_pop(ctxt);
+        input = (*ctxt).input_pop();
         !input.is_null()
     } {
         /* Non consuming */
@@ -5192,7 +5239,7 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     }
 
     while {
-        input = input_pop(ctxt);
+        input = (*ctxt).input_pop();
         !input.is_null()
     } {
         /* Non consuming */
@@ -5335,7 +5382,7 @@ pub(crate) unsafe extern "C" fn xml_setup_parser_for_buffer(
     (*input).base = buffer;
     (*input).cur = buffer;
     (*input).end = buffer.add(xml_strlen(buffer as _) as _);
-    input_push(ctxt, input);
+    (*ctxt).input_push(input);
 }
 
 /**
@@ -5729,7 +5776,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
     }
     (*input_stream).buf = Some(buf);
     (*input_stream).reset_base();
-    input_push(ctxt, input_stream);
+    (*ctxt).input_push(input_stream);
 
     /*
      * If the caller didn't provide an initial 'chunk' for determining
@@ -6859,7 +6906,7 @@ pub unsafe extern "C" fn xml_pop_input(ctxt: XmlParserCtxtPtr) -> XmlChar {
             c"Unfinished entity outside the DTD".as_ptr() as _,
         );
     }
-    let input: XmlParserInputPtr = input_pop(ctxt);
+    let input: XmlParserInputPtr = (*ctxt).input_pop();
     if !(*input).entity.is_null() {
         (*(*input).entity).flags &= !XML_ENT_EXPANDING as i32;
     }
@@ -10954,7 +11001,7 @@ pub unsafe fn xml_create_io_parser_ctxt(
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
-    input_push(ctxt, input_stream);
+    (*ctxt).input_push(input_stream);
 
     ctxt
 }
@@ -11369,7 +11416,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     let dict: XmlDictPtr = (*ctxt).dict;
 
     while {
-        input = input_pop(ctxt);
+        input = (*ctxt).input_pop();
         !input.is_null()
     } {
         /* Non consuming */
@@ -11512,7 +11559,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
     (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
     (*input_stream).reset_base();
 
-    input_push(ctxt, input_stream);
+    (*ctxt).input_push(input_stream);
 
     if size > 0 && !chunk.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
         let base: size_t = (*(*ctxt).input).get_base();
@@ -11728,7 +11775,7 @@ pub unsafe extern "C" fn xml_read_io(
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
-    input_push(ctxt, stream);
+    (*ctxt).input_push(stream);
     xml_do_read(ctxt, url, encoding, options, 0)
 }
 
@@ -11796,7 +11843,7 @@ pub unsafe extern "C" fn xml_ctxt_read_file(
     if stream.is_null() {
         return null_mut();
     }
-    input_push(ctxt, stream);
+    (*ctxt).input_push(stream);
     xml_do_read(ctxt, null_mut(), encoding, options, 1)
 }
 
@@ -11836,7 +11883,7 @@ pub unsafe fn xml_ctxt_read_memory(
         return null_mut();
     }
 
-    input_push(ctxt, stream);
+    (*ctxt).input_push(stream);
     xml_do_read(ctxt, url, encoding, options, 1)
 }
 
@@ -11874,7 +11921,7 @@ pub unsafe extern "C" fn xml_ctxt_read_io(
     if stream.is_null() {
         return null_mut();
     }
-    input_push(ctxt, stream);
+    (*ctxt).input_push(stream);
     xml_do_read(ctxt, url, encoding, options, 1)
 }
 

@@ -38,7 +38,6 @@ use crate::{
             xml_parse_document, xml_stop_parser, XmlParserCtxtPtr, XmlParserInputPtr,
             XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr, XML_SAX2_MAGIC,
         },
-        parser_internals::input_push,
         pattern::{
             xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
             xml_patterncompile, xml_stream_pop, xml_stream_push, xml_stream_push_attr,
@@ -30881,7 +30880,7 @@ pub unsafe fn xml_schema_validate_stream(
         ret = -1;
     // goto done;
     } else {
-        input_push(pctxt, input_stream);
+        (*pctxt).input_push(input_stream);
         (*ctxt).parser_ctxt = pctxt;
         (*ctxt).input = Some(Rc::clone(&input));
 

@@ -33,7 +33,7 @@ use crate::{
             XmlParserMode, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XML_COMPLETE_ATTRS,
             XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
-        parser_internals::{input_push, xml_new_input_stream, xml_switch_to_encoding},
+        parser_internals::{xml_new_input_stream, xml_switch_to_encoding},
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
         relaxng::{
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
@@ -1033,7 +1033,6 @@ pub unsafe fn xml_text_reader_setup(
             // }
             let input_stream: XmlParserInputPtr = xml_new_input_stream((*reader).ctxt);
             if input_stream.is_null() {
-                // xml_free_parser_input_buffer(buf);
                 return -1;
             }
 
@@ -1045,7 +1044,7 @@ pub unsafe fn xml_text_reader_setup(
             (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
             (*input_stream).reset_base();
 
-            input_push((*reader).ctxt, input_stream);
+            (*(*reader).ctxt).input_push(input_stream);
             (*reader).cur = 0;
         }
         if (*reader).ctxt.is_null() {

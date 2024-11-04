@@ -475,7 +475,7 @@ pub unsafe extern "C" fn xml_create_url_parser_ctxt(
         return null_mut();
     }
 
-    input_push(ctxt, input_stream);
+    (*ctxt).input_push(input_stream);
     if (*ctxt).directory.is_null() && directory.is_null() {
         directory = xml_parser_get_directory(filename);
     }
@@ -520,7 +520,7 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
     (*input).buf = Some(Rc::new(RefCell::new(buf)));
     (*input).reset_base();
 
-    input_push(ctxt, input);
+    (*ctxt).input_push(input);
     ctxt
 }
 
@@ -573,7 +573,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
             return null_mut();
         }
 
-        input_push(ctxt, input_stream);
+        (*ctxt).input_push(input_stream);
 
         if (*ctxt).directory.is_null() && directory.is_null() {
             directory = xml_parser_get_directory(url as _);
@@ -589,7 +589,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
             return null_mut();
         }
 
-        input_push(ctxt, input_stream);
+        (*ctxt).input_push(input_stream);
 
         if (*ctxt).directory.is_null() && directory.is_null() {
             directory = xml_parser_get_directory(uri as _);
@@ -1338,11 +1338,11 @@ pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParser
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, null());
         #[allow(clippy::while_immutable_condition)]
         while (*ctxt).input_nr > 1 {
-            xml_free_input_stream(input_pop(ctxt));
+            xml_free_input_stream((*ctxt).input_pop());
         }
         return -1;
     }
-    let ret: c_int = input_push(ctxt, input);
+    let ret: c_int = (*ctxt).input_push(input);
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return -1;
     }
@@ -6328,66 +6328,6 @@ pub(crate) unsafe extern "C" fn node_pop(ctxt: XmlParserCtxtPtr) -> XmlNodePtr {
 }
 
 /**
- * inputPush:
- * @ctxt:  an XML parser context
- * @value:  the parser input
- *
- * Pushes a new parser input on top of the input stack
- *
- * Returns -1 in case of error, the index in the stack otherwise
- */
-pub unsafe extern "C" fn input_push(ctxt: XmlParserCtxtPtr, value: XmlParserInputPtr) -> c_int {
-    if ctxt.is_null() || value.is_null() {
-        return -1;
-    }
-    if (*ctxt).input_nr >= (*ctxt).input_max {
-        let new_size: size_t = (*ctxt).input_max as usize * 2;
-
-        let tmp: *mut XmlParserInputPtr = xml_realloc(
-            (*ctxt).input_tab as _,
-            new_size * size_of::<XmlParserInputPtr>(),
-        ) as *mut XmlParserInputPtr;
-        if tmp.is_null() {
-            xml_err_memory(ctxt, null());
-            return -1;
-        }
-        (*ctxt).input_tab = tmp;
-        (*ctxt).input_max = new_size as _;
-    }
-    *(*ctxt).input_tab.add((*ctxt).input_nr as usize) = value;
-    (*ctxt).input = value;
-    let res = (*ctxt).input_nr;
-    (*ctxt).input_nr += 1;
-    res
-}
-
-/**
- * inputPop:
- * @ctxt: an XML parser context
- *
- * Pops the top parser input from the input stack
- *
- * Returns the input just removed
- */
-pub unsafe extern "C" fn input_pop(ctxt: XmlParserCtxtPtr) -> XmlParserInputPtr {
-    if ctxt.is_null() {
-        return null_mut();
-    }
-    if (*ctxt).input_nr <= 0 {
-        return null_mut();
-    }
-    (*ctxt).input_nr -= 1;
-    if (*ctxt).input_nr > 0 {
-        (*ctxt).input = *(*ctxt).input_tab.add((*ctxt).input_nr as usize - 1);
-    } else {
-        (*ctxt).input = null_mut();
-    }
-    let ret: XmlParserInputPtr = *(*ctxt).input_tab.add((*ctxt).input_nr as usize);
-    *(*ctxt).input_tab.add((*ctxt).input_nr as usize) = null_mut();
-    ret
-}
-
-/**
  * namePop:
  * @ctxt: an XML parser context
  *
@@ -7475,63 +7415,6 @@ mod tests {
     };
 
     use super::*;
-
-    #[test]
-    fn test_input_pop() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                let ret_val = input_pop(ctxt);
-                desret_xml_parser_input_ptr(ret_val);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in inputPop",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in inputPop");
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_input_push() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_value in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let value = gen_xml_parser_input_ptr(n_value, 1);
-
-                    let ret_val = input_push(ctxt, value);
-                    desret_int(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_parser_input_ptr(n_value, value, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in inputPush",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in inputPush()");
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_value);
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_name_pop() {

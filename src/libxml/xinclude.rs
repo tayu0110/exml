@@ -29,7 +29,7 @@ use crate::{
             xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr, XmlParserInputPtr,
             XmlParserOption, XML_DETECT_IDS,
         },
-        parser_internals::{input_push, xml_free_input_stream, xml_string_current_char},
+        parser_internals::{xml_free_input_stream, xml_string_current_char},
         tree::{
             xml_add_next_sibling, xml_add_prev_sibling, xml_create_int_subset, xml_doc_copy_node,
             xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_free_node_list,
@@ -795,7 +795,7 @@ unsafe extern "C" fn xml_xinclude_parse_file(
         return null_mut();
     }
 
-    input_push(pctxt, input_stream);
+    (*pctxt).input_push(input_stream);
 
     if (*pctxt).directory.is_null() {
         (*pctxt).directory = xml_parser_get_directory(url);

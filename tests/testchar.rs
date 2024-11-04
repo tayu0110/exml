@@ -22,7 +22,7 @@ use exml::{
             xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt,
             xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
         },
-        parser_internals::{input_push, xml_new_input_stream},
+        parser_internals::xml_new_input_stream,
         tree::{xml_free_doc, XmlDocPtr},
         xmlerror::XmlParserErrors,
         xmlmemory::xml_memory_dump,
@@ -695,7 +695,7 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
         .map_or(null_mut(), |buf| buf.as_ref().as_ptr());
     (*input).base = (*input).cur;
     (*input).end = (*input).base.add(4);
-    input_push(ctxt, input);
+    (*ctxt).input_push(input);
 
     let mut stdout = stdout();
     print!("testing char range: 1");

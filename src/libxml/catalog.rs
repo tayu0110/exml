@@ -31,7 +31,7 @@ use crate::{
             xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr,
             XmlParserInputPtr,
         },
-        parser_internals::{input_push, xml_new_input_stream, XML_MAX_NAMELEN},
+        parser_internals::{xml_new_input_stream, XML_MAX_NAMELEN},
         threads::{
             xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
             XmlRMutex,
@@ -3979,14 +3979,13 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
     }
 
     (*input_stream).filename = xml_canonic_path(filename as _) as _;
-    // (*input_stream).buf = Some(buf);
     std::ptr::write(
         &raw mut (*input_stream).buf,
         Some(Rc::new(RefCell::new(buf))),
     );
     (*input_stream).reset_base();
 
-    input_push(ctxt, input_stream);
+    (*ctxt).input_push(input_stream);
     if (*ctxt).directory.is_null() {
         directory = xml_parser_get_directory(filename);
     }
