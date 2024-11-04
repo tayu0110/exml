@@ -1433,8 +1433,7 @@ impl XmlParserCtxt {
         &mut self,
         url: *const c_char,
         encoding: Option<&str>,
-        options: c_int,
-        reuse: c_int,
+        options: i32,
     ) -> XmlDocPtr {
         let ret: XmlDocPtr;
 
@@ -1463,10 +1462,6 @@ impl XmlParserCtxt {
             }
         }
         self.my_doc = null_mut();
-        if reuse == 0 {
-            xml_free_parser_ctxt(self);
-        }
-
         ret
     }
 }
@@ -11642,7 +11637,9 @@ pub unsafe fn xml_read_doc(
     if ctxt.is_null() {
         return null_mut();
     }
-    (*ctxt).do_read(url, encoding, options, 0)
+    let res = (*ctxt).do_read(url, encoding, options);
+    xml_free_parser_ctxt(ctxt);
+    res
 }
 
 /**
@@ -11665,7 +11662,9 @@ pub unsafe fn xml_read_file(
     if ctxt.is_null() {
         return null_mut();
     }
-    (*ctxt).do_read(null_mut(), encoding, options, 0)
+    let res = (*ctxt).do_read(null_mut(), encoding, options);
+    xml_free_parser_ctxt(ctxt);
+    res
 }
 
 /**
@@ -11692,7 +11691,9 @@ pub unsafe fn xml_read_memory(
     if ctxt.is_null() {
         return null_mut();
     }
-    (*ctxt).do_read(url, encoding, options, 0)
+    let res = (*ctxt).do_read(url, encoding, options);
+    xml_free_parser_ctxt(ctxt);
+    res
 }
 
 /**
@@ -11728,7 +11729,9 @@ pub unsafe fn xml_read_io(
         return null_mut();
     }
     (*ctxt).input_push(stream);
-    (*ctxt).do_read(url, encoding, options, 0)
+    let res = (*ctxt).do_read(url, encoding, options);
+    xml_free_parser_ctxt(ctxt);
+    res
 }
 
 /**
@@ -11796,7 +11799,7 @@ pub unsafe fn xml_ctxt_read_file(
         return null_mut();
     }
     (*ctxt).input_push(stream);
-    (*ctxt).do_read(null_mut(), encoding, options, 1)
+    (*ctxt).do_read(null_mut(), encoding, options)
 }
 
 /**
@@ -11836,7 +11839,7 @@ pub unsafe fn xml_ctxt_read_memory(
     }
 
     (*ctxt).input_push(stream);
-    (*ctxt).do_read(url, encoding, options, 1)
+    (*ctxt).do_read(url, encoding, options)
 }
 
 /**
@@ -11874,7 +11877,7 @@ pub unsafe fn xml_ctxt_read_io(
         return null_mut();
     }
     (*ctxt).input_push(stream);
-    (*ctxt).do_read(url, encoding, options, 1)
+    (*ctxt).do_read(url, encoding, options)
 }
 
 /*
