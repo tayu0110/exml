@@ -1279,6 +1279,52 @@ impl XmlParserCtxt {
             xml_err_memory(self, null());
         }
     }
+
+    /// Common front-end for the xmlRead functions
+    ///
+    /// Returns the resulting document tree or NULL
+    #[doc(alias = "xmlDoRead")]
+    unsafe fn do_read(
+        &mut self,
+        url: *const c_char,
+        encoding: *const c_char,
+        options: c_int,
+        reuse: c_int,
+    ) -> XmlDocPtr {
+        let ret: XmlDocPtr;
+
+        xml_ctxt_use_options_internal(self, options, encoding);
+        if !encoding.is_null() {
+            /*
+             * TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
+             * caller provided an encoding. Otherwise, we might match to
+             * the encoding from the XML declaration which is likely to
+             * break things. Also see xmlSwitchInputEncoding.
+             */
+            if let Some(handler) = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
+            {
+                xml_switch_to_encoding(self, handler);
+            }
+        }
+        if !url.is_null() && !self.input.is_null() && (*self.input).filename.is_null() {
+            (*self.input).filename = xml_strdup(url as _) as _;
+        }
+        xml_parse_document(self);
+        if self.well_formed != 0 || self.recovery != 0 {
+            ret = self.my_doc;
+        } else {
+            ret = null_mut();
+            if !self.my_doc.is_null() {
+                xml_free_doc(self.my_doc);
+            }
+        }
+        self.my_doc = null_mut();
+        if reuse == 0 {
+            xml_free_parser_ctxt(self);
+        }
+
+        ret
+    }
 }
 /**
  * xmlSAXLocator:
@@ -11427,59 +11473,6 @@ pub unsafe extern "C" fn xml_ctxt_use_options(ctxt: XmlParserCtxtPtr, options: c
 }
 
 /**
- * xmlDoRead:
- * @ctxt:  an XML parser context
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- * @reuse:  keep the context for reuse
- *
- * Common front-end for the xmlRead functions
- *
- * Returns the resulting document tree or NULL
- */
-unsafe extern "C" fn xml_do_read(
-    ctxt: XmlParserCtxtPtr,
-    url: *const c_char,
-    encoding: *const c_char,
-    options: c_int,
-    reuse: c_int,
-) -> XmlDocPtr {
-    let ret: XmlDocPtr;
-
-    xml_ctxt_use_options_internal(ctxt, options, encoding);
-    if !encoding.is_null() {
-        /*
-         * TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
-         * caller provided an encoding. Otherwise, we might match to
-         * the encoding from the XML declaration which is likely to
-         * break things. Also see xmlSwitchInputEncoding.
-         */
-        if let Some(handler) = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap()) {
-            xml_switch_to_encoding(ctxt, handler);
-        }
-    }
-    if !url.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_null() {
-        (*(*ctxt).input).filename = xml_strdup(url as _) as _;
-    }
-    xml_parse_document(ctxt);
-    if (*ctxt).well_formed != 0 || (*ctxt).recovery != 0 {
-        ret = (*ctxt).my_doc;
-    } else {
-        ret = null_mut();
-        if !(*ctxt).my_doc.is_null() {
-            xml_free_doc((*ctxt).my_doc);
-        }
-    }
-    (*ctxt).my_doc = null_mut();
-    if reuse == 0 {
-        xml_free_parser_ctxt(ctxt);
-    }
-
-    ret
-}
-
-/**
  * xmlReadDoc:
  * @cur:  a pointer to a zero terminated string
  * @URL:  the base URL to use for the document
@@ -11505,7 +11498,7 @@ pub unsafe extern "C" fn xml_read_doc(
     if ctxt.is_null() {
         return null_mut();
     }
-    xml_do_read(ctxt, url, encoding, options, 0)
+    (*ctxt).do_read(url, encoding, options, 0)
 }
 
 /**
@@ -11528,7 +11521,7 @@ pub unsafe extern "C" fn xml_read_file(
     if ctxt.is_null() {
         return null_mut();
     }
-    xml_do_read(ctxt, null_mut(), encoding, options, 0)
+    (*ctxt).do_read(null_mut(), encoding, options, 0)
 }
 
 /**
@@ -11555,7 +11548,7 @@ pub unsafe fn xml_read_memory(
     if ctxt.is_null() {
         return null_mut();
     }
-    xml_do_read(ctxt, url, encoding, options, 0)
+    (*ctxt).do_read(url, encoding, options, 0)
 }
 
 /**
@@ -11591,7 +11584,7 @@ pub unsafe extern "C" fn xml_read_io(
         return null_mut();
     }
     (*ctxt).input_push(stream);
-    xml_do_read(ctxt, url, encoding, options, 0)
+    (*ctxt).do_read(url, encoding, options, 0)
 }
 
 /**
@@ -11659,7 +11652,7 @@ pub unsafe extern "C" fn xml_ctxt_read_file(
         return null_mut();
     }
     (*ctxt).input_push(stream);
-    xml_do_read(ctxt, null_mut(), encoding, options, 1)
+    (*ctxt).do_read(null_mut(), encoding, options, 1)
 }
 
 /**
@@ -11699,7 +11692,7 @@ pub unsafe fn xml_ctxt_read_memory(
     }
 
     (*ctxt).input_push(stream);
-    xml_do_read(ctxt, url, encoding, options, 1)
+    (*ctxt).do_read(url, encoding, options, 1)
 }
 
 /**
@@ -11737,7 +11730,7 @@ pub unsafe extern "C" fn xml_ctxt_read_io(
         return null_mut();
     }
     (*ctxt).input_push(stream);
-    xml_do_read(ctxt, url, encoding, options, 1)
+    (*ctxt).do_read(url, encoding, options, 1)
 }
 
 /*
