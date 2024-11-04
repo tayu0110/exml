@@ -4143,11 +4143,8 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
 
     /* propagate namespaces down the entity */
-    for i in (0..(*oldctxt).ns_nr).step_by(2) {
-        (*ctxt).ns_push(
-            *(*oldctxt).ns_tab.add(i as usize),
-            *(*oldctxt).ns_tab.add(i as usize + 1),
-        );
+    for i in (0..(*oldctxt).ns_tab.len()).step_by(2) {
+        (*ctxt).ns_push((*oldctxt).ns_tab[i], (*oldctxt).ns_tab[i + 1]);
     }
 
     let oldsax: XmlSAXHandlerPtr = (*ctxt).sax;
@@ -5481,7 +5478,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     let mut uri: *const XmlChar = null_mut();
     let mut node_info: XmlParserNodeInfo = unsafe { zeroed() };
     let mut tlen: c_int = 0;
-    let ns_nr: c_int = (*ctxt).ns_nr;
+    let ns_nr = (*ctxt).ns_tab.len();
 
     if (*ctxt).name_tab.len() as c_uint > XML_PARSER_MAX_DEPTH
         && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
@@ -5540,7 +5537,13 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         (*ctxt).space_pop();
         return -1;
     }
-    (*ctxt).name_ns_push(name, prefix, uri, line, (*ctxt).ns_nr - ns_nr);
+    (*ctxt).name_ns_push(
+        name,
+        prefix,
+        uri,
+        line,
+        (*ctxt).ns_tab.len() as i32 - ns_nr as i32,
+    );
     let cur: XmlNodePtr = (*ctxt).node;
 
     /*
@@ -5586,8 +5589,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         }
         (*ctxt).name_pop();
         (*ctxt).space_pop();
-        if ns_nr != (*ctxt).ns_nr {
-            (*ctxt).ns_pop((*ctxt).ns_nr - ns_nr);
+        if ns_nr != (*ctxt).ns_tab.len() {
+            (*ctxt).ns_pop((*ctxt).ns_tab.len() - ns_nr);
         }
         if !cur.is_null() && (*ctxt).record_info != 0 {
             node_info.node = cur;
@@ -5622,8 +5625,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         (*ctxt).node_pop();
         (*ctxt).name_pop();
         (*ctxt).space_pop();
-        if ns_nr != (*ctxt).ns_nr {
-            (*ctxt).ns_pop((*ctxt).ns_nr - ns_nr);
+        if ns_nr != (*ctxt).ns_tab.len() {
+            (*ctxt).ns_pop((*ctxt).ns_tab.len() - ns_nr);
         }
         return -1;
     }
