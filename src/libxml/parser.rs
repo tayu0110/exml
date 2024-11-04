@@ -697,6 +697,13 @@ impl XmlParserCtxt {
         }
     }
 
+    /// Blocks further parser processing
+    #[doc(alias = "xmlStopParser")]
+    pub unsafe fn stop(&mut self) {
+        self.halt();
+        self.err_no = XmlParserErrors::XmlErrUserStop as i32;
+    }
+
     pub(crate) unsafe fn advance(&mut self, nth: usize) {
         if (*self.input).cur.add(nth) > (*self.input).end {
             self.force_grow();
@@ -744,7 +751,7 @@ impl XmlParserCtxt {
             );
 
             self.err_no = XmlParserErrors::XmlErrInternalError as i32;
-            xml_stop_parser(self);
+            self.stop();
 
             return;
         }
@@ -1153,13 +1160,13 @@ impl XmlParserCtxt {
     }
 
     #[doc(alias = "spacePush")]
-    pub(crate) unsafe fn space_push(&mut self, val: i32) -> i32 {
+    pub(crate) fn space_push(&mut self, val: i32) -> i32 {
         self.space_tab.push(val);
         self.space_tab.len() as i32 - 1
     }
 
     #[doc(alias = "spacePop")]
-    pub(crate) unsafe fn space_pop(&mut self) -> i32 {
+    pub(crate) fn space_pop(&mut self) -> i32 {
         self.space_tab.pop().unwrap_or(-1)
     }
 
@@ -2672,21 +2679,6 @@ pub unsafe extern "C" fn xml_keep_blanks_default(val: c_int) -> c_int {
         set_indent_tree_output(1);
     }
     old
-}
-
-/**
- * xmlStopParser:
- * @ctxt:  an XML parser context
- *
- * Blocks further parser processing
- */
-pub unsafe extern "C" fn xml_stop_parser(ctxt: XmlParserCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).halt();
-
-    (*ctxt).err_no = XmlParserErrors::XmlErrUserStop as i32;
 }
 
 /**
@@ -15398,32 +15390,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlSetupParserForBuffer()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_stop_parser() {
-        #[cfg(feature = "push")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                xml_stop_parser(ctxt);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlStopParser",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlStopParser()");
         }
     }
 

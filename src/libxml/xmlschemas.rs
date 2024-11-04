@@ -35,8 +35,8 @@ use crate::{
         parser::{
             xml_ctxt_read_file, xml_ctxt_read_memory, xml_free_parser_ctxt,
             xml_new_io_input_stream, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
-            xml_parse_document, xml_stop_parser, XmlParserCtxtPtr, XmlParserInputPtr,
-            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr, XML_SAX2_MAGIC,
+            xml_parse_document, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
+            XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr, XML_SAX2_MAGIC,
         },
         pattern::{
             xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
@@ -31043,7 +31043,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
         );
         // goto internal_error;
         (*vctxt).err = -1;
-        xml_stop_parser((*vctxt).parser_ctxt);
+        (*(*vctxt).parser_ctxt).stop();
         return;
     }
     let ielem: XmlSchemaNodeInfoPtr = (*vctxt).inode;
@@ -31076,7 +31076,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                     );
                     // goto internal_error;
                     (*vctxt).err = -1;
-                    xml_stop_parser((*vctxt).parser_ctxt);
+                    (*(*vctxt).parser_ctxt).stop();
                     return;
                 }
                 (*ielem).nb_ns_bindings = 0;
@@ -31095,7 +31095,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                     );
                     // goto internal_error;
                     (*vctxt).err = -1;
-                    xml_stop_parser((*vctxt).parser_ctxt);
+                    (*(*vctxt).parser_ctxt).stop();
                     return;
                 }
             }
@@ -31149,7 +31149,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 );
                 // goto internal_error;
                 (*vctxt).err = -1;
-                xml_stop_parser((*vctxt).parser_ctxt);
+                (*(*vctxt).parser_ctxt).stop();
                 return;
             }
             k = 0;
@@ -31193,7 +31193,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 );
                 // goto internal_error;
                 (*vctxt).err = -1;
-                xml_stop_parser((*vctxt).parser_ctxt);
+                (*(*vctxt).parser_ctxt).stop();
                 return;
             }
         }
@@ -31210,7 +31210,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
         );
         // goto internal_error;
         (*vctxt).err = -1;
-        xml_stop_parser((*vctxt).parser_ctxt);
+        (*(*vctxt).parser_ctxt).stop();
     }
 
     // exit:
@@ -31262,7 +31262,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
         );
         // goto internal_error;
         (*vctxt).err = -1;
-        xml_stop_parser((*vctxt).parser_ctxt);
+        (*(*vctxt).parser_ctxt).stop();
     }
     // exit:
     // internal_error:
@@ -31307,7 +31307,7 @@ unsafe fn xml_schema_sax_handle_text(
             c"calling xmlSchemaVPushText()".as_ptr() as _
         );
         (*vctxt).err = -1;
-        xml_stop_parser((*vctxt).parser_ctxt);
+        (*(*vctxt).parser_ctxt).stop();
     }
 }
 
@@ -31347,7 +31347,7 @@ unsafe fn xml_schema_sax_handle_cdata_section(
             c"calling xmlSchemaVPushText()".as_ptr() as _
         );
         (*vctxt).err = -1;
-        xml_stop_parser((*vctxt).parser_ctxt);
+        (*(*vctxt).parser_ctxt).stop();
     }
 }
 

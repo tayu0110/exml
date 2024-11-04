@@ -27,11 +27,11 @@ use crate::{
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
         parser::{
             xml_byte_consumed, xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options,
-            xml_free_parser_ctxt, xml_parse_chunk, xml_stop_parser, CdataBlockSAXFunc,
-            CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func,
-            StartElementSAXFunc, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState,
-            XmlParserMode, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XML_COMPLETE_ATTRS,
-            XML_DETECT_IDS, XML_SAX2_MAGIC,
+            xml_free_parser_ctxt, xml_parse_chunk, CdataBlockSAXFunc, CharactersSAXFunc,
+            EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func, StartElementSAXFunc,
+            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserMode,
+            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
+            XML_SAX2_MAGIC,
         },
         parser_internals::{xml_new_input_stream, xml_switch_to_encoding},
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
@@ -3741,7 +3741,7 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> c_
             (*reader.ctxt).vctxt.vstate_tab = null_mut();
             (*reader.ctxt).vctxt.vstate_max = 0;
         }
-        xml_stop_parser(reader.ctxt);
+        (*reader.ctxt).stop();
         if !(*reader.ctxt).my_doc.is_null() {
             if reader.preserve == 0 {
                 xml_text_reader_free_doc(reader, (*reader.ctxt).my_doc);
@@ -3982,7 +3982,7 @@ pub unsafe fn xml_text_reader_get_remainder(
     reader.curnode = null_mut();
     reader.mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
     if !reader.ctxt.is_null() {
-        xml_stop_parser(reader.ctxt);
+        (*reader.ctxt).stop();
         if !(*reader.ctxt).my_doc.is_null() {
             if reader.preserve == 0 {
                 xml_text_reader_free_doc(reader, (*reader.ctxt).my_doc);

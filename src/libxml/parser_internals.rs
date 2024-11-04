@@ -69,9 +69,9 @@ use super::parser::{
     xml_ns_err, xml_parse_att_value_internal, xml_parse_char_data_internal, xml_parse_char_ref,
     xml_parse_element_children_content_decl_priv, xml_parse_end_tag1, xml_parse_end_tag2,
     xml_parse_external_entity_private, xml_parser_entity_check, xml_parser_find_node_info,
-    xml_stop_parser, xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr,
-    XmlParserInput, XmlParserInputPtr, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr,
-    XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SKIP_IDS,
+    xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput,
+    XmlParserInputPtr, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption,
+    XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SKIP_IDS,
 };
 use super::sax2::xml_sax2_ignorable_whitespace;
 use super::tree::{
@@ -794,7 +794,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
                  * if we didn't stop the parser. But most callers of this
                  * function don't check the return value.
                  */
-                xml_stop_parser(ctxt);
+                (*ctxt).stop();
                 return -1;
             }
         }
@@ -804,7 +804,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
         /*
          * on encoding conversion errors, stop the parser
          */
-        xml_stop_parser(ctxt);
+        (*ctxt).stop();
         (*ctxt).err_no = XmlParserErrors::XmlI18NConvFailed as i32;
     }
     ret
