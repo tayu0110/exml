@@ -1081,7 +1081,7 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "inputPush")]
-    pub unsafe fn input_push(&mut self, value: XmlParserInputPtr) -> i32 {
+    pub fn input_push(&mut self, value: XmlParserInputPtr) -> i32 {
         if value.is_null() {
             return -1;
         }
@@ -1094,7 +1094,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the input just removed
     #[doc(alias = "inputPop")]
-    pub unsafe fn input_pop(&mut self) -> XmlParserInputPtr {
+    pub fn input_pop(&mut self) -> XmlParserInputPtr {
         if self.input_tab.is_empty() {
             return null_mut();
         }
@@ -1129,7 +1129,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the node just removed
     #[doc(alias = "nodePop")]
-    pub(crate) unsafe fn node_pop(&mut self) -> XmlNodePtr {
+    pub(crate) fn node_pop(&mut self) -> XmlNodePtr {
         let res = self.node_tab.pop().unwrap_or(null_mut());
         self.node = *self.node_tab.last().unwrap_or(&null_mut());
         res
@@ -1139,7 +1139,7 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "namePush")]
-    pub(crate) unsafe fn name_push(&mut self, value: *const XmlChar) -> i32 {
+    pub(crate) fn name_push(&mut self, value: *const XmlChar) -> i32 {
         self.name = value;
         self.name_tab.push(value);
         self.name_tab.len() as i32 - 1
@@ -1149,7 +1149,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the name just removed
     #[doc(alias = "namePop")]
-    pub(crate) unsafe fn name_pop(&mut self) -> *const XmlChar {
+    pub(crate) fn name_pop(&mut self) -> *const XmlChar {
         let res = self.name_tab.pop().unwrap_or(null_mut());
         self.name = *self.name_tab.last().unwrap_or(&null());
         res
@@ -1197,7 +1197,7 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "nameNsPush")]
-    pub(crate) unsafe fn name_ns_push(
+    pub(crate) fn name_ns_push(
         &mut self,
         value: *const XmlChar,
         prefix: *const XmlChar,
@@ -1222,7 +1222,7 @@ impl XmlParserCtxt {
     /// Returns the name just removed
     #[doc(alias = "nameNsPop")]
     #[cfg(feature = "push")]
-    pub(crate) unsafe fn name_ns_pop(&mut self) -> *const XmlChar {
+    pub(crate) fn name_ns_pop(&mut self) -> *const XmlChar {
         let res = self.name_tab.pop().unwrap_or(null_mut());
         self.name = *self.name_tab.last().unwrap_or(&null());
         res
@@ -1232,7 +1232,7 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, -2 if the namespace should be discarded and the index in the stack otherwise.
     #[doc(alias = "nsPush")]
-    pub(crate) unsafe fn ns_push(&mut self, prefix: *const XmlChar, url: *const XmlChar) -> i32 {
+    pub(crate) fn ns_push(&mut self, prefix: *const XmlChar, url: *const XmlChar) -> i32 {
         if self.options & XmlParserOption::XmlParseNsclean as i32 != 0 {
             for i in (0..self.ns_tab.len() - 1).rev().step_by(2) {
                 if self.ns_tab[i] == prefix {
@@ -1254,7 +1254,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the number of namespaces removed
     #[doc(alias = "nsPop")]
-    pub(crate) unsafe fn ns_pop(&mut self, mut nr: usize) -> usize {
+    pub(crate) fn ns_pop(&mut self, mut nr: usize) -> usize {
         if self.ns_tab.len() < nr {
             generic_error!("Pbm popping {} NS\n", nr);
             nr = self.ns_tab.len();
