@@ -1724,9 +1724,9 @@ impl Default for XmlParserCtxt {
  *
  * A SAX Locator.
  */
-pub type XmlSaxlocatorPtr = *mut XmlSaxlocator;
+pub type XmlSAXLocatorPtr = *mut XmlSAXLocator;
 #[repr(C)]
-pub struct XmlSaxlocator {
+pub struct XmlSAXLocator {
     pub(crate) get_public_id: unsafe extern "C" fn(ctx: *mut c_void) -> *const XmlChar,
     pub(crate) get_system_id: unsafe extern "C" fn(ctx: *mut c_void) -> *const XmlChar,
     pub(crate) get_line_number: unsafe extern "C" fn(ctx: *mut c_void) -> i32,
@@ -1923,7 +1923,7 @@ pub type UnparsedEntityDeclSAXFunc = unsafe fn(
  * Everything is available on the context, so this is useless in our case.
  */
 pub type SetDocumentLocatorSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, loc: XmlSaxlocatorPtr);
+    unsafe fn(ctx: Option<GenericErrorContext>, loc: XmlSAXLocatorPtr);
 
 /**
  * startDocumentSAXFunc:

@@ -36,7 +36,7 @@ use crate::{
             xml_ctxt_read_file, xml_ctxt_read_memory, xml_free_parser_ctxt,
             xml_new_io_input_stream, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
             xml_parse_document, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
-            XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr, XML_SAX2_MAGIC,
+            XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
         },
         pattern::{
             xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
@@ -31607,7 +31607,7 @@ unsafe fn unparsed_entity_decl_split(
     }
 }
 
-unsafe fn set_document_locator_split(ctx: Option<GenericErrorContext>, loc: XmlSaxlocatorPtr) {
+unsafe fn set_document_locator_split(ctx: Option<GenericErrorContext>, loc: XmlSAXLocatorPtr) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();

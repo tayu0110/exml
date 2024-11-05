@@ -28,7 +28,7 @@ use crate::{
             xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_memory, XmlFeature, XmlParserCtxt,
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq,
             XmlParserNodeInfoSeqPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
-            XmlSaxlocatorPtr,
+            XmlSAXLocatorPtr,
         },
         parser_internals::{xml_create_memory_parser_ctxt, xml_free_input_stream},
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
@@ -1623,10 +1623,10 @@ pub(crate) fn gen_xml_node_set_ptr(_no: c_int, _nr: c_int) -> XmlNodeSetPtr {
 #[cfg(feature = "xpath")]
 pub(crate) fn des_xml_node_set_ptr(_no: c_int, _val: XmlNodeSetPtr, _nr: c_int) {}
 
-pub(crate) fn gen_xml_saxlocator_ptr(_no: i32, _nr: i32) -> XmlSaxlocatorPtr {
+pub(crate) fn gen_xml_saxlocator_ptr(_no: i32, _nr: i32) -> XmlSAXLocatorPtr {
     null_mut()
 }
-pub(crate) fn des_xml_saxlocator_ptr(_no: i32, _val: XmlSaxlocatorPtr, _nr: i32) {}
+pub(crate) fn des_xml_saxlocator_ptr(_no: i32, _val: XmlSAXLocatorPtr, _nr: i32) {}
 
 pub(crate) unsafe extern "C" fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
     xml_free_input_stream(val);

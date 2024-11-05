@@ -21,7 +21,7 @@ use crate::{
     libxml::{
         entities::XmlEntityPtr,
         htmltree::html_new_doc_no_dtd,
-        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlSaxlocatorPtr},
+        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlSAXLocatorPtr},
         tree::{
             xml_validate_ncname, XmlAttributePtr, XmlDocProperties, XmlElementPtr, XmlNode,
             XmlNsPtr,
@@ -117,7 +117,7 @@ pub unsafe extern "C" fn xml_sax2_get_system_id(ctx: *mut c_void) -> *const XmlC
  */
 pub unsafe fn xml_sax2_set_document_locator(
     _ctx: Option<GenericErrorContext>,
-    _loc: XmlSaxlocatorPtr,
+    _loc: XmlSAXLocatorPtr,
 ) {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
 }

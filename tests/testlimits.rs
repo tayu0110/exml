@@ -20,7 +20,7 @@ use exml::{
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_sax_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
-            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSaxlocatorPtr,
+            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr,
             XML_SAX2_MAGIC,
         },
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
@@ -909,7 +909,7 @@ fn unparsed_entity_decl_callback(
  * Receive the document locator at startup, actually xmlDefaultSAXLocator
  * Everything is available on the context, so this is useless in our case.
  */
-fn set_document_locator_callback(_ctx: Option<GenericErrorContext>, _loc: XmlSaxlocatorPtr) {
+fn set_document_locator_callback(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 

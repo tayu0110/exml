@@ -52,7 +52,7 @@ use exml::{
             xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd, xml_read_file, xml_read_io,
             xml_read_memory, xml_set_external_entity_loader, ErrorSAXFunc, WarningSAXFunc,
             XmlExternalEntityLoader, XmlFeature, XmlParserCtxtPtr, XmlParserInputPtr,
-            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSaxlocatorPtr, XML_COMPLETE_ATTRS,
+            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_COMPLETE_ATTRS,
             XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
@@ -1212,7 +1212,7 @@ unsafe fn unparsed_entity_decl_debug(
  * Receive the document locator at startup, actually xmlDefaultSAXLocator
  * Everything is available on the context, so this is useless in our case.
  */
-unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSaxlocatorPtr) {
+unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;

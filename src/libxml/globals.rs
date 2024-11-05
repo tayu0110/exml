@@ -22,7 +22,7 @@ use crate::{
     globals::reset_last_error,
     io::{XmlOutputBufferPtr, __xml_output_buffer_create_filename},
     libxml::{
-        parser::{XmlSAXHandlerV1, XmlSaxlocator},
+        parser::{XmlSAXHandlerV1, XmlSAXLocator},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
     private::threads::{__xml_global_init_mutex_destroy, xml_cleanup_mutex, xml_init_mutex},
@@ -139,7 +139,7 @@ pub type XmlGlobalStatePtr = *mut XmlGlobalState;
 pub struct XmlGlobalState {
     pub(crate) xml_parser_version: *const c_char,
 
-    pub(crate) xml_default_sax_locator: XmlSaxlocator,
+    pub(crate) xml_default_sax_locator: XmlSAXLocator,
     pub(crate) xml_default_sax_handler: XmlSAXHandlerV1,
     #[allow(unused)]
     pub(crate) docb_default_sax_handler: XmlSAXHandlerV1, /* unused */
@@ -928,7 +928,7 @@ pub unsafe extern "C" fn xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSaxlocator {
+pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSAXLocator {
     if IS_MAIN_THREAD!() != 0 {
         addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
     } else {
@@ -944,7 +944,7 @@ pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSaxlocator {
  * The default SAX Locator
  * { getPublicId, getSystemId, getLineNumber, getColumnNumber}
  */
-static mut _XML_DEFAULT_SAXLOCATOR: XmlSaxlocator = XmlSaxlocator {
+static mut _XML_DEFAULT_SAXLOCATOR: XmlSAXLocator = XmlSAXLocator {
     get_public_id: xml_sax2_get_public_id,
     get_system_id: xml_sax2_get_system_id,
     get_line_number: xml_sax2_get_line_number,
@@ -952,12 +952,12 @@ static mut _XML_DEFAULT_SAXLOCATOR: XmlSaxlocator = XmlSaxlocator {
 };
 
 #[cfg(feature = "thread")]
-pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSaxlocator {
+pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
     __xml_default_sax_locator()
 }
 #[deprecated]
 #[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSaxlocator {
+pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
     addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
 }
 

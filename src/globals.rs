@@ -15,7 +15,7 @@ use crate::{
     io::{XmlOutputBuffer, XmlParserInputBuffer},
     libxml::{
         globals::{XmlDeregisterNodeFunc, XmlRegisterNodeFunc},
-        parser::{XmlSAXHandlerV1, XmlSaxlocator},
+        parser::{XmlSAXHandlerV1, XmlSAXLocator},
         sax2::{
             xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
             xml_sax2_get_system_id,
@@ -62,7 +62,7 @@ impl Clone for GenericErrorContext {
 
 pub struct XmlGlobalState {
     parser_version: Cow<'static, str>,
-    default_sax_locator: XmlSaxlocator,
+    default_sax_locator: XmlSAXLocator,
     default_sax_handler: XmlSAXHandlerV1,
     html_default_sax_handler: XmlSAXHandlerV1,
     free: Option<XmlFreeFunc>,
@@ -105,7 +105,7 @@ impl XmlGlobalState {
         );
         Self {
             parser_version: Cow::Borrowed(VERSION_STRING),
-            default_sax_locator: XmlSaxlocator {
+            default_sax_locator: XmlSAXLocator {
                 get_public_id: xml_sax2_get_public_id,
                 get_system_id: xml_sax2_get_system_id,
                 get_line_number: xml_sax2_get_line_number,
