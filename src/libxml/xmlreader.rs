@@ -3688,9 +3688,7 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
     if !(*cur).name.is_null() {
         xml_free((*cur).name as _);
     }
-    if !(*cur).encoding.is_null() {
-        xml_free((*cur).encoding as _);
-    }
+    (*cur).encoding = None;
     if !(*cur).old_ns.is_null() {
         xml_free_ns_list((*cur).old_ns);
     }
@@ -4413,6 +4411,8 @@ pub fn xml_text_reader_normalization(_reader: &mut XmlTextReader) -> c_int {
 pub unsafe extern "C" fn xml_text_reader_const_encoding(
     reader: &mut XmlTextReader,
 ) -> *const XmlChar {
+    use std::ffi::CString;
+
     let mut doc: XmlDocPtr = null_mut();
     if !reader.doc.is_null() {
         doc = reader.doc;
@@ -4423,10 +4423,11 @@ pub unsafe extern "C" fn xml_text_reader_const_encoding(
         return null_mut();
     }
 
-    if (*doc).encoding.is_null() {
-        null_mut()
+    if let Some(encoding) = (*doc).encoding.as_deref() {
+        let encoding = CString::new(encoding).unwrap();
+        CONSTSTR!(reader, encoding.as_ptr() as *const u8)
     } else {
-        CONSTSTR!(reader, (*doc).encoding)
+        null_mut()
     }
 }
 

@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, CStr},
+    ffi::{c_char, c_int, CStr, CString},
     mem::zeroed,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null_mut},
@@ -1667,9 +1667,10 @@ unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Xml
             xml_ctxt_dump_string(ctxt, (*doc).version);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
-        if !(*doc).encoding.is_null() {
+        if let Some(encoding) = (*doc).encoding.as_deref() {
             fprintf((*ctxt).output, c"encoding=".as_ptr());
-            xml_ctxt_dump_string(ctxt, (*doc).encoding);
+            let encoding = CString::new(encoding).unwrap();
+            xml_ctxt_dump_string(ctxt, encoding.as_ptr() as *const u8);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
         if !(*doc).url.is_null() {
@@ -2566,7 +2567,7 @@ pub unsafe extern "C" fn xml_shell_load(
     if html != 0 {
         #[cfg(feature = "html")]
         {
-            doc = html_parse_file(filename, null_mut());
+            doc = html_parse_file(filename, None);
         }
         #[cfg(not(feature = "html"))]
         {

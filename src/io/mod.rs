@@ -1296,8 +1296,8 @@ pub unsafe extern "C" fn xml_check_http_input(
                                         null(),
                                     );
                                 }
-                                if (*ret).encoding.is_null() {
-                                    (*ret).encoding = xml_strdup(enc.as_ptr() as *const u8);
+                                if (*ret).encoding.is_none() {
+                                    (*ret).encoding = Some(encoding.to_owned());
                                 }
                             }
                         }

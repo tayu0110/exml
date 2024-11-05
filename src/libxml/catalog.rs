@@ -3355,7 +3355,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
         xml_free_doc(doc);
         return -1;
     }
-    let ret: c_int = xml_save_format_file_to(buf, doc, null_mut(), 1);
+    let ret: c_int = xml_save_format_file_to(buf, doc, None, 1);
 
     /*
      * Free it

@@ -44,7 +44,7 @@ use crate::{
             XmlNotationTablePtr,
         },
         xmlerror::XmlParserErrors,
-        xmlstring::{xml_str_equal, xml_strdup, XmlChar},
+        xmlstring::{xml_str_equal, XmlChar},
     },
     private::{
         buf::xml_buf_set_allocation_scheme, error::__xml_simple_error,
@@ -79,7 +79,7 @@ pub struct XmlSaveCtxt {
     pub(crate) typ: c_int,
     pub(crate) fd: c_int,
     pub(crate) filename: *const XmlChar,
-    pub(crate) encoding: *const XmlChar,
+    pub(crate) encoding: Option<String>,
     pub(crate) handler: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     pub(crate) buf: XmlOutputBufferPtr,
     pub(crate) options: c_int,
@@ -90,6 +90,28 @@ pub struct XmlSaveCtxt {
     pub(crate) indent_size: usize,
     pub(crate) escape: Option<fn(&str, &mut String) -> i32>, /* used for element content */
     pub(crate) escape_attr: Option<fn(&str, &mut String) -> i32>, /* used for attribute content */
+}
+
+impl Default for XmlSaveCtxt {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: 0,
+            fd: 0,
+            filename: null(),
+            encoding: None,
+            handler: None,
+            buf: null_mut(),
+            options: 0,
+            level: 0,
+            format: 0,
+            indent: [0; MAX_INDENT + 1],
+            indent_nr: 0,
+            indent_size: 0,
+            escape: None,
+            escape_attr: None,
+        }
+    }
 }
 
 /**
@@ -199,7 +221,7 @@ fn xml_escape_entities(src: &str, dst: &mut String) -> c_int {
  * Initialize a saving context
  */
 pub(crate) fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
-    if ctxt.encoding.is_null() && ctxt.escape.is_none() {
+    if ctxt.encoding.is_none() && ctxt.escape.is_none() {
         ctxt.escape = Some(xml_escape_entities);
     }
     GLOBAL_STATE.with_borrow(|state| {
@@ -1248,12 +1270,8 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                             (*buf).write_str(
                                 "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=",
                             );
-                            if !(*ctxt).encoding.is_null() {
-                                (*buf).write_str(
-                                    CStr::from_ptr((*ctxt).encoding as _)
-                                        .to_string_lossy()
-                                        .as_ref(),
-                                );
+                            if let Some(encoding) = (*ctxt).encoding.as_deref() {
+                                (*buf).write_str(encoding);
                             } else {
                                 (*buf).write_bytes(b"UTF-8");
                             }
@@ -1302,12 +1320,8 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         (*buf).write_str(
                             "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=",
                         );
-                        if !(*ctxt).encoding.is_null() {
-                            (*buf).write_str(
-                                CStr::from_ptr((*ctxt).encoding as _)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                            );
+                        if let Some(encoding) = (*ctxt).encoding.as_deref() {
+                            (*buf).write_str(encoding);
                         } else {
                             (*buf).write_bytes(b"UTF-8");
                         }
@@ -1514,9 +1528,8 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     let dtd: XmlDtdPtr;
     #[cfg(feature = "html")]
     let mut is_xhtml: c_int = 0;
-    let oldenc: *const XmlChar = (*cur).encoding;
-    let oldctxtenc: *const XmlChar = (*ctxt).encoding;
-    let mut encoding: *const XmlChar = (*ctxt).encoding;
+    let oldenc = (*cur).encoding.clone();
+    let oldctxtenc = (*ctxt).encoding.clone();
     let oldescape = (*ctxt).escape;
     let oldescape_attr = (*ctxt).escape_attr;
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
@@ -1531,10 +1544,11 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         return -1;
     }
 
-    if !(*ctxt).encoding.is_null() {
-        (*cur).encoding = (*ctxt).encoding;
-    } else if !(*cur).encoding.is_null() {
-        encoding = (*cur).encoding;
+    let mut encoding = (*ctxt).encoding.clone();
+    if let Some(enc) = (*ctxt).encoding.as_deref() {
+        (*cur).encoding = Some(enc.to_owned());
+    } else if let Some(enc) = (*cur).encoding.as_deref() {
+        encoding = Some(enc.to_owned());
     }
 
     if (matches!((*cur).typ, XmlElementType::XmlHtmlDocumentNode)
@@ -1544,35 +1558,30 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     {
         #[cfg(feature = "html")]
         {
-            if !encoding.is_null() {
-                html_set_meta_encoding(cur, encoding);
+            if let Some(enc) = encoding.as_deref() {
+                html_set_meta_encoding(cur, Some(enc));
             }
-            if encoding.is_null() {
+            if encoding.is_none() {
                 encoding = html_get_meta_encoding(cur);
             }
-            if encoding.is_null() {
-                encoding = c"HTML".as_ptr() as _;
+            if encoding.is_none() {
+                encoding = Some("HTML".to_owned());
             }
-            if (!encoding.is_null()
-                && oldctxtenc.is_null()
+            if (encoding.is_some()
+                && oldctxtenc.is_none()
                 && (*buf).encoder.is_none()
                 && (*buf).conv.is_none())
-                && xml_save_switch_encoding(
-                    &mut *ctxt,
-                    CStr::from_ptr(encoding as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                ) < 0
+                && xml_save_switch_encoding(&mut *ctxt, encoding.as_deref().unwrap()) < 0
             {
                 (*cur).encoding = oldenc;
                 return -1;
             }
             if (*ctxt).options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-                html_doc_content_dump_format_output(buf, cur, encoding as _, 1);
+                html_doc_content_dump_format_output(buf, cur, encoding.as_deref(), 1);
             } else {
-                html_doc_content_dump_format_output(buf, cur, encoding as _, 0);
+                html_doc_content_dump_format_output(buf, cur, encoding.as_deref(), 0);
             }
-            if !(*ctxt).encoding.is_null() {
+            if (*ctxt).encoding.is_some() {
                 (*cur).encoding = oldenc;
             }
             return 0;
@@ -1585,16 +1594,15 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         || (*ctxt).options & XmlSaveOption::XmlSaveAsXml as i32 != 0
         || (*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32 != 0
     {
-        let enc = if encoding.is_null() {
-            XmlCharEncoding::None
-        } else {
-            let encoding = CStr::from_ptr(encoding as *const i8).to_string_lossy();
+        let enc = if let Some(encoding) = encoding.as_deref() {
             encoding
                 .parse::<XmlCharEncoding>()
                 .unwrap_or(XmlCharEncoding::Error)
+        } else {
+            XmlCharEncoding::None
         };
-        if !encoding.is_null()
-            && oldctxtenc.is_null()
+        if encoding.is_some()
+            && oldctxtenc.is_none()
             && (*buf).encoder.is_none()
             && (*buf).conv.is_none()
             && ((*ctxt).options & XmlSaveOption::XmlSaveNoDecl as i32) == 0
@@ -1608,13 +1616,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                  * document since we output the XMLDecl the conversion
                  * must be done to not generate not well formed documents.
                  */
-                if xml_save_switch_encoding(
-                    &mut *ctxt,
-                    CStr::from_ptr(encoding as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                ) < 0
-                {
+                if xml_save_switch_encoding(&mut *ctxt, encoding.as_deref().unwrap()) < 0 {
                     (*cur).encoding = oldenc;
                     return -1;
                 }
@@ -1640,10 +1642,11 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
             } else {
                 (*buf).write_bytes(b"\"1.0\"");
             }
-            if !encoding.is_null() {
+            if let Some(encoding) = encoding.as_deref() {
                 (*buf).write_bytes(b" encoding=");
                 if let Some(mut buf) = (*buf).buffer {
-                    buf.push_quoted_cstr(CStr::from_ptr(encoding as *const i8));
+                    let enc = CString::new(encoding).unwrap();
+                    buf.push_quoted_cstr(enc.as_c_str());
                 }
             }
             match (*cur).standalone {
@@ -1704,7 +1707,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     /*
      * Restore the state of the saving context at the end of the document
      */
-    if switched_encoding != 0 && oldctxtenc.is_null() {
+    if switched_encoding != 0 && oldctxtenc.is_none() {
         xml_save_clear_encoding(ctxt);
         (*ctxt).escape = oldescape;
         (*ctxt).escape_attr = oldescape_attr;
@@ -1722,9 +1725,7 @@ unsafe extern "C" fn xml_free_save_ctxt(ctxt: XmlSaveCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).encoding.is_null() {
-        xml_free((*ctxt).encoding as _);
-    }
+    (*ctxt).encoding = None;
     if !(*ctxt).buf.is_null() {
         xml_output_buffer_close((*ctxt).buf);
     }
@@ -1738,29 +1739,28 @@ unsafe extern "C" fn xml_free_save_ctxt(ctxt: XmlSaveCtxtPtr) {
  *
  * Returns the new structure or NULL in case of error
  */
-unsafe extern "C" fn xml_new_save_ctxt(
-    encoding: *const c_char,
-    mut options: c_int,
-) -> XmlSaveCtxtPtr {
+unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: c_int) -> XmlSaveCtxtPtr {
     let ret: XmlSaveCtxtPtr = xml_malloc(size_of::<XmlSaveCtxt>()) as _;
     if ret.is_null() {
         xml_save_err_memory(c"creating saving context".as_ptr() as _);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSaveCtxt>());
+    std::ptr::write(&mut *ret, XmlSaveCtxt::default());
 
-    if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
+    if let Some(enc) = encoding {
         (*ret).handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
         if (*ret).handler.is_none() {
+            let encoding = CString::new(enc).unwrap();
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding,
                 null_mut(),
-                encoding,
+                encoding.as_ptr(),
             );
             xml_free_save_ctxt(ret);
             return null_mut();
         }
-        (*ret).encoding = xml_strdup(encoding as _) as _;
+        (*ret).encoding = Some(enc.to_owned());
         (*ret).escape = None;
     }
     xml_save_ctxt_init(&mut *ret);
@@ -1798,10 +1798,10 @@ unsafe extern "C" fn xml_new_save_ctxt(
  *
  * Returns a new serialization context or NULL in case of error.
  */
-pub unsafe extern "C" fn xml_save_to_filename(
+pub unsafe fn xml_save_to_filename(
     filename: *const c_char,
-    encoding: *const c_char,
-    options: c_int,
+    encoding: Option<&str>,
+    options: i32,
 ) -> XmlSaveCtxtPtr {
     let compression: c_int = 0; /* TODO handle compression option */
 
@@ -1817,35 +1817,6 @@ pub unsafe extern "C" fn xml_save_to_filename(
     ret
 }
 
-// /**
-//  * xmlSaveToBuffer:
-//  * @buffer:  a buffer
-//  * @encoding:  the encoding name to use or NULL
-//  * @options:  a set of xmlSaveOptions
-//  *
-//  * Create a document saving context serializing to a buffer
-//  * with the encoding and the options given
-//  *
-//  * Returns a new serialization context or NULL in case of error.
-//  */
-// pub unsafe extern "C" fn xml_save_to_buffer(
-//     buffer: XmlBufferPtr,
-//     encoding: *const c_char,
-//     options: c_int,
-// ) -> XmlSaveCtxtPtr {
-//     let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
-//     if ret.is_null() {
-//         return null_mut();
-//     }
-//     (*ret).buf = xml_output_buffer_create_buffer(buffer, (*ret).handler);
-//     if (*ret).buf.is_null() {
-//         xml_char_enc_close_func((*ret).handler);
-//         xml_free_save_ctxt(ret);
-//         return null_mut();
-//     }
-//     ret
-// }
-
 /**
  * xmlSaveToIO:
  * @iowrite:  an I/O write function
@@ -1859,11 +1830,11 @@ pub unsafe extern "C" fn xml_save_to_filename(
  *
  * Returns a new serialization context or NULL in case of error.
  */
-pub unsafe extern "C" fn xml_save_to_io(
+pub unsafe fn xml_save_to_io(
     iowrite: Option<XmlOutputWriteCallback>,
     ioclose: Option<XmlOutputCloseCallback>,
     ioctx: *mut c_void,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> XmlSaveCtxtPtr {
     let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
@@ -1914,9 +1885,9 @@ unsafe extern "C" fn html_node_dump_output_internal(
 ) -> c_int {
     use super::htmltree::html_node_dump_format_output;
 
-    let mut oldenc: *const XmlChar = null();
-    let oldctxtenc: *const XmlChar = (*ctxt).encoding;
-    let mut encoding: *const XmlChar = (*ctxt).encoding;
+    let mut oldenc = None;
+    let oldctxtenc = (*ctxt).encoding.clone();
+    let mut encoding = (*ctxt).encoding.clone();
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     let mut switched_encoding: c_int = 0;
 
@@ -1924,49 +1895,43 @@ unsafe extern "C" fn html_node_dump_output_internal(
 
     let doc: XmlDocPtr = (*cur).doc;
     if !doc.is_null() {
-        oldenc = (*doc).encoding;
-        if !(*ctxt).encoding.is_null() {
-            (*doc).encoding = (*ctxt).encoding;
-        } else if !(*doc).encoding.is_null() {
-            encoding = (*doc).encoding;
+        oldenc = (*doc).encoding.clone();
+        if let Some(encoding) = (*ctxt).encoding.as_deref() {
+            (*doc).encoding = Some(encoding.to_owned());
+        } else if let Some(enc) = (*doc).encoding.as_deref() {
+            encoding = Some(enc.to_owned());
         }
     }
 
-    if !encoding.is_null() && !doc.is_null() {
-        html_set_meta_encoding(doc, encoding);
+    if encoding.is_some() && !doc.is_null() {
+        html_set_meta_encoding(doc, encoding.as_deref());
     }
-    if encoding.is_null() && !doc.is_null() {
+    if encoding.is_none() && !doc.is_null() {
         encoding = html_get_meta_encoding(doc);
     }
-    if encoding.is_null() {
-        encoding = c"HTML".as_ptr() as _;
+    if encoding.is_none() {
+        encoding = Some("HTML".to_owned());
     }
-    if !encoding.is_null()
-        && oldctxtenc.is_null()
+    if encoding.is_some()
+        && oldctxtenc.is_none()
         && (*buf).encoder.is_none()
         && (*buf).conv.is_none()
     {
-        if xml_save_switch_encoding(
-            &mut *ctxt,
-            CStr::from_ptr(encoding as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        ) < 0
-        {
+        if xml_save_switch_encoding(&mut *ctxt, encoding.as_deref().unwrap()) < 0 {
             (*doc).encoding = oldenc;
             return -1;
         }
         switched_encoding = 1;
     }
     if (*ctxt).options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-        html_node_dump_format_output(buf, doc, cur, encoding as _, 1);
+        html_node_dump_format_output(buf, doc, cur, encoding.as_deref(), 1);
     } else {
-        html_node_dump_format_output(buf, doc, cur, encoding as _, 0);
+        html_node_dump_format_output(buf, doc, cur, encoding.as_deref(), 0);
     }
     /*
      * Restore the state of the saving context at the end of the document
      */
-    if switched_encoding != 0 && oldctxtenc.is_null() {
+    if switched_encoding != 0 && oldctxtenc.is_none() {
         xml_save_clear_encoding(ctxt);
     }
     if !doc.is_null() {

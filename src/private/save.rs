@@ -91,7 +91,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
             xml_buf_add(buf, c"&amp;".as_ptr() as _, 5);
             cur = cur.add(1);
             base = cur;
-        } else if *cur >= 0x80 && *cur.add(1) != 0 && (doc.is_null() || (*doc).encoding.is_null()) {
+        } else if *cur >= 0x80 && *cur.add(1) != 0 && (doc.is_null() || (*doc).encoding.is_none()) {
             /*
              * We assume we have UTF-8 content.
              */

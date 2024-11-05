@@ -5,7 +5,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_uchar, c_uint, CStr},
+    ffi::{c_char, c_int, c_uchar, c_uint, CStr, CString},
     io::Read,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
@@ -21,7 +21,7 @@ use libc::{
 use crate::{
     __xml_raise_error,
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
-    error::{parser_validity_error, parser_validity_warning, XmlError},
+    error::{parser_validity_error, parser_validity_warning},
     globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
@@ -5743,7 +5743,7 @@ unsafe extern "C" fn html_find_encoding(ctxt: XmlParserCtxtPtr) -> *mut XmlChar 
 
     if ctxt.is_null()
         || (*ctxt).input.is_null()
-        || !(*(*ctxt).input).encoding.is_null()
+        || (*(*ctxt).input).encoding.is_some()
         || (*(*ctxt).input).buf.is_none()
         || (*(*ctxt).input)
             .buf
@@ -5911,10 +5911,11 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
         if guess.is_null() {
             xml_switch_encoding(ctxt, XmlCharEncoding::ISO8859_1);
         } else {
-            if !(*(*ctxt).input).encoding.is_null() {
-                xml_free((*(*ctxt).input).encoding as _);
-            }
-            (*(*ctxt).input).encoding = guess;
+            (*(*ctxt).input).encoding = Some(
+                CStr::from_ptr(guess as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
             if let Some(handler) =
                 find_encoding_handler(CStr::from_ptr(guess as *const i8).to_str().unwrap())
             {
@@ -7027,39 +7028,26 @@ unsafe extern "C" fn html_parse_attribute(
  * If a new encoding is detected the parser is switched to decode
  * it and pass UTF8
  */
-unsafe extern "C" fn html_check_encoding_direct(
-    ctxt: HtmlParserCtxtPtr,
-    mut encoding: *const XmlChar,
-) {
+unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&str>) {
     if ctxt.is_null()
-        || encoding.is_null()
+        || encoding.is_none()
         || (*ctxt).options & HtmlParserOption::HtmlParseIgnoreEnc as i32 != 0
     {
         return;
     }
 
     /* do not change encoding */
-    if !(*(*ctxt).input).encoding.is_null() {
+    if (*(*ctxt).input).encoding.is_some() {
         return;
     }
 
-    if !encoding.is_null() {
-        while *encoding == b' ' || *encoding == b'\t' {
-            encoding = encoding.add(1);
-        }
+    if let Some(mut encoding) = encoding {
+        encoding = encoding.trim_start_matches([' ', '\t']);
+        (*(*ctxt).input).encoding = Some(encoding.to_owned());
 
-        if !(*(*ctxt).input).encoding.is_null() {
-            xml_free((*(*ctxt).input).encoding as _);
-        }
-        (*(*ctxt).input).encoding = xml_strdup(encoding);
-
-        let enc =
-            CStr::from_ptr(encoding as *const i8)
-                .to_str()
-                .map_or(XmlCharEncoding::Error, |s| {
-                    s.parse::<XmlCharEncoding>()
-                        .unwrap_or(XmlCharEncoding::Error)
-                });
+        let enc = encoding
+            .parse::<XmlCharEncoding>()
+            .unwrap_or(XmlCharEncoding::Error);
         /*
          * registered set of known encodings
          */
@@ -7094,17 +7082,16 @@ unsafe extern "C" fn html_check_encoding_direct(
             /*
              * fallback for unknown encodings
              */
-            if let Some(handler) =
-                find_encoding_handler(CStr::from_ptr(encoding as *const i8).to_str().unwrap())
-            {
+            if let Some(handler) = find_encoding_handler(encoding) {
                 (*ctxt).switch_to_encoding(handler);
                 (*ctxt).charset = XmlCharEncoding::UTF8;
             } else {
+                let enc = CString::new(encoding).unwrap();
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
                     c"htmlCheckEncoding: unknown encoding %s\n".as_ptr() as _,
-                    encoding,
+                    enc.as_ptr() as *const u8,
                     null(),
                 );
             }
@@ -7194,7 +7181,14 @@ unsafe extern "C" fn html_check_encoding(ctxt: HtmlParserCtxtPtr, attvalue: *con
     }
     if !encoding.is_null() && *encoding == b'=' {
         encoding = encoding.add(1);
-        html_check_encoding_direct(ctxt, encoding);
+        html_check_encoding_direct(
+            ctxt,
+            Some(
+                CStr::from_ptr(encoding as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ),
+        );
     }
 }
 
@@ -7228,7 +7222,14 @@ unsafe extern "C" fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: *mut *const 
         {
             http = 1;
         } else if !value.is_null() && xml_strcasecmp(att, c"charset".as_ptr() as _) == 0 {
-            html_check_encoding_direct(ctxt, value);
+            html_check_encoding_direct(
+                ctxt,
+                Some(
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ),
+            );
         } else if !value.is_null() && xml_strcasecmp(att, c"content".as_ptr() as _) == 0 {
             content = value;
         }
@@ -9371,13 +9372,7 @@ unsafe fn html_init_parser_ctxt(
         return -1;
     }
     memset(ctxt as _, 0, size_of::<HtmlParserCtxt>());
-    std::ptr::write(&mut (*ctxt).space_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).ns_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).name_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).push_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).node_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).input_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
+    std::ptr::write(&mut *ctxt, HtmlParserCtxt::default());
 
     (*ctxt).dict = xml_dict_create();
     if (*ctxt).dict.is_null() {
@@ -9412,7 +9407,7 @@ unsafe fn html_init_parser_ctxt(
     (*ctxt).input_tab.shrink_to(5);
     (*ctxt).input = null_mut();
     (*ctxt).version = null_mut();
-    (*ctxt).encoding = null_mut();
+    (*ctxt).encoding = None;
     (*ctxt).standalone = -1;
     (*ctxt).instate = XmlParserInputState::XmlParserStart;
 
@@ -9468,13 +9463,7 @@ pub unsafe fn html_new_sax_parser_ctxt(
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
-    std::ptr::write(&mut (*ctxt).space_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).ns_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).name_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).push_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).node_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).input_tab, vec![]);
-    std::ptr::write(&mut (*ctxt).last_error, XmlError::default());
+    std::ptr::write(&mut *ctxt, XmlParserCtxt::default());
     if html_init_parser_ctxt(ctxt, sax, user_data) < 0 {
         html_free_parser_ctxt(ctxt);
         return null_mut();
@@ -9940,9 +9929,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
         );
     }
 
-    if (*ctxt).encoding == XmlCharEncoding::None as usize as _
-        && ((*(*ctxt).input).end.offset_from((*(*ctxt).input).cur)) >= 4
-    {
+    if (*ctxt).encoding.is_none() && ((*(*ctxt).input).end.offset_from((*(*ctxt).input).cur)) >= 4 {
         /*
          * Get the 4 first bytes and decode the charset
          * if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
@@ -10072,9 +10059,9 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
  *
  * Returns the new parser context or NULL
  */
-unsafe extern "C" fn html_create_doc_parser_ctxt(
+unsafe fn html_create_doc_parser_ctxt(
     cur: *const XmlChar,
-    encoding: *const c_char,
+    encoding: Option<&str>,
 ) -> HtmlParserCtxtPtr {
     if cur.is_null() {
         return null_mut();
@@ -10085,28 +10072,22 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
         return null_mut();
     }
 
-    if !encoding.is_null() {
-        if !(*(*ctxt).input).encoding.is_null() {
-            xml_free((*(*ctxt).input).encoding as _);
-        }
-        (*(*ctxt).input).encoding = xml_strdup(encoding as _);
+    if let Some(encoding) = encoding {
+        (*(*ctxt).input).encoding = Some(encoding.to_owned());
 
-        let enc = CStr::from_ptr(encoding)
-            .to_str()
-            .map_or(XmlCharEncoding::Error, |s| {
-                s.parse().unwrap_or(XmlCharEncoding::Error)
-            });
+        let enc = encoding.parse().unwrap_or(XmlCharEncoding::Error);
         /*
          * registered set of known encodings
          */
         if !matches!(enc, XmlCharEncoding::Error) {
+            let encoding = CString::new(encoding).unwrap();
             xml_switch_encoding(ctxt, enc);
             if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
                     c"Unsupported encoding %s\n".as_ptr() as _,
-                    encoding as _,
+                    encoding.as_ptr() as *const u8,
                     null(),
                 );
             }
@@ -10114,15 +10095,15 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
             /*
              * fallback for unknown encodings
              */
-            if let Some(handler) = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap())
-            {
+            if let Some(handler) = find_encoding_handler(encoding) {
                 (*ctxt).switch_to_encoding(handler);
             } else {
+                let encoding = CString::new(encoding).unwrap();
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
                     c"Unsupported encoding %s\n".as_ptr() as _,
-                    encoding as _,
+                    encoding.as_ptr() as *const u8,
                     null(),
                 );
             }
@@ -10150,7 +10131,7 @@ unsafe extern "C" fn html_create_doc_parser_ctxt(
 #[deprecated]
 pub unsafe fn html_sax_parse_doc(
     cur: *const XmlChar,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     sax: HtmlSaxhandlerPtr,
     user_data: Option<GenericErrorContext>,
 ) -> HtmlDocPtr {
@@ -10192,10 +10173,7 @@ pub unsafe fn html_sax_parse_doc(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_parse_doc(
-    cur: *const XmlChar,
-    encoding: *const c_char,
-) -> HtmlDocPtr {
+pub unsafe fn html_parse_doc(cur: *const XmlChar, encoding: Option<&str>) -> HtmlDocPtr {
     html_sax_parse_doc(cur, encoding, null_mut(), None)
 }
 
@@ -10210,9 +10188,9 @@ pub unsafe extern "C" fn html_parse_doc(
  *
  * Returns the new parser context or NULL
  */
-pub unsafe extern "C" fn html_create_file_parser_ctxt(
+pub unsafe fn html_create_file_parser_ctxt(
     filename: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
 ) -> HtmlParserCtxtPtr {
     /* htmlCharEncoding enc; */
     let content: *mut XmlChar;
@@ -10243,14 +10221,15 @@ pub unsafe extern "C" fn html_create_file_parser_ctxt(
     (*ctxt).input_push(input_stream);
 
     /* set encoding */
-    if !encoding.is_null() {
-        let l: size_t = strlen(encoding);
+    if let Some(encoding) = encoding {
+        let l = encoding.len();
 
         if l < 1000 {
             content = xml_malloc_atomic(xml_strlen(content_line) as usize + l + 1) as _;
             if !content.is_null() {
+                let encoding = CString::new(encoding).unwrap();
                 strcpy(content as _, content_line as _);
-                strcat(content as _, encoding);
+                strcat(content as _, encoding.as_ptr());
                 html_check_encoding(ctxt, content);
                 xml_free(content as _);
             }
@@ -10280,7 +10259,7 @@ pub unsafe extern "C" fn html_create_file_parser_ctxt(
 #[deprecated]
 pub unsafe fn html_sax_parse_file(
     filename: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     sax: HtmlSaxhandlerPtr,
     user_data: Option<GenericErrorContext>,
 ) -> HtmlDocPtr {
@@ -10320,10 +10299,7 @@ pub unsafe fn html_sax_parse_file(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_parse_file(
-    filename: *const c_char,
-    encoding: *const c_char,
-) -> HtmlDocPtr {
+pub unsafe fn html_parse_file(filename: *const c_char, encoding: Option<&str>) -> HtmlDocPtr {
     html_sax_parse_file(filename, encoding, null_mut(), None)
 }
 
@@ -10659,6 +10635,7 @@ unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParse
         return null_mut();
     }
     memset(input as _, 0, size_of::<HtmlParserInput>());
+    std::ptr::write(&mut *input, HtmlParserInput::default());
     (*input).filename = null_mut();
     (*input).directory = null_mut();
     (*input).base = null_mut();
@@ -11817,8 +11794,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
 
     DICT_FREE!(dict, (*ctxt).version);
     (*ctxt).version = null_mut();
-    DICT_FREE!(dict, (*ctxt).encoding);
-    (*ctxt).encoding = null_mut();
+    (*ctxt).encoding = None;
     DICT_FREE!(dict, (*ctxt).directory as *const u8);
     (*ctxt).directory = null_mut();
     DICT_FREE!(dict, (*ctxt).ext_sub_uri);
@@ -11961,22 +11937,19 @@ pub unsafe extern "C" fn html_ctxt_use_options(
  *
  * Returns the resulting document tree or NULL
  */
-unsafe extern "C" fn html_do_read(
+unsafe fn html_do_read(
     ctxt: HtmlParserCtxtPtr,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
     reuse: c_int,
 ) -> HtmlDocPtr {
     html_ctxt_use_options(ctxt, options);
     (*ctxt).html = 1;
-    if !encoding.is_null() {
-        if let Some(handler) = find_encoding_handler(CStr::from_ptr(encoding).to_str().unwrap()) {
+    if let Some(encoding) = encoding {
+        if let Some(handler) = find_encoding_handler(encoding) {
             (*ctxt).switch_to_encoding(handler);
-            if !(*(*ctxt).input).encoding.is_null() {
-                xml_free((*(*ctxt).input).encoding as _);
-            }
-            (*(*ctxt).input).encoding = xml_strdup(encoding as _) as _;
+            (*(*ctxt).input).encoding = Some(encoding.to_owned());
         }
     }
     if !url.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_null() {
@@ -12005,10 +11978,10 @@ unsafe extern "C" fn html_do_read(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_read_doc(
+pub unsafe fn html_read_doc(
     cur: *const XmlChar,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
     if cur.is_null() {
@@ -12016,7 +11989,7 @@ pub unsafe extern "C" fn html_read_doc(
     }
 
     xml_init_parser();
-    let ctxt: HtmlParserCtxtPtr = html_create_doc_parser_ctxt(cur, null());
+    let ctxt: HtmlParserCtxtPtr = html_create_doc_parser_ctxt(cur, None);
     if ctxt.is_null() {
         return null_mut();
     }
@@ -12033,9 +12006,9 @@ pub unsafe extern "C" fn html_read_doc(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_read_file(
+pub unsafe fn html_read_file(
     filename: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
     xml_init_parser();
@@ -12043,7 +12016,7 @@ pub unsafe extern "C" fn html_read_file(
     if ctxt.is_null() {
         return null_mut();
     }
-    html_do_read(ctxt, null_mut(), null_mut(), options, 0)
+    html_do_read(ctxt, null_mut(), None, options, 0)
 }
 
 /**
@@ -12061,7 +12034,7 @@ pub unsafe extern "C" fn html_read_file(
 pub unsafe fn html_read_memory(
     buffer: Vec<u8>,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
     xml_init_parser();
@@ -12088,7 +12061,7 @@ pub unsafe fn html_read_memory(
 pub unsafe fn html_read_io(
     ioctx: impl Read + 'static,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
     xml_init_parser();
@@ -12121,11 +12094,11 @@ pub unsafe fn html_read_io(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_ctxt_read_doc(
+pub unsafe fn html_ctxt_read_doc(
     ctxt: XmlParserCtxtPtr,
     cur: *const XmlChar,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
     if cur.is_null() {
@@ -12152,10 +12125,10 @@ pub unsafe extern "C" fn html_ctxt_read_doc(
  *
  * Returns the resulting document tree
  */
-pub unsafe extern "C" fn html_ctxt_read_file(
+pub unsafe fn html_ctxt_read_file(
     ctxt: XmlParserCtxtPtr,
     filename: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
     if filename.is_null() {
@@ -12194,7 +12167,7 @@ pub unsafe fn html_ctxt_read_memory(
     ctxt: XmlParserCtxtPtr,
     buffer: Vec<u8>,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
     if ctxt.is_null() {
@@ -12211,7 +12184,6 @@ pub unsafe fn html_ctxt_read_memory(
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
-        // xml_free_parser_input_buffer(input);
         return null_mut();
     }
 
@@ -12238,7 +12210,7 @@ pub unsafe fn html_ctxt_read_io(
     ctxt: XmlParserCtxtPtr,
     ioctx: impl Read + 'static,
     url: *const c_char,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
     if ctxt.is_null() {
@@ -12539,112 +12511,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlAttrAllowed()");
-        }
-    }
-
-    #[test]
-    fn test_html_create_file_parser_ctxt() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let filename = gen_fileoutput(n_filename, 0);
-                    let encoding = gen_const_char_ptr(n_encoding, 1);
-
-                    let ret_val = html_create_file_parser_ctxt(filename, encoding);
-                    desret_html_parser_ctxt_ptr(ret_val);
-                    des_fileoutput(n_filename, filename, 0);
-                    des_const_char_ptr(n_encoding, encoding, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        eprintln!("Leak of {} blocks found in htmlCreateFileParserCtxt {n_filename} {n_encoding}", xml_mem_blocks() - mem_base);
-                        leaks += 1;
-                    }
-                }
-            }
-
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlCreateFileParserCtxt()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_html_ctxt_read_file() {
-        #[cfg(feature = "html")]
-        unsafe {
-            for n_ctxt in 0..GEN_NB_HTML_PARSER_CTXT_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_options in 0..GEN_NB_INT {
-                            let ctxt = gen_html_parser_ctxt_ptr(n_ctxt, 0);
-                            let filename = gen_filepath(n_filename, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let options = gen_int(n_options, 3);
-
-                            let ret_val = html_ctxt_read_file(ctxt, filename, encoding, options);
-                            desret_html_doc_ptr(ret_val);
-                            des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_filepath(n_filename, filename, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_int(n_options, options, 3);
-                            reset_last_error();
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_html_ctxt_read_doc() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_HTML_PARSER_CTXT_PTR {
-                for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_url in 0..GEN_NB_FILEPATH {
-                        for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            for n_options in 0..GEN_NB_INT {
-                                let mem_base = xml_mem_blocks();
-                                let ctxt = gen_html_parser_ctxt_ptr(n_ctxt, 0);
-                                let cur = gen_const_xml_char_ptr(n_cur, 1);
-                                let url = gen_filepath(n_url, 2);
-                                let encoding = gen_const_char_ptr(n_encoding, 3);
-                                let options = gen_int(n_options, 4);
-
-                                let ret_val = html_ctxt_read_doc(ctxt, cur, url, encoding, options);
-                                desret_html_doc_ptr(ret_val);
-                                des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                                des_const_xml_char_ptr(n_cur, cur, 1);
-                                des_filepath(n_url, url, 2);
-                                des_const_char_ptr(n_encoding, encoding, 3);
-                                des_int(n_options, options, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in htmlCtxtReadDoc",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    eprint!(" {}", n_ctxt);
-                                    eprint!(" {}", n_cur);
-                                    eprint!(" {}", n_url);
-                                    eprint!(" {}", n_encoding);
-                                    eprintln!(" {}", n_options);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlCtxtReadDoc()");
         }
     }
 
@@ -13136,38 +13002,6 @@ mod tests {
     }
 
     #[test]
-    fn test_html_parse_doc() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_const_xml_char_ptr(n_cur, 0);
-                    let encoding = gen_const_char_ptr(n_encoding, 1);
-
-                    let ret_val = html_parse_doc(cur as *const XmlChar, encoding);
-                    desret_html_doc_ptr(ret_val);
-                    des_const_xml_char_ptr(n_cur, cur, 0);
-                    des_const_char_ptr(n_encoding, encoding, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlParseDoc",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_encoding);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlParseDoc()");
-        }
-    }
-
-    #[test]
     fn test_html_parse_document() {
         #[cfg(feature = "html")]
         unsafe {
@@ -13257,110 +13091,5 @@ mod tests {
                 "{leaks} Leaks are found in htmlParseEntityRef()"
             );
         }
-    }
-
-    #[test]
-    fn test_html_parse_file() {
-        #[cfg(feature = "html")]
-        unsafe {
-            for n_filename in 0..GEN_NB_FILEPATH {
-                for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                    let filename = gen_filepath(n_filename, 0);
-                    let encoding = gen_const_char_ptr(n_encoding, 1);
-
-                    let ret_val = html_parse_file(filename, encoding);
-                    desret_html_doc_ptr(ret_val);
-                    des_filepath(n_filename, filename, 0);
-                    des_const_char_ptr(n_encoding, encoding, 1);
-                    reset_last_error();
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_html_read_doc() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_url in 0..GEN_NB_FILEPATH {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_options in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let cur = gen_const_xml_char_ptr(n_cur, 0);
-                            let url = gen_filepath(n_url, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let options = gen_int(n_options, 3);
-
-                            let ret_val =
-                                html_read_doc(cur as *const XmlChar, url, encoding, options);
-                            desret_html_doc_ptr(ret_val);
-                            des_const_xml_char_ptr(n_cur, cur, 0);
-                            des_filepath(n_url, url, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_int(n_options, options, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in htmlReadDoc",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                eprint!(" {}", n_cur);
-                                eprint!(" {}", n_url);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_options);
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found  htmlReadDoc()in");
-        }
-    }
-
-    #[test]
-    fn test_html_read_file() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_options in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let filename = gen_filepath(n_filename, 0);
-                        let encoding = gen_const_char_ptr(n_encoding, 1);
-                        let options = gen_int(n_options, 2);
-
-                        let ret_val = html_read_file(filename, encoding, options);
-                        desret_html_doc_ptr(ret_val);
-                        des_filepath(n_filename, filename, 0);
-                        des_const_char_ptr(n_encoding, encoding, 1);
-                        des_int(n_options, options, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in htmlReadFile",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in htmlReadFile()");
-                            eprint!(" {}", n_filename);
-                            eprint!(" {}", n_encoding);
-                            eprintln!(" {}", n_options);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_html_tag_lookup() {
-
-        /* missing type support */
     }
 }

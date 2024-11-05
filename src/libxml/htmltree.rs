@@ -4,15 +4,15 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int},
+    ffi::{c_char, c_int, CStr, CString},
     mem::size_of,
     ptr::{null, null_mut},
     sync::atomic::Ordering,
 };
 
-use libc::{memset, size_t, snprintf, FILE};
+use libc::{memset, size_t, FILE};
 
-use crate::io::XmlOutputBufferPtr;
+use crate::{encoding::XmlCharEncoding, io::XmlOutputBufferPtr};
 
 use super::{
     globals::{xml_malloc, xml_register_node_default_value},
@@ -23,7 +23,7 @@ use super::{
         XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
     xmlerror::XmlParserErrors,
-    xmlstring::{xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strstr, XmlChar},
+    xmlstring::{xml_str_equal, xml_strcasecmp, xml_strstr, XmlChar},
 };
 
 /**
@@ -108,6 +108,7 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDoc>());
+    std::ptr::write(&mut *cur, XmlDoc::default());
 
     (*cur).typ = XmlElementType::XmlHtmlDocumentNode;
     (*cur).version = null_mut();
@@ -117,13 +118,13 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     (*cur).children = null_mut();
     (*cur).ext_subset = null_mut();
     (*cur).old_ns = null_mut();
-    (*cur).encoding = null_mut();
+    (*cur).encoding = None;
     (*cur).standalone = 1;
     (*cur).compression = 0;
     (*cur).ids = null_mut();
     (*cur).refs = null_mut();
     (*cur)._private = null_mut();
-    (*cur).charset = crate::encoding::XmlCharEncoding::UTF8;
+    (*cur).charset = XmlCharEncoding::UTF8;
     (*cur).properties =
         XmlDocProperties::XmlDocHtml as i32 | XmlDocProperties::XmlDocUserbuilt as i32;
     if !external_id.is_null() || !uri.is_null() {
@@ -145,13 +146,13 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
  *
  * Returns the current encoding as flagged in the HTML source
  */
-pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlChar {
+pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
     let mut cur: HtmlNodePtr;
     let mut content: *const XmlChar;
     let mut encoding: *const XmlChar;
 
     if doc.is_null() {
-        return null_mut();
+        return None;
     }
     cur = (*doc).children;
 
@@ -175,7 +176,7 @@ pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlCh
                 cur = (*cur).next;
             }
             if cur.is_null() {
-                return null_mut();
+                return None;
             }
             cur = (*cur).children;
             /*
@@ -193,7 +194,7 @@ pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlCh
                 cur = (*cur).next;
             }
             if cur.is_null() {
-                return null_mut();
+                return None;
             }
         }
         // found_head:
@@ -258,7 +259,11 @@ pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlCh
                                 encoding = encoding.add(1);
                             }
                         }
-                        return encoding;
+                        return Some(
+                            CStr::from_ptr(encoding as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
                     }
                 }
                 attr = (*attr).next;
@@ -266,7 +271,7 @@ pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlCh
         }
         cur = (*cur).next;
     }
-    null_mut()
+    None
 }
 
 /**
@@ -280,36 +285,25 @@ pub unsafe extern "C" fn html_get_meta_encoding(doc: HtmlDocPtr) -> *const XmlCh
  *
  * Returns 0 in case of success and -1 in case of error
  */
-pub unsafe extern "C" fn html_set_meta_encoding(
-    doc: HtmlDocPtr,
-    encoding: *const XmlChar,
-) -> c_int {
+pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) -> c_int {
     let mut cur: HtmlNodePtr;
     let mut meta: HtmlNodePtr = null_mut();
     let mut head: HtmlNodePtr = null_mut();
-    let mut content: *const XmlChar = null();
-    let mut newcontent: [c_char; 100] = [0; 100];
-
-    newcontent[0] = 0;
 
     if doc.is_null() {
         return -1;
     }
 
     /* html isn't a real encoding it's just libxml2 way to get entities */
-    if xml_strcasecmp(encoding, c"html".as_ptr() as _) == 0 {
+    if encoding.as_ref().map(|e| e.to_ascii_lowercase()).as_deref() == Some("html") {
         return -1;
     }
 
-    if !encoding.is_null() {
-        snprintf(
-            newcontent.as_mut_ptr() as _,
-            newcontent.len(),
-            c"text/html; charset=%s".as_ptr() as _,
-            encoding,
-        );
-        newcontent[newcontent.len() - 1] = 0;
-    }
+    let newcontent = if let Some(encoding) = encoding {
+        format!("text/html; charset={encoding}")
+    } else {
+        String::new()
+    };
 
     cur = (*doc).children;
 
@@ -366,12 +360,12 @@ pub unsafe extern "C" fn html_set_meta_encoding(
     }
 
     let create = |mut meta: *mut super::tree::XmlNode,
-                  encoding: *const u8,
+                  encoding: Option<&str>,
                   head: *mut super::tree::XmlNode,
-                  newcontent: [i8; 100],
-                  content: *const u8| {
+                  newcontent: &str,
+                  content: Option<&str>| {
         if meta.is_null() {
-            if !encoding.is_null() && !head.is_null() {
+            if encoding.is_some() && !head.is_null() {
                 /*
                  * Create a new Meta element with the right attributes
                  */
@@ -391,12 +385,16 @@ pub unsafe extern "C" fn html_set_meta_encoding(
             }
         } else {
             /* remove the meta tag if NULL is passed */
-            if encoding.is_null() {
+            if encoding.is_none() {
                 xml_unlink_node(meta);
                 xml_free_node(meta);
             }
             /* change the document only if there is a real encoding change */
-            else if xml_strcasestr(content, encoding).is_null() {
+            else if content.map_or(true, |c| {
+                !c.to_ascii_lowercase()
+                    .contains(&encoding.unwrap().to_ascii_lowercase())
+            }) {
+                let newcontent = CString::new(newcontent).unwrap();
                 xml_set_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
             }
         }
@@ -411,7 +409,7 @@ pub unsafe extern "C" fn html_set_meta_encoding(
         assert!(!cur.is_null());
         if (*cur).children.is_null() {
             // goto create;
-            return create(meta, encoding, head, newcontent, content);
+            return create(meta, encoding, head, &newcontent, None);
         }
         cur = (*cur).children;
     }
@@ -421,6 +419,7 @@ pub unsafe extern "C" fn html_set_meta_encoding(
      * Search and update all the remaining the meta elements carrying
      * encoding information
      */
+    let mut content = None;
     while !cur.is_null() {
         if (matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null())
             && (xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0)
@@ -429,7 +428,7 @@ pub unsafe extern "C" fn html_set_meta_encoding(
             let mut http: c_int;
             let mut value: *const XmlChar;
 
-            content = null_mut();
+            content = None;
             http = 0;
             while !attr.is_null() {
                 if !(*attr).children.is_null()
@@ -444,15 +443,19 @@ pub unsafe extern "C" fn html_set_meta_encoding(
                     } else if !value.is_null()
                         && xml_strcasecmp((*attr).name, c"content".as_ptr() as _) == 0
                     {
-                        content = value;
+                        content = Some(
+                            CStr::from_ptr(value as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
                     }
-                    if http != 0 && !content.is_null() {
+                    if http != 0 && content.is_some() {
                         break;
                     }
                 }
                 attr = (*attr).next;
             }
-            if http != 0 && !content.is_null() {
+            if http != 0 && content.is_some() {
                 meta = cur;
                 break;
             }
@@ -460,7 +463,7 @@ pub unsafe extern "C" fn html_set_meta_encoding(
         cur = (*cur).next;
     }
     // create:
-    create(meta, encoding, head, newcontent, content)
+    create(meta, encoding, head, &newcontent, content.as_deref())
 }
 
 /**
@@ -522,10 +525,10 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
     size: *mut c_int,
     format: c_int,
 ) {
-    use std::{cell::RefCell, ffi::CStr, rc::Rc};
+    use std::{cell::RefCell, rc::Rc};
 
     use crate::{
-        encoding::find_encoding_handler,
+        encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_alloc_output_buffer_internal, xml_output_buffer_close, XmlOutputBufferPtr},
         libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors, xmlstring::xml_strndup},
     };
@@ -541,29 +544,27 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         return;
     }
 
-    let encoding: *const c_char = html_get_meta_encoding(cur) as _;
-
-    let handler =
-        if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
-            let e = enc.parse::<crate::encoding::XmlCharEncoding>();
-            if !matches!(e, Ok(crate::encoding::XmlCharEncoding::UTF8)) {
-                let handler = find_encoding_handler(enc);
-                if handler.is_none() {
-                    html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding,
-                        null_mut(),
-                        encoding,
-                    );
-                }
-                handler
-            } else {
-                None
+    let handler = if let Some(enc) = html_get_meta_encoding(cur) {
+        let e = enc.parse::<XmlCharEncoding>();
+        if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
+            let handler = find_encoding_handler(&enc);
+            if handler.is_none() {
+                let encoding = CString::new(enc).unwrap();
+                html_save_err(
+                    XmlParserErrors::XmlSaveUnknownEncoding,
+                    null_mut(),
+                    encoding.as_ptr(),
+                );
             }
-        } else if let Some(handler) = find_encoding_handler("HTML") {
-            Some(handler)
+            handler
         } else {
-            find_encoding_handler("ascii")
-        };
+            None
+        }
+    } else if let Some(handler) = find_encoding_handler("HTML") {
+        Some(handler)
+    } else {
+        find_encoding_handler("ascii")
+    };
 
     let buf: XmlOutputBufferPtr =
         xml_alloc_output_buffer_internal(handler.map(|e| Rc::new(RefCell::new(e))));
@@ -573,7 +574,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         return;
     }
 
-    html_doc_content_dump_format_output(buf, cur, null_mut(), format);
+    html_doc_content_dump_format_output(buf, cur, None, format);
 
     (*buf).flush();
     if let Some(conv) = (*buf).conv {
@@ -613,10 +614,8 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
-    use std::ffi::CStr;
-
     use crate::{
-        encoding::find_encoding_handler,
+        encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
         libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
     };
@@ -627,29 +626,27 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
         return -1;
     }
 
-    let encoding: *const c_char = html_get_meta_encoding(cur) as _;
-
-    let handler =
-        if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
-            let e = enc.parse::<crate::encoding::XmlCharEncoding>();
-            if !matches!(e, Ok(crate::encoding::XmlCharEncoding::UTF8)) {
-                let handler = find_encoding_handler(enc);
-                if handler.is_none() {
-                    html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding,
-                        null_mut(),
-                        encoding,
-                    );
-                }
-                handler
-            } else {
-                None
+    let handler = if let Some(enc) = html_get_meta_encoding(cur) {
+        let e = enc.parse::<XmlCharEncoding>();
+        if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
+            let handler = find_encoding_handler(&enc);
+            if handler.is_none() {
+                let encoding = CString::new(enc).unwrap();
+                html_save_err(
+                    XmlParserErrors::XmlSaveUnknownEncoding,
+                    null_mut(),
+                    encoding.as_ptr(),
+                );
             }
-        } else if let Some(handler) = find_encoding_handler("HTML") {
-            Some(handler)
+            handler
         } else {
-            find_encoding_handler("ascii")
-        };
+            None
+        }
+    } else if let Some(handler) = find_encoding_handler("HTML") {
+        Some(handler)
+    } else {
+        find_encoding_handler("ascii")
+    };
 
     let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, handler);
     if buf.is_null() {
@@ -671,10 +668,10 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> c_int {
-    use std::{cell::RefCell, ffi::CStr, rc::Rc};
+    use std::{cell::RefCell, rc::Rc};
 
     use crate::{
-        encoding::find_encoding_handler,
+        encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_filename, XmlOutputBufferPtr},
         libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
     };
@@ -685,29 +682,27 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
 
     xml_init_parser();
 
-    let encoding: *const c_char = html_get_meta_encoding(cur) as _;
-
-    let handler =
-        if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
-            let e = enc.parse::<crate::encoding::XmlCharEncoding>();
-            if !matches!(e, Ok(crate::encoding::XmlCharEncoding::UTF8)) {
-                let handler = find_encoding_handler(enc);
-                if handler.is_none() {
-                    html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding,
-                        null_mut(),
-                        encoding,
-                    );
-                }
-                handler
-            } else {
-                None
+    let handler = if let Some(enc) = html_get_meta_encoding(cur) {
+        let e = enc.parse::<XmlCharEncoding>();
+        if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
+            let handler = find_encoding_handler(&enc);
+            if handler.is_none() {
+                let encoding = CString::new(enc).unwrap();
+                html_save_err(
+                    XmlParserErrors::XmlSaveUnknownEncoding,
+                    null_mut(),
+                    encoding.as_ptr(),
+                );
             }
-        } else if let Some(handler) = find_encoding_handler("HTML") {
-            Some(handler)
+            handler
         } else {
-            find_encoding_handler("ascii")
-        };
+            None
+        }
+    } else if let Some(handler) = find_encoding_handler("HTML") {
+        Some(handler)
+    } else {
+        find_encoding_handler("ascii")
+    };
 
     /*
      * save the content to a temp buffer.
@@ -792,7 +787,7 @@ unsafe extern "C" fn html_buf_node_dump_format(
     (*outbuf).written = 0;
 
     let using: size_t = xml_buf_use(buf);
-    html_node_dump_format_output(outbuf, doc, cur, null_mut(), format);
+    html_node_dump_format_output(outbuf, doc, cur, None, format);
     xml_free(outbuf as _);
     (xml_buf_use(buf) as i32 - using as i32) as _
 }
@@ -872,7 +867,7 @@ pub unsafe extern "C" fn html_node_dump_file_format(
     use std::ffi::CStr;
 
     use crate::{
-        encoding::find_encoding_handler,
+        encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
         libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
     };
@@ -881,8 +876,8 @@ pub unsafe extern "C" fn html_node_dump_file_format(
 
     let handler =
         if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
-            let e = enc.parse::<crate::encoding::XmlCharEncoding>();
-            if !matches!(e, Ok(crate::encoding::XmlCharEncoding::UTF8)) {
+            let e = enc.parse::<XmlCharEncoding>();
+            if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
                 let handler = find_encoding_handler(enc);
                 if handler.is_none() {
                     html_save_err(
@@ -909,7 +904,7 @@ pub unsafe extern "C" fn html_node_dump_file_format(
         return 0;
     }
 
-    html_node_dump_format_output(buf, doc, cur, null_mut(), format);
+    html_node_dump_format_output(buf, doc, cur, None, format);
 
     xml_output_buffer_close(buf)
 }
@@ -926,11 +921,11 @@ pub unsafe extern "C" fn html_node_dump_file_format(
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_save_file_enc(
+pub unsafe fn html_save_file_enc(
     filename: *const c_char,
     cur: XmlDocPtr,
-    encoding: *const c_char,
-) -> c_int {
+    encoding: Option<&str>,
+) -> i32 {
     html_save_file_format(filename, cur, encoding, 1)
 }
 
@@ -946,16 +941,16 @@ pub unsafe extern "C" fn html_save_file_enc(
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_save_file_format(
+pub unsafe fn html_save_file_format(
     filename: *const c_char,
     cur: XmlDocPtr,
-    encoding: *const c_char,
-    format: c_int,
-) -> c_int {
-    use std::{cell::RefCell, ffi::CStr, rc::Rc};
+    encoding: Option<&str>,
+    format: i32,
+) -> i32 {
+    use std::{cell::RefCell, rc::Rc};
 
     use crate::{
-        encoding::find_encoding_handler,
+        encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_filename, XmlOutputBufferPtr},
         libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
     };
@@ -966,33 +961,33 @@ pub unsafe extern "C" fn html_save_file_format(
 
     xml_init_parser();
 
-    let handler =
-        if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
-            let e = enc.parse::<crate::encoding::XmlCharEncoding>();
-            let handler = if !matches!(e, Ok(crate::encoding::XmlCharEncoding::UTF8)) {
-                let handler = find_encoding_handler(enc);
-                if handler.is_none() {
-                    html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding,
-                        null_mut(),
-                        encoding,
-                    );
-                }
-                handler
-            } else {
-                None
-            };
-            html_set_meta_encoding(cur, encoding as _);
+    let handler = if let Some(enc) = encoding.as_ref() {
+        let e = enc.parse::<XmlCharEncoding>();
+        let handler = if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
+            let handler = find_encoding_handler(enc);
+            if handler.is_none() {
+                let encoding = CString::new(*enc).unwrap();
+                html_save_err(
+                    XmlParserErrors::XmlSaveUnknownEncoding,
+                    null_mut(),
+                    encoding.as_ptr(),
+                );
+            }
             handler
         } else {
-            html_set_meta_encoding(cur, c"UTF-8".as_ptr() as _);
-            let handler = find_encoding_handler("HTML");
-            if handler.is_some() {
-                handler
-            } else {
-                find_encoding_handler("ascii")
-            }
+            None
         };
+        html_set_meta_encoding(cur, Some(enc));
+        handler
+    } else {
+        html_set_meta_encoding(cur, Some("UTF-8"));
+        let handler = find_encoding_handler("HTML");
+        if handler.is_some() {
+            handler
+        } else {
+            find_encoding_handler("ascii")
+        }
+    };
 
     /*
      * save the content to a temp buffer.
@@ -1163,11 +1158,11 @@ unsafe extern "C" fn html_attr_dump_output(
  * Dump an HTML node, recursive behaviour,children are printed too.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_node_dump_format_output(
+pub unsafe fn html_node_dump_format_output(
     buf: XmlOutputBufferPtr,
     doc: XmlDocPtr,
     mut cur: XmlNodePtr,
-    _encoding: *const c_char,
+    _encoding: Option<&str>,
     format: c_int,
 ) {
     use std::ffi::CStr;
@@ -1471,7 +1466,7 @@ pub unsafe extern "C" fn html_doc_content_dump_output(
     cur: XmlDocPtr,
     _encoding: *const c_char,
 ) {
-    html_node_dump_format_output(buf, cur, cur as _, null_mut(), 1);
+    html_node_dump_format_output(buf, cur, cur as _, None, 1);
 }
 
 /**
@@ -1484,10 +1479,10 @@ pub unsafe extern "C" fn html_doc_content_dump_output(
  * Dump an HTML document.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_doc_content_dump_format_output(
+pub unsafe fn html_doc_content_dump_format_output(
     buf: XmlOutputBufferPtr,
     cur: XmlDocPtr,
-    _encoding: *const c_char,
+    _encoding: Option<&str>,
     format: c_int,
 ) {
     let mut typ: c_int = 0;
@@ -1495,7 +1490,7 @@ pub unsafe extern "C" fn html_doc_content_dump_format_output(
         typ = (*cur).typ as i32;
         (*cur).typ = XmlElementType::XmlHtmlDocumentNode;
     }
-    html_node_dump_format_output(buf, cur, cur as _, null_mut(), format);
+    html_node_dump_format_output(buf, cur, cur as _, None, format);
     if !cur.is_null() {
         (*cur).typ = typ.try_into().unwrap();
     }
@@ -1518,7 +1513,7 @@ pub unsafe extern "C" fn html_node_dump_output(
     cur: XmlNodePtr,
     _encoding: *const c_char,
 ) {
-    html_node_dump_format_output(buf, doc, cur, null_mut(), 1);
+    html_node_dump_format_output(buf, doc, cur, None, 1);
 }
 
 /**
@@ -1571,73 +1566,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_html_doc_content_dump_format_output() {
-        #[cfg(all(feature = "html", feature = "output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    for n_encoding in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_format in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let buf = gen_xml_output_buffer_ptr(n_buf, 0);
-                            let cur = gen_xml_doc_ptr(n_cur, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let format = gen_int(n_format, 3);
-
-                            html_doc_content_dump_format_output(buf, cur, encoding, format);
-                            des_xml_output_buffer_ptr(n_buf, buf, 0);
-                            des_xml_doc_ptr(n_cur, cur, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_int(n_format, format, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                eprintln!("Leak of {} blocks found in htmlDocContentDumpFormatOutput {n_buf} {n_cur} {n_encoding} {n_format}", xml_mem_blocks() - mem_base);
-                                leaks += 1;
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlDocContentDumpFormatOutput()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_html_get_meta_encoding() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_HTML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_html_doc_ptr(n_doc, 0);
-
-                let ret_val = html_get_meta_encoding(doc);
-                desret_const_xml_char_ptr(ret_val);
-                des_html_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in htmlGetMetaEncoding",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_doc);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlGetMetaEncoding()"
-            );
-        }
-    }
 
     #[test]
     fn test_html_doc_content_dump_output() {
@@ -2006,55 +1934,6 @@ mod tests {
     }
 
     #[test]
-    fn test_html_node_dump_format_output() {
-        #[cfg(all(feature = "html", feature = "output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                        for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            for n_format in 0..GEN_NB_INT {
-                                let mem_base = xml_mem_blocks();
-                                let buf = gen_xml_output_buffer_ptr(n_buf, 0);
-                                let doc = gen_xml_doc_ptr(n_doc, 1);
-                                let cur = gen_xml_node_ptr(n_cur, 2);
-                                let encoding = gen_const_char_ptr(n_encoding, 3);
-                                let format = gen_int(n_format, 4);
-
-                                html_node_dump_format_output(buf, doc, cur, encoding, format);
-                                des_xml_output_buffer_ptr(n_buf, buf, 0);
-                                des_xml_doc_ptr(n_doc, doc, 1);
-                                des_xml_node_ptr(n_cur, cur, 2);
-                                des_const_char_ptr(n_encoding, encoding, 3);
-                                des_int(n_format, format, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in htmlNodeDumpFormatOutput",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    eprint!(" {}", n_buf);
-                                    eprint!(" {}", n_doc);
-                                    eprint!(" {}", n_cur);
-                                    eprint!(" {}", n_encoding);
-                                    eprintln!(" {}", n_format);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlNodeDumpFormatOutput()"
-            );
-        }
-    }
-
-    #[test]
     fn test_html_node_dump_output() {
         #[cfg(all(feature = "html", feature = "output"))]
         unsafe {
@@ -2127,88 +2006,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlSaveFile()");
-        }
-    }
-
-    #[test]
-    fn test_html_save_file_enc() {
-        #[cfg(all(feature = "html", feature = "output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let filename = gen_fileoutput(n_filename, 0);
-                        let cur = gen_xml_doc_ptr(n_cur, 1);
-                        let encoding = gen_const_char_ptr(n_encoding, 2);
-
-                        let ret_val = html_save_file_enc(filename, cur, encoding);
-                        desret_int(ret_val);
-                        des_fileoutput(n_filename, filename, 0);
-                        des_xml_doc_ptr(n_cur, cur, 1);
-                        des_const_char_ptr(n_encoding, encoding, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in htmlSaveFileEnc",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_filename);
-                            eprint!(" {}", n_cur);
-                            eprintln!(" {}", n_encoding);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlSaveFileEnc()");
-        }
-    }
-
-    #[test]
-    fn test_html_save_file_format() {
-        #[cfg(all(feature = "html", feature = "output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_format in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let filename = gen_fileoutput(n_filename, 0);
-                            let cur = gen_xml_doc_ptr(n_cur, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let format = gen_int(n_format, 3);
-
-                            let ret_val = html_save_file_format(filename, cur, encoding, format);
-                            desret_int(ret_val);
-                            des_fileoutput(n_filename, filename, 0);
-                            des_xml_doc_ptr(n_cur, cur, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_int(n_format, format, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in htmlSaveFileFormat",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                eprint!(" {}", n_filename);
-                                eprint!(" {}", n_cur);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_format);
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlSaveFileFormat()"
-            );
         }
     }
 }

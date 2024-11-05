@@ -11,7 +11,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_uchar, CStr, CString},
+    ffi::{c_char, c_int, c_uchar, CStr},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -662,11 +662,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         }
         if !doc.is_null() {
             if (*doc).children.is_null() {
-                if !(*ctxt).encoding.is_null() {
-                    (*doc).encoding = xml_strdup((*ctxt).encoding);
-                } else {
-                    (*doc).encoding = null_mut();
-                }
+                (*doc).encoding = (*ctxt).encoding().map(|e| e.to_owned());
                 (*doc).standalone = (*ctxt).standalone;
             }
         } else {
@@ -950,10 +946,9 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
             (*(*writer).out).conv = XmlBufRef::with_capacity(4000);
         }
         (*(*writer).out).encode(true);
-        if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_null() {
-            let name =
-                CString::new((*(*writer).out).encoder.as_ref().unwrap().borrow().name()).unwrap();
-            (*(*writer).doc).encoding = xml_strdup(name.as_ptr() as *const u8);
+        if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_none() {
+            let encoder = (*(*writer).out).encoder.as_ref().unwrap().borrow();
+            (*(*writer).doc).encoding = Some(encoder.name().to_owned());
         }
     } else {
         (*(*writer).out).conv = None;

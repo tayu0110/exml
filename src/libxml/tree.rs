@@ -16,6 +16,7 @@ use libc::{memcpy, memset, ptrdiff_t, size_t, snprintf, strlen, FILE};
 
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
+    encoding::XmlCharEncoding,
     error::XmlErrorDomain,
     io::XmlOutputBufferPtr,
     libxml::{
@@ -156,8 +157,9 @@ pub const XML_XML_ID: *const XmlChar = c"xml:id".as_ptr() as _;
  * be deprecated to use an XML_DTD_NODE.
  */
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlElementType {
+    #[default]
     XmlInvalidNode = 0, // for std::mem::zeroed(). This is invalid value.
     XmlElementNode = 1,
     XmlAttributeNode = 2,
@@ -702,11 +704,11 @@ pub struct XmlDoc {
     pub(crate) ext_subset: *mut XmlDtd, /* the document external subset */
     pub(crate) old_ns: *mut XmlNs,      /* Global namespace, the old way */
     pub(crate) version: *const XmlChar, /* the XML version string */
-    pub(crate) encoding: *const XmlChar, /* external initial encoding, if any */
+    pub(crate) encoding: Option<String>, /* external initial encoding, if any */
     pub(crate) ids: *mut c_void,        /* Hash table for ID attributes if any */
     pub(crate) refs: *mut c_void,       /* Hash table for IDREFs attributes if any */
     pub(crate) url: *const XmlChar,     /* The URI for that document */
-    pub(crate) charset: crate::encoding::XmlCharEncoding, /* Internal flag for charset handling,
+    pub(crate) charset: XmlCharEncoding, /* Internal flag for charset handling,
                                         actually an xmlCharEncoding */
     pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
     pub(crate) psvi: *mut c_void, /* for type/PSVI information */
@@ -714,6 +716,37 @@ pub struct XmlDoc {
                                   document */
     pub properties: c_int, /* set of xmlDocProperties for this document
                            set at the end of parsing */
+}
+
+impl Default for XmlDoc {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: XmlElementType::default(),
+            name: null_mut(),
+            children: null_mut(),
+            last: null_mut(),
+            parent: null_mut(),
+            next: null_mut(),
+            prev: null_mut(),
+            doc: null_mut(),
+            compression: 0,
+            standalone: 0,
+            int_subset: null_mut(),
+            ext_subset: null_mut(),
+            old_ns: null_mut(),
+            version: null(),
+            encoding: None,
+            ids: null_mut(),
+            refs: null_mut(),
+            url: null(),
+            charset: XmlCharEncoding::None,
+            dict: null_mut(),
+            psvi: null_mut(),
+            parse_flags: 0,
+            properties: 0,
+        }
+    }
 }
 
 /**
@@ -1587,12 +1620,6 @@ pub unsafe extern "C" fn xml_new_dtd(
     system_id: *const XmlChar,
 ) -> XmlDtdPtr {
     if !doc.is_null() && !(*doc).ext_subset.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewDtd(%s): document %s already have a DTD %s\n",
-        // 	    /* !!! */  name, (*doc).name,
-        // 	    /* !!! */ (*(*doc).extSubset).name);
-        // #endif
         return null_mut();
     }
 
@@ -1871,10 +1898,6 @@ pub unsafe extern "C" fn xml_new_ns(
  */
 pub unsafe extern "C" fn xml_free_ns(cur: XmlNsPtr) {
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlFreeNs : ns.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
     if !(*cur).href.load(Ordering::Relaxed).is_null() {
@@ -1895,10 +1918,6 @@ pub unsafe extern "C" fn xml_free_ns(cur: XmlNsPtr) {
 pub unsafe extern "C" fn xml_free_ns_list(mut cur: XmlNsPtr) {
     let mut next: XmlNsPtr;
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlFreeNsList : ns.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
     while !cur.is_null() {
@@ -1930,6 +1949,7 @@ pub unsafe extern "C" fn xml_new_doc(mut version: *const XmlChar) -> XmlDocPtr {
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDoc>());
+    std::ptr::write(&mut *cur, XmlDoc::default());
     (*cur).typ = XmlElementType::XmlDocumentNode;
 
     (*cur).version = xml_strdup(version) as _;
@@ -1969,10 +1989,6 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
     let mut dict: XmlDictPtr = null_mut();
 
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlFreeDoc : document.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
 
@@ -2022,7 +2038,7 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
 
     DICT_FREE!(dict, (*cur).version);
     DICT_FREE!(dict, (*cur).name);
-    DICT_FREE!(dict, (*cur).encoding);
+    (*cur).encoding = None;
     DICT_FREE!(dict, (*cur).url);
     xml_free(cur as _);
     if !dict.is_null() {
@@ -2050,10 +2066,6 @@ pub unsafe extern "C" fn xml_new_doc_prop(
     value: *const XmlChar,
 ) -> XmlAttrPtr {
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewDocProp : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -2214,10 +2226,6 @@ pub unsafe extern "C" fn xml_new_prop(
     value: *const XmlChar,
 ) -> XmlAttrPtr {
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewProp : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -2241,10 +2249,6 @@ pub unsafe extern "C" fn xml_new_ns_prop(
     value: *const XmlChar,
 ) -> XmlAttrPtr {
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewNsProp : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -2268,10 +2272,6 @@ pub unsafe extern "C" fn xml_new_ns_prop_eat_name(
     value: *const XmlChar,
 ) -> XmlAttrPtr {
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewNsPropEatName : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -2352,17 +2352,9 @@ unsafe extern "C" fn xml_new_reconciled_ns(
     let mut counter: c_int = 1;
 
     if tree.is_null() || !matches!((*tree).typ, XmlElementType::XmlElementNode) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewReconciledNs : tree.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
     if ns.is_null() || !matches!((*ns).typ, Some(XmlElementType::XmlNamespaceDecl)) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewReconciledNs : ns.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
     /*
@@ -3095,9 +3087,7 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: c_int) -> XmlDo
     if !(*doc).name.is_null() {
         (*ret).name = xml_mem_strdup((*doc).name as _) as _;
     }
-    if !(*doc).encoding.is_null() {
-        (*ret).encoding = xml_strdup((*doc).encoding);
-    }
+    (*ret).encoding = (*doc).encoding.clone();
     if !(*doc).url.is_null() {
         (*ret).url = xml_strdup((*doc).url);
     }
@@ -3254,10 +3244,6 @@ pub unsafe extern "C" fn xml_new_doc_node_eat_name(
  */
 pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> XmlNodePtr {
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewNode : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -3298,10 +3284,6 @@ pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> Xml
  */
 pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar) -> XmlNodePtr {
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewNode : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -3356,18 +3338,10 @@ pub unsafe extern "C" fn xml_new_child(
     let prev: XmlNodePtr;
 
     if parent.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewChild : parent.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewChild : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -3485,10 +3459,6 @@ pub unsafe extern "C" fn xml_new_doc_pi(
     content: *const XmlChar,
 ) -> XmlNodePtr {
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewPI : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -3884,18 +3854,10 @@ pub unsafe extern "C" fn xml_new_text_child(
     let prev: XmlNodePtr;
 
     if parent.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewTextChild : parent.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if name.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNewTextChild : name.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -4428,10 +4390,6 @@ pub unsafe extern "C" fn xml_doc_get_root_element(doc: *const XmlDoc) -> XmlNode
  */
 pub unsafe extern "C" fn xml_get_last_child(parent: *const XmlNode) -> XmlNodePtr {
     if parent.is_null() || matches!((*parent).typ, XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlGetLastChild : parent.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
     (*parent).last
@@ -4623,26 +4581,14 @@ pub unsafe extern "C" fn xml_add_child(parent: XmlNodePtr, cur: XmlNodePtr) -> X
     let mut prev: XmlNodePtr;
 
     if parent.is_null() || matches!((*parent).typ, XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddChild : parent.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddChild : child.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if parent == cur {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddChild : parent == cur\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
     /*
@@ -4762,26 +4708,11 @@ pub unsafe extern "C" fn xml_add_child_list(parent: XmlNodePtr, mut cur: XmlNode
     let mut prev: XmlNodePtr;
 
     if parent.is_null() || matches!((*parent).typ, XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddChildList : parent.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddChildList : child.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
-    }
-
-    if !(*cur).doc.is_null() && !(*parent).doc.is_null() && (*cur).doc != (*parent).doc {
-        // #ifdef DEBUG_TREE
-        // 	xmlGenericError(xmlGenericErrorContext,
-        // 		c"Elements moved to a different document\n".as_ptr() as _);
-        // #endif
     }
 
     /*
@@ -4853,10 +4784,6 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
         || matches!((*old).typ, XmlElementType::XmlNamespaceDecl)
         || (*old).parent.is_null()
     {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlReplaceNode : old.is_null() or without parent\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
@@ -4869,19 +4796,11 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
     if (matches!((*old).typ, XmlElementType::XmlAttributeNode)
         && !matches!((*cur).typ, XmlElementType::XmlAttributeNode))
     {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlReplaceNode : Trying to replace attribute node with other node type\n".as_ptr() as _);
-        // #endif
         return old;
     }
     if (matches!((*cur).typ, XmlElementType::XmlAttributeNode)
         && !matches!((*old).typ, XmlElementType::XmlAttributeNode))
     {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlReplaceNode : Trying to replace a non-attribute node with attribute node\n".as_ptr() as _);
-        // #endif
         return old;
     }
     xml_unlink_node(cur);
@@ -5004,25 +4923,13 @@ unsafe extern "C" fn xml_add_prop_sibling(
 ))]
 pub unsafe extern "C" fn xml_add_prev_sibling(cur: XmlNodePtr, elem: XmlNodePtr) -> XmlNodePtr {
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddPrevSibling : cur.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
     if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddPrevSibling : elem.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if cur == elem {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddPrevSibling : cur == elem\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -5083,26 +4990,14 @@ pub unsafe extern "C" fn xml_add_prev_sibling(cur: XmlNodePtr, elem: XmlNodePtr)
  */
 pub unsafe extern "C" fn xml_add_sibling(mut cur: XmlNodePtr, elem: XmlNodePtr) -> XmlNodePtr {
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddSibling : cur.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddSibling : elem.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if cur == elem {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddSibling : cur == elem\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -5169,25 +5064,13 @@ pub unsafe extern "C" fn xml_add_sibling(mut cur: XmlNodePtr, elem: XmlNodePtr) 
  */
 pub unsafe extern "C" fn xml_add_next_sibling(cur: XmlNodePtr, elem: XmlNodePtr) -> XmlNodePtr {
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddNextSibling : cur.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
     if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddNextSibling : elem.is_null()\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
     if cur == elem {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlAddNextSibling : cur == elem\n".as_ptr() as _);
-        // #endif
         return null_mut();
     }
 
@@ -5244,10 +5127,6 @@ pub unsafe extern "C" fn xml_add_next_sibling(cur: XmlNodePtr, elem: XmlNodePtr)
  */
 pub unsafe extern "C" fn xml_unlink_node(cur: XmlNodePtr) {
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlUnlinkNode : node.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
     if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
@@ -5365,10 +5244,6 @@ pub unsafe extern "C" fn xml_text_concat(
         && !matches!((*node).typ, XmlElementType::XmlCommentNode)
         && !matches!((*node).typ, XmlElementType::XmlPiNode)
     {
-        // #ifdef DEBUG_TREE
-        // 	xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlTextConcat: node is not text nor CDATA\n".as_ptr() as _);
-        // #endif
         return -1;
     }
     /* need to check if content is currently in the dictionary */
@@ -6063,10 +5938,6 @@ pub unsafe extern "C" fn xml_get_ns_list(
  */
 pub unsafe extern "C" fn xml_set_ns(node: XmlNodePtr, ns: XmlNsPtr) {
     if node.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlSetNs: node.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
     if (matches!((*node).typ, XmlElementType::XmlElementNode)
@@ -6095,13 +5966,7 @@ pub unsafe extern "C" fn xml_copy_namespace(cur: XmlNsPtr) -> XmlNsPtr {
             (*cur).href.load(Ordering::Relaxed),
             (*cur).prefix.load(Ordering::Relaxed),
         ),
-        _ => {
-            // #ifdef DEBUG_TREE
-            // 	    xmlGenericError(xmlGenericErrorContext(),
-            // 		    "xmlCopyNamespace: invalid type %d\n".as_ptr() as _, (*cur).typ);
-            // #endif
-            null_mut()
-        }
+        _ => null_mut(),
     }
 }
 
@@ -7400,10 +7265,6 @@ pub unsafe extern "C" fn xml_node_list_get_raw_string(
  */
 pub unsafe extern "C" fn xml_node_set_content(cur: XmlNodePtr, content: *const XmlChar) {
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNodeSetContent : node.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
     match (*cur).typ {
@@ -7475,10 +7336,6 @@ pub unsafe extern "C" fn xml_node_set_content_len(
     len: c_int,
 ) {
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNodeSetContentLen : node.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
     match (*cur).typ {
@@ -7544,10 +7401,6 @@ pub unsafe extern "C" fn xml_node_set_content_len(
  */
 pub unsafe extern "C" fn xml_node_add_content(cur: XmlNodePtr, content: *const XmlChar) {
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNodeAddContent : node.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
     if content.is_null() {
@@ -7574,10 +7427,6 @@ pub unsafe extern "C" fn xml_node_add_content_len(
     len: c_int,
 ) {
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlNodeAddContentLen : node.is_null()\n".as_ptr() as _);
-        // #endif
         return;
     }
     if len <= 0 {
@@ -8238,17 +8087,9 @@ pub unsafe extern "C" fn xml_node_set_base(cur: XmlNodePtr, uri: *const XmlChar)
 pub unsafe extern "C" fn xml_remove_prop(cur: XmlAttrPtr) -> c_int {
     let mut tmp: XmlAttrPtr;
     if cur.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlRemoveProp : cur.is_null()\n".as_ptr() as _);
-        // #endif
         return -1;
     }
     if (*cur).parent.is_null() {
-        // #ifdef DEBUG_TREE
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 		c"xmlRemoveProp : (*cur).parent.is_null()\n".as_ptr() as _);
-        // #endif
         return -1;
     }
     tmp = (*(*cur).parent).properties;
@@ -8271,10 +8112,6 @@ pub unsafe extern "C" fn xml_remove_prop(cur: XmlAttrPtr) -> c_int {
         }
         tmp = (*tmp).next;
     }
-    // #ifdef DEBUG_TREE
-    //     xmlGenericError(xmlGenericErrorContext,
-    // 	    "xmlRemoveProp : attribute not owned by its node\n".as_ptr() as _);
-    // #endif
     -1
 }
 
@@ -8330,120 +8167,6 @@ pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) 
     xml_free_prop(prop);
     0
 }
-
-/*
- * Internal, don't use.
- */
-// /**
-//  * xmlBufferWriteCHAR:
-//  * @buf:  the XML buffer
-//  * @string:  the string to add
-//  *
-//  * routine which manages and grows an output buffer. This one adds
-//  * xmlChars at the end of the buffer.
-//  */
-// pub unsafe extern "C" fn xml_buffer_write_xml_char(buf: XmlBufferPtr, string: *const XmlChar) {
-//     if buf.is_null() {
-//         return;
-//     }
-//     xml_buffer_cat(buf, string);
-// }
-
-// /**
-//  * xmlBufferWriteChar:
-//  * @buf:  the XML buffer output
-//  * @string:  the string to add
-//  *
-//  * routine which manage and grows an output buffer. This one add
-//  * C chars at the end of the array.
-//  */
-// pub unsafe extern "C" fn xml_buffer_write_char(buf: XmlBufferPtr, string: *const c_char) {
-//     if buf.is_null() {
-//         return;
-//     }
-//     xml_buffer_ccat(buf, string);
-// }
-
-// /**
-//  * xmlBufferWriteQuotedString:
-//  * @buf:  the XML buffer output
-//  * @string:  the string to add
-//  *
-//  * routine which manage and grows an output buffer. This one writes
-//  * a quoted or double quoted #XmlChar string, checking first if it holds
-//  * quote or double-quotes internally
-//  */
-// pub unsafe extern "C" fn xml_buffer_write_quoted_string(buf: XmlBufferPtr, string: *const XmlChar) {
-//     let mut cur: *const XmlChar;
-//     let mut base: *const XmlChar;
-//     if buf.is_null() {
-//         return;
-//     }
-//     if !xml_strchr(string, b'\"').is_null() {
-//         if !xml_strchr(string, b'\'').is_null() {
-//             // #ifdef DEBUG_BUFFER
-//             // 	    xmlGenericError(xmlGenericErrorContext(),
-//             //  "xmlBufferWriteQuotedString: string contains quote and double-quotes !\n".as_ptr() as _);
-//             // #endif
-//             xml_buffer_ccat(buf, c"\"".as_ptr() as _);
-//             base = string;
-//             cur = string;
-//             while *cur != 0 {
-//                 if *cur == b'"' {
-//                     if base != cur {
-//                         xml_buffer_add(buf, base, cur.offset_from(base) as _);
-//                     }
-//                     xml_buffer_add(buf, c"&quot;".as_ptr() as _, 6);
-//                     cur = cur.add(1);
-//                     base = cur;
-//                 } else {
-//                     cur = cur.add(1);
-//                 }
-//             }
-//             if base != cur {
-//                 xml_buffer_add(buf, base, cur.offset_from(base) as _);
-//             }
-//             xml_buffer_ccat(buf, c"\"".as_ptr() as _);
-//         } else {
-//             xml_buffer_ccat(buf, c"\'".as_ptr() as _);
-//             xml_buffer_cat(buf, string);
-//             xml_buffer_ccat(buf, c"\'".as_ptr() as _);
-//         }
-//     } else {
-//         xml_buffer_ccat(buf, c"\"".as_ptr() as _);
-//         xml_buffer_cat(buf, string);
-//         xml_buffer_ccat(buf, c"\"".as_ptr() as _);
-//     }
-// }
-
-// /**
-//  * xmlAttrSerializeTxtContent:
-//  * @buf:  the XML buffer output
-//  * @doc:  the document
-//  * @attr: the attribute node
-//  * @string: the text content
-//  *
-//  * Serialize text attribute values to an xml simple buffer
-//  */
-// #[cfg(feature = "output")]
-// pub unsafe extern "C" fn xml_attr_serialize_txt_content(
-//     buf: XmlBufferPtr,
-//     doc: XmlDocPtr,
-//     attr: XmlAttrPtr,
-//     string: *const XmlChar,
-// ) {
-//     use crate::private::save::xml_buf_attr_serialize_txt_content;
-
-//     if buf.is_null() || string.is_null() {
-//         return;
-//     }
-//     let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
-//     if buffer.is_null() {
-//         return;
-//     }
-//     xml_buf_attr_serialize_txt_content(buffer, doc, attr, string);
-//     xml_buf_back_to_buffer(buffer);
-// }
 
 /*
  * Namespace handling.
@@ -8687,7 +8410,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory(
     size: *mut c_int,
     format: c_int,
 ) {
-    xml_doc_dump_format_memory_enc(cur, mem, size, null_mut(), format);
+    xml_doc_dump_format_memory_enc(cur, mem, size, None, format);
 }
 
 /**
@@ -8707,7 +8430,7 @@ pub unsafe extern "C" fn xml_doc_dump_memory(
     mem: *mut *mut XmlChar,
     size: *mut c_int,
 ) {
-    xml_doc_dump_format_memory_enc(cur, mem, size, null_mut(), 0);
+    xml_doc_dump_format_memory_enc(cur, mem, size, None, 0);
 }
 
 /**
@@ -8722,11 +8445,11 @@ pub unsafe extern "C" fn xml_doc_dump_memory(
  * allocated memory with xml_free().
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_doc_dump_memory_enc(
+pub unsafe fn xml_doc_dump_memory_enc(
     out_doc: XmlDocPtr,
     doc_txt_ptr: *mut *mut XmlChar,
     doc_txt_len: *mut c_int,
-    txt_encoding: *const c_char,
+    txt_encoding: Option<&str>,
 ) {
     xml_doc_dump_format_memory_enc(out_doc, doc_txt_ptr, doc_txt_len, txt_encoding, 0);
 }
@@ -8746,14 +8469,14 @@ pub unsafe extern "C" fn xml_doc_dump_memory_enc(
  * or xmlKeepBlanksDefault(0) was called
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
+pub unsafe fn xml_doc_dump_format_memory_enc(
     out_doc: XmlDocPtr,
     doc_txt_ptr: *mut *mut XmlChar,
     mut doc_txt_len: *mut c_int,
-    mut txt_encoding: *const c_char,
+    mut txt_encoding: Option<&str>,
     format: c_int,
 ) {
-    use std::mem::{size_of_val, zeroed};
+    use std::ffi::CString;
 
     use crate::{
         encoding::find_encoding_handler,
@@ -8764,7 +8487,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
         },
     };
 
-    let mut ctxt: XmlSaveCtxt = unsafe { zeroed() };
+    let mut ctxt = XmlSaveCtxt::default();
     let mut dummy: c_int = 0;
 
     if doc_txt_len.is_null() {
@@ -8789,17 +8512,16 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
      *  This logic is copied from xmlSaveFileEnc.
      */
 
-    if txt_encoding.is_null() {
-        txt_encoding = (*out_doc).encoding as _;
+    if txt_encoding.is_none() {
+        txt_encoding = (*out_doc).encoding.as_deref();
     }
-    let conv_hdlr = if let Some(Ok(encoding)) =
-        (!txt_encoding.is_null()).then(|| CStr::from_ptr(txt_encoding).to_str())
-    {
+    let conv_hdlr = if let Some(encoding) = txt_encoding {
         let Some(handler) = find_encoding_handler(encoding) else {
+            let enc = CString::new(encoding).unwrap();
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding,
                 out_doc as XmlNodePtr,
-                txt_encoding,
+                enc.as_ptr(),
             );
             return;
         };
@@ -8814,11 +8536,10 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
         return;
     }
 
-    memset(addr_of_mut!(ctxt) as _, 0, size_of_val(&ctxt));
     ctxt.buf = out_buff;
     ctxt.level = 0;
     ctxt.format = (format != 0) as i32;
-    ctxt.encoding = txt_encoding as _;
+    ctxt.encoding = txt_encoding.map(|e| e.to_owned());
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt), out_doc);
@@ -8863,9 +8584,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory_enc(
  * or xmlKeepBlanksDefault(0) was called
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, format: c_int) -> c_int {
-    use std::mem::{size_of_val, zeroed};
-
+pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, format: i32) -> i32 {
     use crate::{
         encoding::find_encoding_handler,
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
@@ -8874,37 +8593,32 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
 
     use super::xmlsave::XmlSaveCtxt;
 
-    let mut ctxt: XmlSaveCtxt = unsafe { zeroed() };
-
-    let mut encoding: *const c_char;
+    let mut ctxt = XmlSaveCtxt::default();
 
     if cur.is_null() {
         return -1;
     }
-    encoding = (*cur).encoding as _;
+    let mut encoding = (*cur).encoding.clone();
 
-    let handler =
-        if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
-            if let Some(handler) = find_encoding_handler(enc) {
-                Some(handler)
-            } else {
-                xml_free((*cur).encoding as _);
-                (*cur).encoding = null_mut();
-                encoding = null_mut();
-                None
-            }
+    let handler = if let Some(enc) = (*cur).encoding.as_deref() {
+        if let Some(handler) = find_encoding_handler(enc) {
+            Some(handler)
         } else {
+            (*cur).encoding = None;
+            encoding = None;
             None
-        };
+        }
+    } else {
+        None
+    };
     let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, handler);
     if buf.is_null() {
         return -1;
     }
-    memset(addr_of_mut!(ctxt) as _, 0, size_of_val(&ctxt));
     ctxt.buf = buf;
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
-    ctxt.encoding = encoding as _;
+    ctxt.encoding = encoding;
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
@@ -8966,7 +8680,7 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
             );
         }
     } else {
-        xml_node_dump_output(outbuf, doc, cur, 0, 1, null_mut());
+        xml_node_dump_output(outbuf, doc, cur, 0, 1, None);
     }
     xml_output_buffer_close(outbuf);
 }
@@ -8983,7 +8697,7 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_save_file(filename: *const c_char, cur: XmlDocPtr) -> c_int {
-    xml_save_format_file_enc(filename, cur, null_mut(), 0)
+    xml_save_format_file_enc(filename, cur, None, 0)
 }
 
 /**
@@ -9006,7 +8720,7 @@ pub unsafe extern "C" fn xml_save_format_file(
     cur: XmlDocPtr,
     format: c_int,
 ) -> c_int {
-    xml_save_format_file_enc(filename, cur, null_mut(), format)
+    xml_save_format_file_enc(filename, cur, None, format)
 }
 
 /**
@@ -9065,7 +8779,7 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     let using: size_t = xml_buf_use(buf);
     let oldalloc: c_int = xml_buf_get_allocation_scheme(buf);
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_node_dump_output(outbuf, doc, cur, level, format, null_mut());
+    xml_node_dump_output(outbuf, doc, cur, level, format, None);
     xml_buf_set_allocation_scheme(buf, oldalloc.try_into().unwrap());
     xml_free(outbuf as _);
     let ret: c_int = (xml_buf_use(buf) - using) as i32;
@@ -9124,13 +8838,11 @@ pub unsafe extern "C" fn xml_buf_node_dump(
  * returns: the number of bytes written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_save_file_to(
+pub unsafe fn xml_save_file_to(
     buf: XmlOutputBufferPtr,
     cur: XmlDocPtr,
-    encoding: *const c_char,
+    encoding: Option<&str>,
 ) -> c_int {
-    use std::mem::{size_of_val, zeroed};
-
     use crate::{
         io::xml_output_buffer_close,
         libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
@@ -9138,7 +8850,7 @@ pub unsafe extern "C" fn xml_save_file_to(
 
     use super::xmlsave::XmlSaveCtxt;
 
-    let mut ctxt: XmlSaveCtxt = unsafe { zeroed() };
+    let mut ctxt = XmlSaveCtxt::default();
 
     if buf.is_null() {
         return -1;
@@ -9147,11 +8859,10 @@ pub unsafe extern "C" fn xml_save_file_to(
         xml_output_buffer_close(buf);
         return -1;
     }
-    memset(addr_of_mut!(ctxt) as _, 0, size_of_val(&ctxt));
     ctxt.buf = buf;
     ctxt.level = 0;
     ctxt.format = 0;
-    ctxt.encoding = encoding as _;
+    ctxt.encoding = encoding.map(|e| e.to_owned());
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
@@ -9173,14 +8884,12 @@ pub unsafe extern "C" fn xml_save_file_to(
  * returns: the number of bytes written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_save_format_file_to(
+pub unsafe fn xml_save_format_file_to(
     buf: XmlOutputBufferPtr,
     cur: XmlDocPtr,
-    encoding: *const c_char,
+    encoding: Option<&str>,
     format: c_int,
 ) -> c_int {
-    use std::mem::{size_of_val, zeroed};
-
     use crate::{
         io::xml_output_buffer_close,
         libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
@@ -9188,7 +8897,7 @@ pub unsafe extern "C" fn xml_save_format_file_to(
 
     use super::xmlsave::XmlSaveCtxt;
 
-    let mut ctxt: XmlSaveCtxt = unsafe { zeroed() };
+    let mut ctxt = XmlSaveCtxt::default();
 
     if buf.is_null() {
         return -1;
@@ -9200,11 +8909,10 @@ pub unsafe extern "C" fn xml_save_format_file_to(
         xml_output_buffer_close(buf);
         return -1;
     }
-    memset(addr_of_mut!(ctxt) as _, 0, size_of_val(&ctxt));
     ctxt.buf = buf;
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
-    ctxt.encoding = encoding as _;
+    ctxt.encoding = encoding.map(|e| e.to_owned());
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
@@ -9226,16 +8934,14 @@ pub unsafe extern "C" fn xml_save_format_file_to(
  * or xmlKeepBlanksDefault(0) was called
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_node_dump_output(
+pub unsafe fn xml_node_dump_output(
     buf: XmlOutputBufferPtr,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
     level: c_int,
     format: c_int,
-    mut encoding: *const c_char,
+    mut encoding: Option<&str>,
 ) {
-    use std::mem::{size_of_val, zeroed};
-
     use crate::libxml::{
         parser::xml_init_parser,
         xmlsave::{
@@ -9246,7 +8952,7 @@ pub unsafe extern "C" fn xml_node_dump_output(
 
     use super::xmlsave::XmlSaveCtxt;
 
-    let mut ctxt: XmlSaveCtxt = unsafe { zeroed() };
+    let mut ctxt = XmlSaveCtxt::default();
     #[cfg(feature = "html")]
     let dtd: XmlDtdPtr;
     #[cfg(feature = "html")]
@@ -9258,15 +8964,14 @@ pub unsafe extern "C" fn xml_node_dump_output(
         return;
     }
 
-    if encoding.is_null() {
-        encoding = c"UTF-8".as_ptr() as _;
+    if encoding.is_none() {
+        encoding = Some("UTF-8");
     }
 
-    memset(addr_of_mut!(ctxt) as _, 0, size_of_val(&ctxt));
     ctxt.buf = buf;
     ctxt.level = level;
     ctxt.format = if format != 0 { 1 } else { 0 };
-    ctxt.encoding = encoding as _;
+    ctxt.encoding = encoding.map(|e| e.to_owned());
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
 
@@ -9306,17 +9011,13 @@ pub unsafe extern "C" fn xml_node_dump_output(
  * or xmlKeepBlanksDefault(0) was called
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_save_format_file_enc(
+pub unsafe fn xml_save_format_file_enc(
     filename: *const c_char,
     cur: XmlDocPtr,
-    mut encoding: *const c_char,
+    mut encoding: Option<&str>,
     format: c_int,
 ) -> c_int {
-    use std::{
-        cell::RefCell,
-        mem::{size_of_val, zeroed},
-        rc::Rc,
-    };
+    use std::{cell::RefCell, rc::Rc};
 
     use crate::{
         encoding::find_encoding_handler,
@@ -9326,25 +9027,24 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
 
     use super::xmlsave::XmlSaveCtxt;
 
-    let mut ctxt: XmlSaveCtxt = unsafe { zeroed() };
+    let mut ctxt = XmlSaveCtxt::default();
 
     if cur.is_null() {
         return -1;
     }
 
-    if encoding.is_null() {
-        encoding = (*cur).encoding as _;
+    if encoding.is_none() {
+        encoding = (*cur).encoding.as_deref();
     }
 
-    let handler =
-        if let Some(Ok(enc)) = (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str()) {
-            let Some(handler) = find_encoding_handler(enc) else {
-                return -1;
-            };
-            Some(handler)
-        } else {
-            None
+    let handler = if let Some(enc) = encoding {
+        let Some(handler) = find_encoding_handler(enc) else {
+            return -1;
         };
+        Some(handler)
+    } else {
+        None
+    };
 
     // #ifdef LIBXML_ZLIB_ENABLED
     //     if ((*cur).compression < 0) (*cur).compression = xmlGetCompressMode();
@@ -9360,11 +9060,10 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
     if buf.is_null() {
         return -1;
     }
-    memset(addr_of_mut!(ctxt) as _, 0, size_of_val(&ctxt));
     ctxt.buf = buf;
     ctxt.level = 0;
     ctxt.format = if format != 0 { 1 } else { 0 };
-    ctxt.encoding = encoding as _;
+    ctxt.encoding = encoding.map(|e| e.to_owned());
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
 
@@ -9385,10 +9084,10 @@ pub unsafe extern "C" fn xml_save_format_file_enc(
  * returns: the number of bytes written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_save_file_enc(
+pub unsafe fn xml_save_file_enc(
     filename: *const c_char,
     cur: XmlDocPtr,
-    encoding: *const c_char,
+    encoding: Option<&str>,
 ) -> c_int {
     xml_save_format_file_enc(filename, cur, encoding, 0)
 }
@@ -12928,636 +12627,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_attr_serialize_txt_content() {
-    //     #[cfg(feature = "output")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_doc in 0..GEN_NB_XML_DOC_PTR {
-    //                 for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-    //                     for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                         let doc = gen_xml_doc_ptr(n_doc, 1);
-    //                         let attr = gen_xml_attr_ptr(n_attr, 2);
-    //                         let string = gen_const_xml_char_ptr(n_string, 3);
-
-    //                         xml_attr_serialize_txt_content(buf, doc, attr, string);
-    //                         des_xml_buffer_ptr(n_buf, buf, 0);
-    //                         des_xml_doc_ptr(n_doc, doc, 1);
-    //                         des_xml_attr_ptr(n_attr, attr, 2);
-    //                         des_const_xml_char_ptr(n_string, string, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlAttrSerializeTxtContent",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             assert!(
-    //                                 leaks == 0,
-    //                                 "{leaks} Leaks are found in xmlAttrSerializeTxtContent()"
-    //                             );
-    //                             eprint!(" {}", n_buf);
-    //                             eprint!(" {}", n_doc);
-    //                             eprint!(" {}", n_attr);
-    //                             eprintln!(" {}", n_string);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buf_content() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_CONST_XML_BUF_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let buf = gen_const_xml_buf_ptr(n_buf, 0);
-
-    //             let ret_val = xml_buf_content(buf);
-    //             desret_xml_char_ptr(ret_val);
-    //             des_const_xml_buf_ptr(n_buf, buf, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlBufContent",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufContent()");
-    //                 eprintln!(" {}", n_buf);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buf_end() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUF_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let buf = gen_xml_buf_ptr(n_buf, 0);
-
-    //             let ret_val = xml_buf_end(buf as _);
-    //             desret_xml_char_ptr(ret_val);
-    //             des_xml_buf_ptr(n_buf, buf, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlBufEnd",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufEnd()");
-    //                 eprintln!(" {}", n_buf);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buf_get_node_content() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUF_PTR {
-    //             for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buf_ptr(n_buf, 0);
-    //                 let cur = gen_const_xml_node_ptr(n_cur, 1);
-
-    //                 let ret_val = xml_buf_get_node_content(buf as _, cur);
-    //                 desret_int(ret_val);
-    //                 des_xml_buf_ptr(n_buf, buf, 0);
-    //                 des_const_xml_node_ptr(n_cur, cur, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufGetNodeContent",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlBufGetNodeContent()"
-    //                     );
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_cur);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buf_node_dump() {
-
-    //     /* missing type support */
-    // }
-
-    // #[test]
-    // fn test_xml_buf_shrink() {
-
-    //     /* missing type support */
-    // }
-
-    // #[test]
-    // fn test_xml_buf_use() {
-
-    //     /* missing type support */
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_add() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_len in 0..GEN_NB_INT {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                     let str = gen_const_xml_char_ptr(n_str, 1);
-    //                     let mut len = gen_int(n_len, 2);
-    //                     if !str.is_null() && len > xml_strlen(str) {
-    //                         len = 0;
-    //                     }
-
-    //                     let ret_val = xml_buffer_add(buf, str, len);
-    //                     desret_int(ret_val);
-    //                     des_xml_buffer_ptr(n_buf, buf, 0);
-    //                     des_const_xml_char_ptr(n_str, str, 1);
-    //                     des_int(n_len, len, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlBufferAdd",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferAdd()");
-    //                         eprint!(" {}", n_buf);
-    //                         eprint!(" {}", n_str);
-    //                         eprintln!(" {}", n_len);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_add_head() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_len in 0..GEN_NB_INT {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                     let str = gen_const_xml_char_ptr(n_str, 1);
-    //                     let mut len = gen_int(n_len, 2);
-    //                     if !str.is_null() && len > xml_strlen(str) {
-    //                         len = 0;
-    //                     }
-
-    //                     let ret_val = xml_buffer_add_head(buf, str, len);
-    //                     desret_int(ret_val);
-    //                     des_xml_buffer_ptr(n_buf, buf, 0);
-    //                     des_const_xml_char_ptr(n_str, str, 1);
-    //                     des_int(n_len, len, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlBufferAddHead",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferAddHead()");
-    //                         eprint!(" {}", n_buf);
-    //                         eprint!(" {}", n_str);
-    //                         eprintln!(" {}", n_len);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_ccat() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_str in 0..GEN_NB_CONST_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let str = gen_const_char_ptr(n_str, 1);
-
-    //                 let ret_val = xml_buffer_ccat(buf, str);
-    //                 desret_int(ret_val);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_const_char_ptr(n_str, str, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferCCat",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCCat()");
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_str);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_cat() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let str = gen_const_xml_char_ptr(n_str, 1);
-
-    //                 let ret_val = xml_buffer_cat(buf, str);
-    //                 desret_int(ret_val);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_const_xml_char_ptr(n_str, str, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferCat",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCat()");
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_str);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_content() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_CONST_XML_BUFFER_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let buf = gen_const_xml_buffer_ptr(n_buf, 0);
-
-    //             let ret_val = xml_buffer_content(buf);
-    //             desret_const_xml_char_ptr(ret_val);
-    //             des_const_xml_buffer_ptr(n_buf, buf, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlBufferContent",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferContent()");
-    //                 eprintln!(" {}", n_buf);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_create() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         let mem_base = xml_mem_blocks();
-
-    //         let ret_val = xml_buffer_create();
-    //         desret_xml_buffer_ptr(ret_val);
-    //         reset_last_error();
-    //         if mem_base != xml_mem_blocks() {
-    //             leaks += 1;
-    //             eprintln!(
-    //                 "Leak of {} blocks found in xmlBufferCreate",
-    //                 xml_mem_blocks() - mem_base
-    //             );
-    //             assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferCreate()");
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_create_size() {
-
-    //     /* missing type support */
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_create_static() {
-
-    //     /* missing type support */
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_detach() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let buf = gen_xml_buffer_ptr(n_buf, 0);
-
-    //             let ret_val = xml_buffer_detach(buf);
-    //             desret_xml_char_ptr(ret_val);
-    //             des_xml_buffer_ptr(n_buf, buf, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlBufferDetach",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferDetach()");
-    //                 eprintln!(" {}", n_buf);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_empty() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let buf = gen_xml_buffer_ptr(n_buf, 0);
-
-    //             xml_buffer_empty(buf);
-    //             des_xml_buffer_ptr(n_buf, buf, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlBufferEmpty",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferEmpty()");
-    //                 eprintln!(" {}", n_buf);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_grow() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_len in 0..GEN_NB_UNSIGNED_INT {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let len = gen_unsigned_int(n_len, 1);
-
-    //                 let ret_val = xml_buffer_grow(buf, len);
-    //                 desret_int(ret_val);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_unsigned_int(n_len, len, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferGrow",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferGrow()");
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_len);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_length() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_CONST_XML_BUFFER_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let buf = gen_const_xml_buffer_ptr(n_buf, 0);
-
-    //             let ret_val = xml_buffer_length(buf);
-    //             desret_int(ret_val);
-    //             des_const_xml_buffer_ptr(n_buf, buf, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlBufferLength",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferLength()");
-    //                 eprintln!(" {}", n_buf);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_resize() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_size in 0..GEN_NB_UNSIGNED_INT {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let size = gen_unsigned_int(n_size, 1);
-
-    //                 let ret_val = xml_buffer_resize(buf, size);
-    //                 desret_int(ret_val);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_unsigned_int(n_size, size, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferResize",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferResize()");
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_size);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_set_allocation_scheme() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_scheme in 0..GEN_NB_XML_BUFFER_ALLOCATION_SCHEME {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let scheme = gen_xml_buffer_allocation_scheme(n_scheme, 1);
-
-    //                 xml_buffer_set_allocation_scheme(buf, scheme);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_xml_buffer_allocation_scheme(n_scheme, scheme, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferSetAllocationScheme",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlBufferSetAllocationScheme()"
-    //                     );
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_scheme);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_shrink() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_len in 0..GEN_NB_UNSIGNED_INT {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let len = gen_unsigned_int(n_len, 1);
-
-    //                 let ret_val = xml_buffer_shrink(buf, len);
-    //                 desret_int(ret_val);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_unsigned_int(n_len, len, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferShrink",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBufferShrink()");
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_len);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_write_char() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let string = gen_const_xml_char_ptr(n_string, 1);
-
-    //                 xml_buffer_write_xml_char(buf, string);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_const_xml_char_ptr(n_string, string, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferWriteCHAR",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlBufferWriteCHAR()"
-    //                     );
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_string);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_write_ichar() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_string in 0..GEN_NB_CONST_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let string = gen_const_char_ptr(n_string, 1);
-
-    //                 xml_buffer_write_char(buf, string);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_const_char_ptr(n_string, string, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferWriteChar",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlBufferWriteChar()"
-    //                     );
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_string);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_buffer_write_quoted_string() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let string = gen_const_xml_char_ptr(n_string, 1);
-
-    //                 xml_buffer_write_quoted_string(buf, string);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_const_xml_char_ptr(n_string, string, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlBufferWriteQuotedString",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlBufferWriteQuotedString()"
-    //                     );
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_string);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     #[test]
     fn test_xml_build_qname() {
         unsafe {
@@ -14282,61 +13351,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_doc_dump_format_memory_enc() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_out_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_doc_txt_ptr in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                    for n_doc_txt_len in 0..GEN_NB_INT_PTR {
-                        for n_txt_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            for n_format in 0..GEN_NB_INT {
-                                let mem_base = xml_mem_blocks();
-                                let out_doc = gen_xml_doc_ptr(n_out_doc, 0);
-                                let doc_txt_ptr = gen_xml_char_ptr_ptr(n_doc_txt_ptr, 1);
-                                let doc_txt_len = gen_int_ptr(n_doc_txt_len, 2);
-                                let txt_encoding = gen_const_char_ptr(n_txt_encoding, 3);
-                                let format = gen_int(n_format, 4);
-
-                                xml_doc_dump_format_memory_enc(
-                                    out_doc,
-                                    doc_txt_ptr,
-                                    doc_txt_len,
-                                    txt_encoding,
-                                    format,
-                                );
-                                des_xml_doc_ptr(n_out_doc, out_doc, 0);
-                                des_xml_char_ptr_ptr(n_doc_txt_ptr, doc_txt_ptr, 1);
-                                des_int_ptr(n_doc_txt_len, doc_txt_len, 2);
-                                des_const_char_ptr(n_txt_encoding, txt_encoding, 3);
-                                des_int(n_format, format, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlDocDumpFormatMemoryEnc",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlDocDumpFormatMemoryEnc()"
-                                    );
-                                    eprint!(" {}", n_out_doc);
-                                    eprint!(" {}", n_doc_txt_ptr);
-                                    eprint!(" {}", n_doc_txt_len);
-                                    eprint!(" {}", n_txt_encoding);
-                                    eprintln!(" {}", n_format);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_doc_dump_memory() {
         #[cfg(feature = "output")]
         unsafe {
@@ -14365,55 +13379,6 @@ mod tests {
                             eprint!(" {}", n_cur);
                             eprint!(" {}", n_mem);
                             eprintln!(" {}", n_size);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_doc_dump_memory_enc() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_out_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_doc_txt_ptr in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                    for n_doc_txt_len in 0..GEN_NB_INT_PTR {
-                        for n_txt_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let out_doc = gen_xml_doc_ptr(n_out_doc, 0);
-                            let doc_txt_ptr = gen_xml_char_ptr_ptr(n_doc_txt_ptr, 1);
-                            let doc_txt_len = gen_int_ptr(n_doc_txt_len, 2);
-                            let txt_encoding = gen_const_char_ptr(n_txt_encoding, 3);
-
-                            xml_doc_dump_memory_enc(
-                                out_doc,
-                                doc_txt_ptr,
-                                doc_txt_len,
-                                txt_encoding,
-                            );
-                            des_xml_doc_ptr(n_out_doc, out_doc, 0);
-                            des_xml_char_ptr_ptr(n_doc_txt_ptr, doc_txt_ptr, 1);
-                            des_int_ptr(n_doc_txt_len, doc_txt_len, 2);
-                            des_const_char_ptr(n_txt_encoding, txt_encoding, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlDocDumpMemoryEnc",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlDocDumpMemoryEnc()"
-                                );
-                                eprint!(" {}", n_out_doc);
-                                eprint!(" {}", n_doc_txt_ptr);
-                                eprint!(" {}", n_doc_txt_len);
-                                eprintln!(" {}", n_txt_encoding);
-                            }
                         }
                     }
                 }
@@ -16024,140 +14989,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_node_buf_get_content() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_buffer in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buffer = gen_xml_buffer_ptr(n_buffer, 0);
-    //                 let cur = gen_const_xml_node_ptr(n_cur, 1);
-
-    //                 let ret_val = xml_node_buf_get_content(buffer, cur);
-    //                 desret_int(ret_val);
-    //                 des_xml_buffer_ptr(n_buffer, buffer, 0);
-    //                 des_const_xml_node_ptr(n_cur, cur, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlNodeBufGetContent",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlNodeBufGetContent()"
-    //                     );
-    //                     eprint!(" {}", n_buffer);
-    //                     eprintln!(" {}", n_cur);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_node_dump() {
-    //     #[cfg(feature = "output")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_doc in 0..GEN_NB_XML_DOC_PTR {
-    //                 for n_cur in 0..GEN_NB_XML_NODE_PTR {
-    //                     for n_level in 0..GEN_NB_INT {
-    //                         for n_format in 0..GEN_NB_INT {
-    //                             let mem_base = xml_mem_blocks();
-    //                             let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                             let doc = gen_xml_doc_ptr(n_doc, 1);
-    //                             let cur = gen_xml_node_ptr(n_cur, 2);
-    //                             let level = gen_int(n_level, 3);
-    //                             let format = gen_int(n_format, 4);
-
-    //                             let ret_val = xml_node_dump(buf, doc, cur, level, format);
-    //                             desret_int(ret_val);
-    //                             des_xml_buffer_ptr(n_buf, buf, 0);
-    //                             des_xml_doc_ptr(n_doc, doc, 1);
-    //                             des_xml_node_ptr(n_cur, cur, 2);
-    //                             des_int(n_level, level, 3);
-    //                             des_int(n_format, format, 4);
-    //                             reset_last_error();
-    //                             if mem_base != xml_mem_blocks() {
-    //                                 leaks += 1;
-    //                                 eprint!(
-    //                                     "Leak of {} blocks found in xmlNodeDump",
-    //                                     xml_mem_blocks() - mem_base
-    //                                 );
-    //                                 assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeDump()");
-    //                                 eprint!(" {}", n_buf);
-    //                                 eprint!(" {}", n_doc);
-    //                                 eprint!(" {}", n_cur);
-    //                                 eprint!(" {}", n_level);
-    //                                 eprintln!(" {}", n_format);
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    #[test]
-    fn test_xml_node_dump_output() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                        for n_level in 0..GEN_NB_INT {
-                            for n_format in 0..GEN_NB_INT {
-                                for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                                    let mem_base = xml_mem_blocks();
-                                    let buf = gen_xml_output_buffer_ptr(n_buf, 0);
-                                    let doc = gen_xml_doc_ptr(n_doc, 1);
-                                    let cur = gen_xml_node_ptr(n_cur, 2);
-                                    let level = gen_int(n_level, 3);
-                                    let format = gen_int(n_format, 4);
-                                    let encoding = gen_const_char_ptr(n_encoding, 5);
-
-                                    xml_node_dump_output(buf, doc, cur, level, format, encoding);
-                                    des_xml_output_buffer_ptr(n_buf, buf, 0);
-                                    des_xml_doc_ptr(n_doc, doc, 1);
-                                    des_xml_node_ptr(n_cur, cur, 2);
-                                    des_int(n_level, level, 3);
-                                    des_int(n_format, format, 4);
-                                    des_const_char_ptr(n_encoding, encoding, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlNodeDumpOutput",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        assert!(
-                                            leaks == 0,
-                                            "{leaks} Leaks are found in xmlNodeDumpOutput()"
-                                        );
-                                        eprint!(" {}", n_buf);
-                                        eprint!(" {}", n_doc);
-                                        eprint!(" {}", n_cur);
-                                        eprint!(" {}", n_level);
-                                        eprint!(" {}", n_format);
-                                        eprintln!(" {}", n_encoding);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     #[test]
     fn test_xml_node_get_base() {
         unsafe {
@@ -16730,81 +15561,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_save_file_enc() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let filename = gen_fileoutput(n_filename, 0);
-                        let cur = gen_xml_doc_ptr(n_cur, 1);
-                        let encoding = gen_const_char_ptr(n_encoding, 2);
-
-                        let ret_val = xml_save_file_enc(filename, cur, encoding);
-                        desret_int(ret_val);
-                        des_fileoutput(n_filename, filename, 0);
-                        des_xml_doc_ptr(n_cur, cur, 1);
-                        des_const_char_ptr(n_encoding, encoding, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSaveFileEnc",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlSaveFileEnc()");
-                            eprint!(" {}", n_filename);
-                            eprint!(" {}", n_cur);
-                            eprintln!(" {}", n_encoding);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_save_file_to() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let mut buf = gen_xml_output_buffer_ptr(n_buf, 0);
-                        let cur = gen_xml_doc_ptr(n_cur, 1);
-                        let encoding = gen_const_char_ptr(n_encoding, 2);
-
-                        let ret_val = xml_save_file_to(buf, cur, encoding);
-                        buf = null_mut();
-                        desret_int(ret_val);
-                        des_xml_output_buffer_ptr(n_buf, buf, 0);
-                        des_xml_doc_ptr(n_cur, cur, 1);
-                        des_const_char_ptr(n_encoding, encoding, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSaveFileTo",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlSaveFileTo()");
-                            eprint!(" {}", n_buf);
-                            eprint!(" {}", n_cur);
-                            eprintln!(" {}", n_encoding);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_save_format_file() {
         #[cfg(feature = "output")]
         unsafe {
@@ -16834,97 +15590,6 @@ mod tests {
                             eprint!(" {}", n_filename);
                             eprint!(" {}", n_cur);
                             eprintln!(" {}", n_format);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_save_format_file_enc() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_format in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let filename = gen_fileoutput(n_filename, 0);
-                            let cur = gen_xml_doc_ptr(n_cur, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let format = gen_int(n_format, 3);
-
-                            let ret_val = xml_save_format_file_enc(filename, cur, encoding, format);
-                            desret_int(ret_val);
-                            des_fileoutput(n_filename, filename, 0);
-                            des_xml_doc_ptr(n_cur, cur, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_int(n_format, format, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlSaveFormatFileEnc",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlSaveFormatFileEnc()"
-                                );
-                                eprint!(" {}", n_filename);
-                                eprint!(" {}", n_cur);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_format);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_save_format_file_to() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_OUTPUT_BUFFER_PTR {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_format in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let mut buf = gen_xml_output_buffer_ptr(n_buf, 0);
-                            let cur = gen_xml_doc_ptr(n_cur, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let format = gen_int(n_format, 3);
-
-                            let ret_val = xml_save_format_file_to(buf, cur, encoding, format);
-                            buf = null_mut();
-                            desret_int(ret_val);
-                            des_xml_output_buffer_ptr(n_buf, buf, 0);
-                            des_xml_doc_ptr(n_cur, cur, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_int(n_format, format, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlSaveFormatFileTo",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlSaveFormatFileTo()"
-                                );
-                                eprint!(" {}", n_buf);
-                                eprint!(" {}", n_cur);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_format);
-                            }
                         }
                     }
                 }
@@ -17001,33 +15666,6 @@ mod tests {
             }
         }
     }
-
-    // #[test]
-    // fn test_xml_set_buffer_allocation_scheme() {
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         for n_scheme in 0..GEN_NB_XML_BUFFER_ALLOCATION_SCHEME {
-    //             let mem_base = xml_mem_blocks();
-    //             let scheme = gen_xml_buffer_allocation_scheme(n_scheme, 0);
-
-    //             xml_set_buffer_allocation_scheme(scheme);
-    //             des_xml_buffer_allocation_scheme(n_scheme, scheme, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlSetBufferAllocationScheme",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 assert!(
-    //                     leaks == 0,
-    //                     "{leaks} Leaks are found in xmlSetBufferAllocationScheme()"
-    //                 );
-    //                 eprintln!(" {}", n_scheme);
-    //             }
-    //         }
-    //     }
-    // }
 
     #[test]
     fn test_xml_set_compress_mode() {

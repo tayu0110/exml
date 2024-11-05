@@ -180,7 +180,7 @@ static mut PUSH: c_int = 0;
 static mut PUSHSIZE: c_int = 4096;
 static mut MEMORY: c_int = 0;
 static mut TEST_IO: c_int = 0;
-static ENCODING: Mutex<Option<CString>> = Mutex::new(None);
+static ENCODING: Mutex<Option<String>> = Mutex::new(None);
 #[cfg(feature = "xinclude")]
 static mut XINCLUDE: c_int = 0;
 static mut DTDATTRS: c_int = 0;
@@ -2285,7 +2285,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     }
                     for i in 0..(*(*cur).nodesetval).node_nr {
                         node = *(*(*cur).nodesetval).node_tab.add(i as usize);
-                        xml_node_dump_output(buf, null_mut(), node, 0, 0, null_mut());
+                        xml_node_dump_output(buf, null_mut(), node, 0, 0, None);
                         (*buf).write_bytes(b"\n");
                     }
                     xml_output_buffer_close(buf);
@@ -2463,7 +2463,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             }
 
             let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-            doc = html_read_memory(mem, filename, null_mut(), OPTIONS);
+            doc = html_read_memory(mem, filename, None, OPTIONS);
 
             munmap(base as _, info.st_size as _);
             close(fd);
@@ -2471,7 +2471,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
     } else if cfg!(feature = "html") && HTML != 0 {
         #[cfg(feature = "html")]
         {
-            doc = html_read_file(filename, null_mut(), OPTIONS);
+            doc = html_read_file(filename, None, OPTIONS);
         }
     } else if cfg!(feature = "push") && PUSH != 0 {
         /*
@@ -2778,9 +2778,9 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
                         if FORMAT == 1 {
-                            html_save_file_format(o, doc, encoding.as_ptr(), 1);
+                            html_save_file_format(o, doc, Some(encoding.as_str()), 1);
                         } else {
-                            html_save_file_format(o, doc, encoding.as_ptr(), 0);
+                            html_save_file_format(o, doc, Some(encoding.as_str()), 0);
                         }
                     } else if FORMAT == 1 {
                         let o = OUTPUT
@@ -2788,7 +2788,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             .unwrap()
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        html_save_file_format(o, doc, null_mut(), 1);
+                        html_save_file_format(o, doc, None, 1);
                     } else {
                         let out: *mut FILE = OUTPUT
                             .lock()
@@ -2894,7 +2894,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             doc,
                             addr_of_mut!(result),
                             addr_of_mut!(len),
-                            encoding.as_ptr(),
+                            Some(encoding.as_str()),
                             1,
                         );
                     } else {
@@ -2902,7 +2902,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             doc,
                             addr_of_mut!(result),
                             addr_of_mut!(len),
-                            encoding.as_ptr(),
+                            Some(encoding.as_str()),
                         );
                     }
                 } else if FORMAT == 1 {
@@ -2934,14 +2934,14 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                             .unwrap()
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        ret = xml_save_format_file_enc(o, doc, encoding.as_ptr(), 1);
+                        ret = xml_save_format_file_enc(o, doc, Some(encoding.as_str()), 1);
                     } else {
                         let o = OUTPUT
                             .lock()
                             .unwrap()
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        ret = xml_save_file_enc(o, doc, encoding.as_ptr());
+                        ret = xml_save_file_enc(o, doc, Some(encoding.as_str()));
                     }
                     if ret < 0 {
                         let lock = OUTPUT.lock().unwrap();
@@ -3002,11 +3002,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 if let Some(o) = OUTPUT.lock().unwrap().as_ref() {
                     ctxt = xml_save_to_filename(
                         o.as_ptr(),
-                        ENCODING
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(null_mut(), |e| e.as_ptr()),
+                        ENCODING.lock().unwrap().as_deref(),
                         save_opts,
                     );
                 } else {
@@ -3017,11 +3013,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         Some(xml_file_write),
                         Some(xml_file_flush),
                         stdout as _,
-                        ENCODING
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(null_mut(), |e| e.as_ptr()),
+                        ENCODING.lock().unwrap().as_deref(),
                         save_opts,
                     );
                 }
@@ -3920,7 +3912,7 @@ fn main() {
                 NOCATALOGS += 1;
             } else if arg == "-encode" || arg == "--encode" {
                 *ENCODING.lock().unwrap() =
-                    CString::new(args.next().expect("--encode: Encoding is not specified")).ok();
+                    Some(args.next().expect("--encode: Encoding is not specified"));
                 /*
                  * OK it's for testing purposes
                  */

@@ -1788,7 +1788,7 @@ pub(crate) unsafe extern "C" fn gen_html_doc_ptr(no: c_int, _nr: c_int) -> HtmlD
         return html_read_memory(
             "<html/>".as_bytes().to_vec(),
             c"test".as_ptr() as _,
-            null_mut(),
+            None,
             0,
         );
     }

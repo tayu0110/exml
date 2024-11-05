@@ -1739,7 +1739,7 @@ unsafe fn sax_parse_test(
     if options & XML_PARSE_HTML != 0 {
         let ctxt: HtmlParserCtxtPtr =
             html_new_sax_parser_ctxt(addr_of_mut!(EMPTY_SAXHANDLER_STRUCT), None);
-        html_ctxt_read_file(ctxt, cfilename.as_ptr(), null_mut(), options);
+        html_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
         html_free_parser_ctxt(ctxt);
         ret = 0;
     } else {
@@ -1789,7 +1789,7 @@ unsafe fn sax_parse_test(
         if options & XML_PARSE_HTML != 0 {
             let ctxt: HtmlParserCtxtPtr =
                 html_new_sax_parser_ctxt(addr_of_mut!(DEBUG_HTMLSAXHANDLER_STRUCT), None);
-            html_ctxt_read_file(ctxt, cfilename.as_ptr(), null_mut(), options);
+            html_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
             html_free_parser_ctxt(ctxt);
             ret = 0;
         } else {
@@ -2687,7 +2687,7 @@ unsafe fn err_parse_test(
     if cfg!(feature = "html") && options & XML_PARSE_HTML != 0 {
         #[cfg(feature = "html")]
         {
-            doc = html_read_file(cfilename.as_ptr(), null_mut(), options);
+            doc = html_read_file(cfilename.as_ptr(), None, options);
         }
     } else if cfg!(feature = "xinclude") && options & XmlParserOption::XmlParseXinclude as i32 != 0
     {
@@ -5822,15 +5822,15 @@ unsafe fn automata_test(
 }
 
 const TEST_DESCRIPTIONS: &[TestDesc] = &[
-    #[cfg(all(feature = "libxml_reader", feature = "valid"))]
+    #[cfg(all(feature = "html", feature = "push"))]
     TestDesc {
         desc: "for debug",
-        func: stream_parse_test,
-        input: Some("./test/errors/754946.xml"),
-        out: Some("./result/errors/"),
-        suffix: None,
-        err: Some(".str"),
-        options: 0,
+        func: push_parse_test,
+        input: Some("./test/HTML/script2.html"),
+        out: Some("./result/HTML/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: XML_PARSE_HTML,
     },
     TestDesc {
         desc: "XML regression tests",

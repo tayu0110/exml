@@ -1037,7 +1037,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                 *out = *cur;
                 out = out.add(1);
             } else if *cur >= 0x80 {
-                if (!doc.is_null() && !(*doc).encoding.is_null()) || html != 0 {
+                if (!doc.is_null() && (*doc).encoding.is_some()) || html != 0 {
                     /*
                     * Bjørn Reese <br@sseusa.com> provided the patch
                        XmlChar xc;
@@ -1079,7 +1079,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                             c"xmlEncodeEntities: input not UTF-8".as_ptr() as _,
                         );
                         if !doc.is_null() {
-                            (*doc).encoding = xml_strdup(c"ISO-8859-1".as_ptr() as _);
+                            (*doc).encoding = Some("ISO-8859-1".to_owned());
                         }
                         snprintf(
                             buf.as_mut_ptr() as _,
@@ -1124,7 +1124,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                             c"xmlEncodeEntities: char out of range\n".as_ptr() as _,
                         );
                         if !doc.is_null() {
-                            (*doc).encoding = xml_strdup(c"ISO-8859-1".as_ptr() as _);
+                            (*doc).encoding = Some("ISO-8859-1".to_owned());
                         }
                         snprintf(
                             buf.as_mut_ptr() as _,

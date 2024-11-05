@@ -46,7 +46,7 @@ use crate::libxml::valid::{
     xml_new_doc_element_content, xml_validate_element, xml_validate_root,
 };
 use crate::libxml::xmlerror::XmlParserErrors;
-use crate::libxml::xmlstring::{xml_str_equal, xml_strcasecmp};
+use crate::libxml::xmlstring::xml_str_equal;
 
 use crate::private::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
@@ -614,11 +614,11 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
             }
             XmlCharEncoding::ISO8859_1 => {
                 if (*ctxt).input_tab.len() == 1
-                    && (*ctxt).encoding.is_null()
+                    && (*ctxt).encoding.is_none()
                     && !(*ctxt).input.is_null()
-                    && !(*(*ctxt).input).encoding.is_null()
+                    && (*(*ctxt).input).encoding.is_some()
                 {
-                    (*ctxt).encoding = xml_strdup((*(*ctxt).input).encoding);
+                    (*ctxt).encoding = (*(*ctxt).input).encoding.clone();
                 }
                 (*ctxt).charset = enc;
                 return 0;
@@ -1063,9 +1063,7 @@ pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
     if !(*input).directory.is_null() {
         xml_free((*input).directory as _);
     }
-    if !(*input).encoding.is_null() {
-        xml_free((*input).encoding as _);
-    }
+    (*input).encoding = None;
     if !(*input).version.is_null() {
         xml_free((*input).version as _);
     }
@@ -1183,6 +1181,7 @@ pub unsafe extern "C" fn xml_new_input_stream(ctxt: XmlParserCtxtPtr) -> XmlPars
         return null_mut();
     }
     memset(input as _, 0, size_of::<XmlParserInput>());
+    std::ptr::write(&mut *input, XmlParserInput::default());
     (*input).line = 1;
     (*input).col = 1;
     (*input).standalone = -1;
@@ -5538,8 +5537,8 @@ pub(crate) unsafe extern "C" fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -
  *
  * Returns the encoding value or NULL
  */
-pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    let mut encoding: *mut XmlChar = null_mut();
+pub(crate) unsafe fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> Option<String> {
+    let mut encoding = None;
 
     (*ctxt).skip_blanks();
     if (*ctxt).content_bytes().starts_with(b"encoding") {
@@ -5547,7 +5546,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
         (*ctxt).skip_blanks();
         if (*ctxt).current_byte() != b'=' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
-            return null_mut();
+            return None;
         }
         (*ctxt).skip_char();
         (*ctxt).skip_blanks();
@@ -5556,8 +5555,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
             encoding = xml_parse_enc_name(ctxt);
             if (*ctxt).current_byte() != b'"' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
-                xml_free(encoding as _);
-                return null_mut();
+                return None;
             } else {
                 (*ctxt).skip_char();
             }
@@ -5566,8 +5564,7 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
             encoding = xml_parse_enc_name(ctxt);
             if (*ctxt).current_byte() != b'\'' {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, null());
-                xml_free(encoding as _);
-                return null_mut();
+                return None;
             } else {
                 (*ctxt).skip_char();
             }
@@ -5579,25 +5576,24 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
          * Non standard parsing, allowing the user to ignore encoding
          */
         if (*ctxt).options & XmlParserOption::XmlParseIgnoreEnc as i32 != 0 {
-            xml_free(encoding as _);
-            return null_mut();
+            return None;
         }
 
         /*
          * UTF-16 encoding match has already taken place at this stage,
          * more over the little-endian/big-endian selection is already done
          */
-        if !encoding.is_null()
-            && (xml_strcasecmp(encoding, c"UTF-16".as_ptr() as _) == 0
-                || xml_strcasecmp(encoding, c"UTF16".as_ptr() as _) == 0)
-        {
+        if let Some(encoding) = encoding.as_deref().filter(|e| {
+            let e = e.to_ascii_uppercase();
+            e == "UTF-16" || e == "UTF16"
+        }) {
             /*
              * If no encoding was passed to the parser, that we are
              * using UTF-16 and no decoder is present i.e. the
              * document is apparently UTF-8 compatible, then raise an
              * encoding mismatch fatal error
              */
-            if (*ctxt).encoding.is_null()
+            if (*ctxt).encoding.is_none()
                 && (*(*ctxt).input).buf.is_some()
                 && (*(*ctxt).input)
                     .buf
@@ -5613,45 +5609,35 @@ pub(crate) unsafe extern "C" fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) 
                     c"Document labelled UTF-16 but has UTF-8 content\n".as_ptr() as _,
                 );
             }
-            if !(*ctxt).encoding.is_null() {
-                xml_free((*ctxt).encoding as _);
-            }
-            (*ctxt).encoding = encoding;
+            (*ctxt).encoding = Some(encoding.to_owned());
         }
         /*
          * UTF-8 encoding is handled natively
          */
-        else if !encoding.is_null()
-            && (xml_strcasecmp(encoding, c"UTF-8".as_ptr() as _) == 0
-                || xml_strcasecmp(encoding, c"UTF8".as_ptr() as _) == 0)
-        {
+        else if let Some(encoding) = encoding.as_deref().filter(|e| {
+            let e = e.to_ascii_uppercase();
+            e == "UTF-8" || e == "UTF8"
+        }) {
             /* TODO: Check for encoding mismatch. */
-            if !(*ctxt).encoding.is_null() {
-                xml_free((*ctxt).encoding as _);
-            }
-            (*ctxt).encoding = encoding;
-        } else if !encoding.is_null() {
-            if !(*(*ctxt).input).encoding.is_null() {
-                xml_free((*(*ctxt).input).encoding as _);
-            }
-            (*(*ctxt).input).encoding = encoding;
+            (*ctxt).encoding = Some(encoding.to_owned());
+        } else if let Some(encoding) = encoding.as_deref() {
+            (*(*ctxt).input).encoding = Some(encoding.to_owned());
 
-            if let Some(handler) =
-                find_encoding_handler(CStr::from_ptr(encoding as *const i8).to_str().unwrap())
-            {
+            if let Some(handler) = find_encoding_handler(encoding) {
                 if (*ctxt).switch_to_encoding(handler) < 0 {
                     /* failed to convert */
                     (*ctxt).err_no = XmlParserErrors::XmlErrUnsupportedEncoding as i32;
-                    return null_mut();
+                    return None;
                 }
             } else {
+                let encoding = CString::new(encoding).unwrap();
                 xml_fatal_err_msg_str(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
                     c"Unsupported encoding %s\n".as_ptr() as _,
-                    encoding,
+                    encoding.as_ptr() as *const u8,
                 );
-                return null_mut();
+                return None;
             }
         }
     }
@@ -5793,7 +5779,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
     (*ctxt).detect_sax2();
     (*ctxt).grow();
 
-    if (*ctxt).encoding.is_null() && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
+    if (*ctxt).encoding.is_none() && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
         let mut start: [XmlChar; 4] = [0; 4];
 
         start[0] = (*ctxt).current_byte();

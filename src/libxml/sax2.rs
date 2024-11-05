@@ -382,9 +382,8 @@ pub unsafe fn xml_sax2_external_subset(
         let oldinput: XmlParserInputPtr = (*ctxt).input;
         let oldinput_tab = replace(&mut (*ctxt).input_tab, Vec::with_capacity(5));
         let oldcharset = (*ctxt).charset;
-        let oldencoding: *const XmlChar = (*ctxt).encoding;
+        let oldencoding = (*ctxt).encoding.take();
         let oldprogressive: c_int = (*ctxt).progressive;
-        (*ctxt).encoding = null();
         (*ctxt).progressive = 0;
         (*ctxt).input = null_mut();
         xml_push_input(ctxt, input);
@@ -441,11 +440,6 @@ pub unsafe fn xml_sax2_external_subset(
         (*ctxt).input = oldinput;
         (*ctxt).input_tab = oldinput_tab;
         (*ctxt).charset = oldcharset;
-        if !(*ctxt).encoding.is_null()
-            && ((*ctxt).dict.is_null() || xml_dict_owns((*ctxt).dict, (*ctxt).encoding) == 0)
-        {
-            xml_free((*ctxt).encoding as _);
-        }
         (*ctxt).encoding = oldencoding;
         (*ctxt).progressive = oldprogressive;
         /* (*ctxt).wellFormed = oldwellFormed; */
@@ -1282,11 +1276,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
                 (*doc).properties |= XmlDocProperties::XmlDocOld10 as i32;
             }
             (*doc).parse_flags = (*ctxt).options;
-            if !(*ctxt).encoding.is_null() {
-                (*doc).encoding = xml_strdup((*ctxt).encoding);
-            } else {
-                (*doc).encoding = null_mut();
-            }
+            (*doc).encoding = (*ctxt).encoding().map(|e| e.to_owned());
             (*doc).standalone = (*ctxt).standalone;
         } else {
             xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
@@ -1339,20 +1329,21 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
     /*
      * Grab the encoding if it was added on-the-fly
      */
-    if !(*ctxt).encoding.is_null()
+    if (*ctxt).encoding.is_some()
         && !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).encoding.is_null()
+        && (*(*ctxt).my_doc).encoding.is_none()
     {
-        (*(*ctxt).my_doc).encoding = (*ctxt).encoding;
-        (*ctxt).encoding = null();
+        if let Some(enc) = (*ctxt).encoding.take() {
+            (*(*ctxt).my_doc).encoding = Some(enc);
+        }
     }
     if !(*ctxt).input_tab.is_empty()
         && !(*ctxt).input_tab[0].is_null()
-        && !(*(*ctxt).input_tab[0]).encoding.is_null()
+        && (*(*ctxt).input_tab[0]).encoding.is_some()
         && !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).encoding.is_null()
+        && (*(*ctxt).my_doc).encoding.is_none()
     {
-        (*(*ctxt).my_doc).encoding = xml_strdup((*(*ctxt).input_tab[0]).encoding);
+        (*(*ctxt).my_doc).encoding = (*(*ctxt).input_tab[0]).encoding.clone();
     }
     if (*ctxt).charset != crate::encoding::XmlCharEncoding::None
         && !(*ctxt).my_doc.is_null()
