@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_long, CStr},
+    ffi::{c_char, CStr},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of, null, null_mut},
@@ -160,22 +160,22 @@ pub type XmlSchematronPtr = *mut XmlSchematron;
 #[repr(C)]
 pub struct XmlSchematron {
     name: *const XmlChar, /* schema name */
-    preserve: c_int,      /* was the document passed by the user */
+    preserve: i32,        /* was the document passed by the user */
     doc: XmlDocPtr,       /* pointer to the parsed document */
-    flags: c_int,         /* specific to this schematron */
+    flags: i32,           /* specific to this schematron */
 
     _private: *mut c_void, /* unused by the library */
     dict: XmlDictPtr,      /* the dictionary used internally */
 
     title: *const XmlChar, /* the title if any */
 
-    nb_ns: c_int, /* the number of namespaces */
+    nb_ns: i32, /* the number of namespaces */
 
-    nb_pattern: c_int,                 /* the number of patterns */
+    nb_pattern: i32,                   /* the number of patterns */
     patterns: XmlSchematronPatternPtr, /* the patterns found */
     rules: XmlSchematronRulePtr,       /* the rules gathered */
-    nb_namespaces: c_int,              /* number of namespaces in the array */
-    max_namespaces: c_int,             /* size of the array */
+    nb_namespaces: i32,                /* number of namespaces in the array */
+    max_namespaces: i32,               /* size of the array */
     namespaces: *mut *const XmlChar,   /* the array of namespaces */
 }
 
@@ -188,12 +188,12 @@ pub type XmlSchematronValidCtxtPtr = *mut XmlSchematronValidCtxt;
 
 #[repr(C)]
 pub struct XmlSchematronValidCtxt {
-    typ: c_int,
-    flags: c_int, /* an or of xmlSchematronValidOptions */
+    typ: i32,
+    flags: i32, /* an or of xmlSchematronValidOptions */
 
     dict: XmlDictPtr,
-    nberrors: c_int,
-    err: c_int,
+    nberrors: i32,
+    err: i32,
 
     schema: XmlSchematronPtr,
     xctxt: XmlXPathContextPtr,
@@ -220,26 +220,26 @@ pub type XmlSchematronParserCtxtPtr = *mut XmlSchematronParserCtxt;
 
 #[repr(C)]
 pub struct XmlSchematronParserCtxt {
-    typ: c_int,
+    typ: i32,
     url: *const XmlChar,
     doc: XmlDocPtr,
-    preserve: c_int, /* Whether the doc should be freed  */
+    preserve: i32, /* Whether the doc should be freed  */
     buffer: *const c_char,
-    size: c_int,
+    size: i32,
 
     dict: XmlDictPtr, /* dictionary for interned string names */
 
-    nberrors: c_int,
-    err: c_int,
+    nberrors: i32,
+    err: i32,
     xctxt: XmlXPathContextPtr, /* the XPath context used for compilation */
     schema: XmlSchematronPtr,
 
-    nb_namespaces: c_int,            /* number of namespaces in the array */
-    max_namespaces: c_int,           /* size of the array */
+    nb_namespaces: i32,              /* number of namespaces in the array */
+    max_namespaces: i32,             /* size of the array */
     namespaces: *mut *const XmlChar, /* the array of namespaces */
 
-    nb_includes: c_int,        /* number of includes in the array */
-    max_includes: c_int,       /* size of the array */
+    nb_includes: i32,          /* number of includes in the array */
+    max_includes: i32,         /* size of the array */
     includes: *mut XmlNodePtr, /* the array of includes */
 
     /* error reporting data */
@@ -344,7 +344,7 @@ pub unsafe extern "C" fn xml_schematron_new_parser_ctxt(
  */
 pub unsafe extern "C" fn xml_schematron_new_mem_parser_ctxt(
     buffer: *const c_char,
-    size: c_int,
+    size: i32,
 ) -> XmlSchematronParserCtxtPtr {
     if buffer.is_null() || size <= 0 {
         return null_mut();
@@ -448,12 +448,12 @@ pub unsafe extern "C" fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronPars
 /*****
 pub unsafe extern "C" fn xmlSchematronSetParserErrors(ctxt: xmlSchematronParserCtxtPtr, xmlSchematronValidityErrorFunc err, xmlSchematronValidityWarningFunc warn,
                      ctx: *mut c_void);
-pub unsafe extern "C" fn c_int
+pub unsafe extern "C" fn i32
         xmlSchematronGetParserErrors(ctxt: xmlSchematronParserCtxtPtr,
                     xmlSchematronValidityErrorFunc * err,
                     xmlSchematronValidityWarningFunc * warn,
                     c_void **ctx);
-pub unsafe extern "C" fn c_int
+pub unsafe extern "C" fn i32
         xmlSchematronIsValid	(ctxt: xmlSchematronValidCtxtPtr);
  *****/
 
@@ -889,7 +889,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
     rule: XmlNodePtr,
 ) {
     let mut cur: XmlNodePtr;
-    let mut nb_checks: c_int = 0;
+    let mut nb_checks: i32 = 0;
     let mut test: *mut XmlChar;
 
     let mut report: *mut XmlChar;
@@ -1123,7 +1123,7 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
 ) {
     let mut cur: XmlNodePtr;
 
-    let mut nb_rules: c_int = 0;
+    let mut nb_rules: i32 = 0;
     let mut id: *mut XmlChar;
 
     if ctxt.is_null() || pat.is_null() {
@@ -1189,7 +1189,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
     let doc: XmlDocPtr;
     let mut ret: XmlSchematronPtr = null_mut();
     let mut cur: XmlNodePtr;
-    let mut preserve: c_int = 0;
+    let mut preserve: i32 = 0;
 
     if ctxt.is_null() {
         return null_mut();
@@ -1539,11 +1539,11 @@ pub unsafe fn xml_schematron_set_valid_structured_errors(
 /******
 pub unsafe extern "C" fn xmlSchematronSetValidErrors	(ctxt: xmlSchematronValidCtxtPtr, xmlSchematronValidityErrorFunc err, xmlSchematronValidityWarningFunc warn,
                      ctx: *mut c_void);
-pub unsafe extern "C" fn c_int xmlSchematronGetValidErrors	(ctxt: xmlSchematronValidCtxtPtr, xmlSchematronValidityErrorFunc *err, xmlSchematronValidityWarningFunc *warn,
+pub unsafe extern "C" fn i32 xmlSchematronGetValidErrors	(ctxt: xmlSchematronValidCtxtPtr, xmlSchematronValidityErrorFunc *err, xmlSchematronValidityWarningFunc *warn,
                      c_void **ctx);
-pub unsafe extern "C" fn c_int xmlSchematronSetValidOptions(ctxt: xmlSchematronValidCtxtPtr, c_int options);
-pub unsafe extern "C" fn c_int xmlSchematronValidCtxtGetOptions(ctxt: xmlSchematronValidCtxtPtr);
-pub unsafe extern "C" fn c_int
+pub unsafe extern "C" fn i32 xmlSchematronSetValidOptions(ctxt: xmlSchematronValidCtxtPtr, i32 options);
+pub unsafe extern "C" fn i32 xmlSchematronValidCtxtGetOptions(ctxt: xmlSchematronValidCtxtPtr);
+pub unsafe extern "C" fn i32
             xmlSchematronValidateOneElement (ctxt: xmlSchematronValidCtxtPtr,
                              xmlNodePtr elem);
  *******/
@@ -1584,7 +1584,7 @@ unsafe extern "C" fn xml_schematron_verr_memory(
  */
 pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
     schema: XmlSchematronPtr,
-    options: c_int,
+    options: i32,
 ) -> XmlSchematronValidCtxtPtr {
     let ret: XmlSchematronValidCtxtPtr =
         xml_malloc(size_of::<XmlSchematronValidCtxt>()) as XmlSchematronValidCtxtPtr;
@@ -1660,7 +1660,7 @@ unsafe extern "C" fn xml_schematron_register_variables(
     mut letr: XmlSchematronLetPtr,
     instance: XmlDocPtr,
     cur: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut let_eval: XmlXPathObjectPtr;
 
     (*ctxt).doc = instance;
@@ -1791,8 +1791,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                     ret = xml_strcat(ret, str as _);
                 }
                 XmlXPathObjectType::XpathNumber => {
-                    let size: c_int =
-                        snprintf(null_mut(), 0, c"%0g".as_ptr() as _, (*eval).floatval);
+                    let size: i32 = snprintf(null_mut(), 0, c"%0g".as_ptr() as _, (*eval).floatval);
                     let buf: *mut XmlChar = malloc(size as usize) as _;
                     /* xmlStrPrintf(buf, size, c"%0g".as_ptr() as _, (*eval).floatval); // doesn't work */
                     sprintf(buf as _, c"%0g".as_ptr() as _, (*eval).floatval);
@@ -1818,7 +1817,7 @@ unsafe extern "C" fn xml_schematron_format_report(
          * remove superfluous \n
          */
         if !ret.is_null() {
-            let mut len: c_int = xml_strlen(ret) as _;
+            let mut len: i32 = xml_strlen(ret) as _;
             let mut c: XmlChar;
 
             if len > 0 {
@@ -1874,7 +1873,7 @@ unsafe extern "C" fn xml_schematron_report_success(
     test: XmlSchematronTestPtr,
     cur: XmlNodePtr,
     pattern: XmlSchematronPatternPtr,
-    success: c_int,
+    success: i32,
 ) {
     if ctxt.is_null() || cur.is_null() || test.is_null() {
         return;
@@ -1899,7 +1898,7 @@ unsafe extern "C" fn xml_schematron_report_success(
         {
             return;
         }
-        let line: c_long = xml_get_line_no(cur);
+        let line: i64 = xml_get_line_no(cur);
         path = xml_get_node_path(cur);
         if path.is_null() {
             path = (*cur).name as _;
@@ -2008,8 +2007,8 @@ unsafe extern "C" fn xml_schematron_run_test(
     instance: XmlDocPtr,
     cur: XmlNodePtr,
     pattern: XmlSchematronPatternPtr,
-) -> c_int {
-    let mut failed: c_int;
+) -> i32 {
+    let mut failed: i32;
 
     failed = 0;
     (*(*ctxt).xctxt).doc = instance;
@@ -2072,7 +2071,7 @@ unsafe extern "C" fn xml_schematron_run_test(
 unsafe extern "C" fn xml_schematron_unregister_variables(
     ctxt: XmlXPathContextPtr,
     mut letr: XmlSchematronLetPtr,
-) -> c_int {
+) -> i32 {
     while !letr.is_null() {
         if xml_xpath_register_variable_ns(ctxt, (*letr).name, null_mut(), null_mut()) != 0 {
             generic_error!("Unregistering a let variable failed\n");
@@ -2177,7 +2176,7 @@ unsafe extern "C" fn xml_schematron_report_pattern(
 pub unsafe extern "C" fn xml_schematron_validate_doc(
     ctxt: XmlSchematronValidCtxtPtr,
     instance: XmlDocPtr,
-) -> c_int {
+) -> i32 {
     let mut cur: XmlNodePtr;
     let mut pattern: XmlSchematronPatternPtr;
     let mut rule: XmlSchematronRulePtr;

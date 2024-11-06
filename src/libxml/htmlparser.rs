@@ -5,7 +5,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_uchar, c_uint, CStr, CString},
+    ffi::{c_char, CStr, CString},
     io::Read,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
@@ -115,7 +115,7 @@ pub struct HtmlElemDesc {
  */
 pub type HtmlEntityDescPtr = *mut HtmlEntityDesc;
 pub struct HtmlEntityDesc {
-    value: c_uint,       /* the UNICODE value for the character */
+    value: u32,          /* the UNICODE value for the character */
     name: *const c_char, /* The entity name */
     #[allow(unused)]
     desc: *const c_char, /* the description */
@@ -4343,7 +4343,7 @@ const HTML40_ENTITIES_TABLE: &[HtmlEntityDesc] = &[
 #[deprecated]
 pub unsafe extern "C" fn html_init_auto_close() {}
 
-unsafe extern "C" fn html_compare_tags(key: *const c_void, member: *const c_void) -> c_int {
+unsafe extern "C" fn html_compare_tags(key: *const c_void, member: *const c_void) -> i32 {
     let tag: *const XmlChar = key as *const XmlChar;
     let desc: *const HtmlElemDesc = member as *const HtmlElemDesc;
 
@@ -4401,7 +4401,7 @@ pub unsafe extern "C" fn html_entity_lookup(name: *const XmlChar) -> *const Html
  *
  * Returns the associated htmlEntityDescPtr if found, NULL otherwise.
  */
-pub unsafe extern "C" fn html_entity_value_lookup(value: c_uint) -> *const HtmlEntityDesc {
+pub unsafe extern "C" fn html_entity_value_lookup(value: u32) -> *const HtmlEntityDesc {
     for entry in HTML40_ENTITIES_TABLE {
         if entry.value >= value {
             if entry.value > value {
@@ -4424,7 +4424,7 @@ pub unsafe extern "C" fn html_entity_value_lookup(value: c_uint) -> *const HtmlE
  *
  * Returns 1 if autoclosed, 0 otherwise
  */
-pub unsafe extern "C" fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> c_int {
+pub unsafe extern "C" fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
     let mut child: HtmlNodePtr;
 
     if elem.is_null() {
@@ -5448,10 +5448,10 @@ const HTML_START_CLOSE: &[HtmlStartCloseEntry] = &[
     },
 ];
 
-unsafe extern "C" fn html_compare_start_close(vkey: *const c_void, member: *const c_void) -> c_int {
+unsafe extern "C" fn html_compare_start_close(vkey: *const c_void, member: *const c_void) -> i32 {
     let key: *const HtmlStartCloseEntry = vkey as *const HtmlStartCloseEntry;
     let entry: *const HtmlStartCloseEntry = member as *const HtmlStartCloseEntry;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     ret = strcmp((*key).old_tag, (*entry).old_tag);
     if ret == 0 {
@@ -5471,10 +5471,7 @@ unsafe extern "C" fn html_compare_start_close(vkey: *const c_void, member: *cons
  *
  * Returns 0 if no, 1 if yes.
  */
-unsafe extern "C" fn html_check_auto_close(
-    newtag: *const XmlChar,
-    oldtag: *const XmlChar,
-) -> c_int {
+unsafe extern "C" fn html_check_auto_close(newtag: *const XmlChar, oldtag: *const XmlChar) -> i32 {
     let mut key: HtmlStartCloseEntry = unsafe { zeroed() };
 
     key.old_tag = oldtag as *const c_char;
@@ -5506,7 +5503,7 @@ pub unsafe extern "C" fn html_auto_close_tag(
     _doc: HtmlDocPtr,
     name: *const XmlChar,
     elem: HtmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut child: HtmlNodePtr;
 
     if elem.is_null() {
@@ -5656,8 +5653,8 @@ pub(crate) unsafe extern "C" fn __html_parse_content(ctxt: *mut c_void) {
  * Returns the number of space chars skipped
  */
 
-unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> c_int {
-    let mut res: c_int = 0;
+unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> i32 {
+    let mut res: i32 = 0;
 
     while xml_is_blank_char(*(*(*ctxt).input).cur as u32) {
         if *(*(*ctxt).input).cur == b'\n' {
@@ -5688,7 +5685,7 @@ unsafe extern "C" fn html_parse_err_int(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
     msg: *const c_char,
-    val: c_int,
+    val: i32,
 ) {
     if !ctxt.is_null()
         && (*ctxt).disable_sax != 0
@@ -5866,8 +5863,8 @@ unsafe extern "C" fn html_parse_err(
  *
  * Returns the current c_char value and its length
  */
-unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) -> c_int {
-    let mut val: c_uint;
+unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
+    let mut val: u32;
 
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return 0;
@@ -5950,8 +5947,8 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
      *
      * Check for the 0x110000 limit too
      */
-    let cur: *const c_uchar = (*(*ctxt).input).cur;
-    let c: c_uchar = *cur;
+    let cur: *const u8 = (*(*ctxt).input).cur;
+    let c: u8 = *cur;
     'goto_encoding_error: {
         if c & 0x80 != 0 {
             if c & 0x40 == 0 {
@@ -5999,7 +5996,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
                 }
             }
 
-            if !xml_is_char(val as u32) {
+            if !xml_is_char(val) {
                 html_parse_err_int(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
@@ -6086,10 +6083,10 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut c_int) 
 }
 
 unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    let mut len: c_int = 0;
-    let mut l: c_int = 0;
-    let mut c: c_int;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut len: i32 = 0;
+    let mut l: i32 = 0;
+    let mut c: i32;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH as i32
     } else {
         XML_MAX_NAME_LENGTH as i32
@@ -6171,7 +6168,7 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
 unsafe extern "C" fn html_parse_name(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
     let mut input: *const XmlChar;
     let ret: *const XmlChar;
-    let count: c_int;
+    let count: i32;
 
     (*ctxt).grow();
 
@@ -6293,10 +6290,10 @@ pub(crate) unsafe extern "C" fn html_parse_entity_ref(
  * [66] CharRef ::= b'&#' [0-9]+ ';' |
  *                  '&#x' [0-9a-fA-F]+ ';'
  *
- * Returns the value parsed (as an c_int)
+ * Returns the value parsed (as an int)
  */
-pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> c_int {
-    let mut val: c_int = 0;
+pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> i32 {
+    let mut val: i32 = 0;
 
     if ctxt.is_null() || (*ctxt).input.is_null() {
         html_parse_err(
@@ -6720,8 +6717,8 @@ unsafe extern "C" fn html_parse_html_attribute(
     stop: XmlChar,
 ) -> *mut XmlChar {
     let mut buffer: *mut XmlChar;
-    let mut buffer_size: c_int;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut buffer_size: i32;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_HUGE_LENGTH as i32
     } else {
         XML_MAX_TEXT_LENGTH as i32
@@ -6754,9 +6751,9 @@ unsafe extern "C" fn html_parse_html_attribute(
         }
         if (*ctxt).current_byte() == b'&' {
             if NXT!(ctxt, 1) == b'#' {
-                let mut bits: c_int;
+                let mut bits: i32;
 
-                let c: c_uint = html_parse_char_ref(ctxt) as _;
+                let c: u32 = html_parse_char_ref(ctxt) as _;
                 if c < 0x80 {
                     *out = c as _;
                     out = out.add(1);
@@ -6782,7 +6779,7 @@ unsafe extern "C" fn html_parse_html_attribute(
                 }
 
                 if out.offset_from(buffer) > buffer_size as isize - 100 {
-                    let indx: c_int = out.offset_from(buffer) as _;
+                    let indx: i32 = out.offset_from(buffer) as _;
 
                     grow_buffer!(ctxt, buffer, buffer_size);
                     out = buffer.add(indx as usize) as _;
@@ -6793,7 +6790,7 @@ unsafe extern "C" fn html_parse_html_attribute(
                     *out = b'&';
                     out = out.add(1);
                     if out.offset_from(buffer) > buffer_size as isize - 100 {
-                        let indx: c_int = out.offset_from(buffer) as i32;
+                        let indx: i32 = out.offset_from(buffer) as i32;
 
                         grow_buffer!(ctxt, buffer, buffer_size);
                         out = buffer.add(indx as usize) as _;
@@ -6804,7 +6801,7 @@ unsafe extern "C" fn html_parse_html_attribute(
                     cur = name;
                     while *cur != 0 {
                         if out.offset_from(buffer) > buffer_size as isize - 100 {
-                            let indx: c_int = out.offset_from(buffer) as i32;
+                            let indx: i32 = out.offset_from(buffer) as i32;
 
                             grow_buffer!(ctxt, buffer, buffer_size);
                             out = buffer.add(indx as usize) as _;
@@ -6814,15 +6811,15 @@ unsafe extern "C" fn html_parse_html_attribute(
                         cur = cur.add(1);
                     }
                 } else {
-                    let mut bits: c_int;
+                    let mut bits: i32;
 
                     if out.offset_from(buffer) > buffer_size as isize - 100 {
-                        let indx: c_int = out.offset_from(buffer) as i32;
+                        let indx: i32 = out.offset_from(buffer) as i32;
 
                         grow_buffer!(ctxt, buffer, buffer_size);
                         out = buffer.add(indx as usize) as _;
                     }
-                    let c: c_uint = (*ent).value;
+                    let c: u32 = (*ent).value;
                     if c < 0x80 {
                         *out = c as _;
                         out = out.add(1);
@@ -6849,16 +6846,16 @@ unsafe extern "C" fn html_parse_html_attribute(
                 }
             }
         } else {
-            let mut bits: c_int;
-            let mut l: c_int = 0;
+            let mut bits: i32;
+            let mut l: i32 = 0;
 
             if out.offset_from(buffer) > buffer_size as isize - 100 {
-                let indx: c_int = out.offset_from(buffer) as i32;
+                let indx: i32 = out.offset_from(buffer) as i32;
 
                 grow_buffer!(ctxt, buffer, buffer_size);
                 out = buffer.add(indx as usize) as _;
             }
-            let c: c_uint = CUR_CHAR!(ctxt, l) as _;
+            let c: u32 = CUR_CHAR!(ctxt, l) as _;
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                 xml_free(buffer as _);
                 return null_mut();
@@ -7203,7 +7200,7 @@ unsafe extern "C" fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: *mut *const 
     let mut i: usize;
     let mut att: *const XmlChar;
     let mut value: *const XmlChar;
-    let mut http: c_int = 0;
+    let mut http: i32 = 0;
     let mut content: *const XmlChar = null();
 
     if ctxt.is_null() || atts.is_null() {
@@ -7260,14 +7257,14 @@ unsafe extern "C" fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: *mut *const 
  *
  * Returns 0 in case of success, -1 in case of error and 1 if discarded
  */
-unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
+unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut attname: *const XmlChar;
     let mut attvalue: *mut XmlChar = null_mut();
     let mut atts: *mut *const XmlChar;
-    let mut nbatts: c_int = 0;
-    let mut maxatts: c_int;
-    let mut meta: c_int = 0;
-    let mut discardtag: c_int = 0;
+    let mut nbatts: i32 = 0;
+    let mut maxatts: i32;
+    let mut meta: i32 = 0;
+    let mut discardtag: i32 = 0;
 
     if ctxt.is_null() || (*ctxt).input.is_null() {
         html_parse_err(
@@ -7506,7 +7503,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
 #[repr(C)]
 pub struct ElementPriority {
     name: *const c_char,
-    priority: c_int,
+    priority: i32,
 }
 
 const HTML_END_PRIORITY: &[ElementPriority] = &[
@@ -7566,7 +7563,7 @@ const HTML_END_PRIORITY: &[ElementPriority] = &[
  *
  * Return value: The "endtag" priority.
  **/
-unsafe extern "C" fn html_get_end_priority(name: *const XmlChar) -> c_int {
+unsafe extern "C" fn html_get_end_priority(name: *const XmlChar) -> i32 {
     let mut i: usize = 0;
 
     while !HTML_END_PRIORITY[i].name.is_null()
@@ -7589,7 +7586,7 @@ unsafe extern "C" fn html_get_end_priority(name: *const XmlChar) -> c_int {
 unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
     let mut info: *const HtmlElemDesc;
 
-    let priority: c_int = html_get_end_priority(newtag);
+    let priority: i32 = html_get_end_priority(newtag);
 
     for i in (0..(*ctxt).name_tab.len()).rev() {
         if xml_str_equal(newtag, (*ctxt).name_tab[i]) {
@@ -7662,10 +7659,10 @@ unsafe extern "C" fn html_node_info_pop(ctxt: HtmlParserCtxtPtr) -> *mut HtmlPar
  *
  * Returns 1 if the current level should be closed.
  */
-unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> c_int {
+unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     let oldname: *const XmlChar;
 
-    let ret: c_int;
+    let ret: i32;
 
     if (*ctxt).current_byte() != b'<' || NXT!(ctxt, 1) != b'/' {
         html_parse_err(
@@ -7834,8 +7831,8 @@ unsafe extern "C" fn html_parse_html_name_non_invasive(ctxt: HtmlParserCtxtPtr) 
 unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
     let mut buf: [XmlChar; HTML_PARSER_BIG_BUFFER_SIZE + 5] = [0; HTML_PARSER_BIG_BUFFER_SIZE + 5];
     let mut nbchar: i32 = 0;
-    let mut cur: c_int;
-    let mut l: c_int = 0;
+    let mut cur: i32;
+    let mut l: i32 = 0;
 
     cur = CUR_CHAR!(ctxt, l);
     while cur != 0 {
@@ -7930,7 +7927,7 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
  */
 unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
     let mut len: size_t = 0;
-    let mut err: c_int = 0;
+    let mut err: i32 = 0;
 
     let mut ret: *mut XmlChar = null_mut();
 
@@ -7944,7 +7941,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
         );
         return null_mut();
     }
-    let quote: c_int = (*ctxt).current_byte() as _;
+    let quote: i32 = (*ctxt).current_byte() as _;
     (*ctxt).skip_char();
 
     if (*ctxt).current_ptr() < (*ctxt).base_ptr() {
@@ -7997,7 +7994,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
  */
 unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
     let mut len: size_t = 0;
-    let mut err: c_int = 0;
+    let mut err: i32 = 0;
 
     let mut ret: *mut XmlChar = null_mut();
 
@@ -8011,7 +8008,7 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
         );
         return null_mut();
     }
-    let quote: c_int = (*ctxt).current_byte() as _;
+    let quote: i32 = (*ctxt).current_byte() as _;
     (*ctxt).skip_char();
 
     /*
@@ -8245,17 +8242,17 @@ unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
  */
 unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
     let mut buf: *mut XmlChar;
-    let mut len: c_int;
-    let mut size: c_int = HTML_PARSER_BUFFER_SIZE as i32;
-    let mut q: c_int;
-    let mut ql: c_int = 0;
-    let mut r: c_int;
-    let mut rl: c_int = 0;
-    let mut cur: c_int;
-    let mut l: c_int = 0;
-    let mut next: c_int;
-    let mut nl: c_int = 0;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut len: i32;
+    let mut size: i32 = HTML_PARSER_BUFFER_SIZE as i32;
+    let mut q: i32;
+    let mut ql: i32 = 0;
+    let mut r: i32;
+    let mut rl: i32 = 0;
+    let mut cur: i32;
+    let mut l: i32 = 0;
+    let mut next: i32;
+    let mut nl: i32 = 0;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_HUGE_LENGTH as i32
     } else {
         XML_MAX_TEXT_LENGTH as i32
@@ -8446,11 +8443,11 @@ unsafe extern "C" fn html_skip_bogus_comment(ctxt: HtmlParserCtxtPtr) {
  */
 unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
     let mut buf: *mut XmlChar;
-    let mut len: c_int = 0;
-    let mut size: c_int = HTML_PARSER_BUFFER_SIZE as i32;
-    let mut cur: c_int;
-    let mut l: c_int = 0;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut len: i32 = 0;
+    let mut size: i32 = HTML_PARSER_BUFFER_SIZE as i32;
+    let mut cur: i32;
+    let mut l: i32 = 0;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_HUGE_LENGTH as i32
     } else {
         XML_MAX_TEXT_LENGTH as i32
@@ -8609,7 +8606,7 @@ const HTML_NO_CONTENT_ELEMENTS: &[*const c_char] = &[c"html".as_ptr(), c"head".a
  * Returns 1 if a paragraph has been inserted, 0 if not and -1
  *         in case of error.
  */
-unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> c_int {
+unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -8665,10 +8662,10 @@ unsafe extern "C" fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
     }
 
     if NXT!(ctxt, 1) == b'#' {
-        let mut bits: c_int;
-        let mut i: c_int = 0;
+        let mut bits: i32;
+        let mut i: i32 = 0;
 
-        let c: c_uint = html_parse_char_ref(ctxt) as _;
+        let c: u32 = html_parse_char_ref(ctxt) as _;
         if c == 0 {
             return;
         }
@@ -8731,10 +8728,10 @@ unsafe extern "C" fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
                 /* (*(*ctxt).sax).characters((*ctxt).userData,  c";".as_ptr() as _, 1); */
             }
         } else {
-            let mut bits: c_int;
-            let mut i: c_int = 0;
+            let mut bits: i32;
+            let mut i: i32 = 0;
 
-            let c: c_uint = (*ent).value;
+            let c: u32 = (*ent).value;
             if c < 0x80 {
                 out[i as usize] = c as _;
                 i += 1;
@@ -8840,7 +8837,7 @@ const ALLOW_PCDATA: &[*const c_char] = &[
  *
  * Returns 1 if ignorable 0 otherwise.
  */
-unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: c_int) -> c_int {
+unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> i32 {
     let mut last_child: XmlNodePtr;
     let dtd: XmlDtdPtr;
 
@@ -8925,11 +8922,11 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
  *
  * [14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)
  */
-unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: c_int) {
+unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: i32) {
     let mut buf: [XmlChar; HTML_PARSER_BIG_BUFFER_SIZE + 6] = [0; HTML_PARSER_BIG_BUFFER_SIZE + 6];
-    let mut nbchar: c_int = 0;
-    let mut cur: c_int;
-    let mut l: c_int = 0;
+    let mut nbchar: i32 = 0;
+    let mut cur: i32;
+    let mut l: i32 = 0;
 
     if readahead != 0 {
         buf[nbchar as usize] = readahead as _;
@@ -9228,7 +9225,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         node_info.begin_line = (*(*ctxt).input).line as _;
     }
 
-    let failed: c_int = html_parse_start_tag(ctxt);
+    let failed: i32 = html_parse_start_tag(ctxt);
     let name: *const XmlChar = (*ctxt).name;
     if failed == -1 || name.is_null() {
         if (*ctxt).current_byte() == b'>' {
@@ -9367,7 +9364,7 @@ unsafe fn html_init_parser_ctxt(
     ctxt: HtmlParserCtxtPtr,
     sax: *const HtmlSaxhandler,
     user_data: Option<GenericErrorContext>,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -9538,7 +9535,7 @@ unsafe extern "C" fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr)
 unsafe extern "C" fn html_node_info_push(
     ctxt: HtmlParserCtxtPtr,
     value: *mut HtmlParserNodeInfo,
-) -> c_int {
+) -> i32 {
     if (*ctxt).node_info_nr >= (*ctxt).node_info_max {
         if (*ctxt).node_info_max == 0 {
             (*ctxt).node_info_max = 5;
@@ -9601,7 +9598,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
         node_info.begin_line = (*(*ctxt).input).line as _;
     }
 
-    let failed: c_int = html_parse_start_tag(ctxt);
+    let failed: i32 = html_parse_start_tag(ctxt);
     let name: *const XmlChar = (*ctxt).name;
     if failed == -1 || name.is_null() {
         if (*ctxt).current_byte() == b'>' {
@@ -9902,7 +9899,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
  * Returns 0, -1 in case of error. the parser context is augmented
  *                as a result of the parsing.
  */
-pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> c_int {
+pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut start: [XmlChar; 4] = [0; 4];
     let dtd: XmlDtdPtr;
 
@@ -10319,17 +10316,17 @@ pub unsafe fn html_parse_file(filename: *const c_char, encoding: Option<&str>) -
  * The value of @outlen after return is the number of octets consumed.
  */
 pub unsafe extern "C" fn utf8_to_html(
-    mut out: *mut c_uchar,
-    outlen: *mut c_int,
-    mut input: *const c_uchar,
-    inlen: *mut c_int,
-) -> c_int {
-    let mut processed: *const c_uchar = input;
-    let outstart: *const c_uchar = out;
-    let instart: *const c_uchar = input;
-    let mut c: c_uint;
-    let mut d: c_uint;
-    let mut trailing: c_int;
+    mut out: *mut u8,
+    outlen: *mut i32,
+    mut input: *const u8,
+    inlen: *mut i32,
+) -> i32 {
+    let mut processed: *const u8 = input;
+    let outstart: *const u8 = out;
+    let instart: *const u8 = input;
+    let mut c: u32;
+    let mut d: u32;
+    let mut trailing: i32;
 
     if out.is_null() || outlen.is_null() || inlen.is_null() {
         return -1;
@@ -10342,8 +10339,8 @@ pub unsafe extern "C" fn utf8_to_html(
         *inlen = 0;
         return 0;
     }
-    let inend: *const c_uchar = input.add(*inlen as usize);
-    let outend: *const c_uchar = out.add(*outlen as usize);
+    let inend: *const u8 = input.add(*inlen as usize);
+    let outend: *const u8 = out.add(*outlen as usize);
     while input < inend {
         d = *input as _;
         input = input.add(1);
@@ -10409,7 +10406,7 @@ pub unsafe extern "C" fn utf8_to_html(
             } else {
                 (*ent).name
             };
-            let len: c_int = strlen(cp) as _;
+            let len: i32 = strlen(cp) as _;
             if out.add(2 + len as usize) >= outend as _ {
                 break;
             }
@@ -10444,24 +10441,24 @@ pub unsafe extern "C" fn utf8_to_html(
  * The value of @outlen after return is the number of octets consumed.
  */
 pub unsafe extern "C" fn html_encode_entities(
-    mut out: *mut c_uchar,
-    outlen: *mut c_int,
-    mut input: *const c_uchar,
-    inlen: *mut c_int,
-    quote_char: c_int,
-) -> c_int {
-    let mut processed: *const c_uchar = input;
-    let outstart: *const c_uchar = out;
-    let instart: *const c_uchar = input;
-    let mut c: c_uint;
-    let mut d: c_uint;
-    let mut trailing: c_int;
+    mut out: *mut u8,
+    outlen: *mut i32,
+    mut input: *const u8,
+    inlen: *mut i32,
+    quote_char: i32,
+) -> i32 {
+    let mut processed: *const u8 = input;
+    let outstart: *const u8 = out;
+    let instart: *const u8 = input;
+    let mut c: u32;
+    let mut d: u32;
+    let mut trailing: i32;
 
     if out.is_null() || outlen.is_null() || inlen.is_null() || input.is_null() {
         return -1;
     }
-    let outend: *const c_uchar = out.add(*outlen as usize);
-    let inend: *const c_uchar = input.add(*inlen as usize);
+    let outend: *const u8 = out.add(*outlen as usize);
+    let inend: *const u8 = input.add(*inlen as usize);
     while input < inend {
         d = *input as _;
         input = input.add(1);
@@ -10508,7 +10505,7 @@ pub unsafe extern "C" fn html_encode_entities(
 
         /* assertion: c is a single UTF-4 value */
         if c < 0x80
-            && c != quote_char as c_uint
+            && c != quote_char as u32
             && c != '&' as u32
             && c != '<' as u32
             && c != '>' as u32
@@ -10531,7 +10528,7 @@ pub unsafe extern "C" fn html_encode_entities(
             } else {
                 (*ent).name
             };
-            let len: c_int = strlen(cp as _) as _;
+            let len: i32 = strlen(cp as _) as _;
             if outend.offset_from(out) < len as isize + 2 {
                 break;
             }
@@ -10583,7 +10580,7 @@ const HTML_SCRIPT_ATTRIBUTES: &[*const c_char] = &[
  *
  * Returns 1 is the attribute is a script 0 otherwise
  */
-pub unsafe extern "C" fn html_is_script_attribute(name: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn html_is_script_attribute(name: *const XmlChar) -> i32 {
     if name.is_null() {
         return 0;
     }
@@ -10604,14 +10601,14 @@ pub unsafe extern "C" fn html_is_script_attribute(name: *const XmlChar) -> c_int
 
 /**
  * htmlHandleOmittedElem:
- * @val:  c_int 0 or 1
+ * @val:  int 0 or 1
  *
  * Set and return the previous value for handling HTML omitted tags.
  *
  * Returns the last value for 0 for no handling, 1 for auto insertion.
  */
-pub unsafe extern "C" fn html_handle_omitted_elem(val: c_int) -> c_int {
-    let old: c_int = HTML_OMITTED_DEFAULT_VALUE.load(Ordering::Acquire);
+pub unsafe extern "C" fn html_handle_omitted_elem(val: i32) -> i32 {
+    let old: i32 = HTML_OMITTED_DEFAULT_VALUE.load(Ordering::Acquire);
 
     HTML_OMITTED_DEFAULT_VALUE.store(val, Ordering::Release);
     old
@@ -10674,7 +10671,7 @@ pub unsafe fn html_create_push_parser_ctxt(
     sax: HtmlSaxhandlerPtr,
     user_data: Option<GenericErrorContext>,
     chunk: *const c_char,
-    size: c_int,
+    size: i32,
     filename: *const c_char,
     enc: XmlCharEncoding,
 ) -> HtmlParserCtxtPtr {
@@ -10771,10 +10768,10 @@ unsafe extern "C" fn html_parse_lookup_sequence(
     first: XmlChar,
     next: XmlChar,
     third: XmlChar,
-    ignoreattrval: c_int,
-) -> c_int {
+    ignoreattrval: i32,
+) -> i32 {
     let mut len: size_t;
-    let mut quote: c_int;
+    let mut quote: i32;
 
     let input: HtmlParserInputPtr = (*ctxt).input;
     if input.is_null() {
@@ -10859,9 +10856,9 @@ unsafe extern "C" fn html_parse_lookup_sequence(
  * Returns the index to the current parsing point if the full sequence is available, -1 otherwise.
  */
 #[cfg(feature = "push")]
-unsafe extern "C" fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> c_int {
-    let mut mark: c_int;
-    let mut offset: c_int;
+unsafe extern "C" fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i32 {
+    let mut mark: i32;
+    let mut offset: i32;
 
     loop {
         mark = html_parse_lookup_sequence(ctxt, b'-', b'-', 0, 0);
@@ -10894,8 +10891,8 @@ unsafe extern "C" fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> c
  * Returns zero if no parsing was possible
  */
 #[cfg(feature = "push")]
-unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: c_int) -> c_int {
-    let ret: c_int = 0;
+unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i32 {
+    let ret: i32 = 0;
     let mut input: HtmlParserInputPtr;
     let mut avail: ptrdiff_t = 0;
     let mut cur: XmlChar;
@@ -11182,7 +11179,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     node_info.begin_line = (*(*ctxt).input).line as _;
                 }
 
-                let failed: c_int = html_parse_start_tag(ctxt);
+                let failed: i32 = html_parse_start_tag(ctxt);
                 let name: *const XmlChar = (*ctxt).name;
                 if failed == -1 || name.is_null() {
                     if (*ctxt).current_byte() == b'>' {
@@ -11329,7 +11326,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                      * Handle SCRIPT/STYLE separately
                      */
                     if terminate == 0 {
-                        let idx: c_int = html_parse_lookup_sequence(ctxt, b'<', b'/', 0, 0);
+                        let idx: i32 = html_parse_lookup_sequence(ctxt, b'<', b'/', 0, 0);
                         if idx < 0 {
                             // goto done;
                             break 'done;
@@ -11630,9 +11627,9 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
 pub unsafe extern "C" fn html_parse_chunk(
     ctxt: HtmlParserCtxtPtr,
     chunk: *const c_char,
-    size: c_int,
-    terminate: c_int,
-) -> c_int {
+    size: i32,
+    terminate: i32,
+) -> i32 {
     use std::slice::from_raw_parts;
 
     if ctxt.is_null() || (*ctxt).input.is_null() {
@@ -11654,7 +11651,7 @@ pub unsafe extern "C" fn html_parse_chunk(
         let base: size_t = (*(*ctxt).input).get_base();
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        let res: c_int = (*(*ctxt).input)
+        let res: i32 = (*(*ctxt).input)
             .buf
             .as_mut()
             .unwrap()
@@ -11864,10 +11861,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
  * Returns 0 in case of success, the set of unknown or unimplemented options
  *         in case of error.
  */
-pub unsafe extern "C" fn html_ctxt_use_options(
-    ctxt: HtmlParserCtxtPtr,
-    mut options: c_int,
-) -> c_int {
+pub unsafe extern "C" fn html_ctxt_use_options(ctxt: HtmlParserCtxtPtr, mut options: i32) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -11947,8 +11941,8 @@ unsafe fn html_do_read(
     ctxt: HtmlParserCtxtPtr,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
-    reuse: c_int,
+    options: i32,
+    reuse: i32,
 ) -> HtmlDocPtr {
     html_ctxt_use_options(ctxt, options);
     (*ctxt).html = 1;
@@ -11988,7 +11982,7 @@ pub unsafe fn html_read_doc(
     cur: *const XmlChar,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> HtmlDocPtr {
     if cur.is_null() {
         return null_mut();
@@ -12015,7 +12009,7 @@ pub unsafe fn html_read_doc(
 pub unsafe fn html_read_file(
     filename: *const c_char,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> HtmlDocPtr {
     xml_init_parser();
     let ctxt: HtmlParserCtxtPtr = html_create_file_parser_ctxt(filename, encoding);
@@ -12041,7 +12035,7 @@ pub unsafe fn html_read_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> HtmlDocPtr {
     xml_init_parser();
     let ctxt: HtmlParserCtxtPtr = html_create_memory_parser_ctxt(buffer);
@@ -12068,7 +12062,7 @@ pub unsafe fn html_read_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> HtmlDocPtr {
     xml_init_parser();
 
@@ -12105,7 +12099,7 @@ pub unsafe fn html_ctxt_read_doc(
     cur: *const XmlChar,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> HtmlDocPtr {
     if cur.is_null() {
         return null_mut();
@@ -12135,7 +12129,7 @@ pub unsafe fn html_ctxt_read_file(
     ctxt: XmlParserCtxtPtr,
     filename: *const c_char,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> HtmlDocPtr {
     if filename.is_null() {
         return null_mut();
@@ -12174,7 +12168,7 @@ pub unsafe fn html_ctxt_read_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> HtmlDocPtr {
     if ctxt.is_null() {
         return null_mut();
@@ -12217,7 +12211,7 @@ pub unsafe fn html_ctxt_read_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> HtmlDocPtr {
     if ctxt.is_null() {
         return null_mut();
@@ -12264,7 +12258,7 @@ pub enum HtmlStatus {
 pub unsafe extern "C" fn html_attr_allowed(
     elt: *const HtmlElemDesc,
     attr: *const XmlChar,
-    legacy: c_int,
+    legacy: i32,
 ) -> HtmlStatus {
     let mut p: *mut *const c_char;
 
@@ -12318,7 +12312,7 @@ pub unsafe extern "C" fn html_attr_allowed(
 pub unsafe extern "C" fn html_element_allowed_here(
     parent: *const HtmlElemDesc,
     elt: *const XmlChar,
-) -> c_int {
+) -> i32 {
     let mut p: *mut *const c_char;
 
     if elt.is_null() || parent.is_null() || (*parent).subelts.is_null() {
@@ -12378,7 +12372,7 @@ pub unsafe extern "C" fn html_element_status_here(
  *    for Attribute nodes, a return from htmlAttrAllowed
  *    for other nodes, htmlStatus::HTML_NA (no checks performed)
  */
-pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: c_int) -> HtmlStatus {
+pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: i32) -> HtmlStatus {
     if node.is_null() {
         return HtmlStatus::HtmlInvalid;
     }
@@ -12672,14 +12666,14 @@ mod tests {
                                 let ret_val = html_encode_entities(
                                     out,
                                     outlen,
-                                    input as *const c_uchar,
+                                    input as *const u8,
                                     inlen,
                                     quote_char,
                                 );
                                 desret_int(ret_val);
                                 des_unsigned_char_ptr(n_out, out, 0);
                                 des_int_ptr(n_outlen, outlen, 1);
-                                des_const_unsigned_char_ptr(n_in, input as *const c_uchar, 2);
+                                des_const_unsigned_char_ptr(n_in, input as *const u8, 2);
                                 des_int_ptr(n_inlen, inlen, 3);
                                 des_int(n_quote_char, quote_char, 4);
                                 reset_last_error();

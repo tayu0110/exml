@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, CStr},
+    ffi::{c_char, CStr},
     os::raw::c_void,
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
@@ -112,15 +112,15 @@ pub type XlinkSimpleLinkFunk = unsafe extern "C" fn(
 pub type XlinkExtendedLinkFunk = unsafe extern "C" fn(
     ctx: *mut c_void,
     node: XmlNodePtr,
-    nbLocators: c_int,
+    nbLocators: i32,
     hrefs: *mut *const XmlChar,
     roles: *mut *const XmlChar,
-    nbArcs: c_int,
+    nbArcs: i32,
     from: *mut *const XmlChar,
     to: *mut *const XmlChar,
     show: *mut XlinkShow,
     actuate: *mut XlinkActuate,
-    nbTitles: c_int,
+    nbTitles: i32,
     titles: *mut *const XmlChar,
     langs: *mut *const XmlChar,
 );
@@ -141,10 +141,10 @@ pub type XlinkExtendedLinkFunk = unsafe extern "C" fn(
 pub type XlinkExtendedLinkSetFunk = unsafe extern "C" fn(
     ctx: *mut c_void,
     node: XmlNodePtr,
-    nbLocators: c_int,
+    nbLocators: i32,
     hrefs: *mut *const XmlChar,
     roles: *mut *const XmlChar,
-    nbTitles: c_int,
+    nbTitles: i32,
     titles: *mut *const XmlChar,
     langs: *mut *const XmlChar,
 );

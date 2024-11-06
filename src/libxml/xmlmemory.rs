@@ -3,13 +3,12 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
+use std::ffi::{c_char, c_void};
 use std::mem::{size_of, zeroed};
 use std::ptr::{addr_of_mut, null_mut};
 
 use libc::{
-    fclose, fopen, fprintf, free, getenv, malloc, memset, realloc, size_t, sscanf, strcpy, strlen,
-    FILE,
+    fclose, fopen, fprintf, free, getenv, malloc, memset, realloc, sscanf, strcpy, strlen, FILE,
 };
 
 use crate::generic_error;
@@ -23,9 +22,9 @@ use super::globals::{_XML_FREE, _XML_MALLOC, _XML_MALLOC_ATOMIC, _XML_MEM_STRDUP
 use super::threads::{xml_mutex_lock, xml_mutex_unlock, XmlMutex};
 use super::xmlstring::XmlChar;
 
-static mut DEBUG_MEM_SIZE: c_ulong = 0;
-static mut DEBUG_MEM_BLOCKS: c_ulong = 0;
-static mut DEBUG_MAX_MEM_SIZE: c_ulong = 0;
+static mut DEBUG_MEM_SIZE: u64 = 0;
+static mut DEBUG_MEM_BLOCKS: u64 = 0;
+static mut DEBUG_MAX_MEM_SIZE: u64 = 0;
 static mut XML_MEM_MUTEX: XmlMutex = unsafe { zeroed() };
 
 const MEMTAG: usize = 0x5aa5;
@@ -38,12 +37,12 @@ const REALLOC_ATOMIC_TYPE: usize = 5;
 
 #[repr(C)]
 struct Memnod {
-    mh_tag: c_uint,
-    mh_type: c_uint,
-    mh_number: c_ulong,
-    mh_size: size_t,
+    mh_tag: u32,
+    mh_type: u32,
+    mh_number: u64,
+    mh_size: usize,
     mh_file: *const c_char,
-    mh_line: c_uint,
+    mh_line: u32,
 }
 
 type Memhdr = Memnod;
@@ -68,8 +67,8 @@ macro_rules! HDR_2_CLIENT {
     };
 }
 
-static mut BLOCK: c_uint = 0;
-static mut XML_MEM_STOP_AT_BLOCK: c_uint = 0;
+static mut BLOCK: u32 = 0;
+static mut XML_MEM_STOP_AT_BLOCK: u32 = 0;
 static mut XML_MEM_TRACE_BLOCK_AT: *mut c_void = null_mut();
 // #[cfg(feature = "debug_memory_location")]
 // static mut memlist: *mut Memhdr = null_mut();
@@ -107,7 +106,7 @@ pub type XmlFreeFunc = unsafe extern "C" fn(mem: *mut c_void);
  *
  * Returns a pointer to the newly allocated block or NULL in case of error.
  */
-pub type XmlMallocFunc = unsafe extern "C" fn(size: size_t) -> *mut c_void;
+pub type XmlMallocFunc = unsafe extern "C" fn(size: usize) -> *mut c_void;
 
 /**
  * xmlReallocFunc:
@@ -118,7 +117,7 @@ pub type XmlMallocFunc = unsafe extern "C" fn(size: size_t) -> *mut c_void;
  *
  * Returns a pointer to the newly reallocated block or NULL in case of error.
  */
-pub type XmlReallocFunc = unsafe extern "C" fn(mem: *mut c_void, size: size_t) -> *mut c_void;
+pub type XmlReallocFunc = unsafe extern "C" fn(mem: *mut c_void, size: usize) -> *mut c_void;
 
 /**
  * xmlStrdupFunc:
@@ -174,7 +173,7 @@ pub unsafe extern "C" fn xml_mem_setup(
     malloc_func: Option<XmlMallocFunc>,
     realloc_func: Option<XmlReallocFunc>,
     strdup_func: Option<XmlStrdupFunc>,
-) -> c_int {
+) -> i32 {
     if free_func.is_none() {
         return -1;
     }
@@ -211,7 +210,7 @@ pub unsafe extern "C" fn xml_mem_get(
     malloc_func: *mut XmlMallocFunc,
     realloc_func: *mut XmlReallocFunc,
     strdup_func: *mut XmlStrdupFunc,
-) -> c_int {
+) -> i32 {
     if !free_func.is_null() {
         *free_func = xml_free;
     }
@@ -251,7 +250,7 @@ pub unsafe extern "C" fn xml_gc_mem_setup(
     malloc_atomic_func: Option<XmlMallocFunc>,
     realloc_func: Option<XmlReallocFunc>,
     strdup_func: Option<XmlStrdupFunc>,
-) -> c_int {
+) -> i32 {
     if free_func.is_none() {
         return -1;
     }
@@ -295,7 +294,7 @@ pub unsafe extern "C" fn xml_gc_mem_get(
     malloc_atomic_func: *mut XmlMallocFunc,
     realloc_func: *mut XmlReallocFunc,
     strdup_func: *mut XmlStrdupFunc,
-) -> c_int {
+) -> i32 {
     if !free_func.is_null() {
         *free_func = xml_free;
     }
@@ -323,7 +322,7 @@ pub unsafe extern "C" fn xml_gc_mem_get(
  * DEPRECATED: Alias for xmlInitParser.
  */
 #[deprecated]
-pub unsafe extern "C" fn xml_init_memory() -> c_int {
+pub unsafe extern "C" fn xml_init_memory() -> i32 {
     xml_init_parser();
     0
 }
@@ -351,7 +350,7 @@ pub unsafe extern "C" fn xml_cleanup_memory() {}
  *
  * Returns the size of a memory allocation.
  */
-pub unsafe extern "C" fn xml_mem_size(ptr: *mut c_void) -> size_t {
+pub unsafe extern "C" fn xml_mem_size(ptr: *mut c_void) -> usize {
     if ptr.is_null() {
         return 0;
     }
@@ -371,7 +370,7 @@ pub unsafe extern "C" fn xml_mem_size(ptr: *mut c_void) -> size_t {
  *
  * Returns an int representing the amount of memory allocated.
  */
-pub unsafe extern "C" fn xml_mem_used() -> c_int {
+pub unsafe extern "C" fn xml_mem_used() -> i32 {
     DEBUG_MEM_SIZE as _
 }
 
@@ -382,9 +381,9 @@ pub unsafe extern "C" fn xml_mem_used() -> c_int {
  *
  * Returns an int representing the number of blocks
  */
-pub unsafe extern "C" fn xml_mem_blocks() -> c_int {
+pub unsafe extern "C" fn xml_mem_blocks() -> i32 {
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
-    let res: c_int = DEBUG_MEM_BLOCKS as _;
+    let res: i32 = DEBUG_MEM_BLOCKS as _;
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
     res
 }
@@ -424,7 +423,7 @@ pub unsafe extern "C" fn xml_mem_display(mut fp: *mut FILE) {
  * the last nbBytes of memory allocated and not freed, useful for dumping
  * the memory left allocated between two places at runtime.
  */
-pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: c_long) {
+pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: i64) {
     let old_fp: *mut FILE = fp;
 
     if nb_bytes <= 0 {
@@ -455,7 +454,7 @@ pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: c_lon
  * show a show display of the memory allocated, and dump
  * the @nr last allocated areas which were not freed
  */
-pub unsafe extern "C" fn xml_mem_show(fp: *mut FILE, _nr: c_int) {
+pub unsafe extern "C" fn xml_mem_show(fp: *mut FILE, _nr: i32) {
     // #[cfg(feature = "debug_memory_location")]
     // let p: *mut Memhdr;
 
@@ -484,7 +483,7 @@ pub unsafe extern "C" fn xml_memory_dump() {}
  *
  * Returns a pointer to the allocated area or NULL in case of lack of memory.
  */
-pub unsafe extern "C" fn xml_mem_malloc(size: size_t) -> *mut c_void {
+pub unsafe extern "C" fn xml_mem_malloc(size: usize) -> *mut c_void {
     xml_malloc_loc(size, c"none".as_ptr() as _, 0)
 }
 
@@ -497,7 +496,7 @@ pub unsafe extern "C" fn xml_mem_malloc(size: size_t) -> *mut c_void {
  *
  * Returns a pointer to the allocated area or NULL in case of lack of memory.
  */
-pub unsafe extern "C" fn xml_mem_realloc(ptr: *mut c_void, size: size_t) -> *mut c_void {
+pub unsafe extern "C" fn xml_mem_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     xml_realloc_loc(ptr, size, c"none".as_ptr() as _, 0)
 }
 
@@ -573,9 +572,9 @@ pub unsafe extern "C" fn xml_memory_strdup(str: *const XmlChar) -> *mut XmlChar 
  * Returns a pointer to the allocated area or NULL in case of lack of memory.
  */
 pub unsafe extern "C" fn xml_malloc_loc(
-    size: size_t,
+    size: usize,
     file: *const c_char,
-    line: c_int,
+    line: i32,
 ) -> *mut c_void {
     xml_init_parser();
 
@@ -617,7 +616,7 @@ pub unsafe extern "C" fn xml_malloc_loc(
         generic_error!(
             "{:?} : Malloc({}) Ok\n",
             XML_MEM_TRACE_BLOCK_AT,
-            size as c_ulong
+            size as u64
         );
         xml_malloc_breakpoint();
     }
@@ -638,9 +637,9 @@ pub unsafe extern "C" fn xml_malloc_loc(
  */
 pub unsafe extern "C" fn xml_realloc_loc(
     ptr: *mut c_void,
-    size: size_t,
+    size: usize,
     file: *const c_char,
-    line: c_int,
+    line: i32,
 ) -> *mut c_void {
     let mut p: *mut Memhdr;
 
@@ -651,7 +650,7 @@ pub unsafe extern "C" fn xml_realloc_loc(
     xml_init_parser();
 
     p = CLIENT_2_HDR!(ptr);
-    let number: c_ulong = (*p).mh_number;
+    let number: u64 = (*p).mh_number;
     if XML_MEM_STOP_AT_BLOCK == number as _ {
         xml_malloc_breakpoint();
     }
@@ -683,8 +682,8 @@ pub unsafe extern "C" fn xml_realloc_loc(
         generic_error!(
             "{:?} : Realloced({} -> {}) Ok\n",
             XML_MEM_TRACE_BLOCK_AT,
-            (*p).mh_size as c_ulong,
-            size as c_ulong
+            (*p).mh_size as u64,
+            size as u64
         );
         xml_malloc_breakpoint();
     }
@@ -719,9 +718,9 @@ pub unsafe extern "C" fn xml_realloc_loc(
  * Returns a pointer to the allocated area or NULL in case of lack of memory.
  */
 pub unsafe extern "C" fn xml_malloc_atomic_loc(
-    size: size_t,
+    size: usize,
     file: *const c_char,
-    line: c_int,
+    line: i32,
 ) -> *mut c_void {
     xml_init_parser();
 
@@ -763,7 +762,7 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
         generic_error!(
             "{:?} : Malloc({}) Ok\n",
             XML_MEM_TRACE_BLOCK_AT,
-            size as c_ulong
+            size as u64
         );
         xml_malloc_breakpoint();
     }
@@ -784,9 +783,9 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
 pub unsafe extern "C" fn xml_mem_strdup_loc(
     str: *const c_char,
     file: *const c_char,
-    line: c_int,
+    line: i32,
 ) -> *mut char {
-    let size: size_t = strlen(str) + 1;
+    let size: usize = strlen(str) + 1;
 
     xml_init_parser();
 

@@ -4,13 +4,13 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, CStr, CString},
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     ptr::{null, null_mut},
     sync::atomic::Ordering,
 };
 
-use libc::{memset, size_t, FILE};
+use libc::{memset, FILE};
 
 use crate::{encoding::XmlCharEncoding, io::XmlOutputBufferPtr};
 
@@ -211,7 +211,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             && xml_str_equal((*cur).name, c"meta".as_ptr() as _)
         {
             let mut attr: XmlAttrPtr = (*cur).properties;
-            let mut http: c_int;
+            let mut http: i32;
             let mut value: *const XmlChar;
 
             content = null_mut();
@@ -285,7 +285,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
  *
  * Returns 0 in case of success and -1 in case of error
  */
-pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) -> c_int {
+pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) -> i32 {
     let mut cur: HtmlNodePtr;
     let mut meta: HtmlNodePtr = null_mut();
     let mut head: HtmlNodePtr = null_mut();
@@ -425,7 +425,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
             && (xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0)
         {
             let mut attr: XmlAttrPtr = (*cur).properties;
-            let mut http: c_int;
+            let mut http: i32;
             let mut value: *const XmlChar;
 
             content = None;
@@ -479,7 +479,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
 pub unsafe extern "C" fn html_doc_dump_memory(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
-    size: *mut c_int,
+    size: *mut i32,
 ) {
     html_doc_dump_memory_format(cur, mem, size, 1);
 }
@@ -522,8 +522,8 @@ unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extr
 pub unsafe extern "C" fn html_doc_dump_memory_format(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
-    size: *mut c_int,
-    format: c_int,
+    size: *mut i32,
+    format: i32,
 ) {
     use std::{cell::RefCell, rc::Rc};
 
@@ -613,7 +613,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
@@ -667,7 +667,7 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
  * returns: the number of byte written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
     use std::{cell::RefCell, rc::Rc};
 
     use crate::{
@@ -759,8 +759,8 @@ unsafe extern "C" fn html_buf_node_dump_format(
     buf: XmlBufPtr,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
-    format: c_int,
-) -> size_t {
+    format: i32,
+) -> usize {
     use crate::{
         buf::XmlBufRef,
         io::{XmlOutputBuffer, XmlOutputBufferPtr},
@@ -786,7 +786,7 @@ unsafe extern "C" fn html_buf_node_dump_format(
     (*outbuf).context = null_mut();
     (*outbuf).written = 0;
 
-    let using: size_t = xml_buf_use(buf);
+    let using: usize = xml_buf_use(buf);
     html_node_dump_format_output(outbuf, doc, cur, None, format);
     xml_free(outbuf as _);
     (xml_buf_use(buf) as i32 - using as i32) as _
@@ -804,7 +804,7 @@ unsafe extern "C" fn html_buf_node_dump_format(
  * Returns the number of byte written or -1 in case of error
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
+pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> i32 {
     use crate::libxml::parser::xml_init_parser;
 
     if buf.is_null() || cur.is_null() {
@@ -817,8 +817,8 @@ pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: Xml
     //     return -1;
     // }
 
-    // let ret: size_t = html_buf_node_dump_format(buffer, doc, cur, 1);
-    let ret: size_t = html_buf_node_dump_format(buf, doc, cur, 1);
+    // let ret: usize = html_buf_node_dump_format(buffer, doc, cur, 1);
+    let ret: usize = html_buf_node_dump_format(buf, doc, cur, 1);
 
     // xml_buf_back_to_buffer(buffer);
 
@@ -862,8 +862,8 @@ pub unsafe extern "C" fn html_node_dump_file_format(
     doc: XmlDocPtr,
     cur: XmlNodePtr,
     encoding: *const c_char,
-    format: c_int,
-) -> c_int {
+    format: i32,
+) -> i32 {
     use std::ffi::CStr;
 
     use crate::{
@@ -1163,7 +1163,7 @@ pub unsafe fn html_node_dump_format_output(
     doc: XmlDocPtr,
     mut cur: XmlNodePtr,
     _encoding: Option<&str>,
-    format: c_int,
+    format: i32,
 ) {
     use std::ffi::CStr;
 
@@ -1483,9 +1483,9 @@ pub unsafe fn html_doc_content_dump_format_output(
     buf: XmlOutputBufferPtr,
     cur: XmlDocPtr,
     _encoding: Option<&str>,
-    format: c_int,
+    format: i32,
 ) {
-    let mut typ: c_int = 0;
+    let mut typ: i32 = 0;
     if !cur.is_null() {
         typ = (*cur).typ as i32;
         (*cur).typ = XmlElementType::XmlHtmlDocumentNode;
@@ -1549,7 +1549,7 @@ const HTML_BOOLEAN_ATTRS: &[*const c_char] = &[
  *
  * returns: false if the attribute is not boolean, true otherwise.
  */
-pub unsafe extern "C" fn html_is_boolean_attr(name: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn html_is_boolean_attr(name: *const XmlChar) -> i32 {
     let mut i: usize = 0;
 
     while !HTML_BOOLEAN_ATTRS[i].is_null() {

@@ -11,7 +11,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_uchar, CStr, CString},
+    ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -96,13 +96,13 @@ pub struct XmlTextWriter {
     out: XmlOutputBufferPtr, /* output buffer */
     nodes: XmlListPtr,       /* element name stack */
     nsstack: XmlListPtr,     /* name spaces stack */
-    level: c_int,
-    indent: c_int,       /* enable indent */
-    doindent: c_int,     /* internal indent flag */
+    level: i32,
+    indent: i32,         /* enable indent */
+    doindent: i32,       /* internal indent flag */
     ichar: *mut XmlChar, /* indent character */
     qchar: c_char,       /* character used for quoting attribute values */
     ctxt: XmlParserCtxtPtr,
-    no_doc_free: c_int,
+    no_doc_free: i32,
     doc: XmlDocPtr,
 }
 
@@ -135,7 +135,7 @@ extern "C" fn xml_free_text_writer_stack_entry(data: *mut c_void) {
  *
  * Returns -1, 0, 1
  */
-extern "C" fn xml_cmp_text_writer_stack_entry(data0: *const c_void, data1: *const c_void) -> c_int {
+extern "C" fn xml_cmp_text_writer_stack_entry(data0: *const c_void, data1: *const c_void) -> i32 {
     if data0 == data1 {
         return 0;
     }
@@ -190,8 +190,8 @@ extern "C" fn xml_free_text_writer_ns_stack_entry(data: *mut c_void) {
 extern "C" fn xml_cmp_text_writer_ns_stack_entry(
     data0: *const c_void,
     data1: *const c_void,
-) -> c_int {
-    let mut rc: c_int;
+) -> i32 {
+    let mut rc: i32;
 
     if data0 == data1 {
         return 0;
@@ -363,7 +363,7 @@ pub unsafe extern "C" fn xml_new_text_writer(out: XmlOutputBufferPtr) -> XmlText
  */
 pub unsafe extern "C" fn xml_new_text_writer_filename(
     uri: *const c_char,
-    compression: c_int,
+    compression: i32,
 ) -> XmlTextWriterPtr {
     let out: XmlOutputBufferPtr = xml_output_buffer_create_filename(uri, None, compression);
     if out.is_null() {
@@ -403,7 +403,7 @@ pub unsafe extern "C" fn xml_new_text_writer_filename(
 //  */
 // pub unsafe extern "C" fn xml_new_text_writer_memory(
 //     buf: XmlBufferPtr,
-//     _compression: c_int,
+//     _compression: i32,
 // ) -> XmlTextWriterPtr {
 //     /*::todo handle compression */
 //     let out: XmlOutputBufferPtr = xml_output_buffer_create_buffer(buf, null_mut());
@@ -436,7 +436,7 @@ pub unsafe extern "C" fn xml_new_text_writer_filename(
  * @ctxt:  a writer context
  * @error:  the error number
  * @msg:  the error message
- * @val:  an c_int
+ * @val:  an int
  *
  * Handle a writer error
  */
@@ -444,7 +444,7 @@ unsafe extern "C" fn xml_writer_err_msg_int(
     ctxt: XmlTextWriterPtr,
     error: XmlParserErrors,
     msg: *const c_char,
-    val: c_int,
+    val: i32,
 ) {
     if !ctxt.is_null() {
         __xml_raise_error!(
@@ -502,10 +502,10 @@ unsafe extern "C" fn xml_writer_err_msg_int(
 unsafe extern "C" fn xml_text_writer_write_doc_callback(
     context: *mut c_void,
     str: *const c_char,
-    len: c_int,
-) -> c_int {
+    len: i32,
+) -> i32 {
     let ctxt: XmlParserCtxtPtr = context as XmlParserCtxtPtr;
-    let rc: c_int;
+    let rc: i32;
 
     let res = {
         rc = xml_parse_chunk(ctxt, str, len, 0);
@@ -532,9 +532,9 @@ unsafe extern "C" fn xml_text_writer_write_doc_callback(
  *
  * Returns -1, 0, 1
  */
-unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) -> i32 {
     let ctxt: XmlParserCtxtPtr = context as XmlParserCtxtPtr;
-    let rc: c_int;
+    let rc: i32;
 
     let res = {
         rc = xml_parse_chunk(ctxt, null_mut(), 0, 1);
@@ -567,7 +567,7 @@ unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) ->
  */
 pub unsafe extern "C" fn xml_new_text_writer_push_parser(
     ctxt: XmlParserCtxtPtr,
-    _compression: c_int,
+    _compression: i32,
 ) -> XmlTextWriterPtr {
     if ctxt.is_null() {
         xml_writer_err_msg(
@@ -710,7 +710,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
  */
 pub unsafe extern "C" fn xml_new_text_writer_doc(
     doc: *mut XmlDocPtr,
-    compression: c_int,
+    compression: i32,
 ) -> XmlTextWriterPtr {
     let mut sax_handler: XmlSAXHandler = unsafe { zeroed() };
 
@@ -787,7 +787,7 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
 pub unsafe extern "C" fn xml_new_text_writer_tree(
     doc: XmlDocPtr,
     node: XmlNodePtr,
-    compression: c_int,
+    compression: i32,
 ) -> XmlTextWriterPtr {
     let mut sax_handler: XmlSAXHandler = unsafe { zeroed() };
 
@@ -910,9 +910,9 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
     version: *const c_char,
     encoding: *const c_char,
     standalone: *const c_char,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() || (*writer).out.is_null() {
         xml_writer_err_msg(
@@ -1053,9 +1053,9 @@ pub unsafe extern "C" fn xml_text_writer_start_document(
  *
  * Returns the bytes written or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_document(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_document(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut lk: XmlLinkPtr;
     let mut p: *mut XmlTextWriterStackEntry;
 
@@ -1146,11 +1146,11 @@ pub unsafe extern "C" fn xml_text_writer_end_document(writer: XmlTextWriterPtr) 
  *
  * Output the current namespace declarations.
  */
-unsafe extern "C" fn xml_text_writer_output_nsdecl(writer: XmlTextWriterPtr) -> c_int {
+unsafe extern "C" fn xml_text_writer_output_nsdecl(writer: XmlTextWriterPtr) -> i32 {
     let mut lk: XmlLinkPtr;
     let mut np: *mut XmlTextWriterNsStackEntry;
-    let mut count: c_int;
-    let mut sum: c_int;
+    let mut count: i32;
+    let mut sum: i32;
 
     sum = 0;
     while xml_list_empty((*writer).nsstack) == 0 {
@@ -1191,10 +1191,10 @@ unsafe extern "C" fn xml_text_writer_output_nsdecl(writer: XmlTextWriterPtr) -> 
  *
  * Returns -1 on error or the number of strings written.
  */
-unsafe extern "C" fn xml_text_writer_write_indent(writer: XmlTextWriterPtr) -> c_int {
-    let mut ret: c_int;
+unsafe extern "C" fn xml_text_writer_write_indent(writer: XmlTextWriterPtr) -> i32 {
+    let mut ret: i32;
 
-    let lksize: c_int = xml_list_size((*writer).nodes);
+    let lksize: i32 = xml_list_size((*writer).nodes);
     if lksize < 1 {
         return -1; /* list is empty */
     }
@@ -1223,9 +1223,9 @@ unsafe extern "C" fn xml_text_writer_write_indent(writer: XmlTextWriterPtr) -> c
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_start_comment(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_start_comment(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() {
@@ -1312,9 +1312,9 @@ pub unsafe extern "C" fn xml_text_writer_start_comment(writer: XmlTextWriterPtr)
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         xml_writer_err_msg(
@@ -1379,11 +1379,11 @@ pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -
 // pub unsafe extern "C" fn xmlTextWriterWriteFormatComment(
 //     writer: xmlTextWriterPtr,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     xmlTextWriterWriteVFormatComment(writer, format)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // va_list ap;
 
 //     // va_start(ap, format);
@@ -1407,7 +1407,7 @@ pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -
 // pub unsafe extern "C" fn xmlTextWriterWriteVFormatComment(
 //     writer: xmlTextWriterPtr,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() {
 //         xmlWriterErrMsg(
 //             writer,
@@ -1420,7 +1420,7 @@ pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -
 //     xmlTextWriterWriteComment(writer, format as _)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // let buf: *mut xmlChar;
 
 //     // if writer.is_null() {
@@ -1455,9 +1455,9 @@ pub unsafe extern "C" fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -
 pub unsafe extern "C" fn xml_text_writer_write_comment(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     sum = 0;
     count = xml_text_writer_start_comment(writer);
@@ -1494,9 +1494,9 @@ pub unsafe extern "C" fn xml_text_writer_write_comment(
 pub unsafe extern "C" fn xml_text_writer_start_element(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() || name.is_null() || (*name == b'\0') {
@@ -1604,8 +1604,8 @@ pub unsafe extern "C" fn xml_text_writer_start_element_ns(
     prefix: *const XmlChar,
     name: *const XmlChar,
     namespace_uri: *const XmlChar,
-) -> c_int {
-    let mut sum: c_int;
+) -> i32 {
+    let mut sum: i32;
     let mut buf: *mut XmlChar;
 
     if writer.is_null() || name.is_null() || (*name == b'\0') {
@@ -1620,7 +1620,7 @@ pub unsafe extern "C" fn xml_text_writer_start_element_ns(
     buf = xml_strcat(buf, name);
 
     sum = 0;
-    let count: c_int = xml_text_writer_start_element(writer, buf);
+    let count: i32 = xml_text_writer_start_element(writer, buf);
     xml_free(buf as _);
     if count < 0 {
         return -1;
@@ -1672,9 +1672,9 @@ pub unsafe extern "C" fn xml_text_writer_start_element_ns(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         return -1;
@@ -1773,9 +1773,9 @@ pub unsafe extern "C" fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         return -1;
@@ -1881,11 +1881,11 @@ pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterP
 //     writer: xmlTextWriterPtr,
 //     name: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     xmlTextWriterWriteVFormatElement(writer, name, format)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // va_list ap;
 
 //     // va_start(ap, format);
@@ -1911,7 +1911,7 @@ pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterP
 //     writer: xmlTextWriterPtr,
 //     name: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() {
 //         return -1;
 //     }
@@ -1919,7 +1919,7 @@ pub unsafe extern "C" fn xml_text_writer_full_end_element(writer: XmlTextWriterP
 //     xmlTextWriterWriteElement(writer, name, format as _)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // let buf: *mut xmlChar;
 
 //     // if writer.is_null() {
@@ -1951,9 +1951,9 @@ pub unsafe extern "C" fn xml_text_writer_write_element(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     sum = 0;
     count = xml_text_writer_start_element(writer, name);
@@ -1996,11 +1996,11 @@ pub unsafe extern "C" fn xml_text_writer_write_element(
 //     name: *const xmlChar,
 //     namespaceURI: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     xmlTextWriterWriteVFormatElementNS(writer, prefix, name, namespaceURI, format)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // va_list ap;
 
 //     // va_start(ap, format);
@@ -2031,7 +2031,7 @@ pub unsafe extern "C" fn xml_text_writer_write_element(
 //     name: *const xmlChar,
 //     namespaceURI: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() {
 //         return -1;
 //     }
@@ -2039,7 +2039,7 @@ pub unsafe extern "C" fn xml_text_writer_write_element(
 //     xmlTextWriterWriteElementNS(writer, prefix, name, namespaceURI, format as _)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // let buf: *mut xmlChar;
 
 //     // if writer.is_null() {
@@ -2075,9 +2075,9 @@ pub unsafe extern "C" fn xml_text_writer_write_element_ns(
     name: *const XmlChar,
     namespace_uri: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
         return -1;
@@ -2119,10 +2119,10 @@ pub unsafe extern "C" fn xml_text_writer_write_element_ns(
 // pub unsafe extern "C" fn xmlTextWriterWriteFormatRaw(
 //     writer: xmlTextWriterPtr,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     xmlTextWriterWriteVFormatRaw(writer, format)
 //     // original code is the following, but Rust cannot handle variable arguments...
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // va_list ap;
 
 //     // va_start(ap, format);
@@ -2146,14 +2146,14 @@ pub unsafe extern "C" fn xml_text_writer_write_element_ns(
 // pub unsafe extern "C" fn xmlTextWriterWriteVFormatRaw(
 //     writer: xmlTextWriterPtr,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() {
 //         return -1;
 //     }
 
 //     xmlTextWriterWriteRaw(writer, format as _)
 //     // original code is the following, but Rust cannot handle variable arguments...
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // let buf: *mut xmlChar;
 
 //     // if writer.is_null() {
@@ -2183,9 +2183,9 @@ pub unsafe extern "C" fn xml_text_writer_write_element_ns(
 unsafe extern "C" fn xml_text_writer_handle_state_dependencies(
     writer: XmlTextWriterPtr,
     p: *mut XmlTextWriterStackEntry,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut extra: [c_char; 3] = [0; 3];
 
     if writer.is_null() {
@@ -2265,10 +2265,10 @@ unsafe extern "C" fn xml_text_writer_handle_state_dependencies(
 pub unsafe extern "C" fn xml_text_writer_write_raw_len(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
-    len: c_int,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+    len: i32,
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() {
@@ -2327,7 +2327,7 @@ pub unsafe extern "C" fn xml_text_writer_write_raw_len(
 pub unsafe extern "C" fn xml_text_writer_write_raw(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
-) -> c_int {
+) -> i32 {
     xml_text_writer_write_raw_len(writer, content, xml_strlen(content))
 }
 
@@ -2344,13 +2344,13 @@ pub unsafe extern "C" fn xml_text_writer_write_raw(
 // pub unsafe extern "C" fn xmlTextWriterWriteFormatString(
 //     writer: xmlTextWriterPtr,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() || format.is_null() {
 //         return -1;
 //     }
 //     xmlTextWriterWriteVFormatString(writer, format)
 //     // original code is the following, but Rust cannot handle variable arguments...
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // va_list ap;
 
 //     // if (writer.is_null() || (format.is_null())) {
@@ -2378,14 +2378,14 @@ pub unsafe extern "C" fn xml_text_writer_write_raw(
 // pub unsafe extern "C" fn xmlTextWriterWriteVFormatString(
 //     writer: xmlTextWriterPtr,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() || format.is_null() {
 //         return -1;
 //     }
 //     xmlTextWriterWriteString(writer, format as _)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // let buf: *mut xmlChar;
 
 //     // if (writer.is_null() || (format.is_null())) {
@@ -2415,9 +2415,9 @@ pub unsafe extern "C" fn xml_text_writer_write_raw(
 pub unsafe extern "C" fn xml_text_writer_write_string(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
-) -> c_int {
-    let count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let count: i32;
+    let mut sum: i32;
     let p: *mut XmlTextWriterStackEntry;
     let mut buf: *mut XmlChar;
 
@@ -2485,10 +2485,10 @@ const B64CRLF: &str = "\r\n";
  */
 unsafe extern "C" fn xml_output_buffer_write_base64(
     out: XmlOutputBufferPtr,
-    len: c_int,
-    data: *const c_uchar,
-) -> c_int {
-    const DTABLE: [c_uchar; 64] = [
+    len: i32,
+    data: *const u8,
+) -> i32 {
+    const DTABLE: [u8; 64] = [
         b'A', b'B', b'C', b'D', b'E', b'F', b'G', b'H', b'I', b'J', b'K', b'L', b'M', b'N', b'O',
         b'P', b'Q', b'R', b'S', b'T', b'U', b'V', b'W', b'X', b'Y', b'Z', b'a', b'b', b'c', b'd',
         b'e', b'f', b'g', b'h', b'i', b'j', b'k', b'l', b'm', b'n', b'o', b'p', b'q', b'r', b's',
@@ -2496,10 +2496,10 @@ unsafe extern "C" fn xml_output_buffer_write_base64(
         b'8', b'9', b'+', b'/',
     ];
 
-    let mut i: c_int;
-    let mut linelen: c_int;
-    let mut count: c_int;
-    let mut sum: c_int;
+    let mut i: i32;
+    let mut linelen: i32;
+    let mut count: i32;
+    let mut sum: i32;
 
     if out.is_null() || len < 0 || data.is_null() {
         return -1;
@@ -2510,17 +2510,17 @@ unsafe extern "C" fn xml_output_buffer_write_base64(
 
     i = 0;
     loop {
-        let mut igroup: [c_uchar; 3] = [0; 3];
+        let mut igroup: [u8; 3] = [0; 3];
         let mut ogroup: [u8; 4] = [0; 4];
-        let mut c: c_int;
-        let mut n: c_int = 3;
+        let mut c: i32;
+        let mut n: i32 = 3;
 
         igroup[0] = 0;
         igroup[1] = 0;
         igroup[2] = 0;
         for j in 0..3 {
             c = *data.add(i as usize) as _;
-            igroup[j] = c as c_uchar;
+            igroup[j] = c as u8;
             i += 1;
             if i >= len {
                 n = j as _;
@@ -2580,11 +2580,11 @@ unsafe extern "C" fn xml_output_buffer_write_base64(
 pub unsafe extern "C" fn xml_text_writer_write_base64(
     writer: XmlTextWriterPtr,
     data: *const c_char,
-    start: c_int,
-    len: c_int,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+    start: i32,
+    len: i32,
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() || data.is_null() || start < 0 || len < 0 {
@@ -2631,12 +2631,12 @@ pub unsafe extern "C" fn xml_text_writer_write_base64(
  */
 unsafe extern "C" fn xml_output_buffer_write_bin_hex(
     out: XmlOutputBufferPtr,
-    len: c_int,
-    data: *const c_uchar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
-    const HEX: [c_uchar; 16] = [
+    len: i32,
+    data: *const u8,
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
+    const HEX: [u8; 16] = [
         b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D', b'E',
         b'F',
     ];
@@ -2677,11 +2677,11 @@ unsafe extern "C" fn xml_output_buffer_write_bin_hex(
 pub unsafe extern "C" fn xml_text_writer_write_bin_hex(
     writer: XmlTextWriterPtr,
     data: *const c_char,
-    start: c_int,
-    len: c_int,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+    start: i32,
+    len: i32,
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() || data.is_null() || start < 0 || len < 0 {
@@ -2729,9 +2729,9 @@ pub unsafe extern "C" fn xml_text_writer_write_bin_hex(
 pub unsafe extern "C" fn xml_text_writer_start_attribute(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
         return -1;
@@ -2806,8 +2806,8 @@ pub unsafe extern "C" fn xml_text_writer_start_attribute_ns(
     prefix: *const XmlChar,
     name: *const XmlChar,
     namespace_uri: *const XmlChar,
-) -> c_int {
-    let mut sum: c_int;
+) -> i32 {
+    let mut sum: i32;
     let mut buf: *mut XmlChar;
     let p: *mut XmlTextWriterNsStackEntry;
 
@@ -2881,7 +2881,7 @@ pub unsafe extern "C" fn xml_text_writer_start_attribute_ns(
     buf = xml_strcat(buf, name);
 
     sum = 0;
-    let count: c_int = xml_text_writer_start_attribute(writer, buf);
+    let count: i32 = xml_text_writer_start_attribute(writer, buf);
     xml_free(buf as _);
     if count < 0 {
         return -1;
@@ -2899,9 +2899,9 @@ pub unsafe extern "C" fn xml_text_writer_start_attribute_ns(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr) -> c_int {
-    let count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr) -> i32 {
+    let count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         return -1;
@@ -2954,11 +2954,11 @@ pub unsafe extern "C" fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr)
 //     writer: xmlTextWriterPtr,
 //     name: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     xmlTextWriterWriteVFormatAttribute(writer, name, format)
 
 //     // original code is the following, but Rust cannot handle variable arguments...
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // va_list ap;
 
 //     // va_start(ap, format);
@@ -2984,14 +2984,14 @@ pub unsafe extern "C" fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr)
 //     writer: xmlTextWriterPtr,
 //     name: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() {
 //         return -1;
 //     }
 
 //     xmlTextWriterWriteAttribute(writer, name, format as _)
 //     // original code is the following, but Rust cannot handle variable arguments...
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // let buf: *mut xmlChar;
 
 //     // if writer.is_null() {
@@ -3023,9 +3023,9 @@ pub unsafe extern "C" fn xml_text_writer_write_attribute(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     sum = 0;
     count = xml_text_writer_start_attribute(writer, name);
@@ -3066,10 +3066,10 @@ pub unsafe extern "C" fn xml_text_writer_write_attribute(
 //     name: *const xmlChar,
 //     namespaceURI: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     xmlTextWriterWriteVFormatAttributeNS(writer, prefix, name, namespaceURI, format)
 //     // original code is the following, but Rust cannot handle variable arguments...
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // va_list ap;
 
 //     // va_start(ap, format);
@@ -3100,14 +3100,14 @@ pub unsafe extern "C" fn xml_text_writer_write_attribute(
 //     name: *const xmlChar,
 //     namespaceURI: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() {
 //         return -1;
 //     }
 //     xmlTextWriterWriteAttributeNS(writer, prefix, name, namespaceURI, format as _)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // let buf: *mut xmlChar;
 
 //     // if writer.is_null() {
@@ -3143,9 +3143,9 @@ pub unsafe extern "C" fn xml_text_writer_write_attribute_ns(
     name: *const XmlChar,
     namespace_uri: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
         return -1;
@@ -3186,9 +3186,9 @@ pub unsafe extern "C" fn xml_text_writer_write_attribute_ns(
 pub unsafe extern "C" fn xml_text_writer_start_pi(
     writer: XmlTextWriterPtr,
     target: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() || target.is_null() || *target == b'\0' {
@@ -3293,9 +3293,9 @@ pub unsafe extern "C" fn xml_text_writer_start_pi(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         return -1;
@@ -3355,11 +3355,11 @@ pub unsafe extern "C" fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> c_i
 //     writer: xmlTextWriterPtr,
 //     target: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     xmlTextWriterWriteVFormatPI(writer, target, format)
 //     // original code is the following, but Rust cannot handle variable arguments...
 
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // va_list ap;
 
 //     // va_start(ap, format);
@@ -3385,12 +3385,12 @@ pub unsafe extern "C" fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> c_i
 //     writer: xmlTextWriterPtr,
 //     target: *const xmlChar,
 //     format: *const c_char,
-// ) -> c_int {
+// ) -> i32 {
 //     if writer.is_null() {
 //         return -1;
 //     }
 //     xmlTextWriterWritePI(writer, target, format as _)
-//     // let rc: c_int;
+//     // let rc: i32;
 //     // let buf: *mut xmlChar;
 
 //     // if writer.is_null() {
@@ -3422,9 +3422,9 @@ pub unsafe extern "C" fn xml_text_writer_write_pi(
     writer: XmlTextWriterPtr,
     target: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     sum = 0;
     count = xml_text_writer_start_pi(writer, target);
@@ -3457,7 +3457,7 @@ const XML_TEXT_WRITER_WRITE_PROCESSING_INSTRUCTION: unsafe extern "C" fn(
     writer: XmlTextWriterPtr,
     target: *const XmlChar,
     content: *const XmlChar,
-) -> c_int = xml_text_writer_write_pi;
+) -> i32 = xml_text_writer_write_pi;
 
 /*
  * CDATA
@@ -3470,9 +3470,9 @@ const XML_TEXT_WRITER_WRITE_PROCESSING_INSTRUCTION: unsafe extern "C" fn(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() {
@@ -3560,9 +3560,9 @@ pub unsafe extern "C" fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> c_int {
-    let count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> i32 {
+    let count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         return -1;
@@ -3603,12 +3603,12 @@ pub unsafe extern "C" fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> 
 //     writer: xmlTextWriterPtr,
 //     format: *const c_char,
 //     ...
-// ) -> c_int;
+// ) -> i32;
 // pub unsafe extern "C" fn xmlTextWriterWriteVFormatCDATA(
 //     writer: xmlTextWriterPtr,
 //     format: *const c_char,
 //     argptr: va_list,
-// ) -> c_int;
+// ) -> i32;
 /**
  * xmlTextWriterWriteCDATA:
  * @writer:  the xmlTextWriterPtr
@@ -3621,9 +3621,9 @@ pub unsafe extern "C" fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> 
 pub unsafe extern "C" fn xml_text_writer_write_cdata(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     sum = 0;
     count = xml_text_writer_start_cdata(writer);
@@ -3666,9 +3666,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
     name: *const XmlChar,
     pubid: *const XmlChar,
     sysid: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
         return -1;
@@ -3824,10 +3824,10 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> c_int {
-    let mut do_loop: c_int;
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> i32 {
+    let mut do_loop: i32;
+    let mut count: i32;
+    let mut sum: i32;
     let mut lk: XmlLinkPtr;
     let mut p: *mut XmlTextWriterStackEntry;
 
@@ -3910,7 +3910,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> c_
 //     sysid: *const xmlChar,
 //     format: *const c_char,
 //     ...
-// ) -> c_int;
+// ) -> i32;
 // pub unsafe extern "C" fn xmlTextWriterWriteVFormatDTD(
 //     writer: xmlTextWriterPtr,
 //     name: *const xmlChar,
@@ -3918,7 +3918,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> c_
 //     sysid: *const xmlChar,
 //     format: *const c_char,
 //     argptr: va_list,
-// ) -> c_int;
+// ) -> i32;
 /**
  * xmlTextWriterWriteDTD:
  * @writer:  the xmlTextWriterPtr
@@ -3937,9 +3937,9 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd(
     pubid: *const XmlChar,
     sysid: *const XmlChar,
     subset: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     sum = 0;
     count = xml_text_writer_start_dtd(writer, name, pubid, sysid);
@@ -3974,7 +3974,7 @@ const XML_TEXT_WRITER_WRITE_DOC_TYPE: unsafe extern "C" fn(
     pubid: *const XmlChar,
     sysid: *const XmlChar,
     subset: *const XmlChar,
-) -> c_int = xml_text_writer_write_dtd;
+) -> i32 = xml_text_writer_write_dtd;
 
 /*
  * DTD element definition
@@ -3991,9 +3991,9 @@ const XML_TEXT_WRITER_WRITE_DOC_TYPE: unsafe extern "C" fn(
 pub unsafe extern "C" fn xml_text_writer_start_dtdelement(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
@@ -4085,9 +4085,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdelement(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         return -1;
@@ -4137,13 +4137,13 @@ pub unsafe extern "C" fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr
 //     name: *const xmlChar,
 //     format: *const c_char,
 //     ...
-// ) -> c_int;
+// ) -> i32;
 // pub unsafe extern "C" fn xmlTextWriterWriteVFormatDTDElement(
 //     writer: xmlTextWriterPtr,
 //     name: *const xmlChar,
 //     format: *const c_char,
 //     argptr: va_list,
-// ) -> c_int;
+// ) -> i32;
 
 /**
  * xmlTextWriterWriteDTDElement:
@@ -4159,9 +4159,9 @@ pub unsafe extern "C" fn xml_text_writer_write_dtdelement(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if content.is_null() {
         return -1;
@@ -4204,9 +4204,9 @@ pub unsafe extern "C" fn xml_text_writer_write_dtdelement(
 pub unsafe extern "C" fn xml_text_writer_start_dtdattlist(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
@@ -4298,9 +4298,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdattlist(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         return -1;
@@ -4350,13 +4350,13 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPt
 //     name: *const xmlChar,
 //     format: *const c_char,
 //     ...
-// ) -> c_int;
+// ) -> i32;
 // pub unsafe extern "C" fn xmlTextWriterWriteVFormatDTDAttlist(
 //     writer: xmlTextWriterPtr,
 //     name: *const xmlChar,
 //     format: *const c_char,
 //     argptr: va_list,
-// ) -> c_int;
+// ) -> i32;
 /**
  * xmlTextWriterWriteDTDAttlist:
  * @writer:  the xmlTextWriterPtr
@@ -4371,9 +4371,9 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_attlist(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if content.is_null() {
         return -1;
@@ -4416,11 +4416,11 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_attlist(
  */
 pub unsafe extern "C" fn xml_text_writer_start_dtd_entity(
     writer: XmlTextWriterPtr,
-    pe: c_int,
+    pe: i32,
     name: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
     let mut p: *mut XmlTextWriterStackEntry;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
@@ -4525,9 +4525,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd_entity(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         return -1;
@@ -4583,18 +4583,18 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr
  */
 // pub unsafe extern "C" fn xmlTextWriterWriteFormatDTDInternalEntity(
 //     writer: xmlTextWriterPtr,
-//     pe: c_int,
+//     pe: i32,
 //     name: *const xmlChar,
 //     format: *const c_char,
 //     ...
-// ) -> c_int;
+// ) -> i32;
 // pub unsafe extern "C" fn xmlTextWriterWriteVFormatDTDInternalEntity(
 //     writer: xmlTextWriterPtr,
-//     pe: c_int,
+//     pe: i32,
 //     name: *const xmlChar,
 //     format: *const c_char,
 //     argptr: va_list,
-// ) -> c_int;
+// ) -> i32;
 
 /**
  * xmlTextWriterWriteDTDInternalEntity:
@@ -4609,12 +4609,12 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr
  */
 pub unsafe extern "C" fn xml_text_writer_write_dtd_internal_entity(
     writer: XmlTextWriterPtr,
-    pe: c_int,
+    pe: i32,
     name: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if name.is_null() || *name == b'\0' || content.is_null() {
         return -1;
@@ -4657,14 +4657,14 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_internal_entity(
  */
 pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity(
     writer: XmlTextWriterPtr,
-    pe: c_int,
+    pe: i32,
     name: *const XmlChar,
     pubid: *const XmlChar,
     sysid: *const XmlChar,
     ndataid: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if pubid.is_null() && sysid.is_null() {
         return -1;
@@ -4711,9 +4711,9 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
     pubid: *const XmlChar,
     sysid: *const XmlChar,
     ndataid: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() {
         xml_writer_err_msg(
@@ -4857,13 +4857,13 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
  */
 pub unsafe extern "C" fn xml_text_writer_write_dtd_entity(
     writer: XmlTextWriterPtr,
-    pe: c_int,
+    pe: i32,
     name: *const XmlChar,
     pubid: *const XmlChar,
     sysid: *const XmlChar,
     ndataid: *const XmlChar,
     content: *const XmlChar,
-) -> c_int {
+) -> i32 {
     if content.is_null() && pubid.is_null() && sysid.is_null() {
         return -1;
     }
@@ -4897,9 +4897,9 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
     name: *const XmlChar,
     pubid: *const XmlChar,
     sysid: *const XmlChar,
-) -> c_int {
-    let mut count: c_int;
-    let mut sum: c_int;
+) -> i32 {
+    let mut count: i32;
+    let mut sum: i32;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
         return -1;
@@ -5029,10 +5029,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
  *
  * Returns -1 on error or 0 otherwise.
  */
-pub unsafe extern "C" fn xml_text_writer_set_indent(
-    writer: XmlTextWriterPtr,
-    indent: c_int,
-) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_set_indent(writer: XmlTextWriterPtr, indent: i32) -> i32 {
     if writer.is_null() || indent < 0 {
         return -1;
     }
@@ -5055,7 +5052,7 @@ pub unsafe extern "C" fn xml_text_writer_set_indent(
 pub unsafe extern "C" fn xml_text_writer_set_indent_string(
     writer: XmlTextWriterPtr,
     str: *const XmlChar,
-) -> c_int {
+) -> i32 {
     if writer.is_null() || str.is_null() {
         return -1;
     }
@@ -5084,7 +5081,7 @@ pub unsafe extern "C" fn xml_text_writer_set_indent_string(
 pub unsafe extern "C" fn xml_text_writer_set_quote_char(
     writer: XmlTextWriterPtr,
     quotechar: XmlChar,
-) -> c_int {
+) -> i32 {
     if writer.is_null() || (quotechar != b'\'' && quotechar != b'"') {
         return -1;
     }
@@ -5105,7 +5102,7 @@ pub unsafe extern "C" fn xml_text_writer_set_quote_char(
  *
  * Returns the bytes written (may be 0 because of buffering) or -1 in case of error
  */
-pub unsafe extern "C" fn xml_text_writer_flush(writer: XmlTextWriterPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_writer_flush(writer: XmlTextWriterPtr) -> i32 {
     if writer.is_null() {
         return -1;
     }

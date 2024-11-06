@@ -4,7 +4,6 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_int, c_uint},
     mem::{size_of, size_of_val},
     ptr::{addr_of, addr_of_mut, null_mut},
 };
@@ -23,7 +22,7 @@ use super::{globals::XmlGlobalState, parser::xml_init_parser};
 
 extern "C" {
     // Does it work ???
-    fn pthread_equal(t1: pthread_t, t2: pthread_t) -> c_int;
+    fn pthread_equal(t1: pthread_t, t2: pthread_t) -> i32;
 }
 
 pub(crate) const XML_IS_THREADED: bool = true;
@@ -51,8 +50,8 @@ pub type XmlRMutexPtr = *mut XmlRMutex;
  */
 pub struct XmlRMutex {
     lock: pthread_mutex_t,
-    held: c_uint,
-    waiters: c_uint,
+    held: u32,
+    waiters: u32,
     tid: pthread_t,
     cv: pthread_cond_t,
 }
@@ -281,8 +280,8 @@ pub unsafe extern "C" fn xml_unlock_library() {
  *
  * Returns the current thread ID number
  */
-pub(crate) unsafe extern "C" fn xml_get_thread_id() -> c_int {
-    let mut ret: c_int = 0;
+pub(crate) unsafe extern "C" fn xml_get_thread_id() -> i32 {
+    let mut ret: i32 = 0;
 
     if !XML_IS_THREADED {
         return 0;
@@ -302,7 +301,7 @@ pub(crate) unsafe extern "C" fn xml_get_thread_id() -> c_int {
  *
  * Returns 1 if the current thread is the main thread, 0 otherwise
  */
-pub(crate) unsafe extern "C" fn xml_is_main_thread() -> c_int {
+pub(crate) unsafe extern "C" fn xml_is_main_thread() -> i32 {
     xml_init_parser();
 
     // #ifdef DEBUG_THREADS
@@ -393,5 +392,5 @@ pub unsafe extern "C" fn xmlDllMain(
     hinstDLL: *mut c_void,
     fdwReason: c_ulong,
     lpvReserved: *mut c_void,
-) -> c_int;
+) -> i32;
 // #endif

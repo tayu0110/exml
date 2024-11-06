@@ -4,7 +4,6 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::c_int,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -69,20 +68,20 @@ pub type XmlStreamStepPtr = *mut XmlStreamStep;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct XmlStreamStep {
-    flags: c_int,         /* properties of that step */
+    flags: i32,           /* properties of that step */
     name: *const XmlChar, /* first string value if NULL accept all */
     ns: *const XmlChar,   /* second string value */
-    node_type: c_int,     /* type of node */
+    node_type: i32,       /* type of node */
 }
 
 pub type XmlStreamCompPtr = *mut XmlStreamComp;
 #[repr(C)]
 pub struct XmlStreamComp {
     dict: *mut XmlDict,      /* the dictionary if any */
-    nb_step: c_int,          /* number of steps in the automata */
-    max_step: c_int,         /* allocated number of steps */
+    nb_step: i32,            /* number of steps in the automata */
+    max_step: i32,           /* allocated number of steps */
     steps: XmlStreamStepPtr, /* the array of steps */
-    flags: c_int,
+    flags: i32,
 }
 
 /**
@@ -97,9 +96,9 @@ pub struct XmlPattern {
     dict: XmlDictPtr,        /* the optional dictionary */
     next: *mut XmlPattern,   /* next pattern if | is used */
     pattern: *const XmlChar, /* the pattern */
-    flags: c_int,            /* flags */
-    nb_step: c_int,
-    max_step: c_int,
+    flags: i32,              /* flags */
+    nb_step: i32,
+    max_step: i32,
     steps: XmlStepOpPtr,      /* ops for computation */
     stream: XmlStreamCompPtr, /* the streaming data if any */
 }
@@ -209,12 +208,12 @@ pub type XmlPatParserContextPtr = *mut XmlPatParserContext;
 pub struct XmlPatParserContext {
     cur: *const XmlChar,             /* the current char being parsed */
     base: *const XmlChar,            /* the full expression */
-    error: c_int,                    /* error code */
+    error: i32,                      /* error code */
     dict: XmlDictPtr,                /* the dictionary if any */
     comp: XmlPatternPtr,             /* the result */
     elem: XmlNodePtr,                /* the current node if any */
     namespaces: *mut *const XmlChar, /* the namespaces definitions */
-    nb_namespaces: c_int,            /* the number of namespaces */
+    nb_namespaces: i32,              /* the number of namespaces */
 }
 
 /**
@@ -249,7 +248,7 @@ unsafe extern "C" fn xml_new_pat_parser_context(
     (*cur).cur = pattern;
     (*cur).base = pattern;
     if !namespaces.is_null() {
-        let mut i: c_int = 0;
+        let mut i: i32 = 0;
         while !(*namespaces.add(2 * i as usize)).is_null() {
             i += 1;
         }
@@ -355,7 +354,7 @@ unsafe extern "C" fn xml_pattern_add(
     op: XmlPatOp,
     value: *mut XmlChar,
     value2: *mut XmlChar,
-) -> c_int {
+) -> i32 {
     if (*comp).nb_step >= (*comp).max_step {
         let temp: XmlStepOpPtr = xml_realloc(
             (*comp).steps as _,
@@ -432,8 +431,8 @@ macro_rules! CUR_PTR {
 
 unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
     let mut cur: *const XmlChar;
-    let mut val: c_int;
-    let mut len: c_int = 0;
+    let mut val: i32;
+    let mut len: i32 = 0;
 
     SKIP_BLANKS!(ctxt);
 
@@ -480,8 +479,8 @@ unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut X
 
 unsafe extern "C" fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
     let mut cur: *const XmlChar;
-    let mut val: c_int;
-    let mut len: c_int = 0;
+    let mut val: i32;
+    let mut len: i32 = 0;
 
     SKIP_BLANKS!(ctxt);
 
@@ -537,7 +536,7 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
             return;
         }
         if CUR!(ctxt) == b':' {
-            let mut i: c_int;
+            let mut i: i32;
             let prefix: *mut XmlChar = name;
 
             NEXT!(ctxt);
@@ -619,7 +618,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
     let mut token: *mut XmlChar = null_mut();
     let mut name: *mut XmlChar = null_mut();
     let mut url: *mut XmlChar = null_mut();
-    let mut has_blanks: c_int = 0;
+    let mut has_blanks: i32 = 0;
 
     SKIP_BLANKS!(ctxt);
     'error: {
@@ -669,7 +668,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
             NEXT!(ctxt);
             if CUR!(ctxt) != b':' {
                 let prefix: *mut XmlChar = name;
-                let mut i: c_int;
+                let mut i: i32;
 
                 if has_blanks != 0 || xml_is_blank_char(CUR!(ctxt) as u32) {
                     //  ERROR5(NULL, NULL, NULL, "Invalid QName.\n", NULL);
@@ -741,7 +740,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                     }
                     if CUR!(ctxt) == b':' {
                         let prefix: *mut XmlChar = name;
-                        let mut i: c_int;
+                        let mut i: i32;
 
                         NEXT!(ctxt);
                         if xml_is_blank_char(CUR!(ctxt) as u32) {
@@ -1075,7 +1074,7 @@ unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
  *
  * Returns the new structure or NULL in case of error.
  */
-unsafe extern "C" fn xml_new_stream_comp(mut size: c_int) -> XmlStreamCompPtr {
+unsafe extern "C" fn xml_new_stream_comp(mut size: i32) -> XmlStreamCompPtr {
     if size < 4 {
         size = 4;
     }
@@ -1114,9 +1113,9 @@ unsafe extern "C" fn xml_stream_comp_add_step(
     comp: XmlStreamCompPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
-    node_type: c_int,
-    flags: c_int,
-) -> c_int {
+    node_type: i32,
+    flags: i32,
+) -> i32 {
     let mut cur: XmlStreamStepPtr;
 
     if (*comp).nb_step >= (*comp).max_step {
@@ -1149,12 +1148,12 @@ unsafe extern "C" fn xml_stream_comp_add_step(
  *
  * Returns -1 in case of failure and 0 in case of success.
  */
-unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> c_int {
+unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
     let stream: XmlStreamCompPtr;
-    let mut s: c_int = 0;
-    let mut root: c_int = 0;
-    let mut flags: c_int = 0;
-    let mut prevs: c_int = -1;
+    let mut s: i32 = 0;
+    let mut root: i32 = 0;
+    let mut flags: i32 = 0;
+    let mut prevs: i32 = -1;
     let mut step: XmlStepOp;
 
     if comp.is_null() || (*comp).steps.is_null() {
@@ -1377,9 +1376,9 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> c_int {
  *
  * returns 0 in case of success and -1 in case of error.
  */
-unsafe extern "C" fn xml_reverse_pattern(comp: XmlPatternPtr) -> c_int {
-    let mut i: c_int;
-    let mut j: c_int;
+unsafe extern "C" fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
+    let mut i: i32;
+    let mut j: i32;
 
     /*
      * remove the leading // for //a or .//a
@@ -1442,7 +1441,7 @@ unsafe extern "C" fn xml_reverse_pattern(comp: XmlPatternPtr) -> c_int {
 pub unsafe extern "C" fn xml_patterncompile(
     pattern: *const XmlChar,
     dict: *mut XmlDict,
-    flags: c_int,
+    flags: i32,
     namespaces: *mut *const XmlChar,
 ) -> XmlPatternPtr {
     let mut ret: XmlPatternPtr = null_mut();
@@ -1451,8 +1450,8 @@ pub unsafe extern "C" fn xml_patterncompile(
     let mut or: *const XmlChar;
     let mut start: *const XmlChar;
     let mut tmp: *mut XmlChar;
-    let mut typ: c_int = 0;
-    let mut streamable: c_int = 1;
+    let mut typ: i32 = 0;
+    let mut streamable: i32 = 1;
 
     if pattern.is_null() {
         return null_mut();
@@ -1561,23 +1560,23 @@ pub unsafe extern "C" fn xml_patterncompile(
 pub type XmlStepStatePtr = *mut XmlStepState;
 #[repr(C)]
 pub struct XmlStepState {
-    step: c_int,
+    step: i32,
     node: XmlNodePtr,
 }
 
 pub type XmlStepStatesPtr = *mut XmlStepStates;
 #[repr(C)]
 pub struct XmlStepStates {
-    nbstates: c_int,
-    maxstates: c_int,
+    nbstates: i32,
+    maxstates: i32,
     states: XmlStepStatePtr,
 }
 
 unsafe extern "C" fn xml_pat_push_state(
     states: *mut XmlStepStates,
-    step: c_int,
+    step: i32,
     node: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     if (*states).states.is_null() || (*states).maxstates <= 0 {
         (*states).maxstates = 4;
         (*states).nbstates = 0;
@@ -1608,8 +1607,8 @@ unsafe extern "C" fn xml_pat_push_state(
  *
  * Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
  */
-unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> c_int {
-    let mut i: c_int;
+unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> i32 {
+    let mut i: i32;
     let mut step: XmlStepOpPtr;
     let mut states: XmlStepStates = XmlStepStates {
         nbstates: 0,
@@ -1903,8 +1902,8 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
  *
  * Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
  */
-pub unsafe extern "C" fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlNodePtr) -> c_int {
-    let mut ret: c_int = 0;
+pub unsafe extern "C" fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlNodePtr) -> i32 {
+    let mut ret: i32 = 0;
 
     if comp.is_null() || node.is_null() {
         return -1;
@@ -1926,12 +1925,12 @@ pub type XmlStreamCtxtPtr = *mut XmlStreamCtxt;
 pub struct XmlStreamCtxt {
     next: *mut XmlStreamCtxt, /* link to next sub pattern if | */
     comp: XmlStreamCompPtr,   /* the compiled stream */
-    nb_state: c_int,          /* number of states in the automata */
-    max_state: c_int,         /* allocated number of states */
-    level: c_int,             /* how deep are we ? */
-    states: *mut c_int,       /* the array of step indexes */
-    flags: c_int,             /* validation options */
-    block_level: c_int,
+    nb_state: i32,            /* number of states in the automata */
+    max_state: i32,           /* allocated number of states */
+    level: i32,               /* how deep are we ? */
+    states: *mut i32,         /* the array of step indexes */
+    flags: i32,               /* validation options */
+    block_level: i32,
 }
 
 /**
@@ -1943,7 +1942,7 @@ pub struct XmlStreamCtxt {
  *
  * Returns 1 if streamable, 0 if not and -1 in case of error.
  */
-pub unsafe extern "C" fn xml_pattern_streamable(mut comp: XmlPatternPtr) -> c_int {
+pub unsafe extern "C" fn xml_pattern_streamable(mut comp: XmlPatternPtr) -> i32 {
     if comp.is_null() {
         return -1;
     }
@@ -1965,8 +1964,8 @@ pub unsafe extern "C" fn xml_pattern_streamable(mut comp: XmlPatternPtr) -> c_in
  * Returns -2 if no limit (using //), otherwise the depth,
  *         and -1 in case of error
  */
-pub unsafe extern "C" fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> c_int {
-    let mut ret: c_int = 0;
+pub unsafe extern "C" fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> i32 {
+    let mut ret: i32 = 0;
 
     if comp.is_null() {
         return -1;
@@ -1999,8 +1998,8 @@ pub unsafe extern "C" fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> c_int
  * Returns -1 in case of error otherwise the depth,
  *
  */
-pub unsafe extern "C" fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> c_int {
-    let mut ret: c_int = 12345678;
+pub unsafe extern "C" fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> i32 {
+    let mut ret: i32 = 12345678;
     if comp.is_null() {
         return -1;
     }
@@ -2027,7 +2026,7 @@ pub unsafe extern "C" fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> c_int
  *
  * Returns 1 if true, 0 if false and -1 in case of error
  */
-pub unsafe extern "C" fn xml_pattern_from_root(mut comp: XmlPatternPtr) -> c_int {
+pub unsafe extern "C" fn xml_pattern_from_root(mut comp: XmlPatternPtr) -> i32 {
     if comp.is_null() {
         return -1;
     }
@@ -2059,7 +2058,7 @@ unsafe extern "C" fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamC
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlStreamCtxt>());
-    (*cur).states = xml_malloc(4 * 2 * size_of::<c_int>()) as *mut c_int;
+    (*cur).states = xml_malloc(4 * 2 * size_of::<i32>()) as *mut i32;
     if (*cur).states.is_null() {
         xml_free(cur as _);
         // ERROR(NULL, NULL, NULL, "xmlNewStreamCtxt: malloc failed\n");
@@ -2147,9 +2146,9 @@ pub unsafe extern "C" fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
  */
 unsafe extern "C" fn xml_stream_ctxt_add_state(
     comp: XmlStreamCtxtPtr,
-    idx: c_int,
-    level: c_int,
-) -> c_int {
+    idx: i32,
+    level: i32,
+) -> i32 {
     for i in 0..(*comp).nb_state {
         if *(*comp).states.add(2 * i as usize) < 0 {
             *(*comp).states.add(2 * i as usize) = idx;
@@ -2158,10 +2157,10 @@ unsafe extern "C" fn xml_stream_ctxt_add_state(
         }
     }
     if (*comp).nb_state >= (*comp).max_state {
-        let cur: *mut c_int = xml_realloc(
+        let cur: *mut i32 = xml_realloc(
             (*comp).states as _,
-            (*comp).max_state as usize * 4 * size_of::<c_int>(),
-        ) as *mut c_int;
+            (*comp).max_state as usize * 4 * size_of::<i32>(),
+        ) as *mut i32;
         if cur.is_null() {
             // ERROR(NULL, NULL, NULL, "xmlNewStreamCtxt: malloc failed\n");
             return -1;
@@ -2195,17 +2194,17 @@ unsafe extern "C" fn xml_stream_push_internal(
     mut stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
-    node_type: c_int,
-) -> c_int {
-    let mut ret: c_int = 0;
-    let mut err: c_int = 0;
-    let mut is_final: c_int = 0;
-    let mut tmp: c_int;
-    let mut i: c_int;
-    let mut m: c_int;
-    let mut is_match: c_int;
-    let mut step_nr: c_int;
-    let mut desc: c_int;
+    node_type: i32,
+) -> i32 {
+    let mut ret: i32 = 0;
+    let mut err: i32 = 0;
+    let mut is_final: i32 = 0;
+    let mut tmp: i32;
+    let mut i: i32;
+    let mut m: i32;
+    let mut is_match: i32;
+    let mut step_nr: i32;
+    let mut desc: i32;
     let mut comp: XmlStreamCompPtr;
     let mut step: XmlStreamStep;
 
@@ -2571,8 +2570,8 @@ pub unsafe extern "C" fn xml_stream_push_node(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
-    node_type: c_int,
-) -> c_int {
+    node_type: i32,
+) -> i32 {
     xml_stream_push_internal(stream, name, ns, node_type)
 }
 
@@ -2596,7 +2595,7 @@ pub unsafe extern "C" fn xml_stream_push(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
-) -> c_int {
+) -> i32 {
     xml_stream_push_internal(stream, name, ns, XmlElementType::XmlElementNode as i32)
 }
 
@@ -2620,7 +2619,7 @@ pub unsafe extern "C" fn xml_stream_push_attr(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
-) -> c_int {
+) -> i32 {
     xml_stream_push_internal(stream, name, ns, XmlElementType::XmlAttributeNode as i32)
 }
 
@@ -2632,8 +2631,8 @@ pub unsafe extern "C" fn xml_stream_push_attr(
  *
  * Returns: -1 in case of error, 0 otherwise.
  */
-pub unsafe extern "C" fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> c_int {
-    let mut lev: c_int;
+pub unsafe extern "C" fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> i32 {
+    let mut lev: i32;
 
     if stream.is_null() {
         return -1;
@@ -2684,7 +2683,7 @@ pub unsafe extern "C" fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> c_int {
  * Returns: 1 in case of need of nodes of the above described types,
  *          0 otherwise. -1 on API errors.
  */
-pub unsafe extern "C" fn xml_stream_wants_any_node(mut stream: XmlStreamCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_stream_wants_any_node(mut stream: XmlStreamCtxtPtr) -> i32 {
     if stream.is_null() {
         return -1;
     }

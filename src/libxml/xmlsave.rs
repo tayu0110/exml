@@ -5,7 +5,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_long, CStr, CString},
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{null, null_mut},
@@ -76,15 +76,15 @@ pub type XmlSaveCtxtPtr = *mut XmlSaveCtxt;
 #[repr(C)]
 pub struct XmlSaveCtxt {
     pub(crate) _private: *mut c_void,
-    pub(crate) typ: c_int,
-    pub(crate) fd: c_int,
+    pub(crate) typ: i32,
+    pub(crate) fd: i32,
     pub(crate) filename: *const XmlChar,
     pub(crate) encoding: Option<String>,
     pub(crate) handler: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     pub(crate) buf: XmlOutputBufferPtr,
-    pub(crate) options: c_int,
-    pub(crate) level: c_int,
-    pub(crate) format: c_int,
+    pub(crate) options: i32,
+    pub(crate) level: i32,
+    pub(crate) format: i32,
     pub(crate) indent: [u8; MAX_INDENT + 1], /* array for indenting output */
     pub(crate) indent_nr: usize,
     pub(crate) indent_size: usize,
@@ -192,7 +192,7 @@ pub(crate) fn xml_serialize_hex_char_ref(out: &mut [u8], mut val: u32) -> &[u8] 
  *     if the return value is positive, else unpredictable.
  * The value of @outlen after return is the number of octets consumed.
  */
-fn xml_escape_entities(src: &str, dst: &mut String) -> c_int {
+fn xml_escape_entities(src: &str, dst: &mut String) -> i32 {
     let mut out = [0; 13];
     for c in src.chars() {
         match c {
@@ -243,7 +243,7 @@ pub(crate) fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
     })
 }
 
-unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> c_int {
+unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> i32 {
     let buf: XmlOutputBufferPtr = ctxt.buf;
 
     if (*buf).encoder.is_none() && (*buf).conv.is_none() {
@@ -277,7 +277,7 @@ unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> c_
  *
  * Write out formatting for non-significant whitespace output.
  */
-unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, extra: c_int) {
+unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, extra: i32) {
     if ctxt.buf.is_null() {
         return;
     }
@@ -489,7 +489,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
     ctxt: XmlSaveCtxtPtr,
     mut cur: XmlNodePtr,
 ) {
-    let format: c_int = (*ctxt).format;
+    let format: i32 = (*ctxt).format;
     let mut tmp: XmlNodePtr;
 
     let mut unformatted_node: XmlNodePtr = null_mut();
@@ -878,8 +878,8 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
             (*dtd).notations as _,
         );
     }
-    let format: c_int = (*ctxt).format;
-    let level: c_int = (*ctxt).level;
+    let format: i32 = (*ctxt).format;
+    let level: i32 = (*ctxt).level;
     (*ctxt).format = 0;
     (*ctxt).level = -1;
     cur = (*dtd).children;
@@ -1003,7 +1003,7 @@ const XHTML_NS_NAME: &str = "http://www.w3.org/1999/xhtml";
  * Returns 1 if the node is an empty node, 0 if not and -1 in case of error
  */
 #[cfg(feature = "html")]
-unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> c_int {
+unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
     if node.is_null() {
         return -1;
     }
@@ -1113,8 +1113,8 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
         parser_internals::XML_STRING_TEXT, tree::xml_get_prop, xmlstring::xml_strcasecmp,
     };
 
-    let format: c_int = (*ctxt).format;
-    let mut addmeta: c_int;
+    let format: i32 = (*ctxt).format;
+    let mut addmeta: i32;
     let mut tmp: XmlNodePtr;
 
     let mut unformatted_node: XmlNodePtr = null_mut();
@@ -1504,7 +1504,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
     }
 }
 
-unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> i32 {
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
     (*buf).flush();
     let _ = (*buf).encoder.take();
@@ -1523,17 +1523,17 @@ unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> c_int {
 pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     ctxt: XmlSaveCtxtPtr,
     cur: XmlDocPtr,
-) -> c_int {
+) -> i32 {
     #[cfg(feature = "html")]
     let dtd: XmlDtdPtr;
     #[cfg(feature = "html")]
-    let mut is_xhtml: c_int = 0;
+    let mut is_xhtml: i32 = 0;
     let oldenc = (*cur).encoding.clone();
     let oldctxtenc = (*ctxt).encoding.clone();
     let oldescape = (*ctxt).escape;
     let oldescape_attr = (*ctxt).escape_attr;
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
-    let mut switched_encoding: c_int = 0;
+    let mut switched_encoding: i32 = 0;
 
     xml_init_parser();
 
@@ -1739,7 +1739,7 @@ unsafe extern "C" fn xml_free_save_ctxt(ctxt: XmlSaveCtxtPtr) {
  *
  * Returns the new structure or NULL in case of error
  */
-unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: c_int) -> XmlSaveCtxtPtr {
+unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSaveCtxtPtr {
     let ret: XmlSaveCtxtPtr = xml_malloc(size_of::<XmlSaveCtxt>()) as _;
     if ret.is_null() {
         xml_save_err_memory(c"creating saving context".as_ptr() as _);
@@ -1803,7 +1803,7 @@ pub unsafe fn xml_save_to_filename(
     encoding: Option<&str>,
     options: i32,
 ) -> XmlSaveCtxtPtr {
-    let compression: c_int = 0; /* TODO handle compression option */
+    let compression: i32 = 0; /* TODO handle compression option */
 
     let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
     if ret.is_null() {
@@ -1835,7 +1835,7 @@ pub unsafe fn xml_save_to_io(
     ioclose: Option<XmlOutputCloseCallback>,
     ioctx: *mut c_void,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlSaveCtxtPtr {
     let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
     if ret.is_null() {
@@ -1860,8 +1860,8 @@ pub unsafe fn xml_save_to_io(
  *
  * Returns the number of byte written or -1 in case of error
  */
-pub unsafe extern "C" fn xml_save_doc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> c_long {
-    let ret: c_long = 0;
+pub unsafe extern "C" fn xml_save_doc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> i64 {
+    let ret: i64 = 0;
 
     if ctxt.is_null() || doc.is_null() {
         return -1;
@@ -1879,17 +1879,14 @@ pub unsafe extern "C" fn xml_save_doc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> c
  * Dump an HTML node, recursive behaviour, children are printed too.
  */
 #[cfg(feature = "html")]
-unsafe extern "C" fn html_node_dump_output_internal(
-    ctxt: XmlSaveCtxtPtr,
-    cur: XmlNodePtr,
-) -> c_int {
+unsafe extern "C" fn html_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, cur: XmlNodePtr) -> i32 {
     use super::htmltree::html_node_dump_format_output;
 
     let mut oldenc = None;
     let oldctxtenc = (*ctxt).encoding.clone();
     let mut encoding = (*ctxt).encoding.clone();
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
-    let mut switched_encoding: c_int = 0;
+    let mut switched_encoding: i32 = 0;
 
     xml_init_parser();
 
@@ -1951,8 +1948,8 @@ unsafe extern "C" fn html_node_dump_output_internal(
  *
  * Returns the number of byte written or -1 in case of error
  */
-pub unsafe extern "C" fn xml_save_tree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -> c_long {
-    let ret: c_long = 0;
+pub unsafe extern "C" fn xml_save_tree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -> i64 {
+    let ret: i64 = 0;
 
     if ctxt.is_null() || node.is_null() {
         return -1;
@@ -1986,7 +1983,7 @@ pub unsafe extern "C" fn xml_save_tree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -
  *
  * Returns the number of byte written or -1 in case of error.
  */
-pub unsafe extern "C" fn xml_save_flush(ctxt: XmlSaveCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_save_flush(ctxt: XmlSaveCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -2005,11 +2002,11 @@ pub unsafe extern "C" fn xml_save_flush(ctxt: XmlSaveCtxtPtr) -> c_int {
  *
  * Returns the number of byte written or -1 in case of error.
  */
-pub unsafe extern "C" fn xml_save_close(ctxt: XmlSaveCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_save_close(ctxt: XmlSaveCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
-    let ret: c_int = xml_save_flush(ctxt);
+    let ret: i32 = xml_save_flush(ctxt);
     xml_free_save_ctxt(ctxt);
     ret
 }
@@ -2026,7 +2023,7 @@ pub unsafe extern "C" fn xml_save_close(ctxt: XmlSaveCtxtPtr) -> c_int {
 pub unsafe fn xml_save_set_escape(
     ctxt: XmlSaveCtxtPtr,
     escape: Option<fn(&str, &mut String) -> i32>,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -2046,7 +2043,7 @@ pub unsafe fn xml_save_set_escape(
 pub unsafe fn xml_save_set_attr_escape(
     ctxt: XmlSaveCtxtPtr,
     escape: Option<fn(&str, &mut String) -> i32>,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() {
         return -1;
     }

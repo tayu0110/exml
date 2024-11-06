@@ -5,7 +5,7 @@
 
 use std::{
     any::type_name,
-    ffi::{c_char, c_int, c_ulong},
+    ffi::c_char,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -101,16 +101,16 @@ pub struct XmlEntity {
 
     pub(crate) orig: AtomicPtr<XmlChar>, /* content without ref substitution */
     pub(crate) content: AtomicPtr<XmlChar>, /* content or ndata if unparsed */
-    pub(crate) length: c_int,            /* the content length */
+    pub(crate) length: i32,              /* the content length */
     pub(crate) etype: Option<XmlEntityType>, /* The entity type */
     pub(crate) external_id: AtomicPtr<XmlChar>, /* External identifier for PUBLIC */
     pub(crate) system_id: AtomicPtr<XmlChar>, /* URI for a SYSTEM or PUBLIC Entity */
 
     pub(crate) nexte: AtomicPtr<XmlEntity>, /* unused */
     pub(crate) uri: AtomicPtr<XmlChar>,     /* the full URI as computed */
-    pub(crate) owner: c_int,                /* does the entity own the childrens */
-    pub(crate) flags: c_int,                /* various flags */
-    pub expanded_size: c_ulong,             /* expanded size */
+    pub(crate) owner: i32,                  /* does the entity own the childrens */
+    pub(crate) flags: i32,                  /* various flags */
+    pub expanded_size: u64,                 /* expanded size */
 }
 
 /*
@@ -159,7 +159,7 @@ unsafe extern "C" fn xml_entities_err_memory(extra: *const c_char) {
 unsafe extern "C" fn xml_create_entity(
     dict: XmlDictPtr,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     external_id: *const XmlChar,
     system_id: *const XmlChar,
     content: *const XmlChar,
@@ -224,7 +224,7 @@ unsafe extern "C" fn xml_create_entity(
 pub unsafe extern "C" fn xml_new_entity(
     doc: XmlDocPtr,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     external_id: *const XmlChar,
     system_id: *const XmlChar,
     content: *const XmlChar,
@@ -348,7 +348,7 @@ unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
 unsafe extern "C" fn xml_add_entity(
     dtd: XmlDtdPtr,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     external_id: *const XmlChar,
     system_id: *const XmlChar,
     content: *const XmlChar,
@@ -373,11 +373,11 @@ unsafe extern "C" fn xml_add_entity(
         | Ok(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
             predef = xml_get_predefined_entity(name);
             if !predef.is_null() {
-                let mut valid: c_int = 0;
+                let mut valid: i32 = 0;
 
                 /* 4.6 Predefined Entities */
                 if typ == XmlEntityType::XmlInternalGeneralEntity as i32 && !content.is_null() {
-                    let c: c_int = *(*predef).content.load(Ordering::Relaxed).add(0) as _;
+                    let c: i32 = *(*predef).content.load(Ordering::Relaxed).add(0) as _;
 
                     if (*content.add(0) as i32 == c && *content.add(1) == 0)
                         && (c == b'>' as i32 || c == b'\'' as i32 || c == b'"' as i32)
@@ -465,7 +465,7 @@ unsafe extern "C" fn xml_add_entity(
 pub unsafe extern "C" fn xml_add_doc_entity(
     doc: XmlDocPtr,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     external_id: *const XmlChar,
     system_id: *const XmlChar,
     content: *const XmlChar,
@@ -522,7 +522,7 @@ pub unsafe extern "C" fn xml_add_doc_entity(
 pub unsafe extern "C" fn xml_add_dtd_entity(
     doc: XmlDocPtr,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     external_id: *const XmlChar,
     system_id: *const XmlChar,
     content: *const XmlChar,
@@ -900,13 +900,13 @@ macro_rules! grow_buffer_reentrant {
 pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
     doc: XmlDocPtr,
     input: *const XmlChar,
-    attr: c_int,
+    attr: i32,
 ) -> *mut XmlChar {
     let mut cur: *const XmlChar = input;
     let mut buffer: *mut XmlChar;
     let mut out: *mut XmlChar;
     let mut buffer_size: size_t;
-    let mut html: c_int = 0;
+    let mut html: i32 = 0;
 
     if input.is_null() {
         return null_mut();
@@ -1065,8 +1065,8 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                      */
                     let mut buf: [c_char; 11] = [0; 11];
                     let mut ptr: *mut c_char;
-                    let mut val: c_int = 0;
-                    let mut l: c_int = 1;
+                    let mut val: i32 = 0;
+                    let mut l: i32 = 1;
 
                     if *cur.add(0) & 0xC0 != 0xC0
                         || *cur.add(1) & 0xC0 != 0x80

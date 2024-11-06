@@ -5,7 +5,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_uint, c_ulong, CStr, CString},
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -14,7 +14,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::{fprintf, memcpy, memset, size_t, snprintf, strchr, FILE};
+use libc::{fprintf, memcpy, memset, snprintf, strchr, FILE};
 
 use crate::{
     __xml_raise_error,
@@ -210,7 +210,7 @@ pub struct XmlSchema {
     pub(crate) id: *const XmlChar, /* Obsolete */
     pub(crate) doc: XmlDocPtr,
     pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) flags: c_int,
+    pub(crate) flags: i32,
 
     pub(crate) type_decl: XmlHashTablePtr,
     pub(crate) attr_decl: XmlHashTablePtr,
@@ -224,8 +224,8 @@ pub struct XmlSchema {
     pub(crate) group_decl: XmlHashTablePtr,
     pub(crate) dict: XmlDictPtr,
     pub(crate) includes: *mut c_void, /* the includes, this is opaque for now */
-    pub(crate) preserve: c_int,       /* whether to free the document */
-    pub(crate) counter: c_int,        /* used to give anonymous components unique names */
+    pub(crate) preserve: i32,         /* whether to free the document */
+    pub(crate) counter: i32,          /* used to give anonymous components unique names */
     pub(crate) idc_def: XmlHashTablePtr, /* All identity-constraint defs. */
     pub(crate) volatiles: *mut c_void, /* Obsolete */
 }
@@ -264,7 +264,7 @@ pub type XmlSchemaValidityWarningFunc = unsafe extern "C" fn(ctx: *mut c_void, m
  */
 
 pub type XmlSchemaValidityLocatorFunc =
-    unsafe extern "C" fn(ctx: *mut c_void, file: *mut Option<String>, line: *mut c_ulong) -> c_int;
+    unsafe extern "C" fn(ctx: *mut c_void, file: *mut Option<String>, line: *mut u64) -> i32;
 
 const UNBOUNDED: usize = 1 << 30;
 
@@ -730,8 +730,8 @@ pub type XmlSchemaItemListPtr = *mut XmlSchemaItemList;
 #[repr(C)]
 pub struct XmlSchemaItemList {
     pub(crate) items: *mut *mut c_void, /* used for dynamic addition of schemata */
-    pub(crate) nb_items: c_int,         /* used for dynamic addition of schemata */
-    pub(crate) size_items: c_int,       /* used for dynamic addition of schemata */
+    pub(crate) nb_items: i32,           /* used for dynamic addition of schemata */
+    pub(crate) size_items: i32,         /* used for dynamic addition of schemata */
 }
 
 const XML_SCHEMA_CTXT_PARSER: i32 = 1;
@@ -740,7 +740,7 @@ const XML_SCHEMA_CTXT_VALIDATOR: i32 = 2;
 pub type XmlSchemaAbstractCtxtPtr = *mut XmlSchemaAbstractCtxt;
 #[repr(C)]
 pub struct XmlSchemaAbstractCtxt {
-    pub(crate) typ: c_int,         /* E.g. XML_SCHEMA_CTXT_VALIDATOR */
+    pub(crate) typ: i32,           /* E.g. XML_SCHEMA_CTXT_VALIDATOR */
     pub(crate) dummy: *mut c_void, /* Fix alignment issues */
 }
 
@@ -758,7 +758,7 @@ pub type XmlSchemaSchemaRelationPtr = *mut XmlSchemaSchemaRelation;
 #[repr(C)]
 pub struct XmlSchemaSchemaRelation {
     next: XmlSchemaSchemaRelationPtr,
-    typ: c_int, /* E.g. XML_SCHEMA_SCHEMA_IMPORT */
+    typ: i32, /* E.g. XML_SCHEMA_SCHEMA_IMPORT */
     import_namespace: *const XmlChar,
     bucket: XmlSchemaBucketPtr,
 }
@@ -769,17 +769,17 @@ const XML_SCHEMA_BUCKET_COMPS_ADDED: i32 = 1 << 1;
 pub type XmlSchemaBucketPtr = *mut XmlSchemaBucket;
 #[repr(C)]
 pub struct XmlSchemaBucket {
-    typ: c_int,
-    flags: c_int,
+    typ: i32,
+    flags: i32,
     schema_location: *const XmlChar,
     orig_target_namespace: *const XmlChar,
     target_namespace: *const XmlChar,
     doc: XmlDocPtr,
     relations: XmlSchemaSchemaRelationPtr,
-    located: c_int,
-    parsed: c_int,
-    imported: c_int,
-    preserve_doc: c_int,
+    located: i32,
+    parsed: i32,
+    imported: i32,
+    preserve_doc: i32,
     globals: XmlSchemaItemListPtr, /* Global components. */
     locals: XmlSchemaItemListPtr,  /* Local components. */
 }
@@ -795,8 +795,8 @@ pub struct XmlSchemaBucket {
 pub type XmlSchemaImportPtr = *mut XmlSchemaImport;
 #[repr(C)]
 pub struct XmlSchemaImport {
-    typ: c_int, /* Main OR import OR include. */
-    flags: c_int,
+    typ: i32, /* Main OR import OR include. */
+    flags: i32,
     schema_location: *const XmlChar, /* The URI of the schema document. */
     /* For chameleon includes, @origTargetNamespace will be NULL */
     orig_target_namespace: *const XmlChar,
@@ -808,10 +808,10 @@ pub struct XmlSchemaImport {
     doc: XmlDocPtr, /* The schema node-tree. */
     /* @relations will hold any included/imported/redefined schemas. */
     relations: XmlSchemaSchemaRelationPtr,
-    located: c_int,
-    parsed: c_int,
-    imported: c_int,
-    preserve_doc: c_int,
+    located: i32,
+    parsed: i32,
+    imported: i32,
+    preserve_doc: i32,
     globals: XmlSchemaItemListPtr,
     locals: XmlSchemaItemListPtr,
     /* The imported schema. */
@@ -824,17 +824,17 @@ pub struct XmlSchemaImport {
 pub type XmlSchemaIncludePtr = *mut XmlSchemaInclude;
 #[repr(C)]
 pub struct XmlSchemaInclude {
-    typ: c_int,
-    flags: c_int,
+    typ: i32,
+    flags: i32,
     schema_location: *const XmlChar,
     orig_target_namespace: *const XmlChar,
     target_namespace: *const XmlChar,
     doc: XmlDocPtr,
     relations: XmlSchemaSchemaRelationPtr,
-    located: c_int,
-    parsed: c_int,
-    imported: c_int,
-    preserve_doc: c_int,
+    located: i32,
+    parsed: i32,
+    imported: i32,
+    preserve_doc: i32,
     globals: XmlSchemaItemListPtr, /* Global components. */
     locals: XmlSchemaItemListPtr,  /* Local components. */
 
@@ -901,9 +901,9 @@ pub struct XmlSchemaAttributeUse {
      */
     attr_decl: XmlSchemaAttributePtr,
 
-    flags: c_int,
+    flags: i32,
     node: XmlNodePtr,
-    occurs: c_int, /* required, optional */
+    occurs: i32, /* required, optional */
     def_value: *const XmlChar,
     def_val: XmlSchemaValPtr,
 }
@@ -921,7 +921,7 @@ pub struct XmlSchemaAttributeUseProhib {
     node: XmlNodePtr,
     name: *const XmlChar,
     target_namespace: *const XmlChar,
-    is_ref: c_int,
+    is_ref: i32,
 }
 
 /**
@@ -968,28 +968,28 @@ const SCHEMAS_PARSE_OPTIONS: i32 = XmlParserOption::XmlParseNoent as i32;
 pub type XmlSchemaParserCtxtPtr = *mut XmlSchemaParserCtxt;
 #[repr(C)]
 pub struct XmlSchemaParserCtxt {
-    typ: c_int,
+    typ: i32,
     err_ctxt: Option<GenericErrorContext>, /* user specific error context */
     error: Option<GenericError>,           /* the callback in case of errors */
     warning: Option<GenericError>,         /* the callback in case of warning */
-    err: c_int,
-    nberrors: c_int,
+    err: i32,
+    nberrors: i32,
     serror: Option<StructuredError>,
 
     constructor: XmlSchemaConstructionCtxtPtr,
-    owns_constructor: c_int, /* TODO: Move this to parser *flags*. */
+    owns_constructor: i32, /* TODO: Move this to parser *flags*. */
 
     /* xmlSchemaPtr topschema;	*/
     /* xmlHashTablePtr namespaces;  */
     schema: XmlSchemaPtr, /* The main schema in use */
-    counter: c_int,
+    counter: i32,
 
     url: *const XmlChar,
     doc: XmlDocPtr,
-    preserve: c_int, /* Whether the doc should be freed  */
+    preserve: i32, /* Whether the doc should be freed  */
 
     buffer: *const c_char,
-    size: c_int,
+    size: i32,
 
     /*
      * Used to build complex element content models
@@ -1001,17 +1001,17 @@ pub struct XmlSchemaParserCtxt {
 
     dict: XmlDictPtr,            /* dictionary for interned string names */
     ctxt_type: XmlSchemaTypePtr, /* The current context simple/complex type */
-    options: c_int,
+    options: i32,
     vctxt: XmlSchemaValidCtxtPtr,
-    is_s4_s: c_int,
-    is_redefine: c_int,
-    xsi_assemble: c_int,
-    stop: c_int, /* If the parser should stop; i.e. a critical error. */
+    is_s4_s: i32,
+    is_redefine: i32,
+    xsi_assemble: i32,
+    stop: i32, /* If the parser should stop; i.e. a critical error. */
     target_namespace: *const XmlChar,
     redefined: XmlSchemaBucketPtr, /* The schema to be redefined. */
 
     redef: XmlSchemaRedefPtr, /* Used for redefinitions. */
-    redef_counter: c_int,     /* Used for redefinitions. */
+    redef_counter: i32,       /* Used for redefinitions. */
     attr_prohibs: XmlSchemaItemListPtr,
 }
 
@@ -1047,8 +1047,8 @@ pub struct XmlSchemaParticle {
     pub(crate) children: XmlSchemaTreeItemPtr, /* the "term" (e.g. a model group,
                                            a group definition, a XML_SCHEMA_EXTRA_QNAMEREF (if a reference),
                                                etc.) */
-    pub(crate) min_occurs: c_int,
-    pub(crate) max_occurs: c_int,
+    pub(crate) min_occurs: i32,
+    pub(crate) max_occurs: i32,
     pub(crate) node: XmlNodePtr,
 }
 
@@ -1086,7 +1086,7 @@ pub struct XmlSchemaModelGroupDef {
     name: *const XmlChar,
     target_namespace: *const XmlChar,
     node: XmlNodePtr,
-    flags: c_int,
+    flags: i32,
 }
 
 /**
@@ -1100,7 +1100,7 @@ pub type XmlSchemaIdcselectPtr = *mut XmlSchemaIdcselect;
 pub struct XmlSchemaIdcselect {
     next: XmlSchemaIdcselectPtr,
     idc: XmlSchemaIDCPtr,
-    index: c_int,            /* an index position if significant for IDC key-sequences */
+    index: i32,              /* an index position if significant for IDC key-sequences */
     xpath: *const XmlChar,   /* the XPath expression */
     xpath_comp: *mut c_void, /* the compiled XPath expression */
 }
@@ -1122,7 +1122,7 @@ pub struct XmlSchemaIDC {
     target_namespace: *const XmlChar,
     selector: XmlSchemaIdcselectPtr,
     fields: XmlSchemaIdcselectPtr,
-    nb_fields: c_int,
+    nb_fields: i32,
     refe: XmlSchemaQnameRefPtr,
 }
 
@@ -1136,7 +1136,7 @@ pub type XmlSchemaIDCAugPtr = *mut XmlSchemaIDCAug;
 pub struct XmlSchemaIDCAug {
     next: XmlSchemaIDCAugPtr, /* next in a list */
     def: XmlSchemaIDCPtr,     /* the IDC definition */
-    keyref_depth: c_int,      /* the lowest tree level to which IDC
+    keyref_depth: i32,        /* the lowest tree level to which IDC
                               tables need to be bubbled upwards */
 }
 
@@ -1162,8 +1162,8 @@ pub type XmlSchemaPSVIIDCNodePtr = *mut XmlSchemaPSVIIDCNode;
 pub struct XmlSchemaPSVIIDCNode {
     node: XmlNodePtr,
     keys: *mut XmlSchemaPSVIIDCKeyPtr,
-    node_line: c_int,
-    node_qname_id: c_int,
+    node_line: i32,
+    node_qname_id: i32,
 }
 
 /**
@@ -1177,8 +1177,8 @@ pub struct XmlSchemaPSVIIDCBinding {
     next: XmlSchemaPSVIIDCBindingPtr, /* next binding of a specific node */
     definition: XmlSchemaIDCPtr,      /* the IDC definition */
     node_table: *mut XmlSchemaPSVIIDCNodePtr, /* array of key-sequences */
-    nb_nodes: c_int,                  /* number of entries in the node table */
-    size_nodes: c_int,                /* size of the node table */
+    nb_nodes: i32,                    /* number of entries in the node table */
+    size_nodes: i32,                  /* size of the node table */
     dupls: XmlSchemaItemListPtr,
 }
 
@@ -1196,12 +1196,12 @@ const XPATH_STATE_OBJ_BLOCKED: i32 = -3;
 pub type XmlSchemaIDCStateObjPtr = *mut XmlSchemaIDCStateObj;
 #[repr(C)]
 pub struct XmlSchemaIDCStateObj {
-    typ: c_int,
+    typ: i32,
     next: XmlSchemaIDCStateObjPtr, /* next if in a list */
-    depth: c_int,                  /* depth of creation */
-    history: *mut c_int,           /* list of (depth, state-id) tuples */
-    nb_history: c_int,
-    size_history: c_int,
+    depth: i32,                    /* depth of creation */
+    history: *mut i32,             /* list of (depth, state-id) tuples */
+    nb_history: i32,
+    size_history: i32,
     matcher: XmlSchemaIDCMatcherPtr, /* the correspondent field/selector
                                      matcher */
     sel: XmlSchemaIdcselectPtr,
@@ -1218,15 +1218,15 @@ const IDC_MATCHER: i32 = 0;
 pub type XmlSchemaIDCMatcherPtr = *mut XmlSchemaIDCMatcher;
 #[repr(C)]
 pub struct XmlSchemaIDCMatcher {
-    typ: c_int,
-    depth: c_int,                        /* the tree depth at creation time */
+    typ: i32,
+    depth: i32,                          /* the tree depth at creation time */
     next: XmlSchemaIDCMatcherPtr,        /* next in the list */
     next_cached: XmlSchemaIDCMatcherPtr, /* next in the cache list */
     aidc: XmlSchemaIDCAugPtr,            /* the augmented IDC item */
-    idc_type: c_int,
+    idc_type: i32,
     key_seqs: *mut *mut XmlSchemaPSVIIDCKeyPtr, /* the key-sequences of the target
                                                 elements */
-    size_key_seqs: c_int,
+    size_key_seqs: i32,
     targets: XmlSchemaItemListPtr, /* list of target-node
                                    (xmlSchemaPSVIIDCNodePtr) entries */
     htab: XmlHashTablePtr,
@@ -1257,22 +1257,22 @@ const XML_SCHEMA_NODE_INFO_ERR_BAD_TYPE: i32 = 1 << 10;
 pub type XmlSchemaNodeInfoPtr = *mut XmlSchemaNodeInfo;
 #[repr(C)]
 pub struct XmlSchemaNodeInfo {
-    node_type: c_int,
+    node_type: i32,
     node: XmlNodePtr,
-    node_line: c_int,
+    node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
     value: *const XmlChar,
     val: XmlSchemaValPtr,       /* the pre-computed value if any */
     type_def: XmlSchemaTypePtr, /* the complex/simple type definition if any */
 
-    flags: c_int, /* combination of node info flags */
+    flags: i32, /* combination of node info flags */
 
-    val_needed: c_int,
-    norm_val: c_int,
+    val_needed: i32,
+    norm_val: i32,
 
     decl: XmlSchemaElementPtr, /* the element/attribute declaration */
-    depth: c_int,
+    depth: i32,
     idc_table: XmlSchemaPSVIIDCBindingPtr, /* the table of PSVI IDC bindings
                                            for the scope element*/
     idc_matchers: XmlSchemaIDCMatcherPtr, /* the IDC matchers for the scope
@@ -1280,11 +1280,11 @@ pub struct XmlSchemaNodeInfo {
     regex_ctxt: XmlRegExecCtxtPtr,
 
     ns_bindings: *mut *const XmlChar, /* Namespace bindings on this element */
-    nb_ns_bindings: c_int,
-    size_ns_bindings: c_int,
+    nb_ns_bindings: i32,
+    size_ns_bindings: i32,
 
-    has_keyrefs: c_int,
-    applied_xpath: c_int, /* Indicates that an XPath has been applied. */
+    has_keyrefs: i32,
+    applied_xpath: i32, /* Indicates that an XPath has been applied. */
 }
 
 const XML_SCHEMAS_ATTR_UNKNOWN: i32 = 1;
@@ -1316,20 +1316,20 @@ const XML_SCHEMA_ATTR_INFO_META_XMLNS: i32 = 5;
 pub type XmlSchemaAttrInfoPtr = *mut XmlSchemaAttrInfo;
 #[repr(C)]
 pub struct XmlSchemaAttrInfo {
-    node_type: c_int,
+    node_type: i32,
     node: XmlNodePtr,
-    node_line: c_int,
+    node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
     value: *const XmlChar,
     val: XmlSchemaValPtr,       /* the pre-computed value if any */
     type_def: XmlSchemaTypePtr, /* the complex/simple type definition if any */
-    flags: c_int,               /* combination of node info flags */
+    flags: i32,                 /* combination of node info flags */
 
     decl: XmlSchemaAttributePtr,     /* the attribute declaration */
     using: XmlSchemaAttributeUsePtr, /* the attribute use */
-    state: c_int,
-    meta_type: c_int,
+    state: i32,
+    meta_type: i32,
     vc_value: *const XmlChar, /* the value constraint value */
     parent: XmlSchemaNodeInfoPtr,
 }
@@ -1343,7 +1343,7 @@ const XML_SCHEMA_VALID_CTXT_FLAG_STREAM: i32 = 1;
 pub type XmlSchemaValidCtxtPtr = *mut XmlSchemaValidCtxt;
 #[repr(C)]
 pub struct XmlSchemaValidCtxt {
-    typ: c_int,
+    typ: i32,
     err_ctxt: Option<GenericErrorContext>, /* user specific data block */
     error: Option<GenericError>,           /* the callback in case of errors */
     warning: Option<GenericError>,         /* the callback in case of warning */
@@ -1358,8 +1358,8 @@ pub struct XmlSchemaValidCtxt {
     user_data: *mut c_void, /* TODO: What is this for? */
     filename: *mut c_char,
 
-    err: c_int,
-    nberrors: c_int,
+    err: i32,
+    nberrors: i32,
 
     node: XmlNodePtr,
     cur: XmlNodePtr,
@@ -1367,15 +1367,15 @@ pub struct XmlSchemaValidCtxt {
     regexp: XmlRegExecCtxtPtr,
     value: XmlSchemaValPtr,
 
-    value_ws: c_int,
-    options: c_int,
+    value_ws: i32,
+    options: i32,
     validation_root: XmlNodePtr,
     pctxt: XmlSchemaParserCtxtPtr,
-    xsi_assemble: c_int,
+    xsi_assemble: i32,
 
-    depth: c_int,
+    depth: i32,
     elem_infos: *mut XmlSchemaNodeInfoPtr, /* array of element information */
-    size_elem_infos: c_int,
+    size_elem_infos: i32,
     inode: XmlSchemaNodeInfoPtr, /* the current element information */
 
     aidcs: XmlSchemaIDCAugPtr, /* a list of augmented IDC information */
@@ -1385,14 +1385,14 @@ pub struct XmlSchemaValidCtxt {
     idc_matcher_cache: XmlSchemaIDCMatcherPtr, /* Cache for IDC matcher objects. */
 
     idc_nodes: *mut XmlSchemaPSVIIDCNodePtr, /* list of all IDC node-table entries*/
-    nb_idc_nodes: c_int,
-    size_idc_nodes: c_int,
+    nb_idc_nodes: i32,
+    size_idc_nodes: i32,
 
     idc_keys: *mut XmlSchemaPSVIIDCKeyPtr, /* list of all IDC node-table entries */
-    nb_idc_keys: c_int,
-    size_idc_keys: c_int,
+    nb_idc_keys: i32,
+    size_idc_keys: i32,
 
-    flags: c_int,
+    flags: i32,
 
     dict: XmlDictPtr,
 
@@ -1400,14 +1400,14 @@ pub struct XmlSchemaValidCtxt {
     reader: XmlTextReaderPtr,
 
     attr_infos: *mut XmlSchemaAttrInfoPtr,
-    nb_attr_infos: c_int,
-    size_attr_infos: c_int,
+    nb_attr_infos: i32,
+    size_attr_infos: i32,
 
-    skip_depth: c_int,
+    skip_depth: i32,
     node_qnames: XmlSchemaItemListPtr,
-    has_keyrefs: c_int,
-    create_idcnode_tables: c_int,
-    psvi_expose_idcnode_tables: c_int,
+    has_keyrefs: i32,
+    create_idcnode_tables: i32,
+    psvi_expose_idcnode_tables: i32,
 
     /* Locator for error reporting in streaming mode */
     loc_func: Option<XmlSchemaValidityLocatorFunc>,
@@ -1435,7 +1435,7 @@ pub type XmlIDCHashEntryPtr = *mut XmlIDCHashEntry;
 #[repr(C)]
 pub struct XmlIDCHashEntry {
     next: XmlIDCHashEntryPtr, /* next item with same hash */
-    index: c_int,             /* index into associated item list */
+    index: i32,               /* index into associated item list */
 }
 
 /**
@@ -1459,7 +1459,7 @@ unsafe fn xml_schema_err4_line(
     error_level: XmlErrorLevel,
     error: XmlParserErrors,
     mut node: XmlNodePtr,
-    mut line: c_int,
+    mut line: i32,
     msg: *const c_char,
     str1: *const XmlChar,
     str2: *const XmlChar,
@@ -1475,7 +1475,7 @@ unsafe fn xml_schema_err4_line(
             #[allow(unused_assignments)]
             let mut dummy = Some(c"".to_owned());
             let mut file: *const c_char = null();
-            let mut col: c_int = 0;
+            let mut col: i32 = 0;
             if !matches!(error_level, XmlErrorLevel::XmlErrWarning) {
                 (*vctxt).nberrors += 1;
                 (*vctxt).err = error as i32;
@@ -1536,7 +1536,7 @@ unsafe fn xml_schema_err4_line(
             }
             if let Some(loc_func) = (*vctxt).loc_func {
                 if file.is_null() || line == 0 {
-                    let mut l: c_ulong = 0;
+                    let mut l: u64 = 0;
                     let mut f = None;
                     loc_func((*vctxt).loc_ctxt, addr_of_mut!(f), addr_of_mut!(l));
                     if file.is_null() {
@@ -1710,9 +1710,9 @@ unsafe extern "C" fn xml_schema_internal_err2(
 
 unsafe extern "C" fn xml_schema_item_list_add_size(
     list: XmlSchemaItemListPtr,
-    mut initial_size: c_int,
+    mut initial_size: i32,
     item: *mut c_void,
-) -> c_int {
+) -> i32 {
     if (*list).items.is_null() {
         if initial_size <= 0 {
             initial_size = 1;
@@ -1747,9 +1747,9 @@ unsafe extern "C" fn xml_schema_item_list_add_size(
 
 unsafe extern "C" fn xml_schema_add_item_size(
     list: *mut XmlSchemaItemListPtr,
-    initial_size: c_int,
+    initial_size: i32,
     item: *mut c_void,
-) -> c_int {
+) -> i32 {
     if (*list).is_null() {
         *list = xml_schema_item_list_create();
         if (*list).is_null() {
@@ -1965,7 +1965,7 @@ unsafe extern "C" fn xml_schema_get_component_designation(
  * Returns a string representation of the type of
  * processContents.
  */
-unsafe extern "C" fn xml_schema_wildcard_pcto_string(pc: c_int) -> *const XmlChar {
+unsafe extern "C" fn xml_schema_wildcard_pcto_string(pc: i32) -> *const XmlChar {
     match pc {
         _ if XML_SCHEMAS_ANY_SKIP == pc => c"skip".as_ptr() as _,
         _ if XML_SCHEMAS_ANY_LAX == pc => c"lax".as_ptr() as _,
@@ -2007,7 +2007,7 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
     item_node: XmlNodePtr,
 ) -> *mut XmlChar {
     let mut str: *mut XmlChar = null_mut();
-    let mut named: c_int = 1;
+    let mut named: i32 = 1;
 
     if !(*buf).is_null() {
         xml_free(*buf as _);
@@ -2714,9 +2714,9 @@ unsafe extern "C" fn xml_schema_validate_notation(
     node: XmlNodePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-    val_needed: c_int,
-) -> c_int {
-    let mut ret: c_int;
+    val_needed: i32,
+) -> i32 {
+    let mut ret: i32;
 
     if !vctxt.is_null() && (*vctxt).schema.is_null() {
         VERROR_INT!(
@@ -2785,9 +2785,9 @@ unsafe extern "C" fn xml_schema_validate_qname(
     vctxt: XmlSchemaValidCtxtPtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-    val_needed: c_int,
-) -> c_int {
-    let mut ret: c_int;
+    val_needed: i32,
+) -> i32 {
+    let mut ret: i32;
     let mut local: *mut XmlChar;
     let mut prefix: *mut XmlChar = null_mut();
 
@@ -2887,7 +2887,7 @@ unsafe extern "C" fn xml_schema_get_primitive_type(mut typ: XmlSchemaTypePtr) ->
 unsafe extern "C" fn xml_schema_eval_error_node_type(
     actxt: XmlSchemaAbstractCtxtPtr,
     node: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     if !node.is_null() {
         return (*node).typ as i32;
     }
@@ -2927,8 +2927,8 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
     mut val: XmlSchemaValPtr,
     ws: XmlSchemaWhitespaceValueType,
     ret_value: *mut *mut XmlChar,
-    for_hash: c_int,
-) -> c_int {
+    for_hash: i32,
+) -> i32 {
     let mut val_type: XmlSchemaValType;
     let mut value: *const XmlChar;
     let mut value2: *const XmlChar = null();
@@ -2936,7 +2936,7 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
     if ret_value.is_null() || val.is_null() {
         return -1;
     }
-    let list: c_int = (!xml_schema_value_get_next(val).is_null()) as i32;
+    let list: i32 = (!xml_schema_value_get_next(val).is_null()) as i32;
     *ret_value = null_mut();
     while {
         // value = null_mut();
@@ -2981,7 +2981,7 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
                     the same hash value for this to work, and it's easiest
                     to just cut off the useless '.0' suffix for the
                     decimal type.  */
-                    let len: c_int = xml_strlen(value2);
+                    let len: i32 = xml_strlen(value2);
                     if len > 2
                         && *value2.add(len as usize - 1) == b'0'
                         && *value2.add(len as usize - 2) == b'.'
@@ -3026,7 +3026,7 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext(
     val: XmlSchemaValPtr,
     ws: XmlSchemaWhitespaceValueType,
     ret_value: *mut *mut XmlChar,
-) -> c_int {
+) -> i32 {
     xml_schema_get_canon_value_whtsp_ext_1(val, ws, ret_value, 0)
 }
 
@@ -3047,8 +3047,8 @@ unsafe extern "C" fn xml_schema_format_facet_enum_set(
     let mut facet: XmlSchemaFacetPtr;
     let mut ws: XmlSchemaWhitespaceValueType;
     let mut value: *mut XmlChar = null_mut();
-    let mut res: c_int;
-    let mut found: c_int = 0;
+    let mut res: i32;
+    let mut found: i32 = 0;
 
     if !(*buf).is_null() {
         xml_free(*buf as _);
@@ -3117,7 +3117,7 @@ unsafe extern "C" fn xml_schema_facet_err(
     error: XmlParserErrors,
     node: XmlNodePtr,
     value: *const XmlChar,
-    length: c_ulong,
+    length: u64,
     typ: XmlSchemaTypePtr,
     facet: XmlSchemaFacetPtr,
     message: *const c_char,
@@ -3126,7 +3126,7 @@ unsafe extern "C" fn xml_schema_facet_err(
 ) {
     let mut str: *mut XmlChar = null_mut();
     let mut msg: *mut XmlChar = null_mut();
-    let node_type: c_int = xml_schema_eval_error_node_type(actxt, node);
+    let node_type: i32 = xml_schema_eval_error_node_type(actxt, node);
 
     xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
     let facet_type = if matches!(error, XmlParserErrors::XmlSchemavCvcEnumerationValid) {
@@ -3284,12 +3284,12 @@ unsafe extern "C" fn xml_schema_facet_err(
 unsafe extern "C" fn xml_schema_are_values_equal(
     mut x: XmlSchemaValPtr,
     mut y: XmlSchemaValPtr,
-) -> c_int {
+) -> i32 {
     let mut tx: XmlSchemaTypePtr;
     let mut ty: XmlSchemaTypePtr;
     let mut ptx: XmlSchemaTypePtr;
     let mut pty: XmlSchemaTypePtr;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     while !x.is_null() {
         /* Same types. */
@@ -3377,16 +3377,16 @@ unsafe extern "C" fn xml_schema_validate_facets(
     mut val_type: XmlSchemaValType,
     value: *const XmlChar,
     val: XmlSchemaValPtr,
-    length: c_ulong,
-    fire_errors: c_int,
-) -> c_int {
-    let mut ret: c_int;
-    let mut error: c_int = 0;
-    let mut found: c_int;
+    length: u64,
+    fire_errors: i32,
+) -> i32 {
+    let mut ret: i32;
+    let mut error: i32 = 0;
+    let mut found: i32;
     let mut tmp_type: XmlSchemaTypePtr;
     let mut facet_link: XmlSchemaFacetLinkPtr;
     let mut facet: XmlSchemaFacetPtr;
-    let mut len: c_ulong = 0;
+    let mut len: u64 = 0;
     let ws: XmlSchemaWhitespaceValueType;
 
     /*
@@ -3717,7 +3717,7 @@ unsafe extern "C" fn xml_schema_validate_facets(
     error
 }
 
-unsafe extern "C" fn xml_schema_is_global_item(item: XmlSchemaTypePtr) -> c_int {
+unsafe extern "C" fn xml_schema_is_global_item(item: XmlSchemaTypePtr) -> i32 {
     match (*item).typ {
         XmlSchemaTypeType::XmlSchemaTypeComplex | XmlSchemaTypeType::XmlSchemaTypeSimple => {
             if (*item).flags & XML_SCHEMAS_TYPE_GLOBAL != 0 {
@@ -3751,7 +3751,7 @@ unsafe extern "C" fn xml_schema_simple_type_err(
     node: XmlNodePtr,
     value: *const XmlChar,
     typ: XmlSchemaTypePtr,
-    display_value: c_int,
+    display_value: i32,
 ) {
     let mut msg: *mut XmlChar = null_mut();
 
@@ -3859,12 +3859,12 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
     typ: XmlSchemaTypePtr,
     mut value: *const XmlChar,
     ret_val: *mut XmlSchemaValPtr,
-    fire_errors: c_int,
-    mut normalize: c_int,
-    mut is_normalized: c_int,
-) -> c_int {
-    let mut ret: c_int = 0;
-    let mut val_needed: c_int = if !ret_val.is_null() { 1 } else { 0 };
+    fire_errors: i32,
+    mut normalize: i32,
+    mut is_normalized: i32,
+) -> i32 {
+    let mut ret: i32 = 0;
+    let mut val_needed: i32 = if !ret_val.is_null() { 1 } else { 0 };
     let mut val: XmlSchemaValPtr = null_mut();
     /* let ws: xmlSchemaWhitespaceValueType; */
     let mut norm_value: *mut XmlChar = null_mut();
@@ -4066,7 +4066,7 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
             let mut cur: *const XmlChar;
             let mut end: *const XmlChar;
             let mut tmp_value: *mut XmlChar = null_mut();
-            let mut len: c_ulong = 0;
+            let mut len: u64 = 0;
             let mut prev_val: XmlSchemaValPtr = null_mut();
             let mut cur_val: XmlSchemaValPtr = null_mut();
             /* 1.2.2 if {variety} is `list` then the string must be a sequence
@@ -4513,7 +4513,7 @@ pub unsafe extern "C" fn xml_schema_new_parser_ctxt(url: *const c_char) -> XmlSc
  */
 pub unsafe extern "C" fn xml_schema_new_mem_parser_ctxt(
     buffer: *const c_char,
-    size: c_int,
+    size: i32,
 ) -> XmlSchemaParserCtxtPtr {
     if buffer.is_null() || size <= 0 {
         return null_mut();
@@ -4646,7 +4646,7 @@ pub unsafe extern "C" fn xml_schema_get_parser_errors(
     err: *mut Option<GenericError>,
     warn: *mut Option<GenericError>,
     ctx: *mut Option<GenericErrorContext>,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -4671,7 +4671,7 @@ pub unsafe extern "C" fn xml_schema_get_parser_errors(
  * Returns 1 if valid so far, 0 if errors were detected, and -1 in case
  *         of internal error.
  */
-pub unsafe extern "C" fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -4861,7 +4861,7 @@ macro_rules! IS_BAD_SCHEMA_DOC {
 unsafe extern "C" fn xml_schema_get_schema_bucket_by_tns(
     pctxt: XmlSchemaParserCtxtPtr,
     target_namespace: *const XmlChar,
-    imported: c_int,
+    imported: i32,
 ) -> XmlSchemaBucketPtr {
     let mut cur: XmlSchemaBucketPtr;
 
@@ -5014,7 +5014,7 @@ macro_rules! IS_BLANK_NODE {
  *
  * Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
  */
-unsafe extern "C" fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: c_int) -> c_int {
+unsafe extern "C" fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: i32) -> i32 {
     if str.is_null() {
         return 1;
     }
@@ -5450,9 +5450,9 @@ unsafe extern "C" fn xml_schema_get_prop(
 unsafe extern "C" fn xml_schema_item_list_add(
     list: XmlSchemaItemListPtr,
     item: *mut c_void,
-) -> c_int {
+) -> i32 {
     if (*list).size_items <= (*list).nb_items {
-        let new_size: size_t = if (*list).size_items == 0 {
+        let new_size: usize = if (*list).size_items == 0 {
             20
         } else {
             (*list).size_items as usize * 2
@@ -5474,7 +5474,7 @@ unsafe extern "C" fn xml_schema_item_list_add(
 
 unsafe extern "C" fn xml_schema_bucket_create(
     pctxt: XmlSchemaParserCtxtPtr,
-    typ: c_int,
+    typ: i32,
     target_namespace: *const XmlChar,
 ) -> XmlSchemaBucketPtr {
     if (*WXS_CONSTRUCTOR!(pctxt)).main_schema.is_null() {
@@ -5637,23 +5637,23 @@ unsafe extern "C" fn xml_schema_bucket_create(
  */
 unsafe extern "C" fn xml_schema_add_schema_doc(
     pctxt: XmlSchemaParserCtxtPtr,
-    typ: c_int, /* import or include or redefine */
+    typ: i32, /* import or include or redefine */
     mut schema_location: *const XmlChar,
     schema_doc: XmlDocPtr,
     schema_buffer: *const c_char,
-    schema_buffer_len: c_int,
+    schema_buffer_len: i32,
     invoking_node: XmlNodePtr,
     source_target_namespace: *const XmlChar,
     import_namespace: *const XmlChar,
     bucket: *mut XmlSchemaBucketPtr,
-) -> c_int {
+) -> i32 {
     let mut target_namespace: *const XmlChar = null();
     let mut relation: XmlSchemaSchemaRelationPtr = null_mut();
     let mut doc: XmlDocPtr = null_mut();
-    let res: c_int;
+    let res: i32;
     let mut err = 0;
-    let mut located: c_int = 0;
-    let mut preserve_doc: c_int = 0;
+    let mut located: i32 = 0;
+    let mut preserve_doc: i32 = 0;
     let mut bkt: XmlSchemaBucketPtr = null_mut();
 
     if !bucket.is_null() {
@@ -6362,8 +6362,8 @@ unsafe extern "C" fn xml_schema_psimple_type_err(
 unsafe extern "C" fn xml_schema_pval_attr_node_id(
     ctxt: XmlSchemaParserCtxtPtr,
     attr: XmlAttrPtr,
-) -> c_int {
-    let mut ret: c_int;
+) -> i32 {
+    let mut ret: i32;
     let mut value: *const XmlChar;
 
     if attr.is_null() {
@@ -6434,7 +6434,7 @@ unsafe extern "C" fn xml_schema_pval_attr_id(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_elem: XmlNodePtr,
     name: *const XmlChar,
-) -> c_int {
+) -> i32 {
     let attr: XmlAttrPtr = xml_schema_get_prop_node(owner_elem, name as _);
     if attr.is_null() {
         return 0;
@@ -6482,8 +6482,8 @@ unsafe extern "C" fn xml_schema_pval_attr_node_value(
     attr: XmlAttrPtr,
     value: *const XmlChar,
     typ: XmlSchemaTypePtr,
-) -> c_int {
-    let mut ret: c_int;
+) -> i32 {
+    let mut ret: i32;
 
     /*
      * NOTE: Should we move this to xmlschematypes.c? Hmm, but this
@@ -6576,7 +6576,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node(
     attr: XmlAttrPtr,
     typ: XmlSchemaTypePtr,
     value: *mut *const XmlChar,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() || typ.is_null() || attr.is_null() {
         return -1;
     }
@@ -6599,9 +6599,9 @@ unsafe extern "C" fn xml_schema_pval_attr_node(
  */
 unsafe extern "C" fn xml_schema_pval_attr_form_default(
     value: *const XmlChar,
-    flags: *mut c_int,
-    flag_qualified: c_int,
-) -> c_int {
+    flags: *mut i32,
+    flag_qualified: i32,
+) -> i32 {
     if xml_str_equal(value, c"qualified".as_ptr() as _) {
         if *flags & flag_qualified == 0 {
             *flags |= flag_qualified;
@@ -6631,15 +6631,15 @@ unsafe extern "C" fn xml_schema_pval_attr_form_default(
  */
 unsafe extern "C" fn xml_schema_pval_attr_block_final(
     value: *const XmlChar,
-    flags: *mut c_int,
-    flag_all: c_int,
-    flag_extension: c_int,
-    flag_restriction: c_int,
-    flag_substitution: c_int,
-    flag_list: c_int,
-    flag_union: c_int,
-) -> c_int {
-    let mut ret: c_int = 0;
+    flags: *mut i32,
+    flag_all: i32,
+    flag_extension: i32,
+    flag_restriction: i32,
+    flag_substitution: i32,
+    flag_list: i32,
+    flag_union: i32,
+) -> i32 {
+    let mut ret: i32 = 0;
 
     /*
      * TODO: This does not check for duplicate entries.
@@ -6748,11 +6748,11 @@ unsafe extern "C" fn xml_schema_parse_schema_element(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut attr: XmlAttrPtr;
     let mut val: *const XmlChar;
-    let mut res: c_int;
-    let old_errs: c_int = (*ctxt).nberrors;
+    let mut res: i32;
+    let old_errs: i32 = (*ctxt).nberrors;
 
     /*
      * Those flags should be moved to the parser context flags,
@@ -7007,7 +7007,7 @@ unsafe extern "C" fn xml_schema_pval_attr(
     name: *const c_char,
     typ: XmlSchemaTypePtr,
     value: *mut *const XmlChar,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() || typ.is_null() {
         if !value.is_null() {
             *value = null_mut();
@@ -7174,11 +7174,11 @@ unsafe extern "C" fn xml_schema_pcontent_err(
 unsafe extern "C" fn xml_schema_parse_annotation(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
-    needed: c_int,
+    needed: i32,
 ) -> XmlSchemaAnnotPtr {
     let mut child: XmlNodePtr;
     let mut attr: XmlAttrPtr;
-    let mut barked: c_int = 0;
+    let mut barked: i32 = 0;
 
     /*
      * INFO: S4S completed.
@@ -7478,7 +7478,7 @@ unsafe extern "C" fn xml_schema_parse_new_doc(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     bucket: XmlSchemaBucketPtr,
-) -> c_int {
+) -> i32 {
     if bucket.is_null() {
         return 0;
     }
@@ -7528,7 +7528,7 @@ unsafe extern "C" fn xml_schema_parse_new_doc(
     xml_schema_set_parser_structured_errors(newpctxt, (*pctxt).serror, (*pctxt).err_ctxt.clone());
     (*newpctxt).counter = (*pctxt).counter;
 
-    let res: c_int = xml_schema_parse_new_doc_with_context(newpctxt, schema, bucket);
+    let res: i32 = xml_schema_parse_new_doc_with_context(newpctxt, schema, bucket);
 
     /* Channel back errors and cleanup the temporary parser context. */
     if res != 0 {
@@ -7591,8 +7591,8 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
     schema_location: *mut *mut XmlChar,
-    typ: c_int,
-) -> c_int {
+    typ: i32,
+) -> i32 {
     let mut attr: XmlAttrPtr;
 
     if pctxt.is_null() || schema.is_null() || node.is_null() || schema_location.is_null() {
@@ -7780,7 +7780,7 @@ unsafe extern "C" fn xml_schema_add_type(
     name: *const XmlChar,
     ns_name: *const XmlChar,
     node: XmlNodePtr,
-    top_level: c_int,
+    top_level: i32,
 ) -> XmlSchemaTypePtr {
     let mut ret: XmlSchemaTypePtr;
 
@@ -7839,13 +7839,13 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     value: *const XmlChar,
     uri: *mut *const XmlChar,
     local: *mut *const XmlChar,
-) -> c_int {
+) -> i32 {
     let ns: XmlNsPtr;
-    let mut len: c_int = 0;
+    let mut len: i32 = 0;
 
     *uri = null_mut();
     *local = null_mut();
-    let ret: c_int = xml_validate_qname(value, 1);
+    let ret: i32 = xml_validate_qname(value, 1);
     match ret.cmp(&0) {
         std::cmp::Ordering::Greater => {
             xml_schema_psimple_type_err(
@@ -7927,7 +7927,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname(
     attr: XmlAttrPtr,
     uri: *mut *const XmlChar,
     local: *mut *const XmlChar,
-) -> c_int {
+) -> i32 {
     let value: *const XmlChar = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
     xml_schema_pval_attr_node_qname_value(ctxt, schema, owner_item, attr, value, uri, local)
 }
@@ -7955,7 +7955,7 @@ unsafe extern "C" fn xml_schema_pval_attr_qname(
     name: *const c_char,
     uri: *mut *const XmlChar,
     local: *mut *const XmlChar,
-) -> c_int {
+) -> i32 {
     let attr: XmlAttrPtr = xml_schema_get_prop_node(owner_elem, name);
     if attr.is_null() {
         *local = null_mut();
@@ -8118,13 +8118,13 @@ unsafe extern "C" fn xml_schema_add_model_group(
 unsafe extern "C" fn xml_get_min_occurs(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
-    min: c_int,
-    max: c_int,
-    def: c_int,
+    min: i32,
+    max: i32,
+    def: i32,
     expected: *const c_char,
-) -> c_int {
+) -> i32 {
     let mut cur: *const XmlChar;
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
 
     let attr: XmlAttrPtr = xml_schema_get_prop_node(node, c"minOccurs".as_ptr() as _);
     if attr.is_null() {
@@ -8158,7 +8158,7 @@ unsafe extern "C" fn xml_get_min_occurs(
         if ret > i32::MAX / 10 {
             ret = i32::MAX;
         } else {
-            let digit: c_int = (*cur - b'0') as _;
+            let digit: i32 = (*cur - b'0') as _;
             ret *= 10;
             if ret > i32::MAX - digit {
                 ret = i32::MAX;
@@ -8205,13 +8205,13 @@ unsafe extern "C" fn xml_get_min_occurs(
 unsafe extern "C" fn xml_get_max_occurs(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
-    min: c_int,
-    max: c_int,
-    def: c_int,
+    min: i32,
+    max: i32,
+    def: i32,
     expected: *const c_char,
-) -> c_int {
+) -> i32 {
     let mut cur: *const XmlChar;
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
 
     let attr: XmlAttrPtr = xml_schema_get_prop_node(node, c"maxOccurs".as_ptr() as _);
     if attr.is_null() {
@@ -8267,7 +8267,7 @@ unsafe extern "C" fn xml_get_max_occurs(
         if ret > i32::MAX / 10 {
             ret = i32::MAX;
         } else {
-            let digit: c_int = (*cur - b'0') as _;
+            let digit: i32 = (*cur - b'0') as _;
             ret *= 10;
             if ret > i32::MAX - digit {
                 ret = i32::MAX;
@@ -8375,9 +8375,9 @@ unsafe extern "C" fn xml_schema_pcheck_particle_correct_2(
     ctxt: XmlSchemaParserCtxtPtr,
     _item: XmlSchemaParticlePtr,
     node: XmlNodePtr,
-    min_occurs: c_int,
-    max_occurs: c_int,
-) -> c_int {
+    min_occurs: i32,
+    max_occurs: i32,
+) -> i32 {
     if max_occurs == 0 && min_occurs == 0 {
         return 0;
     }
@@ -8438,8 +8438,8 @@ unsafe extern "C" fn xml_schema_pcheck_particle_correct_2(
 unsafe extern "C" fn xml_schema_add_particle(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
-    min: c_int,
-    max: c_int,
+    min: i32,
+    max: i32,
 ) -> XmlSchemaParticlePtr {
     let mut ret: XmlSchemaParticlePtr;
     if ctxt.is_null() {
@@ -8479,7 +8479,7 @@ unsafe extern "C" fn xml_schema_check_reference(
     node: XmlNodePtr,
     attr: XmlAttrPtr,
     namespace_name: *const XmlChar,
-) -> c_int {
+) -> i32 {
     /* TODO: Pointer comparison instead? */
     if xml_str_equal((*pctxt).target_namespace, namespace_name) {
         return 0;
@@ -8613,7 +8613,7 @@ unsafe extern "C" fn xml_schema_add_element(
     name: *const XmlChar,
     ns_name: *const XmlChar,
     node: XmlNodePtr,
-    top_level: c_int,
+    top_level: i32,
 ) -> XmlSchemaElementPtr {
     let mut ret: XmlSchemaElementPtr;
 
@@ -8655,8 +8655,8 @@ unsafe extern "C" fn xml_schema_pget_bool_node_value(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_item: XmlSchemaBasicItemPtr,
     node: XmlNodePtr,
-) -> c_int {
-    let mut res: c_int = 0;
+) -> i32 {
+    let mut res: i32 = 0;
 
     let value: *mut XmlChar = xml_node_get_content(node);
     /*
@@ -8740,9 +8740,8 @@ unsafe extern "C" fn xml_schema_parse_model_group_def_ref(
         return null_mut();
     }
     xml_schema_check_reference(ctxt, schema, node, attr, ref_ns);
-    let min: c_int =
-        xml_get_min_occurs(ctxt, node, 0, -1, 1, c"xs:nonNegativeInteger".as_ptr() as _);
-    let max: c_int = xml_get_max_occurs(
+    let min: i32 = xml_get_min_occurs(ctxt, node, 0, -1, 1, c"xs:nonNegativeInteger".as_ptr() as _);
+    let max: i32 = xml_get_max_occurs(
         ctxt,
         node,
         0,
@@ -8880,7 +8879,7 @@ unsafe extern "C" fn xml_schema_add_attribute(
     name: *const XmlChar,
     ns_name: *const XmlChar,
     node: XmlNodePtr,
-    top_level: c_int,
+    top_level: i32,
 ) -> XmlSchemaAttributePtr {
     let mut ret: XmlSchemaAttributePtr;
 
@@ -8944,7 +8943,7 @@ unsafe extern "C" fn xml_schema_parse_local_attribute(
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
     uses: XmlSchemaItemListPtr,
-    parent_type: c_int,
+    parent_type: i32,
 ) -> XmlSchemaBasicItemPtr {
     let mut attr_value: *const XmlChar;
     let mut name: *const XmlChar = null();
@@ -8955,11 +8954,11 @@ unsafe extern "C" fn xml_schema_parse_local_attribute(
     let mut tmp_ns: *const XmlChar = null();
     let mut tmp_name: *const XmlChar = null();
     let mut def_value: *const XmlChar = null();
-    let mut is_ref: c_int = 0;
-    let mut occurs: c_int = XML_SCHEMAS_ATTR_USE_OPTIONAL;
+    let mut is_ref: i32 = 0;
+    let mut occurs: i32 = XML_SCHEMAS_ATTR_USE_OPTIONAL;
 
-    let mut has_form: c_int = 0;
-    let mut def_value_type: c_int = 0;
+    let mut has_form: i32 = 0;
+    let mut def_value_type: i32 = 0;
 
     const WXS_ATTR_DEF_VAL_DEFAULT: i32 = 1;
     const WXS_ATTR_DEF_VAL_FIXED: i32 = 2;
@@ -8989,7 +8988,7 @@ unsafe extern "C" fn xml_schema_parse_local_attribute(
         }
         is_ref = 1;
     }
-    let nberrors: c_int = (*pctxt).nberrors;
+    let nberrors: i32 = (*pctxt).nberrors;
     /*
      * Check for illegal attributes.
      */
@@ -9623,9 +9622,9 @@ unsafe extern "C" fn xml_schema_parse_local_attributes(
     schema: XmlSchemaPtr,
     child: *mut XmlNodePtr,
     list: *mut XmlSchemaItemListPtr,
-    parent_type: c_int,
-    has_refs: *mut c_int,
-) -> c_int {
+    parent_type: i32,
+    has_refs: *mut i32,
+) -> i32 {
     let mut item: *mut c_void;
 
     while IS_SCHEMA!(*child, c"attribute".as_ptr())
@@ -9734,9 +9733,9 @@ unsafe extern "C" fn xml_schema_parse_wildcard_ns(
     _schema: XmlSchemaPtr,
     wildc: XmlSchemaWildcardPtr,
     node: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut dictns_item: *const XmlChar;
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
     let mut ns_item: *mut XmlChar;
     let mut tmp: XmlSchemaWildcardNsPtr;
     let mut last_ns: XmlSchemaWildcardNsPtr = null_mut();
@@ -10160,8 +10159,8 @@ unsafe extern "C" fn xml_schema_parse_simple_content(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-    has_restriction_or_extension: *mut c_int,
-) -> c_int {
+    has_restriction_or_extension: *mut i32,
+) -> i32 {
     let mut child: XmlNodePtr;
     let mut attr: XmlAttrPtr;
 
@@ -10290,8 +10289,8 @@ unsafe extern "C" fn xml_schema_parse_complex_content(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-    has_restriction_or_extension: *mut c_int,
-) -> c_int {
+    has_restriction_or_extension: *mut i32,
+) -> i32 {
     let mut child: XmlNodePtr;
     let mut attr: XmlAttrPtr;
 
@@ -10426,7 +10425,7 @@ unsafe extern "C" fn xml_schema_parse_complex_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-    top_level: c_int,
+    top_level: i32,
 ) -> XmlSchemaTypePtr {
     let typ: XmlSchemaTypePtr;
     let mut child: XmlNodePtr;
@@ -10436,9 +10435,9 @@ unsafe extern "C" fn xml_schema_parse_complex_type(
     // #ifdef ENABLE_NAMED_LOCALS
     //     let buf: [c_char; 40];
     // #endif
-    let mut is_final: c_int = 0;
-    let mut block: c_int = 0;
-    let mut has_restriction_or_extension: c_int = 0;
+    let mut is_final: i32 = 0;
+    let mut block: i32 = 0;
+    let mut has_restriction_or_extension: i32 = 0;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -10802,8 +10801,8 @@ unsafe extern "C" fn xml_get_boolean_prop(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
     name: *const c_char,
-    mut def: c_int,
-) -> c_int {
+    mut def: i32,
+) -> i32 {
     let val: *const XmlChar = xml_schema_get_prop(ctxt, node, name);
     if val.is_null() {
         return def;
@@ -10883,8 +10882,8 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
     idc: XmlSchemaIDCPtr,
     selector: XmlSchemaIdcselectPtr,
     attr: XmlAttrPtr,
-    is_field: c_int,
-) -> c_int {
+    is_field: i32,
+) -> i32 {
     /*
      * c-selector-xpath:
      * Schema Component Constraint: Selector Value OK
@@ -11017,7 +11016,7 @@ unsafe extern "C" fn xml_schema_parse_idcselector_and_field(
     ctxt: XmlSchemaParserCtxtPtr,
     idc: XmlSchemaIDCPtr,
     node: XmlNodePtr,
-    is_field: c_int,
+    is_field: i32,
 ) -> XmlSchemaIdcselectPtr {
     let mut child: XmlNodePtr;
     let mut attr: XmlAttrPtr;
@@ -11331,17 +11330,17 @@ unsafe extern "C" fn xml_schema_parse_element(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-    is_elem_ref: *mut c_int,
-    top_level: c_int,
+    is_elem_ref: *mut i32,
+    top_level: i32,
 ) -> XmlSchemaBasicItemPtr {
     let mut decl: XmlSchemaElementPtr = null_mut();
     let mut particle: XmlSchemaParticlePtr = null_mut();
     let mut annot: XmlSchemaAnnotPtr = null_mut();
     let mut child: XmlNodePtr;
     let mut attr: XmlAttrPtr;
-    let min: c_int;
-    let max: c_int;
-    let mut is_ref: c_int = 0;
+    let min: i32;
+    let max: i32;
+    let mut is_ref: i32 = 0;
     let mut des: *mut XmlChar = null_mut();
 
     /* 3.3.3 Constraints on XML Representations of Element Declarations */
@@ -11956,7 +11955,7 @@ unsafe extern "C" fn xml_schema_parse_any(
     /*
      * minOccurs/maxOccurs.
      */
-    let max: c_int = xml_get_max_occurs(
+    let max: i32 = xml_get_max_occurs(
         ctxt,
         node,
         0,
@@ -11964,8 +11963,7 @@ unsafe extern "C" fn xml_schema_parse_any(
         1,
         c"(xs:nonNegativeInteger | unbounded)".as_ptr() as _,
     );
-    let min: c_int =
-        xml_get_min_occurs(ctxt, node, 0, -1, 1, c"xs:nonNegativeInteger".as_ptr() as _);
+    let min: i32 = xml_get_min_occurs(ctxt, node, 0, -1, 1, c"xs:nonNegativeInteger".as_ptr() as _);
     xml_schema_pcheck_particle_correct_2(ctxt, null_mut(), node, min, max);
     /*
      * Create & parse the wildcard.
@@ -12045,15 +12043,15 @@ unsafe extern "C" fn xml_schema_parse_model_group(
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
     typ: XmlSchemaTypeType,
-    with_particle: c_int,
+    with_particle: i32,
 ) -> XmlSchemaTreeItemPtr {
     let mut particle: XmlSchemaParticlePtr = null_mut();
     let mut child: XmlNodePtr;
     let mut attr: XmlAttrPtr;
-    let mut min: c_int = 1;
-    let mut max: c_int = 1;
-    let mut is_elem_ref: c_int = 0;
-    let mut has_refs: c_int = 0;
+    let mut min: i32 = 1;
+    let mut max: i32 = 1;
+    let mut is_elem_ref: i32 = 0;
+    let mut has_refs: i32 = 0;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -12977,7 +12975,7 @@ unsafe extern "C" fn xml_schema_parse_union(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut child: XmlNodePtr;
     let mut attr: XmlAttrPtr;
     let mut cur: *const XmlChar;
@@ -13206,13 +13204,13 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-    top_level: c_int,
+    top_level: i32,
 ) -> XmlSchemaTypePtr {
     let typ: XmlSchemaTypePtr;
     let mut child: XmlNodePtr;
     let mut attr_value: *const XmlChar = null();
     let mut attr: XmlAttrPtr;
-    let mut has_restriction: c_int = 0;
+    let mut has_restriction: i32 = 0;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -13749,7 +13747,7 @@ unsafe extern "C" fn xml_schema_parse_attribute_group_definition(
 
     let mut child: XmlNodePtr;
     let mut attr: XmlAttrPtr;
-    let mut has_refs: c_int = 0;
+    let mut has_refs: i32 = 0;
 
     if pctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -13871,13 +13869,13 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-    typ: c_int,
-) -> c_int {
+    typ: i32,
+) -> i32 {
     let mut child: XmlNodePtr;
     let mut schema_location: *const XmlChar = null();
-    let mut res: c_int; /* hasRedefinitions = 0 */
-    let mut is_chameleon: c_int = 0;
-    let mut was_chameleon: c_int = 0;
+    let mut res: i32; /* hasRedefinitions = 0 */
+    let mut is_chameleon: i32 = 0;
+    let mut was_chameleon: i32 = 0;
     let mut bucket: XmlSchemaBucketPtr = null_mut();
 
     if pctxt.is_null() || schema.is_null() || node.is_null() {
@@ -14109,12 +14107,12 @@ unsafe extern "C" fn xml_schema_parse_import(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut child: XmlNodePtr;
     let mut namespace_name: *const XmlChar = null();
     let mut schema_location: *const XmlChar = null();
     let mut attr: XmlAttrPtr;
-    let mut ret: c_int;
+    let mut ret: i32;
     let mut bucket: XmlSchemaBucketPtr = null_mut();
 
     if pctxt.is_null() || schema.is_null() || node.is_null() {
@@ -14306,8 +14304,8 @@ unsafe extern "C" fn xml_schema_parse_include(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-) -> c_int {
-    let res: c_int =
+) -> i32 {
+    let res: i32 =
         xml_schema_parse_include_or_redefine(pctxt, schema, node, XML_SCHEMA_SCHEMA_INCLUDE);
     if res != 0 {
         return res;
@@ -14319,12 +14317,12 @@ unsafe extern "C" fn xml_schema_parse_redefine(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     // #ifndef ENABLE_REDEFINE
     //     TODO
     //     return 0;
     // #endif
-    let res: c_int =
+    let res: i32 =
         xml_schema_parse_include_or_redefine(pctxt, schema, node, XML_SCHEMA_SCHEMA_REDEFINE);
     if res != 0 {
         return res;
@@ -14657,17 +14655,17 @@ unsafe extern "C" fn xml_schema_parse_schema_top_level(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     nodes: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut child: XmlNodePtr;
     let mut annot: XmlSchemaAnnotPtr;
-    let mut res: c_int = 0;
-    let mut tmp_old_errs: c_int;
+    let mut res: i32 = 0;
+    let mut tmp_old_errs: i32;
 
     if ctxt.is_null() || schema.is_null() || nodes.is_null() {
         return -1;
     }
 
-    let old_errs: c_int = (*ctxt).nberrors;
+    let old_errs: i32 = (*ctxt).nberrors;
     child = nodes;
     'exit_failure: {
         'exit: {
@@ -14717,7 +14715,7 @@ unsafe extern "C" fn xml_schema_parse_schema_top_level(
                 child = (*child).next;
             }
             /*
-             * URGENT TODO: Change the functions to return c_int results.
+             * URGENT TODO: Change the functions to return i32 results.
              * We need especially to catch internal errors.
              */
             while !child.is_null() {
@@ -14775,9 +14773,9 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     bucket: XmlSchemaBucketPtr,
-) -> c_int {
-    let mut ret: c_int;
-    let old_errs: c_int;
+) -> i32 {
+    let mut ret: i32;
+    let old_errs: i32;
     let oldbucket: XmlSchemaBucketPtr = (*(*pctxt).constructor).bucket;
 
     /*
@@ -14786,7 +14784,7 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
      * to the parser. Get rid of passing the main schema to the
      * parsing functions.
      */
-    let old_flags: c_int = (*schema).flags;
+    let old_flags: i32 = (*schema).flags;
     let old_doc: XmlDocPtr = (*schema).doc;
     if (*schema).flags != 0 {
         xml_schema_clear_schema_defaults(schema);
@@ -14940,12 +14938,12 @@ unsafe extern "C" fn xml_schema_find_redef_comp_in_graph(
     null_mut()
 }
 
-unsafe extern "C" fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> c_int {
-    let mut err: c_int = 0;
+unsafe extern "C" fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i32 {
+    let mut err: i32 = 0;
     let mut redef: XmlSchemaRedefPtr = (*WXS_CONSTRUCTOR!(pctxt)).redefs;
     let mut prev: XmlSchemaBasicItemPtr;
     let mut item: XmlSchemaBasicItemPtr;
-    let mut was_redefined: c_int;
+    let mut was_redefined: i32;
 
     if redef.is_null() {
         return 0;
@@ -15152,9 +15150,9 @@ macro_rules! WXS_REDEFINED_ATTR_GROUP {
 unsafe extern "C" fn xml_schema_add_components(
     pctxt: XmlSchemaParserCtxtPtr,
     bucket: XmlSchemaBucketPtr,
-) -> c_int {
+) -> i32 {
     let mut item: XmlSchemaBasicItemPtr;
-    let mut err: c_int;
+    let mut err: i32;
     let mut table: *mut XmlHashTablePtr;
     let mut name: *const XmlChar;
 
@@ -15518,7 +15516,7 @@ unsafe extern "C" fn xml_schema_resolve_element_references(
 unsafe extern "C" fn xml_schema_resolve_union_member_types(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     let mut link: XmlSchemaTypeLinkPtr;
     let mut last_link: XmlSchemaTypeLinkPtr;
     let mut new_link: XmlSchemaTypeLinkPtr;
@@ -15795,7 +15793,7 @@ unsafe extern "C" fn xml_schema_resolve_type_references(
 unsafe extern "C" fn xml_schema_resolve_attr_type_references(
     item: XmlSchemaAttributePtr,
     ctxt: XmlSchemaParserCtxtPtr,
-) -> c_int {
+) -> i32 {
     /*
      * The simple type definition corresponding to the <simpleType> element
      * information item in the [children], if present, otherwise the simple
@@ -15875,7 +15873,7 @@ unsafe extern "C" fn xml_schema_get_attribute_decl(
 unsafe extern "C" fn xml_schema_resolve_attr_use_references(
     ause: XmlSchemaAttributeUsePtr,
     ctxt: XmlSchemaParserCtxtPtr,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() || ause.is_null() {
         return -1;
     }
@@ -15956,7 +15954,7 @@ unsafe extern "C" fn xml_schema_get_attribute_group(
 unsafe extern "C" fn xml_schema_resolve_attr_group_references(
     refe: XmlSchemaQnameRefPtr,
     ctxt: XmlSchemaParserCtxtPtr,
-) -> c_int {
+) -> i32 {
     if !(*refe).item.is_null() {
         return 0;
     }
@@ -16108,7 +16106,7 @@ unsafe extern "C" fn xml_schema_get_idc(
 unsafe extern "C" fn xml_schema_resolve_idckey_references(
     idc: XmlSchemaIDCPtr,
     pctxt: XmlSchemaParserCtxtPtr,
-) -> c_int {
+) -> i32 {
     if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
         return 0;
     }
@@ -16171,7 +16169,7 @@ unsafe extern "C" fn xml_schema_resolve_idckey_references(
 unsafe extern "C" fn xml_schema_resolve_attr_use_prohib_references(
     prohib: XmlSchemaAttributeUseProhibPtr,
     pctxt: XmlSchemaParserCtxtPtr,
-) -> c_int {
+) -> i32 {
     if xml_schema_get_attribute_decl((*pctxt).schema, (*prohib).name, (*prohib).target_namespace)
         .is_null()
     {
@@ -16207,7 +16205,7 @@ unsafe extern "C" fn xml_schema_check_type_def_circular_internal(
     pctxt: XmlSchemaParserCtxtPtr,
     ctxt_type: XmlSchemaTypePtr,
     ancestor: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     if ancestor.is_null() || (*ancestor).typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
         return 0;
     }
@@ -16230,7 +16228,7 @@ unsafe extern "C" fn xml_schema_check_type_def_circular_internal(
         return 0;
     }
     (*ancestor).flags |= XML_SCHEMAS_TYPE_MARKED;
-    let ret: c_int =
+    let ret: i32 =
         xml_schema_check_type_def_circular_internal(pctxt, ctxt_type, (*ancestor).base_type);
     (*ancestor).flags ^= XML_SCHEMAS_TYPE_MARKED;
     ret
@@ -16443,7 +16441,7 @@ unsafe extern "C" fn xml_schema_check_attr_group_circular_recur(
 unsafe extern "C" fn xml_schema_check_attr_group_circular(
     attr_gr: XmlSchemaAttributeGroupPtr,
     ctxt: XmlSchemaParserCtxtPtr,
-) -> c_int {
+) -> i32 {
     /*
      * Schema Representation Constraint:
      * Attribute Group Definition Representation OK
@@ -16546,7 +16544,7 @@ unsafe extern "C" fn xml_schema_psimple_err(msg: *const c_char) {
     );
 }
 
-unsafe extern "C" fn xml_schema_item_list_remove(list: XmlSchemaItemListPtr, idx: c_int) -> c_int {
+unsafe extern "C" fn xml_schema_item_list_remove(list: XmlSchemaItemListPtr, idx: i32) -> i32 {
     if (*list).items.is_null() || idx >= (*list).nb_items {
         xml_schema_psimple_err(
             c"Internal error: xmlSchemaItemListRemove, index error.\n".as_ptr() as _,
@@ -16585,7 +16583,7 @@ unsafe extern "C" fn xml_schema_clone_wildcard_ns_constraints(
     ctxt: XmlSchemaParserCtxtPtr,
     dest: XmlSchemaWildcardPtr,
     source: XmlSchemaWildcardPtr,
-) -> c_int {
+) -> i32 {
     let mut cur: XmlSchemaWildcardNsPtr;
     let mut tmp: XmlSchemaWildcardNsPtr;
     let mut last: XmlSchemaWildcardNsPtr;
@@ -16640,7 +16638,7 @@ unsafe extern "C" fn xml_schema_intersect_wildcards(
     ctxt: XmlSchemaParserCtxtPtr,
     complete_wild: XmlSchemaWildcardPtr,
     cur_wild: XmlSchemaWildcardPtr,
-) -> c_int {
+) -> i32 {
     let mut cur: XmlSchemaWildcardNsPtr;
     let mut cur_b: XmlSchemaWildcardNsPtr;
     let mut prev: XmlSchemaWildcardNsPtr;
@@ -16657,7 +16655,7 @@ unsafe extern "C" fn xml_schema_intersect_wildcards(
             || (*(*complete_wild).neg_ns_set).value == (*(*cur_wild).neg_ns_set).value)
     {
         if !(*complete_wild).ns_set.is_null() {
-            let mut found: c_int = 0;
+            let mut found: i32 = 0;
 
             /*
              * Check equality of sets.
@@ -16756,7 +16754,7 @@ unsafe extern "C" fn xml_schema_intersect_wildcards(
      * then the intersection of those sets must be the value.
      */
     if !(*complete_wild).ns_set.is_null() && !(*cur_wild).ns_set.is_null() {
-        let mut found: c_int;
+        let mut found: i32;
 
         cur = (*complete_wild).ns_set;
         prev = null_mut();
@@ -16824,10 +16822,10 @@ unsafe extern "C" fn xml_schema_intersect_wildcards(
 unsafe extern "C" fn xml_schema_item_list_insert(
     list: XmlSchemaItemListPtr,
     item: *mut c_void,
-    idx: c_int,
-) -> c_int {
+    idx: i32,
+) -> i32 {
     if (*list).size_items <= (*list).nb_items {
-        let new_size: size_t = if (*list).size_items == 0 {
+        let new_size: usize = if (*list).size_items == 0 {
             20
         } else {
             (*list).size_items as usize * 2
@@ -16878,12 +16876,12 @@ unsafe extern "C" fn xml_schema_expand_attribute_group_refs(
     complete_wild: *mut XmlSchemaWildcardPtr,
     list: XmlSchemaItemListPtr,
     prohibs: XmlSchemaItemListPtr,
-) -> c_int {
+) -> i32 {
     let mut gr: XmlSchemaAttributeGroupPtr;
     let mut using: XmlSchemaAttributeUsePtr;
     let mut sublist: XmlSchemaItemListPtr;
-    let mut i: c_int;
-    let mut created: c_int = (!(*complete_wild).is_null()) as i32;
+    let mut i: i32;
+    let mut created: i32 = (!(*complete_wild).is_null()) as i32;
 
     if !prohibs.is_null() {
         (*prohibs).nb_items = 0;
@@ -17065,7 +17063,7 @@ unsafe extern "C" fn xml_schema_expand_attribute_group_refs(
 unsafe extern "C" fn xml_schema_attribute_group_expand_refs(
     pctxt: XmlSchemaParserCtxtPtr,
     attr_gr: XmlSchemaAttributeGroupPtr,
-) -> c_int {
+) -> i32 {
     if (*attr_gr).attr_uses.is_null()
         || (*attr_gr).flags & XML_SCHEMAS_ATTRGROUP_WILDCARD_BUILDED != 0
     {
@@ -17089,7 +17087,7 @@ unsafe extern "C" fn xml_schema_attribute_group_expand_refs(
 unsafe extern "C" fn xml_schema_fixup_simple_type_stage_one(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeSimple {
         return 0;
     }
@@ -17187,7 +17185,7 @@ unsafe extern "C" fn xml_schema_check_union_type_def_circular_recur(
     pctxt: XmlSchemaParserCtxtPtr,
     ctx_type: XmlSchemaTypePtr,
     members: XmlSchemaTypeLinkPtr,
-) -> c_int {
+) -> i32 {
     let mut member: XmlSchemaTypeLinkPtr;
     let mut member_type: XmlSchemaTypePtr;
 
@@ -17209,7 +17207,7 @@ unsafe extern "C" fn xml_schema_check_union_type_def_circular_recur(
             }
             if WXS_IS_UNION!(member_type) && (*member_type).flags & XML_SCHEMAS_TYPE_MARKED == 0 {
                 (*member_type).flags |= XML_SCHEMAS_TYPE_MARKED;
-                let res: c_int = xml_schema_check_union_type_def_circular_recur(
+                let res: i32 = xml_schema_check_union_type_def_circular_recur(
                     pctxt,
                     ctx_type,
                     xml_schema_get_union_simple_type_member_types(member_type),
@@ -17229,7 +17227,7 @@ unsafe extern "C" fn xml_schema_check_union_type_def_circular_recur(
 unsafe extern "C" fn xml_schema_check_union_type_def_circular(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     if !WXS_IS_UNION!(typ) {
         return 0;
     }
@@ -17251,7 +17249,7 @@ unsafe extern "C" fn xml_schema_union_wildcards(
     ctxt: XmlSchemaParserCtxtPtr,
     complete_wild: XmlSchemaWildcardPtr,
     cur_wild: XmlSchemaWildcardPtr,
-) -> c_int {
+) -> i32 {
     let mut cur: XmlSchemaWildcardNsPtr;
     let mut cur_b: XmlSchemaWildcardNsPtr;
     let mut tmp: XmlSchemaWildcardNsPtr;
@@ -17267,7 +17265,7 @@ unsafe extern "C" fn xml_schema_union_wildcards(
             || (*(*complete_wild).neg_ns_set).value == (*(*cur_wild).neg_ns_set).value)
     {
         if !(*complete_wild).ns_set.is_null() {
-            let mut found: c_int = 0;
+            let mut found: i32 = 0;
 
             /*
              * Check equality of sets.
@@ -17317,7 +17315,7 @@ unsafe extern "C" fn xml_schema_union_wildcards(
      * then the union of those sets must be the value.
      */
     if !(*complete_wild).ns_set.is_null() && !(*cur_wild).ns_set.is_null() {
-        let mut found: c_int;
+        let mut found: i32;
 
         cur = (*cur_wild).ns_set;
         let start: XmlSchemaWildcardNsPtr = (*complete_wild).ns_set;
@@ -17367,8 +17365,8 @@ unsafe extern "C" fn xml_schema_union_wildcards(
             && !(*(*cur_wild).neg_ns_set).value.is_null()
             && !(*complete_wild).ns_set.is_null())
     {
-        let mut ns_found: c_int;
-        let mut absent_found: c_int = 0;
+        let mut ns_found: i32;
+        let mut absent_found: i32 = 0;
 
         if !(*complete_wild).ns_set.is_null() {
             cur = (*complete_wild).ns_set;
@@ -17515,9 +17513,9 @@ unsafe extern "C" fn xml_schema_union_wildcards(
  *
  * Returns 1 if emptiable, 0 otherwise.
  */
-unsafe extern "C" fn xml_schema_get_particle_emptiable(particle: XmlSchemaParticlePtr) -> c_int {
+unsafe extern "C" fn xml_schema_get_particle_emptiable(particle: XmlSchemaParticlePtr) -> i32 {
     let mut part: XmlSchemaParticlePtr;
-    let mut emptiable: c_int;
+    let mut emptiable: i32;
 
     if (*particle).children.is_null() || (*particle).min_occurs == 0 {
         return 1;
@@ -17565,7 +17563,7 @@ unsafe extern "C" fn xml_schema_get_particle_emptiable(particle: XmlSchemaPartic
  *
  * Returns 1 if emptiable, 0 otherwise.
  */
-unsafe extern "C" fn xml_schema_is_particle_emptiable(particle: XmlSchemaParticlePtr) -> c_int {
+unsafe extern "C" fn xml_schema_is_particle_emptiable(particle: XmlSchemaParticlePtr) -> i32 {
     /*
      * SPEC (1) "Its {min occurs} is 0."
      */
@@ -17597,8 +17595,8 @@ unsafe extern "C" fn xml_schema_is_particle_emptiable(particle: XmlSchemaParticl
 unsafe extern "C" fn xml_schema_check_srcct(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
-    let mut ret: c_int = 0;
+) -> i32 {
+    let mut ret: i32 = 0;
 
     /*
      * TODO: Adjust the error codes here, as I used
@@ -17732,7 +17730,7 @@ unsafe extern "C" fn xml_schema_check_srcct(
 unsafe extern "C" fn xml_schema_fixup_type_attribute_uses(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     let mut using: XmlSchemaAttributeUsePtr;
     let mut uses: XmlSchemaItemListPtr;
     let mut prohibs: XmlSchemaItemListPtr = null_mut();
@@ -17942,8 +17940,8 @@ unsafe extern "C" fn xml_schema_fixup_type_attribute_uses(
  */
 unsafe extern "C" fn xml_schema_is_derived_from_built_in_type(
     typ: XmlSchemaTypePtr,
-    val_type: c_int,
-) -> c_int {
+    val_type: i32,
+) -> i32 {
     if typ.is_null() {
         return 0;
     }
@@ -17980,7 +17978,7 @@ unsafe extern "C" fn xml_schema_is_derived_from_built_in_type(
 unsafe extern "C" fn xml_schema_check_ctprops_correct(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     /*
      * TODO: Correct the error code; XmlParserErrors::XML_SCHEMAP_SRC_CT_1 is used temporarily.
      *
@@ -18023,7 +18021,7 @@ unsafe extern "C" fn xml_schema_check_ctprops_correct(
         let uses: XmlSchemaItemListPtr = (*typ).attr_uses as XmlSchemaItemListPtr;
         let mut using: XmlSchemaAttributeUsePtr;
         let mut tmp: XmlSchemaAttributeUsePtr;
-        let mut has_id: c_int = 0;
+        let mut has_id: i32 = 0;
 
         'next_use: for i in (0..(*uses).nb_items).rev() {
             using = *(*uses).items.add(i as usize) as _;
@@ -18117,7 +18115,7 @@ unsafe extern "C" fn xml_schema_check_ctprops_correct(
 unsafe extern "C" fn xml_schema_check_cosctextends(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     let base: XmlSchemaTypePtr = (*typ).base_type;
     /*
      * TODO: Correct the error code; XML_SCHEMAP_COS_CT_EXTENDS_1_1 is used
@@ -18353,10 +18351,7 @@ unsafe extern "C" fn xml_schema_pattr_use_err4(
  * Returns 1 if the type does contain the given "final".as_ptr() as _,
  * 0 otherwise.
  */
-unsafe extern "C" fn xml_schema_type_final_contains(
-    typ: XmlSchemaTypePtr,
-    is_final: c_int,
-) -> c_int {
+unsafe extern "C" fn xml_schema_type_final_contains(typ: XmlSchemaTypePtr, is_final: i32) -> i32 {
     if typ.is_null() {
         return 0;
     }
@@ -18386,8 +18381,8 @@ unsafe extern "C" fn xml_schema_check_cosstderived_ok(
     actxt: XmlSchemaAbstractCtxtPtr,
     typ: XmlSchemaTypePtr,
     base_type: XmlSchemaTypePtr,
-    subset: c_int,
-) -> c_int {
+    subset: i32,
+) -> i32 {
     /*
      * 1 They are the same type definition.
      * TODO: The identity check might have to be more complex than this.
@@ -18471,10 +18466,10 @@ unsafe extern "C" fn xml_schema_check_cosstderived_ok(
 
 unsafe extern "C" fn xml_schema_get_effective_value_constraint(
     attruse: XmlSchemaAttributeUsePtr,
-    fixed: *mut c_int,
+    fixed: *mut i32,
     value: *mut *const XmlChar,
     val: *mut XmlSchemaValPtr,
-) -> c_int {
+) -> i32 {
     *fixed = 0;
     *value = null_mut();
     if !val.is_null() {
@@ -18517,7 +18512,7 @@ unsafe extern "C" fn xml_schema_get_effective_value_constraint(
 unsafe extern "C" fn xml_schema_check_cvcwildcard_namespace(
     wild: XmlSchemaWildcardPtr,
     ns: *const XmlChar,
-) -> c_int {
+) -> i32 {
     if wild.is_null() {
         return -1;
     }
@@ -18558,7 +18553,7 @@ unsafe extern "C" fn xml_schema_check_cvcwildcard_namespace(
 unsafe extern "C" fn xml_schema_check_cosnssubset(
     sub: XmlSchemaWildcardPtr,
     sper: XmlSchemaWildcardPtr,
-) -> c_int {
+) -> i32 {
     /*
      * 1 super must be any.
      */
@@ -18585,7 +18580,7 @@ unsafe extern "C" fn xml_schema_check_cosnssubset(
         if !(*sper).ns_set.is_null() {
             let mut cur: XmlSchemaWildcardNsPtr;
             let mut cur_b: XmlSchemaWildcardNsPtr;
-            let mut found: c_int = 0;
+            let mut found: i32 = 0;
 
             cur = (*sub).ns_set;
             while !cur.is_null() {
@@ -18638,19 +18633,19 @@ unsafe extern "C" fn xml_schema_check_cosnssubset(
 */
 unsafe extern "C" fn xml_schema_check_derivation_okrestriction2to4(
     pctxt: XmlSchemaParserCtxtPtr,
-    action: c_int,
+    action: i32,
     item: XmlSchemaBasicItemPtr,
     base_item: XmlSchemaBasicItemPtr,
     uses: XmlSchemaItemListPtr,
     base_uses: XmlSchemaItemListPtr,
     wild: XmlSchemaWildcardPtr,
     base_wild: XmlSchemaWildcardPtr,
-) -> c_int {
+) -> i32 {
     let mut cur: XmlSchemaAttributeUsePtr;
     let mut bcur: XmlSchemaAttributeUsePtr;
-    let mut found: c_int; /* err = 0; */
+    let mut found: i32; /* err = 0; */
     let mut b_eff_value: *const XmlChar = null();
-    let mut eff_fixed: c_int = 0;
+    let mut eff_fixed: i32 = 0;
 
     if !uses.is_null() {
         for i in 0..(*uses).nb_items {
@@ -18919,7 +18914,7 @@ unsafe extern "C" fn xml_schema_check_derivation_okrestriction2to4(
 unsafe extern "C" fn xml_schema_check_derivation_okrestriction(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     /*
      * TODO: Correct the error code; XML_SCHEMAP_DERIVATION_OK_RESTRICTION_1 is used
      * temporarily only.
@@ -19006,7 +19001,7 @@ unsafe extern "C" fn xml_schema_check_derivation_okrestriction(
              * derived from the base type.
              *
              */
-            let err: c_int = xml_schema_check_cosstderived_ok(
+            let err: i32 = xml_schema_check_cosstderived_ok(
                 ctxt as XmlSchemaAbstractCtxtPtr,
                 (*typ).content_type_def,
                 (*base).content_type_def,
@@ -19116,8 +19111,8 @@ unsafe extern "C" fn xml_schema_check_derivation_okrestriction(
 unsafe extern "C" fn xml_schema_check_ctcomponent(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
-    let mut ret: c_int;
+) -> i32 {
+    let mut ret: i32;
     /*
      * Complex Type Definition Properties Correct
      */
@@ -19136,9 +19131,9 @@ unsafe extern "C" fn xml_schema_check_ctcomponent(
 unsafe extern "C" fn xml_schema_fixup_complex_type(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
-    let mut res: c_int;
-    let olderrs: c_int = (*pctxt).nberrors;
+) -> i32 {
+    let mut res: i32;
+    let olderrs: i32 = (*pctxt).nberrors;
     let base_type: XmlSchemaTypePtr = (*typ).base_type;
 
     if !WXS_IS_TYPE_NOT_FIXED!(typ) {
@@ -19317,7 +19312,7 @@ unsafe extern "C" fn xml_schema_fixup_complex_type(
                     break 'exit_failure;
                 }
             } else {
-                let mut dummy_sequence: c_int = 0;
+                let mut dummy_sequence: i32 = 0;
                 let mut particle: XmlSchemaParticlePtr = (*typ).subtypes as XmlSchemaParticlePtr;
                 /*
                  * Corresponds to <complexType><complexContent>...
@@ -19593,12 +19588,12 @@ unsafe extern "C" fn xml_schema_fixup_complex_type(
  * @ctxt:  the schema parser context
  *
  * Fixes the content model of the type.
- * URGENT TODO: We need an c_int result!
+ * URGENT TODO: We need an i32 result!
  */
 unsafe extern "C" fn xml_schema_type_fixup(
     typ: XmlSchemaTypePtr,
     actxt: XmlSchemaAbstractCtxtPtr,
-) -> c_int {
+) -> i32 {
     if typ.is_null() {
         return 0;
     }
@@ -19624,7 +19619,7 @@ unsafe extern "C" fn xml_schema_type_fixup(
 unsafe extern "C" fn xml_schema_finish_member_type_definitions_property(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     let mut link: XmlSchemaTypeLinkPtr;
     let mut last_link: XmlSchemaTypeLinkPtr;
     let mut prev_link: XmlSchemaTypeLinkPtr;
@@ -19693,7 +19688,7 @@ unsafe extern "C" fn xml_schema_finish_member_type_definitions_property(
 unsafe extern "C" fn xml_schema_check_st_props_correct(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     let base_type: XmlSchemaTypePtr = (*typ).base_type;
     let mut str: *mut XmlChar = null_mut();
 
@@ -19888,7 +19883,7 @@ unsafe extern "C" fn xml_schema_pillegal_facet_list_union_err(
 unsafe extern "C" fn xml_schema_check_cosstrestricts(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     let mut str: *mut XmlChar = null_mut();
 
     if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeSimple {
@@ -19943,7 +19938,7 @@ unsafe extern "C" fn xml_schema_check_cosstrestricts(
          */
         if !(*typ).facets.is_null() {
             let mut facet: XmlSchemaFacetPtr;
-            let mut ok: c_int = 1;
+            let mut ok: i32 = 1;
 
             primitive = xml_schema_get_primitive_type(typ);
             if primitive.is_null() {
@@ -20152,7 +20147,7 @@ unsafe extern "C" fn xml_schema_check_cosstrestricts(
 
             if !(*typ).facets.is_null() {
                 let mut facet: XmlSchemaFacetPtr;
-                let mut ok: c_int = 1;
+                let mut ok: i32 = 1;
                 /*
                  * 2.3.2.4 Only length, minLength, maxLength, whiteSpace, pattern
                  * and enumeration facet components are allowed among the {facets}.
@@ -20368,7 +20363,7 @@ unsafe extern "C" fn xml_schema_check_cosstrestricts(
              */
             if !(*typ).facets.is_null() {
                 let mut facet: XmlSchemaFacetPtr;
-                let mut ok: c_int = 1;
+                let mut ok: i32 = 1;
 
                 facet = (*typ).facets;
                 while {
@@ -20404,7 +20399,7 @@ unsafe extern "C" fn xml_schema_check_cosstrestricts(
     0
 }
 
-unsafe extern "C" fn xml_schema_create_vctxt_on_pctxt(ctxt: XmlSchemaParserCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_create_vctxt_on_pctxt(ctxt: XmlSchemaParserCtxtPtr) -> i32 {
     if (*ctxt).vctxt.is_null() {
         (*ctxt).vctxt = xml_schema_new_valid_ctxt(null_mut());
         if (*ctxt).vctxt.is_null() {
@@ -20437,9 +20432,9 @@ unsafe extern "C" fn xml_schema_create_vctxt_on_pctxt(ctxt: XmlSchemaParserCtxtP
 unsafe extern "C" fn xml_schema_check_facet_values(
     type_decl: XmlSchemaTypePtr,
     pctxt: XmlSchemaParserCtxtPtr,
-) -> c_int {
-    let mut res: c_int;
-    let olderrs: c_int = (*pctxt).nberrors;
+) -> i32 {
+    let mut res: i32;
+    let olderrs: i32 = (*pctxt).nberrors;
     let name: *const XmlChar = (*type_decl).name;
     /*
      * NOTE: It is intended to use the facets list, instead
@@ -20473,7 +20468,7 @@ unsafe extern "C" fn xml_schema_check_facet_values(
     -1
 }
 
-unsafe extern "C" fn xml_schema_type_fixup_whitespace(typ: XmlSchemaTypePtr) -> c_int {
+unsafe extern "C" fn xml_schema_type_fixup_whitespace(typ: XmlSchemaTypePtr) -> i32 {
     /*
      * Evaluate the whitespace-facet value.
      */
@@ -20584,9 +20579,9 @@ unsafe extern "C" fn xml_schema_derive_facet_err(
     pctxt: XmlSchemaParserCtxtPtr,
     facet1: XmlSchemaFacetPtr,
     facet2: XmlSchemaFacetPtr,
-    less_greater: c_int,
-    or_equal: c_int,
-    of_base: c_int,
+    less_greater: i32,
+    or_equal: i32,
+    of_base: i32,
 ) {
     let mut msg: *mut XmlChar;
 
@@ -20636,7 +20631,7 @@ unsafe extern "C" fn xml_schema_derive_facet_err(
 unsafe extern "C" fn xml_schema_derive_and_validate_facets(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     let base: XmlSchemaTypePtr = (*typ).base_type;
     let mut link: XmlSchemaFacetLinkPtr;
     let mut cur: XmlSchemaFacetLinkPtr;
@@ -20661,7 +20656,7 @@ unsafe extern "C" fn xml_schema_derive_and_validate_facets(
     let mut bfmaxinc: XmlSchemaFacetPtr = null_mut();
     let mut bfminexc: XmlSchemaFacetPtr = null_mut();
     let mut bfmaxexc: XmlSchemaFacetPtr = null_mut();
-    let mut res: c_int; /* err = 0, fixedErr; */
+    let mut res: i32; /* err = 0, fixedErr; */
 
     /*
      * SPEC st-restrict-facets 1:
@@ -21254,9 +21249,9 @@ unsafe extern "C" fn xml_schema_derive_and_validate_facets(
 }
 
 unsafe extern "C" fn xml_schema_type_fixup_optim_facets(typ: XmlSchemaTypePtr) {
-    let mut has: c_int;
-    let mut need_val: c_int = 0;
-    let mut norm_val: c_int = 0;
+    let mut has: i32;
+    let mut need_val: i32 = 0;
+    let mut norm_val: i32 = 0;
 
     has = ((*(*typ).base_type).flags & XML_SCHEMAS_TYPE_HAS_FACETS != 0) as i32;
     if has != 0 {
@@ -21315,9 +21310,9 @@ unsafe extern "C" fn xml_schema_type_fixup_optim_facets(typ: XmlSchemaTypePtr) {
 unsafe extern "C" fn xml_schema_fixup_simple_type_stage_two(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
-) -> c_int {
-    let mut res: c_int;
-    let olderrs: c_int = (*pctxt).nberrors;
+) -> i32 {
+    let mut res: i32;
+    let olderrs: i32 = (*pctxt).nberrors;
 
     if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeSimple {
         return -1;
@@ -21443,7 +21438,7 @@ unsafe extern "C" fn xml_schema_fixup_simple_type_stage_two(
 unsafe extern "C" fn xml_schema_check_attr_props_correct(
     pctxt: XmlSchemaParserCtxtPtr,
     attr: XmlSchemaAttributePtr,
-) -> c_int {
+) -> i32 {
     /*
      * SPEC a-props-correct (1)
      * "The values of the properties of an attribute declaration must
@@ -21478,7 +21473,7 @@ unsafe extern "C" fn xml_schema_check_attr_props_correct(
          * TODO: Don't care about the *canonical* stuff here, this requirement
          * will be removed in WXS 1.1 anyway.
          */
-        let ret: c_int = xml_schema_vcheck_cvc_simple_type(
+        let ret: i32 = xml_schema_vcheck_cvc_simple_type(
             pctxt as XmlSchemaAbstractCtxtPtr,
             (*attr).node,
             WXS_ATTR_TYPEDEF!(attr),
@@ -21525,7 +21520,7 @@ unsafe extern "C" fn xml_schema_check_attr_props_correct(
 unsafe extern "C" fn xml_schema_check_attr_use_props_correct(
     ctxt: XmlSchemaParserCtxtPtr,
     using: XmlSchemaAttributeUsePtr,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() || using.is_null() {
         return -1;
     }
@@ -21571,7 +21566,7 @@ unsafe extern "C" fn xml_schema_check_attr_use_props_correct(
             return (*ctxt).err;
         }
 
-        let ret: c_int = xml_schema_vcheck_cvc_simple_type(
+        let ret: i32 = xml_schema_vcheck_cvc_simple_type(
             ctxt as XmlSchemaAbstractCtxtPtr,
             (*using).node,
             WXS_ATTRUSE_TYPEDEF!(using),
@@ -21634,7 +21629,7 @@ unsafe extern "C" fn xml_schema_check_attr_use_props_correct(
 unsafe extern "C" fn xml_schema_check_agprops_correct(
     pctxt: XmlSchemaParserCtxtPtr,
     attr_gr: XmlSchemaAttributeGroupPtr,
-) -> c_int {
+) -> i32 {
     /*
      * SPEC ag-props-correct
      * (1) "The values of the properties of an attribute group definition
@@ -21649,7 +21644,7 @@ unsafe extern "C" fn xml_schema_check_agprops_correct(
         let uses: XmlSchemaItemListPtr = (*attr_gr).attr_uses as XmlSchemaItemListPtr;
         let mut using: XmlSchemaAttributeUsePtr;
         let mut tmp: XmlSchemaAttributeUsePtr;
-        let mut has_id: c_int = 0;
+        let mut has_id: i32 = 0;
 
         'next_use: for i in (0..(*uses).nb_items).rev() {
             using = *(*uses).items.add(i as usize) as _;
@@ -21718,8 +21713,8 @@ unsafe extern "C" fn xml_schema_check_agprops_correct(
     0
 }
 
-unsafe extern "C" fn xml_schema_check_src_redefine_second(pctxt: XmlSchemaParserCtxtPtr) -> c_int {
-    let mut err: c_int;
+unsafe extern "C" fn xml_schema_check_src_redefine_second(pctxt: XmlSchemaParserCtxtPtr) -> i32 {
+    let mut err: i32;
     let mut redef: XmlSchemaRedefPtr = (*WXS_CONSTRUCTOR!(pctxt)).redefs;
     let mut item: XmlSchemaBasicItemPtr;
 
@@ -21823,7 +21818,7 @@ unsafe extern "C" fn xml_schema_check_subst_group_circular(
 unsafe extern "C" fn xml_schema_are_equal_types(
     type_a: XmlSchemaTypePtr,
     type_b: XmlSchemaTypePtr,
-) -> c_int {
+) -> i32 {
     /*
      * TODO: This should implement component-identity
      * in the future.
@@ -21853,9 +21848,9 @@ unsafe extern "C" fn xml_schema_check_cos_ct_derived_ok(
     actxt: XmlSchemaAbstractCtxtPtr,
     typ: XmlSchemaTypePtr,
     base_type: XmlSchemaTypePtr,
-    set: c_int,
-) -> c_int {
-    let equal: c_int = xml_schema_are_equal_types(typ, base_type);
+    set: i32,
+) -> i32 {
+    let equal: i32 = xml_schema_are_equal_types(typ, base_type);
     /* TODO: Error codes. */
     /*
      * SPEC "For a complex type definition (call it D, for derived)
@@ -21926,8 +21921,8 @@ unsafe extern "C" fn xml_schema_check_cos_derived_ok(
     actxt: XmlSchemaAbstractCtxtPtr,
     typ: XmlSchemaTypePtr,
     base_type: XmlSchemaTypePtr,
-    set: c_int,
-) -> c_int {
+    set: i32,
+) -> i32 {
     if WXS_IS_SIMPLE!(typ) {
         xml_schema_check_cosstderived_ok(actxt, typ, base_type, set)
     } else {
@@ -21957,8 +21952,8 @@ unsafe extern "C" fn xml_schema_parse_check_cos_valid_default(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-) -> c_int {
-    let mut ret: c_int = 0;
+) -> i32 {
+    let mut ret: i32 = 0;
 
     /*
      * cos-valid-default:
@@ -22045,8 +22040,8 @@ unsafe extern "C" fn xml_schema_parse_check_cos_valid_default(
 unsafe extern "C" fn xml_schema_check_elem_props_correct(
     pctxt: XmlSchemaParserCtxtPtr,
     elem_decl: XmlSchemaElementPtr,
-) -> c_int {
-    let mut ret: c_int = 0;
+) -> i32 {
+    let mut ret: i32 = 0;
     let type_def: XmlSchemaTypePtr = WXS_ELEM_TYPEDEF!(elem_decl);
     /*
      * SPEC (1) "The values of the properties of an element declaration
@@ -22113,7 +22108,7 @@ unsafe extern "C" fn xml_schema_check_elem_props_correct(
          */
 
         if type_def != WXS_ELEM_TYPEDEF!(WXS_SUBST_HEAD!(elem_decl)) {
-            let mut set: c_int = 0;
+            let mut set: i32 = 0;
 
             if (*head).flags & XML_SCHEMAS_ELEM_FINAL_EXTENSION != 0 {
                 set |= SUBSET_EXTENSION;
@@ -22183,7 +22178,7 @@ unsafe extern "C" fn xml_schema_check_elem_props_correct(
                 node = xml_has_prop((*elem_decl).node, c"default".as_ptr() as _) as XmlNodePtr;
             }
         }
-        let vcret: c_int = xml_schema_parse_check_cos_valid_default(
+        let vcret: i32 = xml_schema_parse_check_cos_valid_default(
             pctxt,
             node,
             type_def,
@@ -22284,7 +22279,7 @@ unsafe extern "C" fn xml_schema_add_element_substitution_member(
     pctxt: XmlSchemaParserCtxtPtr,
     head: XmlSchemaElementPtr,
     member: XmlSchemaElementPtr,
-) -> c_int {
+) -> i32 {
     let mut subst_group: XmlSchemaSubstGroupPtr;
 
     if pctxt.is_null() || head.is_null() || member.is_null() {
@@ -22335,8 +22330,8 @@ unsafe extern "C" fn xml_schema_check_elem_subst_group(
         let mut head: XmlSchemaElementPtr;
         let mut head_type: XmlSchemaTypePtr;
         let mut typ: XmlSchemaTypePtr;
-        let mut set: c_int;
-        let mut meth_set: c_int;
+        let mut set: i32;
+        let mut meth_set: i32;
         /*
          * SPEC (2) "It is validly substitutable for HEAD subject to HEAD's
          * {disallowed substitutions} as the blocking constraint, as defined in
@@ -22478,12 +22473,12 @@ unsafe extern "C" fn xml_schema_check_element_decl_component(
 unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
     pctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
-    mut counter: c_int,
+    mut counter: i32,
     mut end: XmlAutomataStatePtr,
-) -> c_int {
+) -> i32 {
     let mut tmp: XmlAutomataStatePtr;
     let mut member: XmlSchemaElementPtr;
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
     let elem_decl: XmlSchemaElementPtr = (*particle).children as XmlSchemaElementPtr;
 
     /*
@@ -22573,12 +22568,12 @@ unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
             xml_automata_new_epsilon((*pctxt).am, tmp, end);
         }
     } else {
-        let max_occurs: c_int = if (*particle).max_occurs == UNBOUNDED as i32 {
+        let max_occurs: i32 = if (*particle).max_occurs == UNBOUNDED as i32 {
             UNBOUNDED as i32
         } else {
             (*particle).max_occurs - 1
         };
-        let min_occurs: c_int = if (*particle).min_occurs < 1 {
+        let min_occurs: i32 = if (*particle).min_occurs < 1 {
             0
         } else {
             (*particle).min_occurs - 1
@@ -22636,8 +22631,8 @@ unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
 unsafe extern "C" fn xml_schema_build_content_model_for_element(
     ctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
-) -> c_int {
-    let mut ret: c_int = 0;
+) -> i32 {
+    let mut ret: i32 = 0;
 
     if (*((*particle).children as XmlSchemaElementPtr)).flags & XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD
         != 0
@@ -22683,19 +22678,19 @@ unsafe extern "C" fn xml_schema_build_content_model_for_element(
                 elem_decl as _,
             );
         } else {
-            let max_occurs: c_int = if (*particle).max_occurs == UNBOUNDED as i32 {
+            let max_occurs: i32 = if (*particle).max_occurs == UNBOUNDED as i32 {
                 UNBOUNDED as i32
             } else {
                 (*particle).max_occurs - 1
             };
-            let min_occurs: c_int = if (*particle).min_occurs < 1 {
+            let min_occurs: i32 = if (*particle).min_occurs < 1 {
                 0
             } else {
                 (*particle).min_occurs - 1
             };
 
             start = xml_automata_new_epsilon((*ctxt).am, (*ctxt).state, null_mut());
-            let counter: c_int = xml_automata_new_counter((*ctxt).am, min_occurs, max_occurs);
+            let counter: i32 = xml_automata_new_counter((*ctxt).am, min_occurs, max_occurs);
             (*ctxt).state = xml_automata_new_transition2(
                 (*ctxt).am,
                 start,
@@ -22729,9 +22724,9 @@ unsafe extern "C" fn xml_schema_build_content_model_for_element(
 unsafe extern "C" fn xml_schema_build_acontent_model(
     pctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
-) -> c_int {
-    let mut ret: c_int = 0;
-    let mut tmp2: c_int;
+) -> i32 {
+    let mut ret: i32 = 0;
+    let mut tmp2: i32;
 
     if particle.is_null() {
         PERROR_INT!(
@@ -22811,18 +22806,18 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                     );
                 }
             } else {
-                let max_occurs: c_int = if (*particle).max_occurs == UNBOUNDED as i32 {
+                let max_occurs: i32 = if (*particle).max_occurs == UNBOUNDED as i32 {
                     UNBOUNDED as i32
                 } else {
                     (*particle).max_occurs - 1
                 };
-                let min_occurs: c_int = if (*particle).min_occurs < 1 {
+                let min_occurs: i32 = if (*particle).min_occurs < 1 {
                     0
                 } else {
                     (*particle).min_occurs - 1
                 };
 
-                let counter: c_int = xml_automata_new_counter((*pctxt).am, min_occurs, max_occurs);
+                let counter: i32 = xml_automata_new_counter((*pctxt).am, min_occurs, max_occurs);
                 let hop: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
                 if (*wild).any == 1 {
                     (*pctxt).state = xml_automata_new_transition2(
@@ -22907,7 +22902,7 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                             xml_automata_new_epsilon((*pctxt).am, oldstate, null_mut());
                         oldstate = (*pctxt).state;
 
-                        let counter: c_int = xml_automata_new_counter(
+                        let counter: i32 = xml_automata_new_counter(
                             (*pctxt).am,
                             (*particle).min_occurs - 1,
                             UNBOUNDED as _,
@@ -22960,7 +22955,7 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                     (*pctxt).state = xml_automata_new_epsilon((*pctxt).am, oldstate, null_mut());
                     oldstate = (*pctxt).state;
 
-                    let counter: c_int = xml_automata_new_counter(
+                    let counter: i32 = xml_automata_new_counter(
                         (*pctxt).am,
                         (*particle).min_occurs - 1,
                         (*particle).max_occurs - 1,
@@ -23030,12 +23025,12 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                     sub = (*sub).next;
                 }
             } else {
-                let max_occurs: c_int = if (*particle).max_occurs == UNBOUNDED as i32 {
+                let max_occurs: i32 = if (*particle).max_occurs == UNBOUNDED as i32 {
                     UNBOUNDED as i32
                 } else {
                     (*particle).max_occurs - 1
                 };
-                let min_occurs: c_int = if (*particle).min_occurs < 1 {
+                let min_occurs: i32 = if (*particle).min_occurs < 1 {
                     0
                 } else {
                     (*particle).min_occurs - 1
@@ -23045,7 +23040,7 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                  * use a counter to keep track of the number of transitions
                  * which went through the choice.
                  */
-                let counter: c_int = xml_automata_new_counter((*pctxt).am, min_occurs, max_occurs);
+                let counter: i32 = xml_automata_new_counter((*pctxt).am, min_occurs, max_occurs);
                 let hop: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
                 let base: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
 
@@ -23114,7 +23109,7 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                          * the same counter for all the element transitions
                          * derived from the group
                          */
-                        let counter: c_int = xml_automata_new_counter(
+                        let counter: i32 = xml_automata_new_counter(
                             (*pctxt).am,
                             (*sub).min_occurs,
                             (*sub).max_occurs,
@@ -23259,12 +23254,12 @@ macro_rules! FIXHFAILURE {
 unsafe extern "C" fn xml_schema_fixup_components(
     pctxt: XmlSchemaParserCtxtPtr,
     root_bucket: XmlSchemaBucketPtr,
-) -> c_int {
+) -> i32 {
     let con: XmlSchemaConstructionCtxtPtr = (*pctxt).constructor;
     let mut item: XmlSchemaTreeItemPtr;
     let mut items: *mut XmlSchemaTreeItemPtr;
-    let mut nb_items: c_int;
-    let mut ret: c_int = 0;
+    let mut nb_items: i32;
+    let mut ret: i32 = 0;
     let oldbucket: XmlSchemaBucketPtr = (*con).bucket;
     let mut elem_decl: XmlSchemaElementPtr;
 
@@ -23728,7 +23723,7 @@ unsafe extern "C" fn xml_schema_fixup_components(
 pub unsafe extern "C" fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
     let mut main_schema: XmlSchemaPtr;
     let mut bucket: XmlSchemaBucketPtr = null_mut();
-    let res: c_int;
+    let res: i32;
 
     /*
      * This one is used if the schema to be parsed was specified via
@@ -24024,7 +24019,7 @@ unsafe extern "C" fn xml_schema_annot_dump(output: *mut FILE, annot: XmlSchemaAn
 unsafe extern "C" fn xml_schema_content_model_dump(
     particle: XmlSchemaParticlePtr,
     output: *mut FILE,
-    depth: c_int,
+    depth: i32,
 ) {
     let mut str: *mut XmlChar = null_mut();
     let mut shift: [u8; 100] = [0; 100];
@@ -24426,7 +24421,7 @@ pub unsafe extern "C" fn xml_schema_get_valid_errors(
     err: *mut Option<GenericError>,
     warn: *mut Option<GenericError>,
     ctx: *mut Option<GenericErrorContext>,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -24454,8 +24449,8 @@ pub unsafe extern "C" fn xml_schema_get_valid_errors(
  */
 pub unsafe extern "C" fn xml_schema_set_valid_options(
     ctxt: XmlSchemaValidCtxtPtr,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -24465,7 +24460,7 @@ pub unsafe extern "C" fn xml_schema_set_valid_options(
      * TODO: Is there an other, more easy to maintain,
      * way?
      */
-    for i in 1..c_int::BITS as usize {
+    for i in 1..i32::BITS as usize {
         if options & (1 << i) != 0 {
             return -1;
         }
@@ -24507,7 +24502,7 @@ pub unsafe extern "C" fn xml_schema_validate_set_filename(
  *
  * Returns the option combination or -1 on error.
  */
-pub unsafe extern "C" fn xml_schema_valid_ctxt_get_options(ctxt: XmlSchemaValidCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_schema_valid_ctxt_get_options(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
     if ctxt.is_null() {
         -1
     } else {
@@ -24955,7 +24950,7 @@ extern "C" fn xml_schema_augment_imported_idc(
     }
 }
 
-unsafe extern "C" fn xml_schema_create_pctxt_on_vctxt(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_create_pctxt_on_vctxt(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     if (*vctxt).pctxt.is_null() {
         if !(*vctxt).schema.is_null() {
             (*vctxt).pctxt =
@@ -24987,7 +24982,7 @@ unsafe extern "C" fn xml_schema_create_pctxt_on_vctxt(vctxt: XmlSchemaValidCtxtP
     0
 }
 
-unsafe extern "C" fn xml_schema_pre_run(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_pre_run(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     /*
      * Some initialization.
      */
@@ -25090,7 +25085,7 @@ unsafe extern "C" fn xml_schema_get_fresh_elem_info(
         );
         (*vctxt).size_elem_infos = 10;
     } else if (*vctxt).size_elem_infos <= (*vctxt).depth {
-        let i: c_int = (*vctxt).size_elem_infos;
+        let i: i32 = (*vctxt).size_elem_infos;
 
         (*vctxt).size_elem_infos *= 2;
         (*vctxt).elem_infos = xml_realloc(
@@ -25142,7 +25137,7 @@ unsafe extern "C" fn xml_schema_get_fresh_elem_info(
     info
 }
 
-unsafe extern "C" fn xml_schema_validator_push_elem(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_validator_push_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     (*vctxt).inode = xml_schema_get_fresh_elem_info(vctxt);
     if (*vctxt).inode.is_null() {
         VERROR_INT!(
@@ -25226,13 +25221,13 @@ unsafe extern "C" fn xml_schema_get_fresh_attr_info(
 unsafe extern "C" fn xml_schema_validator_push_attribute(
     vctxt: XmlSchemaValidCtxtPtr,
     attr_node: XmlNodePtr,
-    node_line: c_int,
+    node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
-    owned_names: c_int,
+    owned_names: i32,
     value: *mut XmlChar,
-    owned_value: c_int,
-) -> c_int {
+    owned_value: i32,
+) -> i32 {
     let attr: XmlSchemaAttrInfoPtr = xml_schema_get_fresh_attr_info(vctxt);
     if attr.is_null() {
         VERROR_INT!(
@@ -25286,7 +25281,7 @@ unsafe extern "C" fn xml_schema_validator_push_attribute(
 
 unsafe extern "C" fn xml_schema_get_meta_attr_info(
     vctxt: XmlSchemaValidCtxtPtr,
-    meta_type: c_int,
+    meta_type: i32,
 ) -> XmlSchemaAttrInfoPtr {
     if (*vctxt).nb_attr_infos == 0 {
         return null_mut();
@@ -25324,8 +25319,8 @@ unsafe extern "C" fn xml_schema_assemble_by_location(
     node: XmlNodePtr,
     ns_name: *const XmlChar,
     mut location: *const XmlChar,
-) -> c_int {
-    let mut ret: c_int;
+) -> i32 {
+    let mut ret: i32;
 
     let mut bucket: XmlSchemaBucketPtr = null_mut();
 
@@ -25463,12 +25458,12 @@ unsafe extern "C" fn xml_schema_assemble_by_location(
  * Returns 0 if the new schema is correct, a positive error code
  * number otherwise and -1 in case of an internal or API error.
  */
-unsafe extern "C" fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut cur: *const XmlChar;
     let mut end: *const XmlChar;
     let mut nsname: *const XmlChar = null();
     let mut location: *const XmlChar;
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
     let mut iattr: XmlSchemaAttrInfoPtr;
 
     /*
@@ -25561,14 +25556,14 @@ unsafe extern "C" fn xml_schema_vexpand_qname(
     value: *const XmlChar,
     ns_name: *mut *const XmlChar,
     local_name: *mut *const XmlChar,
-) -> c_int {
+) -> i32 {
     if ns_name.is_null() || local_name.is_null() {
         return -1;
     }
     *ns_name = null_mut();
     *local_name = null_mut();
 
-    let ret: c_int = xml_validate_qname(value, 1);
+    let ret: i32 = xml_validate_qname(value, 1);
     if ret == -1 {
         return -1;
     }
@@ -25629,8 +25624,8 @@ unsafe extern "C" fn xml_schema_process_xsi_type(
     iattr: XmlSchemaAttrInfoPtr,
     local_type: *mut XmlSchemaTypePtr,
     elem_decl: XmlSchemaElementPtr,
-) -> c_int {
-    let mut ret: c_int;
+) -> i32 {
+    let mut ret: i32;
     /*
      * cvc-elt (3.3.4) : (4)
      * AND
@@ -25694,7 +25689,7 @@ unsafe extern "C" fn xml_schema_process_xsi_type(
             return ret;
         }
         if !elem_decl.is_null() {
-            let mut set: c_int = 0;
+            let mut set: i32 = 0;
 
             /*
              * SPEC cvc-elt (3.3.4) : (4.3) (Type Derivation OK)
@@ -25780,8 +25775,8 @@ unsafe extern "C" fn xml_schema_complex_type_err(
     node: XmlNodePtr,
     _typ: XmlSchemaTypePtr,
     message: *const c_char,
-    nbval: c_int,
-    nbneg: c_int,
+    nbval: i32,
+    nbneg: i32,
     values: *mut *mut XmlChar,
 ) {
     let mut str: *mut XmlChar;
@@ -25890,8 +25885,8 @@ unsafe extern "C" fn xml_schema_complex_type_err(
 * 3.4.4 Complex Type Definition Validation Rules
 * Validation Rule: Element Locally Valid (Complex Type) (cvc-complex-type)
 */
-unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
+    let mut ret: i32 = 0;
 
     if (*vctxt).depth <= 0 {
         VERROR_INT!(
@@ -26007,9 +26002,9 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
             | XmlSchemaContentType::XmlSchemaContentElements => {
                 let mut regex_ctxt: XmlRegExecCtxtPtr;
                 let mut values: [*mut XmlChar; 10] = [null_mut(); 10];
-                let mut terminal: c_int = 0;
-                let mut nbval: c_int = 10;
-                let mut nbneg: c_int = 0;
+                let mut terminal: i32 = 0;
+                let mut nbval: i32 = 10;
+                let mut nbneg: i32 = 0;
 
                 /* VAL TODO: Optimized "anyType" validation.*/
 
@@ -26149,8 +26144,8 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
 
 unsafe extern "C" fn xml_schema_validate_elem_wildcard(
     vctxt: XmlSchemaValidCtxtPtr,
-    skip: *mut c_int,
-) -> c_int {
+    skip: *mut i32,
+) -> i32 {
     let wild: XmlSchemaWildcardPtr = (*(*vctxt).inode).decl as XmlSchemaWildcardPtr;
     /*
      * The namespace of the element was already identified to be
@@ -26254,8 +26249,8 @@ unsafe extern "C" fn xml_schema_idc_add_state_object(
     vctxt: XmlSchemaValidCtxtPtr,
     matcher: XmlSchemaIDCMatcherPtr,
     sel: XmlSchemaIdcselectPtr,
-    typ: c_int,
-) -> c_int {
+    typ: i32,
+) -> i32 {
     let sto: XmlSchemaIDCStateObjPtr;
 
     /*
@@ -26330,7 +26325,7 @@ unsafe extern "C" fn xml_schema_idc_add_state_object(
 unsafe extern "C" fn xml_schema_idc_register_matchers(
     vctxt: XmlSchemaValidCtxtPtr,
     elem_decl: XmlSchemaElementPtr,
-) -> c_int {
+) -> i32 {
     let mut matcher: XmlSchemaIDCMatcherPtr;
     let mut last: XmlSchemaIDCMatcherPtr = null_mut();
     let mut idc: XmlSchemaIDCPtr;
@@ -26458,7 +26453,7 @@ unsafe extern "C" fn xml_schema_idc_register_matchers(
     0
 }
 
-unsafe extern "C" fn xml_schema_validate_elem_decl(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_validate_elem_decl(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let elem_decl: XmlSchemaElementPtr = (*(*vctxt).inode).decl;
     let mut actual_type: XmlSchemaTypePtr;
 
@@ -26497,7 +26492,7 @@ unsafe extern "C" fn xml_schema_validate_elem_decl(vctxt: XmlSchemaValidCtxtPtr)
         return XmlParserErrors::XmlSchemavCvcType1 as i32;
     }
     if (*vctxt).nb_attr_infos != 0 {
-        let mut ret: c_int;
+        let mut ret: i32;
         let mut iattr: XmlSchemaAttrInfoPtr;
         /*
          * cvc-elt (3.3.4) : 3
@@ -26620,12 +26615,12 @@ unsafe extern "C" fn xml_schema_validate_elem_decl(vctxt: XmlSchemaValidCtxtPtr)
 unsafe extern "C" fn xml_schema_xpath_evaluate(
     vctxt: XmlSchemaValidCtxtPtr,
     node_type: XmlElementType,
-) -> c_int {
+) -> i32 {
     let mut sto: XmlSchemaIDCStateObjPtr;
     let mut head: XmlSchemaIDCStateObjPtr = null_mut();
-    let mut res: c_int;
-    let mut resolved: c_int = 0;
-    let mut depth: c_int = (*vctxt).depth;
+    let mut res: i32;
+    let mut resolved: i32 = 0;
+    let mut depth: i32 = (*vctxt).depth;
 
     if (*vctxt).xpath_states.is_null() {
         return 0;
@@ -26672,7 +26667,7 @@ unsafe extern "C" fn xml_schema_xpath_evaluate(
              * Register a match in the state object history.
              */
             if (*sto).history.is_null() {
-                (*sto).history = xml_malloc(5 * size_of::<c_int>()) as *mut c_int;
+                (*sto).history = xml_malloc(5 * size_of::<i32>()) as *mut i32;
                 if (*sto).history.is_null() {
                     xml_schema_verr_memory(
                         null_mut(),
@@ -26686,8 +26681,8 @@ unsafe extern "C" fn xml_schema_xpath_evaluate(
                 (*sto).size_history *= 2;
                 (*sto).history = xml_realloc(
                     (*sto).history as _,
-                    (*sto).size_history as usize * size_of::<c_int>(),
-                ) as *mut c_int;
+                    (*sto).size_history as usize * size_of::<i32>(),
+                ) as *mut i32;
                 if (*sto).history.is_null() {
                     xml_schema_verr_memory(
                         null_mut(),
@@ -26767,7 +26762,7 @@ unsafe extern "C" fn xml_schema_get_idc_designation(
 unsafe extern "C" fn xml_schema_idc_store_key(
     vctxt: XmlSchemaValidCtxtPtr,
     key: XmlSchemaPSVIIDCKeyPtr,
-) -> c_int {
+) -> i32 {
     /*
      * Add to global list.
      */
@@ -26817,7 +26812,7 @@ unsafe extern "C" fn xml_schema_idc_acquire_target_list(
 unsafe extern "C" fn xml_schema_get_canon_value_hash(
     val: XmlSchemaValPtr,
     ret_value: *mut *mut XmlChar,
-) -> c_int {
+) -> i32 {
     xml_schema_get_canon_value_whtsp_ext_1(
         val,
         XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse,
@@ -26830,10 +26825,10 @@ unsafe extern "C" fn xml_schema_format_idc_key_sequence_1(
     vctxt: XmlSchemaValidCtxtPtr,
     buf: *mut *mut XmlChar,
     seq: *mut XmlSchemaPSVIIDCKeyPtr,
-    count: c_int,
-    for_hash: c_int,
+    count: i32,
+    for_hash: i32,
 ) -> *const XmlChar {
-    let mut res: c_int;
+    let mut res: i32;
     let mut value: *mut XmlChar = null_mut();
 
     *buf = xml_strdup(c"[".as_ptr() as _);
@@ -26878,7 +26873,7 @@ unsafe extern "C" fn xml_schema_hash_key_sequence(
     vctxt: XmlSchemaValidCtxtPtr,
     buf: *mut *mut XmlChar,
     seq: *mut XmlSchemaPSVIIDCKeyPtr,
-    count: c_int,
+    count: i32,
 ) -> *const XmlChar {
     xml_schema_format_idc_key_sequence_1(vctxt, buf, seq, count, 1)
 }
@@ -26887,7 +26882,7 @@ unsafe extern "C" fn xml_schema_format_idc_key_sequence(
     vctxt: XmlSchemaValidCtxtPtr,
     buf: *mut *mut XmlChar,
     seq: *mut XmlSchemaPSVIIDCKeyPtr,
-    count: c_int,
+    count: i32,
 ) -> *const XmlChar {
     xml_schema_format_idc_key_sequence_1(vctxt, buf, seq, count, 0)
 }
@@ -26906,7 +26901,7 @@ unsafe extern "C" fn xml_schema_format_idc_key_sequence(
 unsafe extern "C" fn xml_schema_idc_store_node_table_item(
     vctxt: XmlSchemaValidCtxtPtr,
     item: XmlSchemaPSVIIDCNodePtr,
-) -> c_int {
+) -> i32 {
     /*
      * Add to global list.
      */
@@ -26947,7 +26942,7 @@ unsafe extern "C" fn xml_schema_vadd_node_qname(
     vctxt: XmlSchemaValidCtxtPtr,
     mut lname: *const XmlChar,
     mut nsname: *const XmlChar,
-) -> c_int {
+) -> i32 {
     lname = xml_dict_lookup((*vctxt).dict, lname, -1);
     if lname.is_null() {
         return -1;
@@ -26967,7 +26962,7 @@ unsafe extern "C" fn xml_schema_vadd_node_qname(
         }
     }
     /* Add new entry. */
-    let i: c_int = (*(*vctxt).node_qnames).nb_items;
+    let i: i32 = (*(*vctxt).node_qnames).nb_items;
     xml_schema_item_list_add((*vctxt).node_qnames, lname as _);
     xml_schema_item_list_add((*vctxt).node_qnames, nsname as _);
     i
@@ -26986,12 +26981,12 @@ unsafe extern "C" fn xml_schema_vadd_node_qname(
  */
 unsafe extern "C" fn xml_schema_xpath_process_history(
     vctxt: XmlSchemaValidCtxtPtr,
-    depth: c_int,
-) -> c_int {
+    depth: i32,
+) -> i32 {
     let mut sto: XmlSchemaIDCStateObjPtr;
     let mut nextsto: XmlSchemaIDCStateObjPtr;
-    let mut res: c_int;
-    let mut match_depth: c_int;
+    let mut res: i32;
+    let mut match_depth: i32;
     let mut key: XmlSchemaPSVIIDCKeyPtr = null_mut();
     let typ: XmlSchemaTypePtr = (*(*vctxt).inode).type_def;
     let mut simple_type: XmlSchemaTypePtr;
@@ -27092,8 +27087,8 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                      * An entry will be NULLed in selector_leave, i.e. when
                      * we hit the target's
                      */
-                    let pos: c_int = (*sto).depth - (*matcher).depth;
-                    let idx: c_int = (*(*sto).sel).index;
+                    let pos: i32 = (*sto).depth - (*matcher).depth;
+                    let idx: i32 = (*(*sto).sel).index;
 
                     /*
                      * Create/grow the array of key-sequences.
@@ -27124,7 +27119,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                                 * size_of::<*mut XmlSchemaPSVIIDCKeyPtr>(),
                         );
                     } else if pos >= (*matcher).size_key_seqs {
-                        let i: c_int = (*matcher).size_key_seqs;
+                        let i: i32 = (*matcher).size_key_seqs;
 
                         (*matcher).size_key_seqs = pos * 2;
                         (*matcher).key_seqs = xml_realloc(
@@ -27254,8 +27249,8 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                  */
                 let matcher: XmlSchemaIDCMatcherPtr = (*sto).matcher;
                 let idc: XmlSchemaIDCPtr = (*(*matcher).aidc).def;
-                let nb_keys: c_int = (*idc).nb_fields;
-                let pos: c_int = depth - (*matcher).depth;
+                let nb_keys: i32 = (*idc).nb_fields;
+                let pos: i32 = depth - (*matcher).depth;
                 /*
                  * Check if the matcher has any key-sequences at all, plus
                  * if it has a key-sequence for the current target node.
@@ -27557,9 +27552,9 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
  *
  * Returns 0 on success and -1 on internal errors.
  */
-unsafe extern "C" fn xml_schema_xpath_pop(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_xpath_pop(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut sto: XmlSchemaIDCStateObjPtr;
-    let mut res: c_int;
+    let mut res: i32;
 
     if (*vctxt).xpath_states.is_null() {
         return 0;
@@ -27630,17 +27625,17 @@ unsafe extern "C" fn xml_schema_illegal_attr_err(
 * Only "assessed" attribute information items will be visible to
 * IDCs. I.e. not "lax" (without declaration) and "skip" wild attributes.
 */
-unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let typ: XmlSchemaTypePtr = (*(*vctxt).inode).type_def;
     let mut attr_use: XmlSchemaAttributeUsePtr;
     let mut attr_decl: XmlSchemaAttributePtr;
     let mut iattr: XmlSchemaAttrInfoPtr;
     let mut tmpiattr: XmlSchemaAttrInfoPtr;
-    let mut found: c_int;
-    let mut xpath_res: c_int;
-    let mut res: c_int;
+    let mut found: i32;
+    let mut xpath_res: i32;
+    let mut res: i32;
     let mut wild_ids = 0;
-    let mut fixed: c_int;
+    let mut fixed: i32;
     let mut def_attr_owner_elem: XmlNodePtr = null_mut();
 
     /*
@@ -27666,7 +27661,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
     /*
      * @nbAttrs is the number of attributes present in the instance.
      */
-    let nb_attrs: c_int = (*vctxt).nb_attr_infos;
+    let nb_attrs: i32 = (*vctxt).nb_attr_infos;
     let nb_uses = if !attr_use_list.is_null() {
         (*attr_use_list).nb_items
     } else {
@@ -28038,7 +28033,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                             );
                             if ns.is_null() {
                                 let mut prefix: [XmlChar; 12] = [0; 12];
-                                let mut counter: c_int = 0;
+                                let mut counter: i32 = 0;
 
                                 /*
                                  * Create a namespace declaration on the validation
@@ -28333,9 +28328,9 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
     -1
 }
 
-unsafe extern "C" fn xml_schema_vattributes_simple(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_vattributes_simple(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut iattr: XmlSchemaAttrInfoPtr;
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
 
     /*
      * SPEC cvc-type (3.1.1)
@@ -28364,8 +28359,8 @@ unsafe extern "C" fn xml_schema_vattributes_simple(vctxt: XmlSchemaValidCtxtPtr)
     ret
 }
 
-unsafe extern "C" fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
+    let mut ret: i32 = 0;
 
     if (*vctxt).skip_depth != -1 && (*vctxt).depth >= (*vctxt).skip_depth {
         VERROR_INT!(
@@ -28465,7 +28460,7 @@ unsafe extern "C" fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> c
                 break 'type_validation;
             }
             if (*(*(*vctxt).inode).decl).typ == XmlSchemaTypeType::XmlSchemaTypeAny {
-                let mut skip: c_int = 0;
+                let mut skip: i32 = 0;
                 /*
                  * Wildcards.
                  */
@@ -28608,12 +28603,12 @@ const XML_SCHEMA_PUSH_TEXT_VOLATILE: i32 = 3;
 
 unsafe extern "C" fn xml_schema_vpush_text(
     vctxt: XmlSchemaValidCtxtPtr,
-    node_type: c_int,
+    node_type: i32,
     value: *const XmlChar,
-    mut len: c_int,
-    mode: c_int,
-    consumed: *mut c_int,
-) -> c_int {
+    mut len: i32,
+    mode: i32,
+    consumed: *mut i32,
+) -> i32 {
     /*
      * Unfortunately we have to duplicate the text sometimes.
      * OPTIMIZE: Maybe we could skip it, if:
@@ -28748,7 +28743,7 @@ unsafe extern "C" fn xml_schema_vcheck_inode_data_type(
     inode: XmlSchemaNodeInfoPtr,
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
-) -> c_int {
+) -> i32 {
     if (*inode).flags & XML_SCHEMA_NODE_INFO_VALUE_NEEDED != 0 {
         xml_schema_vcheck_cvc_simple_type(
             vctxt as XmlSchemaAbstractCtxtPtr,
@@ -28784,8 +28779,8 @@ unsafe extern "C" fn xml_schema_check_cos_valid_default(
     vctxt: XmlSchemaValidCtxtPtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-) -> c_int {
-    let mut ret: c_int = 0;
+) -> i32 {
+    let mut ret: i32 = 0;
     let inode: XmlSchemaNodeInfoPtr = (*vctxt).inode;
 
     /*
@@ -28940,7 +28935,7 @@ unsafe extern "C" fn xml_schema_idc_acquire_binding(
 unsafe extern "C" fn xml_schema_idc_append_node_table_item(
     bind: XmlSchemaPSVIIDCBindingPtr,
     nt_item: XmlSchemaPSVIIDCNodePtr,
-) -> c_int {
+) -> i32 {
     if (*bind).node_table.is_null() {
         (*bind).size_nodes = 10;
         (*bind).node_table =
@@ -28976,13 +28971,13 @@ unsafe extern "C" fn xml_schema_idc_append_node_table_item(
 unsafe extern "C" fn xml_schema_idc_fill_node_tables(
     vctxt: XmlSchemaValidCtxtPtr,
     ielem: XmlSchemaNodeInfoPtr,
-) -> c_int {
+) -> i32 {
     let mut bind: XmlSchemaPSVIIDCBindingPtr;
-    let mut res: c_int;
-    let mut nb_targets: c_int;
-    let mut nb_fields: c_int;
-    let mut nb_dupls: c_int;
-    let mut nb_node_table: c_int;
+    let mut res: i32;
+    let mut nb_targets: i32;
+    let mut nb_fields: i32;
+    let mut nb_dupls: i32;
+    let mut nb_node_table: i32;
     let mut keys: *mut XmlSchemaPSVIIDCKeyPtr;
     let mut ntkeys: *mut XmlSchemaPSVIIDCKeyPtr;
     let mut targets: *mut XmlSchemaPSVIIDCNodePtr;
@@ -29248,7 +29243,7 @@ unsafe extern "C" fn xml_schema_keyref_err(
  *
  * Check the cvc-idc-keyref constraints.
  */
-unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut matcher: XmlSchemaIDCMatcherPtr;
     let mut bind: XmlSchemaPSVIIDCBindingPtr;
 
@@ -29261,13 +29256,13 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
             && !(*matcher).targets.is_null()
             && (*(*matcher).targets).nb_items != 0
         {
-            let mut res: c_int;
+            let mut res: i32;
             let mut ref_keys: *mut XmlSchemaPSVIIDCKeyPtr;
             let mut keys: *mut XmlSchemaPSVIIDCKeyPtr;
             let mut ref_node: XmlSchemaPSVIIDCNodePtr;
             let mut table: XmlHashTablePtr = null_mut();
 
-            let nb_fields: c_int = (*(*(*matcher).aidc).def).nb_fields;
+            let nb_fields: i32 = (*(*(*matcher).aidc).def).nb_fields;
 
             /*
              * Find the IDC node-table for the referenced IDC key/unique.
@@ -29279,7 +29274,7 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
                 }
                 bind = (*bind).next;
             }
-            let has_dupls: c_int = (!bind.is_null()
+            let has_dupls: i32 = (!bind.is_null()
                 && !(*bind).dupls.is_null()
                 && (*(*bind).dupls).nb_items != 0) as i32;
             /*
@@ -29433,7 +29428,7 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
  *
  * Returns 0 if OK and -1 on internal errors.
  */
-unsafe extern "C" fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut bind: XmlSchemaPSVIIDCBindingPtr; /* IDC bindings of the current node. */
     let mut par_bind: XmlSchemaPSVIIDCBindingPtr = null_mut(); /* parent IDC bindings. */
     let mut node: XmlSchemaPSVIIDCNodePtr;
@@ -29441,11 +29436,11 @@ unsafe extern "C" fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxt
     let mut dupls: *mut XmlSchemaPSVIIDCNodePtr;
     let mut par_nodes: *mut XmlSchemaPSVIIDCNodePtr; /* node-table entries. */
     let mut aidc: XmlSchemaIDCAugPtr;
-    let mut j: c_int;
-    let mut ret: c_int = 0;
-    let mut nb_fields: c_int;
-    let mut old_num: c_int;
-    let mut old_dupls: c_int;
+    let mut j: i32;
+    let mut ret: i32 = 0;
+    let mut nb_fields: i32;
+    let mut old_num: i32;
+    let mut old_dupls: i32;
 
     bind = (*(*vctxt).inode).idc_table;
     if bind.is_null() {
@@ -29777,8 +29772,8 @@ unsafe extern "C" fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxt
 /*
 * Process END of element.
 */
-unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
+    let mut ret: i32 = 0;
     let inode: XmlSchemaNodeInfoPtr = (*vctxt).inode;
 
     if (*vctxt).nb_attr_infos != 0 {
@@ -29827,9 +29822,9 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
 
                         if (*inode).flags & XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT == 0 {
                             let mut values: [*mut XmlChar; 10] = [null_mut(); 10];
-                            let mut terminal: c_int = 0;
-                            let mut nbval: c_int = 10;
-                            let mut nbneg: c_int = 0;
+                            let mut terminal: i32 = 0;
+                            let mut nbval: i32 = 10;
+                            let mut nbneg: i32 = 0;
 
                             if (*inode).regex_ctxt.is_null() {
                                 /*
@@ -30292,9 +30287,9 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
     -1
 }
 
-unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut attr: XmlAttrPtr;
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
     let mut ielem: XmlSchemaNodeInfoPtr = null_mut();
     let mut node: XmlNodePtr;
     let mut ns_name: *const XmlChar;
@@ -30701,8 +30696,8 @@ unsafe extern "C" fn xml_schema_post_run(vctxt: XmlSchemaValidCtxtPtr) {
     xml_schema_clear_valid_ctxt(vctxt);
 }
 
-unsafe extern "C" fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
+    let mut ret: i32 = 0;
 
     if xml_schema_pre_run(vctxt) < 0 {
         return -1;
@@ -30758,7 +30753,7 @@ unsafe extern "C" fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> c_int {
 pub unsafe extern "C" fn xml_schema_validate_doc(
     ctxt: XmlSchemaValidCtxtPtr,
     doc: XmlDocPtr,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() || doc.is_null() {
         return -1;
     }
@@ -30794,7 +30789,7 @@ pub unsafe extern "C" fn xml_schema_validate_doc(
 pub unsafe extern "C" fn xml_schema_validate_one_element(
     ctxt: XmlSchemaValidCtxtPtr,
     elem: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() || elem.is_null() || (*elem).typ != XmlElementType::XmlElementNode {
         return -1;
     }
@@ -30823,8 +30818,8 @@ pub unsafe extern "C" fn xml_schema_validate_one_element(
 unsafe extern "C" fn xml_schema_validate_stream_locator(
     ctx: *mut c_void,
     file: *mut Option<String>,
-    line: *mut c_ulong,
-) -> c_int {
+    line: *mut u64,
+) -> i32 {
     if ctx.is_null() || (file.is_null() && line.is_null()) {
         return -1;
     }
@@ -30870,11 +30865,11 @@ pub unsafe fn xml_schema_validate_stream(
     enc: XmlCharEncoding,
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
-) -> c_int {
+) -> i32 {
     let mut plug: XmlSchemaSAXPlugPtr = null_mut();
     let pctxt: XmlParserCtxtPtr;
 
-    let mut ret: c_int;
+    let mut ret: i32;
 
     if ctxt.is_null()
     // || input.is_null()
@@ -30968,8 +30963,8 @@ pub unsafe fn xml_schema_validate_stream(
 pub unsafe extern "C" fn xml_schema_validate_file(
     ctxt: XmlSchemaValidCtxtPtr,
     filename: *const c_char,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     if ctxt.is_null() || filename.is_null() {
         return -1;
     }
@@ -30980,8 +30975,7 @@ pub unsafe extern "C" fn xml_schema_validate_file(
     ) else {
         return -1;
     };
-    let ret: c_int =
-        xml_schema_validate_stream(ctxt, input, XmlCharEncoding::None, null_mut(), None);
+    let ret: i32 = xml_schema_validate_stream(ctxt, input, XmlCharEncoding::None, null_mut(), None);
     ret
 }
 
@@ -31020,7 +31014,7 @@ const XML_SAX_PLUG_MAGIC: u32 = 0xdc43ba21;
 pub type XmlSchemaSAXPlugPtr = *mut XmlSchemaSAXPlugStruct;
 #[repr(C)]
 pub struct XmlSchemaSAXPlugStruct {
-    magic: c_uint,
+    magic: u32,
 
     /* the original callbacks information */
     user_sax_ptr: *mut XmlSAXHandlerPtr,
@@ -31039,16 +31033,16 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
     localname: *const XmlChar,
     _prefix: *const XmlChar,
     uri: *const XmlChar,
-    nb_namespaces: c_int,
+    nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
-    nb_attributes: c_int,
-    _nb_defaulted: c_int,
+    nb_attributes: i32,
+    _nb_defaulted: i32,
     attributes: *mut *const XmlChar,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
-    let mut ret: c_int;
+    let mut ret: i32;
 
     /*
      * SAX VAL TODO: What to do with nb_defaulted?
@@ -31153,8 +31147,8 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
      * attributes yet.
      */
     if nb_attributes != 0 {
-        let mut value_len: c_int;
-        let mut k: c_int;
+        let mut value_len: i32;
+        let mut k: i32;
         let mut value: *mut XmlChar;
 
         for (_, j) in (0..nb_attributes).zip((0..).step_by(5)) {
@@ -31281,7 +31275,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
             c"elem pop mismatch".as_ptr() as _
         );
     }
-    let res: c_int = xml_schema_validator_pop_elem(vctxt);
+    let res: i32 = xml_schema_validator_pop_elem(vctxt);
     if res != 0 && res < 0 {
         VERROR_INT!(
             vctxt,
@@ -31305,7 +31299,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
 unsafe fn xml_schema_sax_handle_text(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -31345,7 +31339,7 @@ unsafe fn xml_schema_sax_handle_text(
 unsafe fn xml_schema_sax_handle_cdata_section(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -31417,7 +31411,7 @@ unsafe fn internal_subset_split(
     }
 }
 
-unsafe fn is_standalone_split(ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn is_standalone_split(ctx: Option<GenericErrorContext>) -> i32 {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -31428,7 +31422,7 @@ unsafe fn is_standalone_split(ctx: Option<GenericErrorContext>) -> c_int {
     0
 }
 
-unsafe fn has_internal_subset_split(ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn has_internal_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -31441,7 +31435,7 @@ unsafe fn has_internal_subset_split(ctx: Option<GenericErrorContext>) -> c_int {
     0
 }
 
-unsafe fn has_external_subset_split(ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn has_external_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -31526,7 +31520,7 @@ unsafe fn get_parameter_entity_split(
 unsafe fn entity_decl_split(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
     content: *mut XmlChar,
@@ -31550,8 +31544,8 @@ unsafe fn attribute_decl_split(
     ctx: Option<GenericErrorContext>,
     elem: *const XmlChar,
     name: *const XmlChar,
-    typ: c_int,
-    def: c_int,
+    typ: i32,
+    def: i32,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
 ) {
@@ -31579,7 +31573,7 @@ unsafe fn attribute_decl_split(
 unsafe fn element_decl_split(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     content: XmlElementContentPtr,
 ) {
     let ctx = ctx.unwrap();
@@ -31725,7 +31719,7 @@ fn fatal_error_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
  * Those are function where both the user handler and the schemas handler
  * need to be called.
  */
-unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
+unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -31743,7 +31737,7 @@ unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: *const XmlChar,
 unsafe fn ignorable_whitespace_split(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -31759,7 +31753,7 @@ unsafe fn ignorable_whitespace_split(
     }
 }
 
-unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: *const XmlChar, len: c_int) {
+unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: *const XmlChar, len: i32) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -31799,10 +31793,10 @@ unsafe fn start_element_ns_split(
     localname: *const XmlChar,
     prefix: *const XmlChar,
     uri: *const XmlChar,
-    nb_namespaces: c_int,
+    nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
-    nb_attributes: c_int,
-    nb_defaulted: c_int,
+    nb_attributes: i32,
+    nb_defaulted: i32,
     attributes: *mut *const XmlChar,
 ) {
     let ctx = ctx.unwrap();
@@ -32051,7 +32045,7 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
  *
  * Returns 0 in case of success and -1 in case of failure.
  */
-pub unsafe extern "C" fn xml_schema_sax_unplug(plug: XmlSchemaSAXPlugPtr) -> c_int {
+pub unsafe extern "C" fn xml_schema_sax_unplug(plug: XmlSchemaSAXPlugPtr) -> i32 {
     let user_data: *mut Option<GenericErrorContext>;
 
     if plug.is_null() || (*plug).magic != XML_SAX_PLUG_MAGIC {

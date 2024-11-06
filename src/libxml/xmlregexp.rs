@@ -4,13 +4,13 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, c_ushort, CStr},
+    ffi::{c_char, CStr},
     mem::{size_of, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
 };
 
-use libc::{fprintf, memcpy, memset, size_t, snprintf, strlen, FILE, INT_MAX};
+use libc::{fprintf, memcpy, memset, snprintf, strlen, FILE, INT_MAX};
 
 use crate::{
     __xml_raise_error,
@@ -43,7 +43,7 @@ use super::{
     parser_internals::xml_is_letter,
 };
 
-const SIZE_MAX: size_t = size_t::MAX;
+const SIZE_MAX: usize = usize::MAX;
 const MAX_PUSH: usize = 10000000;
 
 /*
@@ -141,10 +141,10 @@ pub enum XmlRegMarkedType {
 pub type XmlRegRangePtr = *mut XmlRegRange;
 #[repr(C)]
 pub struct XmlRegRange {
-    neg: c_int, /* 0 normal, 1 not, 2 exclude */
+    neg: i32, /* 0 normal, 1 not, 2 exclude */
     typ: XmlRegAtomType,
-    start: c_int,
-    end: c_int,
+    start: i32,
+    end: i32,
     block_name: *mut XmlChar,
 }
 
@@ -154,20 +154,20 @@ pub type XmlRegStatePtr = *mut XmlRegState;
 pub type XmlRegAtomPtr = *mut XmlRegAtom;
 #[repr(C)]
 pub struct XmlRegAtom {
-    pub(crate) no: c_int,
+    pub(crate) no: i32,
     pub(crate) typ: XmlRegAtomType,
     pub(crate) quant: XmlRegQuantType,
-    pub(crate) min: c_int,
-    pub(crate) max: c_int,
+    pub(crate) min: i32,
+    pub(crate) max: i32,
     pub(crate) valuep: *mut c_void,
     pub(crate) valuep2: *mut c_void,
-    pub(crate) neg: c_int,
-    pub(crate) codepoint: c_int,
+    pub(crate) neg: i32,
+    pub(crate) codepoint: i32,
     pub(crate) start: XmlRegStatePtr,
     pub(crate) start0: XmlRegStatePtr,
     pub(crate) stop: XmlRegStatePtr,
-    max_ranges: c_int,
-    nb_ranges: c_int,
+    max_ranges: i32,
+    nb_ranges: i32,
     pub(crate) ranges: *mut XmlRegRangePtr,
     pub(crate) data: *mut c_void,
 }
@@ -175,18 +175,18 @@ pub struct XmlRegAtom {
 pub type XmlRegCounterPtr = *mut XmlRegCounter;
 #[repr(C)]
 pub struct XmlRegCounter {
-    pub(crate) min: c_int,
-    pub(crate) max: c_int,
+    pub(crate) min: i32,
+    pub(crate) max: i32,
 }
 
 pub type XmlRegTransPtr = *mut XmlRegTrans;
 #[repr(C)]
 pub struct XmlRegTrans {
     atom: XmlRegAtomPtr,
-    to: c_int,
-    counter: c_int,
-    count: c_int,
-    nd: c_int,
+    to: i32,
+    counter: i32,
+    count: i32,
+    nd: i32,
 }
 
 pub type XmlRegParserCtxt = XmlAutomata;
@@ -204,21 +204,21 @@ pub type XmlRegexpPtr = *mut XmlRegexp;
 #[repr(C)]
 pub struct XmlRegexp {
     string: *mut XmlChar,
-    nb_states: c_int,
+    nb_states: i32,
     states: *mut XmlRegStatePtr,
-    nb_atoms: c_int,
+    nb_atoms: i32,
     atoms: *mut XmlRegAtomPtr,
-    nb_counters: c_int,
+    nb_counters: i32,
     counters: *mut XmlRegCounter,
-    determinist: c_int,
-    flags: c_int,
+    determinist: i32,
+    flags: i32,
     /*
      * That's the compact form for determinists automatas
      */
-    nbstates: c_int,
-    compact: *mut c_int,
+    nbstates: i32,
+    compact: *mut i32,
     transdata: *mut *mut c_void,
-    nbstrings: c_int,
+    nbstrings: i32,
     string_map: *mut *mut XmlChar,
 }
 
@@ -226,9 +226,9 @@ pub type XmlRegExecRollbackPtr = *mut XmlRegExecRollback;
 #[repr(C)]
 pub struct XmlRegExecRollback {
     state: XmlRegStatePtr, /* the current state */
-    index: c_int,          /* the index in the input stack */
-    nextbranch: c_int,     /* the next transition to explore in that state */
-    counts: *mut c_int,    /* save the automata state if it has some */
+    index: i32,            /* the index in the input stack */
+    nextbranch: i32,       /* the next transition to explore in that state */
+    counts: *mut i32,      /* save the automata state if it has some */
 }
 
 pub type XmlRegInputTokenPtr = *mut XmlRegInputToken;
@@ -246,45 +246,45 @@ pub struct XmlRegInputToken {
 pub type XmlRegExecCtxtPtr = *mut XmlRegExecCtxt;
 #[repr(C)]
 pub struct XmlRegExecCtxt {
-    status: c_int,      /* execution status != 0 indicate an error */
-    determinist: c_int, /* did we find an indeterministic behaviour */
+    status: i32,        /* execution status != 0 indicate an error */
+    determinist: i32,   /* did we find an indeterministic behaviour */
     comp: XmlRegexpPtr, /* the compiled regexp */
     callback: Option<XmlRegExecCallbacks>,
     data: *mut c_void,
 
     state: XmlRegStatePtr, /* the current state */
-    transno: c_int,        /* the current transition on that state */
-    transcount: c_int,     /* the number of chars in c_char counted transitions */
+    transno: i32,          /* the current transition on that state */
+    transcount: i32,       /* the number of chars in c_char counted transitions */
     /*
      * A stack of rollback states
      */
-    max_rollbacks: c_int,
-    nb_rollbacks: c_int,
+    max_rollbacks: i32,
+    nb_rollbacks: i32,
     rollbacks: *mut XmlRegExecRollback,
 
     /*
      * The state of the automata if any
      */
-    counts: *mut c_int,
+    counts: *mut i32,
 
     /*
      * The input stack
      */
-    input_stack_max: c_int,
-    input_stack_nr: c_int,
-    index: c_int,
-    char_stack: *mut c_int,
+    input_stack_max: i32,
+    input_stack_nr: i32,
+    index: i32,
+    char_stack: *mut i32,
     input_string: *const XmlChar,     /* when operating on characters */
     input_stack: XmlRegInputTokenPtr, /* when operating on strings */
 
     /*
      * error handling
      */
-    err_state_no: c_int,       /* the error state number */
+    err_state_no: i32,         /* the error state number */
     err_state: XmlRegStatePtr, /* the error state */
     err_string: *mut XmlChar,  /* the string raising the error */
-    err_counts: *mut c_int,    /* counters at the error state */
-    nb_push: c_int,
+    err_counts: *mut i32,      /* counters at the error state */
+    nb_push: i32,
 }
 
 /**
@@ -361,8 +361,8 @@ unsafe extern "C" fn xml_reg_new_state(ctxt: XmlRegParserCtxtPtr) -> XmlRegState
 
 pub(crate) unsafe extern "C" fn xml_reg_state_push(ctxt: XmlRegParserCtxtPtr) -> XmlRegStatePtr {
     if (*ctxt).nb_states >= (*ctxt).max_states {
-        let new_size: size_t = if (*ctxt).max_states != 0 {
-            (*ctxt).max_states as size_t * 2
+        let new_size: usize = if (*ctxt).max_states != 0 {
+            (*ctxt).max_states as usize * 2
         } else {
             4
         };
@@ -499,10 +499,10 @@ macro_rules! CUR_SCHAR {
  *
  * [10]   Char   ::=   [^.\?*+()|#x5B#x5D]
  */
-unsafe extern "C" fn xml_fa_is_char(ctxt: XmlRegParserCtxtPtr) -> c_int {
-    let mut len: c_int = 0;
+unsafe extern "C" fn xml_fa_is_char(ctxt: XmlRegParserCtxtPtr) -> i32 {
+    let mut len: i32 = 0;
 
-    let cur: c_int = CUR_SCHAR!((*ctxt).cur, len);
+    let cur: i32 = CUR_SCHAR!((*ctxt).cur, len);
     if cur == b'.' as i32
         || cur == b'\\' as i32
         || cur == b'?' as i32
@@ -583,7 +583,7 @@ macro_rules! IS_NILLABLE {
  */
 unsafe extern "C" fn xml_regexp_err_compile(ctxt: XmlRegParserCtxtPtr, extra: *const c_char) {
     let mut regexp: *const c_char = null();
-    let mut idx: c_int = 0;
+    let mut idx: i32 = 0;
 
     if !ctxt.is_null() {
         regexp = (*ctxt).string as _;
@@ -621,12 +621,12 @@ macro_rules! ERROR {
 unsafe extern "C" fn xml_reg_state_add_trans_to(
     ctxt: XmlRegParserCtxtPtr,
     target: XmlRegStatePtr,
-    from: c_int,
+    from: i32,
 ) {
     if (*target).max_trans_to == 0 {
         (*target).max_trans_to = 8;
         (*target).trans_to =
-            xml_malloc((*target).max_trans_to as usize * size_of::<c_int>()) as *mut c_int;
+            xml_malloc((*target).max_trans_to as usize * size_of::<i32>()) as *mut i32;
         if (*target).trans_to.is_null() {
             xml_regexp_err_memory(ctxt, c"adding transition".as_ptr());
             (*target).max_trans_to = 0;
@@ -634,10 +634,10 @@ unsafe extern "C" fn xml_reg_state_add_trans_to(
         }
     } else if (*target).nb_trans_to >= (*target).max_trans_to {
         (*target).max_trans_to *= 2;
-        let tmp: *mut c_int = xml_realloc(
+        let tmp: *mut i32 = xml_realloc(
             (*target).trans_to as _,
-            (*target).max_trans_to as usize * size_of::<c_int>(),
-        ) as *mut c_int;
+            (*target).max_trans_to as usize * size_of::<i32>(),
+        ) as *mut i32;
         if tmp.is_null() {
             xml_regexp_err_memory(ctxt, c"adding transition".as_ptr());
             (*target).max_trans_to /= 2;
@@ -654,8 +654,8 @@ pub(crate) unsafe extern "C" fn xml_reg_state_add_trans(
     state: XmlRegStatePtr,
     atom: XmlRegAtomPtr,
     target: XmlRegStatePtr,
-    counter: c_int,
-    count: c_int,
+    counter: i32,
+    count: i32,
 ) {
     if state.is_null() {
         ERROR!(ctxt, c"add state: state is NULL".as_ptr());
@@ -725,7 +725,7 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_epsilon_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
     mut to: XmlRegStatePtr,
-) -> c_int {
+) -> i32 {
     if to.is_null() {
         to = xml_reg_state_push(ctxt);
         if to.is_null() {
@@ -751,10 +751,10 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_epsilon_transition(
  */
 unsafe fn xml_reg_new_range(
     ctxt: XmlRegParserCtxtPtr,
-    neg: c_int,
+    neg: i32,
     typ: Option<XmlRegAtomType>,
-    start: c_int,
-    end: c_int,
+    start: i32,
+    end: i32,
 ) -> XmlRegRangePtr {
     let ret: XmlRegRangePtr = xml_malloc(size_of::<XmlRegRange>()) as XmlRegRangePtr;
     if ret.is_null() {
@@ -771,10 +771,10 @@ unsafe fn xml_reg_new_range(
 unsafe fn xml_reg_atom_add_range(
     ctxt: XmlRegParserCtxtPtr,
     atom: XmlRegAtomPtr,
-    neg: c_int,
+    neg: i32,
     typ: Option<XmlRegAtomType>,
-    start: c_int,
-    end: c_int,
+    start: i32,
+    end: i32,
     block_name: *mut XmlChar,
 ) -> XmlRegRangePtr {
     if atom.is_null() {
@@ -835,7 +835,7 @@ unsafe fn xml_reg_atom_add_range(
  * [36]   IsBlock   ::=   'Is' [a-zA-Z0-9#x2D]+
  */
 unsafe extern "C" fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
-    let mut cur: c_int;
+    let mut cur: i32;
     let typ: Option<XmlRegAtomType>;
     let mut block_name: *mut XmlChar = null_mut();
 
@@ -1052,19 +1052,19 @@ unsafe extern "C" fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
  *									*
  ************************************************************************/
 
-unsafe extern "C" fn parse_escaped_codeunit(ctxt: XmlRegParserCtxtPtr) -> c_int {
-    let mut val: c_int = 0;
-    let mut cur: c_int;
+unsafe extern "C" fn parse_escaped_codeunit(ctxt: XmlRegParserCtxtPtr) -> i32 {
+    let mut val: i32 = 0;
+    let mut cur: i32;
     for _ in 0..4 {
         NEXT!(ctxt);
         val *= 16;
         cur = CUR!(ctxt) as _;
-        if cur >= b'0' as c_int && cur <= b'9' as c_int {
-            val += cur - b'0' as c_int;
-        } else if cur >= b'A' as c_int && cur <= b'F' as c_int {
-            val += cur - b'A' as c_int + 10;
-        } else if cur >= b'a' as c_int && cur <= b'f' as c_int {
-            val += cur - b'a' as c_int + 10;
+        if cur >= b'0' as i32 && cur <= b'9' as i32 {
+            val += cur - b'0' as i32;
+        } else if cur >= b'A' as i32 && cur <= b'F' as i32 {
+            val += cur - b'A' as i32 + 10;
+        } else if cur >= b'a' as i32 && cur <= b'f' as i32 {
+            val += cur - b'a' as i32 + 10;
         } else {
             ERROR!(ctxt, c"Expecting hex digit".as_ptr());
             return -1;
@@ -1073,14 +1073,14 @@ unsafe extern "C" fn parse_escaped_codeunit(ctxt: XmlRegParserCtxtPtr) -> c_int 
     val
 }
 
-unsafe extern "C" fn parse_escaped_codepoint(ctxt: XmlRegParserCtxtPtr) -> c_int {
-    let mut val: c_int = parse_escaped_codeunit(ctxt);
+unsafe extern "C" fn parse_escaped_codepoint(ctxt: XmlRegParserCtxtPtr) -> i32 {
+    let mut val: i32 = parse_escaped_codeunit(ctxt);
     if (0xD800..=0xDBFF).contains(&val) {
         NEXT!(ctxt);
         if CUR!(ctxt) == b'\\' {
             NEXT!(ctxt);
             if CUR!(ctxt) == b'u' {
-                let low: c_int = parse_escaped_codeunit(ctxt);
+                let low: i32 = parse_escaped_codeunit(ctxt);
                 if (0xDC00..=0xDFFF).contains(&low) {
                     return (val - 0xD800) * 0x400 + (low - 0xDC00) + 0x10000;
                 }
@@ -1103,7 +1103,7 @@ unsafe extern "C" fn parse_escaped_codepoint(ctxt: XmlRegParserCtxtPtr) -> c_int
  * [37] MultiCharEsc ::= '.' | ('\' [sSiIcCdDwW])
  */
 unsafe extern "C" fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
-    let mut cur: c_int;
+    let mut cur: i32;
 
     if CUR!(ctxt) == b'.' {
         if (*ctxt).atom.is_null() {
@@ -1329,10 +1329,10 @@ macro_rules! PREV {
  * [22]   XmlCharIncDash   ::=   [^\#x5B#x5D]
  */
 unsafe extern "C" fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
-    let mut cur: c_int;
-    let mut len: c_int = 0;
-    let start: c_int;
-    let mut end: c_int;
+    let mut cur: i32;
+    let mut len: i32 = 0;
+    let start: i32;
+    let mut end: i32;
 
     if CUR!(ctxt) == b'\0' {
         ERROR!(ctxt, c"Expecting ']'".as_ptr());
@@ -1469,7 +1469,7 @@ unsafe extern "C" fn xml_fa_parse_pos_char_group(ctxt: XmlRegParserCtxtPtr) {
  * [12]   charClassExpr ::= '[' charGroup ']'
  */
 unsafe extern "C" fn xml_fa_parse_char_group(ctxt: XmlRegParserCtxtPtr) {
-    let neg: c_int = (*ctxt).neg;
+    let neg: i32 = (*ctxt).neg;
 
     if CUR!(ctxt) == b'^' as _ {
         NEXT!(ctxt);
@@ -1527,9 +1527,9 @@ unsafe extern "C" fn xml_fa_parse_char_class(ctxt: XmlRegParserCtxtPtr) {
  *
  * [9]   atom   ::=   Char | charClass | ( '(' regExp ')' )
  */
-unsafe extern "C" fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> c_int {
-    let mut codepoint: c_int;
-    let mut len: c_int = 0;
+unsafe extern "C" fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> i32 {
+    let mut codepoint: i32;
+    let mut len: i32 = 0;
 
     codepoint = xml_fa_is_char(ctxt);
     if codepoint > 0 {
@@ -1595,16 +1595,16 @@ unsafe extern "C" fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> c_int {
  *
  * Returns 0 if success or -1 in case of error
  */
-unsafe extern "C" fn xml_fa_parse_quant_exact(ctxt: XmlRegParserCtxtPtr) -> c_int {
-    let mut ret: c_int = 0;
-    let mut ok: c_int = 0;
-    let mut overflow: c_int = 0;
+unsafe extern "C" fn xml_fa_parse_quant_exact(ctxt: XmlRegParserCtxtPtr) -> i32 {
+    let mut ret: i32 = 0;
+    let mut ok: i32 = 0;
+    let mut overflow: i32 = 0;
 
     while CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' {
         if ret > INT_MAX / 10 {
             overflow = 1;
         } else {
-            let digit: c_int = CUR!(ctxt) as i32 - b'0' as i32;
+            let digit: i32 = CUR!(ctxt) as i32 - b'0' as i32;
 
             ret *= 10;
             if ret > INT_MAX - digit {
@@ -1632,8 +1632,8 @@ unsafe extern "C" fn xml_fa_parse_quant_exact(ctxt: XmlRegParserCtxtPtr) -> c_in
  * [7]   quantMin   ::=   QuantExact ','
  * [8]   QuantExact   ::=   [0-9]+
  */
-unsafe extern "C" fn xml_fa_parse_quantifier(ctxt: XmlRegParserCtxtPtr) -> c_int {
-    let mut cur: c_int;
+unsafe extern "C" fn xml_fa_parse_quantifier(ctxt: XmlRegParserCtxtPtr) -> i32 {
+    let mut cur: i32;
 
     cur = CUR!(ctxt) as _;
     if cur == '?' as i32 || cur == '*' as i32 || cur == '+' as i32 {
@@ -1650,8 +1650,8 @@ unsafe extern "C" fn xml_fa_parse_quantifier(ctxt: XmlRegParserCtxtPtr) -> c_int
         return 1;
     }
     if cur == '{' as i32 {
-        let mut min: c_int = 0;
-        let mut max: c_int = 0;
+        let mut min: i32 = 0;
+        let mut max: i32 = 0;
 
         NEXT!(ctxt);
         cur = xml_fa_parse_quant_exact(ctxt);
@@ -1697,9 +1697,9 @@ unsafe extern "C" fn xml_fa_parse_quantifier(ctxt: XmlRegParserCtxtPtr) -> c_int
  *
  * [3]   piece   ::=   atom quantifier?
  */
-unsafe extern "C" fn xml_fa_parse_piece(ctxt: XmlRegParserCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_fa_parse_piece(ctxt: XmlRegParserCtxtPtr) -> i32 {
     (*ctxt).atom = null_mut();
-    let ret: c_int = xml_fa_parse_atom(ctxt);
+    let ret: i32 = xml_fa_parse_atom(ctxt);
     if ret == 0 {
         return 0;
     }
@@ -1797,7 +1797,7 @@ unsafe extern "C" fn xml_reg_copy_atom(
     //     return(NULL);
 }
 
-pub(crate) unsafe extern "C" fn xml_reg_get_counter(ctxt: XmlRegParserCtxtPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_reg_get_counter(ctxt: XmlRegParserCtxtPtr) -> i32 {
     if (*ctxt).max_counters == 0 {
         (*ctxt).max_counters = 4;
         (*ctxt).counters = xml_malloc((*ctxt).max_counters as usize * size_of::<XmlRegCounter>())
@@ -1839,8 +1839,8 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_counted_epsilon_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
     mut to: XmlRegStatePtr,
-    counter: c_int,
-) -> c_int {
+    counter: i32,
+) -> i32 {
     if to.is_null() {
         to = xml_reg_state_push(ctxt);
         if to.is_null() {
@@ -1864,8 +1864,8 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_counted_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
     mut to: XmlRegStatePtr,
-    counter: c_int,
-) -> c_int {
+    counter: i32,
+) -> i32 {
     if to.is_null() {
         to = xml_reg_state_push(ctxt);
         if to.is_null() {
@@ -1880,13 +1880,13 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_counted_transition(
 pub(crate) unsafe extern "C" fn xml_reg_atom_push(
     ctxt: XmlRegParserCtxtPtr,
     atom: XmlRegAtomPtr,
-) -> c_int {
+) -> i32 {
     if atom.is_null() {
         ERROR!(ctxt, c"atom push: atom is NULL".as_ptr());
         return -1;
     }
     if (*ctxt).nb_atoms >= (*ctxt).max_atoms {
-        let new_size: size_t = if (*ctxt).max_atoms != 0 {
+        let new_size: usize = if (*ctxt).max_atoms != 0 {
             (*ctxt).max_atoms as usize * 2
         } else {
             4
@@ -1921,8 +1921,8 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_transitions(
     from: XmlRegStatePtr,
     mut to: XmlRegStatePtr,
     atom: XmlRegAtomPtr,
-) -> c_int {
-    let mut nullable: c_int = 0;
+) -> i32 {
+    let mut nullable: i32 = 0;
 
     if atom.is_null() {
         ERROR!(ctxt, c"generate transition: atom == NULL".as_ptr());
@@ -1941,15 +1941,6 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_transitions(
              * Generate an epsilon transition to link to the target
              */
             xml_fa_generate_epsilon_transition(ctxt, (*atom).stop, to);
-            // #ifdef DV
-            // 	} else if ((to.is_null()) && ((*atom).quant != XML_REGEXP_QUANT_RANGE) &&
-            // 		   ((*atom).quant != XML_REGEXP_QUANT_ONCE)) {
-            // 	    to = xmlRegStatePush(ctxt, to);
-            //             if (to.is_null())
-            //                 return(-1);
-            // 	    (*ctxt).state = to;
-            // 	    xmlFAGenerateEpsilonTransition(ctxt, (*atom).stop, to);
-            // #endif
         }
         match (*atom).quant {
             XmlRegQuantType::XmlRegexpQuantOpt => {
@@ -1976,7 +1967,7 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_transitions(
                 xml_fa_generate_epsilon_transition(ctxt, (*atom).stop, (*atom).start);
             }
             XmlRegQuantType::XmlRegexpQuantRange => {
-                let counter: c_int;
+                let counter: i32;
                 let inter: XmlRegStatePtr;
                 let newstate: XmlRegStatePtr;
 
@@ -2162,9 +2153,9 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_transitions(
  *
  * [2]   branch   ::=   piece*
  */
-unsafe extern "C" fn xml_fa_parse_branch(ctxt: XmlRegParserCtxtPtr, to: XmlRegStatePtr) -> c_int {
+unsafe extern "C" fn xml_fa_parse_branch(ctxt: XmlRegParserCtxtPtr, to: XmlRegStatePtr) -> i32 {
     let mut previous: XmlRegStatePtr;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     previous = (*ctxt).state;
     ret = xml_fa_parse_piece(ctxt);
@@ -2222,7 +2213,7 @@ unsafe extern "C" fn xml_fa_parse_branch(ctxt: XmlRegParserCtxtPtr, to: XmlRegSt
  *
  * [1]   regExp   ::=     branch  ( '|' branch )*
  */
-unsafe extern "C" fn xml_fa_parse_reg_exp(ctxt: XmlRegParserCtxtPtr, top: c_int) {
+unsafe extern "C" fn xml_fa_parse_reg_exp(ctxt: XmlRegParserCtxtPtr, top: i32) {
     /* if not top start should have been generated by an epsilon trans */
     let start: XmlRegStatePtr = (*ctxt).state;
     (*ctxt).end = null_mut();
@@ -2269,7 +2260,7 @@ unsafe extern "C" fn xml_fa_parse_reg_exp(ctxt: XmlRegParserCtxtPtr, top: c_int)
  * State 2 is final and has an epsilon transition to state 1.
  */
 unsafe extern "C" fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegParserCtxtPtr) {
-    let mut newto: c_int;
+    let mut newto: i32;
     let mut state: XmlRegStatePtr;
     let mut tmp: XmlRegStatePtr;
 
@@ -2339,9 +2330,9 @@ unsafe extern "C" fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegPar
  */
 unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
     ctxt: XmlRegParserCtxtPtr,
-    fromnr: c_int,
-    tonr: c_int,
-    counter: c_int,
+    fromnr: i32,
+    tonr: i32,
+    counter: i32,
 ) {
     let from: XmlRegStatePtr = *(*ctxt).states.add(fromnr as usize);
     if from.is_null() {
@@ -2373,7 +2364,7 @@ unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
              */
             if (*(*to).trans.add(transnr as usize)).to != fromnr {
                 if (*(*to).trans.add(transnr as usize)).count >= 0 {
-                    let newto: c_int = (*(*to).trans.add(transnr as usize)).to;
+                    let newto: i32 = (*(*to).trans.add(transnr as usize)).to;
 
                     xml_reg_state_add_trans(
                         ctxt,
@@ -2400,7 +2391,7 @@ unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
                 }
             }
         } else {
-            let newto: c_int = (*(*to).trans.add(transnr as usize)).to;
+            let newto: i32 = (*(*to).trans.add(transnr as usize)).to;
 
             if (*(*to).trans.add(transnr as usize)).counter >= 0 {
                 xml_reg_state_add_trans(
@@ -2433,7 +2424,7 @@ unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
  */
 pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxtPtr) {
     let mut state: XmlRegStatePtr;
-    let mut has_epsilon: c_int;
+    let mut has_epsilon: i32;
 
     if (*ctxt).states.is_null() {
         return;
@@ -2477,7 +2468,7 @@ pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRe
                 if (*(*state).trans.add(transnr as usize)).to == statenr {
                     (*(*state).trans.add(transnr as usize)).to = -1;
                 } else if (*(*state).trans.add(transnr as usize)).count < 0 {
-                    let newto: c_int = (*(*state).trans.add(transnr as usize)).to;
+                    let newto: i32 = (*(*state).trans.add(transnr as usize)).to;
 
                     has_epsilon = 1;
                     (*(*state).trans.add(transnr as usize)).to = -2;
@@ -2535,7 +2526,7 @@ pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRe
                 && (!(*(*state).trans.add(transnr as usize)).atom.is_null()
                     || (*(*state).trans.add(transnr as usize)).count >= 0)
             {
-                let newto: c_int = (*(*state).trans.add(transnr as usize)).to;
+                let newto: i32 = (*(*state).trans.add(transnr as usize)).to;
 
                 if (*(*ctxt).states.add(newto as usize)).is_null() {
                     continue;
@@ -2586,12 +2577,12 @@ pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRe
  *
  * Returns the new array or NULL in case of error.
  */
-unsafe extern "C" fn xml_reg_calloc2(dim1: size_t, dim2: size_t, elem_size: size_t) -> *mut c_void {
+unsafe extern "C" fn xml_reg_calloc2(dim1: usize, dim2: usize, elem_size: usize) -> *mut c_void {
     /* Check for overflow */
     if dim2 == 0 || elem_size == 0 || dim1 > SIZE_MAX / dim2 / elem_size {
         return null_mut();
     }
-    let total_size: size_t = dim1 * dim2 * elem_size;
+    let total_size: usize = dim1 * dim2 * elem_size;
     let ret: *mut c_void = xml_malloc(total_size);
     if !ret.is_null() {
         memset(ret, 0, total_size);
@@ -2637,8 +2628,8 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
             XmlRegAtomType::XmlRegexpString
         )
     {
-        let mut nbstates: c_int = 0;
-        let mut nbatoms: c_int = 0;
+        let mut nbstates: i32 = 0;
+        let mut nbatoms: i32 = 0;
         let mut value: *mut XmlChar;
         let mut transdata: *mut *mut c_void;
 
@@ -2650,8 +2641,7 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
          * 3/ build a table state x atom for the transitions
          */
 
-        let state_remap: *mut c_int =
-            xml_malloc((*ret).nb_states as usize * size_of::<c_int>()) as _;
+        let state_remap: *mut i32 = xml_malloc((*ret).nb_states as usize * size_of::<i32>()) as _;
         if state_remap.is_null() {
             xml_regexp_err_memory(ctxt, c"compiling regexp".as_ptr());
             xml_free(ret as _);
@@ -2673,8 +2663,7 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
             xml_free(ret as _);
             return null_mut();
         }
-        let string_remap: *mut c_int =
-            xml_malloc((*ret).nb_atoms as usize * size_of::<c_int>()) as _;
+        let string_remap: *mut i32 = xml_malloc((*ret).nb_atoms as usize * size_of::<i32>()) as _;
         if string_remap.is_null() {
             xml_regexp_err_memory(ctxt, c"compiling regexp".as_ptr());
             xml_free(string_map as _);
@@ -2725,11 +2714,11 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
                 return null_mut();
             }
         }
-        let transitions: *mut c_int = xml_reg_calloc2(
+        let transitions: *mut i32 = xml_reg_calloc2(
             (nbstates + 1) as usize,
             (nbatoms + 1) as usize,
-            size_of::<c_int>(),
-        ) as *mut c_int;
+            size_of::<i32>(),
+        ) as *mut i32;
         if transitions.is_null() {
             xml_free(state_remap as _);
             xml_free(string_remap as _);
@@ -2748,12 +2737,12 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
         transdata = null_mut();
 
         for i in 0..(*ret).nb_states {
-            let mut atomno: c_int;
-            let mut targetno: c_int;
-            let mut prev: c_int;
+            let mut atomno: i32;
+            let mut targetno: i32;
+            let mut prev: i32;
             let mut trans: XmlRegTransPtr;
 
-            let stateno: c_int = *state_remap.add(i as usize);
+            let stateno: i32 = *state_remap.add(i as usize);
             if stateno == -1 {
                 continue;
             }
@@ -2985,7 +2974,7 @@ unsafe extern "C" fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
             memcpy(
                 (*exec).counts as _,
                 (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts as _,
-                (*(*exec).comp).nb_counters as usize * size_of::<c_int>(),
+                (*(*exec).comp).nb_counters as usize * size_of::<i32>(),
             );
         }
     }
@@ -2993,13 +2982,13 @@ unsafe extern "C" fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
 
 unsafe extern "C" fn xml_reg_check_character_range(
     typ: XmlRegAtomType,
-    codepoint: c_int,
-    mut neg: c_int,
-    start: c_int,
-    end: c_int,
+    codepoint: i32,
+    mut neg: i32,
+    start: i32,
+    end: i32,
     block_name: *const XmlChar,
-) -> c_int {
-    let mut ret: c_int;
+) -> i32 {
+    let mut ret: i32;
 
     match typ {
         XmlRegAtomType::XmlRegexpString
@@ -3205,8 +3194,8 @@ unsafe extern "C" fn xml_reg_check_character_range(
     ret
 }
 
-unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: c_int) -> c_int {
-    let mut ret: c_int;
+unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
+    let mut ret: i32;
     let mut range: XmlRegRangePtr;
 
     if atom.is_null() || !xml_is_char(codepoint as u32) {
@@ -3221,7 +3210,7 @@ unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: c_i
             return (codepoint == (*atom).codepoint) as i32;
         }
         XmlRegAtomType::XmlRegexpRanges => {
-            let mut accept: c_int = 0;
+            let mut accept: i32 = 0;
 
             for i in 0..(*atom).nb_ranges {
                 range = *(*atom).ranges.add(i as usize);
@@ -3358,7 +3347,7 @@ unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
         );
     } else if (*exec).nb_rollbacks >= (*exec).max_rollbacks {
         let mut tmp: *mut XmlRegExecRollback;
-        let len: c_int = (*exec).max_rollbacks;
+        let len: i32 = (*exec).max_rollbacks;
 
         (*exec).max_rollbacks *= 2;
         tmp = xml_realloc(
@@ -3387,7 +3376,7 @@ unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
             .is_null()
         {
             (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts =
-                xml_malloc((*(*exec).comp).nb_counters as usize * size_of::<c_int>()) as *mut c_int;
+                xml_malloc((*(*exec).comp).nb_counters as usize * size_of::<i32>()) as *mut i32;
             if (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize))
                 .counts
                 .is_null()
@@ -3400,7 +3389,7 @@ unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
         memcpy(
             (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts as _,
             (*exec).counts as _,
-            (*(*exec).comp).nb_counters as usize * size_of::<c_int>(),
+            (*(*exec).comp).nb_counters as usize * size_of::<i32>(),
         );
     }
     (*exec).nb_rollbacks += 1;
@@ -3408,13 +3397,13 @@ unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
 
 pub(crate) const REGEXP_ALL_COUNTER: usize = 0x123456;
 
-unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> c_int {
+unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
     let mut execval: XmlRegExecCtxt = unsafe { zeroed() };
     let exec: XmlRegExecCtxtPtr = addr_of_mut!(execval);
-    let mut ret: c_int;
-    let mut codepoint: c_int;
-    let mut len: c_int;
-    let mut deter: c_int;
+    let mut ret: i32;
+    let mut codepoint: i32;
+    let mut len: i32;
+    let mut deter: i32;
 
     (*exec).input_string = content;
     (*exec).index = 0;
@@ -3431,8 +3420,7 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
     (*exec).input_stack = null_mut();
     (*exec).input_stack_max = 0;
     if (*comp).nb_counters > 0 {
-        (*exec).counts =
-            xml_malloc((*comp).nb_counters as usize * size_of::<c_int>()) as *mut c_int;
+        (*exec).counts = xml_malloc((*comp).nb_counters as usize * size_of::<i32>()) as *mut i32;
         if (*exec).counts.is_null() {
             xml_regexp_err_memory(null_mut(), c"running regexp".as_ptr());
             return -1;
@@ -3440,7 +3428,7 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
         memset(
             (*exec).counts as _,
             0,
-            (*comp).nb_counters as usize * size_of::<c_int>(),
+            (*comp).nb_counters as usize * size_of::<i32>(),
         );
     } else {
         (*exec).counts = null_mut();
@@ -3506,7 +3494,7 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
                          * A counted transition.
                          */
 
-                        let count: c_int = *(*exec).counts.add((*trans).count as usize);
+                        let count: i32 = *(*exec).counts.add((*trans).count as usize);
                         let counter: XmlRegCounterPtr =
                             (*(*exec).comp).counters.add((*trans).count as usize);
                         ret = (count >= (*counter).min && count <= (*counter).max) as i32;
@@ -3569,7 +3557,7 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
                                     break 'inner;
                                 }
                                 if (*exec).transcount >= (*atom).min {
-                                    let transno: c_int = (*exec).transno;
+                                    let transno: i32 = (*exec).transno;
                                     let state: XmlRegStatePtr = (*exec).state;
 
                                     /*
@@ -3719,7 +3707,7 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
  *
  * Returns 1 if it matches, 0 if not and a negative value in case of error
  */
-pub unsafe extern "C" fn xml_regexp_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn xml_regexp_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
     if comp.is_null() || content.is_null() {
         return -1;
     }
@@ -4082,9 +4070,9 @@ pub unsafe extern "C" fn xml_regexp_print(output: *mut FILE, regexp: XmlRegexpPt
 unsafe extern "C" fn xml_fa_equal_atoms(
     atom1: XmlRegAtomPtr,
     atom2: XmlRegAtomPtr,
-    deep: c_int,
-) -> c_int {
-    let mut ret: c_int = 0;
+    deep: i32,
+) -> i32 {
+    let mut ret: i32 = 0;
 
     if atom1 == atom2 {
         return 1;
@@ -4135,7 +4123,7 @@ unsafe extern "C" fn xml_fa_equal_atoms(
 unsafe extern "C" fn xml_fa_compare_atom_types(
     mut type1: XmlRegAtomType,
     mut type2: XmlRegAtomType,
-) -> c_int {
+) -> i32 {
     if matches!(
         type1,
         XmlRegAtomType::XmlRegexpEpsilon
@@ -4379,7 +4367,7 @@ unsafe extern "C" fn xml_fa_compare_atom_types(
 unsafe extern "C" fn xml_reg_str_equal_wildcard(
     mut exp_str: *const XmlChar,
     mut val_str: *const XmlChar,
-) -> c_int {
+) -> i32 {
     if exp_str == val_str {
         return 1;
     }
@@ -4430,8 +4418,8 @@ unsafe extern "C" fn xml_reg_str_equal_wildcard(
 unsafe extern "C" fn xml_fa_compare_ranges(
     mut range1: XmlRegRangePtr,
     mut range2: XmlRegRangePtr,
-) -> c_int {
-    let mut ret: c_int;
+) -> i32 {
+    let mut ret: i32;
 
     if matches!(
         (*range1).typ,
@@ -4468,7 +4456,7 @@ unsafe extern "C" fn xml_fa_compare_ranges(
             ret = 1;
         }
     } else if (*range1).typ == XmlRegAtomType::XmlRegexpCharval {
-        let mut neg: c_int = 0;
+        let mut neg: i32 = 0;
 
         /*
          * just check all codepoints in the range for acceptance,
@@ -4645,9 +4633,9 @@ unsafe extern "C" fn xml_fa_compare_ranges(
 unsafe extern "C" fn xml_fa_compare_atoms(
     mut atom1: XmlRegAtomPtr,
     mut atom2: XmlRegAtomPtr,
-    deep: c_int,
-) -> c_int {
-    let mut ret: c_int = 1;
+    deep: i32,
+) -> i32 {
+    let mut ret: i32 = 1;
 
     if atom1 == atom2 {
         return 1;
@@ -4680,8 +4668,8 @@ unsafe extern "C" fn xml_fa_compare_atoms(
                 } else {
                     let val1: *mut XmlChar = (*atom1).valuep as *mut XmlChar;
                     let val2: *mut XmlChar = (*atom2).valuep as *mut XmlChar;
-                    let compound1: c_int = !xml_strchr(val1, b'|').is_null() as i32;
-                    let compound2: c_int = !xml_strchr(val2, b'|').is_null() as i32;
+                    let compound1: i32 = !xml_strchr(val1, b'|').is_null() as i32;
+                    let compound2: i32 = !xml_strchr(val2, b'|').is_null() as i32;
 
                     /* Ignore negative match flag for ##other namespaces */
                     if compound1 != compound2 {
@@ -4707,7 +4695,7 @@ unsafe extern "C" fn xml_fa_compare_atoms(
             }
             XmlRegAtomType::XmlRegexpRanges => {
                 if matches!((*atom2).typ, XmlRegAtomType::XmlRegexpRanges) {
-                    let mut res: c_int;
+                    let mut res: i32;
                     let mut r1: XmlRegRangePtr;
                     let mut r2: XmlRegRangePtr;
 
@@ -4756,13 +4744,13 @@ unsafe extern "C" fn xml_fa_compare_atoms(
 unsafe extern "C" fn xml_fa_recurse_determinism(
     ctxt: XmlRegParserCtxtPtr,
     state: XmlRegStatePtr,
-    to: c_int,
+    to: i32,
     atom: XmlRegAtomPtr,
-) -> c_int {
-    let mut ret: c_int = 1;
-    let mut res: c_int;
+) -> i32 {
+    let mut ret: i32 = 1;
+    let mut res: i32;
     let mut t1: XmlRegTransPtr;
-    let mut deep: c_int = 1;
+    let mut deep: i32 = 1;
 
     if state.is_null() {
         return ret;
@@ -4779,7 +4767,7 @@ unsafe extern "C" fn xml_fa_recurse_determinism(
      * don't recurse on transitions potentially added in the course of
      * the elimination.
      */
-    let nb_trans: c_int = (*state).nb_trans;
+    let nb_trans: i32 = (*state).nb_trans;
     for transnr in 0..nb_trans {
         t1 = (*state).trans.add(transnr as usize);
         /*
@@ -4828,7 +4816,7 @@ unsafe extern "C" fn xml_fa_finish_recurse_determinism(
     }
     (*state).markd = XmlRegMarkedType::XmlRegexpMarkNormal;
 
-    let nb_trans: c_int = (*state).nb_trans;
+    let nb_trans: i32 = (*state).nb_trans;
     for transnr in 0..nb_trans {
         let t1: XmlRegTransPtr = (*state).trans.add(transnr as usize);
         if (*t1).atom.is_null() && (*t1).to >= 0 {
@@ -4845,13 +4833,13 @@ unsafe extern "C" fn xml_fa_finish_recurse_determinism(
  * should be called after xmlFAEliminateEpsilonTransitions()
  *
  */
-pub(crate) unsafe extern "C" fn xml_fa_computes_determinism(ctxt: XmlRegParserCtxtPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_fa_computes_determinism(ctxt: XmlRegParserCtxtPtr) -> i32 {
     let mut state: XmlRegStatePtr;
     let mut t1: XmlRegTransPtr;
     let mut t2: XmlRegTransPtr;
     let mut last: XmlRegTransPtr;
-    let mut ret: c_int = 1;
-    let mut deep: c_int = 1;
+    let mut ret: i32 = 1;
+    let mut deep: i32 = 1;
 
     if (*ctxt).determinist != -1 {
         return (*ctxt).determinist;
@@ -5008,7 +4996,7 @@ pub(crate) unsafe extern "C" fn xml_fa_computes_determinism(ctxt: XmlRegParserCt
  *
  * Returns 1 if it yes, 0 if not and a negative value in case of error
  */
-pub unsafe extern "C" fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> c_int {
+pub unsafe extern "C" fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
     if comp.is_null() {
         return -1;
     }
@@ -5032,7 +5020,7 @@ pub unsafe extern "C" fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> c_int 
     (*am).states = (*comp).states;
     (*am).determinist = -1;
     (*am).flags = (*comp).flags;
-    let ret: c_int = xml_fa_computes_determinism(am);
+    let ret: i32 = xml_fa_computes_determinism(am);
     (*am).atoms = null_mut();
     (*am).states = null_mut();
     xml_free_automata(am);
@@ -5108,7 +5096,7 @@ pub unsafe extern "C" fn xml_reg_new_exec_ctxt(
          * the second half is used to store the data in case of rollback
          */
         (*exec).counts =
-            xml_malloc((*comp).nb_counters as usize * size_of::<c_int>() * 2) as *mut c_int;
+            xml_malloc((*comp).nb_counters as usize * size_of::<i32>() * 2) as *mut i32;
         if (*exec).counts.is_null() {
             xml_regexp_err_memory(null_mut(), c"creating execution context".as_ptr());
             xml_free(exec as _);
@@ -5117,7 +5105,7 @@ pub unsafe extern "C" fn xml_reg_new_exec_ctxt(
         memset(
             (*exec).counts as _,
             0,
-            (*comp).nb_counters as usize * size_of::<c_int>() * 2,
+            (*comp).nb_counters as usize * size_of::<i32>() * 2,
         );
         (*exec).err_counts = (*exec).counts.add((*comp).nb_counters as usize);
     } else {
@@ -5190,9 +5178,9 @@ unsafe extern "C" fn xml_reg_compact_push_string(
     comp: XmlRegexpPtr,
     value: *const XmlChar,
     data: *mut c_void,
-) -> c_int {
-    let state: c_int = (*exec).index;
-    let mut target: c_int;
+) -> i32 {
+    let state: i32 = (*exec).index;
+    let mut target: i32;
 
     if comp.is_null() || (*comp).compact.is_null() || (*comp).string_map.is_null() {
         return -1;
@@ -5320,13 +5308,13 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
     exec: XmlRegExecCtxtPtr,
     mut value: *const XmlChar,
     mut data: *mut c_void,
-    compound: c_int,
-) -> c_int {
+    compound: i32,
+) -> i32 {
     let mut trans: XmlRegTransPtr;
     let mut atom: XmlRegAtomPtr;
-    let mut ret: c_int;
-    let mut is_final: c_int = 0;
-    let mut progress: c_int = 1;
+    let mut ret: i32;
+    let mut is_final: i32 = 0;
+    let mut progress: i32 = 1;
 
     if exec.is_null() {
         return -1;
@@ -5388,7 +5376,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                     atom = (*trans).atom;
                     ret = 0;
                     if (*trans).count as usize == REGEXP_ALL_LAX_COUNTER {
-                        let mut count: c_int;
+                        let mut count: i32;
                         let mut t: XmlRegTransPtr;
                         let mut counter: XmlRegCounterPtr;
 
@@ -5425,7 +5413,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                             }
                         }
                     } else if (*trans).count as usize == REGEXP_ALL_COUNTER {
-                        let mut count: c_int;
+                        let mut count: i32;
                         let mut t: XmlRegTransPtr;
                         let mut counter: XmlRegCounterPtr;
 
@@ -5451,7 +5439,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                          * A counted transition.
                          */
 
-                        let count: c_int = *(*exec).counts.add((*trans).count as usize);
+                        let count: i32 = *(*exec).counts.add((*trans).count as usize);
                         let counter: XmlRegCounterPtr =
                             (*(*exec).comp).counters.add((*trans).count as usize);
                         ret = (count >= (*counter).min && count <= (*counter).max) as _;
@@ -5468,7 +5456,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                             }
                         }
                         if ret == 1 && (*trans).counter >= 0 {
-                            let count: c_int = *(*exec).counts.add((*trans).counter as usize);
+                            let count: i32 = *(*exec).counts.add((*trans).counter as usize);
                             let counter: XmlRegCounterPtr =
                                 (*(*exec).comp).counters.add((*trans).counter as usize);
                             if count >= (*counter).max {
@@ -5509,7 +5497,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                                     break 'inner;
                                 }
                                 if (*exec).transcount >= (*atom).min {
-                                    let transno: c_int = (*exec).transno;
+                                    let transno: i32 = (*exec).transno;
                                     let state: XmlRegStatePtr = (*exec).state;
 
                                     /*
@@ -5585,7 +5573,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                             memcpy(
                                 (*exec).err_counts as _,
                                 (*exec).counts as _,
-                                (*(*exec).comp).nb_counters as usize * size_of::<c_int>(),
+                                (*(*exec).comp).nb_counters as usize * size_of::<i32>(),
                             );
                         }
                         (*exec).state = *(*(*exec).comp).states.add((*trans).to as usize);
@@ -5639,7 +5627,7 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
                 memcpy(
                     (*exec).err_counts as _,
                     (*exec).counts as _,
-                    (*(*exec).comp).nb_counters as usize * size_of::<c_int>(),
+                    (*(*exec).comp).nb_counters as usize * size_of::<i32>(),
                 );
             }
         }
@@ -5675,7 +5663,7 @@ pub unsafe extern "C" fn xml_reg_exec_push_string(
     exec: XmlRegExecCtxtPtr,
     value: *const XmlChar,
     data: *mut c_void,
-) -> c_int {
+) -> i32 {
     xml_reg_exec_push_string_internal(exec, value, data, 0)
 }
 
@@ -5698,7 +5686,7 @@ pub unsafe extern "C" fn xml_reg_exec_push_string2(
     value: *const XmlChar,
     value2: *const XmlChar,
     data: *mut c_void,
-) -> c_int {
+) -> i32 {
     let mut buf: [XmlChar; 150] = [0; 150];
     let str: *mut XmlChar;
 
@@ -5716,8 +5704,8 @@ pub unsafe extern "C" fn xml_reg_exec_push_string2(
         return xml_reg_exec_push_string(exec, value, data);
     }
 
-    let lenn: c_int = strlen(value2 as _) as _;
-    let lenp: c_int = strlen(value as _) as _;
+    let lenn: i32 = strlen(value2 as _) as _;
+    let lenp: i32 = strlen(value as _) as _;
 
     if 150 < lenn + lenp + 2 {
         str = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as *mut XmlChar;
@@ -5761,23 +5749,23 @@ pub unsafe extern "C" fn xml_reg_exec_push_string2(
  */
 unsafe extern "C" fn xml_reg_exec_get_values(
     exec: XmlRegExecCtxtPtr,
-    err: c_int,
-    nbval: *mut c_int,
-    nbneg: *mut c_int,
+    err: i32,
+    nbval: *mut i32,
+    nbneg: *mut i32,
     values: *mut *mut XmlChar,
-    terminal: *mut c_int,
-) -> c_int {
-    let mut nb: c_int = 0;
+    terminal: *mut i32,
+) -> i32 {
+    let mut nb: i32 = 0;
 
     if exec.is_null() || nbval.is_null() || nbneg.is_null() || values.is_null() || *nbval <= 0 {
         return -1;
     }
 
-    let maxval: c_int = *nbval;
+    let maxval: i32 = *nbval;
     *nbval = 0;
     *nbneg = 0;
     if !(*exec).comp.is_null() && !(*(*exec).comp).compact.is_null() {
-        let mut target: c_int;
+        let mut target: i32;
         let comp: XmlRegexpPtr = (*exec).comp;
 
         let state = if err != 0 {
@@ -5980,11 +5968,11 @@ unsafe extern "C" fn xml_reg_exec_get_values(
  */
 pub unsafe extern "C" fn xml_reg_exec_next_values(
     exec: XmlRegExecCtxtPtr,
-    nbval: *mut c_int,
-    nbneg: *mut c_int,
+    nbval: *mut i32,
+    nbneg: *mut i32,
     values: *mut *mut XmlChar,
-    terminal: *mut c_int,
-) -> c_int {
+    terminal: *mut i32,
+) -> i32 {
     xml_reg_exec_get_values(exec, 0, nbval, nbneg, values, terminal)
 }
 
@@ -6010,11 +5998,11 @@ pub unsafe extern "C" fn xml_reg_exec_next_values(
 pub unsafe extern "C" fn xml_reg_exec_err_info(
     exec: XmlRegExecCtxtPtr,
     string: *mut *const XmlChar,
-    nbval: *mut c_int,
-    nbneg: *mut c_int,
+    nbval: *mut i32,
+    nbneg: *mut i32,
     values: *mut *mut XmlChar,
-    terminal: *mut c_int,
-) -> c_int {
+    terminal: *mut i32,
+) -> i32 {
     if exec.is_null() {
         return -1;
     }
@@ -6041,14 +6029,14 @@ pub type XmlExpCtxtPtr = *mut XmlExpCtxt;
 pub struct XmlExpCtxt {
     dict: XmlDictPtr,
     table: *mut XmlExpNodePtr,
-    size: c_int,
-    nb_elems: c_int,
-    nb_nodes: c_int,
-    max_nodes: c_int,
+    size: i32,
+    nb_elems: i32,
+    nb_nodes: i32,
+    max_nodes: i32,
     expr: *const c_char,
     cur: *const c_char,
-    nb_cons: c_int,
-    tab_size: c_int,
+    nb_cons: i32,
+    tab_size: i32,
 }
 
 /**
@@ -6081,10 +6069,10 @@ pub unsafe extern "C" fn xml_exp_free_ctxt(ctxt: XmlExpCtxtPtr) {
  * Returns the context or NULL in case of error
  */
 #[cfg(feature = "libxml_expr")]
-pub unsafe extern "C" fn xml_exp_new_ctxt(mut max_nodes: c_int, dict: XmlDictPtr) -> XmlExpCtxtPtr {
+pub unsafe extern "C" fn xml_exp_new_ctxt(mut max_nodes: i32, dict: XmlDictPtr) -> XmlExpCtxtPtr {
     use crate::libxml::dict::{xml_dict_create, xml_dict_reference};
 
-    let size: c_int = 256;
+    let size: i32 = 256;
 
     if max_nodes <= 4096 {
         max_nodes = 4096;
@@ -6131,7 +6119,7 @@ pub unsafe extern "C" fn xml_exp_new_ctxt(mut max_nodes: c_int, dict: XmlDictPtr
  * Returns the number of nodes in use or -1 in case of error
  */
 #[cfg(feature = "libxml_expr")]
-pub unsafe extern "C" fn xml_exp_ctxt_nb_nodes(ctxt: XmlExpCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_exp_ctxt_nb_nodes(ctxt: XmlExpCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -6147,7 +6135,7 @@ pub unsafe extern "C" fn xml_exp_ctxt_nb_nodes(ctxt: XmlExpCtxtPtr) -> c_int {
  * Returns the number of nodes ever allocated or -1 in case of error
  */
 #[cfg(feature = "libxml_expr")]
-pub unsafe extern "C" fn xml_exp_ctxt_nb_cons(ctxt: XmlExpCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_exp_ctxt_nb_cons(ctxt: XmlExpCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -6161,8 +6149,8 @@ pub type XmlExpNodePtr = *mut XmlExpNode;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct Count {
-    f_min: c_int,
-    f_max: c_int,
+    f_min: i32,
+    f_max: i32,
 }
 #[cfg(feature = "libxml_expr")]
 #[repr(C)]
@@ -6180,11 +6168,11 @@ union Field {
 #[cfg(feature = "libxml_expr")]
 #[repr(C)]
 pub struct XmlExpNode {
-    typ: c_uchar,  /* xmlExpNodeType */
-    info: c_uchar, /* OR of XmlExpNodeInfo */
-    key: c_ushort, /* the hash key */
-    refe: c_uint,  /* The number of references */
-    c_max: c_int,  /* the maximum length it can consume */
+    typ: u8,    /* xmlExpNodeType */
+    info: u8,   /* OR of XmlExpNodeInfo */
+    key: u16,   /* the hash key */
+    refe: u32,  /* The number of references */
+    c_max: i32, /* the maximum length it can consume */
     exp_left: XmlExpNodePtr,
     next: XmlExpNodePtr, /* the next node in the hash table or free list */
     field: Field,
@@ -6229,7 +6217,7 @@ pub unsafe extern "C" fn xml_exp_free(ctxt: XmlExpCtxtPtr, exp: XmlExpNodePtr) {
     (*exp).refe -= 1;
     if (*exp).refe == 0 {
         /* Unlink it first from the hash table */
-        let key: c_ushort = (*exp).key % (*ctxt).size as u16;
+        let key: u16 = (*exp).key % (*ctxt).size as u16;
         if *(*ctxt).table.add(key as usize) == exp {
             *(*ctxt).table.add(key as usize) = (*exp).next;
         } else {
@@ -6286,8 +6274,8 @@ macro_rules! SKIP_BLANKS {
 }
 
 #[cfg(feature = "libxml_expr")]
-unsafe extern "C" fn xml_exp_parse_number(ctxt: XmlExpCtxtPtr) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn xml_exp_parse_number(ctxt: XmlExpCtxtPtr) -> i32 {
+    let mut ret: i32 = 0;
 
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'*' as _ {
@@ -6359,10 +6347,10 @@ unsafe extern "C" fn xml_exp_parse_or(ctxt: XmlExpCtxtPtr) -> XmlExpNodePtr {
         SKIP_BLANKS!(ctxt);
     }
     if CUR!(ctxt) == b'{' as _ {
-        let max: c_int;
+        let max: i32;
 
         NEXT!(ctxt);
-        let min: c_int = xml_exp_parse_number(ctxt);
+        let min: i32 = xml_exp_parse_number(ctxt);
         if min < 0 {
             xml_exp_free(ctxt, ret);
             return null_mut();
@@ -6513,18 +6501,18 @@ pub unsafe extern "C" fn xml_exp_parse(ctxt: XmlExpCtxtPtr, expr: *const c_char)
  * Calculate the hash key for a token
  */
 #[cfg(feature = "libxml_expr")]
-unsafe extern "C" fn xml_exp_hash_name_compute_key(mut name: *const XmlChar) -> c_ushort {
-    let mut value: c_ushort = 0;
+unsafe extern "C" fn xml_exp_hash_name_compute_key(mut name: *const XmlChar) -> u16 {
+    let mut value: u16 = 0;
     let mut ch: c_char;
 
     if !name.is_null() {
-        value += 30 * (*name) as c_ushort;
+        value += 30 * (*name) as u16;
         while {
             ch = *name as _;
             name = name.add(1);
             ch != 0
         } {
-            value ^= (((value as u64) << 5) + (value as u64 >> 3) + ch as c_ulong) as u16;
+            value ^= (((value as u64) << 5) + (value as u64 >> 3) + ch as u64) as u16;
         }
     }
     value
@@ -6539,27 +6527,27 @@ unsafe extern "C" fn xml_exp_hash_compute_key(
     typ: XmlExpNodeType,
     left: XmlExpNodePtr,
     right: XmlExpNodePtr,
-) -> c_ushort {
-    let mut value: c_ulong;
-    let ret: c_ushort;
+) -> u16 {
+    let mut value: u64;
+    let ret: u16;
 
     match typ {
         XmlExpNodeType::XmlExpSeq => {
             value = (*left).key as _;
             value += (*right).key as u64;
             value *= 3;
-            ret = value as c_ushort;
+            ret = value as u16;
         }
         XmlExpNodeType::XmlExpOr => {
             value = (*left).key as _;
             value += (*right).key as u64;
             value *= 7;
-            ret = value as c_ushort;
+            ret = value as u16;
         }
         XmlExpNodeType::XmlExpCount => {
             value = (*left).key as _;
             value += (*right).key as u64;
-            ret = value as c_ushort;
+            ret = value as u16;
         }
         _ => {
             ret = 0;
@@ -6605,10 +6593,10 @@ unsafe extern "C" fn xml_exp_hash_get_entry(
     mut left: XmlExpNodePtr,
     mut right: XmlExpNodePtr,
     name: *const XmlChar,
-    min: c_int,
-    max: c_int,
+    min: i32,
+    max: i32,
 ) -> XmlExpNodePtr {
-    let mut kbase: c_ushort;
+    let mut kbase: u16;
     let mut insert: XmlExpNodePtr;
 
     if ctxt.is_null() {
@@ -6794,7 +6782,7 @@ unsafe extern "C" fn xml_exp_hash_get_entry(
         return null_mut();
     }
 
-    let key: c_ushort = kbase % (*ctxt).size as u16;
+    let key: u16 = kbase % (*ctxt).size as u16;
     if !(*(*ctxt).table.add(key as usize)).is_null() {
         insert = *(*ctxt).table.add(key as usize);
         while !insert.is_null() {
@@ -6895,7 +6883,7 @@ unsafe extern "C" fn xml_exp_hash_get_entry(
 pub unsafe extern "C" fn xml_exp_new_atom(
     ctxt: XmlExpCtxtPtr,
     mut name: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) -> XmlExpNodePtr {
     if ctxt.is_null() || name.is_null() {
         return null_mut();
@@ -6993,8 +6981,8 @@ pub unsafe extern "C" fn xml_exp_new_seq(
 pub unsafe extern "C" fn xml_exp_new_range(
     ctxt: XmlExpCtxtPtr,
     subset: XmlExpNodePtr,
-    min: c_int,
-    max: c_int,
+    min: i32,
+    max: i32,
 ) -> XmlExpNodePtr {
     if ctxt.is_null() {
         return null_mut();
@@ -7026,7 +7014,7 @@ pub unsafe extern "C" fn xml_exp_new_range(
  * Returns 1 if nillable, 0 if not and -1 in case of error
  */
 #[cfg(feature = "libxml_expr")]
-pub unsafe extern "C" fn xml_exp_is_nillable(exp: XmlExpNodePtr) -> c_int {
+pub unsafe extern "C" fn xml_exp_is_nillable(exp: XmlExpNodePtr) -> i32 {
     if exp.is_null() {
         return -1;
     }
@@ -7042,7 +7030,7 @@ pub unsafe extern "C" fn xml_exp_is_nillable(exp: XmlExpNodePtr) -> c_int {
  * Returns the maximum length or -1 in case of error
  */
 #[cfg(feature = "libxml_expr")]
-pub unsafe extern "C" fn xml_exp_max_token(expr: XmlExpNodePtr) -> c_int {
+pub unsafe extern "C" fn xml_exp_max_token(expr: XmlExpNodePtr) -> i32 {
     if expr.is_null() {
         return -1;
     }
@@ -7054,11 +7042,11 @@ unsafe extern "C" fn xml_exp_get_language_int(
     _ctxt: XmlExpCtxtPtr,
     mut exp: XmlExpNodePtr,
     list: *mut *const XmlChar,
-    len: c_int,
-    nb: c_int,
-) -> c_int {
-    let tmp: c_int;
-    let tmp2: c_int;
+    len: i32,
+    nb: i32,
+) -> i32 {
+    let tmp: i32;
+    let tmp2: i32;
     loop {
         if (*exp).typ == XmlExpNodeType::XmlExpEmpty as u8 {
             return 0;
@@ -7111,8 +7099,8 @@ pub unsafe extern "C" fn xml_exp_get_language(
     ctxt: XmlExpCtxtPtr,
     exp: XmlExpNodePtr,
     lang_list: *mut *const XmlChar,
-    len: c_int,
-) -> c_int {
+    len: i32,
+) -> i32 {
     if ctxt.is_null() || exp.is_null() || lang_list.is_null() || len <= 0 {
         return -1;
     }
@@ -7124,11 +7112,11 @@ unsafe extern "C" fn xml_exp_get_start_int(
     _ctxt: XmlExpCtxtPtr,
     mut exp: XmlExpNodePtr,
     list: *mut *const XmlChar,
-    len: c_int,
-    nb: c_int,
-) -> c_int {
-    let mut tmp: c_int;
-    let tmp2: c_int;
+    len: i32,
+    nb: i32,
+) -> i32 {
+    let mut tmp: i32;
+    let tmp2: i32;
     loop {
         if (*exp).typ == XmlExpNodeType::XmlExpForbid as u8
             || (*exp).typ == XmlExpNodeType::XmlExpEmpty as u8
@@ -7201,8 +7189,8 @@ pub unsafe extern "C" fn xml_exp_get_start(
     ctxt: XmlExpCtxtPtr,
     exp: XmlExpNodePtr,
     tok_list: *mut *const XmlChar,
-    len: c_int,
-) -> c_int {
+    len: i32,
+) -> i32 {
     if ctxt.is_null() || exp.is_null() || tok_list.is_null() || len <= 0 {
         return -1;
     }
@@ -7323,7 +7311,7 @@ pub unsafe extern "C" fn xml_exp_string_derive(
     ctxt: XmlExpCtxtPtr,
     exp: XmlExpNodePtr,
     str: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) -> XmlExpNodePtr {
     use super::dict::xml_dict_exists;
 
@@ -7342,8 +7330,8 @@ pub unsafe extern "C" fn xml_exp_string_derive(
 }
 
 #[cfg(feature = "libxml_expr")]
-unsafe extern "C" fn xml_exp_check_card(exp: XmlExpNodePtr, sub: XmlExpNodePtr) -> c_int {
-    let mut ret: c_int = 1;
+unsafe extern "C" fn xml_exp_check_card(exp: XmlExpNodePtr, sub: XmlExpNodePtr) -> i32 {
+    let mut ret: i32 = 1;
 
     if (*sub).c_max == -1 {
         if (*exp).c_max != -1 {
@@ -7352,10 +7340,6 @@ unsafe extern "C" fn xml_exp_check_card(exp: XmlExpNodePtr, sub: XmlExpNodePtr) 
     } else if (*exp).c_max >= 0 && (*exp).c_max < (*sub).c_max {
         ret = 0;
     }
-    // #if 0
-    //     if ((IS_NILLABLE(sub)) && (!IS_NILLABLE(exp)))
-    //         ret = 0;
-    // #endif
     ret
 }
 
@@ -7380,7 +7364,7 @@ unsafe extern "C" fn xml_exp_divide(
     sub: XmlExpNodePtr,
     mult: *mut XmlExpNodePtr,
     remain: *mut XmlExpNodePtr,
-) -> c_int {
+) -> i32 {
     let mut tmp: XmlExpNodePtr;
     let mut tmp2: XmlExpNodePtr;
 
@@ -7460,7 +7444,7 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
     let mut tmp2: XmlExpNodePtr;
     let mut tmp3: XmlExpNodePtr;
     let mut tab: *mut *const XmlChar;
-    let mut len: c_int;
+    let mut len: i32;
 
     /*
      * In case of equality and if the expression can only consume a finite
@@ -7559,8 +7543,8 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
         }
         /* Try instead to decompose */
         if (*sub).typ == XmlExpNodeType::XmlExpCount as u8 {
-            let min: c_int;
-            let max: c_int;
+            let min: i32;
+            let max: i32;
 
             ret = xml_exp_exp_derive_int(ctxt, (*exp).exp_left, (*sub).exp_left);
             if ret.is_null() {
@@ -7624,8 +7608,8 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
         }
         return xml_exp_hash_get_entry(ctxt, XmlExpNodeType::XmlExpOr, ret, tmp, null(), 0, 0);
     } else if (*exp).typ == XmlExpNodeType::XmlExpCount as u8 {
-        let min: c_int;
-        let max: c_int;
+        let min: i32;
+        let max: i32;
 
         if (*sub).typ == XmlExpNodeType::XmlExpCount as u8 {
             /*
@@ -7636,7 +7620,7 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
                 return null_mut();
             }
             if tmp == FORBIDDEN_EXP {
-                let mult: c_int = xml_exp_divide(
+                let mult: i32 = xml_exp_divide(
                     ctxt,
                     (*sub).exp_left,
                     (*exp).exp_left,
@@ -7902,7 +7886,7 @@ pub unsafe extern "C" fn xml_exp_subsume(
     ctxt: XmlExpCtxtPtr,
     exp: XmlExpNodePtr,
     sub: XmlExpNodePtr,
-) -> c_int {
+) -> i32 {
     if exp.is_null() || ctxt.is_null() || sub.is_null() {
         return -1;
     }
@@ -7938,7 +7922,7 @@ pub unsafe extern "C" fn xml_exp_subsume(
     0
 }
 
-unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob: c_int) {
+unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob: i32) {
     let mut c: XmlExpNodePtr;
 
     if expr.is_null() {

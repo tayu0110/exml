@@ -4,7 +4,6 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::c_int,
     os::raw::c_void,
     ptr::{null, null_mut},
 };
@@ -37,25 +36,25 @@ pub type XmlAutomataPtr = *mut XmlAutomata;
 pub struct XmlAutomata {
     pub(crate) string: *mut XmlChar,
     pub(crate) cur: *mut XmlChar,
-    pub(crate) error: c_int,
-    pub(crate) neg: c_int,
+    pub(crate) error: i32,
+    pub(crate) neg: i32,
     pub(crate) start: XmlRegStatePtr,
     pub(crate) end: XmlRegStatePtr,
     pub(crate) state: XmlRegStatePtr,
     pub(crate) atom: XmlRegAtomPtr,
-    pub(crate) max_atoms: c_int,
-    pub(crate) nb_atoms: c_int,
+    pub(crate) max_atoms: i32,
+    pub(crate) nb_atoms: i32,
     pub(crate) atoms: *mut XmlRegAtomPtr,
-    pub(crate) max_states: c_int,
-    pub(crate) nb_states: c_int,
+    pub(crate) max_states: i32,
+    pub(crate) nb_states: i32,
     pub(crate) states: *mut XmlRegStatePtr,
-    pub(crate) max_counters: c_int,
-    pub(crate) nb_counters: c_int,
+    pub(crate) max_counters: i32,
+    pub(crate) nb_counters: i32,
     pub(crate) counters: *mut XmlRegCounter,
-    pub(crate) determinist: c_int,
-    pub(crate) negs: c_int,
-    pub(crate) flags: c_int,
-    pub(crate) depth: c_int,
+    pub(crate) determinist: i32,
+    pub(crate) negs: i32,
+    pub(crate) flags: i32,
+    pub(crate) depth: i32,
 }
 
 /**
@@ -70,14 +69,14 @@ pub struct XmlAutomataState {
     pub(crate) mark: XmlRegMarkedType,
     pub(crate) markd: XmlRegMarkedType,
     pub(crate) reached: XmlRegMarkedType,
-    pub(crate) no: c_int,
-    pub(crate) max_trans: c_int,
-    pub(crate) nb_trans: c_int,
+    pub(crate) no: i32,
+    pub(crate) max_trans: i32,
+    pub(crate) nb_trans: i32,
     pub(crate) trans: *mut XmlRegTrans,
     /*  knowing states pointing to us can speed things up */
-    pub(crate) max_trans_to: c_int,
-    pub(crate) nb_trans_to: c_int,
-    pub(crate) trans_to: *mut c_int,
+    pub(crate) max_trans_to: i32,
+    pub(crate) nb_trans_to: i32,
+    pub(crate) trans_to: *mut i32,
 }
 
 /*
@@ -151,7 +150,7 @@ pub unsafe extern "C" fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlA
 pub unsafe extern "C" fn xml_automata_set_final_state(
     am: XmlAutomataPtr,
     state: XmlAutomataStatePtr,
-) -> c_int {
+) -> i32 {
     if am.is_null() || state.is_null() {
         return -1;
     }
@@ -249,8 +248,8 @@ pub unsafe extern "C" fn xml_automata_new_transition2(
     if token2.is_null() || *token2 == 0 {
         (*atom).valuep = xml_strdup(token as _) as _;
     } else {
-        let lenn: c_int = strlen(token2 as _) as _;
-        let lenp: c_int = strlen(token as _) as _;
+        let lenn: i32 = strlen(token2 as _) as _;
+        let lenp: i32 = strlen(token as _) as _;
 
         let str: *mut XmlChar = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
         if str.is_null() {
@@ -314,8 +313,8 @@ pub unsafe extern "C" fn xml_automata_new_neg_trans(
     if token2.is_null() || *token2 == 0 {
         (*atom).valuep = xml_strdup(token as _) as _;
     } else {
-        let lenn: c_int = strlen(token2 as _) as _;
-        let lenp: c_int = strlen(token as _) as _;
+        let lenn: i32 = strlen(token2 as _) as _;
+        let lenp: i32 = strlen(token as _) as _;
 
         let str: *mut XmlChar = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
         if str.is_null() {
@@ -371,8 +370,8 @@ pub unsafe extern "C" fn xml_automata_new_count_trans(
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
     token: *const XmlChar,
-    min: c_int,
-    max: c_int,
+    min: i32,
+    max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
     if am.is_null() || from.is_null() || token.is_null() {
@@ -405,7 +404,7 @@ pub unsafe extern "C" fn xml_automata_new_count_trans(
     /*
      * associate a counter to the transition.
      */
-    let counter: c_int = xml_reg_get_counter(am);
+    let counter: i32 = xml_reg_get_counter(am);
     if counter < 0 {
         // goto error;
         xml_reg_free_atom(atom);
@@ -471,8 +470,8 @@ pub unsafe extern "C" fn xml_automata_new_count_trans2(
     mut to: XmlAutomataStatePtr,
     token: *const XmlChar,
     token2: *const XmlChar,
-    min: c_int,
-    max: c_int,
+    min: i32,
+    max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
     if am.is_null() || from.is_null() || token.is_null() {
@@ -496,8 +495,8 @@ pub unsafe extern "C" fn xml_automata_new_count_trans2(
             return null_mut();
         }
     } else {
-        let lenn: c_int = strlen(token2 as _) as _;
-        let lenp: c_int = strlen(token as _) as _;
+        let lenn: i32 = strlen(token2 as _) as _;
+        let lenp: i32 = strlen(token as _) as _;
 
         let str: *mut XmlChar = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
         if str.is_null() {
@@ -523,7 +522,7 @@ pub unsafe extern "C" fn xml_automata_new_count_trans2(
     /*
      * associate a counter to the transition.
      */
-    let counter: c_int = xml_reg_get_counter(am);
+    let counter: i32 = xml_reg_get_counter(am);
     if counter < 0 {
         // goto error;
         xml_reg_free_atom(atom);
@@ -588,8 +587,8 @@ pub unsafe extern "C" fn xml_automata_new_once_trans(
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
     token: *const XmlChar,
-    min: c_int,
-    max: c_int,
+    min: i32,
+    max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
     if am.is_null() || from.is_null() || token.is_null() {
@@ -613,7 +612,7 @@ pub unsafe extern "C" fn xml_automata_new_once_trans(
     /*
      * associate a counter to the transition.
      */
-    let counter: c_int = xml_reg_get_counter(am);
+    let counter: i32 = xml_reg_get_counter(am);
     if counter < 0 {
         // goto error;
         xml_reg_free_atom(atom);
@@ -670,8 +669,8 @@ pub unsafe extern "C" fn xml_automata_new_once_trans2(
     mut to: XmlAutomataStatePtr,
     token: *const XmlChar,
     token2: *const XmlChar,
-    min: c_int,
-    max: c_int,
+    min: i32,
+    max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
     if am.is_null() || from.is_null() || token.is_null() {
@@ -695,8 +694,8 @@ pub unsafe extern "C" fn xml_automata_new_once_trans2(
             return null_mut();
         }
     } else {
-        let lenn: c_int = strlen(token2 as _) as _;
-        let lenp: c_int = strlen(token as _) as _;
+        let lenn: i32 = strlen(token2 as _) as _;
+        let lenp: i32 = strlen(token as _) as _;
 
         let str: *mut XmlChar = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
         if str.is_null() {
@@ -718,7 +717,7 @@ pub unsafe extern "C" fn xml_automata_new_once_trans2(
     /*
      * associate a counter to the transition.
      */
-    let counter: c_int = xml_reg_get_counter(am);
+    let counter: i32 = xml_reg_get_counter(am);
     if counter < 0 {
         // goto error;
         xml_reg_free_atom(atom);
@@ -762,8 +761,8 @@ unsafe extern "C" fn xml_fa_generate_all_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
     mut to: XmlRegStatePtr,
-    lax: c_int,
-) -> c_int {
+    lax: i32,
+) -> i32 {
     if to.is_null() {
         to = xml_reg_state_push(ctxt);
         if to.is_null() {
@@ -797,7 +796,7 @@ pub unsafe extern "C" fn xml_automata_new_all_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
-    lax: c_int,
+    lax: i32,
 ) -> XmlAutomataStatePtr {
     if am.is_null() || from.is_null() {
         return null_mut();
@@ -853,7 +852,7 @@ pub unsafe extern "C" fn xml_automata_new_counted_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
-    counter: c_int,
+    counter: i32,
 ) -> XmlAutomataStatePtr {
     if am.is_null() || from.is_null() || counter < 0 {
         return null_mut();
@@ -882,7 +881,7 @@ pub unsafe extern "C" fn xml_automata_new_counter_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
-    counter: c_int,
+    counter: i32,
 ) -> XmlAutomataStatePtr {
     if am.is_null() || from.is_null() || counter < 0 {
         return null_mut();
@@ -904,16 +903,12 @@ pub unsafe extern "C" fn xml_automata_new_counter_trans(
  *
  * Returns the counter number or -1 in case of error
  */
-pub unsafe extern "C" fn xml_automata_new_counter(
-    am: XmlAutomataPtr,
-    min: c_int,
-    max: c_int,
-) -> c_int {
+pub unsafe extern "C" fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, max: i32) -> i32 {
     if am.is_null() {
         return -1;
     }
 
-    let ret: c_int = xml_reg_get_counter(am);
+    let ret: i32 = xml_reg_get_counter(am);
     if ret < 0 {
         return -1;
     }
@@ -948,12 +943,12 @@ pub unsafe extern "C" fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlReg
  *
  * Returns 1 if true, 0 if not, and -1 in case of error
  */
-pub unsafe extern "C" fn xml_automata_is_determinist(am: XmlAutomataPtr) -> c_int {
+pub unsafe extern "C" fn xml_automata_is_determinist(am: XmlAutomataPtr) -> i32 {
     if am.is_null() {
         return -1;
     }
 
-    let ret: c_int = xml_fa_computes_determinism(am);
+    let ret: i32 = xml_fa_computes_determinism(am);
     ret
 }
 
@@ -964,7 +959,7 @@ pub unsafe extern "C" fn xml_automata_is_determinist(am: XmlAutomataPtr) -> c_in
  *
  * Set some flags on the automata
  */
-pub(crate) unsafe extern "C" fn xml_automata_set_flags(am: XmlAutomataPtr, flags: c_int) {
+pub(crate) unsafe extern "C" fn xml_automata_set_flags(am: XmlAutomataPtr, flags: i32) {
     if am.is_null() {
         return;
     }

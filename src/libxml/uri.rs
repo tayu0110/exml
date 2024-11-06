@@ -13,7 +13,7 @@
  * Author: Daniel Veillard
  */
 use std::{
-    ffi::{c_char, c_int, c_uchar},
+    ffi::c_char,
     mem::{size_of, size_of_val, zeroed},
     ptr::{addr_of_mut, null, null_mut},
 };
@@ -48,11 +48,11 @@ pub struct XmlURI {
     pub(crate) authority: *mut c_char, /* the authority part */
     pub(crate) server: *mut c_char,    /* the server part */
     pub(crate) user: *mut c_char,      /* the user part */
-    pub(crate) port: c_int,            /* the port number */
+    pub(crate) port: i32,              /* the port number */
     pub path: *mut c_char,             /* the path string */
     pub(crate) query: *mut c_char,     /* the query string (deprecated - use with caution) */
     pub(crate) fragment: *mut c_char,  /* the fragment identifier */
-    pub(crate) cleanup: c_int,         /* parsing potentially unclean URI */
+    pub(crate) cleanup: i32,           /* parsing potentially unclean URI */
     pub(crate) query_raw: *mut c_char, /* the query string (as it appears in the URI) */
 }
 
@@ -142,11 +142,11 @@ pub unsafe extern "C" fn xml_create_uri() -> XmlURIPtr {
  */
 pub unsafe extern "C" fn xml_build_uri(uri: *const XmlChar, base: *const XmlChar) -> *mut XmlChar {
     let mut val: *mut XmlChar = null_mut();
-    let mut ret: c_int;
-    let mut len: c_int;
-    let mut indx: c_int;
-    let mut cur: c_int;
-    let mut out: c_int;
+    let mut ret: i32;
+    let mut len: i32;
+    let mut indx: i32;
+    let mut cur: i32;
+    let mut out: i32;
     let mut refe: XmlURIPtr = null_mut();
     let mut bas: XmlURIPtr = null_mut();
     let mut res: XmlURIPtr = null_mut();
@@ -472,15 +472,15 @@ pub unsafe extern "C" fn xml_build_relative_uri(
     base: *const XmlChar,
 ) -> *mut XmlChar {
     let mut val: *mut XmlChar = null_mut();
-    let mut ret: c_int;
-    let mut ix: c_int;
-    let mut nbslash: c_int = 0;
-    let len: c_int;
+    let mut ret: i32;
+    let mut ix: i32;
+    let mut nbslash: i32 = 0;
+    let len: i32;
     let mut bas: XmlURIPtr = null_mut();
     let mut bptr: *mut XmlChar;
     let uptr: *mut XmlChar;
     let mut vptr: *mut XmlChar;
-    let mut remove_path: c_int = 0;
+    let mut remove_path: i32 = 0;
 
     if uri.is_null() || *uri == 0 {
         return null_mut();
@@ -565,7 +565,7 @@ pub unsafe extern "C" fn xml_build_relative_uri(
         bptr = (*bas).path as *mut XmlChar;
         {
             let mut rptr: *mut XmlChar = (*refe).path as *mut XmlChar;
-            let mut pos: c_int = 0;
+            let mut pos: i32 = 0;
 
             /*
              * Next we compare the two strings and find where they first differ
@@ -771,7 +771,7 @@ macro_rules! STRNDUP {
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_scheme(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_scheme(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
 
     if str.is_null() {
@@ -884,7 +884,7 @@ macro_rules! NEXT {
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_userinfo(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_userinfo(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
 
     cur = *str;
@@ -923,7 +923,7 @@ unsafe extern "C" fn xml_parse3986_userinfo(uri: XmlURIPtr, str: *mut *const c_c
  *
  * Returns 0 if found and skipped, 1 otherwise
  */
-unsafe extern "C" fn xml_parse3986_dec_octet(str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_dec_octet(str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char = *str;
 
     if !ISA_DIGIT!(cur) {
@@ -966,7 +966,7 @@ unsafe extern "C" fn xml_parse3986_dec_octet(str: *mut *const c_char) -> c_int {
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_host(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_host(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char = *str;
 
     let host: *const c_char = cur;
@@ -1060,13 +1060,13 @@ unsafe extern "C" fn xml_parse3986_host(uri: XmlURIPtr, str: *mut *const c_char)
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_port(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_port(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char = *str;
-    let mut port: c_int = 0;
+    let mut port: i32 = 0;
 
     if ISA_DIGIT!(cur) {
         while ISA_DIGIT!(cur) {
-            let digit: c_int = *cur as i32 - b'0' as i32;
+            let digit: i32 = *cur as i32 - b'0' as i32;
 
             if port > INT_MAX / 10 {
                 return 1;
@@ -1100,9 +1100,9 @@ unsafe extern "C" fn xml_parse3986_port(uri: XmlURIPtr, str: *mut *const c_char)
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_authority(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_authority(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     cur = *str;
     /*
@@ -1148,8 +1148,8 @@ unsafe extern "C" fn xml_parse3986_authority(uri: XmlURIPtr, str: *mut *const c_
 unsafe extern "C" fn xml_parse3986_segment(
     str: *mut *const c_char,
     forbid: c_char,
-    empty: c_int,
-) -> c_int {
+    empty: i32,
+) -> i32 {
     let mut cur: *const c_char;
 
     cur = *str;
@@ -1178,9 +1178,9 @@ unsafe extern "C" fn xml_parse3986_segment(
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_path_ab_empty(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_path_ab_empty(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     cur = *str;
 
@@ -1221,9 +1221,9 @@ unsafe extern "C" fn xml_parse3986_path_ab_empty(uri: XmlURIPtr, str: *mut *cons
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_path_absolute(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_path_absolute(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     cur = *str;
 
@@ -1271,9 +1271,9 @@ unsafe extern "C" fn xml_parse3986_path_absolute(uri: XmlURIPtr, str: *mut *cons
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_path_rootless(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_path_rootless(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     cur = *str;
 
@@ -1321,9 +1321,9 @@ unsafe extern "C" fn xml_parse3986_path_rootless(uri: XmlURIPtr, str: *mut *cons
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_hier_part(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_hier_part(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     cur = *str;
 
@@ -1396,7 +1396,7 @@ macro_rules! IS_UNWISE {
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_query(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_query(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
 
     if str.is_null() {
@@ -1449,7 +1449,7 @@ unsafe extern "C" fn xml_parse3986_query(uri: XmlURIPtr, str: *mut *const c_char
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_fragment(uri: XmlURIPtr, str: *mut *const c_char) -> c_int {
+unsafe extern "C" fn xml_parse3986_fragment(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
 
     if str.is_null() {
@@ -1493,8 +1493,8 @@ unsafe extern "C" fn xml_parse3986_fragment(uri: XmlURIPtr, str: *mut *const c_c
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -> c_int {
-    let mut ret: c_int;
+unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -> i32 {
+    let mut ret: i32;
 
     ret = xml_parse3986_scheme(uri, addr_of_mut!(str));
     if ret != 0 {
@@ -1541,12 +1541,9 @@ unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_path_no_scheme(
-    uri: XmlURIPtr,
-    str: *mut *const c_char,
-) -> c_int {
+unsafe extern "C" fn xml_parse3986_path_no_scheme(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
-    let mut ret: c_int;
+    let mut ret: i32;
 
     cur = *str;
 
@@ -1595,8 +1592,8 @@ unsafe extern "C" fn xml_parse3986_path_no_scheme(
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const c_char) -> c_int {
-    let mut ret: c_int;
+unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const c_char) -> i32 {
+    let mut ret: i32;
 
     if *str == b'/' as i8 && *str.add(1) == b'/' as i8 {
         str = str.add(2);
@@ -1661,8 +1658,8 @@ unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const 
  *
  * Returns 0 or the error code
  */
-unsafe extern "C" fn xml_parse3986_uri_reference(uri: XmlURIPtr, str: *const c_char) -> c_int {
-    let mut ret: c_int;
+unsafe extern "C" fn xml_parse3986_uri_reference(uri: XmlURIPtr, str: *const c_char) -> i32 {
+    let mut ret: i32;
 
     if str.is_null() {
         return -1;
@@ -1696,7 +1693,7 @@ unsafe extern "C" fn xml_parse3986_uri_reference(uri: XmlURIPtr, str: *const c_c
  * Returns a newly built xmlURIPtr or NULL in case of error
  */
 pub unsafe extern "C" fn xml_parse_uri(str: *const c_char) -> XmlURIPtr {
-    let ret: c_int;
+    let ret: i32;
 
     if str.is_null() {
         return null_mut();
@@ -1723,8 +1720,8 @@ pub unsafe extern "C" fn xml_parse_uri(str: *const c_char) -> XmlURIPtr {
  *
  * Returns a newly built xmlURIPtr or NULL in case of error
  */
-pub unsafe extern "C" fn xml_parse_uri_raw(str: *const c_char, raw: c_int) -> XmlURIPtr {
-    let ret: c_int;
+pub unsafe extern "C" fn xml_parse_uri_raw(str: *const c_char, raw: i32) -> XmlURIPtr {
+    let ret: i32;
 
     if str.is_null() {
         return null_mut();
@@ -1755,7 +1752,7 @@ pub unsafe extern "C" fn xml_parse_uri_raw(str: *const c_char, raw: c_int) -> Xm
  *
  * Returns 0 or the error code
  */
-pub unsafe extern "C" fn xml_parse_uri_reference(uri: XmlURIPtr, str: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_parse_uri_reference(uri: XmlURIPtr, str: *const c_char) -> i32 {
     xml_parse3986_uri_reference(uri, str)
 }
 
@@ -1867,12 +1864,12 @@ const MAX_URI_LENGTH: usize = 1024 * 1024;
  * Function to handle properly a reallocation when saving an URI
  * Also imposes some limit on the length of an URI string output
  */
-unsafe extern "C" fn xml_save_uri_realloc(ret: *mut XmlChar, max: *mut c_int) -> *mut XmlChar {
+unsafe extern "C" fn xml_save_uri_realloc(ret: *mut XmlChar, max: *mut i32) -> *mut XmlChar {
     if *max > MAX_URI_LENGTH as i32 {
         xml_uri_err_memory(c"reaching arbitrary MAX_URI_LENGTH limit\n".as_ptr() as _);
         return null_mut();
     }
-    let tmp: c_int = *max * 2;
+    let tmp: i32 = *max * 2;
     let temp: *mut XmlChar = xml_realloc(ret as _, tmp as usize + 1) as *mut XmlChar;
     if temp.is_null() {
         xml_uri_err_memory(c"saving URI\n".as_ptr() as _);
@@ -1894,8 +1891,8 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
     let mut temp: *mut XmlChar;
     let mut p: *const c_char;
-    let mut len: c_int;
-    let mut max: c_int;
+    let mut len: i32;
+    let mut max: i32;
 
     if uri.is_null() {
         return null_mut();
@@ -1949,10 +1946,10 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     len += 1;
                     p = p.add(1);
                 } else {
-                    let val: c_int = *(p as *mut c_uchar) as i32;
+                    let val: i32 = *(p as *mut u8) as i32;
                     p = p.add(1);
-                    let hi: c_int = val / 0x10;
-                    let lo: c_int = val % 0x10;
+                    let hi: i32 = val / 0x10;
+                    let lo: i32 = val % 0x10;
                     *ret.add(len as usize) = b'%';
                     len += 1;
                     *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
@@ -1997,10 +1994,10 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                             len += 1;
                             p = p.add(1);
                         } else {
-                            let val: c_int = *(p as *mut c_uchar) as i32;
+                            let val: i32 = *(p as *mut u8) as i32;
                             p = p.add(1);
-                            let hi: c_int = val / 0x10;
-                            let lo: c_int = val % 0x10;
+                            let hi: i32 = val / 0x10;
+                            let lo: i32 = val % 0x10;
                             *ret.add(len as usize) = b'%';
                             len += 1;
                             *ret.add(len as usize) =
@@ -2087,10 +2084,10 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                         len += 1;
                         p = p.add(1);
                     } else {
-                        let val: c_int = *(p as *mut c_uchar) as i32;
+                        let val: i32 = *(p as *mut u8) as i32;
                         p = p.add(1);
-                        let hi: c_int = val / 0x10;
-                        let lo: c_int = val % 0x10;
+                        let hi: i32 = val / 0x10;
+                        let lo: i32 = val % 0x10;
                         *ret.add(len as usize) = b'%';
                         len += 1;
                         *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
@@ -2158,10 +2155,10 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                         len += 1;
                         p = p.add(1);
                     } else {
-                        let val: c_int = *(p as *mut c_uchar) as i32;
+                        let val: i32 = *(p as *mut u8) as i32;
                         p = p.add(1);
-                        let hi: c_int = val / 0x10;
-                        let lo: c_int = val % 0x10;
+                        let hi: i32 = val / 0x10;
+                        let lo: i32 = val % 0x10;
                         *ret.add(len as usize) = b'%';
                         len += 1;
                         *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
@@ -2218,10 +2215,10 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                         len += 1;
                         p = p.add(1);
                     } else {
-                        let val: c_int = *(p as *mut c_uchar) as i32;
+                        let val: i32 = *(p as *mut u8) as i32;
                         p = p.add(1);
-                        let hi: c_int = val / 0x10;
-                        let lo: c_int = val % 0x10;
+                        let hi: i32 = val / 0x10;
+                        let lo: i32 = val % 0x10;
                         *ret.add(len as usize) = b'%';
                         len += 1;
                         *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
@@ -2256,10 +2253,10 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     len += 1;
                     p = p.add(1);
                 } else {
-                    let val: c_int = *(p as *mut c_uchar) as i32;
+                    let val: i32 = *(p as *mut u8) as i32;
                     p = p.add(1);
-                    let hi: c_int = val / 0x10;
-                    let lo: c_int = val % 0x10;
+                    let hi: i32 = val / 0x10;
+                    let lo: i32 = val % 0x10;
                     *ret.add(len as usize) = b'%';
                     len += 1;
                     *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
@@ -2318,8 +2315,8 @@ pub unsafe extern "C" fn xml_uri_escape_str(
     let mut ch: XmlChar;
     let mut temp: *mut XmlChar;
     let mut input: *const XmlChar;
-    let mut len: c_int;
-    let mut out: c_int;
+    let mut len: i32;
+    let mut out: i32;
 
     if str.is_null() {
         return null_mut();
@@ -2354,7 +2351,7 @@ pub unsafe extern "C" fn xml_uri_escape_str(
         ch = *input;
 
         if ch != b'@' && !IS_UNRESERVED!(ch as i8) && xml_strchr(list, ch).is_null() {
-            let mut val: c_uchar;
+            let mut val: u8;
             *ret.add(out as usize) = b'%';
             out += 1;
             val = ch >> 4;
@@ -2384,7 +2381,7 @@ pub unsafe extern "C" fn xml_uri_escape_str(
     ret
 }
 
-unsafe extern "C" fn is_hex(c: c_char) -> c_int {
+unsafe extern "C" fn is_hex(c: c_char) -> i32 {
     if (c >= b'0' as i8 && c <= b'9' as i8)
         || (c >= b'a' as i8 && c <= b'f' as i8)
         || (c >= b'A' as i8 && c <= b'F' as i8)
@@ -2401,7 +2398,7 @@ unsafe extern "C" fn is_hex(c: c_char) -> c_int {
  * @target:  optional destination buffer
  *
  * Unescaping routine, but does not check that the string is an URI. The
- * output is a direct c_uchar translation of %XX values (no encoding)
+ * output is a direct unsigned char translation of %XX values (no encoding)
  * Note that the length of the result can only be smaller or same size as
  * the input string.
  *
@@ -2410,7 +2407,7 @@ unsafe extern "C" fn is_hex(c: c_char) -> c_int {
  */
 pub unsafe extern "C" fn xml_uri_unescape_string(
     str: *const c_char,
-    mut len: c_int,
+    mut len: i32,
     target: *mut c_char,
 ) -> *mut c_char {
     let ret: *mut c_char;
@@ -2444,7 +2441,7 @@ pub unsafe extern "C" fn xml_uri_unescape_string(
             && is_hex(*input.add(1)) != 0
             && is_hex(*input.add(2)) != 0
         {
-            let mut c: c_int = 0;
+            let mut c: i32 = 0;
             input = input.add(1);
             if *input >= b'0' as i8 && *input <= b'9' as i8 {
                 c = (*input - b'0' as i8) as i32;
@@ -2488,7 +2485,7 @@ pub unsafe extern "C" fn xml_uri_unescape_string(
  *
  * Returns 0 or an error code
  */
-pub unsafe extern "C" fn xml_normalize_uri_path(path: *mut c_char) -> c_int {
+pub unsafe extern "C" fn xml_normalize_uri_path(path: *mut c_char) -> i32 {
     let mut cur: *mut c_char;
     let mut out: *mut c_char;
 
@@ -2732,7 +2729,7 @@ pub unsafe extern "C" fn xml_uri_escape(str: *const XmlChar) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
     let mut segment: *mut XmlChar;
 
-    let ret2: c_int;
+    let ret2: i32;
 
     if str.is_null() {
         return null_mut();
@@ -2907,7 +2904,7 @@ pub unsafe extern "C" fn xml_canonic_path(mut path: *const XmlChar) -> *mut XmlC
      * replace backslashes in pathnames with "forward slashes"
      */
     #[cfg(target_os = "windows")]
-    let mut len: c_int = 0;
+    let mut len: i32 = 0;
     #[cfg(target_os = "windows")]
     let mut p: *mut c_char = null_mut();
     let mut uri: XmlURIPtr;
@@ -2949,7 +2946,7 @@ pub unsafe extern "C" fn xml_canonic_path(mut path: *const XmlChar) -> *mut XmlC
     /* Check if this is an "absolute uri" */
     let absuri: *const XmlChar = xml_strstr(path, c"://".as_ptr() as _);
     if !absuri.is_null() {
-        let mut c: c_uchar;
+        let mut c: u8;
         let esc_uri: *mut XmlChar;
 
         /*
@@ -2957,7 +2954,7 @@ pub unsafe extern "C" fn xml_canonic_path(mut path: *const XmlChar) -> *mut XmlC
          * escaped leading to a parsing problem.  Check that the first
          * part matches a protocol.
          */
-        let l: c_int = absuri.offset_from(path) as _;
+        let l: i32 = absuri.offset_from(path) as _;
         'goto_path_processing: {
             /* Bypass if first part (part before the '://') is > 20 chars */
             if l <= 0 || l > 20 {

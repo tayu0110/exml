@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_uchar},
+    ffi::c_char,
     mem::size_of,
     os::raw::c_void,
     ptr::{null, null_mut},
@@ -27,7 +27,7 @@ use super::{
 pub type XmlModulePtr = *mut XmlModule;
 #[repr(C)]
 pub struct XmlModule {
-    name: *mut c_uchar,
+    name: *mut u8,
     handle: *mut c_void,
 }
 
@@ -112,7 +112,7 @@ unsafe extern "C" fn xmlModulePlatformOpen(name: *const c_char) -> *mut c_void {
  *
  * Returns a handle for the module or NULL in case of error
  */
-pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: c_int) -> XmlModulePtr {
+pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: i32) -> XmlModulePtr {
     let module: XmlModulePtr = xml_malloc(size_of::<XmlModule>()) as XmlModulePtr;
     if module.is_null() {
         xml_module_err_memory(null_mut(), c"creating module".as_ptr() as _);
@@ -161,7 +161,7 @@ unsafe extern "C" fn xml_module_platform_symbol(
     handle: *mut c_void,
     name: *const c_char,
     symbol: *mut *mut c_void,
-) -> c_int {
+) -> i32 {
     *symbol = dlsym(handle, name);
     if !dlerror().is_null() {
         return -1;
@@ -179,7 +179,7 @@ unsafe extern "C" fn xmlModulePlatformSymbol(
     handle: *mut c_void,
     name: *const c_char,
     symbol: *mut *mut c_void,
-) -> c_int {
+) -> i32 {
     todo!("replace to libloading");
     *symbol = GetProcAddress(handle, name);
     -((*symbol).is_null() as i32)
@@ -203,8 +203,8 @@ pub unsafe extern "C" fn xml_module_symbol(
     module: XmlModulePtr,
     name: *const c_char,
     symbol: *mut *mut c_void,
-) -> c_int {
-    let mut rc: c_int = -1;
+) -> i32 {
+    let mut rc: i32 = -1;
 
     if module.is_null() || symbol.is_null() || name.is_null() {
         __xml_raise_error!(
@@ -267,7 +267,7 @@ pub unsafe extern "C" fn xml_module_symbol(
  * returns 0 on success, and non-zero on error.
  */
 #[cfg(not(target_os = "windows"))]
-unsafe extern "C" fn xml_module_platform_close(handle: *mut c_void) -> c_int {
+unsafe extern "C" fn xml_module_platform_close(handle: *mut c_void) -> i32 {
     dlclose(handle)
 }
 
@@ -276,8 +276,8 @@ unsafe extern "C" fn xml_module_platform_close(handle: *mut c_void) -> c_int {
  * returns 0 on success, and non-zero on error.
  */
 #[cfg(target_os = "windows")]
-unsafe extern "C" fn xmlModulePlatformClose(handle: *mut c_void) -> c_int {
-    let rc: c_int;
+unsafe extern "C" fn xmlModulePlatformClose(handle: *mut c_void) -> i32 {
+    let rc: i32;
 
     todo!("replace to libloading");
     rc = FreeLibrary(handle);
@@ -294,7 +294,7 @@ unsafe extern "C" fn xmlModulePlatformClose(handle: *mut c_void) -> c_int {
  * Returns 0 in case of success, -1 in case of argument error and -2
  *         if the module could not be closed/unloaded.
  */
-pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> c_int {
+pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
     if module.is_null() {
         __xml_raise_error!(
             None,
@@ -317,7 +317,7 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> c_int {
         return -1;
     }
 
-    let rc: c_int = xml_module_platform_close((*module).handle);
+    let rc: i32 = xml_module_platform_close((*module).handle);
 
     if rc != 0 {
         __xml_raise_error!(
@@ -358,7 +358,7 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> c_int {
  *
  * Returns 0 in case of success, -1 in case of argument error
  */
-pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> c_int {
+pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> i32 {
     if module.is_null() {
         __xml_raise_error!(
             None,

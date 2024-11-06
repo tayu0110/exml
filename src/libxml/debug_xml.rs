@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, CStr, CString},
+    ffi::{c_char, CStr, CString},
     mem::zeroed,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null_mut},
@@ -42,14 +42,14 @@ pub type XmlDebugCtxtPtr = *mut XmlDebugCtxt;
 pub struct XmlDebugCtxt {
     output: *mut FILE,    /* the output file */
     shift: [c_char; 101], /* used for indenting */
-    depth: c_int,         /* current depth */
+    depth: i32,           /* current depth */
     doc: XmlDocPtr,       /* current document */
     node: XmlNodePtr,     /* current node */
     dict: XmlDictPtr,     /* the doc dictionary */
-    check: c_int,         /* do just checkings */
-    errors: c_int,        /* number of errors found */
-    nodict: c_int,        /* if the document has no dictionary */
-    options: c_int,       /* options */
+    check: i32,           /* do just checkings */
+    errors: i32,          /* number of errors found */
+    nodict: i32,          /* if the document has no dictionary */
+    options: i32,         /* options */
 }
 
 /*
@@ -187,7 +187,7 @@ unsafe extern "C" fn xml_debug_err2(
     ctxt: XmlDebugCtxtPtr,
     error: XmlParserErrors,
     msg: *const c_char,
-    extra: c_int,
+    extra: i32,
 ) {
     (*ctxt).errors += 1;
     __xml_raise_error!(
@@ -249,7 +249,7 @@ unsafe extern "C" fn xml_debug_err3(
  *         -2 if the namespace is not in scope, and -3 if not on
  *         an ancestor node.
  */
-unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> c_int {
+unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i32 {
     let mut cur: XmlNsPtr;
 
     if node.is_null() || ns.is_null() {
@@ -325,7 +325,7 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
     node: XmlNodePtr,
     ns: XmlNsPtr,
 ) {
-    let ret: c_int = xml_ns_check_scope(node, ns);
+    let ret: i32 = xml_ns_check_scope(node, ns);
     if ret == -2 {
         if (*ns).prefix.load(Ordering::Relaxed).is_null() {
             xml_debug_err(
@@ -1056,7 +1056,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityP
                 fprintf((*ctxt).output, c"EXTERNAL_PARAMETER_ENTITY ".as_ptr());
             }
             Some(e) => {
-                fprintf((*ctxt).output, c"ENTITY_%d ! ".as_ptr(), e as c_int);
+                fprintf((*ctxt).output, c"ENTITY_%d ! ".as_ptr(), e as i32);
             }
             _ => unreachable!(),
         }
@@ -1416,7 +1416,7 @@ unsafe extern "C" fn xml_ctxt_dump_clean_ctxt(_ctxt: XmlDebugCtxtPtr) {
  *
  * Dumps debug information for the attribute
  */
-pub unsafe extern "C" fn xml_debug_dump_attr(output: *mut FILE, attr: XmlAttrPtr, depth: c_int) {
+pub unsafe extern "C" fn xml_debug_dump_attr(output: *mut FILE, attr: XmlAttrPtr, depth: i32) {
     let mut ctxt: XmlDebugCtxt = zeroed();
 
     if output.is_null() {
@@ -1437,11 +1437,7 @@ pub unsafe extern "C" fn xml_debug_dump_attr(output: *mut FILE, attr: XmlAttrPtr
  *
  * Dumps debug information for the attribute list
  */
-pub unsafe extern "C" fn xml_debug_dump_attr_list(
-    output: *mut FILE,
-    attr: XmlAttrPtr,
-    depth: c_int,
-) {
+pub unsafe extern "C" fn xml_debug_dump_attr_list(output: *mut FILE, attr: XmlAttrPtr, depth: i32) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     if output.is_null() {
@@ -1462,11 +1458,7 @@ pub unsafe extern "C" fn xml_debug_dump_attr_list(
  *
  * Dumps debug information for the element node, it is not recursive
  */
-pub unsafe extern "C" fn xml_debug_dump_one_node(
-    output: *mut FILE,
-    node: XmlNodePtr,
-    depth: c_int,
-) {
+pub unsafe extern "C" fn xml_debug_dump_one_node(output: *mut FILE, node: XmlNodePtr, depth: i32) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     if output.is_null() {
@@ -1487,11 +1479,7 @@ pub unsafe extern "C" fn xml_debug_dump_one_node(
  *
  * Dumps debug information for the element node, it is recursive
  */
-pub unsafe extern "C" fn xml_debug_dump_node(
-    mut output: *mut FILE,
-    node: XmlNodePtr,
-    depth: c_int,
-) {
+pub unsafe extern "C" fn xml_debug_dump_node(mut output: *mut FILE, node: XmlNodePtr, depth: i32) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     extern "C" {
@@ -1518,7 +1506,7 @@ pub unsafe extern "C" fn xml_debug_dump_node(
 pub unsafe extern "C" fn xml_debug_dump_node_list(
     mut output: *mut FILE,
     node: XmlNodePtr,
-    depth: c_int,
+    depth: i32,
 ) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1935,7 +1923,7 @@ pub unsafe extern "C" fn xml_debug_dump_entities(output: *mut FILE, doc: XmlDocP
  *
  * Returns the number of errors found
  */
-pub unsafe extern "C" fn xml_debug_check_document(mut output: *mut FILE, doc: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn xml_debug_check_document(mut output: *mut FILE, doc: XmlDocPtr) -> i32 {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
     extern "C" {
@@ -2116,8 +2104,8 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
  *
  * Returns the number of children of @node.
  */
-pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> c_int {
-    let mut ret: c_int = 0;
+pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
+    let mut ret: i32 = 0;
     let mut list: XmlNodePtr = null_mut();
 
     if node.is_null() {
@@ -2173,7 +2161,7 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> c_int {
  *
  * Returns a pointer to either "True" or "False"
  */
-pub unsafe extern "C" fn xml_bool_to_text(boolval: c_int) -> *const c_char {
+pub unsafe extern "C" fn xml_bool_to_text(boolval: i32) -> *const c_char {
     if boolval != 0 {
         c"True".as_ptr()
     } else {
@@ -2212,7 +2200,7 @@ pub struct XmlShellCtxt {
     doc: XmlDocPtr,
     node: XmlNodePtr,
     pctxt: XmlXPathContextPtr,
-    loaded: c_int,
+    loaded: i32,
     output: *mut FILE,
     input: XmlShellReadlineFunc,
 }
@@ -2226,7 +2214,7 @@ pub struct XmlShellCtxt {
  *
  * This is a generic signature for the XML shell functions.
  *
- * Returns an c_int, negative returns indicating errors.
+ * Returns an int, negative returns indicating errors.
  */
 #[cfg(feature = "xpath")]
 pub type XmlShellCmd = unsafe extern "C" fn(
@@ -2234,7 +2222,7 @@ pub type XmlShellCmd = unsafe extern "C" fn(
     arg: *mut c_char,
     node: XmlNodePtr,
     node2: XmlNodePtr,
-) -> c_int;
+) -> i32;
 
 /**
  * xmlShellPrintXPathError:
@@ -2244,7 +2232,7 @@ pub type XmlShellCmd = unsafe extern "C" fn(
  * Print the xpath error to libxml default error channel
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: c_int, mut arg: *const c_char) {
+pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *const c_char) {
     use std::ffi::CStr;
 
     use crate::generic_error;
@@ -2417,7 +2405,7 @@ pub unsafe extern "C" fn xml_shell_list(
     _arg: *mut c_char,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut cur: XmlNodePtr;
     if ctxt.is_null() {
         return 0;
@@ -2464,7 +2452,7 @@ pub unsafe extern "C" fn xml_shell_base(
     _arg: *mut c_char,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use crate::libxml::globals::xml_free;
 
     use super::tree::xml_node_get_base;
@@ -2506,7 +2494,7 @@ pub unsafe extern "C" fn xml_shell_dir(
     _arg: *mut c_char,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() {
         return 0;
     }
@@ -2544,7 +2532,7 @@ pub unsafe extern "C" fn xml_shell_load(
     filename: *mut c_char,
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use crate::libxml::{
         globals::xml_free,
         htmlparser::html_parse_file,
@@ -2556,7 +2544,7 @@ pub unsafe extern "C" fn xml_shell_load(
     use super::tree::xml_free_doc;
 
     let doc: XmlDocPtr;
-    let mut html: c_int = 0;
+    let mut html: i32 = 0;
 
     if ctxt.is_null() || filename.is_null() {
         return -1;
@@ -2630,7 +2618,7 @@ pub unsafe extern "C" fn xml_shell_cat(
     _arg: *mut c_char,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use crate::libxml::{
         htmltree::{html_doc_dump, html_node_dump_file},
         tree::{xml_doc_dump, xml_elem_dump},
@@ -2686,7 +2674,7 @@ pub unsafe extern "C" fn xml_shell_write(
     filename: *mut c_char,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use libc::{fclose, fopen};
 
     use crate::libxml::{htmltree::html_save_file, tree::xml_elem_dump};
@@ -2761,7 +2749,7 @@ pub unsafe extern "C" fn xml_shell_save(
     mut filename: *mut c_char,
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use crate::libxml::htmltree::html_save_file;
 
     use super::tree::xml_save_file;
@@ -2827,7 +2815,7 @@ pub unsafe extern "C" fn xml_shell_validate(
     dtd: *mut c_char,
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use std::mem::size_of_val;
 
     use libc::memset;
@@ -2844,7 +2832,7 @@ pub unsafe extern "C" fn xml_shell_validate(
     use super::valid::XmlValidCtxt;
 
     let mut vctxt: XmlValidCtxt = unsafe { zeroed() };
-    let mut res: c_int = -1;
+    let mut res: i32 = -1;
 
     if ctxt.is_null() || (*ctxt).doc.is_null() {
         return -1;
@@ -2885,9 +2873,9 @@ pub unsafe extern "C" fn xml_shell_du(
     _arg: *mut c_char,
     tree: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut node: XmlNodePtr;
-    let mut indent: c_int = 0;
+    let mut indent: i32 = 0;
 
     if ctxt.is_null() {
         return -1;
@@ -2982,7 +2970,7 @@ pub unsafe extern "C" fn xml_shell_pwd(
     buffer: *mut c_char,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use libc::snprintf;
 
     use crate::libxml::globals::xml_free;
@@ -3029,7 +3017,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
     schemas: *mut c_char,
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use crate::{
         globals::GLOBAL_STATE,
         libxml::relaxng::{
@@ -3056,7 +3044,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
     }
     let vctxt: XmlRelaxNGValidCtxtPtr = xml_relaxng_new_valid_ctxt(relaxngschemas);
     xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
-    let ret: c_int = xml_relaxng_validate_doc(vctxt, (*sctxt).doc);
+    let ret: i32 = xml_relaxng_validate_doc(vctxt, (*sctxt).doc);
 
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {
@@ -3096,7 +3084,7 @@ unsafe extern "C" fn xml_shell_grep(
     arg: *mut c_char,
     mut node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() {
         return 0;
     }
@@ -3181,7 +3169,7 @@ unsafe extern "C" fn xml_shell_set_content(
     value: *mut c_char,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut results: XmlNodePtr = null_mut();
 
     if ctxt.is_null() {
@@ -3234,7 +3222,7 @@ unsafe extern "C" fn xml_shell_register_namespace(
     arg: *mut c_char,
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use crate::libxml::{xmlstring::xml_strdup, xpath_internals::xml_xpath_register_ns};
 
     use super::globals::xml_free;
@@ -3306,7 +3294,7 @@ unsafe extern "C" fn xml_shell_register_root_namespaces(
     _arg: *mut c_char,
     root: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use super::xpath_internals::xml_xpath_register_ns;
 
     let mut ns: XmlNsPtr;
@@ -3357,7 +3345,7 @@ unsafe extern "C" fn xml_shell_set_base(
     arg: *mut c_char,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use super::tree::xml_node_set_base;
 
     xml_node_set_base(node, arg as *mut XmlChar);
@@ -3406,7 +3394,7 @@ pub unsafe extern "C" fn xml_shell(
     let mut cur: *mut c_char;
     let mut command: [c_char; 100] = [0; 100];
     let mut arg: [c_char; 400] = [0; 400];
-    let mut i: c_int;
+    let mut i: i32;
     let mut list: XmlXPathObjectPtr;
 
     if doc.is_null() {
@@ -3700,7 +3688,7 @@ pub unsafe extern "C" fn xml_shell(
             if arg[0] == 0 {
                 xml_mem_show((*ctxt).output, 0);
             } else {
-                let mut len: c_int = 0;
+                let mut len: i32 = 0;
 
                 sscanf(arg.as_mut_ptr(), c"%d".as_ptr(), addr_of_mut!(len));
                 xml_mem_show((*ctxt).output, len);
@@ -3882,7 +3870,7 @@ pub unsafe extern "C" fn xml_shell(
         } else if strcmp(command.as_ptr(), c"ls".as_ptr()) == 0
             || strcmp(command.as_ptr(), c"dir".as_ptr()) == 0
         {
-            let dir: c_int = (strcmp(command.as_ptr(), c"dir".as_ptr()) == 0) as i32;
+            let dir: i32 = (strcmp(command.as_ptr(), c"dir".as_ptr()) == 0) as i32;
 
             if arg[0] == 0 {
                 if dir != 0 {

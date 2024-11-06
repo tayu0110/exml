@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, CStr},
+    ffi::{c_char, CStr},
     mem::size_of,
     ptr::{null, null_mut, NonNull},
 };
@@ -58,8 +58,8 @@ pub type XmlLocationSetPtr = *mut XmlLocationSet;
 #[cfg(feature = "libxml_xptr_locs")]
 #[repr(C)]
 pub struct XmlLocationSet {
-    pub(crate) loc_nr: c_int,  /* number of locations in the set */
-    pub(crate) loc_max: c_int, /* size of the array as allocated */
+    pub(crate) loc_nr: i32,  /* number of locations in the set */
+    pub(crate) loc_max: i32, /* size of the array as allocated */
     pub(crate) loc_tab: *mut XmlXPathObjectPtr, /* array of locations */
 }
 
@@ -245,9 +245,9 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_merge(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_new_range_internal(
     start: XmlNodePtr,
-    startindex: c_int,
+    startindex: i32,
     end: XmlNodePtr,
-    endindex: c_int,
+    endindex: i32,
 ) -> XmlXPathObjectPtr {
     /*
      * Namespace nodes must be copied (see xmlXPathNodeSetDupNs).
@@ -289,10 +289,10 @@ unsafe extern "C" fn xml_xptr_new_range_internal(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_cmp_points(
     node1: XmlNodePtr,
-    index1: c_int,
+    index1: i32,
     node2: XmlNodePtr,
-    index2: c_int,
-) -> c_int {
+    index2: i32,
+) -> i32 {
     if node1.is_null() || node2.is_null() {
         return -2;
     }
@@ -319,7 +319,7 @@ unsafe extern "C" fn xml_xptr_cmp_points(
  */
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
-    let mut tmp: c_int;
+    let mut tmp: i32;
     let tmp2: XmlNodePtr;
     if range.is_null() {
         return;
@@ -360,9 +360,9 @@ unsafe extern "C" fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_range(
     start: XmlNodePtr,
-    startindex: c_int,
+    startindex: i32,
     end: XmlNodePtr,
-    endindex: c_int,
+    endindex: i32,
 ) -> XmlXPathObjectPtr {
     if start.is_null() {
         return null_mut();
@@ -558,7 +558,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_object(
     end: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
     let end_node: XmlNodePtr;
-    let end_index: c_int;
+    let end_index: i32;
 
     if start.is_null() {
         return null_mut();
@@ -631,7 +631,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_collapsed_range(
 unsafe extern "C" fn xml_xptr_ranges_equal(
     range1: XmlXPathObjectPtr,
     range2: XmlXPathObjectPtr,
-) -> c_int {
+) -> i32 {
     if range1 == range2 {
         return 1;
     }
@@ -753,7 +753,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_del(
     cur: XmlLocationSetPtr,
     val: XmlXPathObjectPtr,
 ) {
-    let mut i: c_int = (*cur).loc_nr;
+    let mut i: i32 = (*cur).loc_nr;
 
     if cur.is_null() {
         return;
@@ -794,7 +794,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_del(
  * Removes an entry from an existing LocationSet list.
  */
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_location_set_remove(cur: XmlLocationSetPtr, val: c_int) {
+pub(crate) unsafe extern "C" fn xml_xptr_location_set_remove(cur: XmlLocationSetPtr, val: i32) {
     if cur.is_null() {
         return;
     }
@@ -815,8 +815,8 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_remove(cur: XmlLocationSet
  * Returns the number of child for an element, -1 in case of error
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_get_arity(mut cur: XmlNodePtr) -> c_int {
-    let mut i: c_int;
+unsafe extern "C" fn xml_xptr_get_arity(mut cur: XmlNodePtr) -> i32 {
+    let mut i: i32;
     if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
@@ -844,8 +844,8 @@ unsafe extern "C" fn xml_xptr_get_arity(mut cur: XmlNodePtr) -> c_int {
  *         in case of error
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_get_index(mut cur: XmlNodePtr) -> c_int {
-    let mut i: c_int;
+unsafe extern "C" fn xml_xptr_get_index(mut cur: XmlNodePtr) -> i32 {
+    let mut i: i32;
     if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
@@ -922,7 +922,7 @@ unsafe extern "C" fn xml_xptr_covering_range(
                         | XmlElementType::XmlDocumentNode
                         | XmlElementType::XmlNotationNode
                         | XmlElementType::XmlHtmlDocumentNode => {
-                            let indx: c_int = xml_xptr_get_index(node);
+                            let indx: i32 = xml_xptr_get_index(node);
 
                             node = (*node).parent;
                             return xml_xptr_new_range(node, indx - 1, node, indx + 1);
@@ -953,7 +953,7 @@ unsafe extern "C" fn xml_xptr_covering_range(
  *  x is added to the result location-set.
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nargs: c_int) {
+unsafe extern "C" fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut set: XmlXPathObjectPtr;
 
     CHECK_ARITY!(ctxt, nargs, 1);
@@ -1107,7 +1107,7 @@ unsafe extern "C" fn xml_xptr_inside_range(
  *
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextPtr, nargs: c_int) {
+unsafe extern "C" fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut set: XmlXPathObjectPtr;
 
     CHECK_ARITY!(ctxt, nargs, 1);
@@ -1172,8 +1172,8 @@ unsafe extern "C" fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextP
 unsafe extern "C" fn xml_xptr_get_start_point(
     obj: XmlXPathObjectPtr,
     node: *mut XmlNodePtr,
-    indx: *mut c_int,
-) -> c_int {
+    indx: *mut i32,
+) -> i32 {
     if obj.is_null() || node.is_null() || indx.is_null() {
         return -1;
     }
@@ -1216,8 +1216,8 @@ unsafe extern "C" fn xml_xptr_get_start_point(
 unsafe extern "C" fn xml_xptr_get_end_point(
     obj: XmlXPathObjectPtr,
     node: *mut XmlNodePtr,
-    indx: *mut c_int,
-) -> c_int {
+    indx: *mut i32,
+) -> i32 {
     if obj.is_null() || node.is_null() || indx.is_null() {
         return -1;
     }
@@ -1253,8 +1253,8 @@ unsafe extern "C" fn xml_xptr_get_end_point(
  *
  * Returns the @no'th element child of @cur or NULL
  */
-unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: c_int) -> XmlNodePtr {
-    let mut i: c_int;
+unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: i32) -> XmlNodePtr {
+    let mut i: i32;
     if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
         return cur;
     }
@@ -1294,7 +1294,7 @@ unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: c_int) -> X
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_advance_node(
     mut cur: XmlNodePtr,
-    level: *mut c_int,
+    level: *mut i32,
 ) -> XmlNodePtr {
     // next:
     'next: loop {
@@ -1391,12 +1391,12 @@ pub(crate) unsafe extern "C" fn xml_xptr_advance_node(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_advance_char(
     node: *mut XmlNodePtr,
-    indx: *mut c_int,
-    mut bytes: c_int,
-) -> c_int {
+    indx: *mut i32,
+    mut bytes: i32,
+) -> i32 {
     let mut cur: XmlNodePtr;
-    let mut pos: c_int;
-    let mut len: c_int;
+    let mut pos: i32;
+    let mut len: i32;
 
     if node.is_null() || indx.is_null() {
         return -1;
@@ -1482,9 +1482,9 @@ unsafe extern "C" fn xml_xptr_advance_char(
  * Returns -1 in case of failure, 0 otherwise
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_get_last_char(node: *mut XmlNodePtr, indx: *mut c_int) -> c_int {
+unsafe extern "C" fn xml_xptr_get_last_char(node: *mut XmlNodePtr, indx: *mut i32) -> i32 {
     let mut cur: XmlNodePtr;
-    let mut len: c_int = 0;
+    let mut len: i32 = 0;
 
     if node.is_null()
         || (*node).is_null()
@@ -1494,7 +1494,7 @@ unsafe extern "C" fn xml_xptr_get_last_char(node: *mut XmlNodePtr, indx: *mut c_
         return -1;
     }
     cur = *node;
-    let pos: c_int = *indx;
+    let pos: i32 = *indx;
 
     if matches!(
         (*cur).typ,
@@ -1543,15 +1543,15 @@ unsafe extern "C" fn xml_xptr_get_last_char(node: *mut XmlNodePtr, indx: *mut c_
 unsafe extern "C" fn xml_xptr_match_string(
     mut string: *const XmlChar,
     start: XmlNodePtr,
-    startindex: c_int,
+    startindex: i32,
     end: *mut XmlNodePtr,
-    endindex: *mut c_int,
-) -> c_int {
+    endindex: *mut i32,
+) -> i32 {
     let mut cur: XmlNodePtr;
-    let mut pos: c_int; /* 0 based */
-    let mut len: c_int; /* in bytes */
-    let mut stringlen: c_int; /* in bytes */
-    let mut is_match: c_int;
+    let mut pos: i32; /* 0 based */
+    let mut len: i32; /* in bytes */
+    let mut stringlen: i32; /* in bytes */
+    let mut is_match: i32;
 
     if string.is_null() {
         return -1;
@@ -1581,13 +1581,6 @@ unsafe extern "C" fn xml_xptr_match_string(
                 is_match =
                     (xml_strncmp((*cur).content.add(pos as usize), string, stringlen) == 0) as i32;
                 if is_match != 0 {
-                    // #ifdef DEBUG_RANGES
-                    // 		    xmlGenericError(xmlGenericErrorContext,
-                    // 			    "found range %d bytes at index %d of ->",
-                    // 			    stringlen, pos + 1);
-                    // 		    xmlDebugDumpString(stdout, (*cur).content);
-                    // 		    xmlGenericError(xmlGenericErrorContext, "\n");
-                    // #endif
                     *end = cur;
                     *endindex = pos + stringlen;
                     return 1;
@@ -1598,13 +1591,6 @@ unsafe extern "C" fn xml_xptr_match_string(
                 let sub: c_int = len - pos;
                 is_match = (xml_strncmp((*cur).content.add(pos as usize), string, sub) == 0) as i32;
                 if is_match != 0 {
-                    // #ifdef DEBUG_RANGES
-                    // 		    xmlGenericError(xmlGenericErrorContext,
-                    // 			    "found subrange %d bytes at index %d of ->",
-                    // 			    sub, pos + 1);
-                    // 		    xmlDebugDumpString(stdout, (*cur).content);
-                    // 		    xmlGenericError(xmlGenericErrorContext, "\n");
-                    // #endif
                     string = string.add(sub as usize);
                     stringlen -= sub;
                 } else {
@@ -1641,14 +1627,14 @@ unsafe extern "C" fn xml_xptr_match_string(
 unsafe extern "C" fn xml_xptr_search_string(
     string: *const XmlChar,
     start: *mut XmlNodePtr,
-    startindex: *mut c_int,
+    startindex: *mut i32,
     end: *mut XmlNodePtr,
-    endindex: *mut c_int,
-) -> c_int {
+    endindex: *mut i32,
+) -> i32 {
     let mut cur: XmlNodePtr;
     let mut str: *const XmlChar;
-    let mut pos: c_int; /* 0 based */
-    let mut len: c_int; /* in bytes */
+    let mut pos: i32; /* 0 based */
+    let mut len: i32; /* in bytes */
 
     if string.is_null() {
         return -1;
@@ -1761,10 +1747,10 @@ unsafe extern "C" fn xml_xptr_search_string(
  * ------------------------------
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: c_int) {
-    let mut startindex: c_int = 0;
-    let mut endindex: c_int = 0;
-    let mut fendindex: c_int;
+unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+    let mut startindex: i32 = 0;
+    let mut endindex: i32 = 0;
+    let mut fendindex: i32;
     let mut start: XmlNodePtr = null_mut();
     let mut end: XmlNodePtr = null_mut();
     let mut fend: XmlNodePtr;
@@ -1774,9 +1760,9 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
     let mut string: XmlXPathObjectPtr = null_mut();
     let mut position: XmlXPathObjectPtr = null_mut();
     let mut number: XmlXPathObjectPtr = null_mut();
-    let mut found: c_int;
-    let mut pos: c_int = 0;
-    let mut num: c_int = 0;
+    let mut found: i32;
+    let mut pos: i32 = 0;
+    let mut num: i32 = 0;
 
     /*
      * Grab the arguments
@@ -1794,7 +1780,7 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
             }
             number = value_pop(ctxt);
             if !number.is_null() {
-                num = (*number).floatval as c_int;
+                num = (*number).floatval as i32;
             }
         }
         if nargs >= 3 {
@@ -1805,7 +1791,7 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
             }
             position = value_pop(ctxt);
             if !position.is_null() {
-                pos = (*position).floatval as c_int;
+                pos = (*position).floatval as i32;
             }
         }
         if (*ctxt).value.is_null() || (*(*ctxt).value).typ != XmlXPathObjectType::XpathString {
@@ -1907,7 +1893,7 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
                     ) == 0
                     {
                         if !number.is_null() && num > 0 {
-                            let mut rindx: c_int;
+                            let mut rindx: i32;
                             let mut rend: XmlNodePtr;
                             rend = start;
                             rindx = startindex - 1;
@@ -1970,7 +1956,7 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
  * Returns the newly created object.
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_new_point(node: XmlNodePtr, indx: c_int) -> XmlXPathObjectPtr {
+unsafe extern "C" fn xml_xptr_new_point(node: XmlNodePtr, indx: i32) -> XmlXPathObjectPtr {
     if node.is_null() {
         return null_mut();
     }
@@ -2014,7 +2000,7 @@ unsafe extern "C" fn xml_xptr_new_point(node: XmlNodePtr, indx: c_int) -> XmlXPa
  *
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: c_int) {
+unsafe extern "C" fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut tmp: XmlXPathObjectPtr;
     let mut obj: XmlXPathObjectPtr;
     let mut point: XmlXPathObjectPtr;
@@ -2100,8 +2086,8 @@ unsafe extern "C" fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPt
  * Returns the number of location children
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_nb_loc_children(mut node: XmlNodePtr) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn xml_xptr_nb_loc_children(mut node: XmlNodePtr) -> i32 {
+    let mut ret: i32 = 0;
     if node.is_null() {
         return -1;
     }
@@ -2154,7 +2140,7 @@ unsafe extern "C" fn xml_xptr_nb_loc_children(mut node: XmlNodePtr) -> c_int {
  * ----------------------------
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: c_int) {
+unsafe extern "C" fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut tmp: XmlXPathObjectPtr;
     let mut obj: XmlXPathObjectPtr;
     let mut point: XmlXPathObjectPtr;
@@ -2241,7 +2227,7 @@ unsafe extern "C" fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr,
  * as described in 5.4.3
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: c_int) {
+unsafe extern "C" fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
 
     if (*(*ctxt).context).here.is_null() {
@@ -2263,7 +2249,7 @@ unsafe extern "C" fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, narg
  * as described in 5.4.3
  */
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: c_int) {
+unsafe extern "C" fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
 
     if (*(*ctxt).context).origin.is_null() {
@@ -2337,7 +2323,7 @@ pub unsafe extern "C" fn xml_xptr_new_context(
  *   SKIP(n) Skip n xmlChar, and must also be used only to skip ASCII defined
  *           strings within the parser.
  *   CURRENT Returns the current c_char value, with the full decoding of
- *           UTF-8 if we are using this mode. It returns an c_int.
+ *           UTF-8 if we are using this mode. It returns an int.
  *   NEXT    Skip to the next character, this does the proper decoding
  *           in UTF-8 mode. It also pop-up unfinished entities on the fly.
  *           It returns the pointer to the current xmlChar.
@@ -2472,7 +2458,7 @@ unsafe extern "C" fn xml_xptr_err(
  * Move the current node of the nodeset on the stack to the
  * given child if found
  */
-unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: c_int) {
+unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathNodeset);
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     let oldset: XmlNodeSetPtr = (*obj).nodesetval;
@@ -2524,12 +2510,12 @@ unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, nam
     }
 
     while CUR!(ctxt) == b'/' {
-        let mut child: c_int = 0;
-        let mut overflow: c_int = 0;
+        let mut child: i32 = 0;
+        let mut overflow: i32 = 0;
         NEXT!(ctxt);
 
         while CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' {
-            let d: c_int = (CUR!(ctxt) - b'0') as i32;
+            let d: i32 = (CUR!(ctxt) - b'0') as i32;
             if child > i32::MAX / 10 {
                 overflow = 1;
             } else {
@@ -2587,8 +2573,8 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
     mut name: *mut XmlChar,
 ) {
     let mut cur: *mut XmlChar;
-    let mut len: c_int;
-    let mut level: c_int;
+    let mut len: i32;
+    let mut level: i32;
 
     if name.is_null() {
         name = xml_xpath_parse_name(ctxt);
@@ -2884,7 +2870,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
     let mut res: XmlXPathObjectPtr = null_mut();
     let mut tmp: XmlXPathObjectPtr;
     let init: XmlXPathObjectPtr = null_mut();
-    let mut stack: c_int = 0;
+    let mut stack: i32 = 0;
 
     xml_init_parser();
 
@@ -2971,7 +2957,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_range_to_function(
     ctxt: XmlXPathParserContextPtr,
-    _nargs: c_int,
+    _nargs: i32,
 ) {
     XP_ERROR!(ctxt, XmlXPathError::XpathExprError as i32);
 }
@@ -2995,8 +2981,8 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
     /* pointers to traversal nodes */
     let mut cur: XmlNodePtr;
     let mut end: XmlNodePtr;
-    let mut index1: c_int;
-    let mut index2: c_int;
+    let mut index1: i32;
+    let mut index2: i32;
 
     if range.is_null() {
         return null_mut();
@@ -3024,7 +3010,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
         if cur == end {
             if (*cur).typ == XmlElementType::XmlTextNode {
                 let mut content: *const XmlChar = (*cur).content;
-                let mut len: c_int;
+                let mut len: i32;
 
                 if content.is_null() {
                     tmp = xmlNewTextLen(null_mut(), 0);

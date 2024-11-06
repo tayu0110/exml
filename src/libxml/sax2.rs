@@ -4,18 +4,18 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_uint, c_ulong, c_void, CStr, CString},
+    ffi::{c_char, c_void, CStr, CString},
     mem::{replace, size_of},
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
     sync::atomic::Ordering,
 };
 
-use libc::{memcpy, memset, ptrdiff_t, size_t, INT_MAX};
+use libc::{memcpy, memset, INT_MAX};
 
 use crate::{
     __xml_raise_error,
-    encoding::detect_encoding,
+    encoding::{detect_encoding, XmlCharEncoding},
     error::{parser_error, parser_warning},
     globals::{GenericErrorContext, StructuredError},
     libxml::{
@@ -128,9 +128,9 @@ pub unsafe fn xml_sax2_set_document_locator(
  *
  * Provide the line number of the current parsing point.
  *
- * Returns an c_int
+ * Returns an int
  */
-pub unsafe extern "C" fn xml_sax2_get_line_number(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).input.is_null() {
         return 0;
@@ -144,9 +144,9 @@ pub unsafe extern "C" fn xml_sax2_get_line_number(ctx: *mut c_void) -> c_int {
  *
  * Provide the column number of the current parsing point.
  *
- * Returns an c_int
+ * Returns an int
  */
-pub unsafe extern "C" fn xml_sax2_get_column_number(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_sax2_get_column_number(ctx: *mut c_void) -> i32 {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).input.is_null() {
         return 0;
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn xml_sax2_get_column_number(ctx: *mut c_void) -> c_int {
  *
  * Returns 1 if true
  */
-pub unsafe fn xml_sax2_is_standalone(ctx: Option<GenericErrorContext>) -> c_int {
+pub unsafe fn xml_sax2_is_standalone(ctx: Option<GenericErrorContext>) -> i32 {
     if ctx.is_none() {
         return 0;
     }
@@ -185,7 +185,7 @@ pub unsafe fn xml_sax2_is_standalone(ctx: Option<GenericErrorContext>) -> c_int 
  *
  * Returns 1 if true
  */
-pub unsafe fn xml_sax2_has_internal_subset(ctx: Option<GenericErrorContext>) -> c_int {
+pub unsafe fn xml_sax2_has_internal_subset(ctx: Option<GenericErrorContext>) -> i32 {
     if ctx.is_none() {
         return 0;
     }
@@ -208,7 +208,7 @@ pub unsafe fn xml_sax2_has_internal_subset(ctx: Option<GenericErrorContext>) -> 
  *
  * Returns 1 if true
  */
-pub unsafe fn xml_sax2_has_external_subset(ctx: Option<GenericErrorContext>) -> c_int {
+pub unsafe fn xml_sax2_has_external_subset(ctx: Option<GenericErrorContext>) -> i32 {
     if ctx.is_none() {
         return 0;
     }
@@ -355,7 +355,7 @@ pub unsafe fn xml_sax2_external_subset(
             && ((*ctxt).well_formed != 0 && !(*ctxt).my_doc.is_null()))
     {
         let mut input: XmlParserInputPtr = null_mut();
-        let mut consumed: c_ulong;
+        let mut consumed: u64;
 
         /*
          * Ask the Entity resolver to load the damn thing
@@ -383,7 +383,7 @@ pub unsafe fn xml_sax2_external_subset(
         let oldinput_tab = replace(&mut (*ctxt).input_tab, Vec::with_capacity(5));
         let oldcharset = (*ctxt).charset;
         let oldencoding = (*ctxt).encoding.take();
-        let oldprogressive: c_int = (*ctxt).progressive;
+        let oldprogressive: i32 = (*ctxt).progressive;
         (*ctxt).progressive = 0;
         (*ctxt).input = null_mut();
         xml_push_input(ctxt, input);
@@ -428,7 +428,7 @@ pub unsafe fn xml_sax2_external_subset(
         }
 
         consumed = (*(*ctxt).input).consumed;
-        let buffered: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+        let buffered: usize = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
         if buffered as u64 > u64::MAX - consumed {
             consumed = u64::MAX;
         } else {
@@ -715,7 +715,7 @@ unsafe extern "C" fn xml_warn_msg(
 pub unsafe fn xml_sax2_entity_decl(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
     content: *mut XmlChar,
@@ -894,8 +894,8 @@ pub unsafe fn xml_sax2_attribute_decl(
     ctx: Option<GenericErrorContext>,
     elem: *const XmlChar,
     fullname: *const XmlChar,
-    typ: c_int,
-    def: c_int,
+    typ: i32,
+    def: i32,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
 ) {
@@ -921,7 +921,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         /*
          * Raise the error but keep the validity flag
          */
-        let tmp: c_int = (*ctxt).valid;
+        let tmp: i32 = (*ctxt).valid;
         xml_err_valid(
             ctxt,
             XmlParserErrors::XmlDTDXmlidType,
@@ -1004,7 +1004,7 @@ pub unsafe fn xml_sax2_attribute_decl(
 pub unsafe fn xml_sax2_element_decl(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     content: XmlElementContentPtr,
 ) {
     let elem: XmlElementPtr;
@@ -1393,9 +1393,9 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
     {
         (*(*ctxt).my_doc).encoding = (*(*ctxt).input_tab[0]).encoding.clone();
     }
-    if (*ctxt).charset != crate::encoding::XmlCharEncoding::None
+    if (*ctxt).charset != XmlCharEncoding::None
         && !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).charset == crate::encoding::XmlCharEncoding::None
+        && (*(*ctxt).my_doc).charset == XmlCharEncoding::None
     {
         (*(*ctxt).my_doc).charset = (*ctxt).charset;
     }
@@ -2055,8 +2055,8 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
 ) {
     let mut elem_decl: XmlElementPtr;
     let mut att: *const XmlChar;
-    let mut internal: c_int = 1;
-    let mut i: c_int;
+    let mut internal: i32 = 1;
+    let mut i: i32;
 
     elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).int_subset, name, prefix);
     if elem_decl.is_null() {
@@ -2252,7 +2252,7 @@ pub unsafe fn xml_sax2_start_element(
     let mut prefix: *mut XmlChar = null_mut();
     let mut att: *const XmlChar;
     let mut value: *const XmlChar;
-    let mut i: c_int;
+    let mut i: i32;
 
     if ctx.is_none() || fullname.is_null() {
         return;
@@ -2318,7 +2318,7 @@ pub unsafe fn xml_sax2_start_element(
     }
     (*ctxt).nodemem = -1;
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-        if ((*(*ctxt).input).line as c_uint) < u16::MAX as c_uint {
+        if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
             (*ret).line = (*(*ctxt).input).line as _;
         } else {
             (*ret).line = u16::MAX;
@@ -2461,8 +2461,7 @@ pub unsafe fn xml_sax2_start_element(
          * check the document root element for validity
          */
         if (*ctxt).validate != 0 && (*ctxt).vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
-            let chk: c_int =
-                xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            let chk: i32 = xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
             if chk <= 0 {
                 (*ctxt).valid = 0;
             }
@@ -2547,10 +2546,10 @@ pub unsafe fn xml_sax2_start_element_ns(
     prefix: *const XmlChar,
     // I want to rename to `uri`, but it also appears as a local variable....
     orig_uri: *const XmlChar,
-    nb_namespaces: c_int,
+    nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
-    mut nb_attributes: c_int,
-    nb_defaulted: c_int,
+    mut nb_attributes: i32,
+    nb_defaulted: i32,
     attributes: *mut *const XmlChar,
 ) {
     let ret: XmlNodePtr;
@@ -2559,7 +2558,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     let mut uri: *const XmlChar;
     let mut pref: *const XmlChar;
     let mut lname: *mut XmlChar = null_mut();
-    let mut i: c_int;
+    let mut i: i32;
 
     if ctx.is_none() {
         return;
@@ -2648,7 +2647,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         }
     }
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-        if ((*(*ctxt).input).line as c_uint) < u16::MAX as c_uint {
+        if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
             (*ret).line = (*(*ctxt).input).line as _;
         } else {
             (*ret).line = u16::MAX;
@@ -2825,8 +2824,7 @@ pub unsafe fn xml_sax2_start_element_ns(
          * check the document root element for validity
          */
         if (*ctxt).validate != 0 && (*ctxt).vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
-            let chk: c_int =
-                xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            let chk: i32 = xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
             if chk <= 0 {
                 (*ctxt).valid = 0;
             }
@@ -2852,7 +2850,7 @@ pub unsafe fn xml_sax2_start_element_ns(
 unsafe extern "C" fn xml_sax2_text_node(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) -> XmlNodePtr {
     let mut intern: *const XmlChar = null();
 
@@ -2879,7 +2877,7 @@ unsafe extern "C" fn xml_sax2_text_node(
     if (*ctxt).dict_names != 0 {
         let cur: XmlChar = *str.add(len as usize);
 
-        if len < 2 * size_of::<*mut c_void>() as c_int
+        if len < 2 * size_of::<*mut c_void>() as i32
             && (*ctxt).options & XmlParserOption::XmlParseCompact as i32 != 0
         {
             /* store the string in the node overriding properties and nsDef */
@@ -2930,7 +2928,7 @@ unsafe extern "C" fn xml_sax2_text_node(
         } else {
             (*ret).line = u16::MAX;
             if (*ctxt).options & XmlParserOption::XmlParseBigLines as i32 != 0 {
-                (*ret).psvi = (*(*ctxt).input).line as ptrdiff_t as *mut c_void;
+                (*ret).psvi = (*(*ctxt).input).line as isize as *mut c_void;
             }
         }
     }
@@ -3366,12 +3364,12 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: *const 
  * Append characters.
  */
 // static void
-// xmlSAX2Text(xmlParserCtxtPtr ctxt, const xmlChar *ch, c_int len,
+// xmlSAX2Text(xmlParserCtxtPtr ctxt, const xmlChar *ch, int len,
 //             xmlElementType type)
 unsafe extern "C" fn xml_sax2_text(
     ctxt: XmlParserCtxtPtr,
     ch: *const XmlChar,
-    len: c_int,
+    len: i32,
     typ: XmlElementType,
 ) {
     let mut last_child: XmlNodePtr;
@@ -3410,7 +3408,7 @@ unsafe extern "C" fn xml_sax2_text(
             xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
         }
     } else {
-        let coalesce_text: c_int = (!last_child.is_null()
+        let coalesce_text: i32 = (!last_child.is_null()
             && (*last_child).typ == typ
             && (!matches!(typ, XmlElementType::XmlTextNode)
                 || ((*last_child).name == XML_STRING_TEXT.as_ptr() as _)))
@@ -3449,7 +3447,7 @@ unsafe extern "C" fn xml_sax2_text(
                 return;
             }
             if (*ctxt).nodelen + len >= (*ctxt).nodemem {
-                let mut size: c_int;
+                let mut size: i32;
 
                 size = if (*ctxt).nodemem > INT_MAX - len {
                     INT_MAX
@@ -3513,11 +3511,7 @@ unsafe extern "C" fn xml_sax2_text(
  *
  * receiving some chars from the parser.
  */
-pub unsafe fn xml_sax2_characters(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: c_int,
-) {
+pub unsafe fn xml_sax2_characters(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     let ctxt = if let Some(ctx) = ctx {
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
@@ -3544,7 +3538,7 @@ pub unsafe fn xml_sax2_characters(
 pub unsafe fn xml_sax2_ignorable_whitespace(
     _ctx: Option<GenericErrorContext>,
     _ch: *const XmlChar,
-    _len: c_int,
+    _len: i32,
 ) {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
 }
@@ -3579,7 +3573,7 @@ pub unsafe fn xml_sax2_processing_instruction(
     }
 
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-        if ((*(*ctxt).input).line as c_uint) < u16::MAX as c_uint {
+        if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
             (*ret).line = (*(*ctxt).input).line as _;
         } else {
             (*ret).line = u16::MAX;
@@ -3625,7 +3619,7 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const X
         return;
     }
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
-        if ((*(*ctxt).input).line as c_uint) < u16::MAX as c_uint {
+        if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
             (*ret).line = (*(*ctxt).input).line as _;
         } else {
             (*ret).line = u16::MAX;
@@ -3661,7 +3655,7 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const X
 pub unsafe fn xml_sax2_cdata_block(
     ctx: Option<GenericErrorContext>,
     value: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     let ctxt = if let Some(ctx) = ctx {
         let lock = ctx.lock();
@@ -3672,7 +3666,7 @@ pub unsafe fn xml_sax2_cdata_block(
     xml_sax2_text(ctxt, value, len, XmlElementType::XmlCdataSectionNode);
 }
 
-static mut XML_SAX2_DEFAULT_VERSION_VALUE: c_int = 2;
+static mut XML_SAX2_DEFAULT_VERSION_VALUE: i32 = 2;
 
 /**
  * xmlSAXDefaultVersion:
@@ -3690,8 +3684,8 @@ static mut XML_SAX2_DEFAULT_VERSION_VALUE: c_int = 2;
  */
 #[deprecated]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn xml_sax_default_version(version: c_int) -> c_int {
-    let ret: c_int = XML_SAX2_DEFAULT_VERSION_VALUE;
+pub unsafe extern "C" fn xml_sax_default_version(version: i32) -> i32 {
+    let ret: i32 = XML_SAX2_DEFAULT_VERSION_VALUE;
 
     if version != 1 && version != 2 {
         return -1;
@@ -3709,7 +3703,7 @@ pub unsafe extern "C" fn xml_sax_default_version(version: c_int) -> c_int {
  *
  * Returns 0 in case of success and -1 in case of error.
  */
-pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: c_int) -> c_int {
+pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: i32) -> i32 {
     if hdlr.is_null() {
         return -1;
     }
@@ -3766,10 +3760,7 @@ pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: c_in
  *
  * Initialize the default XML SAX2 handler
  */
-pub unsafe extern "C" fn xml_sax2_init_default_sax_handler(
-    hdlr: *mut XmlSAXHandler,
-    warning: c_int,
-) {
+pub unsafe extern "C" fn xml_sax2_init_default_sax_handler(hdlr: *mut XmlSAXHandler, warning: i32) {
     if hdlr.is_null() || (*hdlr).initialized != 0 {
         return;
     }

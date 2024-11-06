@@ -3,13 +3,13 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::ffi::{c_char, c_int, c_uint};
+use std::ffi::c_char;
 
 use libc::strcmp;
 
 use super::chvalid::{xml_char_in_range, XmlChLRange, XmlChRangeGroup, XmlChSRange};
 
-pub type XmlIntFunc = unsafe extern "C" fn(c_int) -> c_int; /* just to keep one's mind untwisted */
+pub type XmlIntFunc = unsafe extern "C" fn(i32) -> i32; /* just to keep one's mind untwisted */
 
 #[repr(C)]
 pub struct XmlUnicodeRange {
@@ -20,7 +20,7 @@ pub struct XmlUnicodeRange {
 #[repr(C)]
 pub struct XmlUnicodeNameTable {
     table: *const XmlUnicodeRange,
-    numentries: c_int,
+    numentries: i32,
 }
 
 const XML_UNICODE_BLOCKS: *const XmlUnicodeRange = [
@@ -8325,7 +8325,7 @@ const XML_UNICODE_CAT_TBL: XmlUnicodeNameTable = XmlUnicodeNameTable {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_aegean_numbers(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_aegean_numbers(code: i32) -> i32 {
     (0x10100..=0x1013F).contains(&code) as i32
 }
 
@@ -8337,7 +8337,7 @@ pub unsafe extern "C" fn xml_ucs_is_aegean_numbers(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_alphabetic_presentation_forms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_alphabetic_presentation_forms(code: i32) -> i32 {
     (0xFB00..=0xFB4F).contains(&code) as i32
 }
 
@@ -8349,7 +8349,7 @@ pub unsafe extern "C" fn xml_ucs_is_alphabetic_presentation_forms(code: c_int) -
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_arabic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_arabic(code: i32) -> i32 {
     (0x0600..=0x06FF).contains(&code) as i32
 }
 
@@ -8361,7 +8361,7 @@ pub unsafe extern "C" fn xml_ucs_is_arabic(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_a(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_a(code: i32) -> i32 {
     (0xFB50..=0xFDFF).contains(&code) as i32
 }
 
@@ -8373,7 +8373,7 @@ pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_a(code: c_int) -> 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_b(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_b(code: i32) -> i32 {
     (0xFE70..=0xFEFF).contains(&code) as i32
 }
 
@@ -8385,7 +8385,7 @@ pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_b(code: c_int) -> 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_armenian(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_armenian(code: i32) -> i32 {
     (0x0530..=0x058F).contains(&code) as i32
 }
 
@@ -8397,7 +8397,7 @@ pub unsafe extern "C" fn xml_ucs_is_armenian(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_arrows(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_arrows(code: i32) -> i32 {
     (0x2190..=0x21FF).contains(&code) as i32
 }
 
@@ -8409,7 +8409,7 @@ pub unsafe extern "C" fn xml_ucs_is_arrows(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_basic_latin(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_basic_latin(code: i32) -> i32 {
     (0x0000..=0x007F).contains(&code) as i32
 }
 
@@ -8421,7 +8421,7 @@ pub unsafe extern "C" fn xml_ucs_is_basic_latin(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_bengali(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_bengali(code: i32) -> i32 {
     (0x0980..=0x09FF).contains(&code) as i32
 }
 
@@ -8433,7 +8433,7 @@ pub unsafe extern "C" fn xml_ucs_is_bengali(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_block_elements(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_block_elements(code: i32) -> i32 {
     (0x2580..=0x259F).contains(&code) as i32
 }
 
@@ -8445,7 +8445,7 @@ pub unsafe extern "C" fn xml_ucs_is_block_elements(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_bopomofo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_bopomofo(code: i32) -> i32 {
     (0x3100..=0x312F).contains(&code) as i32
 }
 
@@ -8457,7 +8457,7 @@ pub unsafe extern "C" fn xml_ucs_is_bopomofo(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_bopomofo_extended(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_bopomofo_extended(code: i32) -> i32 {
     (0x31A0..=0x31BF).contains(&code) as i32
 }
 
@@ -8469,7 +8469,7 @@ pub unsafe extern "C" fn xml_ucs_is_bopomofo_extended(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_box_drawing(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_box_drawing(code: i32) -> i32 {
     (0x2500..=0x257F).contains(&code) as i32
 }
 
@@ -8481,7 +8481,7 @@ pub unsafe extern "C" fn xml_ucs_is_box_drawing(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_braille_patterns(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_braille_patterns(code: i32) -> i32 {
     (0x2800..=0x28FF).contains(&code) as i32
 }
 
@@ -8493,7 +8493,7 @@ pub unsafe extern "C" fn xml_ucs_is_braille_patterns(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_buhid(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_buhid(code: i32) -> i32 {
     (0x1740..=0x175F).contains(&code) as i32
 }
 
@@ -8505,7 +8505,7 @@ pub unsafe extern "C" fn xml_ucs_is_buhid(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_byzantine_musical_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_byzantine_musical_symbols(code: i32) -> i32 {
     (0x1D000..=0x1D0FF).contains(&code) as i32
 }
 
@@ -8517,7 +8517,7 @@ pub unsafe extern "C" fn xml_ucs_is_byzantine_musical_symbols(code: c_int) -> c_
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility(code: i32) -> i32 {
     (0x3300..=0x33FF).contains(&code) as i32
 }
 
@@ -8529,7 +8529,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_forms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_forms(code: i32) -> i32 {
     (0xFE30..=0xFE4F).contains(&code) as i32
 }
 
@@ -8541,7 +8541,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_forms(code: c_int) -> c_in
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs(code: i32) -> i32 {
     (0xF900..=0xFAFF).contains(&code) as i32
 }
 
@@ -8553,7 +8553,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs(code: c_int) ->
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs_supplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs_supplement(code: i32) -> i32 {
     (0x2F800..=0x2FA1F).contains(&code) as i32
 }
 
@@ -8565,7 +8565,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs_supplement(code
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_radicals_supplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_radicals_supplement(code: i32) -> i32 {
     (0x2E80..=0x2EFF).contains(&code) as i32
 }
 
@@ -8577,7 +8577,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_radicals_supplement(code: c_int) -> c_in
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_symbolsand_punctuation(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_symbolsand_punctuation(code: i32) -> i32 {
     (0x3000..=0x303F).contains(&code) as i32
 }
 
@@ -8589,7 +8589,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_symbolsand_punctuation(code: c_int) -> c
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs(code: i32) -> i32 {
     (0x4E00..=0x9FFF).contains(&code) as i32
 }
 
@@ -8601,7 +8601,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs(code: c_int) -> c_int
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_a(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_a(code: i32) -> i32 {
     (0x3400..=0x4DBF).contains(&code) as i32
 }
 
@@ -8613,7 +8613,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_a(code: c_i
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_b(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_b(code: i32) -> i32 {
     (0x20000..=0x2A6DF).contains(&code) as i32
 }
 
@@ -8625,7 +8625,7 @@ pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_b(code: c_i
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cherokee(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cherokee(code: i32) -> i32 {
     (0x13A0..=0x13FF).contains(&code) as i32
 }
 
@@ -8637,7 +8637,7 @@ pub unsafe extern "C" fn xml_ucs_is_cherokee(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marks(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marks(code: i32) -> i32 {
     (0x0300..=0x036F).contains(&code) as i32
 }
 
@@ -8649,7 +8649,7 @@ pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marks(code: c_int) -> 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marksfor_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marksfor_symbols(code: i32) -> i32 {
     (0x20D0..=0x20FF).contains(&code) as i32
 }
 
@@ -8661,7 +8661,7 @@ pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marksfor_symbols(code:
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_combining_half_marks(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_combining_half_marks(code: i32) -> i32 {
     (0xFE20..=0xFE2F).contains(&code) as i32
 }
 
@@ -8673,7 +8673,7 @@ pub unsafe extern "C" fn xml_ucs_is_combining_half_marks(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_combining_marksfor_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_combining_marksfor_symbols(code: i32) -> i32 {
     (0x20D0..=0x20FF).contains(&code) as i32
 }
 
@@ -8685,7 +8685,7 @@ pub unsafe extern "C" fn xml_ucs_is_combining_marksfor_symbols(code: c_int) -> c
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_control_pictures(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_control_pictures(code: i32) -> i32 {
     (0x2400..=0x243F).contains(&code) as i32
 }
 
@@ -8697,7 +8697,7 @@ pub unsafe extern "C" fn xml_ucs_is_control_pictures(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_currency_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_currency_symbols(code: i32) -> i32 {
     (0x20A0..=0x20CF).contains(&code) as i32
 }
 
@@ -8709,7 +8709,7 @@ pub unsafe extern "C" fn xml_ucs_is_currency_symbols(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cypriot_syllabary(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cypriot_syllabary(code: i32) -> i32 {
     (0x10800..=0x1083F).contains(&code) as i32
 }
 
@@ -8721,7 +8721,7 @@ pub unsafe extern "C" fn xml_ucs_is_cypriot_syllabary(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cyrillic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cyrillic(code: i32) -> i32 {
     (0x0400..=0x04FF).contains(&code) as i32
 }
 
@@ -8733,7 +8733,7 @@ pub unsafe extern "C" fn xml_ucs_is_cyrillic(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cyrillic_supplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cyrillic_supplement(code: i32) -> i32 {
     (0x0500..=0x052F).contains(&code) as i32
 }
 
@@ -8745,7 +8745,7 @@ pub unsafe extern "C" fn xml_ucs_is_cyrillic_supplement(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_deseret(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_deseret(code: i32) -> i32 {
     (0x10400..=0x1044F).contains(&code) as i32
 }
 
@@ -8757,7 +8757,7 @@ pub unsafe extern "C" fn xml_ucs_is_deseret(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_devanagari(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_devanagari(code: i32) -> i32 {
     (0x0900..=0x097F).contains(&code) as i32
 }
 
@@ -8769,7 +8769,7 @@ pub unsafe extern "C" fn xml_ucs_is_devanagari(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_dingbats(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_dingbats(code: i32) -> i32 {
     (0x2700..=0x27BF).contains(&code) as i32
 }
 
@@ -8781,7 +8781,7 @@ pub unsafe extern "C" fn xml_ucs_is_dingbats(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_enclosed_alphanumerics(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_enclosed_alphanumerics(code: i32) -> i32 {
     (0x2460..=0x24FF).contains(&code) as i32
 }
 
@@ -8793,7 +8793,7 @@ pub unsafe extern "C" fn xml_ucs_is_enclosed_alphanumerics(code: c_int) -> c_int
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_enclosed_cjk_lettersand_months(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_enclosed_cjk_lettersand_months(code: i32) -> i32 {
     (0x3200..=0x32FF).contains(&code) as i32
 }
 
@@ -8805,7 +8805,7 @@ pub unsafe extern "C" fn xml_ucs_is_enclosed_cjk_lettersand_months(code: c_int) 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_ethiopic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ethiopic(code: i32) -> i32 {
     (0x1200..=0x137F).contains(&code) as i32
 }
 
@@ -8817,7 +8817,7 @@ pub unsafe extern "C" fn xml_ucs_is_ethiopic(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_general_punctuation(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_general_punctuation(code: i32) -> i32 {
     (0x2000..=0x206F).contains(&code) as i32
 }
 
@@ -8829,7 +8829,7 @@ pub unsafe extern "C" fn xml_ucs_is_general_punctuation(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_geometric_shapes(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_geometric_shapes(code: i32) -> i32 {
     (0x25A0..=0x25FF).contains(&code) as i32
 }
 
@@ -8841,7 +8841,7 @@ pub unsafe extern "C" fn xml_ucs_is_geometric_shapes(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_georgian(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_georgian(code: i32) -> i32 {
     (0x10A0..=0x10FF).contains(&code) as i32
 }
 
@@ -8853,7 +8853,7 @@ pub unsafe extern "C" fn xml_ucs_is_georgian(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_gothic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_gothic(code: i32) -> i32 {
     (0x10330..=0x1034F).contains(&code) as i32
 }
 
@@ -8865,7 +8865,7 @@ pub unsafe extern "C" fn xml_ucs_is_gothic(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_greek(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_greek(code: i32) -> i32 {
     (0x0370..=0x03FF).contains(&code) as i32
 }
 
@@ -8877,7 +8877,7 @@ pub unsafe extern "C" fn xml_ucs_is_greek(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_greek_extended(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_greek_extended(code: i32) -> i32 {
     (0x1F00..=0x1FFF).contains(&code) as i32
 }
 
@@ -8889,7 +8889,7 @@ pub unsafe extern "C" fn xml_ucs_is_greek_extended(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_greekand_coptic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_greekand_coptic(code: i32) -> i32 {
     (0x0370..=0x03FF).contains(&code) as i32
 }
 
@@ -8901,7 +8901,7 @@ pub unsafe extern "C" fn xml_ucs_is_greekand_coptic(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_gujarati(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_gujarati(code: i32) -> i32 {
     (0x0A80..=0x0AFF).contains(&code) as i32
 }
 
@@ -8913,7 +8913,7 @@ pub unsafe extern "C" fn xml_ucs_is_gujarati(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_gurmukhi(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_gurmukhi(code: i32) -> i32 {
     (0x0A00..=0x0A7F).contains(&code) as i32
 }
 
@@ -8925,7 +8925,7 @@ pub unsafe extern "C" fn xml_ucs_is_gurmukhi(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_halfwidthand_fullwidth_forms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_halfwidthand_fullwidth_forms(code: i32) -> i32 {
     (0xFF00..=0xFFEF).contains(&code) as i32
 }
 
@@ -8937,7 +8937,7 @@ pub unsafe extern "C" fn xml_ucs_is_halfwidthand_fullwidth_forms(code: c_int) ->
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_hangul_compatibility_jamo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hangul_compatibility_jamo(code: i32) -> i32 {
     (0x3130..=0x318F).contains(&code) as i32
 }
 
@@ -8949,7 +8949,7 @@ pub unsafe extern "C" fn xml_ucs_is_hangul_compatibility_jamo(code: c_int) -> c_
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_hangul_jamo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hangul_jamo(code: i32) -> i32 {
     (0x1100..=0x11FF).contains(&code) as i32
 }
 
@@ -8961,7 +8961,7 @@ pub unsafe extern "C" fn xml_ucs_is_hangul_jamo(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_hangul_syllables(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hangul_syllables(code: i32) -> i32 {
     (0xAC00..=0xD7AF).contains(&code) as i32
 }
 
@@ -8973,7 +8973,7 @@ pub unsafe extern "C" fn xml_ucs_is_hangul_syllables(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_hanunoo(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hanunoo(code: i32) -> i32 {
     (0x1720..=0x173F).contains(&code) as i32
 }
 
@@ -8985,7 +8985,7 @@ pub unsafe extern "C" fn xml_ucs_is_hanunoo(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_hebrew(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hebrew(code: i32) -> i32 {
     (0x0590..=0x05FF).contains(&code) as i32
 }
 
@@ -8997,7 +8997,7 @@ pub unsafe extern "C" fn xml_ucs_is_hebrew(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_high_private_use_surrogates(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_high_private_use_surrogates(code: i32) -> i32 {
     (0xDB80..=0xDBFF).contains(&code) as i32
 }
 
@@ -9009,7 +9009,7 @@ pub unsafe extern "C" fn xml_ucs_is_high_private_use_surrogates(code: c_int) -> 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_high_surrogates(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_high_surrogates(code: i32) -> i32 {
     (0xD800..=0xDB7F).contains(&code) as i32
 }
 
@@ -9021,7 +9021,7 @@ pub unsafe extern "C" fn xml_ucs_is_high_surrogates(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_hiragana(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_hiragana(code: i32) -> i32 {
     (0x3040..=0x309F).contains(&code) as i32
 }
 
@@ -9033,7 +9033,7 @@ pub unsafe extern "C" fn xml_ucs_is_hiragana(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_ipa_extensions(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ipa_extensions(code: i32) -> i32 {
     (0x0250..=0x02AF).contains(&code) as i32
 }
 
@@ -9045,7 +9045,7 @@ pub unsafe extern "C" fn xml_ucs_is_ipa_extensions(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_ideographic_description_characters(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ideographic_description_characters(code: i32) -> i32 {
     (0x2FF0..=0x2FFF).contains(&code) as i32
 }
 
@@ -9057,7 +9057,7 @@ pub unsafe extern "C" fn xml_ucs_is_ideographic_description_characters(code: c_i
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_kanbun(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_kanbun(code: i32) -> i32 {
     (0x3190..=0x319F).contains(&code) as i32
 }
 
@@ -9069,7 +9069,7 @@ pub unsafe extern "C" fn xml_ucs_is_kanbun(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_kangxi_radicals(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_kangxi_radicals(code: i32) -> i32 {
     (0x2F00..=0x2FDF).contains(&code) as i32
 }
 
@@ -9081,7 +9081,7 @@ pub unsafe extern "C" fn xml_ucs_is_kangxi_radicals(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_kannada(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_kannada(code: i32) -> i32 {
     (0x0C80..=0x0CFF).contains(&code) as i32
 }
 
@@ -9093,7 +9093,7 @@ pub unsafe extern "C" fn xml_ucs_is_kannada(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_katakana(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_katakana(code: i32) -> i32 {
     (0x30A0..=0x30FF).contains(&code) as i32
 }
 
@@ -9105,7 +9105,7 @@ pub unsafe extern "C" fn xml_ucs_is_katakana(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_katakana_phonetic_extensions(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_katakana_phonetic_extensions(code: i32) -> i32 {
     (0x31F0..=0x31FF).contains(&code) as i32
 }
 
@@ -9117,7 +9117,7 @@ pub unsafe extern "C" fn xml_ucs_is_katakana_phonetic_extensions(code: c_int) ->
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_khmer(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_khmer(code: i32) -> i32 {
     (0x1780..=0x17FF).contains(&code) as i32
 }
 
@@ -9129,7 +9129,7 @@ pub unsafe extern "C" fn xml_ucs_is_khmer(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_khmer_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_khmer_symbols(code: i32) -> i32 {
     (0x19E0..=0x19FF).contains(&code) as i32
 }
 
@@ -9141,7 +9141,7 @@ pub unsafe extern "C" fn xml_ucs_is_khmer_symbols(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_lao(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_lao(code: i32) -> i32 {
     (0x0E80..=0x0EFF).contains(&code) as i32
 }
 
@@ -9153,7 +9153,7 @@ pub unsafe extern "C" fn xml_ucs_is_lao(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_latin1_supplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_latin1_supplement(code: i32) -> i32 {
     (0x0080..=0x00FF).contains(&code) as i32
 }
 
@@ -9165,7 +9165,7 @@ pub unsafe extern "C" fn xml_ucs_is_latin1_supplement(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_latin_extended_a(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_latin_extended_a(code: i32) -> i32 {
     (0x0100..=0x017F).contains(&code) as i32
 }
 
@@ -9177,7 +9177,7 @@ pub unsafe extern "C" fn xml_ucs_is_latin_extended_a(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_latin_extended_b(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_latin_extended_b(code: i32) -> i32 {
     (0x0180..=0x024F).contains(&code) as i32
 }
 
@@ -9189,7 +9189,7 @@ pub unsafe extern "C" fn xml_ucs_is_latin_extended_b(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_latin_extended_additional(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_latin_extended_additional(code: i32) -> i32 {
     (0x1E00..=0x1EFF).contains(&code) as i32
 }
 
@@ -9201,7 +9201,7 @@ pub unsafe extern "C" fn xml_ucs_is_latin_extended_additional(code: c_int) -> c_
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_letterlike_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_letterlike_symbols(code: i32) -> i32 {
     (0x2100..=0x214F).contains(&code) as i32
 }
 
@@ -9213,7 +9213,7 @@ pub unsafe extern "C" fn xml_ucs_is_letterlike_symbols(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_limbu(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_limbu(code: i32) -> i32 {
     (0x1900..=0x194F).contains(&code) as i32
 }
 
@@ -9225,7 +9225,7 @@ pub unsafe extern "C" fn xml_ucs_is_limbu(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_linear_bideograms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_linear_bideograms(code: i32) -> i32 {
     (0x10080..=0x100FF).contains(&code) as i32
 }
 
@@ -9237,7 +9237,7 @@ pub unsafe extern "C" fn xml_ucs_is_linear_bideograms(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_linear_bsyllabary(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_linear_bsyllabary(code: i32) -> i32 {
     (0x10000..=0x1007F).contains(&code) as i32
 }
 
@@ -9249,7 +9249,7 @@ pub unsafe extern "C" fn xml_ucs_is_linear_bsyllabary(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_low_surrogates(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_low_surrogates(code: i32) -> i32 {
     (0xDC00..=0xDFFF).contains(&code) as i32
 }
 
@@ -9261,7 +9261,7 @@ pub unsafe extern "C" fn xml_ucs_is_low_surrogates(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_malayalam(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_malayalam(code: i32) -> i32 {
     (0x0D00..=0x0D7F).contains(&code) as i32
 }
 
@@ -9273,7 +9273,7 @@ pub unsafe extern "C" fn xml_ucs_is_malayalam(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_mathematical_alphanumeric_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_mathematical_alphanumeric_symbols(code: i32) -> i32 {
     (0x1D400..=0x1D7FF).contains(&code) as i32
 }
 
@@ -9285,7 +9285,7 @@ pub unsafe extern "C" fn xml_ucs_is_mathematical_alphanumeric_symbols(code: c_in
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_mathematical_operators(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_mathematical_operators(code: i32) -> i32 {
     (0x2200..=0x22FF).contains(&code) as i32
 }
 
@@ -9297,7 +9297,7 @@ pub unsafe extern "C" fn xml_ucs_is_mathematical_operators(code: c_int) -> c_int
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_a(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_a(code: i32) -> i32 {
     (0x27C0..=0x27EF).contains(&code) as i32
 }
 
@@ -9309,7 +9309,7 @@ pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_a(code: c
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_b(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_b(code: i32) -> i32 {
     (0x2980..=0x29FF).contains(&code) as i32
 }
 
@@ -9321,7 +9321,7 @@ pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_b(code: c
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbols(code: i32) -> i32 {
     (0x2600..=0x26FF).contains(&code) as i32
 }
 
@@ -9333,7 +9333,7 @@ pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbols(code: c_int) -> c_int 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbolsand_arrows(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbolsand_arrows(code: i32) -> i32 {
     (0x2B00..=0x2BFF).contains(&code) as i32
 }
 
@@ -9345,7 +9345,7 @@ pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbolsand_arrows(code: c_int)
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_technical(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_miscellaneous_technical(code: i32) -> i32 {
     (0x2300..=0x23FF).contains(&code) as i32
 }
 
@@ -9357,7 +9357,7 @@ pub unsafe extern "C" fn xml_ucs_is_miscellaneous_technical(code: c_int) -> c_in
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_mongolian(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_mongolian(code: i32) -> i32 {
     (0x1800..=0x18AF).contains(&code) as i32
 }
 
@@ -9369,7 +9369,7 @@ pub unsafe extern "C" fn xml_ucs_is_mongolian(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_musical_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_musical_symbols(code: i32) -> i32 {
     (0x1D100..=0x1D1FF).contains(&code) as i32
 }
 
@@ -9381,7 +9381,7 @@ pub unsafe extern "C" fn xml_ucs_is_musical_symbols(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_myanmar(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_myanmar(code: i32) -> i32 {
     (0x1000..=0x109F).contains(&code) as i32
 }
 
@@ -9393,7 +9393,7 @@ pub unsafe extern "C" fn xml_ucs_is_myanmar(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_number_forms(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_number_forms(code: i32) -> i32 {
     (0x2150..=0x218F).contains(&code) as i32
 }
 
@@ -9405,7 +9405,7 @@ pub unsafe extern "C" fn xml_ucs_is_number_forms(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_ogham(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ogham(code: i32) -> i32 {
     (0x1680..=0x169F).contains(&code) as i32
 }
 
@@ -9417,7 +9417,7 @@ pub unsafe extern "C" fn xml_ucs_is_ogham(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_old_italic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_old_italic(code: i32) -> i32 {
     (0x10300..=0x1032F).contains(&code) as i32
 }
 
@@ -9429,7 +9429,7 @@ pub unsafe extern "C" fn xml_ucs_is_old_italic(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_optical_character_recognition(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_optical_character_recognition(code: i32) -> i32 {
     (0x2440..=0x245F).contains(&code) as i32
 }
 
@@ -9441,7 +9441,7 @@ pub unsafe extern "C" fn xml_ucs_is_optical_character_recognition(code: c_int) -
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_oriya(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_oriya(code: i32) -> i32 {
     (0x0B00..=0x0B7F).contains(&code) as i32
 }
 
@@ -9453,7 +9453,7 @@ pub unsafe extern "C" fn xml_ucs_is_oriya(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_osmanya(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_osmanya(code: i32) -> i32 {
     (0x10480..=0x104AF).contains(&code) as i32
 }
 
@@ -9465,7 +9465,7 @@ pub unsafe extern "C" fn xml_ucs_is_osmanya(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_phonetic_extensions(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_phonetic_extensions(code: i32) -> i32 {
     (0x1D00..=0x1D7F).contains(&code) as i32
 }
 
@@ -9477,7 +9477,7 @@ pub unsafe extern "C" fn xml_ucs_is_phonetic_extensions(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_private_use(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_private_use(code: i32) -> i32 {
     ((0xE000..=0xF8FF).contains(&code)
         || (0xF0000..=0xFFFFF).contains(&code)
         || (0x100000..=0x10FFFF).contains(&code)) as i32
@@ -9491,7 +9491,7 @@ pub unsafe extern "C" fn xml_ucs_is_private_use(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_private_use_area(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_private_use_area(code: i32) -> i32 {
     (0xE000..=0xF8FF).contains(&code) as i32
 }
 
@@ -9503,7 +9503,7 @@ pub unsafe extern "C" fn xml_ucs_is_private_use_area(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_runic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_runic(code: i32) -> i32 {
     (0x16A0..=0x16FF).contains(&code) as i32
 }
 
@@ -9515,7 +9515,7 @@ pub unsafe extern "C" fn xml_ucs_is_runic(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_shavian(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_shavian(code: i32) -> i32 {
     (0x10450..=0x1047F).contains(&code) as i32
 }
 
@@ -9527,7 +9527,7 @@ pub unsafe extern "C" fn xml_ucs_is_shavian(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_sinhala(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_sinhala(code: i32) -> i32 {
     (0x0D80..=0x0DFF).contains(&code) as i32
 }
 
@@ -9539,7 +9539,7 @@ pub unsafe extern "C" fn xml_ucs_is_sinhala(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_small_form_variants(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_small_form_variants(code: i32) -> i32 {
     (0xFE50..=0xFE6F).contains(&code) as i32
 }
 
@@ -9551,7 +9551,7 @@ pub unsafe extern "C" fn xml_ucs_is_small_form_variants(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_spacing_modifier_letters(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_spacing_modifier_letters(code: i32) -> i32 {
     (0x02B0..=0x02FF).contains(&code) as i32
 }
 
@@ -9563,7 +9563,7 @@ pub unsafe extern "C" fn xml_ucs_is_spacing_modifier_letters(code: c_int) -> c_i
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_specials(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_specials(code: i32) -> i32 {
     (0xFFF0..=0xFFFF).contains(&code) as i32
 }
 
@@ -9575,7 +9575,7 @@ pub unsafe extern "C" fn xml_ucs_is_specials(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_superscriptsand_subscripts(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_superscriptsand_subscripts(code: i32) -> i32 {
     (0x2070..=0x209F).contains(&code) as i32
 }
 
@@ -9587,7 +9587,7 @@ pub unsafe extern "C" fn xml_ucs_is_superscriptsand_subscripts(code: c_int) -> c
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_a(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_a(code: i32) -> i32 {
     (0x27F0..=0x27FF).contains(&code) as i32
 }
 
@@ -9599,7 +9599,7 @@ pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_a(code: c_int) -> c_int 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_b(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_b(code: i32) -> i32 {
     (0x2900..=0x297F).contains(&code) as i32
 }
 
@@ -9611,7 +9611,7 @@ pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_b(code: c_int) -> c_int 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_supplemental_mathematical_operators(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplemental_mathematical_operators(code: i32) -> i32 {
     (0x2A00..=0x2AFF).contains(&code) as i32
 }
 
@@ -9623,7 +9623,7 @@ pub unsafe extern "C" fn xml_ucs_is_supplemental_mathematical_operators(code: c_
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_a(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_a(code: i32) -> i32 {
     (0xF0000..=0xFFFFF).contains(&code) as i32
 }
 
@@ -9635,7 +9635,7 @@ pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_a(code: c_int
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_b(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_b(code: i32) -> i32 {
     (0x100000..=0x10FFFF).contains(&code) as i32
 }
 
@@ -9647,7 +9647,7 @@ pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_b(code: c_int
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_syriac(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_syriac(code: i32) -> i32 {
     (0x0700..=0x074F).contains(&code) as i32
 }
 
@@ -9659,7 +9659,7 @@ pub unsafe extern "C" fn xml_ucs_is_syriac(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_tagalog(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tagalog(code: i32) -> i32 {
     (0x1700..=0x171F).contains(&code) as i32
 }
 
@@ -9671,7 +9671,7 @@ pub unsafe extern "C" fn xml_ucs_is_tagalog(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_tagbanwa(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tagbanwa(code: i32) -> i32 {
     (0x1760..=0x177F).contains(&code) as i32
 }
 
@@ -9683,7 +9683,7 @@ pub unsafe extern "C" fn xml_ucs_is_tagbanwa(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_tags(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tags(code: i32) -> i32 {
     (0xE0000..=0xE007F).contains(&code) as i32
 }
 
@@ -9695,7 +9695,7 @@ pub unsafe extern "C" fn xml_ucs_is_tags(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_tai_le(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tai_le(code: i32) -> i32 {
     (0x1950..=0x197F).contains(&code) as i32
 }
 
@@ -9707,7 +9707,7 @@ pub unsafe extern "C" fn xml_ucs_is_tai_le(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_tai_xuan_jing_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tai_xuan_jing_symbols(code: i32) -> i32 {
     (0x1D300..=0x1D35F).contains(&code) as i32
 }
 
@@ -9719,7 +9719,7 @@ pub unsafe extern "C" fn xml_ucs_is_tai_xuan_jing_symbols(code: c_int) -> c_int 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_tamil(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tamil(code: i32) -> i32 {
     (0x0B80..=0x0BFF).contains(&code) as i32
 }
 
@@ -9731,7 +9731,7 @@ pub unsafe extern "C" fn xml_ucs_is_tamil(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_telugu(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_telugu(code: i32) -> i32 {
     (0x0C00..=0x0C7F).contains(&code) as i32
 }
 
@@ -9743,7 +9743,7 @@ pub unsafe extern "C" fn xml_ucs_is_telugu(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_thaana(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_thaana(code: i32) -> i32 {
     (0x0780..=0x07BF).contains(&code) as i32
 }
 
@@ -9755,7 +9755,7 @@ pub unsafe extern "C" fn xml_ucs_is_thaana(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_thai(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_thai(code: i32) -> i32 {
     (0x0E00..=0x0E7F).contains(&code) as i32
 }
 
@@ -9767,7 +9767,7 @@ pub unsafe extern "C" fn xml_ucs_is_thai(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_tibetan(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_tibetan(code: i32) -> i32 {
     (0x0F00..=0x0FFF).contains(&code) as i32
 }
 
@@ -9779,7 +9779,7 @@ pub unsafe extern "C" fn xml_ucs_is_tibetan(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_ugaritic(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_ugaritic(code: i32) -> i32 {
     (0x10380..=0x1039F).contains(&code) as i32
 }
 
@@ -9791,7 +9791,7 @@ pub unsafe extern "C" fn xml_ucs_is_ugaritic(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_unified_canadian_aboriginal_syllabics(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_unified_canadian_aboriginal_syllabics(code: i32) -> i32 {
     (0x1400..=0x167F).contains(&code) as i32
 }
 
@@ -9803,7 +9803,7 @@ pub unsafe extern "C" fn xml_ucs_is_unified_canadian_aboriginal_syllabics(code: 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_variation_selectors(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_variation_selectors(code: i32) -> i32 {
     (0xFE00..=0xFE0F).contains(&code) as i32
 }
 
@@ -9815,7 +9815,7 @@ pub unsafe extern "C" fn xml_ucs_is_variation_selectors(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_variation_selectors_supplement(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_variation_selectors_supplement(code: i32) -> i32 {
     (0xE0100..=0xE01EF).contains(&code) as i32
 }
 
@@ -9827,7 +9827,7 @@ pub unsafe extern "C" fn xml_ucs_is_variation_selectors_supplement(code: c_int) 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_yi_radicals(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_yi_radicals(code: i32) -> i32 {
     (0xA490..=0xA4CF).contains(&code) as i32
 }
 
@@ -9839,7 +9839,7 @@ pub unsafe extern "C" fn xml_ucs_is_yi_radicals(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_yi_syllables(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_yi_syllables(code: i32) -> i32 {
     (0xA000..=0xA48F).contains(&code) as i32
 }
 
@@ -9851,7 +9851,7 @@ pub unsafe extern "C" fn xml_ucs_is_yi_syllables(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_yijing_hexagram_symbols(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_yijing_hexagram_symbols(code: i32) -> i32 {
     (0x4DC0..=0x4DFF).contains(&code) as i32
 }
 
@@ -9864,7 +9864,7 @@ pub unsafe extern "C" fn xml_ucs_is_yijing_hexagram_symbols(code: c_int) -> c_in
  *
  * Returns 1 if true, 0 if false and -1 on unknown block
  */
-pub unsafe extern "C" fn xml_ucs_is_block(code: c_int, block: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_block(code: i32, block: *const c_char) -> i32 {
     if let Some(func) = xml_unicode_lookup(&XML_UNICODE_BLOCK_TBL, block) {
         func(code)
     } else {
@@ -9880,8 +9880,8 @@ pub unsafe extern "C" fn xml_ucs_is_block(code: c_int, block: *const c_char) -> 
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_c(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_CG) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_c(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_CG) as i32
 }
 
 /**
@@ -9892,7 +9892,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_c(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_cc(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_cc(code: i32) -> i32 {
     ((0x0..=0x1f).contains(&code) || (0x7f..=0x9f).contains(&code)) as i32
 }
 
@@ -9904,8 +9904,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_cc(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_cf(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_CF_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_cf(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_CF_G) as i32
 }
 
 /**
@@ -9916,7 +9916,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_cf(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_co(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_co(code: i32) -> i32 {
     ((code == 0xe000)
         || (code == 0xf8ff)
         || (code == 0xf0000)
@@ -9933,7 +9933,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_co(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_cs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_cs(code: i32) -> i32 {
     ((code == 0xd800)
         || (0xdb7f..=0xdb80).contains(&code)
         || (0xdbff..=0xdc00).contains(&code)
@@ -9948,8 +9948,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_cs(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_l(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LG) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_l(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_LG) as i32
 }
 
 /**
@@ -9960,8 +9960,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_l(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_ll(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LL_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_ll(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_LL_G) as i32
 }
 
 /**
@@ -9972,8 +9972,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_ll(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_lm(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LM_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_lm(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_LM_G) as i32
 }
 
 /**
@@ -9984,8 +9984,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_lm(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_lo(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LO_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_lo(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_LO_G) as i32
 }
 
 /**
@@ -9996,8 +9996,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_lo(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_lt(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LT_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_lt(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_LT_G) as i32
 }
 
 /**
@@ -10008,8 +10008,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_lt(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_lu(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_LU_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_lu(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_LU_G) as i32
 }
 
 /**
@@ -10020,8 +10020,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_lu(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_m(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_MG) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_m(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_MG) as i32
 }
 
 /**
@@ -10032,8 +10032,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_m(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_mc(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_MC_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_mc(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_MC_G) as i32
 }
 
 /**
@@ -10044,7 +10044,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_mc(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_me(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_me(code: i32) -> i32 {
     ((0x488..=0x489).contains(&code)
         || (code == 0x6de)
         || (0x20dd..=0x20e0).contains(&code)
@@ -10059,8 +10059,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_me(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_mn(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_MN_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_mn(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_MN_G) as i32
 }
 
 /**
@@ -10071,8 +10071,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_mn(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_n(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_NG) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_n(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_NG) as i32
 }
 
 /**
@@ -10083,8 +10083,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_n(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_nd(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_ND_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_nd(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_ND_G) as i32
 }
 
 /**
@@ -10095,7 +10095,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_nd(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_nl(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_nl(code: i32) -> i32 {
     ((0x16ee..=0x16f0).contains(&code)
         || (0x2160..=0x2183).contains(&code)
         || (code == 0x3007)
@@ -10112,8 +10112,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_nl(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_no(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_NO_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_no(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_NO_G) as i32
 }
 
 /**
@@ -10124,8 +10124,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_no(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_p(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PG) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_p(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_PG) as i32
 }
 
 /**
@@ -10136,7 +10136,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_p(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_pc(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_pc(code: i32) -> i32 {
     ((code == 0x5f)
         || (0x203f..=0x2040).contains(&code)
         || (code == 0x2054)
@@ -10155,8 +10155,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pc(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_pd(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PD_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_pd(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_PD_G) as i32
 }
 
 /**
@@ -10167,8 +10167,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pd(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_pe(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PE_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_pe(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_PE_G) as i32
 }
 
 /**
@@ -10179,7 +10179,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pe(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_pf(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_pf(code: i32) -> i32 {
     ((code == 0xbb) || (code == 0x2019) || (code == 0x201d) || (code == 0x203a)) as i32
 }
 
@@ -10191,7 +10191,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pf(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_pi(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_pi(code: i32) -> i32 {
     ((code == 0xab)
         || (code == 0x2018)
         || (0x201b..=0x201c).contains(&code)
@@ -10207,8 +10207,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pi(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_po(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PO_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_po(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_PO_G) as i32
 }
 
 /**
@@ -10219,8 +10219,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_po(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_ps(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_PS_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_ps(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_PS_G) as i32
 }
 
 /**
@@ -10231,8 +10231,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_ps(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_s(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SG) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_s(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_SG) as i32
 }
 
 /**
@@ -10243,8 +10243,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_s(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_sc(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SC_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_sc(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_SC_G) as i32
 }
 
 /**
@@ -10255,8 +10255,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_sc(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_sk(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SK_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_sk(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_SK_G) as i32
 }
 
 /**
@@ -10267,8 +10267,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_sk(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_sm(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SM_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_sm(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_SM_G) as i32
 }
 
 /**
@@ -10279,8 +10279,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_sm(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_so(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_SO_G) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_so(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_SO_G) as i32
 }
 
 /**
@@ -10291,8 +10291,8 @@ pub unsafe extern "C" fn xml_ucs_is_cat_so(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_z(code: c_int) -> c_int {
-    xml_char_in_range(code as c_uint, &XML_ZG) as i32
+pub unsafe extern "C" fn xml_ucs_is_cat_z(code: i32) -> i32 {
+    xml_char_in_range(code as u32, &XML_ZG) as i32
 }
 
 /**
@@ -10303,7 +10303,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_z(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_zl(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_zl(code: i32) -> i32 {
     (code == 0x2028) as i32
 }
 
@@ -10315,7 +10315,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_zl(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_zp(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_zp(code: i32) -> i32 {
     (code == 0x2029) as i32
 }
 
@@ -10327,7 +10327,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_zp(code: c_int) -> c_int {
  *
  * Returns 1 if true 0 otherwise
  */
-pub unsafe extern "C" fn xml_ucs_is_cat_zs(code: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat_zs(code: i32) -> i32 {
     ((code == 0x20)
         || (code == 0xa0)
         || (code == 0x1680)
@@ -10347,7 +10347,7 @@ pub unsafe extern "C" fn xml_ucs_is_cat_zs(code: c_int) -> c_int {
  *
  * Returns 1 if true, 0 if false and -1 on unknown category
  */
-pub unsafe extern "C" fn xml_ucs_is_cat(code: c_int, cat: *const c_char) -> c_int {
+pub unsafe extern "C" fn xml_ucs_is_cat(code: i32, cat: *const c_char) -> i32 {
     if let Some(func) = xml_unicode_lookup(&XML_UNICODE_CAT_TBL, cat) {
         func(code)
     } else {
@@ -10368,10 +10368,10 @@ unsafe extern "C" fn xml_unicode_lookup(
     tptr: *const XmlUnicodeNameTable,
     tname: *const c_char,
 ) -> Option<XmlIntFunc> {
-    let mut low: c_int;
-    let mut high: c_int;
-    let mut mid: c_int;
-    let mut cmp: c_int;
+    let mut low: i32;
+    let mut high: i32;
+    let mut mid: i32;
+    let mut cmp: i32;
 
     if tptr.is_null() || tname.is_null() {
         return None;

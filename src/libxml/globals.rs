@@ -5,7 +5,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_void},
+    ffi::{c_char, c_void},
     mem::{size_of, zeroed},
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
@@ -96,12 +96,12 @@ pub unsafe extern "C" fn xml_cleanup_globals() {}
 pub type XmlOutputBufferCreateFilenameFunc = unsafe fn(
     URI: *const c_char,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-    compression: c_int,
+    compression: i32,
 ) -> XmlOutputBufferPtr;
 
 /**
 * xmlOutputBufferCreateFilenameDefault:
-* @func: function poc_inter to the new OutputBufferCreateFilenameFunc
+* @func: function pointer to the new OutputBufferCreateFilenameFunc
 *
 * Registers a callback for URI output file handling
 *
@@ -153,22 +153,22 @@ pub struct XmlGlobalState {
     // pub(crate) xml_generic_error: Option<XmlGenericErrorFunc>,
     // pub(crate) xml_structured_error: Option<XmlStructuredErrorFunc>,
     // pub(crate) xml_generic_error_context: AtomicPtr<c_void>,
-    pub(crate) old_xml_wd_compatibility: c_int,
+    pub(crate) old_xml_wd_compatibility: i32,
 
     pub(crate) xml_buffer_alloc_scheme: XmlBufferAllocationScheme,
-    pub(crate) xml_default_buffer_size: c_int,
+    pub(crate) xml_default_buffer_size: i32,
 
-    pub(crate) xml_substitute_entities_default_value: c_int,
-    pub(crate) xml_do_validity_checking_default_value: c_int,
-    pub(crate) xml_get_warnings_default_value: c_int,
-    pub(crate) xml_keep_blanks_default_value: c_int,
-    pub(crate) xml_line_numbers_default_value: c_int,
-    pub(crate) xml_load_ext_dtd_default_value: c_int,
-    pub(crate) xml_parser_debug_entities: c_int,
-    pub(crate) xml_pedantic_parser_default_value: c_int,
+    pub(crate) xml_substitute_entities_default_value: i32,
+    pub(crate) xml_do_validity_checking_default_value: i32,
+    pub(crate) xml_get_warnings_default_value: i32,
+    pub(crate) xml_keep_blanks_default_value: i32,
+    pub(crate) xml_line_numbers_default_value: i32,
+    pub(crate) xml_load_ext_dtd_default_value: i32,
+    pub(crate) xml_parser_debug_entities: i32,
+    pub(crate) xml_pedantic_parser_default_value: i32,
 
-    // pub(crate) xml_save_no_empty_tags: c_int,
-    pub(crate) xml_indent_tree_output: c_int,
+    // pub(crate) xml_save_no_empty_tags: i32,
+    pub(crate) xml_indent_tree_output: i32,
     // pub(crate) xml_tree_indent_string: *const c_char,
     pub(crate) xml_register_node_default_value: Option<XmlRegisterNodeFunc>,
     pub(crate) xml_deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
@@ -208,8 +208,8 @@ static mut XML_BUFFER_ALLOC_SCHEME_THR_DEF: XmlBufferAllocationScheme =
  *
  * Global setting, default buffer size. Default value is BASE_BUFFER_SIZE
  */
-pub(crate) static mut _XML_DEFAULT_BUFFER_SIZE: c_int = BASE_BUFFER_SIZE as i32;
-pub(crate) static mut XML_DEFAULT_BUFFER_SIZE_THR_DEF: c_int = BASE_BUFFER_SIZE as i32;
+pub(crate) static mut _XML_DEFAULT_BUFFER_SIZE: i32 = BASE_BUFFER_SIZE as i32;
+pub(crate) static mut XML_DEFAULT_BUFFER_SIZE_THR_DEF: i32 = BASE_BUFFER_SIZE as i32;
 
 /**
  * xmlDoValidityCheckingDefaultValue:
@@ -220,7 +220,7 @@ pub(crate) static mut XML_DEFAULT_BUFFER_SIZE_THR_DEF: c_int = BASE_BUFFER_SIZE 
  * Disabled by default.
  */
 pub(crate) static _XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF: c_int = 0;
+static mut XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF: i32 = 0;
 
 /**
  * xmlGetWarningsDefaultValue:
@@ -231,7 +231,7 @@ static mut XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF: c_int = 0;
  * Activated by default.
  */
 pub(crate) static _XML_GET_WARNINGS_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
-static mut XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF: c_int = 1;
+static mut XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF: i32 = 1;
 
 /*
  * output defaults
@@ -243,7 +243,7 @@ static mut XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF: c_int = 1;
  * Enabled by default
  */
 pub(crate) static _XML_INDENT_TREE_OUTPUT: AtomicI32 = AtomicI32::new(1);
-static mut XML_INDENT_TREE_OUTPUT_THR_DEF: c_int = 1;
+static mut XML_INDENT_TREE_OUTPUT_THR_DEF: i32 = 1;
 
 /**
  * xmlTreeIndentString:
@@ -265,7 +265,7 @@ static mut XML_INDENT_TREE_OUTPUT_THR_DEF: c_int = 1;
  * for some applications since this was libxml1 default behaviour.
  */
 pub(crate) static _XML_KEEP_BLANKS_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
-static mut XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF: c_int = 1;
+static mut XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF: i32 = 1;
 
 /**
  * xmlLineNumbersDefaultValue:
@@ -278,7 +278,7 @@ static mut XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF: c_int = 1;
  * application.
  */
 pub(crate) static _XML_LINE_NUMBERS_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF: c_int = 0;
+static mut XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF: i32 = 0;
 
 /**
  * xmlLoadExtDtdDefaultValue:
@@ -290,7 +290,7 @@ static mut XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF: c_int = 0;
  * Disabled by default.
  */
 pub(crate) static _XML_LOAD_EXT_DTD_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF: c_int = 0;
+static mut XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF: i32 = 0;
 
 /**
  * xmlParserDebugEntities:
@@ -302,7 +302,7 @@ static mut XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF: c_int = 0;
  * Disabled by default
  */
 pub(crate) static _XML_PARSER_DEBUG_ENTITIES: AtomicI32 = AtomicI32::new(0);
-static mut XML_PARSER_DEBUG_ENTITIES_THR_DEF: c_int = 0;
+static mut XML_PARSER_DEBUG_ENTITIES_THR_DEF: i32 = 0;
 
 /**
  * xmlPedanticParserDefaultValue:
@@ -313,7 +313,7 @@ static mut XML_PARSER_DEBUG_ENTITIES_THR_DEF: c_int = 0;
  * Disabled by default.
  */
 pub(crate) static _XML_PEDANTIC_PARSER_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF: c_int = 0;
+static mut XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF: i32 = 0;
 
 /**
  * xmlSaveNoEmptyTags:
@@ -324,7 +324,7 @@ static mut XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF: c_int = 0;
  * Disabled by default
  */
 pub(crate) static _XML_SAVE_NO_EMPTY_TAGS: AtomicI32 = AtomicI32::new(0);
-static mut XML_SAVE_NO_EMPTY_TAGS_THR_DEF: c_int = 0;
+static mut XML_SAVE_NO_EMPTY_TAGS_THR_DEF: i32 = 0;
 
 /**
  * xmlSubstituteEntitiesDefaultValue:
@@ -338,7 +338,7 @@ static mut XML_SAVE_NO_EMPTY_TAGS_THR_DEF: c_int = 0;
  * engine does not handle entities references transparently.
  */
 pub(crate) static _XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
-static mut XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF: c_int = 0;
+static mut XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF: i32 = 0;
 
 // /**
 //  * xmlGenericError:
@@ -1067,7 +1067,7 @@ pub unsafe fn __xml_output_buffer_create_filename_value(
 pub unsafe fn xml_output_buffer_create_filename_value(
     uri: *const c_char,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-    compression: c_int,
+    compression: i32,
 ) -> XmlOutputBufferPtr {
     if let Some(fvalue) = __xml_output_buffer_create_filename_value() {
         fvalue(uri, encoder, compression)
@@ -1080,7 +1080,7 @@ pub unsafe fn xml_output_buffer_create_filename_value(
 pub unsafe extern "C" fn xml_output_buffer_create_filename_value(
     uri: *const c_char,
     encoder: Option<XmlCharEncodingHandler>,
-    compression: c_int,
+    compression: i32,
 ) -> XmlOutputBufferPtr {
     _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE.unwrap()(uri, encoder, compression)
 }

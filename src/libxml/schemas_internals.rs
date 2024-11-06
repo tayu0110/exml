@@ -3,7 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{any::type_name, ffi::c_int, os::raw::c_void};
+use std::{any::type_name, os::raw::c_void};
 
 use super::{
     globals::xml_free,
@@ -354,12 +354,12 @@ pub struct XmlSchemaAttribute {
     pub(crate) annot: XmlSchemaAnnotPtr,
 
     pub(crate) base: XmlSchemaTypePtr,    /* Deprecated; not used */
-    pub(crate) occurs: c_int,             /* Deprecated; not used */
+    pub(crate) occurs: i32,               /* Deprecated; not used */
     pub(crate) def_value: *const XmlChar, /* The initial value of the value constraint */
     pub(crate) subtypes: XmlSchemaTypePtr, /* the type definition */
     pub(crate) node: XmlNodePtr,
     pub(crate) target_namespace: *const XmlChar,
-    pub(crate) flags: c_int,
+    pub(crate) flags: i32,
     pub(crate) ref_prefix: *const XmlChar, /* Deprecated; not used */
     pub(crate) def_val: XmlSchemaValPtr,   /* The compiled value constraint */
     pub(crate) ref_decl: XmlSchemaAttributePtr, /* Deprecated; not used */
@@ -406,13 +406,13 @@ pub struct XmlSchemaWildcard {
     pub(crate) id: *const XmlChar,     /* Deprecated; not used */
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) node: XmlNodePtr,
-    pub(crate) min_occurs: c_int, /* Deprecated; not used */
-    pub(crate) max_occurs: c_int, /* Deprecated; not used */
-    pub(crate) process_contents: c_int,
-    pub(crate) any: c_int, /* Indicates if the ns constraint is of ##any */
+    pub(crate) min_occurs: i32, /* Deprecated; not used */
+    pub(crate) max_occurs: i32, /* Deprecated; not used */
+    pub(crate) process_contents: i32,
+    pub(crate) any: i32, /* Indicates if the ns constraint is of ##any */
     pub(crate) ns_set: XmlSchemaWildcardNsPtr, /* The list of allowed namespaces */
     pub(crate) neg_ns_set: XmlSchemaWildcardNsPtr, /* The negated namespace */
-    pub(crate) flags: c_int,
+    pub(crate) flags: i32,
 }
 
 /**
@@ -466,7 +466,7 @@ pub struct XmlSchemaAttributeGroup {
 
     pub(crate) attributes: XmlSchemaAttributePtr, /* Deprecated; not used */
     pub(crate) node: XmlNodePtr,
-    pub(crate) flags: c_int,
+    pub(crate) flags: i32,
     pub(crate) attribute_wildcard: XmlSchemaWildcardPtr,
     pub(crate) ref_prefix: *const XmlChar, /* Deprecated; not used */
     pub(crate) ref_item: XmlSchemaAttributeGroupPtr, /* Deprecated; not used */
@@ -709,25 +709,25 @@ pub struct XmlSchemaType {
     pub(crate) subtypes: XmlSchemaTypePtr,
     pub(crate) attributes: XmlSchemaAttributePtr, /* Deprecated; not used */
     pub(crate) node: XmlNodePtr,
-    pub(crate) min_occurs: c_int, /* Deprecated; not used */
-    pub(crate) max_occurs: c_int, /* Deprecated; not used */
+    pub(crate) min_occurs: i32, /* Deprecated; not used */
+    pub(crate) max_occurs: i32, /* Deprecated; not used */
 
-    pub(crate) flags: c_int,
+    pub(crate) flags: i32,
     pub(crate) content_type: XmlSchemaContentType,
     pub(crate) base: *const XmlChar,    /* Base type's local name */
     pub(crate) base_ns: *const XmlChar, /* Base type's target namespace */
     pub(crate) base_type: XmlSchemaTypePtr, /* The base type component */
     pub(crate) facets: XmlSchemaFacetPtr, /* Local facets */
     pub(crate) redef: *mut XmlSchemaType, /* Deprecated; not used */
-    pub(crate) recurse: c_int,          /* Obsolete */
+    pub(crate) recurse: i32,            /* Obsolete */
     pub(crate) attribute_uses: *mut XmlSchemaAttributeLinkPtr, /* Deprecated; not used */
     pub(crate) attribute_wildcard: XmlSchemaWildcardPtr,
-    pub(crate) built_in_type: c_int, /* Type of built-in types. */
+    pub(crate) built_in_type: i32, /* Type of built-in types. */
     pub(crate) member_types: XmlSchemaTypeLinkPtr, /* member-types if a union type. */
     pub(crate) facet_set: XmlSchemaFacetLinkPtr, /* All facets (incl. inherited) */
     pub(crate) ref_prefix: *const XmlChar, /* Deprecated; not used */
     pub(crate) content_type_def: XmlSchemaTypePtr, /* Used for the simple content of complex types.
-                                     Could we use @subtypes for this? */
+                                   Could we use @subtypes for this? */
     pub(crate) cont_model: XmlRegexpPtr, /* Holds the automaton of the content model */
     pub(crate) target_namespace: *const XmlChar,
     pub(crate) attr_uses: *mut c_void,
@@ -872,10 +872,10 @@ pub struct XmlSchemaElement {
     pub(crate) subtypes: XmlSchemaTypePtr, /* the type definition */
     pub(crate) attributes: XmlSchemaAttributePtr,
     pub(crate) node: XmlNodePtr,
-    pub(crate) min_occurs: c_int, /* Deprecated; not used */
-    pub(crate) max_occurs: c_int, /* Deprecated; not used */
+    pub(crate) min_occurs: i32, /* Deprecated; not used */
+    pub(crate) max_occurs: i32, /* Deprecated; not used */
 
-    pub(crate) flags: c_int,
+    pub(crate) flags: i32,
     pub(crate) target_namespace: *const XmlChar,
     pub(crate) named_type: *const XmlChar,
     pub(crate) named_type_ns: *const XmlChar,
@@ -928,8 +928,8 @@ pub struct XmlSchemaFacet {
     pub(crate) id: *const XmlChar,        /* Obsolete */
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) node: XmlNodePtr,
-    pub(crate) fixed: c_int, /* XML_SCHEMAS_FACET_PRESERVE, etc. */
-    pub(crate) whitespace: c_int,
+    pub(crate) fixed: i32, /* XML_SCHEMAS_FACET_PRESERVE, etc. */
+    pub(crate) whitespace: i32,
     pub(crate) val: XmlSchemaValPtr, /* The compiled value */
     pub(crate) regexp: XmlRegexpPtr, /* The regex for patterns */
 }

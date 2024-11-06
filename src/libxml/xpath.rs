@@ -5,14 +5,14 @@
 
 use std::{
     any::type_name,
-    ffi::{c_char, c_int, c_long, c_ulong},
+    ffi::c_char,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     sync::atomic::Ordering,
 };
 
-use libc::{memcpy, memmove, memset, ptrdiff_t, snprintf, strlen, INT_MAX, INT_MIN};
+use libc::{memcpy, memmove, memset, snprintf, strlen, INT_MAX, INT_MIN};
 
 #[cfg(not(feature = "thread"))]
 use crate::libxml::xpath_internals::XML_XPATH_DISABLE_OPTIMIZER;
@@ -121,10 +121,10 @@ pub type XmlNodeSetPtr = *mut XmlNodeSet;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlNodeSet {
-    pub node_nr: c_int,  /* number of nodes in the set */
-    pub node_max: c_int, /* size of the array as allocated */
+    pub node_nr: i32,  /* number of nodes in the set */
+    pub node_max: i32, /* size of the array as allocated */
     pub node_tab: *mut XmlNodePtr, /* array of nodes in no particular order */
-                         /* @@ with_ns to check whether namespace nodes should be looked at @@ */
+                       /* @@ with_ns to check whether namespace nodes should be looked at @@ */
 }
 
 /*
@@ -213,13 +213,13 @@ pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 pub struct XmlXPathObject {
     pub typ: XmlXPathObjectType,
     pub nodesetval: XmlNodeSetPtr,
-    pub boolval: c_int,
+    pub boolval: i32,
     pub floatval: f64,
     pub stringval: *mut XmlChar,
     pub(crate) user: *mut c_void,
-    pub(crate) index: c_int,
+    pub(crate) index: i32,
     pub(crate) user2: *mut c_void,
-    pub(crate) index2: c_int,
+    pub(crate) index2: i32,
 }
 
 /**
@@ -233,7 +233,7 @@ pub struct XmlXPathObject {
  * Returns -1 in case of error, 0 otherwise
  */
 #[cfg(feature = "xpath")]
-pub type XmlXPathConvertFunc = unsafe extern "C" fn(obj: XmlXPathObjectPtr, typ: c_int) -> c_int;
+pub type XmlXPathConvertFunc = unsafe extern "C" fn(obj: XmlXPathObjectPtr, typ: i32) -> i32;
 
 /*
  * Extra type: a name and a conversion function.
@@ -270,7 +270,7 @@ pub struct XmlXPathVariable {
  */
 
 #[cfg(feature = "xpath")]
-pub type XmlXPathEvalFunc = unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, nargs: c_int);
+pub type XmlXPathEvalFunc = unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, nargs: i32);
 
 /*
  * Extra function: a name and a evaluation function.
@@ -327,7 +327,7 @@ pub struct XmlXPathAxis {
  */
 
 #[cfg(feature = "xpath")]
-pub type XmlXPathFunction = unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, nargs: c_int);
+pub type XmlXPathFunction = unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, nargs: i32);
 
 /*
  * Function and Variable Lookup.
@@ -413,33 +413,33 @@ pub struct XmlXPathContext {
     pub doc: XmlDocPtr,   /* The current document */
     pub node: XmlNodePtr, /* The current node */
 
-    pub(crate) nb_variables_unused: c_int, /* unused (hash table) */
-    pub(crate) max_variables_unused: c_int, /* unused (hash table) */
-    pub(crate) var_hash: XmlHashTablePtr,  /* Hash table of defined variables */
+    pub(crate) nb_variables_unused: i32, /* unused (hash table) */
+    pub(crate) max_variables_unused: i32, /* unused (hash table) */
+    pub(crate) var_hash: XmlHashTablePtr, /* Hash table of defined variables */
 
-    pub(crate) nb_types: c_int,        /* number of defined types */
-    pub(crate) max_types: c_int,       /* max number of types */
+    pub(crate) nb_types: i32,          /* number of defined types */
+    pub(crate) max_types: i32,         /* max number of types */
     pub(crate) types: XmlXPathTypePtr, /* Array of defined types */
 
-    pub(crate) nb_funcs_unused: c_int,     /* unused (hash table) */
-    pub(crate) max_funcs_unused: c_int,    /* unused (hash table) */
+    pub(crate) nb_funcs_unused: i32,       /* unused (hash table) */
+    pub(crate) max_funcs_unused: i32,      /* unused (hash table) */
     pub(crate) func_hash: XmlHashTablePtr, /* Hash table of defined funcs */
 
-    pub(crate) nb_axis: c_int,        /* number of defined axis */
-    pub(crate) max_axis: c_int,       /* max number of axis */
+    pub(crate) nb_axis: i32,          /* number of defined axis */
+    pub(crate) max_axis: i32,         /* max number of axis */
     pub(crate) axis: XmlXPathAxisPtr, /* Array of defined axis */
 
     /* the namespace nodes of the context node */
     pub(crate) namespaces: *mut XmlNsPtr, /* Array of namespaces */
-    pub(crate) ns_nr: c_int,              /* number of namespace in scope */
+    pub(crate) ns_nr: i32,                /* number of namespace in scope */
     pub(crate) user: *mut c_void,         /* function to free */
 
     /* extra variables */
-    pub(crate) context_size: c_int,       /* the context size */
-    pub(crate) proximity_position: c_int, /* the proximity position */
+    pub(crate) context_size: i32,       /* the context size */
+    pub(crate) proximity_position: i32, /* the proximity position */
 
     /* extra stuff for XPointer */
-    pub(crate) xptr: c_int,        /* is this an XPointer context? */
+    pub(crate) xptr: i32,          /* is this an XPointer context? */
     pub(crate) here: XmlNodePtr,   /* for here() */
     pub(crate) origin: XmlNodePtr, /* for origin() */
 
@@ -461,7 +461,7 @@ pub struct XmlXPathContext {
 
     /* temporary namespace lists kept for walking the namespace axis */
     pub(crate) tmp_ns_list: *mut XmlNsPtr, /* Array of namespaces */
-    pub(crate) tmp_ns_nr: c_int,           /* number of namespaces in scope */
+    pub(crate) tmp_ns_nr: i32,             /* number of namespaces in scope */
 
     /* error reporting mechanism */
     pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
@@ -472,15 +472,15 @@ pub struct XmlXPathContext {
     /* dictionary */
     pub(crate) dict: XmlDictPtr, /* dictionary if any */
 
-    pub(crate) flags: c_int, /* flags to control compilation */
+    pub(crate) flags: i32, /* flags to control compilation */
 
     /* Cache for reusal of XPath objects */
     pub cache: *mut c_void,
 
     /* Resource limits */
-    pub(crate) op_limit: c_ulong,
-    pub(crate) op_count: c_ulong,
-    pub(crate) depth: c_int,
+    pub(crate) op_limit: u64,
+    pub(crate) op_count: u64,
+    pub(crate) depth: i32,
 }
 
 /*
@@ -519,11 +519,11 @@ pub type XmlXPathStepOpPtr = *mut XmlXPathStepOp;
 #[repr(C)]
 pub struct XmlXPathStepOp {
     pub(crate) op: XmlXPathOp, /* The identifier of the operation */
-    pub(crate) ch1: c_int,     /* First child */
-    pub(crate) ch2: c_int,     /* Second child */
-    pub(crate) value: c_int,
-    pub(crate) value2: c_int,
-    pub(crate) value3: c_int,
+    pub(crate) ch1: i32,       /* First child */
+    pub(crate) ch2: i32,       /* Second child */
+    pub(crate) value: i32,
+    pub(crate) value2: i32,
+    pub(crate) value3: i32,
     pub(crate) value4: *mut c_void,
     pub(crate) value5: *mut c_void,
     pub(crate) cache: Option<XmlXPathFunction>,
@@ -539,10 +539,10 @@ pub type XmlXPathCompExprPtr = *mut XmlXPathCompExpr;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathCompExpr {
-    pub(crate) nb_step: c_int,  /* Number of steps in this expression */
-    pub(crate) max_step: c_int, /* Maximum number of steps allocated */
+    pub(crate) nb_step: i32,  /* Number of steps in this expression */
+    pub(crate) max_step: i32, /* Maximum number of steps allocated */
     pub(crate) steps: *mut XmlXPathStepOp, /* ops for computation of this expression */
-    pub(crate) last: c_int,     /* index of last step in expression */
+    pub(crate) last: i32,     /* index of last step in expression */
     pub(crate) expr: *mut XmlChar, /* the expression being computed */
     pub(crate) dict: XmlDictPtr, /* the dictionary to use if any */
     #[cfg(feature = "libxml_pattern")]
@@ -563,19 +563,19 @@ pub struct XmlXPathParserContext {
     pub(crate) cur: *const XmlChar,  /* the current char being parsed */
     pub(crate) base: *const XmlChar, /* the full expression */
 
-    pub(crate) error: c_int, /* error code */
+    pub(crate) error: i32, /* error code */
 
     pub(crate) context: XmlXPathContextPtr, /* the evaluation context */
     pub(crate) value: XmlXPathObjectPtr,    /* the current value */
-    pub(crate) value_nr: c_int,             /* number of values stacked */
-    pub(crate) value_max: c_int,            /* max number of values stacked */
+    pub(crate) value_nr: i32,               /* number of values stacked */
+    pub(crate) value_max: i32,              /* max number of values stacked */
     pub(crate) value_tab: *mut XmlXPathObjectPtr, /* stack of values */
 
     pub(crate) comp: XmlXPathCompExprPtr, /* the precompiled expression */
-    pub(crate) xptr: c_int,               /* it this an XPointer expression */
+    pub(crate) xptr: i32,                 /* it this an XPointer expression */
     pub(crate) ancestor: XmlNodePtr,      /* used for walking preceding axis */
 
-    pub(crate) value_frame: c_int, /* unused */
+    pub(crate) value_frame: i32, /* unused */
 }
 
 /************************************************************************
@@ -873,18 +873,15 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
  *
  * Compare two nodes w.r.t document order
  *
- * Returns -2 in case of error 1 if first poc_int < second poc_int, 0 if
+ * Returns -2 in case of error 1 if first point < second point, 0 if
  *         it's the same node, -1 otherwise
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cmp_nodes(
-    mut node1: XmlNodePtr,
-    mut node2: XmlNodePtr,
-) -> c_int {
-    let mut depth1: c_int;
-    let mut depth2: c_int;
-    let mut attr1: c_int = 0;
-    let mut attr2: c_int = 0;
+pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: XmlNodePtr) -> i32 {
+    let mut depth1: i32;
+    let mut depth2: i32;
+    let mut attr1: i32 = 0;
+    let mut attr2: i32 = 0;
     let mut attr_node1: XmlNodePtr = null_mut();
     let mut attr_node2: XmlNodePtr = null_mut();
     let mut cur: XmlNodePtr;
@@ -946,12 +943,12 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(
      */
     if matches!((*node1).typ, XmlElementType::XmlElementNode)
         && matches!((*node2).typ, XmlElementType::XmlElementNode)
-        && 0 > (*node1).content as ptrdiff_t
-        && 0 > (*node2).content as ptrdiff_t
+        && 0 > (*node1).content as isize
+        && 0 > (*node2).content as isize
         && (*node1).doc == (*node2).doc
     {
-        let l1: ptrdiff_t = -((*node1).content as ptrdiff_t);
-        let l2: ptrdiff_t = -((*node2).content as ptrdiff_t);
+        let l1: isize = -((*node1).content as isize);
+        let l2: isize = -((*node2).content as isize);
         if l1 < l2 {
             return 1;
         }
@@ -1022,12 +1019,12 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(
      */
     if matches!((*node1).typ, XmlElementType::XmlElementNode)
         && matches!((*node2).typ, XmlElementType::XmlElementNode)
-        && 0 > (*node1).content as ptrdiff_t
-        && 0 > (*node2).content as ptrdiff_t
+        && 0 > (*node1).content as isize
+        && 0 > (*node2).content as isize
         && (*node1).doc == (*node2).doc
     {
-        let l1: ptrdiff_t = -((*node1).content as ptrdiff_t);
-        let l2: ptrdiff_t = -((*node2).content as ptrdiff_t);
+        let l1: isize = -((*node1).content as isize);
+        let l2: isize = -((*node2).content as isize);
         if l1 < l2 {
             return 1;
         }
@@ -1058,7 +1055,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(
  * Returns the boolean value
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_number_to_boolean(val: f64) -> c_int {
+pub unsafe extern "C" fn xml_xpath_cast_number_to_boolean(val: f64) -> i32 {
     if xml_xpath_is_nan(val) != 0 || val == 0.0 {
         return 0;
     }
@@ -1074,7 +1071,7 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_boolean(val: f64) -> c_int {
  * Returns the boolean value
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -> i32 {
     if val.is_null() || xml_strlen(val) == 0 {
         return 0;
     }
@@ -1090,7 +1087,7 @@ pub unsafe extern "C" fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -
  * Returns the boolean value
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> c_int {
+pub unsafe extern "C" fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> i32 {
     if ns.is_null() || (*ns).node_nr == 0 {
         return 0;
     }
@@ -1106,7 +1103,7 @@ pub unsafe extern "C" fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -
  * Returns the boolean value
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> c_int {
+pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i32 {
     if val.is_null() {
         return 0;
     }
@@ -1141,7 +1138,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> c_
  * Returns the number value
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_boolean_to_number(val: c_int) -> f64 {
+pub unsafe extern "C" fn xml_xpath_cast_boolean_to_number(val: i32) -> f64 {
     if val != 0 {
         return 1.0;
     }
@@ -1247,7 +1244,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
  * Returns a newly allocated string.
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_boolean_to_string(val: c_int) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_xpath_cast_boolean_to_string(val: i32) -> *mut XmlChar {
     if val != 0 {
         xml_strdup(c"true".as_ptr() as *const XmlChar)
     } else {
@@ -1267,23 +1264,23 @@ const LOWER_DOUBLE: f64 = 1E-5;
  * @buffer:     output buffer
  * @buffersize: size of output buffer
  *
- * Convert the number c_into a string representation.
+ * Convert the number into a string representation.
  */
-unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, buffersize: c_int) {
+unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, buffersize: i32) {
     match xml_xpath_is_inf(number) {
         1 => {
-            if buffersize > "Infinity".len() as c_int + 1 {
+            if buffersize > "Infinity".len() as i32 + 1 {
                 snprintf(buffer, buffersize as usize, c"Infinity".as_ptr() as _);
             }
         }
         -1 => {
-            if buffersize > "-Infinity".len() as c_int + 1 {
+            if buffersize > "-Infinity".len() as i32 + 1 {
                 snprintf(buffer, buffersize as usize, c"-Infinity".as_ptr() as _);
             }
         }
         _ => {
             if xml_xpath_is_nan(number) != 0 {
-                if buffersize > "NaN".len() as c_int + 1 {
+                if buffersize > "NaN".len() as i32 + 1 {
                     snprintf(buffer, buffersize as usize, c"NaN".as_ptr() as _);
                 }
             } else if number == 0.0 {
@@ -1291,12 +1288,12 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                 snprintf(buffer, buffersize as usize, c"0".as_ptr() as _);
             } else if number > INT_MIN as f64
                 && number < INT_MAX as f64
-                && number == number as c_int as f64
+                && number == number as i32 as f64
             {
                 let mut work: [c_char; 30] = [0; 30];
                 let mut ptr: *mut c_char;
                 let mut cur: *mut c_char;
-                let value: c_int = number as c_int;
+                let value: i32 = number as i32;
 
                 ptr = buffer.add(0);
                 if value == 0 {
@@ -1322,23 +1319,23 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                   For the dimension of work,
                       DBL_DIG is number of significant digits
                   EXPONENT is only needed for "scientific notation"
-                      3 is sign, decimal poc_int, and terminating zero
+                      3 is sign, decimal point, and terminating zero
                   LOWER_DOUBLE_EXP is max number of leading zeroes in fraction
                   Note that this dimension is slightly (a few characters)
                   larger than actually necessary.
                 */
                 let mut work: [c_char; DBL_DIG + EXPONENT_DIGITS + 3 + LOWER_DOUBLE_EXP] =
                     [0; DBL_DIG + EXPONENT_DIGITS + 3 + LOWER_DOUBLE_EXP];
-                let integer_place: c_int;
-                let fraction_place: c_int;
+                let integer_place: i32;
+                let fraction_place: i32;
                 let mut ptr: *mut c_char;
                 let mut after_fraction: *mut c_char;
-                let mut size: c_int;
+                let mut size: i32;
                 let absolute_value: f64 = number.abs();
 
                 /*
-                 * First choose format - scientific or regular floating poc_int.
-                 * In either case, result is in work, and after_fraction poc_ints
+                 * First choose format - scientific or regular floating point.
+                 * In either case, result is in work, and after_fraction points
                  * just past the fractional part.
                  */
                 if !(LOWER_DOUBLE..=UPPER_DOUBLE).contains(&absolute_value) && absolute_value != 0.0
@@ -1360,7 +1357,7 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                 } else {
                     /* Use regular notation */
                     if absolute_value > 0.0 {
-                        integer_place = absolute_value.log10() as c_int;
+                        integer_place = absolute_value.log10() as i32;
                         if integer_place > 0 {
                             fraction_place = DBL_DIG as i32 - integer_place - 1;
                         } else {
@@ -1789,7 +1786,7 @@ unsafe extern "C" fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
  * @options: options (currently only the value 0 is used)
  *
  * Creates/frees an object cache on the XPath context.
- * If activates XPath objects (xmlXPathObject) will be cached c_internally
+ * If activates XPath objects (xmlXPathObject) will be cached internally
  * to be reused.
  * @options:
  *   0: This will set the XPath object caching:
@@ -1800,15 +1797,15 @@ unsafe extern "C" fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
  *        misc objects. Use <0 for the default number (100).
  *   Other values for @options have currently no effect.
  *
- * Returns 0 if the setting succeeded, and -1 on API or c_internal errors.
+ * Returns 0 if the setting succeeded, and -1 on API or internal errors.
  */
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_context_set_cache(
     ctxt: XmlXPathContextPtr,
-    active: c_int,
-    mut value: c_int,
-    options: c_int,
-) -> c_int {
+    active: i32,
+    mut value: i32,
+    options: i32,
+) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -1854,8 +1851,8 @@ pub unsafe extern "C" fn xml_xpath_context_set_cache(
  *    of error.
  */
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> c_long {
-    let mut count: ptrdiff_t = 0;
+pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
+    let mut count: isize = 0;
     let mut cur: XmlNodePtr;
 
     if doc.is_null() {
@@ -1911,7 +1908,7 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> c_long {
 pub unsafe extern "C" fn xml_xpath_set_context_node(
     node: XmlNodePtr,
     ctx: XmlXPathContextPtr,
-) -> c_int {
+) -> i32 {
     if node.is_null() || ctx.is_null() {
         return -1;
     }
@@ -2061,7 +2058,7 @@ pub unsafe extern "C" fn xml_xpath_eval_expression(
 pub unsafe extern "C" fn xml_xpath_eval_predicate(
     ctxt: XmlXPathContextPtr,
     res: XmlXPathObjectPtr,
-) -> c_int {
+) -> i32 {
     use crate::generic_error;
 
     if ctxt.is_null() || res.is_null() {
@@ -2125,7 +2122,7 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
     use std::ffi::CString;
 
     let mut comp: XmlXPathCompExprPtr;
-    let mut old_depth: c_int = 0;
+    let mut old_depth: i32 = 0;
 
     #[cfg(feature = "libxml_pattern")]
     {
@@ -2156,9 +2153,9 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
 
     if *(*pctxt).cur != 0 {
         /*
-         * aleksey: in some cases this line prc_ints *second* error message
+         * aleksey: in some cases this line prints *second* error message
          * (see bug #78858) and probably this should be fixed.
-         * However, we are not sure that all error messages are prc_inted
+         * However, we are not sure that all error messages are printed
          * out in other places. It's not critical so we leave it as-is for now
          */
         let file = CString::new(file!()).unwrap();
@@ -2272,11 +2269,11 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
     res_obj_ptr: *mut XmlXPathObjectPtr,
-    to_bool: c_int,
-) -> c_int {
+    to_bool: i32,
+) -> i32 {
     let res_obj: XmlXPathObjectPtr;
     #[cfg(not(feature = "thread"))]
-    static mut REENTANCE: c_int = 0;
+    static mut REENTANCE: i32 = 0;
 
     CHECK_CTXT_NEG!(ctxt);
 
@@ -2297,7 +2294,7 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
     if pctxt.is_null() {
         return -1;
     }
-    let res: c_int = xml_xpath_run_eval(pctxt, to_bool);
+    let res: i32 = xml_xpath_run_eval(pctxt, to_bool);
 
     if (*pctxt).error != XmlXPathError::XpathExpressionOk as i32 {
         res_obj = null_mut();
@@ -2361,13 +2358,13 @@ pub unsafe extern "C" fn xml_xpath_compiled_eval(
  * compiled expression.
  *
  * Returns 1 if the expression evaluated to true, 0 if to false and
- *         -1 in API and c_internal errors.
+ *         -1 in API and internal errors.
  */
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_compiled_eval_to_boolean(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
-) -> c_int {
+) -> i32 {
     xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), 1)
 }
 
@@ -2441,8 +2438,8 @@ pub unsafe extern "C" fn xml_xpath_init() {
 * Returns 1 if the value is a NaN, 0 otherwise
 */
 #[cfg(any(feature = "xpath", feature = "schema"))]
-pub unsafe extern "C" fn xml_xpath_is_nan(val: f64) -> c_int {
-    val.is_nan() as c_int
+pub unsafe extern "C" fn xml_xpath_is_nan(val: f64) -> i32 {
+    val.is_nan() as i32
 }
 
 /**
@@ -2452,7 +2449,7 @@ pub unsafe extern "C" fn xml_xpath_is_nan(val: f64) -> c_int {
  * Returns 1 if the value is +Infinite, -1 if -Infinite, 0 otherwise
  */
 #[cfg(any(feature = "xpath", feature = "schema"))]
-pub unsafe extern "C" fn xml_xpath_is_inf(val: f64) -> c_int {
+pub unsafe extern "C" fn xml_xpath_is_inf(val: f64) -> i32 {
     if val.is_infinite() {
         if val > 0.0 {
             1

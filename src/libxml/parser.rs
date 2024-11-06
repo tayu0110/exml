@@ -6,7 +6,7 @@
 use std::{
     any::type_name,
     cell::RefCell,
-    ffi::{c_char, c_int, c_uchar, c_uint, c_ulong, c_void, CStr, CString},
+    ffi::{c_char, c_void, CStr, CString},
     io::Read,
     mem::{size_of, size_of_val},
     ops::DerefMut,
@@ -317,7 +317,7 @@ pub enum XmlParserInputState {
     XmlParserEOF = -1, /* nothing is to be parsed */
     #[default]
     XmlParserStart = 0, /* nothing has been parsed */
-    XmlParserMisc,     /* Misc* before c_int subset */
+    XmlParserMisc,     /* Misc* before int subset */
     XmlParserPI,       /* Within a processing instruction */
     XmlParserDTD,      /* within some DTD content */
     XmlParserProlog,   /* Misc* after internal subset */
@@ -430,8 +430,8 @@ pub enum XmlParserMode {
 pub(crate) struct XmlStartTag {
     pub(crate) prefix: *const XmlChar,
     pub(crate) uri: *const XmlChar,
-    pub(crate) line: c_int,
-    pub(crate) ns_nr: c_int,
+    pub(crate) line: i32,
+    pub(crate) ns_nr: i32,
 }
 
 impl Default for XmlStartTag {
@@ -637,7 +637,7 @@ impl XmlParserCtxt {
             return 0;
         }
 
-        let ret: c_int = buf.borrow_mut().grow(INPUT_CHUNK as _);
+        let ret: i32 = buf.borrow_mut().grow(INPUT_CHUNK as _);
         (*input).set_base_and_cursor(0, cur_base as usize);
 
         /* TODO: Get error code from xmlParserInputBufferGrow */
@@ -686,9 +686,8 @@ impl XmlParserCtxt {
 
             if res > 0 {
                 used -= res;
-                if res > c_ulong::MAX as size_t || (*input).consumed > c_ulong::MAX - res as c_ulong
-                {
-                    (*input).consumed = c_ulong::MAX;
+                if res > u64::MAX as size_t || (*input).consumed > u64::MAX - res as u64 {
+                    (*input).consumed = u64::MAX;
                 } else {
                     (*input).consumed += res as u64;
                 }
@@ -942,7 +941,7 @@ impl XmlParserCtxt {
                     }
                     xml_parse_pe_reference(self);
                 } else if self.current_byte() == 0 {
-                    let mut consumed: c_ulong;
+                    let mut consumed: u64;
 
                     if self.input_tab.len() <= 1 {
                         break;
@@ -1003,7 +1002,7 @@ impl XmlParserCtxt {
     /// Returns the current char value and its length
     #[doc(hidden)]
     #[doc(alias = "xmlCurrentChar")]
-    pub unsafe fn current_char(&mut self, len: &mut c_int) -> Option<char> {
+    pub unsafe fn current_char(&mut self, len: &mut i32) -> Option<char> {
         if self.input.is_null() {
             return None;
         }
@@ -1149,7 +1148,7 @@ impl XmlParserCtxt {
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "nodePush")]
     pub(crate) unsafe fn node_push(&mut self, value: XmlNodePtr) -> i32 {
-        if self.node_tab.len() as c_uint > XML_PARSER_MAX_DEPTH
+        if self.node_tab.len() as u32 > XML_PARSER_MAX_DEPTH
             && self.options & XmlParserOption::XmlParseHuge as i32 == 0
         {
             xml_fatal_err_msg_int(
@@ -1833,7 +1832,7 @@ pub type GetParameterEntitySAXFunc =
 pub type EntityDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     publicId: *const XmlChar,
     systemId: *const XmlChar,
     content: *mut XmlChar,
@@ -1871,8 +1870,8 @@ pub type AttributeDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     elem: *const XmlChar,
     fullname: *const XmlChar,
-    typ: c_int,
-    def: c_int,
+    typ: i32,
+    def: i32,
     defaultValue: *const XmlChar,
     tree: XmlEnumerationPtr,
 );
@@ -1889,7 +1888,7 @@ pub type AttributeDeclSAXFunc = unsafe fn(
 pub type ElementDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     content: XmlElementContentPtr,
 );
 
@@ -1988,7 +1987,7 @@ pub type ReferenceSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: *c
  * Receiving some chars from the parser.
  */
 pub type CharactersSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int);
+    unsafe fn(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32);
 
 /**
  * ignorableWhitespaceSAXFunc:
@@ -2000,7 +1999,7 @@ pub type CharactersSAXFunc =
  * UNUSED: by default the DOM building will use characters.
  */
 pub type IgnorableWhitespaceSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int);
+    unsafe fn(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32);
 
 /**
  * processingInstructionSAXFunc:
@@ -2031,7 +2030,7 @@ pub type CommentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, value: *co
  * Called when a pcdata block has been parsed.
  */
 pub type CdataBlockSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, value: *const XmlChar, len: c_int);
+    unsafe fn(ctx: Option<GenericErrorContext>, value: *const XmlChar, len: i32);
 
 /**
  * warningSAXFunc:
@@ -2073,7 +2072,7 @@ pub type FatalErrorSAXFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const 
  *
  * Returns 1 if true
  */
-pub type IsStandaloneSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> c_int;
+pub type IsStandaloneSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> i32;
 /**
  * hasInternalSubsetSAXFunc:
  * @ctx:  the user data (XML parser context)
@@ -2082,7 +2081,7 @@ pub type IsStandaloneSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> c_
  *
  * Returns 1 if true
  */
-pub type HasInternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> c_int;
+pub type HasInternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> i32;
 
 /**
  * hasExternalSubsetSAXFunc:
@@ -2092,7 +2091,7 @@ pub type HasInternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) 
  *
  * Returns 1 if true
  */
-pub type HasExternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> c_int;
+pub type HasExternalSubsetSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>) -> i32;
 
 /************************************************************************
  *									*
@@ -2130,10 +2129,10 @@ pub type StartElementNsSAX2Func = unsafe fn(
     localname: *const XmlChar,
     prefix: *const XmlChar,
     URI: *const XmlChar,
-    nb_namespaces: c_int,
+    nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
-    nb_attributes: c_int,
-    nb_defaulted: c_int,
+    nb_attributes: i32,
+    nb_defaulted: i32,
     attributes: *mut *const XmlChar,
 );
 
@@ -2185,7 +2184,7 @@ pub struct XmlSAXHandler {
     pub get_parameter_entity: Option<GetParameterEntitySAXFunc>,
     pub cdata_block: Option<CdataBlockSAXFunc>,
     pub external_subset: Option<ExternalSubsetSAXFunc>,
-    pub initialized: c_uint,
+    pub initialized: u32,
     /* The following fields are extensions available only on version 2 */
     pub _private: AtomicPtr<c_void>,
     pub start_element_ns: Option<StartElementNsSAX2Func>,
@@ -2228,7 +2227,7 @@ pub struct XmlSAXHandlerV1 {
     pub(crate) get_parameter_entity: Option<GetParameterEntitySAXFunc>,
     pub(crate) cdata_block: Option<CdataBlockSAXFunc>,
     pub(crate) external_subset: Option<ExternalSubsetSAXFunc>,
-    pub(crate) initialized: c_uint,
+    pub(crate) initialized: u32,
 }
 
 /**
@@ -2275,7 +2274,7 @@ pub type XmlExternalEntityLoader = unsafe extern "C" fn(
  *   NEXT    Skip to the next character, this does the proper decoding
  *           in UTF-8 mode. It also pop-up unfinished entities on the fly.
  *   NEXTL!(ctxt, l) Skip the current unicode character of l xmlChars long.
- *   (*ctxt).xml_current_char( l) returns the current unicode character (c_int), set l
+ *   (*ctxt).xml_current_char( l) returns the current unicode character (int), set l
  *           to the number of xmlChars used for the encoding [0-5].
  *   CUR_SCHAR  same but operate on a string instead of the context
  *   COPY_BUF  copy the current unicode c_char to the target buffer, increment
@@ -2420,7 +2419,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_int(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
     msg: *const c_char,
-    val: c_int,
+    val: i32,
 ) {
     if !ctxt.is_null()
         && (*ctxt).disable_sax != 0
@@ -2702,7 +2701,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str_int_str(
     error: XmlParserErrors,
     msg: *const c_char,
     str1: *const XmlChar,
-    val: c_int,
+    val: i32,
     str2: *const XmlChar,
 ) {
     if !ctxt.is_null()
@@ -2811,7 +2810,7 @@ pub(crate) unsafe extern "C" fn xml_ns_err(
     }
 }
 
-pub(crate) unsafe extern "C" fn xml_is_name_char(ctxt: XmlParserCtxtPtr, c: c_int) -> c_int {
+pub(crate) unsafe extern "C" fn xml_is_name_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
     if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {
         /*
          * Use the new checks of production [4] [4a] amd [5] of the
@@ -2965,10 +2964,7 @@ pub unsafe extern "C" fn xml_cleanup_parser() {
  *
  * Returns -1 as this is an error to use it.
  */
-pub(crate) unsafe extern "C" fn xml_parser_input_read(
-    _input: XmlParserInputPtr,
-    _len: c_int,
-) -> c_int {
+pub(crate) unsafe extern "C" fn xml_parser_input_read(_input: XmlParserInputPtr, _len: i32) -> i32 {
     -1
 }
 
@@ -2985,10 +2981,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_read(
  * Returns the amount of c_char read, or -1 in case of error, 0 indicate the
  * end of this entity
  */
-pub(crate) unsafe extern "C" fn xml_parser_input_grow(
-    input: XmlParserInputPtr,
-    len: c_int,
-) -> c_int {
+pub(crate) unsafe extern "C" fn xml_parser_input_grow(input: XmlParserInputPtr, len: i32) -> i32 {
     if input.is_null() || len < 0 {
         return -1;
     }
@@ -3014,7 +3007,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_grow(
     if buf.len() > indx + INPUT_CHUNK {
         return 0;
     }
-    let ret: c_int = input_buffer.borrow_mut().grow(len);
+    let ret: i32 = input_buffer.borrow_mut().grow(len);
 
     (*input).base = if buf.is_ok() {
         buf.as_ref().as_ptr()
@@ -3090,7 +3083,7 @@ pub unsafe fn xml_parse_memory(buffer: Vec<u8>) -> XmlDocPtr {
 
 /**
  * xmlSubstituteEntitiesDefault:
- * @val:  c_int 0 or 1
+ * @val:  int 0 or 1
  *
  * DEPRECATED: Use the modern options API with XML_PARSE_NOENT.
  *
@@ -3112,7 +3105,7 @@ pub unsafe extern "C" fn xml_substitute_entities_default(val: i32) -> i32 {
 
 /**
  * xmlKeepBlanksDefault:
- * @val:  c_int 0 or 1
+ * @val:  int 0 or 1
  *
  * DEPRECATED: Use the modern options API with XML_PARSE_NOBLANKS.
  *
@@ -3147,7 +3140,7 @@ pub unsafe extern "C" fn xml_keep_blanks_default(val: i32) -> i32 {
 
 /**
  * xmlPedanticParserDefault:
- * @val:  c_int 0 or 1
+ * @val:  int 0 or 1
  *
  * DEPRECATED: Use the modern options API with XML_PARSE_PEDANTIC.
  *
@@ -3164,7 +3157,7 @@ pub unsafe extern "C" fn xml_pedantic_parser_default(val: i32) -> i32 {
 
 /**
  * xmlLineNumbersDefault:
- * @val:  c_int 0 or 1
+ * @val:  int 0 or 1
  *
  * DEPRECATED: The modern options API always enables line numbers.
  *
@@ -3242,8 +3235,8 @@ pub unsafe extern "C" fn xml_recover_file(filename: *const c_char) -> XmlDocPtr 
 pub type XmlDefAttrsPtr = *mut XmlDefAttrs;
 #[repr(C)]
 pub struct XmlDefAttrs {
-    pub(crate) nb_attrs: c_int, /* number of defaulted attributes on that element */
-    pub(crate) max_attrs: c_int, /* the size of the array */
+    pub(crate) nb_attrs: i32, /* number of defaulted attributes on that element */
+    pub(crate) max_attrs: i32, /* the size of the array */
     pub(crate) values: [*const XmlChar; 5], /* array of localname/prefix/values/external */
 }
 
@@ -3260,7 +3253,7 @@ pub struct XmlDefAttrs {
  * [65] Ignore ::= Char* - (Char* ('<![' | ']]>') Char*)
  */
 pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCtxtPtr) {
-    let mut input_ids: *mut c_int = null_mut();
+    let mut input_ids: *mut i32 = null_mut();
     let mut input_ids_size: size_t = 0;
     let mut depth: size_t = 0;
 
@@ -3269,7 +3262,7 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
             && (*ctxt).nth_byte(1) == b'!'
             && (*ctxt).nth_byte(2) == b'['
         {
-            let id: c_int = (*(*ctxt).input).id;
+            let id: i32 = (*(*ctxt).input).id;
 
             (*ctxt).advance(3);
             (*ctxt).skip_blanks();
@@ -3300,8 +3293,8 @@ pub(crate) unsafe extern "C" fn xml_parse_conditional_sections(ctxt: XmlParserCt
                     } else {
                         input_ids_size * 2
                     };
-                    let tmp: *mut c_int =
-                        xml_realloc(input_ids as _, input_ids_size as usize * size_of::<c_int>())
+                    let tmp: *mut i32 =
+                        xml_realloc(input_ids as _, input_ids_size as usize * size_of::<i32>())
                             as _;
                     if tmp.is_null() {
                         xml_err_memory(ctxt, null());
@@ -3539,7 +3532,7 @@ pub(crate) const SAX_COMPAT_MODE: &CStr = c"SAX compatibility mode document";
  * Returns 0, -1 in case of error. the parser context is augmented
  *                as a result of the parsing.
  */
-pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
     let mut start: [XmlChar; 4] = [0; 4];
 
     xml_init_parser();
@@ -3743,7 +3736,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> c_int {
  * Returns 0, -1 in case of error. the parser context is augmented
  *                as a result of the parsing.
  */
-pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> c_int {
+pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
     let mut start: [XmlChar; 4] = [0; 4];
 
     if ctxt.is_null() || (*ctxt).input.is_null() {
@@ -3866,8 +3859,8 @@ pub unsafe fn xml_sax_user_parse_file(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
     filename: *const c_char,
-) -> c_int {
-    let ret: c_int;
+) -> i32 {
+    let ret: i32;
 
     let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
     if ctxt.is_null() {
@@ -3923,8 +3916,8 @@ pub unsafe fn xml_sax_user_parse_memory(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
     buffer: Vec<u8>,
-) -> c_int {
-    let ret: c_int;
+) -> i32 {
+    let ret: i32;
 
     xml_init_parser();
 
@@ -3983,7 +3976,7 @@ pub unsafe fn xml_sax_user_parse_memory(
 pub unsafe extern "C" fn xml_sax_parse_doc(
     sax: XmlSAXHandlerPtr,
     cur: *const XmlChar,
-    recovery: c_int,
+    recovery: i32,
 ) -> XmlDocPtr {
     let ret: XmlDocPtr;
 
@@ -4041,7 +4034,7 @@ pub unsafe extern "C" fn xml_sax_parse_doc(
 pub unsafe fn xml_sax_parse_memory(
     sax: XmlSAXHandlerPtr,
     buffer: Vec<u8>,
-    recovery: c_int,
+    recovery: i32,
 ) -> XmlDocPtr {
     xml_sax_parse_memory_with_data(sax, buffer, recovery, null_mut())
 }
@@ -4071,7 +4064,7 @@ pub unsafe fn xml_sax_parse_memory(
 pub unsafe fn xml_sax_parse_memory_with_data(
     sax: XmlSAXHandlerPtr,
     buffer: Vec<u8>,
-    recovery: c_int,
+    recovery: i32,
     data: *mut c_void,
 ) -> XmlDocPtr {
     let ret: XmlDocPtr;
@@ -4133,7 +4126,7 @@ pub unsafe fn xml_sax_parse_memory_with_data(
 pub unsafe extern "C" fn xml_sax_parse_file(
     sax: XmlSAXHandlerPtr,
     filename: *const c_char,
-    recovery: c_int,
+    recovery: i32,
 ) -> XmlDocPtr {
     xml_sax_parse_file_with_data(sax, filename, recovery, null_mut())
 }
@@ -4163,7 +4156,7 @@ pub unsafe extern "C" fn xml_sax_parse_file(
 pub unsafe extern "C" fn xml_sax_parse_file_with_data(
     sax: XmlSAXHandlerPtr,
     filename: *const c_char,
-    recovery: c_int,
+    recovery: i32,
     data: *mut c_void,
 ) -> XmlDocPtr {
     use crate::io::xml_parser_get_directory;
@@ -4589,10 +4582,10 @@ pub unsafe fn xml_parse_balanced_chunk_memory(
     doc: XmlDocPtr,
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
-    depth: c_int,
+    depth: i32,
     string: *const XmlChar,
     lst: *mut XmlNodePtr,
-) -> c_int {
+) -> i32 {
     xml_parse_balanced_chunk_memory_recover(doc, sax, user_data, depth, string, lst, 0)
 }
 
@@ -4646,7 +4639,7 @@ unsafe extern "C" fn xml_get_namespace(
 pub unsafe fn xml_parse_in_node_context(
     mut node: XmlNodePtr,
     data: Vec<u8>,
-    mut options: c_int,
+    mut options: i32,
     lst: *mut XmlNodePtr,
 ) -> XmlParserErrors {
     let ctxt: XmlParserCtxtPtr;
@@ -4896,14 +4889,14 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     doc: XmlDocPtr,
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
-    depth: c_int,
+    depth: i32,
     string: *const XmlChar,
     lst: *mut XmlNodePtr,
-    recover: c_int,
-) -> c_int {
+    recover: i32,
+) -> i32 {
     let mut oldsax: XmlSAXHandlerPtr = null_mut();
     let content: XmlNodePtr;
-    let ret: c_int;
+    let ret: i32;
 
     if depth > 40 {
         return XmlParserErrors::XmlErrEntityLoop as i32;
@@ -5066,7 +5059,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     oldctxt: XmlParserCtxtPtr,
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
-    depth: c_int,
+    depth: i32,
     url: *const XmlChar,
     id: *const XmlChar,
     list: *mut XmlNodePtr,
@@ -5264,7 +5257,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
      * Also record the size of the entity parsed
      */
     if !(*ctxt).input.is_null() && !oldctxt.is_null() {
-        let mut consumed: c_ulong = (*(*ctxt).input).consumed;
+        let mut consumed: u64 = (*(*ctxt).input).consumed;
         consumed =
             consumed.saturating_add((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _);
 
@@ -5323,11 +5316,11 @@ pub unsafe fn xml_parse_external_entity(
     doc: XmlDocPtr,
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
-    depth: c_int,
+    depth: i32,
     url: *const XmlChar,
     id: *const XmlChar,
     lst: *mut XmlNodePtr,
-) -> c_int {
+) -> i32 {
     xml_parse_external_entity_private(doc, null_mut(), sax, user_data, depth, url, id, lst) as i32
 }
 
@@ -5352,7 +5345,7 @@ pub unsafe extern "C" fn xml_parse_ctxt_external_entity(
     url: *const XmlChar,
     id: *const XmlChar,
     lst: *mut XmlNodePtr,
-) -> c_int {
+) -> i32 {
     if ctx.is_null() {
         return -1;
     }
@@ -5411,7 +5404,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     ctxt: XmlParserCtxtPtr,
     sax: *const XmlSAXHandler,
     user_data: Option<GenericErrorContext>,
-) -> c_int {
+) -> i32 {
     let mut input: XmlParserInputPtr;
 
     if ctxt.is_null() {
@@ -5596,7 +5589,7 @@ pub unsafe fn xml_new_sax_parser_ctxt(
  *
  * Returns 0 in case of success and -1 in case of error
  */
-pub(crate) unsafe extern "C" fn xml_init_parser_ctxt(ctxt: XmlParserCtxtPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_init_parser_ctxt(ctxt: XmlParserCtxtPtr) -> i32 {
     xml_init_sax_parser_ctxt(ctxt, null_mut(), None)
 }
 
@@ -5852,11 +5845,8 @@ const XML_FEATURES_LIST: &[*const c_char] = &[
  */
 #[deprecated]
 #[cfg(feature = "legacy")]
-pub unsafe extern "C" fn xml_get_features_list(
-    len: *mut c_int,
-    result: *mut *const c_char,
-) -> c_int {
-    let ret: c_int = XML_FEATURES_LIST.len() as i32;
+pub unsafe extern "C" fn xml_get_features_list(len: *mut i32, result: *mut *const c_char) -> i32 {
+    let ret: i32 = XML_FEATURES_LIST.len() as i32;
     if len.is_null() || result.is_null() {
         return ret;
     }
@@ -5888,35 +5878,35 @@ pub unsafe extern "C" fn xml_get_feature(
     ctxt: XmlParserCtxtPtr,
     name: *const c_char,
     result: *mut c_void,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() || name.is_null() || result.is_null() {
         return -1;
     }
 
     if strcmp(name, c"validate".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).validate;
+        *(result as *mut i32) = (*ctxt).validate;
     } else if strcmp(name, c"keep blanks".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).keep_blanks;
+        *(result as *mut i32) = (*ctxt).keep_blanks;
     } else if strcmp(name, c"disable SAX".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).disable_sax;
+        *(result as *mut i32) = (*ctxt).disable_sax;
     } else if strcmp(name, c"fetch external entities".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).loadsubset;
+        *(result as *mut i32) = (*ctxt).loadsubset;
     } else if strcmp(name, c"substitute entities".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).replace_entities;
+        *(result as *mut i32) = (*ctxt).replace_entities;
     } else if strcmp(name, c"gather line info".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).record_info;
+        *(result as *mut i32) = (*ctxt).record_info;
     } else if strcmp(name, c"user data".as_ptr() as _) == 0 {
         *(result as *mut *mut c_void) = (*ctxt).user_data;
     } else if strcmp(name, c"is html".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).html;
+        *(result as *mut i32) = (*ctxt).html;
     } else if strcmp(name, c"is standalone".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).standalone;
+        *(result as *mut i32) = (*ctxt).standalone;
     } else if strcmp(name, c"document".as_ptr() as _) == 0 {
         *(result as *mut XmlDocPtr) = (*ctxt).my_doc;
     } else if strcmp(name, c"is well formed".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).well_formed;
+        *(result as *mut i32) = (*ctxt).well_formed;
     } else if strcmp(name, c"is valid".as_ptr() as _) == 0 {
-        *(result as *mut c_int) = (*ctxt).valid;
+        *(result as *mut i32) = (*ctxt).valid;
     } else if strcmp(name, c"SAX block".as_ptr() as _) == 0 {
         *(result as *mut XmlSAXHandlerPtr) = (*ctxt).sax;
     } else if strcmp(name, c"SAX function internalSubset".as_ptr() as _) == 0 {
@@ -5996,13 +5986,13 @@ pub unsafe extern "C" fn xml_set_feature(
     ctxt: XmlParserCtxtPtr,
     name: *const c_char,
     value: *mut c_void,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() || name.is_null() || value.is_null() {
         return -1;
     }
 
     if strcmp(name, c"validate".as_ptr() as _) == 0 {
-        let newvalidate: c_int = *(value as *mut c_int);
+        let newvalidate: i32 = *(value as *mut i32);
 
         if (*ctxt).validate == 0 && newvalidate != 0 {
             if (*ctxt).vctxt.warning.is_none() {
@@ -6015,27 +6005,27 @@ pub unsafe extern "C" fn xml_set_feature(
         }
         (*ctxt).validate = newvalidate;
     } else if strcmp(name, c"keep blanks".as_ptr() as _) == 0 {
-        (*ctxt).keep_blanks = *(value as *mut c_int);
+        (*ctxt).keep_blanks = *(value as *mut i32);
     } else if strcmp(name, c"disable SAX".as_ptr() as _) == 0 {
-        (*ctxt).disable_sax = *(value as *mut c_int);
+        (*ctxt).disable_sax = *(value as *mut i32);
     } else if strcmp(name, c"fetch external entities".as_ptr() as _) == 0 {
-        (*ctxt).loadsubset = *(value as *mut c_int);
+        (*ctxt).loadsubset = *(value as *mut i32);
     } else if strcmp(name, c"substitute entities".as_ptr() as _) == 0 {
-        (*ctxt).replace_entities = *(value as *mut c_int);
+        (*ctxt).replace_entities = *(value as *mut i32);
     } else if strcmp(name, c"gather line info".as_ptr() as _) == 0 {
-        (*ctxt).record_info = *(value as *mut c_int);
+        (*ctxt).record_info = *(value as *mut i32);
     } else if strcmp(name, c"user data".as_ptr() as _) == 0 {
         (*ctxt).user_data = *(value as *mut *mut c_void);
     } else if strcmp(name, c"is html".as_ptr() as _) == 0 {
-        (*ctxt).html = *(value as *mut c_int);
+        (*ctxt).html = *(value as *mut i32);
     } else if strcmp(name, c"is standalone".as_ptr() as _) == 0 {
-        (*ctxt).standalone = *(value as *mut c_int);
+        (*ctxt).standalone = *(value as *mut i32);
     } else if strcmp(name, c"document".as_ptr() as _) == 0 {
         (*ctxt).my_doc = *(value as *mut XmlDocPtr);
     } else if strcmp(name, c"is well formed".as_ptr() as _) == 0 {
-        (*ctxt).well_formed = *(value as *mut c_int);
+        (*ctxt).well_formed = *(value as *mut i32);
     } else if strcmp(name, c"is valid".as_ptr() as _) == 0 {
-        (*ctxt).valid = *(value as *mut c_int);
+        (*ctxt).valid = *(value as *mut i32);
     } else if strcmp(name, c"SAX block".as_ptr() as _) == 0 {
         (*ctxt).sax = *(value as *mut XmlSAXHandlerPtr);
     } else if strcmp(name, c"SAX function internalSubset".as_ptr() as _) == 0 {
@@ -6124,7 +6114,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
     chunk: *const c_char,
-    size: c_int,
+    size: i32,
     filename: *const c_char,
 ) -> XmlParserCtxtPtr {
     use crate::io::xml_parser_get_directory;
@@ -6251,10 +6241,10 @@ unsafe extern "C" fn xml_parse_lookup_string(
  * Check whether there's enough data in the input buffer to finish parsing
  * a start tag. This has to take quotes into account.
  */
-unsafe extern "C" fn xml_parse_lookup_gt(ctxt: XmlParserCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_parse_lookup_gt(ctxt: XmlParserCtxtPtr) -> i32 {
     let mut cur: *const XmlChar;
     let end: *const XmlChar = (*(*ctxt).input).end;
-    let mut state: c_int = (*ctxt).end_check_state;
+    let mut state: i32 = (*ctxt).end_check_state;
 
     if (*ctxt).check_index == 0 {
         cur = (*(*ctxt).input).cur.add(1);
@@ -6298,7 +6288,7 @@ unsafe extern "C" fn xml_parse_lookup_gt(ctxt: XmlParserCtxtPtr) -> c_int {
  * We still keep compatibility to pre-revision5 parsing semantic if the
  * new XML_PARSE_OLD10 option is given to the parser.
  */
-unsafe extern "C" fn xml_is_name_start_char(ctxt: XmlParserCtxtPtr, c: c_int) -> c_int {
+unsafe extern "C" fn xml_is_name_start_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
     if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {
         /*
          * Use the new checks of production [4] [4a] amd [5] of the
@@ -6333,9 +6323,9 @@ unsafe extern "C" fn xml_is_name_start_char(ctxt: XmlParserCtxtPtr, c: c_int) ->
 }
 
 unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    let mut len: c_int = 0;
-    let mut l: c_int = 0;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut len: i32 = 0;
+    let mut l: i32 = 0;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH as i32
     } else {
         XML_MAX_NAME_LENGTH as i32
@@ -6619,11 +6609,8 @@ const XML_ENT_FIXED_COST: usize = 20;
  *
  * Returns 1 on error, 0 on success.
  */
-pub(crate) unsafe extern "C" fn xml_parser_entity_check(
-    ctxt: XmlParserCtxtPtr,
-    extra: c_ulong,
-) -> c_int {
-    let mut consumed: c_ulong;
+pub(crate) unsafe extern "C" fn xml_parser_entity_check(ctxt: XmlParserCtxtPtr, extra: u64) -> i32 {
+    let mut consumed: u64;
     let input: XmlParserInputPtr = (*ctxt).input;
     let entity: XmlEntityPtr = (*input).entity;
 
@@ -6685,16 +6672,16 @@ pub(crate) unsafe extern "C" fn xml_parser_entity_check(
  * Characters referred to using character references must match the
  * production for Char.
  *
- * Returns the value parsed (as an c_int), 0 in case of error, str will be
+ * Returns the value parsed (as an int), 0 in case of error, str will be
  *         updated to the current value of the index
  */
 unsafe extern "C" fn xml_parse_string_char_ref(
     ctxt: XmlParserCtxtPtr,
     str: *mut *const XmlChar,
-) -> c_int {
+) -> i32 {
     let mut ptr: *const XmlChar;
     let mut cur: XmlChar;
-    let mut val: c_int = 0;
+    let mut val: i32 = 0;
 
     if str.is_null() || (*str).is_null() {
         return 0;
@@ -6803,10 +6790,10 @@ pub(crate) unsafe extern "C" fn xml_parse_string_name(
 ) -> *mut XmlChar {
     let mut buf: [XmlChar; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
     let mut cur: *const XmlChar = *str;
-    let mut len: c_int = 0;
-    let mut l: c_int = 0;
-    let mut c: c_int;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut len: i32 = 0;
+    let mut l: i32 = 0;
+    let mut c: i32;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH as i32
     } else {
         XML_MAX_NAME_LENGTH as i32
@@ -6831,7 +6818,7 @@ pub(crate) unsafe extern "C" fn xml_parse_string_name(
              * for the processing speed.
              */
             let mut buffer: *mut XmlChar;
-            let mut max: c_int = len * 2;
+            let mut max: i32 = len * 2;
 
             buffer = xml_malloc_atomic(max as usize) as _;
             if buffer.is_null() {
@@ -7303,11 +7290,8 @@ pub unsafe extern "C" fn xml_pop_input(ctxt: XmlParserCtxtPtr) -> XmlChar {
  *
  * Returns 0 in case of success and -1 in case of failure
  */
-unsafe extern "C" fn xml_load_entity_content(
-    ctxt: XmlParserCtxtPtr,
-    entity: XmlEntityPtr,
-) -> c_int {
-    let mut l: c_int = 0;
+unsafe extern "C" fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: XmlEntityPtr) -> i32 {
+    let mut l: i32 = 0;
 
     if ctxt.is_null()
         || entity.is_null()
@@ -7439,12 +7423,12 @@ macro_rules! grow_buffer {
 pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
     ctxt: XmlParserCtxtPtr,
     mut str: *const XmlChar,
-    len: c_int,
-    what: c_int,
+    len: i32,
+    what: i32,
     end: XmlChar,
     end2: XmlChar,
     end3: XmlChar,
-    check: c_int,
+    check: i32,
 ) -> *mut XmlChar {
     let mut buffer: *mut XmlChar;
     let mut buffer_size: size_t;
@@ -7453,7 +7437,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
     let mut rep: *mut XmlChar = null_mut();
     let mut ent: XmlEntityPtr;
     let mut c: i32;
-    let mut l: c_int = 0;
+    let mut l: i32 = 0;
 
     if str.is_null() {
         return null_mut();
@@ -7501,7 +7485,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                     break;
                 }
                 if c == b'&' as i32 && *str.add(1) == b'#' {
-                    let val: c_int = xml_parse_string_char_ref(ctxt, addr_of_mut!(str));
+                    let val: i32 = xml_parse_string_char_ref(ctxt, addr_of_mut!(str));
                     if val == 0 {
                         break 'int_error;
                     }
@@ -7603,7 +7587,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                         xml_free(rep as _);
                         rep = null_mut();
                     } else if !ent.is_null() {
-                        let i: c_int = xml_strlen((*ent).name.load(Ordering::Relaxed));
+                        let i: i32 = xml_strlen((*ent).name.load(Ordering::Relaxed));
                         let mut cur: *const XmlChar = (*ent).name.load(Ordering::Relaxed);
 
                         *buffer.add(nbchars as usize) = b'&';
@@ -7759,8 +7743,8 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
  */
 unsafe extern "C" fn xml_parse_att_value_complex(
     ctxt: XmlParserCtxtPtr,
-    attlen: *mut c_int,
-    normalize: c_int,
+    attlen: *mut i32,
+    normalize: i32,
 ) -> *mut XmlChar {
     let limit: XmlChar;
     let mut buf: *mut XmlChar;
@@ -7772,8 +7756,8 @@ unsafe extern "C" fn xml_parse_att_value_complex(
     } else {
         XML_MAX_TEXT_LENGTH
     };
-    let mut l: c_int = 0;
-    let mut in_space: c_int = 0;
+    let mut l: i32 = 0;
+    let mut in_space: i32 = 0;
     let mut current: *mut XmlChar;
     let mut ent: XmlEntityPtr;
 
@@ -7811,7 +7795,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                 if c == '&' {
                     in_space = 0;
                     if (*ctxt).nth_byte(1) == b'#' {
-                        let val: c_int = xml_parse_char_ref(ctxt);
+                        let val: i32 = xml_parse_char_ref(ctxt);
 
                         if val == b'&' as i32 {
                             if (*ctxt).replace_entities != 0 {
@@ -7926,7 +7910,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                                 }
                             }
                         } else if !ent.is_null() {
-                            let i: c_int = xml_strlen((*ent).name.load(Ordering::Relaxed));
+                            let i: i32 = xml_strlen((*ent).name.load(Ordering::Relaxed));
                             let mut cur: *const XmlChar = (*ent).name.load(Ordering::Relaxed);
 
                             /*
@@ -7940,7 +7924,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                             ) && !(*ent).content.load(Ordering::Relaxed).is_null()
                             {
                                 if (*ent).flags & XML_ENT_CHECKED as i32 == 0 {
-                                    let old_copy: c_ulong = (*ctxt).sizeentcopy;
+                                    let old_copy: u64 = (*ctxt).sizeentcopy;
 
                                     (*ctxt).sizeentcopy = (*ent).length as _;
 
@@ -8131,15 +8115,15 @@ macro_rules! GROW_PARSE_ATT_VALUE_INTERNAL {
 
 pub(crate) unsafe extern "C" fn xml_parse_att_value_internal(
     ctxt: XmlParserCtxtPtr,
-    len: *mut c_int,
-    alloc: *mut c_int,
-    normalize: c_int,
+    len: *mut i32,
+    alloc: *mut i32,
+    normalize: i32,
 ) -> *mut XmlChar {
     let mut start: *const XmlChar;
     let mut end: *const XmlChar;
     let mut last: *const XmlChar;
     let ret: *mut XmlChar;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_HUGE_LENGTH as i32
     } else {
         XML_MAX_TEXT_LENGTH as i32
@@ -8147,8 +8131,8 @@ pub(crate) unsafe extern "C" fn xml_parse_att_value_internal(
 
     (*ctxt).grow();
     let mut input: *const XmlChar = (*ctxt).current_ptr();
-    let mut line: c_int = (*(*ctxt).input).line;
-    let mut col: c_int = (*(*ctxt).input).col;
+    let mut line: i32 = (*(*ctxt).input).line;
+    let mut col: i32 = (*(*ctxt).input).col;
     if *input != b'"' && *input != b'\'' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrAttributeNotStarted, null());
         return null_mut();
@@ -8408,16 +8392,16 @@ pub(crate) unsafe extern "C" fn xml_attr_normalize_space(
 unsafe extern "C" fn xml_attr_normalize_space2(
     ctxt: XmlParserCtxtPtr,
     src: *mut XmlChar,
-    len: *mut c_int,
+    len: *mut i32,
 ) -> *const XmlChar {
-    let mut remove_head: c_int = 0;
-    let mut need_realloc: c_int = 0;
+    let mut remove_head: i32 = 0;
+    let mut need_realloc: i32 = 0;
     let mut cur: *const XmlChar;
 
     if ctxt.is_null() || src.is_null() || len.is_null() {
         return null_mut();
     }
-    let i: c_int = *len;
+    let i: i32 = *len;
     if i <= 0 {
         return null_mut();
     }
@@ -8466,8 +8450,8 @@ unsafe extern "C" fn xml_attr_normalize_space2(
  * @elem:  the element name
  * @prefix:  a XmlChar ** used to store the value of the attribute prefix
  * @value:  a XmlChar ** used to store the value of the attribute
- * @len:  an c_int * to save the length of the attribute
- * @alloc:  an c_int * to indicate if the attribute was allocated
+ * @len:  an int * to save the length of the attribute
+ * @alloc:  an int * to indicate if the attribute was allocated
  *
  * parse an attribute in the new SAX2 framework.
  *
@@ -8479,12 +8463,12 @@ unsafe extern "C" fn xml_parse_attribute2(
     elem: *const XmlChar,
     prefix: *mut *const XmlChar,
     value: *mut *mut XmlChar,
-    len: *mut c_int,
-    alloc: *mut c_int,
+    len: *mut i32,
+    alloc: *mut i32,
 ) -> *const XmlChar {
     let mut val: *mut XmlChar;
     let mut internal_val: *mut XmlChar = null_mut();
-    let mut normalize: c_int = 0;
+    let mut normalize: i32 = 0;
 
     *value = null_mut();
     (*ctxt).grow();
@@ -8504,8 +8488,8 @@ unsafe extern "C" fn xml_parse_attribute2(
      * get the type if needed
      */
     if !(*ctxt).atts_special.is_null() {
-        let typ: c_int = xml_hash_qlookup2((*ctxt).atts_special, pref, elem, *prefix, name)
-            as ptrdiff_t as c_int;
+        let typ: i32 =
+            xml_hash_qlookup2((*ctxt).atts_special, pref, elem, *prefix, name) as ptrdiff_t as i32;
         if typ != 0 {
             normalize = 1;
         }
@@ -8735,10 +8719,10 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
     }
 }
 
-unsafe extern "C" fn xml_ctxt_grow_attrs(ctxt: XmlParserCtxtPtr, nr: c_int) -> c_int {
+unsafe extern "C" fn xml_ctxt_grow_attrs(ctxt: XmlParserCtxtPtr, nr: i32) -> i32 {
     let atts: *mut *const XmlChar;
-    let attallocs: *mut c_int;
-    let maxatts: c_int;
+    let attallocs: *mut i32;
+    let maxatts: i32;
 
     if nr + 5 > (*ctxt).maxatts {
         maxatts = if (*ctxt).maxatts == 0 {
@@ -8754,7 +8738,7 @@ unsafe extern "C" fn xml_ctxt_grow_attrs(ctxt: XmlParserCtxtPtr, nr: c_int) -> c
         }
         attallocs = xml_realloc(
             (*ctxt).attallocs as _,
-            (maxatts as usize / 5) * size_of::<c_int>(),
+            (maxatts as usize / 5) * size_of::<i32>(),
         ) as _;
         if attallocs.is_null() {
             xml_free(atts as _);
@@ -8812,7 +8796,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     ctxt: XmlParserCtxtPtr,
     pref: *mut *const XmlChar,
     uri: *mut *const XmlChar,
-    tlen: *mut c_int,
+    tlen: *mut i32,
 ) -> *const XmlChar {
     let mut localname: *const XmlChar;
     let mut prefix: *const XmlChar = null();
@@ -8821,7 +8805,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     let mut nsname: *const XmlChar;
     let mut attvalue: *mut XmlChar = null_mut();
     let mut atts: *mut *const XmlChar = (*ctxt).atts;
-    let mut maxatts: c_int = (*ctxt).maxatts;
+    let mut maxatts: i32 = (*ctxt).maxatts;
 
     if (*ctxt).current_byte() != b'<' {
         return null_mut();
@@ -8829,12 +8813,12 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     (*ctxt).advance(1);
 
     let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
-    let inputid: c_int = (*(*ctxt).input).id;
-    let mut nbatts: c_int = 0;
-    let mut nratts: c_int = 0;
-    let mut nbdef: c_int = 0;
-    let mut nb_ns: c_int = 0;
-    let mut attval: c_int = 0;
+    let inputid: i32 = (*(*ctxt).input).id;
+    let mut nbatts: i32 = 0;
+    let mut nratts: i32 = 0;
+    let mut nbdef: i32 = 0;
+    let mut nb_ns: i32 = 0;
+    let mut attval: i32 = 0;
     // /* Forget any namespaces added during an earlier parse of this element. */
     // (*ctxt).ns_tab.len() = ns_nr;
 
@@ -8863,8 +8847,8 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
             && xml_is_char((*ctxt).current_byte() as u32))
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
-            let mut len: c_int = -1;
-            let mut alloc: c_int = 0;
+            let mut len: i32 = -1;
+            let mut alloc: i32 = 0;
 
             attname = xml_parse_attribute2(
                 ctxt,
@@ -9401,7 +9385,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
  *
  * Check whether the input buffer contains a character.
  */
-unsafe extern "C" fn xml_parse_lookup_char(ctxt: XmlParserCtxtPtr, c: c_int) -> c_int {
+unsafe extern "C" fn xml_parse_lookup_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
     let cur = if (*ctxt).check_index == 0 {
         (*(*ctxt).input).cur.add(1)
     } else {
@@ -9429,7 +9413,7 @@ unsafe extern "C" fn xml_parse_lookup_char(ctxt: XmlParserCtxtPtr, c: c_int) -> 
  *
  * Check whether the input buffer contains terminated c_char data.
  */
-unsafe extern "C" fn xml_parse_lookup_char_data(ctxt: XmlParserCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_parse_lookup_char_data(ctxt: XmlParserCtxtPtr) -> i32 {
     let mut cur: *const XmlChar = (*(*ctxt).input).cur.add((*ctxt).check_index as usize);
     let end: *const XmlChar = (*(*ctxt).input).end;
 
@@ -9453,7 +9437,7 @@ unsafe extern "C" fn xml_parse_lookup_char_data(ctxt: XmlParserCtxtPtr) -> c_int
 /*
  * used for the test in the inner loop of the c_char data testing
  */
-const TEST_CHAR_DATA: [c_uchar; 256] = [
+const TEST_CHAR_DATA: [u8; 256] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, /* 0x9, CR/LF separated */
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -9490,10 +9474,10 @@ const TEST_CHAR_DATA: [c_uchar; 256] = [
 unsafe extern "C" fn are_blanks(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
-    len: c_int,
-    blank_chars: c_int,
-) -> c_int {
-    let ret: c_int;
+    len: i32,
+    blank_chars: i32,
+) -> i32 {
+    let ret: i32;
 
     /*
      * Don't spend time trying to differentiate them, the same callback is
@@ -9569,7 +9553,7 @@ unsafe extern "C" fn are_blanks(
 /**
  * xmlParseCharDataComplex:
  * @ctxt:  an XML parser context
- * @cdata:  c_int indicating whether we are within a CDATA section
+ * @cdata:  int indicating whether we are within a CDATA section
  *
  * Always makes progress if the first c_char isn't '<' or '&'.
  *
@@ -9577,10 +9561,10 @@ unsafe extern "C" fn are_blanks(
  * of xmlParseCharData() when the parsing requires handling
  * of non-ASCII characters.
  */
-unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial: c_int) {
+unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial: i32) {
     let mut buf: [XmlChar; XML_PARSER_BIG_BUFFER_SIZE + 5] = [0; XML_PARSER_BIG_BUFFER_SIZE + 5];
-    let mut nbchar: c_int = 0;
-    let mut l: c_int = 0;
+    let mut nbchar: i32 = 0;
+    let mut l: i32 = 0;
 
     let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
     while cur != '<' /* checked */ && cur != '&' && xml_is_char(cur as u32)
@@ -9695,15 +9679,12 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
  *
  * [14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)
  */
-pub(crate) unsafe extern "C" fn xml_parse_char_data_internal(
-    ctxt: XmlParserCtxtPtr,
-    partial: c_int,
-) {
+pub(crate) unsafe extern "C" fn xml_parse_char_data_internal(ctxt: XmlParserCtxtPtr, partial: i32) {
     let mut input: *const XmlChar;
-    let mut nbchar: c_int;
-    let mut line: c_int = (*(*ctxt).input).line;
-    let mut col: c_int = (*(*ctxt).input).col;
-    let mut ccol: c_int;
+    let mut nbchar: i32;
+    let mut line: i32 = (*(*ctxt).input).line;
+    let mut col: i32 = (*(*ctxt).input).col;
+    let mut ccol: i32;
 
     (*ctxt).grow();
     /*
@@ -10057,7 +10038,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: 
  * [NS 9] ETag ::= '</' QName S? '>'
  */
 #[cfg(feature = "sax1")]
-pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: c_int) {
+pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: i32) {
     let mut name: *const XmlChar;
 
     (*ctxt).grow();
@@ -10127,16 +10108,12 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
  *         UTF-8 error occurred otherwise
  */
 #[cfg(feature = "push")]
-unsafe extern "C" fn xml_check_cdata_push(
-    utf: *const XmlChar,
-    len: c_int,
-    complete: c_int,
-) -> c_int {
+unsafe extern "C" fn xml_check_cdata_push(utf: *const XmlChar, len: i32, complete: i32) -> i32 {
     use super::chvalid::xml_is_char;
 
-    let mut ix: c_int;
-    let mut c: c_uchar;
-    let mut codepoint: c_int;
+    let mut ix: i32;
+    let mut c: u8;
+    let mut codepoint: i32;
 
     if utf.is_null() || len <= 0 {
         return 0;
@@ -10219,7 +10196,7 @@ unsafe extern "C" fn xml_check_cdata_push(
  * the internal subset.
  */
 #[cfg(feature = "push")]
-unsafe extern "C" fn xml_parse_lookup_internal_subset(ctxt: XmlParserCtxtPtr) -> c_int {
+unsafe extern "C" fn xml_parse_lookup_internal_subset(ctxt: XmlParserCtxtPtr) -> i32 {
     /*
      * Sorry, but progressive parsing of the internal subset is not
      * supported. We first check that the full content of the internal
@@ -10230,7 +10207,7 @@ unsafe extern "C" fn xml_parse_lookup_internal_subset(ctxt: XmlParserCtxtPtr) ->
     let mut cur: *const XmlChar;
     let mut start: *const XmlChar;
     let end: *const XmlChar = (*(*ctxt).input).end;
-    let mut state: c_int = (*ctxt).end_check_state;
+    let mut state: i32 = (*ctxt).end_check_state;
 
     if (*ctxt).check_index == 0 {
         cur = (*(*ctxt).input).cur.add(1);
@@ -10322,9 +10299,9 @@ unsafe extern "C" fn xml_parse_lookup_internal_subset(ctxt: XmlParserCtxtPtr) ->
  *
  * Returns zero if no parsing was possible
  */
-unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: c_int) -> c_int {
-    let mut ret: c_int = 0;
-    let mut tlen: c_int = 0;
+unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32 {
+    let mut ret: i32 = 0;
+    let mut tlen: i32 = 0;
     let mut avail: size_t;
     let mut cur: XmlChar;
     let mut next: XmlChar;
@@ -10511,7 +10488,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     let name: *const XmlChar;
                     let mut prefix: *const XmlChar = null_mut();
                     let mut uri: *const XmlChar = null_mut();
-                    let line: c_int = (*(*ctxt).input).line;
+                    let line: i32 = (*(*ctxt).input).line;
                     let ns_nr = (*ctxt).ns_tab.len();
 
                     if avail < 2 && (*ctxt).input_tab.len() == 1 {
@@ -10788,8 +10765,8 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     };
 
                     if term.is_null() {
-                        let mut tmp: c_int;
-                        let size: c_int;
+                        let mut tmp: i32;
+                        let size: i32;
 
                         if terminate != 0 {
                             /* Unfinished CDATA section */
@@ -10822,8 +10799,8 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         }
                         (*ctxt).advance_with_line_handling(tmp as usize);
                     } else {
-                        let base: c_int = term.offset_from((*ctxt).current_ptr()) as i32;
-                        let mut tmp: c_int;
+                        let base: i32 = term.offset_from((*ctxt).current_ptr()) as i32;
+                        let mut tmp: i32;
 
                         tmp = xml_check_cdata_push((*(*ctxt).input).cur, base, 1);
                         if tmp < 0 || tmp != base {
@@ -11089,12 +11066,12 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
 pub unsafe extern "C" fn xml_parse_chunk(
     ctxt: XmlParserCtxtPtr,
     chunk: *const c_char,
-    mut size: c_int,
-    terminate: c_int,
-) -> c_int {
+    mut size: i32,
+    terminate: i32,
+) -> i32 {
     use super::parser_internals::XML_MAX_LOOKUP_LIMIT;
 
-    let mut end_in_lf: c_int = 0;
+    let mut end_in_lf: i32 = 0;
 
     if ctxt.is_null() {
         return XmlParserErrors::XmlErrInternalError as i32;
@@ -11131,7 +11108,7 @@ pub unsafe extern "C" fn xml_parse_chunk(
         let base: size_t = (*(*ctxt).input).get_base();
         let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
 
-        let res: c_int = (*(*ctxt).input)
+        let res: i32 = (*(*ctxt).input)
             .buf
             .as_mut()
             .unwrap()
@@ -11325,7 +11302,7 @@ pub unsafe extern "C" fn xml_parser_find_node_info(
         return null_mut();
     }
     /* Find position where node should be at */
-    let pos: c_ulong = xml_parser_find_node_info_index(addr_of_mut!((*ctxt).node_seq), node);
+    let pos: u64 = xml_parser_find_node_info_index(addr_of_mut!((*ctxt).node_seq), node);
     if pos < (*ctxt).node_seq.length && (*(*ctxt).node_seq.buffer.add(pos as usize)).node == node {
         (*ctxt).node_seq.buffer.add(pos as usize)
     } else {
@@ -11384,14 +11361,14 @@ pub unsafe extern "C" fn xml_clear_node_info_seq(seq: XmlParserNodeInfoSeqPtr) {
 pub unsafe extern "C" fn xml_parser_find_node_info_index(
     seq: XmlParserNodeInfoSeqPtr,
     node: XmlNodePtr,
-) -> c_ulong {
-    let mut upper: c_ulong;
-    let mut lower: c_ulong;
-    let mut middle: c_ulong;
-    let mut found: c_int = 0;
+) -> u64 {
+    let mut upper: u64;
+    let mut lower: u64;
+    let mut middle: u64;
+    let mut found: i32 = 0;
 
     if seq.is_null() || node.is_null() {
-        return c_ulong::MAX;
+        return u64::MAX;
     }
 
     /* Do a binary search for the key */
@@ -11439,7 +11416,7 @@ pub unsafe extern "C" fn xml_parser_add_node_info(
     }
 
     /* Find pos and check to see if node is already in the sequence */
-    let pos: c_ulong =
+    let pos: u64 =
         xml_parser_find_node_info_index(addr_of_mut!((*ctxt).node_seq), (*info).node as XmlNodePtr);
 
     if pos < (*ctxt).node_seq.length
@@ -11456,7 +11433,7 @@ pub unsafe extern "C" fn xml_parser_add_node_info(
             if (*ctxt).node_seq.maximum == 0 {
                 (*ctxt).node_seq.maximum = 2;
             }
-            let byte_size: c_uint = (size_of_val(&*(*ctxt).node_seq.buffer)
+            let byte_size: u32 = (size_of_val(&*(*ctxt).node_seq.buffer)
                 * (2 * (*ctxt).node_seq.maximum as usize)) as _;
 
             let tmp_buffer: XmlParserNodeInfoPtr = if (*ctxt).node_seq.buffer.is_null() {
@@ -11509,7 +11486,7 @@ pub unsafe extern "C" fn xml_set_external_entity_loader(f: XmlExternalEntityLoad
  *
  * Get the default external entity resolver function for the application
  *
- * Returns the xmlExternalEntityLoader function poc_inter
+ * Returns the xmlExternalEntityLoader function pointer
  */
 pub unsafe extern "C" fn xml_get_external_entity_loader() -> XmlExternalEntityLoader {
     XML_CURRENT_EXTERNAL_ENTITY_LOADER
@@ -11571,7 +11548,7 @@ pub unsafe extern "C" fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> i64 {
         return -1;
     }
     if (*input).buf.is_some() && (*input).buf.as_ref().unwrap().borrow().encoder.is_some() {
-        let mut unused: c_uint = 0;
+        let mut unused: u32 = 0;
         let mut buf = (*input).buf.as_ref().unwrap().borrow_mut();
         let handler = buf.encoder.as_mut().unwrap();
         /*
@@ -11770,10 +11747,10 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
 pub unsafe extern "C" fn xml_ctxt_reset_push(
     ctxt: XmlParserCtxtPtr,
     chunk: *const c_char,
-    size: c_int,
+    size: i32,
     filename: *const c_char,
     encoding: *const c_char,
-) -> c_int {
+) -> i32 {
     if ctxt.is_null() {
         return 1;
     }
@@ -11869,7 +11846,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
  * Returns 0 in case of success, the set of unknown or unimplemented options
  *         in case of error.
  */
-pub unsafe extern "C" fn xml_ctxt_use_options(ctxt: XmlParserCtxtPtr, options: c_int) -> c_int {
+pub unsafe extern "C" fn xml_ctxt_use_options(ctxt: XmlParserCtxtPtr, options: i32) -> i32 {
     (*ctxt).ctxt_use_options_internal(options, None)
 }
 
@@ -11888,7 +11865,7 @@ pub unsafe fn xml_read_doc(
     cur: *const XmlChar,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlDocPtr {
     if cur.is_null() {
         return null_mut();
@@ -11917,7 +11894,7 @@ pub unsafe fn xml_read_doc(
 pub unsafe fn xml_read_file(
     filename: *const c_char,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlDocPtr {
     xml_init_parser();
     let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(filename, options);
@@ -11945,7 +11922,7 @@ pub unsafe fn xml_read_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlDocPtr {
     xml_init_parser();
     let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
@@ -11975,7 +11952,7 @@ pub unsafe fn xml_read_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlDocPtr {
     xml_init_parser();
 
@@ -12014,7 +11991,7 @@ pub unsafe fn xml_ctxt_read_doc(
     cur: *const XmlChar,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlDocPtr {
     if cur.is_null() {
         return null_mut();
@@ -12044,7 +12021,7 @@ pub unsafe fn xml_ctxt_read_file(
     ctxt: XmlParserCtxtPtr,
     filename: *const c_char,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlDocPtr {
     if filename.is_null() {
         return null_mut();
@@ -12083,7 +12060,7 @@ pub unsafe fn xml_ctxt_read_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlDocPtr {
     if ctxt.is_null() {
         return null_mut();
@@ -12124,7 +12101,7 @@ pub unsafe fn xml_ctxt_read_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
     encoding: Option<&str>,
-    options: c_int,
+    options: i32,
 ) -> XmlDocPtr {
     if ctxt.is_null() {
         return null_mut();
@@ -12314,7 +12291,7 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
 pub(crate) unsafe extern "C" fn xml_parse_external_id(
     ctxt: XmlParserCtxtPtr,
     public_id: *mut *mut XmlChar,
-    strict: c_int,
+    strict: i32,
 ) -> *mut XmlChar {
     let mut uri: *mut XmlChar = null_mut();
 
@@ -12392,9 +12369,9 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
  */
 pub(crate) unsafe extern "C" fn xml_parse_pubid_literal(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: *mut XmlChar;
-    let mut len: c_int = 0;
-    let mut size: c_int = XML_PARSER_BUFFER_SIZE as i32;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut len: i32 = 0;
+    let mut size: i32 = XML_PARSER_BUFFER_SIZE as i32;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH as i32
     } else {
         XML_MAX_NAME_LENGTH as i32
@@ -12488,7 +12465,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
     (*ctxt).advance(2);
 
     if (*ctxt).content_bytes().starts_with(b"NOTATION") {
-        let inputid: c_int = (*(*ctxt).input).id;
+        let inputid: i32 = (*(*ctxt).input).id;
         (*ctxt).advance(8);
         if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
@@ -12585,7 +12562,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
     let mut uri: *mut XmlChar = null_mut();
     let mut literal: *mut XmlChar = null_mut();
     let ndata: *const XmlChar;
-    let mut is_parameter: c_int = 0;
+    let mut is_parameter: i32 = 0;
     let mut orig: *mut XmlChar = null_mut();
 
     if (*ctxt).current_byte() != b'<' || (*ctxt).nth_byte(1) != b'!' {
@@ -12595,7 +12572,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
 
     /* GROW; done in the caller */
     if (*ctxt).content_bytes().starts_with(b"ENTITY") {
-        let inputid: c_int = (*(*ctxt).input).id;
+        let inputid: i32 = (*(*ctxt).input).id;
         (*ctxt).advance(6);
         if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
@@ -12979,7 +12956,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
     (*ctxt).advance(2);
 
     if (*ctxt).content_bytes().starts_with(b"ATTLIST") {
-        let inputid: c_int = (*(*ctxt).input).id;
+        let inputid: i32 = (*(*ctxt).input).id;
 
         (*ctxt).advance(7);
         if (*ctxt).skip_blanks() == 0 {
@@ -13027,7 +13004,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                 break;
             }
 
-            let typ: c_int = xml_parse_attribute_type(ctxt, addr_of_mut!(tree));
+            let typ: i32 = xml_parse_attribute_type(ctxt, addr_of_mut!(tree));
             if typ <= 0 {
                 break;
             }
@@ -13045,7 +13022,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                 break;
             }
 
-            let def: c_int = xml_parse_default_decl(ctxt, addr_of_mut!(default_value));
+            let def: i32 = xml_parse_default_decl(ctxt, addr_of_mut!(default_value));
             if def <= 0 {
                 if !default_value.is_null() {
                     xml_free(default_value as _);
@@ -13156,8 +13133,8 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
  */
 pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl_priv(
     ctxt: XmlParserCtxtPtr,
-    inputchk: c_int,
-    depth: c_int,
+    inputchk: i32,
+    depth: i32,
 ) -> XmlElementContentPtr {
     let mut ret: XmlElementContentPtr;
     let mut cur: XmlElementContentPtr;
@@ -13176,7 +13153,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
     (*ctxt).skip_blanks();
     (*ctxt).grow();
     if (*ctxt).current_byte() == b'(' {
-        let inputid: c_int = (*(*ctxt).input).id;
+        let inputid: i32 = (*(*ctxt).input).id;
 
         /* Recurse on first child */
         (*ctxt).skip_char();
@@ -13353,7 +13330,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
         (*ctxt).skip_blanks();
         (*ctxt).grow();
         if (*ctxt).current_byte() == b'(' {
-            let inputid: c_int = (*(*ctxt).input).id;
+            let inputid: i32 = (*(*ctxt).input).id;
             /* Recurse on second child */
             (*ctxt).skip_char();
             (*ctxt).skip_blanks();
@@ -13465,7 +13442,7 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
         (*ctxt).skip_char();
     } else if (*ctxt).current_byte() == b'+' {
         if !ret.is_null() {
-            let mut found: c_int = 0;
+            let mut found: i32 = 0;
 
             if matches!((*ret).ocur, XmlElementContentOccur::XmlElementContentOpt)
                 || matches!((*ret).ocur, XmlElementContentOccur::XmlElementContentMult)
@@ -13531,9 +13508,9 @@ c"xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::X
  *
  * Returns the type of the element, or -1 in case of error
  */
-pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> c_int {
+pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
     let name: *const XmlChar;
-    let mut ret: c_int = -1;
+    let mut ret: i32 = -1;
     let mut content: XmlElementContentPtr = null_mut();
 
     if (*ctxt).current_byte() != b'<' || (*ctxt).nth_byte(1) != b'!' {
@@ -13543,7 +13520,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -
 
     /* GROW; done in the caller */
     if (*ctxt).content_bytes().starts_with(b"ELEMENT") {
-        let inputid: c_int = (*(*ctxt).input).id;
+        let inputid: i32 = (*(*ctxt).input).id;
 
         (*ctxt).advance(7);
         if (*ctxt).skip_blanks() == 0 {
@@ -13741,11 +13718,11 @@ pub(crate) unsafe extern "C" fn xml_parse_markup_decl(ctxt: XmlParserCtxtPtr) {
  * Characters referred to using character references must match the
  * production for Char.
  *
- * Returns the value parsed (as an c_int), 0 in case of error
+ * Returns the value parsed (as an int), 0 in case of error
  */
-pub(crate) unsafe extern "C" fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> c_int {
-    let mut val: c_int = 0;
-    let mut count: c_int = 0;
+pub(crate) unsafe extern "C" fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> i32 {
+    let mut val: i32 = 0;
+    let mut count: i32 = 0;
 
     /*
      * Using RAW/CUR/NEXT is okay since we are working on ASCII range here
@@ -13885,12 +13862,12 @@ pub(crate) unsafe extern "C" fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> c_
  */
 pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
     let mut buf: *mut XmlChar = null_mut();
-    let mut len: c_int = 0;
-    let mut size: c_int = XML_PARSER_BUFFER_SIZE as i32;
-    let mut rl: c_int = 0;
-    let mut sl: c_int = 0;
-    let mut l: c_int = 0;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut len: i32 = 0;
+    let mut size: i32 = XML_PARSER_BUFFER_SIZE as i32;
+    let mut rl: i32 = 0;
+    let mut sl: i32 = 0;
+    let mut l: i32 = 0;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_HUGE_LENGTH as i32
     } else {
         XML_MAX_TEXT_LENGTH as i32
@@ -14043,7 +14020,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
 
     if (*ctxt).current_byte() == 0 {
         let name: *const XmlChar = (*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
-        let line: c_int = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
+        let line: i32 = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
         xml_fatal_err_msg_str_int_str(
             ctxt,
             XmlParserErrors::XmlErrTagNotFinished,
@@ -14074,8 +14051,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
  */
 pub(crate) unsafe extern "C" fn xml_parse_version_num(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: *mut XmlChar;
-    let mut len: c_int = 0;
-    let mut size: c_int = 10;
+    let mut len: i32 = 0;
+    let mut size: i32 = 10;
     let mut cur: XmlChar;
 
     buf = xml_malloc_atomic(size as usize) as *mut XmlChar;
@@ -14133,8 +14110,8 @@ pub(crate) unsafe extern "C" fn xml_parse_version_num(ctxt: XmlParserCtxtPtr) ->
  * Returns the encoding name value or NULL
  */
 pub(crate) unsafe fn xml_parse_enc_name(ctxt: XmlParserCtxtPtr) -> Option<String> {
-    let mut len: c_int = 0;
-    let max_length: c_int = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
+    let mut len: i32 = 0;
+    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH as i32
     } else {
         XML_MAX_NAME_LENGTH as i32
@@ -14302,7 +14279,7 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, null());
         (*ctxt).skip_char();
     } else {
-        let mut c: c_int;
+        let mut c: i32;
 
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, null());
         while {
@@ -14343,7 +14320,7 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
     }
 
     /* Avoid expansion of parameter entities when skipping blanks. */
-    let oldstate: c_int = (*ctxt).instate as _;
+    let oldstate: i32 = (*ctxt).instate as _;
     (*ctxt).instate = XmlParserInputState::XmlParserStart;
 
     if (*ctxt).skip_blanks() == 0 {
@@ -14399,7 +14376,7 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, null());
         (*ctxt).skip_char();
     } else {
-        let mut c: c_int;
+        let mut c: i32;
 
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, null());
         while {

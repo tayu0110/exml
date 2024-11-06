@@ -5,7 +5,7 @@
 
 use std::{
     any::type_name,
-    ffi::{c_char, c_int, c_long, c_uint, c_ulong},
+    ffi::c_char,
     io::Read,
     mem::{size_of, size_of_val},
     os::raw::c_void,
@@ -13,7 +13,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::{memset, size_t};
+use libc::memset;
 
 use crate::{
     buf::libxml_api::{xml_buf_cat, xml_buf_create, xml_buf_free, XmlBufPtr},
@@ -220,10 +220,10 @@ pub type XmlTextReaderPtr = *mut XmlTextReader;
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
 pub struct XmlTextReader {
-    mode: c_int,                     /* the parsing mode */
+    mode: i32,                       /* the parsing mode */
     doc: XmlDocPtr,                  /* when walking an existing doc */
     validate: XmlTextReaderValidate, /* is there any validation */
-    allocs: c_int,                   /* what structure were deallocated */
+    allocs: i32,                     /* what structure were deallocated */
     state: XmlTextReaderState,
     ctxt: XmlParserCtxtPtr,                           /* the parser context */
     sax: XmlSAXHandlerPtr,                            /* the parser SAX callbacks */
@@ -234,20 +234,20 @@ pub struct XmlTextReader {
     end_element_ns: Option<EndElementNsSAX2Func>,     /* idem */
     characters: Option<CharactersSAXFunc>,
     cdata_block: Option<CdataBlockSAXFunc>,
-    base: c_uint,         /* base of the segment in the input */
-    cur: c_uint,          /* current position in the input */
+    base: u32,            /* base of the segment in the input */
+    cur: u32,             /* current position in the input */
     node: XmlNodePtr,     /* current node */
     curnode: XmlNodePtr,  /* current attribute node */
-    depth: c_int,         /* depth of the current node */
+    depth: i32,           /* depth of the current node */
     faketext: XmlNodePtr, /* fake xmlNs chld */
-    preserve: c_int,      /* preserve the resulting document */
+    preserve: i32,        /* preserve the resulting document */
     buffer: XmlBufPtr,    /* used to return const xmlChar * */
     dict: XmlDictPtr,     /* the context dictionary */
 
     /* entity stack when traversing entities content */
     ent: XmlNodePtr,          /* Current Entity Ref Node */
-    ent_nr: c_int,            /* Depth of the entities stack */
-    ent_max: c_int,           /* Max depth of the entities stack */
+    ent_nr: i32,              /* Depth of the entities stack */
+    ent_max: i32,             /* Max depth of the entities stack */
     ent_tab: *mut XmlNodePtr, /* array of entities */
 
     /* error handling */
@@ -260,9 +260,9 @@ pub struct XmlTextReader {
     #[cfg(feature = "schema")]
     rng_valid_ctxt: XmlRelaxNGValidCtxtPtr, /* The Relax NG validation context */
     #[cfg(feature = "schema")]
-    rng_preserve_ctxt: c_int, /* 1 if the context was provided by the user */
+    rng_preserve_ctxt: i32, /* 1 if the context was provided by the user */
     #[cfg(feature = "schema")]
-    rng_valid_errors: c_int, /* The number of errors detected */
+    rng_valid_errors: i32, /* The number of errors detected */
     #[cfg(feature = "schema")]
     rng_full_node: XmlNodePtr, /* the node if RNG not progressive */
     /* Handling of Schemas validation */
@@ -271,28 +271,28 @@ pub struct XmlTextReader {
     #[cfg(feature = "schema")]
     xsd_valid_ctxt: XmlSchemaValidCtxtPtr, /* The Schemas validation context */
     #[cfg(feature = "schema")]
-    xsd_preserve_ctxt: c_int, /* 1 if the context was provided by the user */
+    xsd_preserve_ctxt: i32, /* 1 if the context was provided by the user */
     #[cfg(feature = "schema")]
-    xsd_valid_errors: c_int, /* The number of errors detected */
+    xsd_valid_errors: i32, /* The number of errors detected */
     #[cfg(feature = "schema")]
     xsd_plug: XmlSchemaSAXPlugPtr, /* the schemas plug in SAX pipeline */
     /* Handling of XInclude processing */
     #[cfg(feature = "xinclude")]
-    xinclude: c_int, /* is xinclude asked for */
+    xinclude: i32, /* is xinclude asked for */
     #[cfg(feature = "xinclude")]
     xinclude_name: *const XmlChar, /* the xinclude name from dict */
     #[cfg(feature = "xinclude")]
     xincctxt: XmlXincludeCtxtPtr, /* the xinclude context */
     #[cfg(feature = "xinclude")]
-    in_xinclude: c_int, /* counts for xinclude */
+    in_xinclude: i32, /* counts for xinclude */
     #[cfg(feature = "libxml_pattern")]
-    pattern_nr: c_int, /* number of preserve patterns */
+    pattern_nr: i32, /* number of preserve patterns */
     #[cfg(feature = "libxml_pattern")]
-    pattern_max: c_int, /* max preserve patterns */
+    pattern_max: i32, /* max preserve patterns */
     #[cfg(feature = "libxml_pattern")]
     pattern_tab: *mut XmlPatternPtr, /* array of preserve patterns */
-    preserves: c_int,    /* level of preserves */
-    parser_flags: c_int, /* the set of options set */
+    preserves: i32,    /* level of preserves */
+    parser_flags: i32, /* the set of options set */
     /* Structured error handling */
     serror_func: Option<StructuredError>, /* callback function */
 }
@@ -471,10 +471,10 @@ unsafe fn xml_text_reader_start_element_ns(
     localname: *const XmlChar,
     prefix: *const XmlChar,
     uri: *const XmlChar,
-    nb_namespaces: c_int,
+    nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
-    nb_attributes: c_int,
-    nb_defaulted: c_int,
+    nb_attributes: i32,
+    nb_defaulted: i32,
     attributes: *mut *const XmlChar,
 ) {
     let ctxt = {
@@ -552,7 +552,7 @@ unsafe fn xml_text_reader_end_element_ns(
 unsafe fn xml_text_reader_characters(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();
@@ -579,7 +579,7 @@ unsafe fn xml_text_reader_characters(
 unsafe fn xml_text_reader_cdata_block(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();
@@ -890,8 +890,8 @@ pub unsafe fn xml_text_reader_setup(
     input: Option<XmlParserInputBuffer>,
     url: *const c_char,
     encoding: *const c_char,
-    mut options: c_int,
-) -> c_int {
+    mut options: i32,
+) -> i32 {
     use std::{cell::RefCell, ffi::CStr, rc::Rc};
 
     use crate::{
@@ -1149,7 +1149,7 @@ pub unsafe fn xml_text_reader_setup(
  *          nodes to read, or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_read_tree(reader: &mut XmlTextReader) -> c_int {
+unsafe extern "C" fn xml_text_reader_read_tree(reader: &mut XmlTextReader) -> i32 {
     if reader.state == XmlTextReaderState::End {
         return 0;
     }
@@ -1251,9 +1251,9 @@ const CHUNK_SIZE: usize = 512;
  * Returns -1 in case of failure, 0 otherwise
  */
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_push_data(reader: &mut XmlTextReader) -> c_int {
-    let mut val: c_int;
-    let mut s: c_int;
+unsafe extern "C" fn xml_text_reader_push_data(reader: &mut XmlTextReader) -> i32 {
+    let mut val: i32;
+    let mut s: i32;
 
     if reader.input.is_none() || reader.input.as_ref().unwrap().buffer.is_none() {
         return -1;
@@ -1418,7 +1418,7 @@ unsafe extern "C" fn xml_text_reader_validate_pop(reader: &mut XmlTextReader) {
             }
             return;
         }
-        let ret: c_int =
+        let ret: i32 =
             xml_relaxng_validate_pop_element(reader.rng_valid_ctxt, (*reader.ctxt).my_doc, node);
         if ret != 1 {
             reader.rng_valid_errors += 1;
@@ -1480,7 +1480,7 @@ unsafe extern "C" fn xml_text_reader_free_prop_list(
 unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlNodePtr) {
     let mut next: XmlNodePtr;
     let mut parent: XmlNodePtr;
-    let mut depth: size_t = 0;
+    let mut depth: usize = 0;
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
@@ -1743,13 +1743,13 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
 unsafe extern "C" fn xml_text_reader_ent_push(
     reader: &mut XmlTextReader,
     value: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     use crate::generic_error;
 
     use super::globals::xml_realloc;
 
     if reader.ent_nr >= reader.ent_max {
-        let new_size: size_t = if reader.ent_max == 0 {
+        let new_size: usize = if reader.ent_max == 0 {
             10
         } else {
             reader.ent_max as usize * 2
@@ -1812,7 +1812,7 @@ unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
     }
     #[cfg(feature = "schema")]
     if reader.validate == XmlTextReaderValidate::ValidateRng && !reader.rng_valid_ctxt.is_null() {
-        let mut ret: c_int;
+        let mut ret: i32;
 
         if !reader.rng_full_node.is_null() {
             return;
@@ -1852,7 +1852,7 @@ unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
 unsafe extern "C" fn xml_text_reader_validate_cdata(
     reader: &mut XmlTextReader,
     data: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     #[cfg(feature = "valid")]
     if reader.validate == XmlTextReaderValidate::ValidateDtd
@@ -1867,7 +1867,7 @@ unsafe extern "C" fn xml_text_reader_validate_cdata(
         if !reader.rng_full_node.is_null() {
             return;
         }
-        let ret: c_int = xml_relaxng_validate_push_cdata(reader.rng_valid_ctxt, data, len);
+        let ret: i32 = xml_relaxng_validate_push_cdata(reader.rng_valid_ctxt, data, len);
         if ret != 1 {
             reader.rng_valid_errors += 1;
         }
@@ -2031,10 +2031,10 @@ unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader)
  *          nodes to read, or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32 {
     use crate::libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS};
 
-    let mut val: c_int;
+    let mut val: i32;
     let mut olddepth = 0;
     let mut oldstate: XmlTextReaderState = XmlTextReaderState::Start;
     let mut oldnode: XmlNodePtr = null_mut();
@@ -2624,8 +2624,8 @@ unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *
  *          nodes to read, or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_do_expand(reader: &mut XmlTextReader) -> c_int {
-    let mut val: c_int;
+unsafe extern "C" fn xml_text_reader_do_expand(reader: &mut XmlTextReader) -> i32 {
+    let mut val: i32;
 
     if reader.node.is_null() || reader.ctxt.is_null() {
         return -1;
@@ -2707,7 +2707,7 @@ pub unsafe extern "C" fn xml_text_reader_read_string(reader: &mut XmlTextReader)
  *         in case of error.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return -1;
     }
@@ -2755,8 +2755,8 @@ pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: &mut XmlTe
  * Returns 0 i no attributes, -1 in case of error or the attribute count
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> c_int {
-    let mut ret: c_int;
+pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32 {
+    let mut ret: i32;
     let mut attr: XmlAttrPtr;
     let mut ns: XmlNsPtr;
 
@@ -2802,7 +2802,7 @@ pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextRea
  * Returns the depth or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_depth(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_depth(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return 0;
     }
@@ -2828,7 +2828,7 @@ pub unsafe extern "C" fn xml_text_reader_depth(reader: &mut XmlTextReader) -> c_
  * Returns 1 if true, 0 if false, and -1 in case or error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_has_attributes(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_has_attributes(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return 0;
     }
@@ -2856,7 +2856,7 @@ pub unsafe extern "C" fn xml_text_reader_has_attributes(reader: &mut XmlTextRead
  * Returns 1 if true, 0 if false, and -1 in case or error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_has_value(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_has_value(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return 0;
     }
@@ -2887,7 +2887,7 @@ pub unsafe extern "C" fn xml_text_reader_has_value(reader: &mut XmlTextReader) -
  * Returns 0 if not defaulted, 1 if defaulted, and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_is_default(_reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_is_default(_reader: &mut XmlTextReader) -> i32 {
     0
 }
 
@@ -2900,7 +2900,7 @@ pub unsafe extern "C" fn xml_text_reader_is_default(_reader: &mut XmlTextReader)
  * Returns 1 if empty, 0 if not and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_is_empty_element(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_is_empty_element(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return -1;
     }
@@ -2937,7 +2937,7 @@ pub unsafe extern "C" fn xml_text_reader_is_empty_element(reader: &mut XmlTextRe
  * Returns the xmlReaderTypes of the current node or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_node_type(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_node_type(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return XmlReaderTypes::XmlReaderTypeNone as i32;
     }
@@ -3003,7 +3003,7 @@ pub unsafe extern "C" fn xml_text_reader_node_type(reader: &mut XmlTextReader) -
  * Returns " or ' and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_quote_char(_reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_quote_char(_reader: &mut XmlTextReader) -> i32 {
     /* TODO maybe lookup the attribute value for " first */
     b'"' as _
 }
@@ -3017,7 +3017,7 @@ pub unsafe extern "C" fn xml_text_reader_quote_char(_reader: &mut XmlTextReader)
  * Returns the state value, or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_read_state(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_read_state(reader: &mut XmlTextReader) -> i32 {
     reader.mode
 }
 
@@ -3033,7 +3033,7 @@ pub unsafe extern "C" fn xml_text_reader_read_state(reader: &mut XmlTextReader) 
  * error.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_is_namespace_decl(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_is_namespace_decl(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return -1;
     }
@@ -3722,7 +3722,7 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
  * Returns 0 or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     reader.node = null_mut();
     reader.curnode = null_mut();
     reader.mode = XmlTextReaderMode::XmlTextreaderModeClosed as i32;
@@ -3776,7 +3776,7 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> c_
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_attribute_no(
     reader: &mut XmlTextReader,
-    no: c_int,
+    no: i32,
 ) -> *mut XmlChar {
     let mut cur: XmlAttrPtr;
     let mut ns: XmlNsPtr;
@@ -4051,8 +4051,8 @@ pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_move_to_attribute_no(
     reader: &mut XmlTextReader,
-    no: c_int,
-) -> c_int {
+    no: i32,
+) -> i32 {
     let mut cur: XmlAttrPtr;
     let mut ns: XmlNsPtr;
 
@@ -4109,7 +4109,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_no(
 pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
     reader: &mut XmlTextReader,
     name: *const XmlChar,
-) -> c_int {
+) -> i32 {
     let mut prefix: *mut XmlChar = null_mut();
     let mut ns: XmlNsPtr;
     let mut prop: XmlAttrPtr;
@@ -4234,7 +4234,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
     reader: &mut XmlTextReader,
     local_name: *const XmlChar,
     namespace_uri: *const XmlChar,
-) -> c_int {
+) -> i32 {
     let mut prop: XmlAttrPtr;
     let mut ns: XmlNsPtr;
     let mut prefix: *mut XmlChar = null_mut();
@@ -4302,7 +4302,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_move_to_first_attribute(
     reader: &mut XmlTextReader,
-) -> c_int {
+) -> i32 {
     if reader.node.is_null() {
         return -1;
     }
@@ -4331,9 +4331,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_first_attribute(
  * Returns 1 in case of success, -1 in case of error, 0 if not found
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_move_to_next_attribute(
-    reader: &mut XmlTextReader,
-) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_move_to_next_attribute(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return -1;
     }
@@ -4374,7 +4372,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_next_attribute(
  * Returns 1 in case of success, -1 in case of error, 0 if not moved
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_move_to_element(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_move_to_element(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
         return -1;
     }
@@ -4401,7 +4399,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_element(reader: &mut XmlTextRea
  * Returns 1 or -1 in case of error.
  */
 #[cfg(feature = "libxml_reader")]
-pub fn xml_text_reader_normalization(_reader: &mut XmlTextReader) -> c_int {
+pub fn xml_text_reader_normalization(_reader: &mut XmlTextReader) -> i32 {
     1
 }
 
@@ -4456,9 +4454,9 @@ pub unsafe extern "C" fn xml_text_reader_const_encoding(
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
     reader: &mut XmlTextReader,
-    prop: c_int,
-    value: c_int,
-) -> c_int {
+    prop: i32,
+    value: i32,
+) -> i32 {
     if reader.ctxt.is_null() {
         return -1;
     }
@@ -4523,8 +4521,8 @@ pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_parser_prop(
     reader: &mut XmlTextReader,
-    prop: c_int,
-) -> c_int {
+    prop: i32,
+) -> i32 {
     if reader.ctxt.is_null() {
         return -1;
     }
@@ -4573,12 +4571,10 @@ pub fn xml_text_reader_current_node(reader: &mut XmlTextReader) -> XmlNodePtr {
  *
  * Provide the line number of the current parsing point.
  *
- * Returns an c_int or 0 if not available
+ * Returns an int or 0 if not available
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_get_parser_line_number(
-    reader: &mut XmlTextReader,
-) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_get_parser_line_number(reader: &mut XmlTextReader) -> i32 {
     if reader.ctxt.is_null() || (*reader.ctxt).input.is_null() {
         return 0;
     }
@@ -4591,12 +4587,12 @@ pub unsafe extern "C" fn xml_text_reader_get_parser_line_number(
  *
  * Provide the column number of the current parsing point.
  *
- * Returns an c_int or 0 if not available
+ * Returns an int or 0 if not available
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_parser_column_number(
     reader: &mut XmlTextReader,
-) -> c_int {
+) -> i32 {
     if reader.ctxt.is_null() || (*reader.ctxt).input.is_null() {
         return 0;
     }
@@ -4662,7 +4658,7 @@ pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
     reader: &mut XmlTextReader,
     pattern: *const XmlChar,
     namespaces: *mut *const XmlChar,
-) -> c_int {
+) -> i32 {
     use crate::generic_error;
 
     use super::globals::xml_realloc;
@@ -4758,7 +4754,7 @@ pub unsafe extern "C" fn xml_text_reader_expand(reader: &mut XmlTextReader) -> X
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_next_tree(reader: &mut XmlTextReader) -> c_int {
+unsafe extern "C" fn xml_text_reader_next_tree(reader: &mut XmlTextReader) -> i32 {
     if reader.state == XmlTextReaderState::End {
         return 0;
     }
@@ -4826,8 +4822,8 @@ unsafe extern "C" fn xml_text_reader_next_tree(reader: &mut XmlTextReader) -> c_
  *          nodes to read, or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_next(reader: &mut XmlTextReader) -> c_int {
-    let mut ret: c_int;
+pub unsafe extern "C" fn xml_text_reader_next(reader: &mut XmlTextReader) -> i32 {
+    let mut ret: i32;
 
     if !reader.doc.is_null() {
         return xml_text_reader_next_tree(reader);
@@ -4867,7 +4863,7 @@ pub unsafe extern "C" fn xml_text_reader_next(reader: &mut XmlTextReader) -> c_i
  *          nodes to read, or -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_next_sibling(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_next_sibling(reader: &mut XmlTextReader) -> i32 {
     if reader.doc.is_null() {
         /* TODO */
         return -1;
@@ -4899,7 +4895,7 @@ pub unsafe extern "C" fn xml_text_reader_next_sibling(reader: &mut XmlTextReader
  * Returns the flag value 1 if valid, 0 if no, and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_is_valid(reader: &mut XmlTextReader) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_is_valid(reader: &mut XmlTextReader) -> i32 {
     #[cfg(feature = "schema")]
     {
         if reader.validate == XmlTextReaderValidate::ValidateRng {
@@ -4971,7 +4967,7 @@ fn xml_text_reader_validity_error(ctxt: Option<GenericErrorContext>, msg: &str) 
 
     // va_list ap;
 
-    // len: c_int = xmlStrlen(msg);
+    // len: i32 = xmlStrlen(msg);
 
     // if ((len > 1) && (msg[len - 2] != ':')) {
     //     /*
@@ -5055,7 +5051,7 @@ fn xml_text_reader_validity_warning(ctxt: Option<GenericErrorContext>, msg: &str
 
     // va_list ap;
 
-    // len: c_int = xmlStrlen(msg);
+    // len: i32 = xmlStrlen(msg);
 
     // if ((len != 0) && (msg[len - 1] != ':')) {
     //     /*
@@ -5180,8 +5176,8 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
     reader: XmlTextReaderPtr,
     rng: *const c_char,
     ctxt: XmlRelaxNGValidCtxtPtr,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     if reader.is_null() {
         return -1;
     }
@@ -5295,7 +5291,7 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
 pub unsafe extern "C" fn xml_text_reader_relaxng_validate(
     reader: XmlTextReaderPtr,
     rng: *const c_char,
-) -> c_int {
+) -> i32 {
     xml_text_reader_relaxng_validate_internal(reader, rng, null_mut(), 0)
 }
 
@@ -5316,8 +5312,8 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_validate(
 pub unsafe extern "C" fn xml_text_reader_relaxng_validate_ctxt(
     reader: XmlTextReaderPtr,
     ctxt: XmlRelaxNGValidCtxtPtr,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     xml_text_reader_relaxng_validate_internal(reader, null_mut(), ctxt, options)
 }
 
@@ -5338,7 +5334,7 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_validate_ctxt(
 pub unsafe extern "C" fn xml_text_reader_relaxng_set_schema(
     reader: XmlTextReaderPtr,
     schema: XmlRelaxNGPtr,
-) -> c_int {
+) -> i32 {
     if reader.is_null() {
         return -1;
     }
@@ -5411,8 +5407,8 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_set_schema(
 unsafe extern "C" fn xml_text_reader_locator(
     ctx: *mut c_void,
     file: *mut Option<String>,
-    line: *mut c_ulong,
-) -> c_int {
+    line: *mut u64,
+) -> i32 {
     if ctx.is_null() || (file.is_null() && line.is_null()) {
         return -1;
     }
@@ -5435,13 +5431,13 @@ unsafe extern "C" fn xml_text_reader_locator(
         return 0;
     }
     if !(*reader).node.is_null() {
-        let res: c_long;
-        let mut ret: c_int = 0;
+        let res: i64;
+        let mut ret: i32 = 0;
 
         if !line.is_null() {
             res = xml_get_line_no((*reader).node);
             if res > 0 {
-                *line = res as c_ulong;
+                *line = res as u64;
             } else {
                 ret = -1;
             }
@@ -5478,8 +5474,8 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
     reader: XmlTextReaderPtr,
     xsd: *const c_char,
     ctxt: XmlSchemaValidCtxtPtr,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     if reader.is_null() {
         return -1;
     }
@@ -5614,7 +5610,7 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
 pub unsafe extern "C" fn xml_text_reader_schema_validate(
     reader: XmlTextReaderPtr,
     xsd: *const c_char,
-) -> c_int {
+) -> i32 {
     xml_text_reader_schema_validate_internal(reader, xsd, null_mut(), 0)
 }
 
@@ -5635,8 +5631,8 @@ pub unsafe extern "C" fn xml_text_reader_schema_validate(
 pub unsafe extern "C" fn xml_text_reader_schema_validate_ctxt(
     reader: XmlTextReaderPtr,
     ctxt: XmlSchemaValidCtxtPtr,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     xml_text_reader_schema_validate_internal(reader, null_mut(), ctxt, options)
 }
 
@@ -5658,7 +5654,7 @@ pub unsafe extern "C" fn xml_text_reader_schema_validate_ctxt(
 pub unsafe extern "C" fn xml_text_reader_set_schema(
     reader: XmlTextReaderPtr,
     schema: XmlSchemaPtr,
-) -> c_int {
+) -> i32 {
     if reader.is_null() {
         return -1;
     }
@@ -5787,7 +5783,7 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_version(
  * specify its standalone status or in case of error.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_standalone(reader: XmlTextReaderPtr) -> c_int {
+pub unsafe extern "C" fn xml_text_reader_standalone(reader: XmlTextReaderPtr) -> i32 {
     let mut doc: XmlDocPtr = null_mut();
     if reader.is_null() {
         return -1;
@@ -5821,7 +5817,7 @@ pub unsafe extern "C" fn xml_text_reader_standalone(reader: XmlTextReaderPtr) ->
  *         in case the index could not be computed.
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_byte_consumed(reader: XmlTextReaderPtr) -> c_long {
+pub unsafe extern "C" fn xml_text_reader_byte_consumed(reader: XmlTextReaderPtr) -> i64 {
     if reader.is_null() || (*reader).ctxt.is_null() {
         return -1;
     }
@@ -5885,7 +5881,7 @@ pub unsafe extern "C" fn xml_reader_for_doc(
     cur: *const XmlChar,
     url: *const c_char,
     encoding: *const c_char,
-    options: c_int,
+    options: i32,
 ) -> XmlTextReaderPtr {
     use std::ffi::CStr;
 
@@ -5916,7 +5912,7 @@ pub unsafe extern "C" fn xml_reader_for_doc(
 pub unsafe extern "C" fn xml_reader_for_file(
     filename: *const c_char,
     encoding: *const c_char,
-    options: c_int,
+    options: i32,
 ) -> XmlTextReaderPtr {
     let reader: XmlTextReaderPtr = xml_new_text_reader_filename(filename);
     if reader.is_null() {
@@ -5944,7 +5940,7 @@ pub unsafe fn xml_reader_for_memory(
     buffer: Vec<u8>,
     url: *const c_char,
     encoding: *const c_char,
-    options: c_int,
+    options: i32,
 ) -> XmlTextReaderPtr {
     use crate::encoding::XmlCharEncoding;
 
@@ -5979,7 +5975,7 @@ pub unsafe extern "C" fn xml_reader_for_io(
     ioctx: impl Read + 'static,
     url: *const c_char,
     encoding: *const c_char,
-    options: c_int,
+    options: i32,
 ) -> XmlTextReaderPtr {
     use crate::encoding::XmlCharEncoding;
 
@@ -6004,7 +6000,7 @@ pub unsafe extern "C" fn xml_reader_for_io(
  * Returns 0 in case of success and -1 in case of error
  */
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> i32 {
     if doc.is_null() {
         return -1;
     }
@@ -6060,8 +6056,8 @@ pub unsafe extern "C" fn xml_reader_new_doc(
     cur: *const XmlChar,
     url: *const c_char,
     encoding: *const c_char,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::ffi::CStr;
 
     if cur.is_null() {
@@ -6098,8 +6094,8 @@ pub unsafe extern "C" fn xml_reader_new_file(
     reader: XmlTextReaderPtr,
     filename: *const c_char,
     encoding: *const c_char,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::ffi::CStr;
 
     use crate::encoding::XmlCharEncoding;
@@ -6141,8 +6137,8 @@ pub unsafe fn xml_reader_new_memory(
     buffer: Vec<u8>,
     url: *const c_char,
     encoding: *const c_char,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use crate::encoding::XmlCharEncoding;
 
     if reader.is_null() {
@@ -6178,8 +6174,8 @@ pub unsafe extern "C" fn xml_reader_new_io(
     ioctx: impl Read + 'static,
     url: *const c_char,
     encoding: *const c_char,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use crate::encoding::XmlCharEncoding;
 
     if reader.is_null() {
@@ -6224,10 +6220,10 @@ pub type XmlTextReaderErrorFunc = unsafe fn(
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_locator_line_number(
     locator: XmlTextReaderLocatorPtr,
-) -> c_int {
+) -> i32 {
     /* we know that locator is a xmlParserCtxtPtr */
     let ctx: XmlParserCtxtPtr = locator as XmlParserCtxtPtr;
-    let ret: c_int;
+    let ret: i32;
 
     if locator.is_null() {
         return -1;

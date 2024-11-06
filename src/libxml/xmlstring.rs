@@ -3,10 +3,10 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::ffi::{c_char, c_int, c_uchar, c_uint};
+use std::ffi::c_char;
 use std::ptr::{null, null_mut};
 
-use libc::{memcpy, size_t, strlen, INT_MAX};
+use libc::{memcpy, strlen, INT_MAX};
 
 use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
 
@@ -17,7 +17,7 @@ use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
  * It's unsigned allowing to pinpoint case where char * are assigned
  * to XmlChar * (possibly making serialization back impossible).
  */
-pub type XmlChar = c_uchar;
+pub type XmlChar = u8;
 
 /************************************************************************
  *                                                                      *
@@ -34,7 +34,7 @@ pub type XmlChar = c_uchar;
  *
  * Returns a new XmlChar * or NULL
  */
-pub unsafe extern "C" fn xml_strndup(cur: *const XmlChar, len: c_int) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_strndup(cur: *const XmlChar, len: i32) -> *mut XmlChar {
     if cur.is_null() || len < 0 {
         return null_mut();
     };
@@ -42,8 +42,8 @@ pub unsafe extern "C" fn xml_strndup(cur: *const XmlChar, len: c_int) -> *mut Xm
     if ret.is_null() {
         return null_mut();
     }
-    memcpy(ret as _, cur as _, len as size_t);
-    *ret.add(len as size_t) = 0;
+    memcpy(ret as _, cur as _, len as usize);
+    *ret.add(len as usize) = 0;
     ret
 }
 
@@ -66,7 +66,7 @@ pub unsafe extern "C" fn xml_strdup(cur: *const XmlChar) -> *mut XmlChar {
     while *p != 0 {
         p = p.add(1)
     } /* non input consuming */
-    xml_strndup(cur, p.offset_from(cur).abs() as c_int)
+    xml_strndup(cur, p.offset_from(cur).abs() as i32)
 }
 
 /**
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn xml_strdup(cur: *const XmlChar) -> *mut XmlChar {
  *
  * Returns a new XmlChar * or NULL
  */
-pub unsafe extern "C" fn xml_char_strndup(cur: *const c_char, len: c_int) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_char_strndup(cur: *const c_char, len: i32) -> *mut XmlChar {
     if cur.is_null() || len < 0 {
         return null_mut();
     };
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn xml_char_strdup(cur: *const c_char) -> *mut XmlChar {
     while *p != b'\0' as c_char {
         p = p.add(1);
     } /* non input consuming */
-    xml_char_strndup(cur, p.offset_from(cur).abs() as c_int)
+    xml_char_strndup(cur, p.offset_from(cur).abs() as i32)
 }
 
 /**
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn xml_char_strdup(cur: *const c_char) -> *mut XmlChar {
  *
  * Returns the integer result of the comparison
  */
-pub unsafe extern "C" fn xml_strcmp(mut str1: *const XmlChar, mut str2: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn xml_strcmp(mut str1: *const XmlChar, mut str2: *const XmlChar) -> i32 {
     if str1 == str2 {
         return 0;
     }
@@ -140,7 +140,7 @@ pub unsafe extern "C" fn xml_strcmp(mut str1: *const XmlChar, mut str2: *const X
     //     strcmp(str1 as *const c_char, str2 as *const c_char)
     // } else {
     while {
-        let tmp = *str1 as c_int - *str2 as c_int;
+        let tmp = *str1 as i32 - *str2 as i32;
         str1 = str1.add(1);
         if tmp != 0 {
             return tmp;
@@ -237,8 +237,8 @@ pub unsafe fn xml_str_qequal(
 pub unsafe extern "C" fn xml_strncmp(
     mut str1: *const XmlChar,
     mut str2: *const XmlChar,
-    mut len: c_int,
-) -> c_int {
+    mut len: i32,
+) -> i32 {
     if len <= 0 {
         return 0;
     }
@@ -297,11 +297,8 @@ const CASEMAP: [XmlChar; 256] = [
  *
  * Returns the integer result of the comparison
  */
-pub unsafe extern "C" fn xml_strcasecmp(
-    mut str1: *const XmlChar,
-    mut str2: *const XmlChar,
-) -> c_int {
-    let mut tmp: c_int;
+pub unsafe extern "C" fn xml_strcasecmp(mut str1: *const XmlChar, mut str2: *const XmlChar) -> i32 {
+    let mut tmp: i32;
 
     if str1 == str2 {
         return 0;
@@ -338,9 +335,9 @@ pub unsafe extern "C" fn xml_strcasecmp(
 pub unsafe extern "C" fn xml_strncasecmp(
     mut str1: *const XmlChar,
     mut str2: *const XmlChar,
-    mut len: c_int,
-) -> c_int {
-    let mut tmp: c_int;
+    mut len: i32,
+) -> i32 {
+    let mut tmp: i32;
 
     if len <= 0 {
         return 0;
@@ -413,7 +410,7 @@ pub unsafe extern "C" fn xml_strstr(
     if val.is_null() {
         return null();
     }
-    let n: c_int = xml_strlen(val);
+    let n: i32 = xml_strlen(val);
 
     if n == 0 {
         return str;
@@ -447,7 +444,7 @@ pub unsafe extern "C" fn xml_strcasestr(
     if val.is_null() {
         return null();
     }
-    let n: c_int = xml_strlen(val);
+    let n: i32 = xml_strlen(val);
 
     if n == 0 {
         return str;
@@ -472,11 +469,7 @@ pub unsafe extern "C" fn xml_strcasestr(
  *
  * Returns the XmlChar * for the first occurrence or NULL.
  */
-pub unsafe extern "C" fn xml_strsub(
-    mut str: *const XmlChar,
-    start: c_int,
-    len: c_int,
-) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_strsub(mut str: *const XmlChar, start: i32, len: i32) -> *mut XmlChar {
     if str.is_null() {
         return null_mut();
     }
@@ -507,7 +500,7 @@ pub unsafe extern "C" fn xml_strsub(
  *
  * Returns the number of XmlChar contained in the ARRAY.
  */
-pub unsafe extern "C" fn xml_strlen(str: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn xml_strlen(str: *const XmlChar) -> i32 {
     let len = if !str.is_null() {
         strlen(str as *const c_char)
     } else {
@@ -517,7 +510,7 @@ pub unsafe extern "C" fn xml_strlen(str: *const XmlChar) -> c_int {
     if len > INT_MAX as usize {
         0
     } else {
-        len as c_int
+        len as i32
     }
 }
 
@@ -537,7 +530,7 @@ pub unsafe extern "C" fn xml_strlen(str: *const XmlChar) -> c_int {
 pub unsafe extern "C" fn xml_strncat(
     cur: *mut XmlChar,
     add: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) -> *mut XmlChar {
     if add.is_null() || len == 0 {
         return cur;
@@ -549,7 +542,7 @@ pub unsafe extern "C" fn xml_strncat(
         return xml_strndup(add, len);
     }
 
-    let size: c_int = xml_strlen(cur);
+    let size: i32 = xml_strlen(cur);
     if size < 0 || size > INT_MAX - len {
         return null_mut();
     }
@@ -577,7 +570,7 @@ pub unsafe extern "C" fn xml_strncat(
 pub unsafe extern "C" fn xml_strncat_new(
     str1: *const XmlChar,
     str2: *const XmlChar,
-    mut len: c_int,
+    mut len: i32,
 ) -> *mut XmlChar {
     if len < 0 {
         len = xml_strlen(str2);
@@ -592,11 +585,11 @@ pub unsafe extern "C" fn xml_strncat_new(
         return xml_strndup(str2, len);
     }
 
-    let size: c_int = xml_strlen(str1);
+    let size: i32 = xml_strlen(str1);
     if size < 0 || size > INT_MAX - len {
         return null_mut();
     }
-    let ret: *mut XmlChar = xml_malloc(size as size_t + len as size_t + 1) as *mut XmlChar;
+    let ret: *mut XmlChar = xml_malloc(size as usize + len as usize + 1) as *mut XmlChar;
     if ret.is_null() {
         return xml_strndup(str1, size);
     }
@@ -645,10 +638,10 @@ pub unsafe extern "C" fn xml_strcat(cur: *mut XmlChar, add: *const XmlChar) -> *
  *
  * Returns the number of characters written to @buf or -1 if an error occurs.
  */
-// pub fn xmlStrPrintf             (XmlChar *buf, int len, const char *msg, ...) LIBXML_ATTR_FORMAT(3,4) -> c_int;
-// pub unsafe extern "C" fn xmlStrPrintf(buf: *mut XmlChar, len: c_int, msg: *const c_char, ...) -> c_int {
+// pub fn xmlStrPrintf             (XmlChar *buf, int len, const char *msg, ...) LIBXML_ATTR_FORMAT(3,4) -> i32;
+// pub unsafe extern "C" fn xmlStrPrintf(buf: *mut XmlChar, len: i32, msg: *const c_char, ...) -> i32 {
 //     let args: va_list;
-//     let ret: c_int;
+//     let ret: i32;
 
 //      if((buf == NULL) || (msg == NULL)) {
 //          return(-1);
@@ -663,7 +656,7 @@ pub unsafe extern "C" fn xml_strcat(cur: *mut XmlChar, add: *const XmlChar) -> *
 #[macro_export]
 macro_rules! xml_str_printf {
     ( $buf:expr, $len:expr, $msg:expr, $( $args:expr ),* ) => {
-        (|buf: *mut XmlChar, len: c_int, msg: *const c_char| -> i32 {
+        (|buf: *mut XmlChar, len: i32, msg: *const c_char| -> i32 {
             if buf.is_null() || msg.is_null() {
                 return -1;
             }
@@ -686,9 +679,9 @@ macro_rules! xml_str_printf {
  *
  * Returns the number of characters written to @buf or -1 if an error occurs.
  */
-// pub fn xmlStrVPrintf                (XmlChar *buf, int len, const char *msg, va_list ap) LIBXML_ATTR_FORMAT(3,0) -> c_int;
-// pub unsafe extern "C" fn xmlStrVPrintf(buf: *mut XmlChar, len: c_int, msg: *const char, ap: va_list) -> c_int {
-//     let ret: c_int;
+// pub fn xmlStrVPrintf                (XmlChar *buf, int len, const char *msg, va_list ap) LIBXML_ATTR_FORMAT(3,0) -> i32;
+// pub unsafe extern "C" fn xmlStrVPrintf(buf: *mut XmlChar, len: i32, msg: *const char, ap: va_list) -> i32 {
+//     let ret: i32;
 
 //      if((buf == null()) || (msg == null())) {
 //          return(-1);
@@ -723,8 +716,8 @@ macro_rules! xml_str_printf {
  *
  * returns the numbers of bytes in the character, -1 on format error
  */
-pub unsafe extern "C" fn xml_utf8_size(utf: *const XmlChar) -> c_int {
-    let mut len: c_int;
+pub unsafe extern "C" fn xml_utf8_size(utf: *const XmlChar) -> i32 {
+    let mut len: i32;
 
     if utf.is_null() {
         return -1;
@@ -758,7 +751,7 @@ pub unsafe extern "C" fn xml_utf8_size(utf: *const XmlChar) -> c_int {
  *
  * returns result of the compare as with xmlStrncmp
  */
-pub unsafe extern "C" fn xml_utf8_charcmp(utf1: *const XmlChar, utf2: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn xml_utf8_charcmp(utf1: *const XmlChar, utf2: *const XmlChar) -> i32 {
     if utf1.is_null() {
         if utf2.is_null() {
             return 0;
@@ -777,8 +770,8 @@ pub unsafe extern "C" fn xml_utf8_charcmp(utf1: *const XmlChar, utf2: *const Xml
  *
  * Returns the number of characters in the string or -1 in case of error
  */
-pub unsafe extern "C" fn xml_utf8_strlen(mut utf: *const XmlChar) -> c_int {
-    let mut ret: size_t = 0;
+pub unsafe extern "C" fn xml_utf8_strlen(mut utf: *const XmlChar) -> i32 {
+    let mut ret: usize = 0;
 
     if utf.is_null() {
         return -1;
@@ -813,7 +806,7 @@ pub unsafe extern "C" fn xml_utf8_strlen(mut utf: *const XmlChar) -> c_int {
     if ret > INT_MAX as usize {
         0
     } else {
-        ret as c_int
+        ret as i32
     }
 }
 
@@ -829,8 +822,8 @@ pub unsafe extern "C" fn xml_utf8_strlen(mut utf: *const XmlChar) -> c_int {
  * Returns the char value or -1 in case of error, and sets *len to
  *        the actual number of bytes consumed (0 in case of error)
  */
-pub unsafe extern "C" fn xml_get_utf8_char(utf: *const c_uchar, len: *mut c_int) -> c_int {
-    let mut c: c_uint;
+pub unsafe extern "C" fn xml_get_utf8_char(utf: *const u8, len: *mut i32) -> i32 {
+    let mut c: u32;
 
     'error: {
         if utf.is_null() {
@@ -867,22 +860,22 @@ pub unsafe extern "C" fn xml_get_utf8_char(utf: *const c_uchar, len: *mut c_int)
                     }
                     *len = 4;
                     /* 4-byte code */
-                    c = (*utf.add(0) as c_uint & 0x7) << 18;
-                    c |= (*utf.add(1) as c_uint & 0x3f) << 12;
-                    c |= (*utf.add(2) as c_uint & 0x3f) << 6;
-                    c |= *utf.add(3) as c_uint & 0x3f;
+                    c = (*utf.add(0) as u32 & 0x7) << 18;
+                    c |= (*utf.add(1) as u32 & 0x3f) << 12;
+                    c |= (*utf.add(2) as u32 & 0x3f) << 6;
+                    c |= *utf.add(3) as u32 & 0x3f;
                 } else {
                     /* 3-byte code */
                     *len = 3;
-                    c = (*utf.add(0) as c_uint & 0xf) << 12;
-                    c |= (*utf.add(1) as c_uint & 0x3f) << 6;
-                    c |= *utf.add(2) as c_uint & 0x3f;
+                    c = (*utf.add(0) as u32 & 0xf) << 12;
+                    c |= (*utf.add(1) as u32 & 0x3f) << 6;
+                    c |= *utf.add(2) as u32 & 0x3f;
                 }
             } else {
                 /* 2-byte code */
                 *len = 2;
-                c = (*utf.add(0) as c_uint & 0x1f) << 6;
-                c |= *utf.add(1) as c_uint & 0x3f;
+                c = (*utf.add(0) as u32 & 0x1f) << 6;
+                c |= *utf.add(1) as u32 & 0x3f;
             }
         } else {
             /* 1-byte code */
@@ -911,9 +904,9 @@ pub unsafe extern "C" fn xml_get_utf8_char(utf: *const c_uchar, len: *mut c_int)
  *
  * Return value: true if @utf is valid.
  **/
-pub unsafe extern "C" fn xml_check_utf8(mut utf: *const c_uchar) -> c_int {
-    let mut ix: c_int;
-    let mut c: c_uchar;
+pub unsafe extern "C" fn xml_check_utf8(mut utf: *const u8) -> i32 {
+    let mut ix: i32;
+    let mut c: u8;
 
     if utf.is_null() {
         return 0;
@@ -976,9 +969,9 @@ pub unsafe extern "C" fn xml_check_utf8(mut utf: *const c_uchar) -> c_int {
  * Returns the storage size of
  * the first 'len' characters of ARRAY
  */
-pub unsafe extern "C" fn xml_utf8_strsize(utf: *const XmlChar, mut len: c_int) -> c_int {
+pub unsafe extern "C" fn xml_utf8_strsize(utf: *const XmlChar, mut len: i32) -> i32 {
     let mut ptr: *const XmlChar = utf;
-    let mut ch: c_int;
+    let mut ch: i32;
 
     if utf.is_null() {
         return 0;
@@ -1010,7 +1003,7 @@ pub unsafe extern "C" fn xml_utf8_strsize(utf: *const XmlChar, mut len: c_int) -
             }
         }
     }
-    let ret: size_t = ptr.offset_from(utf).unsigned_abs();
+    let ret: usize = ptr.offset_from(utf).unsigned_abs();
     if ret > INT_MAX as usize {
         0
     } else {
@@ -1027,12 +1020,12 @@ pub unsafe extern "C" fn xml_utf8_strsize(utf: *const XmlChar, mut len: c_int) -
  *
  * Returns a new UTF8 * or NULL
  */
-pub unsafe extern "C" fn xml_utf8_strndup(utf: *const XmlChar, len: c_int) -> *mut XmlChar {
+pub unsafe extern "C" fn xml_utf8_strndup(utf: *const XmlChar, len: i32) -> *mut XmlChar {
     if utf.is_null() || len < 0 {
         return null_mut();
     }
-    let i: c_int = xml_utf8_strsize(utf, len);
-    let ret: *mut XmlChar = xml_malloc_atomic(i as size_t + 1) as *mut XmlChar;
+    let i: i32 = xml_utf8_strsize(utf, len);
+    let ret: *mut XmlChar = xml_malloc_atomic(i as usize + 1) as *mut XmlChar;
     if ret.is_null() {
         return null_mut();
     }
@@ -1051,11 +1044,8 @@ pub unsafe extern "C" fn xml_utf8_strndup(utf: *const XmlChar, len: c_int) -> *m
  *
  * Returns a pointer to the UTF8 character or NULL
  */
-pub unsafe extern "C" fn xml_utf8_strpos(
-    mut utf: *const XmlChar,
-    mut pos: c_int,
-) -> *const XmlChar {
-    let mut ch: c_int;
+pub unsafe extern "C" fn xml_utf8_strpos(mut utf: *const XmlChar, mut pos: i32) -> *const XmlChar {
+    let mut ch: i32;
 
     if utf.is_null() {
         return null();
@@ -1104,18 +1094,15 @@ pub unsafe extern "C" fn xml_utf8_strpos(
  * Returns the relative character position of the desired char
  * or -1 if not found
  */
-pub unsafe extern "C" fn xml_utf8_strloc(
-    mut utf: *const XmlChar,
-    utfchar: *const XmlChar,
-) -> c_int {
-    let mut i: size_t;
+pub unsafe extern "C" fn xml_utf8_strloc(mut utf: *const XmlChar, utfchar: *const XmlChar) -> i32 {
+    let mut i: usize;
 
-    let mut ch: c_int;
+    let mut ch: i32;
 
     if utf.is_null() || utfchar.is_null() {
         return -1;
     }
-    let size: c_int = xml_utf8_strsize(utfchar, 1);
+    let size: i32 = xml_utf8_strsize(utfchar, 1);
     i = 0;
     while {
         ch = *utf as _;
@@ -1161,10 +1148,10 @@ pub unsafe extern "C" fn xml_utf8_strloc(
  */
 pub unsafe extern "C" fn xml_utf8_strsub(
     mut utf: *const XmlChar,
-    start: c_int,
-    len: c_int,
+    start: i32,
+    len: i32,
 ) -> *mut XmlChar {
-    let mut ch: c_int;
+    let mut ch: i32;
 
     if utf.is_null() {
         return null_mut();
@@ -1220,8 +1207,8 @@ pub unsafe extern "C" fn xml_escape_format_string(msg: *mut *mut XmlChar) -> *mu
     let mut msg_ptr: *mut XmlChar;
 
     let mut result_ptr: *mut XmlChar;
-    let mut count: size_t = 0;
-    let mut msg_len: size_t = 0;
+    let mut count: usize = 0;
+    let mut msg_len: usize = 0;
 
     if msg.is_null() || (*msg).is_null() {
         return null_mut();
@@ -1243,7 +1230,7 @@ pub unsafe extern "C" fn xml_escape_format_string(msg: *mut *mut XmlChar) -> *mu
     if count > INT_MAX as _ || msg_len > INT_MAX as usize - count {
         return null_mut();
     }
-    let result_len: size_t = msg_len + count + 1;
+    let result_len: usize = msg_len + count + 1;
     let result: *mut XmlChar = xml_malloc_atomic(result_len) as *mut XmlChar;
     if result.is_null() {
         /* Clear *msg to prevent format string vulnerabilities in
@@ -1347,9 +1334,9 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let utf = gen_const_unsigned_char_ptr(n_utf, 0);
 
-                let ret_val = xml_check_utf8(utf as *const c_uchar);
+                let ret_val = xml_check_utf8(utf as *const u8);
                 desret_int(ret_val);
-                des_const_unsigned_char_ptr(n_utf, utf as *const c_uchar, 0);
+                des_const_unsigned_char_ptr(n_utf, utf as *const u8, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
@@ -1375,9 +1362,9 @@ mod tests {
                     let utf = gen_const_unsigned_char_ptr(n_utf, 0);
                     let len = gen_int_ptr(n_len, 1);
 
-                    let ret_val = xml_get_utf8_char(utf as *const c_uchar, len);
+                    let ret_val = xml_get_utf8_char(utf as *const u8, len);
                     desret_int(ret_val);
-                    des_const_unsigned_char_ptr(n_utf, utf as *const c_uchar, 0);
+                    des_const_unsigned_char_ptr(n_utf, utf as *const u8, 0);
                     des_int_ptr(n_len, len, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {

@@ -3,10 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{
-    ffi::{c_int, c_void},
-    ptr::null_mut,
-};
+use std::{ffi::c_void, ptr::null_mut};
 
 use crate::libxml::{
     entities::XmlEntityPtr,
@@ -25,7 +22,7 @@ use crate::libxml::{
     xmlstring::XmlChar,
 };
 
-static mut DEPRECATED_V1_MSG: c_int = 0;
+static mut DEPRECATED_V1_MSG: i32 = 0;
 
 macro_rules! DEPRECATED {
     ($n:literal) => {
@@ -95,7 +92,7 @@ pub unsafe extern "C" fn setDocumentLocator(_ctx: *mut c_void, _loc: XmlSaxlocat
  * Returns an int
  */
 #[deprecated]
-pub unsafe extern "C" fn getLineNumber(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn getLineNumber(ctx: *mut c_void) -> i32 {
     DEPRECATED!(c"getLineNumber");
     xmlSAX2GetLineNumber(ctx)
 }
@@ -110,7 +107,7 @@ pub unsafe extern "C" fn getLineNumber(ctx: *mut c_void) -> c_int {
  * Returns an int
  */
 #[deprecated]
-pub unsafe extern "C" fn getColumnNumber(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn getColumnNumber(ctx: *mut c_void) -> i32 {
     DEPRECATED!(c"getColumnNumber");
     xmlSAX2GetColumnNumber(ctx)
 }
@@ -125,7 +122,7 @@ pub unsafe extern "C" fn getColumnNumber(ctx: *mut c_void) -> c_int {
  * Returns 1 if true
  */
 #[deprecated]
-pub unsafe extern "C" fn isStandalone(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn isStandalone(ctx: *mut c_void) -> i32 {
     DEPRECATED!(c"isStandalone");
     xmlSAX2IsStandalone(ctx)
 }
@@ -140,7 +137,7 @@ pub unsafe extern "C" fn isStandalone(ctx: *mut c_void) -> c_int {
  * Returns 1 if true
  */
 #[deprecated]
-pub unsafe extern "C" fn hasInternalSubset(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn hasInternalSubset(ctx: *mut c_void) -> i32 {
     DEPRECATED!(c"hasInternalSubset");
     xmlSAX2HasInternalSubset(ctx)
 }
@@ -155,7 +152,7 @@ pub unsafe extern "C" fn hasInternalSubset(ctx: *mut c_void) -> c_int {
  * Returns 1 if true
  */
 #[deprecated]
-pub unsafe extern "C" fn hasExternalSubset(ctx: *mut c_void) -> c_int {
+pub unsafe extern "C" fn hasExternalSubset(ctx: *mut c_void) -> i32 {
     DEPRECATED!(c"hasExternalSubset");
     xmlSAX2HasExternalSubset(ctx)
 }
@@ -278,7 +275,7 @@ pub unsafe extern "C" fn resolveEntity(
 pub unsafe extern "C" fn entityDecl(
     ctx: *mut c_void,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
     content: *mut XmlChar,
@@ -305,8 +302,8 @@ pub unsafe extern "C" fn attributeDecl(
     ctx: *mut c_void,
     elem: *const XmlChar,
     fullname: *const XmlChar,
-    typ: c_int,
-    def: c_int,
+    typ: i32,
+    def: i32,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
 ) {
@@ -328,7 +325,7 @@ pub unsafe extern "C" fn attributeDecl(
 pub unsafe extern "C" fn elementDecl(
     ctx: *mut c_void,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     content: XmlElementContentPtr,
 ) {
     DEPRECATED!(c"elementDecl");
@@ -483,7 +480,7 @@ pub unsafe extern "C" fn reference(ctx: *mut c_void, name: *const XmlChar) {
  * DEPRECATED: use xmlSAX2Characters()
  */
 #[deprecated]
-pub unsafe extern "C" fn characters(ctx: *mut c_void, ch: *const XmlChar, len: c_int) {
+pub unsafe extern "C" fn characters(ctx: *mut c_void, ch: *const XmlChar, len: i32) {
     DEPRECATED!(c"characters");
     xmlSAX2Characters(ctx, ch, len);
 }
@@ -499,7 +496,7 @@ pub unsafe extern "C" fn characters(ctx: *mut c_void, ch: *const XmlChar, len: c
  * DEPRECATED: use xmlSAX2IgnorableWhitespace()
  */
 #[deprecated]
-pub unsafe extern "C" fn ignorableWhitespace(_ctx: *mut c_void, _ch: *const XmlChar, _len: c_int) {
+pub unsafe extern "C" fn ignorableWhitespace(_ctx: *mut c_void, _ch: *const XmlChar, _len: i32) {
     DEPRECATED!(c"ignorableWhitespace");
 }
 
@@ -580,7 +577,7 @@ pub unsafe extern "C" fn getNamespace(_ctx: *mut c_void) -> XmlNsPtr {
  * Returns 1 if true 0 otherwise
  */
 #[deprecated]
-pub unsafe extern "C" fn checkNamespace(_ctx: *mut c_void, _name_space: *mut XmlChar) -> c_int {
+pub unsafe extern "C" fn checkNamespace(_ctx: *mut c_void, _name_space: *mut XmlChar) -> i32 {
     //  DEPRECATED("checkNamespace")
     0
 }
@@ -627,7 +624,7 @@ pub unsafe extern "C" fn comment(ctx: *mut c_void, value: *const XmlChar) {
  * DEPRECATED: use xmlSAX2CDataBlock()
  */
 #[deprecated]
-pub unsafe extern "C" fn cdataBlock(ctx: *mut c_void, value: *const XmlChar, len: c_int) {
+pub unsafe extern "C" fn cdataBlock(ctx: *mut c_void, value: *const XmlChar, len: i32) {
     DEPRECATED!(c"cdataBlock");
     xmlSAX2CDataBlock(ctx, value, len);
 }
@@ -642,7 +639,7 @@ pub unsafe extern "C" fn cdataBlock(ctx: *mut c_void, value: *const XmlChar, len
  */
 #[deprecated]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn initxmlDefaultSAXHandler(hdlr: *mut XmlSAXHandlerV1, warning: c_int) {
+pub unsafe extern "C" fn initxmlDefaultSAXHandler(hdlr: *mut XmlSAXHandlerV1, warning: i32) {
     use crate::libxml::{
         sax2::xmlSAX2SetDocumentLocator,
         xmlerror::{xmlParserError, xmlParserWarning},

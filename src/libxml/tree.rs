@@ -5,14 +5,14 @@
 
 use std::{
     any::type_name,
-    ffi::{c_char, c_int, c_long, c_ulong, c_ushort, CStr, CString},
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::{AtomicI32, AtomicPtr, Ordering},
 };
 
-use libc::{memcpy, memset, ptrdiff_t, size_t, snprintf, strlen, FILE};
+use libc::{memcpy, memset, snprintf, strlen, FILE};
 
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
@@ -585,7 +585,7 @@ pub struct XmlID {
     pub(crate) value: *const XmlChar, /* The ID name */
     pub(crate) attr: XmlAttrPtr,      /* The attribute holding it */
     pub(crate) name: *const XmlChar,  /* The attribute if attr is not available */
-    pub(crate) lineno: c_int,         /* The line number if attr is not available */
+    pub(crate) lineno: i32,           /* The line number if attr is not available */
     pub(crate) doc: *mut XmlDoc,      /* The document holding the ID */
 }
 
@@ -601,7 +601,7 @@ pub struct XmlRef {
     pub(crate) value: *const XmlChar, /* The Ref name */
     pub(crate) attr: XmlAttrPtr,      /* The attribute holding it */
     pub(crate) name: *const XmlChar,  /* The attribute if attr is not available */
-    pub(crate) lineno: c_int,         /* The line number if attr is not available */
+    pub(crate) lineno: i32,           /* The line number if attr is not available */
 }
 
 /**
@@ -628,8 +628,8 @@ pub struct XmlNode {
     pub(crate) properties: *mut XmlAttr, /* properties list */
     pub ns_def: *mut XmlNs,    /* namespace definitions on this node */
     pub(crate) psvi: *mut c_void, /* for type/PSVI information */
-    pub(crate) line: c_ushort, /* line number */
-    pub(crate) extra: c_ushort, /* extra data for XPath/XSLT */
+    pub(crate) line: u16,      /* line number */
+    pub(crate) extra: u16,     /* extra data for XPath/XSLT */
 }
 
 /**
@@ -693,13 +693,13 @@ pub struct XmlDoc {
     pub(crate) doc: *mut XmlDoc,      /* autoreference to itself */
 
     /* End of common part */
-    pub(crate) compression: c_int, /* level of zlib compression */
-    pub(crate) standalone: c_int,  /* standalone document (no external refs)
-                                    1 if standalone="yes"
-                                    0 if standalone="no"
-                                   -1 if there is no XML declaration
-                                   -2 if there is an XML declaration, but no
-                                   standalone attribute was specified */
+    pub(crate) compression: i32, /* level of zlib compression */
+    pub(crate) standalone: i32,  /* standalone document (no external refs)
+                                  1 if standalone="yes"
+                                  0 if standalone="no"
+                                 -1 if there is no XML declaration
+                                 -2 if there is an XML declaration, but no
+                                 standalone attribute was specified */
     pub int_subset: *mut XmlDtd,        /* the document internal subset */
     pub(crate) ext_subset: *mut XmlDtd, /* the document external subset */
     pub(crate) old_ns: *mut XmlNs,      /* Global namespace, the old way */
@@ -712,10 +712,10 @@ pub struct XmlDoc {
                                         actually an xmlCharEncoding */
     pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
     pub(crate) psvi: *mut c_void, /* for type/PSVI information */
-    pub(crate) parse_flags: c_int, /* set of xmlParserOption used to parse the
+    pub(crate) parse_flags: i32,  /* set of xmlParserOption used to parse the
                                   document */
-    pub properties: c_int, /* set of xmlDocProperties for this document
-                           set at the end of parsing */
+    pub properties: i32, /* set of xmlDocProperties for this document
+                         set at the end of parsing */
 }
 
 impl Default for XmlDoc {
@@ -780,7 +780,7 @@ pub struct XmlDOMWrapCtxt {
      * The type of this context, just in case we need specialized
      * contexts in the future.
      */
-    typ: c_int,
+    typ: i32,
     /*
      * Internal namespace map used for various operations.
      */
@@ -797,9 +797,9 @@ pub type XmlNsMapItemPtr = *mut XmlNsMapItem;
 pub struct XmlNsMapItem {
     next: XmlNsMapItemPtr,
     prev: XmlNsMapItemPtr,
-    old_ns: XmlNsPtr,    /* old ns decl reference */
-    new_ns: XmlNsPtr,    /* new ns decl reference */
-    shadow_depth: c_int, /* Shadowed at this depth */
+    old_ns: XmlNsPtr,  /* old ns decl reference */
+    new_ns: XmlNsPtr,  /* new ns decl reference */
+    shadow_depth: i32, /* Shadowed at this depth */
     /*
      * depth:
      * >= 0 == @node's ns-decls
@@ -808,7 +808,7 @@ pub struct XmlNsMapItem {
      * -3   == the (*doc).oldNs storage ns-decls
      * -4   == ns-decls provided via custom ns-handling
      */
-    depth: c_int,
+    depth: i32,
 }
 
 pub type XmlNsMapPtr = *mut XmlNsMap;
@@ -880,7 +880,7 @@ macro_rules! CUR_SCHAR {
     feature = "writer",
     feature = "legacy"
 ))]
-pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int) -> c_int {
+pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
@@ -888,7 +888,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
 
     let mut cur: *const XmlChar = value;
     let mut c: i32;
-    let mut l: c_int = 0;
+    let mut l: i32 = 0;
 
     if value.is_null() {
         return -1;
@@ -979,15 +979,15 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: c_int
  *         and -1 in case of internal or API error.
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int) -> c_int {
+pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
     };
 
     let mut cur: *const XmlChar = value;
-    let mut c: c_int;
-    let mut l: c_int = 0;
+    let mut c: i32;
+    let mut l: i32 = 0;
 
     if value.is_null() {
         return -1;
@@ -1114,15 +1114,15 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: c_int)
  *         and -1 in case of internal or API error.
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) -> c_int {
+pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
     };
 
     let mut cur: *const XmlChar = value;
-    let mut c: c_int;
-    let mut l: c_int = 0;
+    let mut c: i32;
+    let mut l: i32 = 0;
 
     if value.is_null() {
         return -1;
@@ -1215,15 +1215,15 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: c_int) 
  *         and -1 in case of internal or API error.
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: c_int) -> c_int {
+pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
     };
 
     let mut cur: *const XmlChar = value;
-    let mut c: c_int;
-    let mut l: c_int = 0;
+    let mut c: i32;
+    let mut l: i32 = 0;
 
     if value.is_null() {
         return -1;
@@ -1350,7 +1350,7 @@ pub unsafe extern "C" fn xml_build_qname(
     ncname: *const XmlChar,
     prefix: *const XmlChar,
     memory: *mut XmlChar,
-    len: c_int,
+    len: i32,
 ) -> *mut XmlChar {
     let ret: *mut XmlChar;
 
@@ -1361,8 +1361,8 @@ pub unsafe extern "C" fn xml_build_qname(
         return ncname as _;
     }
 
-    let lenn: c_int = strlen(ncname as _) as _;
-    let lenp: c_int = strlen(prefix as _) as _;
+    let lenn: i32 = strlen(ncname as _) as _;
+    let lenp: i32 = strlen(prefix as _) as _;
 
     if memory.is_null() || len < lenn + lenp + 2 {
         ret = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
@@ -1401,7 +1401,7 @@ pub unsafe extern "C" fn xml_split_qname2(
     name: *const XmlChar,
     prefix: *mut *mut XmlChar,
 ) -> *mut XmlChar {
-    let mut len: c_int = 0;
+    let mut len: i32 = 0;
 
     if prefix.is_null() {
         return null_mut();
@@ -1449,7 +1449,7 @@ pub unsafe extern "C" fn xml_split_qname2(
 /**
  * xmlSplitQName3:
  * @name:  the full QName
- * @len: an c_int *
+ * @len: an int *
  *
  * parse an XML qualified name string,i
  *
@@ -1457,8 +1457,8 @@ pub unsafe extern "C" fn xml_split_qname2(
  *         with the length in byte of the prefix and return a pointer
  *         to the start of the name without the prefix
  */
-pub unsafe extern "C" fn xml_split_qname3(name: *const XmlChar, len: *mut c_int) -> *const XmlChar {
-    let mut l: c_int = 0;
+pub unsafe extern "C" fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const XmlChar {
+    let mut l: i32 = 0;
 
     if name.is_null() {
         return null_mut();
@@ -1968,7 +1968,7 @@ pub unsafe extern "C" fn xml_new_doc(mut version: *const XmlChar) -> XmlDocPtr {
      * This field will never change and would
      * be obsolete if not for binary compatibility.
      */
-    (*cur).charset = crate::encoding::XmlCharEncoding::UTF8;
+    (*cur).charset = XmlCharEncoding::UTF8;
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
@@ -2115,7 +2115,7 @@ unsafe extern "C" fn xml_new_prop_internal(
     ns: XmlNsPtr,
     name: *const XmlChar,
     value: *const XmlChar,
-    eatname: c_int,
+    eatname: i32,
 ) -> XmlAttrPtr {
     let mut doc: XmlDocPtr = null_mut();
 
@@ -2349,7 +2349,7 @@ unsafe extern "C" fn xml_new_reconciled_ns(
 ) -> XmlNsPtr {
     let mut def: XmlNsPtr;
     let mut prefix: [XmlChar; 50] = [0; 50];
-    let mut counter: c_int = 1;
+    let mut counter: i32 = 1;
 
     if tree.is_null() || !matches!((*tree).typ, XmlElementType::XmlElementNode) {
         return null_mut();
@@ -2439,7 +2439,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     node: XmlNodePtr,
     doc: XmlDocPtr,
     parent: XmlNodePtr,
-    extended: c_int,
+    extended: i32,
 ) -> XmlNodePtr {
     if node.is_null() {
         return null_mut();
@@ -3073,7 +3073,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
  * Returns: a new #xmlDocPtr, or null_mut() in case of error.
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: c_int) -> XmlDocPtr {
+pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocPtr {
     use super::globals::xml_mem_strdup;
 
     if doc.is_null() {
@@ -3519,7 +3519,7 @@ pub unsafe extern "C" fn xml_new_pi(name: *const XmlChar, content: *const XmlCha
 pub unsafe extern "C" fn xml_new_doc_text_len(
     doc: XmlDocPtr,
     content: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) -> XmlNodePtr {
     let cur: XmlNodePtr = xml_new_text_len(content, len);
     if !cur.is_null() {
@@ -3538,7 +3538,7 @@ pub unsafe extern "C" fn xml_new_doc_text_len(
  * Creation of a new text node with an extra parameter for the content's length
  * Returns a pointer to the new node object.
  */
-pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: c_int) -> XmlNodePtr {
+pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: i32) -> XmlNodePtr {
     /*
      * Allocate a new node and fill the fields.
      */
@@ -3628,7 +3628,7 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
 pub unsafe extern "C" fn xml_new_cdata_block(
     doc: XmlDocPtr,
     content: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) -> XmlNodePtr {
     /*
      * Allocate a new node and fill the fields.
@@ -3681,7 +3681,7 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
     (*cur).doc = doc;
     if *name.add(0) == b'&' {
         name = name.add(1);
-        let len: c_int = xml_strlen(name);
+        let len: i32 = xml_strlen(name);
         if *name.add(len as usize - 1) == b';' {
             (*cur).name = xml_strndup(name, len - 1);
         } else {
@@ -3729,7 +3729,7 @@ pub unsafe extern "C" fn xml_new_reference(
     (*cur).doc = doc as _;
     if *name.add(0) == b'&' {
         name = name.add(1);
-        let len: c_int = xml_strlen(name);
+        let len: i32 = xml_strlen(name);
         if *name.add(len as usize - 1) == b';' {
             (*cur).name = xml_strndup(name, len - 1);
         } else {
@@ -3770,7 +3770,7 @@ pub unsafe extern "C" fn xml_new_reference(
  *
  * Returns: a new #XmlNodePtr, or null_mut() in case of error.
  */
-pub unsafe extern "C" fn xml_copy_node(node: XmlNodePtr, extended: c_int) -> XmlNodePtr {
+pub unsafe extern "C" fn xml_copy_node(node: XmlNodePtr, extended: i32) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node(node, null_mut(), null_mut(), extended);
     ret
 }
@@ -3790,7 +3790,7 @@ pub unsafe extern "C" fn xml_copy_node(node: XmlNodePtr, extended: c_int) -> Xml
 pub unsafe extern "C" fn xml_doc_copy_node(
     node: XmlNodePtr,
     doc: XmlDocPtr,
-    extended: c_int,
+    extended: i32,
 ) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node(node, doc, null_mut(), extended);
     ret
@@ -3976,8 +3976,8 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
  *
  * Returns the line number if successful, -1 otherwise
  */
-unsafe extern "C" fn xml_get_line_no_internal(node: *const XmlNode, depth: c_int) -> c_long {
-    let mut result: c_long = -1;
+unsafe extern "C" fn xml_get_line_no_internal(node: *const XmlNode, depth: i32) -> i64 {
+    let mut result: i64 = -1;
 
     if depth >= 5 {
         return -1;
@@ -3993,7 +3993,7 @@ unsafe extern "C" fn xml_get_line_no_internal(node: *const XmlNode, depth: c_int
     {
         if (*node).line == 65535 {
             if (matches!((*node).typ, XmlElementType::XmlTextNode) && !(*node).psvi.is_null()) {
-                result = (*node).psvi as ptrdiff_t as c_long;
+                result = (*node).psvi as isize as i64;
             } else if (matches!((*node).typ, XmlElementType::XmlElementNode)
                 && !(*node).children.is_null())
             {
@@ -4005,7 +4005,7 @@ unsafe extern "C" fn xml_get_line_no_internal(node: *const XmlNode, depth: c_int
             }
         }
         if (result == -1) || (result == 65535) {
-            result = (*node).line as c_long;
+            result = (*node).line as i64;
         }
     } else if !(*node).prev.is_null()
         && (matches!((*(*node).prev).typ, XmlElementType::XmlElementNode)
@@ -4036,7 +4036,7 @@ unsafe extern "C" fn xml_get_line_no_internal(node: *const XmlNode, depth: c_int
  *
  * Returns the line number if successful, -1 otherwise
  */
-pub unsafe extern "C" fn xml_get_line_no(node: *const XmlNode) -> c_long {
+pub unsafe extern "C" fn xml_get_line_no(node: *const XmlNode) -> i64 {
     xml_get_line_no_internal(node, 0)
 }
 
@@ -4056,13 +4056,13 @@ pub unsafe extern "C" fn xml_get_node_path(node: *const XmlNode) -> *mut XmlChar
     let mut next: *const XmlNode;
     let mut buffer: *mut XmlChar;
     let mut temp: *mut XmlChar;
-    let mut buf_len: size_t;
+    let mut buf_len: usize;
     let mut buf: *mut XmlChar;
     let mut sep: *const c_char;
     let mut name: *const c_char;
     let mut nametemp: [c_char; 100] = [0; 100];
-    let mut occur: c_int;
-    let mut generic: c_int;
+    let mut occur: i32;
+    let mut generic: i32;
 
     if node.is_null() || matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
@@ -4402,7 +4402,7 @@ pub unsafe extern "C" fn xml_get_last_child(parent: *const XmlNode) -> XmlNodePt
  * Is this node a Text node ?
  * Returns 1 yes, 0 no
  */
-pub unsafe extern "C" fn xml_node_is_text(node: *const XmlNode) -> c_int {
+pub unsafe extern "C" fn xml_node_is_text(node: *const XmlNode) -> i32 {
     if node.is_null() {
         return 0;
     }
@@ -4422,7 +4422,7 @@ pub unsafe extern "C" fn xml_node_is_text(node: *const XmlNode) -> c_int {
  *
  * Returns 1 yes, 0 no
  */
-pub unsafe extern "C" fn xml_is_blank_node(node: *const XmlNode) -> c_int {
+pub unsafe extern "C" fn xml_is_blank_node(node: *const XmlNode) -> i32 {
     let mut cur: *const XmlChar;
     if node.is_null() {
         return 0;
@@ -5233,8 +5233,8 @@ pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -
 pub unsafe extern "C" fn xml_text_concat(
     node: XmlNodePtr,
     content: *const XmlChar,
-    len: c_int,
-) -> c_int {
+    len: i32,
+) -> i32 {
     if node.is_null() {
         return -1;
     }
@@ -5274,7 +5274,7 @@ pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
     let mut next: XmlNodePtr;
     let mut parent: XmlNodePtr;
     let mut dict: XmlDictPtr = null_mut();
-    let mut depth: size_t = 0;
+    let mut depth: usize = 0;
 
     if cur.is_null() {
         return;
@@ -5447,7 +5447,7 @@ unsafe extern "C" fn _copy_string_for_new_dict_if_needed(
 ) -> *const XmlChar {
     let mut new_value: *const XmlChar = old_value;
     if !old_value.is_null() {
-        let old_dict_owns_old_value: c_int =
+        let old_dict_owns_old_value: i32 =
             (!old_dict.is_null() && xml_dict_owns(old_dict, old_value) == 1) as i32;
         if old_dict_owns_old_value != 0 {
             if !new_dict.is_null() {
@@ -5732,7 +5732,7 @@ unsafe extern "C" fn xml_ns_in_scope(
     mut node: XmlNodePtr,
     ancestor: XmlNodePtr,
     prefix: *const XmlChar,
-) -> c_int {
+) -> i32 {
     let mut tst: XmlNsPtr;
 
     while !node.is_null() && node != ancestor {
@@ -5829,7 +5829,7 @@ pub unsafe extern "C" fn xml_search_ns_by_href(
             return (*doc).old_ns;
         }
     }
-    let is_attr: c_int = matches!((*node).typ, XmlElementType::XmlAttributeNode) as i32;
+    let is_attr: i32 = matches!((*node).typ, XmlElementType::XmlAttributeNode) as i32;
     while !node.is_null() {
         if matches!((*node).typ, XmlElementType::XmlEntityRefNode)
             || matches!((*node).typ, XmlElementType::XmlEntityNode)
@@ -5885,8 +5885,8 @@ pub unsafe extern "C" fn xml_get_ns_list(
 ) -> *mut XmlNsPtr {
     let mut cur: XmlNsPtr;
     let mut ret: *mut XmlNsPtr = null_mut();
-    let mut nbns: c_int = 0;
-    let mut maxns: c_int = 0;
+    let mut nbns: i32 = 0;
+    let mut maxns: i32 = 0;
 
     if node.is_null() || matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
@@ -6029,7 +6029,7 @@ pub unsafe extern "C" fn xml_set_prop(
     name: *const XmlChar,
     value: *const XmlChar,
 ) -> XmlAttrPtr {
-    let mut len: c_int = 0;
+    let mut len: i32 = 0;
 
     if node.is_null() || name.is_null() || !matches!((*node).typ, XmlElementType::XmlElementNode) {
         return null_mut();
@@ -6056,7 +6056,7 @@ unsafe extern "C" fn xml_get_prop_node_internal(
     node: *const XmlNode,
     name: *const XmlChar,
     ns_name: *const XmlChar,
-    use_dtd: c_int,
+    use_dtd: i32,
 ) -> XmlAttrPtr {
     let mut prop: XmlAttrPtr;
 
@@ -6546,7 +6546,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
     q = cur;
     while *cur != 0 {
         if *cur.add(0) == b'&' {
-            let mut charval: c_int = 0;
+            let mut charval: i32 = 0;
             let mut tmp: XmlChar;
 
             /*
@@ -6735,7 +6735,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
             if charval != 0 {
                 let mut buffer: [XmlChar; 10] = [0; 10];
 
-                let len: c_int = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
+                let len: i32 = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
                 buffer[len as usize] = 0;
 
                 if xml_buf_cat(buf, buffer.as_ptr() as _) != 0 {
@@ -6811,7 +6811,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
 pub unsafe extern "C" fn xml_string_len_get_node_list(
     doc: *const XmlDoc,
     value: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) -> XmlNodePtr {
     let mut ret: XmlNodePtr = null_mut();
     let mut last: XmlNodePtr = null_mut();
@@ -6836,7 +6836,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
     q = cur;
     while cur < end && *cur != 0 {
         if *cur.add(0) == b'&' {
-            let mut charval: c_int = 0;
+            let mut charval: i32 = 0;
             let mut tmp: XmlChar;
 
             /*
@@ -7024,7 +7024,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
             if charval != 0 {
                 let mut buffer: [XmlChar; 10] = [0; 10];
 
-                let l: c_int = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
+                let l: i32 = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
                 buffer[l as usize] = 0;
 
                 if xml_buf_cat(buf, buffer.as_ptr() as _) != 0 {
@@ -7087,7 +7087,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
 pub unsafe extern "C" fn xml_node_list_get_string(
     doc: XmlDocPtr,
     list: *const XmlNode,
-    in_line: c_int,
+    in_line: i32,
 ) -> *mut XmlChar {
     let mut node: *const XmlNode = list;
     let mut ret: *mut XmlChar = null_mut();
@@ -7181,7 +7181,7 @@ pub unsafe extern "C" fn xml_node_list_get_string(
 pub unsafe extern "C" fn xml_node_list_get_raw_string(
     doc: *const XmlDoc,
     list: *const XmlNode,
-    in_line: c_int,
+    in_line: i32,
 ) -> *mut XmlChar {
     use super::entities::xml_encode_special_chars;
 
@@ -7333,7 +7333,7 @@ pub unsafe extern "C" fn xml_node_set_content(cur: XmlNodePtr, content: *const X
 pub unsafe extern "C" fn xml_node_set_content_len(
     cur: XmlNodePtr,
     content: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     if cur.is_null() {
         return;
@@ -7406,7 +7406,7 @@ pub unsafe extern "C" fn xml_node_add_content(cur: XmlNodePtr, content: *const X
     if content.is_null() {
         return;
     }
-    let len: c_int = xml_strlen(content);
+    let len: i32 = xml_strlen(content);
     xml_node_add_content_len(cur, content, len);
 }
 
@@ -7424,7 +7424,7 @@ pub unsafe extern "C" fn xml_node_add_content(cur: XmlNodePtr, content: *const X
 pub unsafe extern "C" fn xml_node_add_content_len(
     cur: XmlNodePtr,
     content: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     if cur.is_null() {
         return;
@@ -7598,12 +7598,12 @@ pub unsafe extern "C" fn xml_node_get_content(cur: *const XmlNode) -> *mut XmlCh
 // pub unsafe extern "C" fn xml_node_buf_get_content(
 //     mut buffer: XmlBufferPtr,
 //     cur: *const XmlNode,
-// ) -> c_int {
+// ) -> i32 {
 //     if cur.is_null() || buffer.is_null() {
 //         return -1;
 //     }
 //     let buf: XmlBufPtr = xml_buf_from_buffer(buffer);
-//     let ret: c_int = xml_buf_get_node_content(buf, cur);
+//     let ret: i32 = xml_buf_get_node_content(buf, cur);
 //     buffer = xml_buf_back_to_buffer(buf);
 //     if ret < 0 || buffer.is_null() {
 //         return -1;
@@ -7624,10 +7624,7 @@ pub unsafe extern "C" fn xml_node_get_content(cur: *const XmlNode) -> *mut XmlCh
  *
  * Returns 0 in case of success and -1 in case of error.
  */
-pub unsafe extern "C" fn xml_buf_get_node_content(
-    buf: XmlBufPtr,
-    mut cur: *const XmlNode,
-) -> c_int {
+pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *const XmlNode) -> i32 {
     if cur.is_null() || buf.is_null() {
         return -1;
     }
@@ -7789,7 +7786,7 @@ pub unsafe extern "C" fn xml_node_get_lang(mut cur: *const XmlNode) -> *mut XmlC
  *
  * Returns -1 if xml:space is not inherited, 0 if "default".as_ptr() as _, 1 if "preserve"
  */
-pub unsafe extern "C" fn xml_node_get_space_preserve(mut cur: *const XmlNode) -> c_int {
+pub unsafe extern "C" fn xml_node_get_space_preserve(mut cur: *const XmlNode) -> i32 {
     let mut space: *mut XmlChar;
 
     if cur.is_null() || !matches!((*cur).typ, XmlElementType::XmlElementNode) {
@@ -7866,7 +7863,7 @@ pub unsafe extern "C" fn xml_node_set_lang(cur: XmlNodePtr, lang: *const XmlChar
  * value of the xml:space attribute.
  */
 #[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_node_set_space_preserve(cur: XmlNodePtr, val: c_int) {
+pub unsafe extern "C" fn xml_node_set_space_preserve(cur: XmlNodePtr, val: i32) {
     if cur.is_null() {
         return;
     }
@@ -8092,7 +8089,7 @@ pub unsafe extern "C" fn xml_node_set_base(cur: XmlNodePtr, uri: *const XmlChar)
  *
  * Returns 0 if success and -1 in case of error.
  */
-pub unsafe extern "C" fn xml_remove_prop(cur: XmlAttrPtr) -> c_int {
+pub unsafe extern "C" fn xml_remove_prop(cur: XmlAttrPtr) -> i32 {
     let mut tmp: XmlAttrPtr;
     if cur.is_null() {
         return -1;
@@ -8137,7 +8134,7 @@ pub unsafe extern "C" fn xml_unset_ns_prop(
     node: XmlNodePtr,
     ns: XmlNsPtr,
     name: *const XmlChar,
-) -> c_int {
+) -> i32 {
     let prop: XmlAttrPtr = xml_get_prop_node_internal(
         node,
         name,
@@ -8166,7 +8163,7 @@ pub unsafe extern "C" fn xml_unset_ns_prop(
  * Returns 0 if successful, -1 if not found
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) -> c_int {
+pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) -> i32 {
     let prop: XmlAttrPtr = xml_get_prop_node_internal(node, name, null_mut(), 0);
     if prop.is_null() {
         return -1;
@@ -8194,16 +8191,16 @@ pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) 
  * Returns the number of namespace declarations created or -1 in case of error.
  */
 #[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_reconciliate_ns(doc: XmlDocPtr, tree: XmlNodePtr) -> c_int {
+pub unsafe extern "C" fn xml_reconciliate_ns(doc: XmlDocPtr, tree: XmlNodePtr) -> i32 {
     let mut old_ns: *mut XmlNsPtr = null_mut();
     let mut new_ns: *mut XmlNsPtr = null_mut();
-    let mut size_cache: c_int = 0;
-    let mut nb_cache: c_int = 0;
+    let mut size_cache: i32 = 0;
+    let mut nb_cache: i32 = 0;
 
     let mut n: XmlNsPtr;
     let mut node: XmlNodePtr = tree;
     let mut attr: XmlAttrPtr;
-    let ret: c_int = 0;
+    let ret: i32 = 0;
 
     if node.is_null() || !matches!((*node).typ, XmlElementType::XmlElementNode) {
         return -1;
@@ -8415,8 +8412,8 @@ pub unsafe extern "C" fn xml_reconciliate_ns(doc: XmlDocPtr, tree: XmlNodePtr) -
 pub unsafe extern "C" fn xml_doc_dump_format_memory(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
-    size: *mut c_int,
-    format: c_int,
+    size: *mut i32,
+    format: i32,
 ) {
     xml_doc_dump_format_memory_enc(cur, mem, size, None, format);
 }
@@ -8436,7 +8433,7 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory(
 pub unsafe extern "C" fn xml_doc_dump_memory(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
-    size: *mut c_int,
+    size: *mut i32,
 ) {
     xml_doc_dump_format_memory_enc(cur, mem, size, None, 0);
 }
@@ -8456,7 +8453,7 @@ pub unsafe extern "C" fn xml_doc_dump_memory(
 pub unsafe fn xml_doc_dump_memory_enc(
     out_doc: XmlDocPtr,
     doc_txt_ptr: *mut *mut XmlChar,
-    doc_txt_len: *mut c_int,
+    doc_txt_len: *mut i32,
     txt_encoding: Option<&str>,
 ) {
     xml_doc_dump_format_memory_enc(out_doc, doc_txt_ptr, doc_txt_len, txt_encoding, 0);
@@ -8480,9 +8477,9 @@ pub unsafe fn xml_doc_dump_memory_enc(
 pub unsafe fn xml_doc_dump_format_memory_enc(
     out_doc: XmlDocPtr,
     doc_txt_ptr: *mut *mut XmlChar,
-    mut doc_txt_len: *mut c_int,
+    mut doc_txt_len: *mut i32,
     mut txt_encoding: Option<&str>,
-    format: c_int,
+    format: i32,
 ) {
     use std::ffi::CString;
 
@@ -8496,7 +8493,7 @@ pub unsafe fn xml_doc_dump_format_memory_enc(
     };
 
     let mut ctxt = XmlSaveCtxt::default();
-    let mut dummy: c_int = 0;
+    let mut dummy: i32 = 0;
 
     if doc_txt_len.is_null() {
         doc_txt_len = addr_of_mut!(dummy); /*  Continue, caller just won't get length */
@@ -8631,7 +8628,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
 
-    let ret: c_int = xml_output_buffer_close(buf);
+    let ret: i32 = xml_output_buffer_close(buf);
     ret
 }
 
@@ -8645,7 +8642,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
  * returns: the number of bytes written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn xml_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
     xml_doc_format_dump(f, cur, 0)
 }
 
@@ -8704,7 +8701,7 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
  * returns: the number of bytes written or -1 in case of failure.
  */
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_save_file(filename: *const c_char, cur: XmlDocPtr) -> c_int {
+pub unsafe extern "C" fn xml_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
     xml_save_format_file_enc(filename, cur, None, 0)
 }
 
@@ -8726,8 +8723,8 @@ pub unsafe extern "C" fn xml_save_file(filename: *const c_char, cur: XmlDocPtr) 
 pub unsafe extern "C" fn xml_save_format_file(
     filename: *const c_char,
     cur: XmlDocPtr,
-    format: c_int,
-) -> c_int {
+    format: i32,
+) -> i32 {
     xml_save_format_file_enc(filename, cur, None, format)
 }
 
@@ -8751,9 +8748,9 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     buf: XmlBufPtr,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
-    level: c_int,
-    format: c_int,
-) -> size_t {
+    level: i32,
+    format: i32,
+) -> usize {
     use crate::{
         buf::XmlBufRef,
         io::{XmlOutputBuffer, XmlOutputBufferPtr},
@@ -8784,13 +8781,13 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     (*outbuf).context = null_mut();
     (*outbuf).written = 0;
 
-    let using: size_t = xml_buf_use(buf);
-    let oldalloc: c_int = xml_buf_get_allocation_scheme(buf);
+    let using: usize = xml_buf_use(buf);
+    let oldalloc: i32 = xml_buf_get_allocation_scheme(buf);
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_node_dump_output(outbuf, doc, cur, level, format, None);
     xml_buf_set_allocation_scheme(buf, oldalloc.try_into().unwrap());
     xml_free(outbuf as _);
-    let ret: c_int = (xml_buf_use(buf) - using) as i32;
+    let ret: i32 = (xml_buf_use(buf) - using) as i32;
     ret as _
 }
 
@@ -8815,9 +8812,9 @@ pub unsafe extern "C" fn xml_buf_node_dump(
 //     buf: XmlBufferPtr,
 //     doc: XmlDocPtr,
 //     cur: XmlNodePtr,
-//     level: c_int,
-//     format: c_int,
-// ) -> c_int {
+//     level: i32,
+//     format: i32,
+// ) -> i32 {
 //     if buf.is_null() || cur.is_null() {
 //         return -1;
 //     }
@@ -8825,7 +8822,7 @@ pub unsafe extern "C" fn xml_buf_node_dump(
 //     if buffer.is_null() {
 //         return -1;
 //     }
-//     let ret: size_t = xml_buf_node_dump(buffer, doc, cur, level, format);
+//     let ret: usize = xml_buf_node_dump(buffer, doc, cur, level, format);
 //     xml_buf_back_to_buffer(buffer);
 //     if ret > i32::MAX as usize {
 //         return -1;
@@ -8850,7 +8847,7 @@ pub unsafe fn xml_save_file_to(
     buf: XmlOutputBufferPtr,
     cur: XmlDocPtr,
     encoding: Option<&str>,
-) -> c_int {
+) -> i32 {
     use crate::{
         io::xml_output_buffer_close,
         libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
@@ -8874,7 +8871,7 @@ pub unsafe fn xml_save_file_to(
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
-    let ret: c_int = xml_output_buffer_close(buf);
+    let ret: i32 = xml_output_buffer_close(buf);
     ret
 }
 
@@ -8896,8 +8893,8 @@ pub unsafe fn xml_save_format_file_to(
     buf: XmlOutputBufferPtr,
     cur: XmlDocPtr,
     encoding: Option<&str>,
-    format: c_int,
-) -> c_int {
+    format: i32,
+) -> i32 {
     use crate::{
         io::xml_output_buffer_close,
         libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
@@ -8924,7 +8921,7 @@ pub unsafe fn xml_save_format_file_to(
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
-    let ret: c_int = xml_output_buffer_close(buf);
+    let ret: i32 = xml_output_buffer_close(buf);
     ret
 }
 
@@ -8946,8 +8943,8 @@ pub unsafe fn xml_node_dump_output(
     buf: XmlOutputBufferPtr,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
-    level: c_int,
-    format: c_int,
+    level: i32,
+    format: i32,
     mut encoding: Option<&str>,
 ) {
     use crate::libxml::{
@@ -8964,7 +8961,7 @@ pub unsafe fn xml_node_dump_output(
     #[cfg(feature = "html")]
     let dtd: XmlDtdPtr;
     #[cfg(feature = "html")]
-    let mut is_xhtml: c_int = 0;
+    let mut is_xhtml: i32 = 0;
 
     xml_init_parser();
 
@@ -9023,8 +9020,8 @@ pub unsafe fn xml_save_format_file_enc(
     filename: *const c_char,
     cur: XmlDocPtr,
     mut encoding: Option<&str>,
-    format: c_int,
-) -> c_int {
+    format: i32,
+) -> i32 {
     use std::{cell::RefCell, rc::Rc};
 
     use crate::{
@@ -9077,7 +9074,7 @@ pub unsafe fn xml_save_format_file_enc(
 
     xml_doc_content_dump_output(addr_of_mut!(ctxt) as _, cur);
 
-    let ret: c_int = xml_output_buffer_close(buf);
+    let ret: i32 = xml_output_buffer_close(buf);
     ret
 }
 
@@ -9096,7 +9093,7 @@ pub unsafe fn xml_save_file_enc(
     filename: *const c_char,
     cur: XmlDocPtr,
     encoding: Option<&str>,
-) -> c_int {
+) -> i32 {
     xml_save_format_file_enc(filename, cur, encoding, 0)
 }
 
@@ -9119,10 +9116,7 @@ const XHTML_TRANS_SYSTEM_ID: &CStr = c"http://www.w3.org/TR/xhtml1/DTD/xhtml1-tr
  *
  * Returns 1 if true, 0 if not and -1 in case of error
  */
-pub unsafe extern "C" fn xml_is_xhtml(
-    system_id: *const XmlChar,
-    public_id: *const XmlChar,
-) -> c_int {
+pub unsafe extern "C" fn xml_is_xhtml(system_id: *const XmlChar, public_id: *const XmlChar) -> i32 {
     if system_id.is_null() && public_id.is_null() {
         return -1;
     }
@@ -9161,7 +9155,7 @@ pub unsafe extern "C" fn xml_is_xhtml(
  * get the compression ratio for a document, ZLIB based
  * Returns 0 (uncompressed) to 9 (max compression)
  */
-pub unsafe extern "C" fn xml_get_doc_compress_mode(doc: *const XmlDoc) -> c_int {
+pub unsafe extern "C" fn xml_get_doc_compress_mode(doc: *const XmlDoc) -> i32 {
     if doc.is_null() {
         return -1;
     }
@@ -9176,7 +9170,7 @@ pub unsafe extern "C" fn xml_get_doc_compress_mode(doc: *const XmlDoc) -> c_int 
  * set the compression ratio for a document, ZLIB based
  * Correct values: 0 (uncompressed) to 9 (max compression)
  */
-pub unsafe extern "C" fn xml_set_doc_compress_mode(doc: XmlDocPtr, mode: c_int) {
+pub unsafe extern "C" fn xml_set_doc_compress_mode(doc: XmlDocPtr, mode: i32) {
     if doc.is_null() {
         return;
     }
@@ -9197,7 +9191,7 @@ pub unsafe extern "C" fn xml_set_doc_compress_mode(doc: XmlDocPtr, mode: c_int) 
  */
 static XML_COMPRESS_MODE: AtomicI32 = AtomicI32::new(0);
 
-pub unsafe extern "C" fn xml_get_compress_mode() -> c_int {
+pub unsafe extern "C" fn xml_get_compress_mode() -> i32 {
     XML_COMPRESS_MODE.load(Ordering::Acquire)
 }
 
@@ -9208,7 +9202,7 @@ pub unsafe extern "C" fn xml_get_compress_mode() -> c_int {
  * set the default compression mode used, ZLIB based
  * Correct values: 0 (uncompressed) to 9 (max compression)
  */
-pub unsafe extern "C" fn xml_set_compress_mode(mode: c_int) {
+pub unsafe extern "C" fn xml_set_compress_mode(mode: i32) {
     if mode < 0 {
         XML_COMPRESS_MODE.store(0, Ordering::Release);
     } else if mode > 9 {
@@ -9390,10 +9384,10 @@ const XML_TREE_NSMAP_CUSTOM: i32 = -4;
 */
 unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
     nsmap: *mut XmlNsMapPtr,
-    position: c_int,
+    position: i32,
     old_ns: XmlNsPtr,
     new_ns: XmlNsPtr,
-    depth: c_int,
+    depth: i32,
 ) -> XmlNsMapItemPtr {
     let ret: XmlNsMapItemPtr;
     let mut map: XmlNsMapPtr;
@@ -9480,11 +9474,11 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
 unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
     map: *mut XmlNsMapPtr,
     node: XmlNodePtr,
-) -> c_int {
+) -> i32 {
     let mut cur: XmlNodePtr;
     let mut ns: XmlNsPtr;
     let mut mi: XmlNsMapItemPtr;
-    let mut shadowed: c_int;
+    let mut shadowed: i32;
 
     if map.is_null() || !(*map).is_null() {
         return -1;
@@ -9549,11 +9543,11 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
 */
 unsafe extern "C" fn xml_dom_wrap_ns_norm_add_ns_map_item2(
     list: *mut *mut XmlNsPtr,
-    size: *mut c_int,
-    number: *mut c_int,
+    size: *mut i32,
+    number: *mut i32,
     old_ns: XmlNsPtr,
     new_ns: XmlNsPtr,
-) -> c_int {
+) -> i32 {
     if !(*list).is_null() {
         *list = xml_malloc(6 * size_of::<XmlNsPtr>()) as _;
         if !(*list).is_null() {
@@ -9692,7 +9686,7 @@ unsafe extern "C" fn xml_search_ns_by_prefix_strict(
     node: XmlNodePtr,
     prefix: *const XmlChar,
     ret_ns: *mut XmlNsPtr,
-) -> c_int {
+) -> i32 {
     let mut cur: XmlNodePtr;
     let mut ns: XmlNsPtr;
 
@@ -9773,12 +9767,12 @@ unsafe extern "C" fn xml_dom_wrap_nsnorm_declare_ns_forced(
     elem: XmlNodePtr,
     ns_name: *const XmlChar,
     prefix: *const XmlChar,
-    check_shadow: c_int,
+    check_shadow: i32,
 ) -> XmlNsPtr {
     let ret: XmlNsPtr;
     let mut buf: [c_char; 50] = [0; 50];
     let mut pref: *const XmlChar;
-    let mut counter: c_int = 0;
+    let mut counter: i32 = 0;
 
     if doc.is_null() || elem.is_null() || !matches!((*elem).typ, XmlElementType::XmlElementNode) {
         return null_mut();
@@ -9872,10 +9866,10 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     ns: XmlNsPtr,
     ret_ns: *mut XmlNsPtr,
     ns_map: *mut XmlNsMapPtr,
-    depth: c_int,
-    ancestors_only: c_int,
-    prefixed: c_int,
-) -> c_int {
+    depth: i32,
+    ancestors_only: i32,
+    prefixed: i32,
+) -> i32 {
     let mut mi: XmlNsMapItemPtr;
 
     if doc.is_null() || ns.is_null() || ret_ns.is_null() || ns_map.is_null() {
@@ -10016,11 +10010,11 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
 pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
     _ctxt: XmlDOMWrapCtxtPtr,
     elem: XmlNodePtr,
-    options: c_int,
-) -> c_int {
-    let mut depth: c_int = -1;
-    let mut adoptns: c_int;
-    let mut parnsdone: c_int = 0;
+    options: i32,
+) -> i32 {
+    let mut depth: i32 = -1;
+    let mut adoptns: i32;
+    let mut parnsdone: i32 = 0;
     let mut ns: XmlNsPtr = null_mut();
     let mut prevns: XmlNsPtr;
     let mut cur: XmlNodePtr;
@@ -10028,16 +10022,16 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
     /* @ancestorsOnly should be set by an option flag. */
-    let ancestors_only: c_int = 0;
-    let opt_remove_redundant_ns: c_int =
+    let ancestors_only: i32 = 0;
+    let opt_remove_redundant_ns: i32 =
         if options & XmlDomreconcileNsoptions::XmlDomReconnsRemoveredund as i32 != 0 {
             1
         } else {
             0
         };
     let mut list_redund: *mut XmlNsPtr = null_mut();
-    let mut size_redund: c_int = 0;
-    let mut nb_redund: c_int = 0;
+    let mut size_redund: i32 = 0;
+    let mut nb_redund: i32 = 0;
 
     if elem.is_null()
         || (*elem).doc.is_null()
@@ -10457,19 +10451,19 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
     node: XmlNodePtr,
     dest_doc: XmlDocPtr,
     dest_parent: XmlNodePtr,
-    _options: c_int,
-) -> c_int {
-    let mut ret: c_int = 0;
+    _options: i32,
+) -> i32 {
+    let mut ret: i32 = 0;
     let mut cur: XmlNodePtr;
     let mut cur_elem: XmlNodePtr = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
     let mut ns: XmlNsPtr = null_mut();
-    let mut depth: c_int = -1;
+    let mut depth: i32 = -1;
     /* gather @parent's ns-decls. */
-    let mut parnsdone: c_int;
+    let mut parnsdone: i32;
     /* @ancestorsOnly should be set per option. */
-    let ancestors_only: c_int = 0;
+    let ancestors_only: i32 = 0;
 
     /*
      * Optimize string adoption for equal or none dicts.
@@ -10912,8 +10906,8 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
     node: XmlNodePtr,
     ns_name: *const XmlChar,
     ret_ns: *mut XmlNsPtr,
-    prefixed: c_int,
-) -> c_int {
+    prefixed: i32,
+) -> i32 {
     let mut cur: XmlNodePtr;
     let mut prev: XmlNodePtr = null_mut();
     let mut out: XmlNodePtr = null_mut();
@@ -10989,7 +10983,7 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
                          * ns-decls.
                          */
                         if !out.is_null() {
-                            let ret: c_int = xml_ns_in_scope(
+                            let ret: i32 = xml_ns_in_scope(
                                 doc,
                                 node,
                                 prev,
@@ -11053,10 +11047,10 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
     attr: XmlAttrPtr,
     dest_doc: XmlDocPtr,
     dest_parent: XmlNodePtr,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     let mut cur: XmlNodePtr;
-    let adopt_str: c_int = 1;
+    let adopt_str: i32 = 1;
 
     if !attr.is_null() || dest_doc.is_null() {
         return -1;
@@ -11210,8 +11204,8 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
     node: XmlNodePtr,
     dest_doc: XmlDocPtr,
     dest_parent: XmlNodePtr,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     if node.is_null()
         || matches!((*node).typ, XmlElementType::XmlNamespaceDecl)
         || dest_doc.is_null()
@@ -11270,7 +11264,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
         );
     } else {
         let cur: XmlNodePtr = node;
-        let mut adopt_str: c_int = 1;
+        let mut adopt_str: i32 = 1;
 
         (*cur).doc = dest_doc;
         /*
@@ -11334,11 +11328,11 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
     ctxt: XmlDOMWrapCtxtPtr,
     doc: XmlDocPtr,
     mut node: XmlNodePtr,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     let mut list: *mut XmlNsPtr = null_mut();
-    let mut size_list: c_int = 0;
-    let mut nb_list: c_int = 0;
+    let mut size_list: i32 = 0;
+    let mut nb_list: i32 = 0;
     let mut ns: XmlNsPtr;
 
     if node.is_null() || doc.is_null() || (*node).doc != doc {
@@ -11621,25 +11615,25 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
     res_node: *mut XmlNodePtr,
     dest_doc: XmlDocPtr,
     dest_parent: XmlNodePtr,
-    deep: c_int,
-    _options: c_int,
-) -> c_int {
-    let mut ret: c_int = 0;
+    deep: i32,
+    _options: i32,
+) -> i32 {
+    let mut ret: i32 = 0;
     let mut cur: XmlNodePtr;
     let mut cur_elem: XmlNodePtr = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
     let mut ns: XmlNsPtr = null_mut();
-    let mut depth: c_int = -1;
-    /* let adoptStr: c_int = 1; */
+    let mut depth: i32 = -1;
+    /* let adoptStr: i32 = 1; */
     /* gather @parent's ns-decls. */
-    let mut parnsdone: c_int = 0;
+    let mut parnsdone: i32 = 0;
     /*
      * @ancestorsOnly:
      * TODO: @ancestorsOnly should be set per option.
      *
      */
-    let ancestors_only: c_int = 0;
+    let ancestors_only: i32 = 0;
     let mut result_clone: XmlNodePtr = null_mut();
     let mut clone: XmlNodePtr;
     let mut parent_clone: XmlNodePtr = null_mut();
@@ -12261,8 +12255,8 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
  * Returns the count of element child or 0 if not available
  */
 #[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_child_element_count(parent: XmlNodePtr) -> c_ulong {
-    let mut ret: c_ulong = 0;
+pub unsafe extern "C" fn xml_child_element_count(parent: XmlNodePtr) -> u64 {
+    let mut ret: u64 = 0;
     let mut cur: XmlNodePtr;
 
     if parent.is_null() {
