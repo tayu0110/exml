@@ -10642,7 +10642,7 @@ unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParse
     (*input).line = 1;
     (*input).col = 1;
     (*input).free = None;
-    (*input).version = null_mut();
+    (*input).version = None;
     (*input).consumed = 0;
     (*input).length = 0;
     input

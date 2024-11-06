@@ -1068,9 +1068,7 @@ pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
         xml_free((*input).directory as _);
     }
     (*input).encoding = None;
-    if !(*input).version.is_null() {
-        xml_free((*input).version as _);
-    }
+    (*input).version = None;
     if !(*input).base.is_null() {
         if let Some(free) = (*input).free {
             free((*input).base as _);

@@ -166,7 +166,7 @@ pub struct XmlParserInput {
     pub consumed: u64,                                  /* How many xmlChars already consumed */
     pub(crate) free: Option<XmlParserInputDeallocate>,  /* function to deallocate the base */
     pub(crate) encoding: Option<String>,                /* the encoding string for entity */
-    pub(crate) version: *const XmlChar,                 /* the version string for entity */
+    pub(crate) version: Option<String>,                 /* the version string for entity */
     pub(crate) standalone: i32,                         /* Was that entity marked standalone */
     pub(crate) id: i32,                                 /* an unique identifier for the entity */
     pub(crate) parent_consumed: u64,                    /* consumed bytes from parents */
@@ -258,7 +258,7 @@ impl Default for XmlParserInput {
             consumed: 0,
             free: None,
             encoding: None,
-            version: null(),
+            version: None,
             standalone: 0,
             id: 0,
             parent_consumed: 0,
@@ -5165,7 +5165,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
          * An XML-1.0 document can't reference an entity not XML-1.0
          */
         if xml_str_equal((*oldctxt).version, c"1.0".as_ptr() as _)
-            && !xml_str_equal((*(*ctxt).input).version, c"1.0".as_ptr() as _)
+            && (*(*ctxt).input).version.as_deref() != Some("1.0")
         {
             xml_fatal_err_msg(
                 ctxt,
@@ -14344,7 +14344,12 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
             c"Space needed here\n".as_ptr() as _,
         );
     }
-    (*(*ctxt).input).version = version;
+    (*(*ctxt).input).version = Some(
+        CStr::from_ptr(version as *const i8)
+            .to_string_lossy()
+            .into_owned(),
+    );
+    xml_free(version as _);
 
     /*
      * We must have the encoding declaration
