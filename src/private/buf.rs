@@ -20,15 +20,13 @@ use crate::libxml::{
     xmlstring::{xml_strchr, xml_strlen, XmlChar},
 };
 
-use super::error::__xml_simple_error;
-
 const SIZE_MAX: size_t = size_t::MAX;
 
 mod legacy {
     use std::ffi::c_uint;
 
     use crate::{
-        error::{XmlErrorDomain, XmlParserErrors},
+        error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
         globals::{
             get_default_buffer_allocation_scheme, get_default_buffer_size,
             set_default_buffer_allocation_scheme,

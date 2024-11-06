@@ -14,7 +14,7 @@ use std::{
 use libc::{memcpy, memmove, memset, snprintf, sscanf};
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
@@ -51,7 +51,6 @@ use crate::{
         },
         xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
     },
-    private::error::__xml_simple_error,
 };
 
 use super::{

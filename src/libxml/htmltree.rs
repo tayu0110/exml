@@ -493,7 +493,7 @@ pub unsafe extern "C" fn html_doc_dump_memory(
  */
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
-    use crate::{error::XmlErrorDomain, private::error::__xml_simple_error};
+    use crate::error::{XmlErrorDomain, __xml_simple_error};
 
     let msg = match code {
         XmlParserErrors::XmlSaveNotUTF8 => c"string is not in UTF-8\n".as_ptr() as _,
@@ -726,7 +726,7 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
  */
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
-    use crate::{error::XmlErrorDomain, private::error::__xml_simple_error};
+    use crate::error::{XmlErrorDomain, __xml_simple_error};
 
     __xml_simple_error(
         XmlErrorDomain::XmlFromOutput,

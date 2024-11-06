@@ -17,12 +17,11 @@ use libc::{malloc, memset, snprintf, sprintf, FILE};
 use crate::{
     __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
-    error::{XmlErrorDomain, XmlParserErrors},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::{tree::XmlElementType, xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
-    private::error::__xml_simple_error,
 };
 
 use super::{

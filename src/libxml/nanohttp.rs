@@ -21,7 +21,7 @@ use libc::{
 };
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     io::__xml_ioerr,
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc},
@@ -31,7 +31,6 @@ use crate::{
             XmlChar,
         },
     },
-    private::error::__xml_simple_error,
 };
 
 const XML_NANO_HTTP_MAX_REDIR: usize = 10;

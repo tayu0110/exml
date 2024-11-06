@@ -1,6 +1,5 @@
 pub mod buf;
 pub mod entities;
-pub mod error;
 pub mod parser;
 #[cfg(feature = "output")]
 pub mod save;

@@ -20,7 +20,7 @@ use libc::memset;
 use crate::{
     buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
-    error::{XmlErrorDomain, XmlParserErrors},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::{
         xml_output_buffer_close, xml_output_buffer_create_filename, xml_output_buffer_create_io,
@@ -45,10 +45,7 @@ use crate::{
         },
         xmlstring::{xml_str_equal, XmlChar},
     },
-    private::{
-        buf::xml_buf_set_allocation_scheme, error::__xml_simple_error,
-        save::xml_buf_attr_serialize_txt_content,
-    },
+    private::{buf::xml_buf_set_allocation_scheme, save::xml_buf_attr_serialize_txt_content},
 };
 
 const MAX_INDENT: usize = 60;

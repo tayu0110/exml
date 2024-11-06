@@ -17,7 +17,7 @@ use libc::{memcpy, memset, snprintf, strlen, FILE};
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
     encoding::XmlCharEncoding,
-    error::{XmlErrorDomain, XmlParserErrors},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     io::XmlOutputBufferPtr,
     libxml::{
         dict::xml_dict_free,
@@ -31,7 +31,6 @@ use crate::{
             xml_buf_free, xml_buf_is_empty, xml_buf_set_allocation_scheme,
         },
         entities::{xml_encode_attribute_entities, XML_ENT_EXPANDING, XML_ENT_PARSED},
-        error::__xml_simple_error,
     },
 };
 

@@ -9,13 +9,12 @@ use std::{
 use anyhow::{bail, ensure};
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     globals::GLOBAL_STATE,
     libxml::{
         parser_internals::XML_MAX_TEXT_LENGTH,
         tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
     },
-    private::error::__xml_simple_error,
 };
 
 unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {

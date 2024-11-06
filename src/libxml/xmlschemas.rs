@@ -19,7 +19,7 @@ use libc::{fprintf, memcpy, memset, snprintf, strchr, FILE};
 use crate::{
     __xml_raise_error,
     encoding::XmlCharEncoding,
-    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
+    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     io::XmlParserInputBuffer,
@@ -130,7 +130,6 @@ use crate::{
             xml_strlen, xml_strncat, xml_strncat_new, xml_strndup, XmlChar,
         },
     },
-    private::error::__xml_simple_error,
 };
 
 /**
