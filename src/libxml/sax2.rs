@@ -1305,7 +1305,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
             return;
         }
     } else {
-        doc = xml_new_doc((*ctxt).version);
+        doc = xml_new_doc((*ctxt).version.as_deref());
         (*ctxt).my_doc = doc;
         if !doc.is_null() {
             (*doc).properties = 0;

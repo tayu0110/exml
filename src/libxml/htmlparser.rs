@@ -9403,7 +9403,7 @@ unsafe fn html_init_parser_ctxt(
     (*ctxt).input_tab.clear();
     (*ctxt).input_tab.shrink_to(5);
     (*ctxt).input = null_mut();
-    (*ctxt).version = null_mut();
+    (*ctxt).version = None;
     (*ctxt).encoding = None;
     (*ctxt).standalone = -1;
     (*ctxt).instate = XmlParserInputState::XmlParserStart;
@@ -11795,8 +11795,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
 
     (*ctxt).ns_tab.clear();
 
-    DICT_FREE!(dict, (*ctxt).version);
-    (*ctxt).version = null_mut();
+    (*ctxt).version = None;
     (*ctxt).encoding = None;
     DICT_FREE!(dict, (*ctxt).directory as *const u8);
     (*ctxt).directory = null_mut();

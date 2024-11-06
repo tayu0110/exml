@@ -345,7 +345,7 @@ pub unsafe extern "C" fn xml_new_text_writer(out: XmlOutputBufferPtr) -> XmlText
         return null_mut();
     }
 
-    (*ret).doc = xml_new_doc(null_mut());
+    (*ret).doc = xml_new_doc(None);
 
     (*ret).no_doc_free = 0;
 
@@ -657,7 +657,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
     } else {
         doc = (*ctxt).my_doc;
         if doc.is_null() {
-            doc = xml_new_doc((*ctxt).version);
+            doc = xml_new_doc((*ctxt).version.as_deref());
             (*ctxt).my_doc = doc;
         }
         if !doc.is_null() {
@@ -740,7 +740,7 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
      */
     (*ctxt).dict_names = 0;
 
-    (*ctxt).my_doc = xml_new_doc(XML_DEFAULT_VERSION.as_ptr() as _);
+    (*ctxt).my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
     if (*ctxt).my_doc.is_null() {
         xml_free_parser_ctxt(ctxt);
         xml_writer_err_msg(

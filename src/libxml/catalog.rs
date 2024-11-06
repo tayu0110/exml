@@ -3314,7 +3314,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
      */
 
     use crate::io::{xml_output_buffer_create_file, XmlOutputBufferPtr};
-    let doc: XmlDocPtr = xml_new_doc(null_mut());
+    let doc: XmlDocPtr = xml_new_doc(None);
     if doc.is_null() {
         return -1;
     }

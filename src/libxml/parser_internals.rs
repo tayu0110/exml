@@ -3856,7 +3856,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
 
     (*ctxt)._private = (*oldctxt)._private;
     if (*oldctxt).my_doc.is_null() {
-        new_doc = xml_new_doc(c"1.0".as_ptr() as _);
+        new_doc = xml_new_doc(Some("1.0"));
         if new_doc.is_null() {
             (*ctxt).sax = oldsax;
             (*ctxt).dict = null_mut();
@@ -5493,15 +5493,15 @@ pub unsafe extern "C" fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
  *
  * Returns the version string, e.g. "1.0"
  */
-pub(crate) unsafe extern "C" fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
-    let mut version: *mut XmlChar = null_mut();
+pub(crate) unsafe fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -> Option<String> {
+    let mut version = None;
 
     if (*ctxt).content_bytes().starts_with(b"version") {
         (*ctxt).advance(7);
         (*ctxt).skip_blanks();
         if (*ctxt).current_byte() != b'=' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, null());
-            return null_mut();
+            return None;
         }
         (*ctxt).skip_char();
         (*ctxt).skip_blanks();
@@ -5808,7 +5808,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
         }
     }
     if (*ctxt).my_doc.is_null() {
-        (*ctxt).my_doc = xml_new_doc(c"1.0".as_ptr() as _);
+        (*ctxt).my_doc = xml_new_doc(Some("1.0"));
         if (*ctxt).my_doc.is_null() {
             xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
             return;

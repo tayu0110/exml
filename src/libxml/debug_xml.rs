@@ -1650,9 +1650,10 @@ unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Xml
             xml_ctxt_dump_string(ctxt, (*doc).name as _);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
-        if !(*doc).version.is_null() {
+        if let Some(version) = (*doc).version.as_deref() {
             fprintf((*ctxt).output, c"version=".as_ptr());
-            xml_ctxt_dump_string(ctxt, (*doc).version);
+            let version = CString::new(version).unwrap();
+            xml_ctxt_dump_string(ctxt, version.as_ptr() as *const u8);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
         if let Some(encoding) = (*doc).encoding.as_deref() {

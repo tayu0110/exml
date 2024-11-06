@@ -96,7 +96,7 @@ use crate::{
         xmlerror::XmlParserErrors,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
-        xmlstring::{xml_char_strdup, xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
+        xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
         xpath::xml_init_xpath_internal,
     },
     private::{
@@ -129,7 +129,7 @@ use super::{
  *
  * The default version of XML used: 1.0
  */
-pub(crate) const XML_DEFAULT_VERSION: &CStr = c"1.0";
+pub(crate) const XML_DEFAULT_VERSION: &str = "1.0";
 
 /**
  * xmlParserInput:
@@ -465,7 +465,7 @@ pub struct XmlParserCtxt {
     pub my_doc: XmlDocPtr,                             /* the document being built */
     pub well_formed: i32,                              /* is the document well formed */
     pub(crate) replace_entities: i32,                  /* shall we replace entities ? */
-    pub(crate) version: *const XmlChar,                /* the XML version string */
+    pub(crate) version: Option<String>,                /* the XML version string */
     pub encoding: Option<String>,                      /* the declared encoding, if any */
     pub(crate) standalone: i32,                        /* standalone document */
     pub(crate) html: i32,                              /* an HTML(1) document
@@ -1635,7 +1635,7 @@ impl Default for XmlParserCtxt {
             my_doc: null_mut(),
             well_formed: 0,
             replace_entities: 0,
-            version: null_mut(),
+            version: None,
             encoding: None,
             standalone: 0,
             html: 0,
@@ -3513,7 +3513,7 @@ unsafe extern "C" fn xml_clean_special_attr(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-pub(crate) const SAX_COMPAT_MODE: &CStr = c"SAX compatibility mode document";
+pub(crate) const SAX_COMPAT_MODE: &str = "SAX compatibility mode document";
 
 /*
  * Less common routines and SAX interfaces
@@ -3595,7 +3595,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
         (*ctxt).standalone = (*(*ctxt).input).standalone;
         (*ctxt).skip_blanks();
     } else {
-        (*ctxt).version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
+        (*ctxt).version = Some(XML_DEFAULT_VERSION.to_owned());
     }
     if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
         if let Some(start_document) = (*(*ctxt).sax).start_document {
@@ -3697,9 +3697,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
     /*
      * Remove locally kept entity definitions if the tree was not built
      */
-    if !(*ctxt).my_doc.is_null()
-        && xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _)
-    {
+    if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).version.as_deref() == Some(SAX_COMPAT_MODE) {
         xml_free_doc((*ctxt).my_doc);
         (*ctxt).my_doc = null_mut();
     }
@@ -3795,7 +3793,7 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32
         }
         (*ctxt).skip_blanks();
     } else {
-        (*ctxt).version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
+        (*ctxt).version = Some(XML_DEFAULT_VERSION.to_owned());
     }
     if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
         if let Some(start_document) = (*(*ctxt).sax).start_document {
@@ -4380,7 +4378,7 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
      * let's parse that entity knowing it's an external subset.
      */
     (*ctxt).in_subset = 2;
-    (*ctxt).my_doc = xml_new_doc(c"1.0".as_ptr() as _);
+    (*ctxt).my_doc = xml_new_doc(Some("1.0"));
     if (*ctxt).my_doc.is_null() {
         xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
         xml_free_parser_ctxt(ctxt);
@@ -4500,7 +4498,7 @@ pub unsafe fn xml_io_parse_dtd(
      * let's parse that entity knowing it's an external subset.
      */
     (*ctxt).in_subset = 2;
-    (*ctxt).my_doc = xml_new_doc(c"1.0".as_ptr() as _);
+    (*ctxt).my_doc = xml_new_doc(Some("1.0"));
     if (*ctxt).my_doc.is_null() {
         xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
         return null_mut();
@@ -4923,7 +4921,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             (*ctxt).user_data = user_data;
         }
     }
-    let new_doc: XmlDocPtr = xml_new_doc(c"1.0".as_ptr() as _);
+    let new_doc: XmlDocPtr = xml_new_doc(Some("1.0"));
     if new_doc.is_null() {
         xml_free_parser_ctxt(ctxt);
         return -1;
@@ -5100,7 +5098,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
     (*ctxt).detect_sax2();
 
-    let new_doc: XmlDocPtr = xml_new_doc(c"1.0".as_ptr() as _);
+    let new_doc: XmlDocPtr = xml_new_doc(Some("1.0"));
     if new_doc.is_null() {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrInternalError;
@@ -5164,7 +5162,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         /*
          * An XML-1.0 document can't reference an entity not XML-1.0
          */
-        if xml_str_equal((*oldctxt).version, c"1.0".as_ptr() as _)
+        if (*oldctxt).version.as_deref() == Some("1.0")
             && (*(*ctxt).input).version.as_deref() != Some("1.0")
         {
             xml_fatal_err_msg(
@@ -5470,7 +5468,7 @@ unsafe fn xml_init_sax_parser_ctxt(
         xml_free_input_stream(input);
     }
     (*ctxt).input = null_mut();
-    (*ctxt).version = null_mut();
+    (*ctxt).version = None;
     (*ctxt).encoding = None;
     (*ctxt).standalone = -1;
     (*ctxt).has_external_subset = 0;
@@ -5639,9 +5637,7 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     }
     (*ctxt).input_tab.clear();
     (*ctxt).input_tab.shrink_to_fit();
-    if !(*ctxt).version.is_null() {
-        xml_free((*ctxt).version as _);
-    }
+    (*ctxt).version = None;
     (*ctxt).encoding = None;
     if !(*ctxt).ext_sub_uri.is_null() {
         xml_free((*ctxt).ext_sub_uri as _);
@@ -10454,7 +10450,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             }
                             (*ctxt).instate = XmlParserInputState::XmlParserMisc;
                         } else {
-                            (*ctxt).version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
+                            (*ctxt).version = Some(XML_DEFAULT_VERSION.to_owned());
                             if !(*ctxt).sax.is_null()
                                 && (*(*ctxt).sax).start_document.is_some()
                                 && (*ctxt).disable_sax == 0
@@ -10470,11 +10466,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                                 xml_default_sax_locator(),
                             );
                         }
-                        (*ctxt).version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
-                        if (*ctxt).version.is_null() {
-                            xml_err_memory(ctxt, null());
-                            break 'to_break;
-                        }
+                        (*ctxt).version = Some(XML_DEFAULT_VERSION.to_owned());
                         if !(*ctxt).sax.is_null()
                             && (*(*ctxt).sax).start_document.is_some()
                             && (*ctxt).disable_sax == 0
@@ -11675,8 +11667,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
 
     (*ctxt).ns_tab.clear();
 
-    DICT_FREE!(dict, (*ctxt).version);
-    (*ctxt).version = null_mut();
+    (*ctxt).version = None;
     (*ctxt).encoding = None;
     DICT_FREE!(dict, (*ctxt).directory);
     (*ctxt).directory = null_mut();
@@ -12700,10 +12691,10 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
              * For expat compatibility in SAX mode.
              */
             if (*ctxt).my_doc.is_null()
-                || xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _)
+                || (*(*ctxt).my_doc).version.as_deref() == Some(SAX_COMPAT_MODE)
             {
                 if (*ctxt).my_doc.is_null() {
-                    (*ctxt).my_doc = xml_new_doc(SAX_COMPAT_MODE.as_ptr() as _);
+                    (*ctxt).my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
                     if (*ctxt).my_doc.is_null() {
                         xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
                         // goto done;
@@ -12808,10 +12799,10 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                  */
                 if (*ctxt).replace_entities != 0
                     && ((*ctxt).my_doc.is_null()
-                        || xml_str_equal((*(*ctxt).my_doc).version, SAX_COMPAT_MODE.as_ptr() as _))
+                        || (*(*ctxt).my_doc).version.as_deref() == Some(SAX_COMPAT_MODE))
                 {
                     if (*ctxt).my_doc.is_null() {
-                        (*ctxt).my_doc = xml_new_doc(SAX_COMPAT_MODE.as_ptr() as _);
+                        (*ctxt).my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
                         if (*ctxt).my_doc.is_null() {
                             xml_err_memory(ctxt, c"New Doc failed".as_ptr() as _);
                             // goto done;
@@ -14049,52 +14040,29 @@ pub(crate) unsafe extern "C" fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
  *
  * Returns the string giving the XML version number, or NULL
  */
-pub(crate) unsafe extern "C" fn xml_parse_version_num(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
-    let mut buf: *mut XmlChar;
-    let mut len: i32 = 0;
-    let mut size: i32 = 10;
+pub(crate) unsafe fn xml_parse_version_num(ctxt: XmlParserCtxtPtr) -> Option<String> {
     let mut cur: XmlChar;
 
-    buf = xml_malloc_atomic(size as usize) as *mut XmlChar;
-    if buf.is_null() {
-        xml_err_memory(ctxt, null());
-        return null_mut();
-    }
+    let mut buf = String::with_capacity(10);
     cur = (*ctxt).current_byte();
     if !cur.is_ascii_digit() {
-        xml_free(buf as _);
-        return null_mut();
+        return None;
     }
-    *buf.add(len as usize) = cur;
-    len += 1;
+    buf.push(cur as char);
     (*ctxt).skip_char();
     cur = (*ctxt).current_byte();
     if cur != b'.' {
-        xml_free(buf as _);
-        return null_mut();
+        return None;
     }
-    *buf.add(len as usize) = cur;
-    len += 1;
+    buf.push(cur as char);
     (*ctxt).skip_char();
     cur = (*ctxt).current_byte();
     while cur.is_ascii_digit() {
-        if len + 1 >= size {
-            size *= 2;
-            let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as *mut XmlChar;
-            if tmp.is_null() {
-                xml_free(buf as _);
-                xml_err_memory(ctxt, null());
-                return null_mut();
-            }
-            buf = tmp;
-        }
-        *buf.add(len as usize) = cur;
-        len += 1;
+        buf.push(cur as char);
         (*ctxt).skip_char();
         cur = (*ctxt).current_byte();
     }
-    *buf.add(len as usize) = 0;
-    buf
+    Some(buf)
 }
 
 /**
@@ -14186,27 +14154,26 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
     /*
      * We must have the VersionInfo here.
      */
-    let version: *mut XmlChar = xml_parse_version_info(ctxt);
-    if version.is_null() {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrVersionMissing, null());
-    } else {
-        if !xml_str_equal(version, XML_DEFAULT_VERSION.as_ptr() as *const XmlChar) {
+    let version = xml_parse_version_info(ctxt);
+    if let Some(version) = version {
+        if version != XML_DEFAULT_VERSION {
             /*
              * Changed here for XML-1.0 5th edition
              */
+            let ver = CString::new(version.as_str()).unwrap();
             if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 != 0 {
                 xml_fatal_err_msg_str(
                     ctxt,
                     XmlParserErrors::XmlErrUnknownVersion,
                     c"Unsupported version '%s'\n".as_ptr() as _,
-                    version,
+                    ver.as_ptr() as *const u8,
                 );
-            } else if *version.add(0) == b'1' && *version.add(1) == b'.' {
+            } else if version.starts_with("1.") {
                 xml_warning_msg(
                     ctxt,
                     XmlParserErrors::XmlWarUnknownVersion,
                     c"Unsupported version '%s'\n".as_ptr() as _,
-                    version,
+                    ver.as_ptr() as *const u8,
                     null(),
                 );
             } else {
@@ -14214,14 +14181,13 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
                     ctxt,
                     XmlParserErrors::XmlErrUnknownVersion,
                     c"Unsupported version '%s'\n".as_ptr() as _,
-                    version,
+                    ver.as_ptr() as *const u8,
                 );
             }
         }
-        if !(*ctxt).version.is_null() {
-            xml_free((*ctxt).version as _);
-        }
-        (*ctxt).version = version;
+        (*ctxt).version = Some(version);
+    } else {
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrVersionMissing, null());
     }
 
     /*
@@ -14305,8 +14271,6 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
  * [77] TextDecl ::= '<?xml' VersionInfo? EncodingDecl S? '?>'
  */
 pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
-    let mut version: *mut XmlChar;
-
     /*
      * We know that '<?xml' is here.
      */
@@ -14334,9 +14298,9 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
     /*
      * We may have the VersionInfo here.
      */
-    version = xml_parse_version_info(ctxt);
-    if version.is_null() {
-        version = xml_char_strdup(XML_DEFAULT_VERSION.as_ptr() as _);
+    let mut version = xml_parse_version_info(ctxt);
+    if version.is_none() {
+        version = Some(XML_DEFAULT_VERSION.to_owned());
     } else if (*ctxt).skip_blanks() == 0 {
         xml_fatal_err_msg(
             ctxt,
@@ -14344,12 +14308,7 @@ pub(crate) unsafe extern "C" fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
             c"Space needed here\n".as_ptr() as _,
         );
     }
-    (*(*ctxt).input).version = Some(
-        CStr::from_ptr(version as *const i8)
-            .to_string_lossy()
-            .into_owned(),
-    );
-    xml_free(version as _);
+    (*(*ctxt).input).version = Some(version.unwrap());
 
     /*
      * We must have the encoding declaration

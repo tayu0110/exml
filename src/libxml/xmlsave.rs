@@ -1635,9 +1635,10 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
          */
         if (*ctxt).options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
             (*buf).write_bytes(b"<?xml version=");
-            if !(*cur).version.is_null() {
+            if let Some(version) = (*cur).version.as_deref() {
                 if let Some(mut buf) = (*buf).buffer {
-                    buf.push_quoted_cstr(CStr::from_ptr((*cur).version as *const i8));
+                    let version = CString::new(version).unwrap();
+                    buf.push_quoted_cstr(&version);
                 }
             } else {
                 (*buf).write_bytes(b"\"1.0\"");

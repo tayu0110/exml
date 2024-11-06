@@ -2383,7 +2383,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         #[cfg(feature = "tree")]
         {
             if GENERATE != 0 {
-                doc = xml_new_doc(c"1.0".as_ptr() as _);
+                doc = xml_new_doc(Some("1.0"));
                 let n = xml_new_doc_node(doc, null_mut(), c"info".as_ptr() as _, null_mut());
                 xml_node_set_content(n, c"abc".as_ptr() as _);
                 xml_doc_set_root_element(doc, n);

@@ -703,7 +703,7 @@ pub struct XmlDoc {
     pub int_subset: *mut XmlDtd,        /* the document internal subset */
     pub(crate) ext_subset: *mut XmlDtd, /* the document external subset */
     pub(crate) old_ns: *mut XmlNs,      /* Global namespace, the old way */
-    pub(crate) version: *const XmlChar, /* the XML version string */
+    pub(crate) version: Option<String>, /* the XML version string */
     pub(crate) encoding: Option<String>, /* external initial encoding, if any */
     pub(crate) ids: *mut c_void,        /* Hash table for ID attributes if any */
     pub(crate) refs: *mut c_void,       /* Hash table for IDREFs attributes if any */
@@ -735,7 +735,7 @@ impl Default for XmlDoc {
             int_subset: null_mut(),
             ext_subset: null_mut(),
             old_ns: null_mut(),
-            version: null(),
+            version: None,
             encoding: None,
             ids: null_mut(),
             refs: null_mut(),
@@ -1935,10 +1935,8 @@ pub unsafe extern "C" fn xml_free_ns_list(mut cur: XmlNsPtr) {
  *
  * Returns a new document
  */
-pub unsafe extern "C" fn xml_new_doc(mut version: *const XmlChar) -> XmlDocPtr {
-    if version.is_null() {
-        version = c"1.0".as_ptr() as _;
-    }
+pub unsafe fn xml_new_doc(version: Option<&str>) -> XmlDocPtr {
+    let version = version.unwrap_or("1.0");
 
     /*
      * Allocate a new document and fill the fields.
@@ -1952,12 +1950,7 @@ pub unsafe extern "C" fn xml_new_doc(mut version: *const XmlChar) -> XmlDocPtr {
     std::ptr::write(&mut *cur, XmlDoc::default());
     (*cur).typ = XmlElementType::XmlDocumentNode;
 
-    (*cur).version = xml_strdup(version) as _;
-    if (*cur).version.is_null() {
-        xml_tree_err_memory(c"building doc".as_ptr() as _);
-        xml_free(cur as _);
-        return null_mut();
-    }
+    (*cur).version = Some(version.to_owned());
     (*cur).standalone = -1;
     (*cur).compression = -1; /* not initialized */
     (*cur).doc = cur;
@@ -2036,7 +2029,7 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
         xml_free_ns_list((*cur).old_ns);
     }
 
-    DICT_FREE!(dict, (*cur).version);
+    (*cur).version = None;
     DICT_FREE!(dict, (*cur).name);
     (*cur).encoding = None;
     (*cur).url = None;
@@ -3079,7 +3072,7 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
     if doc.is_null() {
         return null_mut();
     }
-    let ret: XmlDocPtr = xml_new_doc((*doc).version);
+    let ret: XmlDocPtr = xml_new_doc((*doc).version.as_deref());
     if ret.is_null() {
         return null_mut();
     }
@@ -14118,31 +14111,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlNewComment()");
                     eprintln!(" {}", n_content);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_doc() {
-        unsafe {
-            let mut leaks = 0;
-            for n_version in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let version = gen_const_xml_char_ptr(n_version, 0);
-
-                let ret_val = xml_new_doc(version as *const XmlChar);
-                desret_xml_doc_ptr(ret_val);
-                des_const_xml_char_ptr(n_version, version, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNewDoc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDoc()");
-                    eprintln!(" {}", n_version);
                 }
             }
         }

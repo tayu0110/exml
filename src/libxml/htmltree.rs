@@ -111,7 +111,7 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     std::ptr::write(&mut *cur, XmlDoc::default());
 
     (*cur).typ = XmlElementType::XmlHtmlDocumentNode;
-    (*cur).version = null_mut();
+    (*cur).version = None;
     (*cur).int_subset = null_mut();
     (*cur).doc = cur;
     (*cur).name = null_mut();

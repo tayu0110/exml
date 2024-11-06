@@ -3691,9 +3691,7 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
         xml_text_reader_free_node_list(reader, (*cur).children);
     }
 
-    if !(*cur).version.is_null() {
-        xml_free((*cur).version as _);
-    }
+    (*cur).version = None;
     if !(*cur).name.is_null() {
         xml_free((*cur).name as _);
     }
@@ -5752,6 +5750,8 @@ pub unsafe extern "C" fn xml_text_reader_set_schema(
 pub unsafe extern "C" fn xml_text_reader_const_xml_version(
     reader: XmlTextReaderPtr,
 ) -> *const XmlChar {
+    use std::ffi::CString;
+
     let mut doc: XmlDocPtr = null_mut();
     if reader.is_null() {
         return null_mut();
@@ -5765,10 +5765,11 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_version(
         return null_mut();
     }
 
-    if (*doc).version.is_null() {
-        null_mut()
+    if let Some(version) = (*doc).version.as_deref() {
+        let version = CString::new(version).unwrap();
+        CONSTSTR!(reader, version.as_ptr() as *const u8)
     } else {
-        CONSTSTR!(reader, (*doc).version)
+        null_mut()
     }
 }
 

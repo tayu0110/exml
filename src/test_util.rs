@@ -1977,7 +1977,7 @@ pub(crate) unsafe extern "C" fn des_xml_output_buffer_ptr(
 
 pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: c_int, _nr: c_int) -> XmlDocPtr {
     if no == 0 {
-        return xml_new_doc(c"1.0".as_ptr() as _);
+        return xml_new_doc(Some("1.0"));
     }
     if no == 1 {
         return xml_read_memory("<foo/>".as_bytes().to_vec(), Some("test"), None, 0);
