@@ -322,11 +322,16 @@ pub unsafe extern "C" fn xml_create_url_parser_ctxt(
     }
 
     (*ctxt).input_push(input_stream);
-    if (*ctxt).directory.is_null() && directory.is_null() {
+    if (*ctxt).directory.is_none() && directory.is_null() {
         directory = xml_parser_get_directory(filename);
     }
-    if (*ctxt).directory.is_null() && !directory.is_null() {
-        (*ctxt).directory = directory;
+    if (*ctxt).directory.is_none() && !directory.is_null() {
+        (*ctxt).directory = Some(
+            CStr::from_ptr(directory as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
+        xml_free(directory as _);
     }
 
     ctxt
@@ -421,11 +426,12 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
 
         (*ctxt).input_push(input_stream);
 
-        if (*ctxt).directory.is_null() && directory.is_null() {
+        if (*ctxt).directory.is_none() && directory.is_null() {
             directory = xml_parser_get_directory(url as _);
         }
-        if (*ctxt).directory.is_null() && !directory.is_null() {
-            (*ctxt).directory = directory;
+        if (*ctxt).directory.is_none() && !directory.is_null() {
+            (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
+            xml_free(directory as _);
         }
     } else {
         input_stream = xml_load_external_entity(uri as _, id as _, ctxt as _);
@@ -437,11 +443,12 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
 
         (*ctxt).input_push(input_stream);
 
-        if (*ctxt).directory.is_null() && directory.is_null() {
+        if (*ctxt).directory.is_none() && directory.is_null() {
             directory = xml_parser_get_directory(uri as _);
         }
-        if (*ctxt).directory.is_null() && !directory.is_null() {
-            (*ctxt).directory = directory;
+        if (*ctxt).directory.is_none() && !directory.is_null() {
+            (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
+            xml_free(directory as _);
         }
         xml_free(uri as _);
     }
@@ -1168,15 +1175,19 @@ pub unsafe extern "C" fn xml_new_input_from_file(
                 .to_string_lossy()
                 .into(),
         );
-        xml_free(directory as _);
     } else {
         (*input_stream).directory = None;
     }
     (*input_stream).reset_base();
 
-    if (*ctxt).directory.is_null() && !directory.is_null() {
-        (*ctxt).directory = xml_strdup(directory as *const XmlChar) as *mut c_char;
+    if (*ctxt).directory.is_none() && !directory.is_null() {
+        (*ctxt).directory = Some(
+            CStr::from_ptr(directory as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
+    xml_free(directory as _);
     input_stream
 }
 

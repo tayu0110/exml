@@ -792,8 +792,12 @@ unsafe extern "C" fn xml_xinclude_parse_file(
 
     (*pctxt).input_push(input_stream);
 
-    if (*pctxt).directory.is_null() {
-        (*pctxt).directory = xml_parser_get_directory(url);
+    if (*pctxt).directory.is_none() {
+        let dir = xml_parser_get_directory(url);
+        if !dir.is_null() {
+            (*pctxt).directory = Some(CStr::from_ptr(dir).to_string_lossy().into_owned());
+            xml_free(dir as _);
+        }
     }
 
     (*pctxt).loadsubset |= XML_DETECT_IDS as i32;

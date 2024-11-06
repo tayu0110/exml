@@ -641,7 +641,10 @@ pub unsafe fn xml_sax2_resolve_entity(
         }
     }
     if base.is_null() {
-        base = (*ctxt).directory;
+        if let Some(dir) = (*ctxt).directory.as_deref() {
+            dummy = CString::new(dir).unwrap();
+            base = dummy.as_ptr();
+        }
     }
 
     let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
@@ -752,7 +755,10 @@ pub unsafe fn xml_sax2_entity_decl(
                 }
             }
             if base.is_null() {
-                base = (*ctxt).directory;
+                if let Some(dir) = (*ctxt).directory.as_deref() {
+                    dummy = CString::new(dir).unwrap();
+                    base = dummy.as_ptr();
+                }
             }
 
             let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
@@ -786,7 +792,10 @@ pub unsafe fn xml_sax2_entity_decl(
                 }
             }
             if base.is_null() {
-                base = (*ctxt).directory;
+                if let Some(dir) = (*ctxt).directory.as_deref() {
+                    dummy = CString::new(dir).unwrap();
+                    base = dummy.as_ptr();
+                }
             }
 
             let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
@@ -1204,7 +1213,10 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                 }
             }
             if base.is_null() {
-                base = (*ctxt).directory;
+                if let Some(dir) = (*ctxt).directory.as_deref() {
+                    dummy = CString::new(dir).unwrap();
+                    base = dummy.as_ptr();
+                }
             }
 
             let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
@@ -1245,7 +1257,10 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                 }
             }
             if base.is_null() {
-                base = (*ctxt).directory;
+                if let Some(dir) = (*ctxt).directory.as_deref() {
+                    dummy = CString::new(dir).unwrap();
+                    base = dummy.as_ptr();
+                }
             }
 
             let uri: *mut XmlChar = xml_build_uri(system_id, base as _);

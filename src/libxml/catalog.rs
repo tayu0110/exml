@@ -3992,11 +3992,12 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
     (*input_stream).reset_base();
 
     (*ctxt).input_push(input_stream);
-    if (*ctxt).directory.is_null() {
+    if (*ctxt).directory.is_none() {
         directory = xml_parser_get_directory(filename);
     }
-    if (*ctxt).directory.is_null() && !directory.is_null() {
-        (*ctxt).directory = directory;
+    if (*ctxt).directory.is_none() && !directory.is_null() {
+        (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
+        xml_free(directory as _);
     }
     (*ctxt).valid = 0;
     (*ctxt).validate = 0;

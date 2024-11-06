@@ -10688,22 +10688,28 @@ pub unsafe fn html_create_push_parser_ctxt(
 
     let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(sax, user_data);
     if ctxt.is_null() {
-        // xml_free_parser_input_buffer(buf);
         return null_mut();
     }
     if matches!(enc, XmlCharEncoding::UTF8) || buf.encoder.is_some() {
         (*ctxt).charset = XmlCharEncoding::UTF8;
     }
     if filename.is_null() {
-        (*ctxt).directory = null_mut();
+        (*ctxt).directory = None;
     } else {
-        (*ctxt).directory = xml_parser_get_directory(filename);
+        let dir = xml_parser_get_directory(filename);
+        if !dir.is_null() {
+            (*ctxt).directory = Some(
+                CStr::from_ptr(dir as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(dir as _);
+        }
     }
 
     let input_stream: HtmlParserInputPtr = html_new_input_stream(ctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
-        // xml_free_parser_input_buffer(buf);
         return null_mut();
     }
 
@@ -11797,8 +11803,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
 
     (*ctxt).version = None;
     (*ctxt).encoding = None;
-    DICT_FREE!(dict, (*ctxt).directory as *const u8);
-    (*ctxt).directory = null_mut();
+    (*ctxt).directory = None;
     DICT_FREE!(dict, (*ctxt).ext_sub_uri);
     (*ctxt).ext_sub_uri = null_mut();
     DICT_FREE!(dict, (*ctxt).ext_sub_system);

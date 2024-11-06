@@ -776,15 +776,14 @@ pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> Xml
     };
     let ret: XmlTextReaderPtr = xml_new_text_reader(input, uri);
     if ret.is_null() {
-        // xml_free_parser_input_buffer(input);
         return null_mut();
     }
     (*ret).allocs |= XML_TEXTREADER_INPUT;
-    if (*(*ret).ctxt).directory.is_null() {
+    if (*(*ret).ctxt).directory.is_none() {
         directory = xml_parser_get_directory(uri);
     }
-    if (*(*ret).ctxt).directory.is_null() && !directory.is_null() {
-        (*(*ret).ctxt).directory = xml_strdup(directory as _) as _;
+    if (*(*ret).ctxt).directory.is_none() && !directory.is_null() {
+        (*(*ret).ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
     }
     if !directory.is_null() {
         xml_free(directory as _);

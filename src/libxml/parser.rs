@@ -497,7 +497,7 @@ pub struct XmlParserCtxt {
     pub instate: XmlParserInputState, /* current type of input */
     pub(crate) token: i32,            /* next char look-ahead */
 
-    pub(crate) directory: *mut c_char, /* the data directory */
+    pub(crate) directory: Option<String>, /* the data directory */
 
     /* Node name stack */
     pub(crate) name: *const XmlChar, /* Current parsed Node */
@@ -1654,7 +1654,7 @@ impl Default for XmlParserCtxt {
             vctxt: XmlValidCtxt::default(),
             instate: XmlParserInputState::default(),
             token: 0,
-            directory: null_mut(),
+            directory: None,
             name: null(),
             name_tab: vec![],
             nb_chars: 0,
@@ -4178,8 +4178,16 @@ pub unsafe extern "C" fn xml_sax_parse_file_with_data(
         (*ctxt)._private = data;
     }
 
-    if (*ctxt).directory.is_null() {
-        (*ctxt).directory = xml_parser_get_directory(filename);
+    if (*ctxt).directory.is_none() {
+        let dir = xml_parser_get_directory(filename);
+        if !dir.is_null() {
+            (*ctxt).directory = Some(
+                CStr::from_ptr(dir as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(dir as _);
+        }
     }
 
     (*ctxt).recovery = recovery;
@@ -5477,7 +5485,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).external = 0;
     (*ctxt).instate = XmlParserInputState::XmlParserStart;
     (*ctxt).token = 0;
-    (*ctxt).directory = null_mut();
+    (*ctxt).directory = None;
 
     /* Allocate the Node stack */
     (*ctxt).node_tab.clear();
@@ -5657,9 +5665,7 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
             xml_free((*ctxt).sax as _);
         }
     }
-    if !(*ctxt).directory.is_null() {
-        xml_free((*ctxt).directory as _);
-    }
+    (*ctxt).directory = None;
     if !(*ctxt).vctxt.node_tab.is_null() {
         xml_free((*ctxt).vctxt.node_tab as _);
     }
@@ -6129,9 +6135,17 @@ pub unsafe fn xml_create_push_parser_ctxt(
     }
     (*ctxt).dict_names = 1;
     if filename.is_null() {
-        (*ctxt).directory = null_mut();
+        (*ctxt).directory = None;
     } else {
-        (*ctxt).directory = xml_parser_get_directory(filename);
+        let dir = xml_parser_get_directory(filename);
+        if !dir.is_null() {
+            (*ctxt).directory = Some(
+                CStr::from_ptr(dir as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(dir as _);
+        }
     }
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
@@ -11669,8 +11683,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
 
     (*ctxt).version = None;
     (*ctxt).encoding = None;
-    DICT_FREE!(dict, (*ctxt).directory);
-    (*ctxt).directory = null_mut();
+    (*ctxt).directory = None;
     DICT_FREE!(dict, (*ctxt).ext_sub_uri);
     (*ctxt).ext_sub_uri = null_mut();
     DICT_FREE!(dict, (*ctxt).ext_sub_system);
@@ -11765,9 +11778,17 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
     xml_ctxt_reset(ctxt);
 
     if filename.is_null() {
-        (*ctxt).directory = null_mut();
+        (*ctxt).directory = None;
     } else {
-        (*ctxt).directory = xml_parser_get_directory(filename);
+        let dir = xml_parser_get_directory(filename);
+        if !dir.is_null() {
+            (*ctxt).directory = Some(
+                CStr::from_ptr(dir as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(dir as _);
+        }
     }
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
