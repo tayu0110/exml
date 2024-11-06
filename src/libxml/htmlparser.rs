@@ -10634,7 +10634,7 @@ unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParse
     memset(input as _, 0, size_of::<HtmlParserInput>());
     std::ptr::write(&mut *input, HtmlParserInput::default());
     (*input).filename = None;
-    (*input).directory = null_mut();
+    (*input).directory = None;
     (*input).base = null_mut();
     (*input).cur = null_mut();
     // (*input).buf = None;

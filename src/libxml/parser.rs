@@ -156,7 +156,7 @@ pub struct XmlParserInput {
     /* Input buffer */
     pub buf: Option<Rc<RefCell<XmlParserInputBuffer>>>, /* UTF-8 encoded buffer */
     pub filename: Option<String>,                       /* The file analyzed, if any */
-    pub(crate) directory: *const c_char,                /* the directory/base of the file */
+    pub(crate) directory: Option<String>,               /* the directory/base of the file */
     pub base: *const XmlChar,                           /* Base of the array to parse */
     pub cur: *const XmlChar,                            /* Current c_char being parsed */
     pub end: *const XmlChar,                            /* end of the array to parse */
@@ -248,7 +248,7 @@ impl Default for XmlParserInput {
         Self {
             buf: None,
             filename: None,
-            directory: null(),
+            directory: None,
             base: null(),
             cur: null(),
             end: null(),

@@ -1303,10 +1303,7 @@ pub unsafe extern "C" fn xml_check_http_input(
                             }
                         }
                         if let Some(redir) = context.redirection() {
-                            if !(*ret).directory.is_null() {
-                                xml_free((*ret).directory as _);
-                                (*ret).directory = null_mut();
-                            }
+                            (*ret).directory = None;
                             (*ret).filename = Some(redir.to_owned());
                         }
                     }

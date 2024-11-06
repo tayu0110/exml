@@ -1064,9 +1064,7 @@ pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
     }
 
     (*input).filename = None;
-    if !(*input).directory.is_null() {
-        xml_free((*input).directory as _);
-    }
+    (*input).directory = None;
     (*input).encoding = None;
     (*input).version = None;
     if !(*input).base.is_null() {
@@ -1164,7 +1162,16 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     if !uri.is_null() {
         xml_free(uri as _);
     }
-    (*input_stream).directory = directory;
+    if !directory.is_null() {
+        (*input_stream).directory = Some(
+            CStr::from_ptr(directory as *const i8)
+                .to_string_lossy()
+                .into(),
+        );
+        xml_free(directory as _);
+    } else {
+        (*input_stream).directory = None;
+    }
     (*input_stream).reset_base();
 
     if (*ctxt).directory.is_null() && !directory.is_null() {
