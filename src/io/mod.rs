@@ -1262,11 +1262,12 @@ pub unsafe extern "C" fn xml_check_http_input(
                     let code = context.return_code();
                     if code >= 400 {
                         /* fatal error */
-                        if !(*ret).filename.is_null() {
+                        if let Some(filename) = (*ret).filename.as_deref() {
+                            let filename = CString::new(filename).unwrap();
                             __xml_loader_err(
                                 ctxt as _,
                                 c"failed to load HTTP resource \"%s\"\n".as_ptr() as _,
-                                (*ret).filename as *const c_char,
+                                filename.as_ptr() as *const c_char,
                             );
                         } else {
                             __xml_loader_err(
@@ -1302,15 +1303,11 @@ pub unsafe extern "C" fn xml_check_http_input(
                             }
                         }
                         if let Some(redir) = context.redirection() {
-                            if !(*ret).filename.is_null() {
-                                xml_free((*ret).filename as _);
-                            }
                             if !(*ret).directory.is_null() {
                                 xml_free((*ret).directory as _);
                                 (*ret).directory = null_mut();
                             }
-                            let redir = CString::new(redir).unwrap();
-                            (*ret).filename = xml_strdup(redir.as_ptr() as _) as _;
+                            (*ret).filename = Some(redir.to_owned());
                         }
                     }
                 }

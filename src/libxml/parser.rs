@@ -158,7 +158,7 @@ pub type XmlParserInputPtr = *mut XmlParserInput;
 pub struct XmlParserInput {
     /* Input buffer */
     pub buf: Option<Rc<RefCell<XmlParserInputBuffer>>>, /* UTF-8 encoded buffer */
-    pub filename: *const c_char,                        /* The file analyzed, if any */
+    pub filename: Option<String>,                       /* The file analyzed, if any */
     pub(crate) directory: *const c_char,                /* the directory/base of the file */
     pub base: *const XmlChar,                           /* Base of the array to parse */
     pub cur: *const XmlChar,                            /* Current c_char being parsed */
@@ -250,7 +250,7 @@ impl Default for XmlParserInput {
     fn default() -> Self {
         Self {
             buf: None,
-            filename: null(),
+            filename: None,
             directory: null(),
             base: null(),
             cur: null(),
@@ -1467,7 +1467,7 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlDoRead")]
     unsafe fn do_read(
         &mut self,
-        url: *const c_char,
+        url: Option<&str>,
         encoding: Option<&str>,
         options: i32,
     ) -> XmlDocPtr {
@@ -1485,8 +1485,8 @@ impl XmlParserCtxt {
                 self.switch_to_encoding(handler);
             }
         }
-        if !url.is_null() && !self.input.is_null() && (*self.input).filename.is_null() {
-            (*self.input).filename = xml_strdup(url as _) as _;
+        if url.is_some() && !self.input.is_null() && (*self.input).filename.is_none() {
+            (*self.input).filename = url.map(|u| u.to_owned());
         }
         xml_parse_document(self);
         if self.well_formed != 0 || self.recovery != 0 {
@@ -1728,7 +1728,7 @@ pub type XmlSAXLocatorPtr = *mut XmlSAXLocator;
 #[repr(C)]
 pub struct XmlSAXLocator {
     pub(crate) get_public_id: unsafe extern "C" fn(ctx: *mut c_void) -> *const XmlChar,
-    pub(crate) get_system_id: unsafe extern "C" fn(ctx: *mut c_void) -> *const XmlChar,
+    pub(crate) get_system_id: unsafe fn(ctx: *mut c_void) -> Option<String>,
     pub(crate) get_line_number: unsafe extern "C" fn(ctx: *mut c_void) -> i32,
     pub(crate) get_column_number: unsafe extern "C" fn(ctx: *mut c_void) -> i32,
 }
@@ -3459,7 +3459,7 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
              * by PE References in the internal subset.
              */
             if (*ctxt).input_tab.len() > 1
-                && !(*(*ctxt).input).filename.is_null()
+                && (*(*ctxt).input).filename.is_some()
                 && (*ctxt).current_byte() == b'<'
                 && (*ctxt).nth_byte(1) == b'!'
                 && (*ctxt).nth_byte(2) == b'['
@@ -4368,8 +4368,15 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
         xml_switch_encoding(ctxt, enc);
     }
 
-    if (*input).filename.is_null() {
-        (*input).filename = system_id_canonic as _;
+    if (*input).filename.is_none() {
+        if !system_id_canonic.is_null() {
+            (*input).filename = Some(
+                CStr::from_ptr(system_id_canonic as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(system_id_canonic as _);
+        }
     } else {
         xml_free(system_id_canonic as _);
     }
@@ -4492,7 +4499,7 @@ pub unsafe fn xml_io_parse_dtd(
         xml_switch_encoding(ctxt, enc);
     }
 
-    (*pinput).filename = null_mut();
+    (*pinput).filename = None;
     (*pinput).line = 1;
     (*pinput).col = 1;
     (*pinput).base = (*(*ctxt).input).cur;
@@ -5755,7 +5762,15 @@ pub(crate) unsafe extern "C" fn xml_setup_parser_for_buffer(
 
     xml_clear_parser_ctxt(ctxt);
     if !filename.is_null() {
-        (*input).filename = xml_canonic_path(filename as _) as _;
+        let canonic = xml_canonic_path(filename as _);
+        if !canonic.is_null() {
+            (*input).filename = Some(
+                CStr::from_ptr(canonic as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(canonic as _);
+        }
     }
     (*input).base = buffer;
     (*input).cur = buffer;
@@ -6143,14 +6158,20 @@ pub unsafe fn xml_create_push_parser_ctxt(
     }
 
     if filename.is_null() {
-        (*input_stream).filename = null_mut();
+        (*input_stream).filename = None;
     } else {
-        (*input_stream).filename = xml_canonic_path(filename as _) as _;
-        if (*input_stream).filename.is_null() {
+        let canonic = xml_canonic_path(filename as _);
+        if canonic.is_null() {
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(ctxt);
             return null_mut();
         }
+        (*input_stream).filename = Some(
+            CStr::from_ptr(canonic as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
+        xml_free(canonic as _);
     }
     (*input_stream).buf = Some(buf);
     (*input_stream).reset_base();
@@ -11274,7 +11295,7 @@ pub unsafe fn xml_new_io_input_stream(
     if input_stream.is_null() {
         return null_mut();
     }
-    (*input_stream).filename = null_mut();
+    (*input_stream).filename = None;
     (*input_stream).buf = Some(input);
     (*input_stream).reset_base();
 
@@ -11790,9 +11811,17 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
     }
 
     if filename.is_null() {
-        (*input_stream).filename = null_mut();
+        (*input_stream).filename = None;
     } else {
-        (*input_stream).filename = xml_canonic_path(filename as _) as _;
+        let canonic = xml_canonic_path(filename as _);
+        if !canonic.is_null() {
+            (*input_stream).filename = Some(
+                CStr::from_ptr(canonic as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(canonic as _);
+        }
     }
     (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
     (*input_stream).reset_base();
@@ -11860,7 +11889,7 @@ pub unsafe extern "C" fn xml_ctxt_use_options(ctxt: XmlParserCtxtPtr, options: c
  */
 pub unsafe fn xml_read_doc(
     cur: *const XmlChar,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
@@ -11898,7 +11927,7 @@ pub unsafe fn xml_read_file(
     if ctxt.is_null() {
         return null_mut();
     }
-    let res = (*ctxt).do_read(null_mut(), encoding, options);
+    let res = (*ctxt).do_read(None, encoding, options);
     xml_free_parser_ctxt(ctxt);
     res
 }
@@ -11917,7 +11946,7 @@ pub unsafe fn xml_read_file(
  */
 pub unsafe fn xml_read_memory(
     buffer: Vec<u8>,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
@@ -11947,7 +11976,7 @@ pub unsafe fn xml_read_memory(
  */
 pub unsafe fn xml_read_io(
     ioctx: impl Read + 'static,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
@@ -11986,7 +12015,7 @@ pub unsafe fn xml_read_io(
 pub unsafe fn xml_ctxt_read_doc(
     ctxt: XmlParserCtxtPtr,
     cur: *const XmlChar,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
@@ -12035,7 +12064,7 @@ pub unsafe fn xml_ctxt_read_file(
         return null_mut();
     }
     (*ctxt).input_push(stream);
-    (*ctxt).do_read(null_mut(), encoding, options)
+    (*ctxt).do_read(None, encoding, options)
 }
 
 /**
@@ -12055,7 +12084,7 @@ pub unsafe fn xml_ctxt_read_file(
 pub unsafe fn xml_ctxt_read_memory(
     ctxt: XmlParserCtxtPtr,
     buffer: Vec<u8>,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {
@@ -12096,7 +12125,7 @@ pub unsafe fn xml_ctxt_read_memory(
 pub unsafe fn xml_ctxt_read_io(
     ctxt: XmlParserCtxtPtr,
     ioctx: impl Read + 'static,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> XmlDocPtr {

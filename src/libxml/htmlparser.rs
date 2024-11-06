@@ -9501,7 +9501,7 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
         return null_mut();
     }
 
-    (*input).filename = null_mut();
+    (*input).filename = None;
     std::ptr::write(&raw mut (*input).buf, Some(Rc::new(RefCell::new(buf))));
     (*input).reset_base();
 
@@ -10636,7 +10636,7 @@ unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParse
     }
     memset(input as _, 0, size_of::<HtmlParserInput>());
     std::ptr::write(&mut *input, HtmlParserInput::default());
-    (*input).filename = null_mut();
+    (*input).filename = None;
     (*input).directory = null_mut();
     (*input).base = null_mut();
     (*input).cur = null_mut();
@@ -10711,9 +10711,15 @@ pub unsafe fn html_create_push_parser_ctxt(
     }
 
     if filename.is_null() {
-        (*input_stream).filename = null_mut();
+        (*input_stream).filename = None;
     } else {
-        (*input_stream).filename = xml_canonic_path(filename as _) as _;
+        let canonic = xml_canonic_path(filename as _);
+        (*input_stream).filename = Some(
+            CStr::from_ptr(canonic as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
+        xml_free(canonic as _);
     }
     // (*input_stream).buf = Some(buf);
     std::ptr::write(
@@ -11939,7 +11945,7 @@ pub unsafe extern "C" fn html_ctxt_use_options(
  */
 unsafe fn html_do_read(
     ctxt: HtmlParserCtxtPtr,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
     reuse: c_int,
@@ -11952,8 +11958,8 @@ unsafe fn html_do_read(
             (*(*ctxt).input).encoding = Some(encoding.to_owned());
         }
     }
-    if !url.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_null() {
-        (*(*ctxt).input).filename = xml_strdup(url as _) as _;
+    if url.is_some() && !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_none() {
+        (*(*ctxt).input).filename = url.map(|u| u.to_owned());
     }
     html_parse_document(ctxt);
     let ret: HtmlDocPtr = (*ctxt).my_doc;
@@ -11980,7 +11986,7 @@ unsafe fn html_do_read(
  */
 pub unsafe fn html_read_doc(
     cur: *const XmlChar,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
@@ -12016,7 +12022,7 @@ pub unsafe fn html_read_file(
     if ctxt.is_null() {
         return null_mut();
     }
-    html_do_read(ctxt, null_mut(), None, options, 0)
+    html_do_read(ctxt, None, None, options, 0)
 }
 
 /**
@@ -12033,7 +12039,7 @@ pub unsafe fn html_read_file(
  */
 pub unsafe fn html_read_memory(
     buffer: Vec<u8>,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
@@ -12060,7 +12066,7 @@ pub unsafe fn html_read_memory(
  */
 pub unsafe fn html_read_io(
     ioctx: impl Read + 'static,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
@@ -12097,7 +12103,7 @@ pub unsafe fn html_read_io(
 pub unsafe fn html_ctxt_read_doc(
     ctxt: XmlParserCtxtPtr,
     cur: *const XmlChar,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
@@ -12146,7 +12152,7 @@ pub unsafe fn html_ctxt_read_file(
         return null_mut();
     }
     (*ctxt).input_push(stream);
-    html_do_read(ctxt, null_mut(), encoding, options, 1)
+    html_do_read(ctxt, None, encoding, options, 1)
 }
 
 /**
@@ -12166,7 +12172,7 @@ pub unsafe fn html_ctxt_read_file(
 pub unsafe fn html_ctxt_read_memory(
     ctxt: XmlParserCtxtPtr,
     buffer: Vec<u8>,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {
@@ -12209,7 +12215,7 @@ pub unsafe fn html_ctxt_read_memory(
 pub unsafe fn html_ctxt_read_io(
     ctxt: XmlParserCtxtPtr,
     ioctx: impl Read + 'static,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: Option<&str>,
     options: c_int,
 ) -> HtmlDocPtr {

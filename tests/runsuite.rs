@@ -145,8 +145,11 @@ unsafe extern "C" fn test_external_entity_loader(
         if strcmp(TEST_ENTITIES_NAME[i], url) == 0 {
             ret = xml_new_string_input_stream(ctxt, TEST_ENTITIES_VALUE[i] as *const XmlChar);
             if !ret.is_null() {
-                (*ret).filename =
-                    xml_strdup(TEST_ENTITIES_NAME[i] as *mut XmlChar) as *const c_char;
+                (*ret).filename = Some(
+                    CStr::from_ptr(TEST_ENTITIES_NAME[i])
+                        .to_string_lossy()
+                        .into_owned(),
+                );
             }
             return ret;
         }
@@ -579,7 +582,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
             let buffer = from_raw_parts(xml_buf_content(buf), xml_buf_use(buf)).to_vec();
-            doc = xml_read_memory(buffer, c"test".as_ptr(), None, 0);
+            doc = xml_read_memory(buffer, Some("test"), None, 0);
             if doc.is_null() {
                 test_log!(
                     logfile,
@@ -657,7 +660,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
             let buffer = from_raw_parts(xml_buf_content(buf), xml_buf_use(buf)).to_vec();
-            doc = xml_read_memory(buffer, c"test".as_ptr() as _, None, 0);
+            doc = xml_read_memory(buffer, Some("test"), None, 0);
             if doc.is_null() {
                 test_log!(
                     logfile,

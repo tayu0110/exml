@@ -3978,7 +3978,17 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
         return null_mut();
     }
 
-    (*input_stream).filename = xml_canonic_path(filename as _) as _;
+    {
+        let canonic = xml_canonic_path(filename as _);
+        if !canonic.is_null() {
+            (*input_stream).filename = Some(
+                CStr::from_ptr(canonic as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(canonic as _);
+        }
+    }
     std::ptr::write(
         &raw mut (*input_stream).buf,
         Some(Rc::new(RefCell::new(buf))),

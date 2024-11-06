@@ -5,7 +5,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_uint, c_ulong, CStr},
+    ffi::{c_char, c_int, c_uint, c_ulong, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -264,13 +264,9 @@ pub type XmlSchemaValidityWarningFunc = unsafe extern "C" fn(ctx: *mut c_void, m
  */
 
 pub type XmlSchemaValidityLocatorFunc =
-    unsafe extern "C" fn(ctx: *mut c_void, file: *mut *const c_char, line: *mut c_ulong) -> c_int;
+    unsafe extern "C" fn(ctx: *mut c_void, file: *mut Option<String>, line: *mut c_ulong) -> c_int;
 
 const UNBOUNDED: usize = 1 << 30;
-// #define TODO								\
-// 	xmlGenericError(xmlGenericErrorContext,				\
-// 		"Unimplemented block at %s:%d\n",				\
-// 			__FILE__, __LINE__);
 
 const XML_SCHEMAS_NO_NAMESPACE: &CStr = c"##";
 
@@ -1476,6 +1472,8 @@ unsafe fn xml_schema_err4_line(
     if !ctxt.is_null() {
         if (*ctxt).typ == XML_SCHEMA_CTXT_VALIDATOR {
             let vctxt: XmlSchemaValidCtxtPtr = ctxt as XmlSchemaValidCtxtPtr;
+            #[allow(unused_assignments)]
+            let mut dummy = Some(c"".to_owned());
             let mut file: *const c_char = null();
             let mut col: c_int = 0;
             if !matches!(error_level, XmlErrorLevel::XmlErrWarning) {
@@ -1503,7 +1501,11 @@ unsafe fn xml_schema_err4_line(
                     && !(*vctxt).parser_ctxt.is_null()
                     && !(*(*vctxt).parser_ctxt).input.is_null()
                 {
-                    file = (*(*(*vctxt).parser_ctxt).input).filename;
+                    dummy = (*(*(*vctxt).parser_ctxt).input)
+                        .filename
+                        .as_deref()
+                        .map(|f| CString::new(f).unwrap());
+                    file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
                     line = (*(*(*vctxt).parser_ctxt).input).line;
                     col = (*(*(*vctxt).parser_ctxt).input).col;
                 }
@@ -1521,16 +1523,21 @@ unsafe fn xml_schema_err4_line(
                 } else if !(*vctxt).parser_ctxt.is_null()
                     && !(*(*vctxt).parser_ctxt).input.is_null()
                 {
-                    file = (*(*(*vctxt).parser_ctxt).input).filename;
+                    dummy = (*(*(*vctxt).parser_ctxt).input)
+                        .filename
+                        .as_deref()
+                        .map(|f| CString::new(f).unwrap());
+                    file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
                 }
             }
             if let Some(loc_func) = (*vctxt).loc_func {
                 if file.is_null() || line == 0 {
                     let mut l: c_ulong = 0;
-                    let mut f: *const c_char = null();
+                    let mut f = None;
                     loc_func((*vctxt).loc_ctxt, addr_of_mut!(f), addr_of_mut!(l));
                     if file.is_null() {
-                        file = f;
+                        dummy = f.as_deref().map(|f| CString::new(f).unwrap());
+                        file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
                     }
                     if line == 0 {
                         line = l as _;
@@ -5906,7 +5913,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                         doc = xml_ctxt_read_memory(
                             parser_ctxt,
                             mem,
-                            null_mut(),
+                            None,
                             None,
                             SCHEMAS_PARSE_OPTIONS,
                         );
@@ -30794,7 +30801,7 @@ pub unsafe extern "C" fn xml_schema_validate_one_element(
  */
 unsafe extern "C" fn xml_schema_validate_stream_locator(
     ctx: *mut c_void,
-    file: *mut *const c_char,
+    file: *mut Option<String>,
     line: *mut c_ulong,
 ) -> c_int {
     if ctx.is_null() || (file.is_null() && line.is_null()) {
@@ -30802,7 +30809,7 @@ unsafe extern "C" fn xml_schema_validate_stream_locator(
     }
 
     if !file.is_null() {
-        *file = null_mut();
+        *file = None;
     }
     if !line.is_null() {
         *line = 0;
@@ -30811,7 +30818,7 @@ unsafe extern "C" fn xml_schema_validate_stream_locator(
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if !(*ctxt).input.is_null() {
         if !file.is_null() {
-            *file = (*(*ctxt).input).filename;
+            *file = (*(*ctxt).input).filename.clone();
         }
         if !line.is_null() {
             *line = (*(*ctxt).input).line as _;

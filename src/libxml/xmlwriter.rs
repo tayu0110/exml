@@ -11,7 +11,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, c_int, c_uchar, CStr},
+    ffi::{c_char, c_int, c_uchar, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -681,11 +681,12 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
     if !(*ctxt).my_doc.is_null()
         && ((*(*ctxt).my_doc).url.is_null())
         && !(*ctxt).input.is_null()
-        && !(*(*ctxt).input).filename.is_null()
+        && (*(*ctxt).input).filename.is_some()
     {
-        (*(*ctxt).my_doc).url = xml_canonic_path((*(*ctxt).input).filename as _);
+        let filename = CString::new((*(*ctxt).input).filename.as_deref().unwrap()).unwrap();
+        (*(*ctxt).my_doc).url = xml_canonic_path(filename.as_ptr() as _);
         if (*(*ctxt).my_doc).url.is_null() {
-            (*(*ctxt).my_doc).url = xml_strdup((*(*ctxt).input).filename as _);
+            (*(*ctxt).my_doc).url = xml_strdup(filename.as_ptr() as _);
         }
     }
 }

@@ -85,7 +85,7 @@ unsafe extern "C" fn test_document_range_byte1(
         *data.add(0) = i as c_char;
 
         let buffer = from_raw_parts(document as *const u8, len as usize).to_vec();
-        let res = xml_read_memory(buffer, c"test".as_ptr() as _, None, 0);
+        let res = xml_read_memory(buffer, Some("test"), None, 0);
         let last_error = LAST_ERROR.read().unwrap();
 
         if i as i32 == forbid1 || i as i32 == forbid2 {
@@ -134,7 +134,7 @@ unsafe extern "C" fn test_document_range_byte2(
             *data.add(1) = j as c_char;
 
             let buffer = from_raw_parts(document as *const u8, len as usize).to_vec();
-            let res = xml_read_memory(buffer, c"test".as_ptr() as _, None, 0);
+            let res = xml_read_memory(buffer, Some("test"), None, 0);
             let last_error = *LAST_ERROR.read().unwrap();
 
             #[allow(clippy::if_same_then_else)]
@@ -684,7 +684,7 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
         xml_free_parser_ctxt(ctxt);
         return test_ret;
     }
-    (*input).filename = null_mut();
+    (*input).filename = None;
     (*input).buf = Some(Rc::new(RefCell::new(buf)));
     (*input).cur = (*input)
         .buf
@@ -753,7 +753,7 @@ unsafe extern "C" fn test_user_encoding() -> c_int {
     }
 
     let buffer = from_raw_parts(buf, 2 * total_size as usize).to_vec();
-    let doc: XmlDocPtr = xml_read_memory(buffer, null_mut(), Some("UTF-16LE"), 0);
+    let doc: XmlDocPtr = xml_read_memory(buffer, None, Some("UTF-16LE"), 0);
     if doc.is_null() {
         let error = get_last_error();
         eprintln!("error: {error:?}");

@@ -39,7 +39,7 @@ use crate::{
 macro_rules! __xml_raise_error {
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
         use std::borrow::Cow;
-        use std::ffi::CStr;
+        use std::ffi::{CStr, CString};
         use std::ptr::{null_mut, NonNull};
 
         use libc::{c_char, c_int, c_void};
@@ -79,6 +79,8 @@ macro_rules! __xml_raise_error {
                     let mut input: XmlParserInputPtr;
                     let mut to = &mut state.last_error;
                     let mut baseptr: XmlNodePtr = null_mut();
+                    #[allow(unused_assignments)]
+                    let mut dummy = None;
 
                     if code == XmlParserErrors::XmlErrOK {
                         return None;
@@ -149,11 +151,12 @@ macro_rules! __xml_raise_error {
                     if !ctxt.is_null() {
                         if file.is_null() {
                             input = (*ctxt).input;
-                            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+                            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() as usize - 2];
                             }
                             if !input.is_null() {
-                                file = (*input).filename;
+                                dummy = (*input).filename.as_deref().map(|f| CString::new(f).unwrap());
+                                file = dummy.as_ref().map_or(null_mut(), |f| f.as_ptr());
                                 line = (*input).line;
                                 col = (*input).col;
                             }

@@ -204,14 +204,13 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
          */
         if !ctxt.is_null() {
             input = (*ctxt).input;
-            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
             }
             if !input.is_null() {
-                if !(*input).filename.is_null() {
-                    let file = CStr::from_ptr((*input).filename).to_string_lossy();
-                    channel(None, format!("{file}:{}: ", (*input).line).as_str());
+                if let Some(filename) = (*input).filename.as_deref() {
+                    channel(None, format!("{filename}:{}: ", (*input).line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
                     channel(None, format!("Entity: line {}: ", (*input).line).as_str());
                 }
@@ -278,9 +277,8 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
         if !ctxt.is_null() {
             parser_print_file_context_internal(input, channel, None);
             if !cur.is_null() {
-                if !(*cur).filename.is_null() {
-                    let file = CStr::from_ptr((*cur).filename).to_string_lossy();
-                    channel(None, format!("{file}:{}: \n", (*cur).line).as_str());
+                if let Some(filename) = (*cur).filename.as_deref() {
+                    channel(None, format!("{filename}:{}: \n", (*cur).line).as_str());
                 } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
                     channel(None, format!("Entity: line {}: \n", (*cur).line).as_str());
                 }
@@ -2563,7 +2561,6 @@ unsafe fn mem_parse_test(
 ) -> c_int {
     let mut base: *const c_char = null();
     let mut size: c_int = 0;
-    let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS += 1;
     /*
@@ -2575,7 +2572,7 @@ unsafe fn mem_parse_test(
     }
 
     let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
-    let doc: XmlDocPtr = xml_read_memory(buffer, cfilename.as_ptr(), None, 0);
+    let doc: XmlDocPtr = xml_read_memory(buffer, Some(filename), None, 0);
     unload_mem(base);
     if doc.is_null() {
         return 1;

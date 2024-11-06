@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, c_uint, c_ulong, c_void, CStr},
+    ffi::{c_char, c_int, c_uint, c_ulong, c_void, CStr, CString},
     mem::{replace, size_of},
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
@@ -99,12 +99,12 @@ pub unsafe extern "C" fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const Xml
  *
  * Returns a xmlChar *
  */
-pub unsafe extern "C" fn xml_sax2_get_system_id(ctx: *mut c_void) -> *const XmlChar {
+pub unsafe fn xml_sax2_get_system_id(ctx: *mut c_void) -> Option<String> {
     let ctxt: XmlParserCtxtPtr = ctx as _;
     if ctx.is_null() || (*ctxt).input.is_null() {
-        return null();
+        return None;
     };
-    (*(*ctxt).input).filename as _
+    (*(*ctxt).input).filename.clone()
 }
 
 /**
@@ -397,8 +397,16 @@ pub unsafe fn xml_sax2_external_subset(
             xml_switch_encoding(ctxt, enc);
         }
 
-        if (*input).filename.is_null() {
-            (*input).filename = xml_canonic_path(system_id) as _;
+        if (*input).filename.is_none() {
+            let canonic = xml_canonic_path(system_id);
+            if !canonic.is_null() {
+                (*input).filename = Some(
+                    CStr::from_ptr(canonic as *const i8)
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+                xml_free(canonic as _);
+            }
         }
         (*input).line = 1;
         (*input).col = 1;
@@ -620,8 +628,17 @@ pub unsafe fn xml_sax2_resolve_entity(
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
+    // temporary use.
+    // Currently, filename is Option<String> and base is *const c_char.
+    // Even if we make c-string pointer in if statement, it does not alive sufficient term.
+    // So, make dummy out of if statement.
+    #[allow(unused_assignments)]
+    let mut dummy = c"".to_owned();
     if !(*ctxt).input.is_null() {
-        base = (*(*ctxt).input).filename;
+        if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
+            dummy = CString::new(filename).unwrap();
+            base = dummy.as_ptr();
+        }
     }
     if base.is_null() {
         base = (*ctxt).directory;
@@ -725,9 +742,14 @@ pub unsafe fn xml_sax2_entity_decl(
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
             let mut base: *const c_char = null();
+            #[allow(unused_assignments)]
+            let mut dummy = c"".to_owned();
 
             if !(*ctxt).input.is_null() {
-                base = (*(*ctxt).input).filename;
+                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
+                    dummy = CString::new(filename).unwrap();
+                    base = dummy.as_ptr();
+                }
             }
             if base.is_null() {
                 base = (*ctxt).directory;
@@ -754,9 +776,14 @@ pub unsafe fn xml_sax2_entity_decl(
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
             let mut base: *const c_char = null();
+            #[allow(unused_assignments)]
+            let mut dummy = c"".to_owned();
 
             if !(*ctxt).input.is_null() {
-                base = (*(*ctxt).input).filename;
+                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
+                    dummy = CString::new(filename).unwrap();
+                    base = dummy.as_ptr();
+                }
             }
             if base.is_null() {
                 base = (*ctxt).directory;
@@ -1167,9 +1194,14 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
             let mut base: *const c_char = null();
+            #[allow(unused_assignments)]
+            let mut dummy = c"".to_owned();
 
             if !(*ctxt).input.is_null() {
-                base = (*(*ctxt).input).filename;
+                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
+                    dummy = CString::new(filename).unwrap();
+                    base = dummy.as_ptr();
+                }
             }
             if base.is_null() {
                 base = (*ctxt).directory;
@@ -1203,9 +1235,14 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
             let mut base: *const c_char = null();
+            #[allow(unused_assignments)]
+            let mut dummy = c"".to_owned();
 
             if !(*ctxt).input.is_null() {
-                base = (*(*ctxt).input).filename;
+                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
+                    dummy = CString::new(filename).unwrap();
+                    base = dummy.as_ptr();
+                }
             }
             if base.is_null() {
                 base = (*ctxt).directory;
@@ -1290,9 +1327,10 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
     if !(*ctxt).my_doc.is_null()
         && (*(*ctxt).my_doc).url.is_null()
         && !(*ctxt).input.is_null()
-        && !(*(*ctxt).input).filename.is_null()
+        && (*(*ctxt).input).filename.is_some()
     {
-        (*(*ctxt).my_doc).url = xml_path_to_uri((*(*ctxt).input).filename as _);
+        let filename = CString::new((*(*ctxt).input).filename.as_deref().unwrap()).unwrap();
+        (*(*ctxt).my_doc).url = xml_path_to_uri(filename.as_ptr() as _);
         if (*(*ctxt).my_doc).url.is_null() {
             xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
         }
@@ -3852,425 +3890,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_sax2_attribute_decl() {
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_elem in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_fullname in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     for n_type in 0..GEN_NB_INT {
-    //                         for n_def in 0..GEN_NB_INT {
-    //                             for n_default_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                                 for n_tree in 0..GEN_NB_XML_ENUMERATION_PTR {
-    //                                     let mem_base = xml_mem_blocks();
-    //                                     let ctx = gen_void_ptr(n_ctx, 0);
-    //                                     let elem = gen_const_xml_char_ptr(n_elem, 1);
-    //                                     let fullname = gen_const_xml_char_ptr(n_fullname, 2);
-    //                                     let typ = gen_int(n_type, 3);
-    //                                     let def = gen_int(n_def, 4);
-    //                                     let default_value =
-    //                                         gen_const_xml_char_ptr(n_default_value, 5);
-    //                                     let tree = gen_xml_enumeration_ptr(n_tree, 6);
-
-    //                                     xml_sax2_attribute_decl(
-    //                                         ctx,
-    //                                         elem,
-    //                                         fullname,
-    //                                         typ,
-    //                                         def,
-    //                                         default_value,
-    //                                         tree,
-    //                                     );
-    //                                     des_void_ptr(n_ctx, ctx, 0);
-    //                                     des_const_xml_char_ptr(n_elem, elem, 1);
-    //                                     des_const_xml_char_ptr(n_fullname, fullname, 2);
-    //                                     des_int(n_type, typ, 3);
-    //                                     des_int(n_def, def, 4);
-    //                                     des_const_xml_char_ptr(n_default_value, default_value, 5);
-    //                                     des_xml_enumeration_ptr(n_tree, tree, 6);
-    //                                     reset_last_error();
-    //                                     if mem_base != xml_mem_blocks() {
-    //                                         leaks += 1;
-    //                                         eprint!(
-    //                                             "Leak of {} blocks found in xmlSAX2AttributeDecl",
-    //                                             xml_mem_blocks() - mem_base
-    //                                         );
-    //                                         eprint!(" {}", n_ctx);
-    //                                         eprint!(" {}", n_elem);
-    //                                         eprint!(" {}", n_fullname);
-    //                                         eprint!(" {}", n_type);
-    //                                         eprint!(" {}", n_def);
-    //                                         eprint!(" {}", n_default_value);
-    //                                         eprintln!(" {}", n_tree);
-    //                                     }
-    //                                 }
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2AttributeDecl()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_cdata_block() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_len in 0..GEN_NB_INT {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let ctx = gen_void_ptr(n_ctx, 0);
-    //                     let value = gen_const_xml_char_ptr(n_value, 1);
-    //                     let mut len = gen_int(n_len, 2);
-    //                     if !value.is_null() && len > xml_strlen(value) {
-    //                         len = 0;
-    //                     }
-
-    //                     xml_sax2_cdata_block(ctx, value, len);
-    //                     des_void_ptr(n_ctx, ctx, 0);
-    //                     des_const_xml_char_ptr(n_value, value, 1);
-    //                     des_int(n_len, len, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlSAX2CDataBlock",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_ctx);
-    //                         eprint!(" {}", n_value);
-    //                         eprintln!(" {}", n_len);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2CDataBlock()");
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_characters() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_ch in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_len in 0..GEN_NB_INT {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let ctx = gen_void_ptr(n_ctx, 0);
-    //                     let ch = gen_const_xml_char_ptr(n_ch, 1);
-    //                     let mut len = gen_int(n_len, 2);
-    //                     if !ch.is_null() && len > xml_strlen(ch) {
-    //                         len = 0;
-    //                     }
-
-    //                     xml_sax2_characters(ctx, ch, len);
-    //                     des_void_ptr(n_ctx, ctx, 0);
-    //                     des_const_xml_char_ptr(n_ch, ch, 1);
-    //                     des_int(n_len, len, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlSAX2Characters",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_ctx);
-    //                         eprint!(" {}", n_ch);
-    //                         eprintln!(" {}", n_len);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2Characters()");
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_comment() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let ctx = gen_void_ptr(n_ctx, 0);
-    //                 let value = gen_const_xml_char_ptr(n_value, 1);
-
-    //                 xml_sax2_comment(ctx, value);
-    //                 des_void_ptr(n_ctx, ctx, 0);
-    //                 des_const_xml_char_ptr(n_value, value, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlSAX2Comment",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     eprint!(" {}", n_ctx);
-    //                     eprintln!(" {}", n_value);
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2Comment()");
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_element_decl() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_type in 0..GEN_NB_INT {
-    //                     for n_content in 0..GEN_NB_XML_ELEMENT_CONTENT_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctx = gen_void_ptr(n_ctx, 0);
-    //                         let name = gen_const_xml_char_ptr(n_name, 1);
-    //                         let typ = gen_int(n_type, 2);
-    //                         let content = gen_xml_element_content_ptr(n_content, 3);
-
-    //                         xml_sax2_element_decl(ctx, name, typ, content);
-    //                         des_void_ptr(n_ctx, ctx, 0);
-    //                         des_const_xml_char_ptr(n_name, name, 1);
-    //                         des_int(n_type, typ, 2);
-    //                         des_xml_element_content_ptr(n_content, content, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlSAX2ElementDecl",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             eprint!(" {}", n_ctx);
-    //                             eprint!(" {}", n_name);
-    //                             eprint!(" {}", n_type);
-    //                             eprintln!(" {}", n_content);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2ElementDecl()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_end_document() {
-    //     let mut leaks = 0;
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_void_ptr(n_ctx, 0);
-
-    //             xml_sax2_end_document(ctx);
-    //             des_void_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlSAX2EndDocument",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2EndDocument()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_end_element() {
-    //     #[cfg(any(
-    //         feature = "sax1",
-    //         feature = "html",
-    //         feature = "writer",
-    //         feature = "legacy"
-    //     ))]
-    //     unsafe {
-    //         #[cfg(feature = "sax1")]
-    //         {
-    //             let mut leaks = 0;
-    //             for n_ctx in 0..GEN_NB_VOID_PTR {
-    //                 for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let ctx = gen_void_ptr(n_ctx, 0);
-    //                     let name = gen_const_xml_char_ptr(n_name, 1);
-
-    //                     xml_sax2_end_element(ctx, name);
-    //                     des_void_ptr(n_ctx, ctx, 0);
-    //                     des_const_xml_char_ptr(n_name, name, 1);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlSAX2EndElement",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_ctx);
-    //                         eprintln!(" {}", n_name);
-    //                     }
-    //                 }
-    //             }
-    //             assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2EndElement()");
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_end_element_ns() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_localname in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     for n_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctx = gen_void_ptr(n_ctx, 0);
-    //                         let localname = gen_const_xml_char_ptr(n_localname, 1);
-    //                         let prefix = gen_const_xml_char_ptr(n_prefix, 2);
-    //                         let uri = gen_const_xml_char_ptr(n_uri, 3);
-
-    //                         xml_sax2_end_element_ns(ctx, localname, prefix, uri);
-    //                         des_void_ptr(n_ctx, ctx, 0);
-    //                         des_const_xml_char_ptr(n_localname, localname, 1);
-    //                         des_const_xml_char_ptr(n_prefix, prefix, 2);
-    //                         des_const_xml_char_ptr(n_uri, uri, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlSAX2EndElementNs",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             eprint!(" {}", n_ctx);
-    //                             eprint!(" {}", n_localname);
-    //                             eprint!(" {}", n_prefix);
-    //                             eprintln!(" {}", n_uri);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2EndElementNs()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_entity_decl() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_type in 0..GEN_NB_INT {
-    //                     for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                         for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                             for n_content in 0..GEN_NB_XML_CHAR_PTR {
-    //                                 let mem_base = xml_mem_blocks();
-    //                                 let ctx = gen_void_ptr(n_ctx, 0);
-    //                                 let name = gen_const_xml_char_ptr(n_name, 1);
-    //                                 let typ = gen_int(n_type, 2);
-    //                                 let public_id = gen_const_xml_char_ptr(n_public_id, 3);
-    //                                 let system_id = gen_const_xml_char_ptr(n_system_id, 4);
-    //                                 let content = gen_xml_char_ptr(n_content, 5);
-
-    //                                 xml_sax2_entity_decl(
-    //                                     ctx, name, typ, public_id, system_id, content,
-    //                                 );
-    //                                 des_void_ptr(n_ctx, ctx, 0);
-    //                                 des_const_xml_char_ptr(n_name, name, 1);
-    //                                 des_int(n_type, typ, 2);
-    //                                 des_const_xml_char_ptr(n_public_id, public_id, 3);
-    //                                 des_const_xml_char_ptr(n_system_id, system_id, 4);
-    //                                 des_xml_char_ptr(n_content, content, 5);
-    //                                 reset_last_error();
-    //                                 if mem_base != xml_mem_blocks() {
-    //                                     leaks += 1;
-    //                                     eprint!(
-    //                                         "Leak of {} blocks found in xmlSAX2EntityDecl",
-    //                                         xml_mem_blocks() - mem_base
-    //                                     );
-    //                                     eprint!(" {}", n_ctx);
-    //                                     eprint!(" {}", n_name);
-    //                                     eprint!(" {}", n_type);
-    //                                     eprint!(" {}", n_public_id);
-    //                                     eprint!(" {}", n_system_id);
-    //                                     eprintln!(" {}", n_content);
-    //                                 }
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2EntityDecl()");
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_external_subset() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctx = gen_void_ptr(n_ctx, 0);
-    //                         let name = gen_const_xml_char_ptr(n_name, 1);
-    //                         let external_id = gen_const_xml_char_ptr(n_external_id, 2);
-    //                         let system_id = gen_const_xml_char_ptr(n_system_id, 3);
-
-    //                         xml_sax2_external_subset(ctx, name, external_id, system_id);
-    //                         des_void_ptr(n_ctx, ctx, 0);
-    //                         des_const_xml_char_ptr(n_name, name, 1);
-    //                         des_const_xml_char_ptr(n_external_id, external_id, 2);
-    //                         des_const_xml_char_ptr(n_system_id, system_id, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlSAX2ExternalSubset",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             eprint!(" {}", n_ctx);
-    //                             eprint!(" {}", n_name);
-    //                             eprint!(" {}", n_external_id);
-    //                             eprintln!(" {}", n_system_id);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2ExternalSubset()"
-    //         );
-    //     }
-    // }
-
     #[test]
     fn test_xml_sax2_get_column_number() {
         let mut leaks = 0;
@@ -4299,37 +3918,6 @@ mod tests {
             );
         }
     }
-
-    // #[test]
-    // fn test_xml_sax2_get_entity() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let ctx = gen_void_ptr(n_ctx, 0);
-    //                 let name = gen_const_xml_char_ptr(n_name, 1);
-
-    //                 let ret_val = xml_sax2_get_entity(ctx, name);
-    //                 desret_xml_entity_ptr(ret_val);
-    //                 des_void_ptr(n_ctx, ctx, 0);
-    //                 des_const_xml_char_ptr(n_name, name, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlSAX2GetEntity",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     eprint!(" {}", n_ctx);
-    //                     eprintln!(" {}", n_name);
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2GetEntity()");
-    //     }
-    // }
 
     #[test]
     fn test_xml_sax2_get_line_number() {
@@ -4360,40 +3948,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_xml_sax2_get_parameter_entity() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let ctx = gen_void_ptr(n_ctx, 0);
-    //                 let name = gen_const_xml_char_ptr(n_name, 1);
-
-    //                 let ret_val = xml_sax2_get_parameter_entity(ctx, name);
-    //                 desret_xml_entity_ptr(ret_val);
-    //                 des_void_ptr(n_ctx, ctx, 0);
-    //                 des_const_xml_char_ptr(n_name, name, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlSAX2GetParameterEntity",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     eprint!(" {}", n_ctx);
-    //                     eprintln!(" {}", n_name);
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2GetParameterEntity()"
-    //         );
-    //     }
-    // }
-
     #[test]
     fn test_xml_sax2_get_public_id() {
         let mut leaks = 0;
@@ -4422,134 +3976,6 @@ mod tests {
             );
         }
     }
-
-    #[test]
-    fn test_xml_sax2_get_system_id() {
-        let mut leaks = 0;
-
-        unsafe {
-            for n_ctx in 0..GEN_NB_VOID_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctx = gen_void_ptr(n_ctx, 0);
-
-                let ret_val = xml_sax2_get_system_id(ctx);
-                desret_const_xml_char_ptr(ret_val);
-                des_void_ptr(n_ctx, ctx, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSAX2GetSystemId",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctx);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlSAX2GetSystemId()"
-            );
-        }
-    }
-
-    // #[test]
-    // fn test_xml_sax2_has_external_subset() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_void_ptr(n_ctx, 0);
-
-    //             let ret_val = xml_sax2_has_external_subset(ctx);
-    //             desret_int(ret_val);
-    //             des_void_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlSAX2HasExternalSubset",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2HasExternalSubset()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_has_internal_subset() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_void_ptr(n_ctx, 0);
-
-    //             let ret_val = xml_sax2_has_internal_subset(ctx);
-    //             desret_int(ret_val);
-    //             des_void_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlSAX2HasInternalSubset",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2HasInternalSubset()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_ignorable_whitespace() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_ch in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_len in 0..GEN_NB_INT {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let ctx = gen_void_ptr(n_ctx, 0);
-    //                     let ch = gen_const_xml_char_ptr(n_ch, 1);
-    //                     let mut len = gen_int(n_len, 2);
-    //                     if !ch.is_null() && len > xml_strlen(ch) {
-    //                         len = 0;
-    //                     }
-
-    //                     xml_sax2_ignorable_whitespace(ctx, ch, len);
-    //                     des_void_ptr(n_ctx, ctx, 0);
-    //                     des_const_xml_char_ptr(n_ch, ch, 1);
-    //                     des_int(n_len, len, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlSAX2IgnorableWhitespace",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_ctx);
-    //                         eprint!(" {}", n_ch);
-    //                         eprintln!(" {}", n_len);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2IgnorableWhitespace()"
-    //         );
-    //     }
-    // }
 
     #[test]
     fn test_xml_sax2_init_default_saxhandler() {
@@ -4612,475 +4038,6 @@ mod tests {
             }
         }
     }
-
-    // #[test]
-    // fn test_xml_sax2_internal_subset() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctx = gen_void_ptr(n_ctx, 0);
-    //                         let name = gen_const_xml_char_ptr(n_name, 1);
-    //                         let external_id = gen_const_xml_char_ptr(n_external_id, 2);
-    //                         let system_id = gen_const_xml_char_ptr(n_system_id, 3);
-
-    //                         xml_sax2_internal_subset(ctx, name, external_id, system_id);
-    //                         des_void_ptr(n_ctx, ctx, 0);
-    //                         des_const_xml_char_ptr(n_name, name, 1);
-    //                         des_const_xml_char_ptr(n_external_id, external_id, 2);
-    //                         des_const_xml_char_ptr(n_system_id, system_id, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlSAX2InternalSubset",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             eprint!(" {}", n_ctx);
-    //                             eprint!(" {}", n_name);
-    //                             eprint!(" {}", n_external_id);
-    //                             eprintln!(" {}", n_system_id);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2InternalSubset()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_is_standalone() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_void_ptr(n_ctx, 0);
-
-    //             let ret_val = xml_sax2_is_standalone(ctx);
-    //             desret_int(ret_val);
-    //             des_void_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlSAX2IsStandalone",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2IsStandalone()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_notation_decl() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctx = gen_void_ptr(n_ctx, 0);
-    //                         let name = gen_const_xml_char_ptr(n_name, 1);
-    //                         let public_id = gen_const_xml_char_ptr(n_public_id, 2);
-    //                         let system_id = gen_const_xml_char_ptr(n_system_id, 3);
-
-    //                         xml_sax2_notation_decl(ctx, name, public_id, system_id);
-    //                         des_void_ptr(n_ctx, ctx, 0);
-    //                         des_const_xml_char_ptr(n_name, name, 1);
-    //                         des_const_xml_char_ptr(n_public_id, public_id, 2);
-    //                         des_const_xml_char_ptr(n_system_id, system_id, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlSAX2NotationDecl",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             eprint!(" {}", n_ctx);
-    //                             eprint!(" {}", n_name);
-    //                             eprint!(" {}", n_public_id);
-    //                             eprintln!(" {}", n_system_id);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2NotationDecl()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_processing_instruction() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_target in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_data in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let ctx = gen_void_ptr(n_ctx, 0);
-    //                     let target = gen_const_xml_char_ptr(n_target, 1);
-    //                     let data = gen_const_xml_char_ptr(n_data, 2);
-
-    //                     xml_sax2_processing_instruction(ctx, target, data);
-    //                     des_void_ptr(n_ctx, ctx, 0);
-    //                     des_const_xml_char_ptr(n_target, target, 1);
-    //                     des_const_xml_char_ptr(n_data, data, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlSAX2ProcessingInstruction",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_ctx);
-    //                         eprint!(" {}", n_target);
-    //                         eprintln!(" {}", n_data);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2ProcessingInstruction()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_reference() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let ctx = gen_void_ptr(n_ctx, 0);
-    //                 let name = gen_const_xml_char_ptr(n_name, 1);
-
-    //                 xml_sax2_reference(ctx, name);
-    //                 des_void_ptr(n_ctx, ctx, 0);
-    //                 des_const_xml_char_ptr(n_name, name, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlSAX2Reference",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     eprint!(" {}", n_ctx);
-    //                     eprintln!(" {}", n_name);
-    //                 }
-    //             }
-    //         }
-    //         assert!(leaks == 0, "{leaks} Leaks are found in xmlSAX2Reference()");
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_resolve_entity() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let ctx = gen_void_ptr(n_ctx, 0);
-    //                     let public_id = gen_const_xml_char_ptr(n_public_id, 1);
-    //                     let system_id = gen_const_xml_char_ptr(n_system_id, 2);
-
-    //                     let ret_val = xml_sax2_resolve_entity(ctx, public_id, system_id);
-    //                     desret_xml_parser_input_ptr(ret_val);
-    //                     des_void_ptr(n_ctx, ctx, 0);
-    //                     des_const_xml_char_ptr(n_public_id, public_id, 1);
-    //                     des_const_xml_char_ptr(n_system_id, system_id, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlSAX2ResolveEntity",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         eprint!(" {}", n_ctx);
-    //                         eprint!(" {}", n_public_id);
-    //                         eprintln!(" {}", n_system_id);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2ResolveEntity()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_set_document_locator() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_loc in 0..GEN_NB_XML_SAXLOCATOR_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let ctx = gen_void_ptr(n_ctx, 0);
-    //                 let loc = gen_xml_saxlocator_ptr(n_loc, 1);
-
-    //                 xml_sax2_set_document_locator(ctx, loc);
-    //                 des_void_ptr(n_ctx, ctx, 0);
-    //                 des_xml_saxlocator_ptr(n_loc, loc, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlSAX2SetDocumentLocator",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     eprint!(" {}", n_ctx);
-    //                     eprintln!(" {}", n_loc);
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2SetDocumentLocator()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_start_document() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             let mem_base = xml_mem_blocks();
-    //             let ctx = gen_void_ptr(n_ctx, 0);
-
-    //             xml_sax2_start_document(ctx);
-    //             des_void_ptr(n_ctx, ctx, 0);
-    //             reset_last_error();
-    //             if mem_base != xml_mem_blocks() {
-    //                 leaks += 1;
-    //                 eprint!(
-    //                     "Leak of {} blocks found in xmlSAX2StartDocument",
-    //                     xml_mem_blocks() - mem_base
-    //                 );
-    //                 eprintln!(" {}", n_ctx);
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2StartDocument()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_start_element() {
-    //     #[cfg(any(
-    //         feature = "sax1",
-    //         feature = "html",
-    //         feature = "writer",
-    //         feature = "legacy"
-    //     ))]
-    //     unsafe {
-    //         let mut leaks = 0;
-    //         #[cfg(feature = "sax1")]
-    //         {
-    //             for n_ctx in 0..GEN_NB_VOID_PTR {
-    //                 for n_fullname in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     for n_atts in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctx = gen_void_ptr(n_ctx, 0);
-    //                         let fullname = gen_const_xml_char_ptr(n_fullname, 1);
-    //                         let atts = gen_const_xml_char_ptr_ptr(n_atts, 2);
-
-    //                         xml_sax2_start_element(ctx, fullname, atts as *mut *const XmlChar);
-    //                         des_void_ptr(n_ctx, ctx, 0);
-    //                         des_const_xml_char_ptr(n_fullname, fullname, 1);
-    //                         des_const_xml_char_ptr_ptr(n_atts, atts as *mut *const XmlChar, 2);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlSAX2StartElement",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             eprint!(" {}", n_ctx);
-    //                             eprint!(" {}", n_fullname);
-    //                             eprintln!(" {}", n_atts);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2StartElement()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_start_element_ns() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_localname in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     for n_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                         for n_nb_namespaces in 0..GEN_NB_INT {
-    //                             for n_namespaces in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
-    //                                 for n_nb_attributes in 0..GEN_NB_INT {
-    //                                     for n_nb_defaulted in 0..GEN_NB_INT {
-    //                                         for n_attributes in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
-    //                                             let mem_base = xml_mem_blocks();
-    //                                             let ctx = gen_void_ptr(n_ctx, 0);
-    //                                             let localname =
-    //                                                 gen_const_xml_char_ptr(n_localname, 1);
-    //                                             let prefix = gen_const_xml_char_ptr(n_prefix, 2);
-    //                                             let uri = gen_const_xml_char_ptr(n_uri, 3);
-    //                                             let nb_namespaces = gen_int(n_nb_namespaces, 4);
-    //                                             let namespaces =
-    //                                                 gen_const_xml_char_ptr_ptr(n_namespaces, 5);
-    //                                             let nb_attributes = gen_int(n_nb_attributes, 6);
-    //                                             let nb_defaulted = gen_int(n_nb_defaulted, 7);
-    //                                             let attributes =
-    //                                                 gen_const_xml_char_ptr_ptr(n_attributes, 8);
-
-    //                                             xml_sax2_start_element_ns(
-    //                                                 ctx,
-    //                                                 localname,
-    //                                                 prefix,
-    //                                                 uri,
-    //                                                 nb_namespaces,
-    //                                                 namespaces as *mut *const XmlChar,
-    //                                                 nb_attributes,
-    //                                                 nb_defaulted,
-    //                                                 attributes as *mut *const XmlChar,
-    //                                             );
-    //                                             des_void_ptr(n_ctx, ctx, 0);
-    //                                             des_const_xml_char_ptr(n_localname, localname, 1);
-    //                                             des_const_xml_char_ptr(n_prefix, prefix, 2);
-    //                                             des_const_xml_char_ptr(n_uri, uri, 3);
-    //                                             des_int(n_nb_namespaces, nb_namespaces, 4);
-    //                                             des_const_xml_char_ptr_ptr(
-    //                                                 n_namespaces,
-    //                                                 namespaces as *mut *const XmlChar,
-    //                                                 5,
-    //                                             );
-    //                                             des_int(n_nb_attributes, nb_attributes, 6);
-    //                                             des_int(n_nb_defaulted, nb_defaulted, 7);
-    //                                             des_const_xml_char_ptr_ptr(
-    //                                                 n_attributes,
-    //                                                 attributes as *mut *const XmlChar,
-    //                                                 8,
-    //                                             );
-    //                                             reset_last_error();
-    //                                             if mem_base != xml_mem_blocks() {
-    //                                                 leaks += 1;
-    //                                                 eprint!("Leak of {} blocks found in xmlSAX2StartElementNs", xml_mem_blocks() - mem_base);
-    //                                                 eprint!(" {}", n_ctx);
-    //                                                 eprint!(" {}", n_localname);
-    //                                                 eprint!(" {}", n_prefix);
-    //                                                 eprint!(" {}", n_uri);
-    //                                                 eprint!(" {}", n_nb_namespaces);
-    //                                                 eprint!(" {}", n_namespaces);
-    //                                                 eprint!(" {}", n_nb_attributes);
-    //                                                 eprint!(" {}", n_nb_defaulted);
-    //                                                 eprintln!(" {}", n_attributes);
-    //                                             }
-    //                                         }
-    //                                     }
-    //                                 }
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2StartElementNs()"
-    //         );
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_sax2_unparsed_entity_decl() {
-    //     let mut leaks = 0;
-
-    //     unsafe {
-    //         for n_ctx in 0..GEN_NB_VOID_PTR {
-    //             for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                 for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                     for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                         for n_notation_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-    //                             let mem_base = xml_mem_blocks();
-    //                             let ctx = gen_void_ptr(n_ctx, 0);
-    //                             let name = gen_const_xml_char_ptr(n_name, 1);
-    //                             let public_id = gen_const_xml_char_ptr(n_public_id, 2);
-    //                             let system_id = gen_const_xml_char_ptr(n_system_id, 3);
-    //                             let notation_name = gen_const_xml_char_ptr(n_notation_name, 4);
-
-    //                             xml_sax2_unparsed_entity_decl(
-    //                                 ctx,
-    //                                 name,
-    //                                 public_id,
-    //                                 system_id,
-    //                                 notation_name,
-    //                             );
-    //                             des_void_ptr(n_ctx, ctx, 0);
-    //                             des_const_xml_char_ptr(n_name, name, 1);
-    //                             des_const_xml_char_ptr(n_public_id, public_id, 2);
-    //                             des_const_xml_char_ptr(n_system_id, system_id, 3);
-    //                             des_const_xml_char_ptr(n_notation_name, notation_name, 4);
-    //                             reset_last_error();
-    //                             if mem_base != xml_mem_blocks() {
-    //                                 leaks += 1;
-    //                                 eprint!(
-    //                                     "Leak of {} blocks found in xmlSAX2UnparsedEntityDecl",
-    //                                     xml_mem_blocks() - mem_base
-    //                                 );
-    //                                 eprint!(" {}", n_ctx);
-    //                                 eprint!(" {}", n_name);
-    //                                 eprint!(" {}", n_public_id);
-    //                                 eprint!(" {}", n_system_id);
-    //                                 eprintln!(" {}", n_notation_name);
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         assert!(
-    //             leaks == 0,
-    //             "{leaks} Leaks are found in xmlSAX2UnparsedEntityDecl()"
-    //         );
-    //     }
-    // }
 
     #[test]
     fn test_xml_saxdefault_version() {

@@ -249,10 +249,10 @@ pub unsafe fn parser_print_file_context(input: XmlParserInputPtr) {
 
 pub unsafe fn parser_print_file_info(input: XmlParserInputPtr) {
     if !input.is_null() {
-        if !(*input).filename.is_null() {
+        if (*input).filename.is_some() {
             generic_error!(
                 "{}:{}: ",
-                CStr::from_ptr((*input).filename).to_string_lossy(),
+                (*input).filename.as_deref().unwrap(),
                 (*input).line
             );
         } else {
@@ -299,17 +299,17 @@ pub unsafe fn report_error(
      */
     if !ctxt.is_null() {
         input = (*ctxt).input;
-        if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+        if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
             cur = input;
             input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
         }
         if !input.is_null() {
-            if !(*input).filename.is_null() {
+            if (*input).filename.is_some() {
                 channel(
                     data.clone(),
                     format!(
                         "{}:{}: ",
-                        CStr::from_ptr((*input).filename).to_string_lossy(),
+                        (*input).filename.as_deref().unwrap(),
                         (*input).line
                     )
                     .as_str(),
@@ -390,12 +390,12 @@ pub unsafe fn report_error(
     if !ctxt.is_null() {
         parser_print_file_context_internal(input, channel, data.clone());
         if !cur.is_null() {
-            if !(*cur).filename.is_null() {
+            if (*cur).filename.is_some() {
                 channel(
                     data.clone(),
                     format!(
                         "{}:{}: \n",
-                        CStr::from_ptr((*cur).filename).to_string_lossy(),
+                        (*cur).filename.as_deref().unwrap(),
                         (*cur).line
                     )
                     .as_str(),
@@ -430,7 +430,7 @@ pub(crate) fn parser_error(ctx: Option<GenericErrorContext>, msg: &str) {
                 .downcast_ref::<Box<XmlParserCtxtPtr>>()
                 .expect("ctxt is not XmlParserCtxtPtr");
             let mut input = (*ctxt).input;
-            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
             }
@@ -459,7 +459,7 @@ pub(crate) fn parser_warning(ctx: Option<GenericErrorContext>, msg: &str) {
             .expect("ctxt is not XmlParserCtxtPtr");
         unsafe {
             let mut input = (*ctxt).input;
-            if !input.is_null() && (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                 cur = input;
                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
             }
@@ -492,7 +492,7 @@ pub(crate) fn parser_validity_error(ctx: Option<GenericErrorContext>, msg: &str)
                 .expect("ctxt is not XmlParserCtxtPtr");
             if len > 1 && msg.as_bytes()[len - 2] != b':' {
                 input = (*ctxt).input;
-                if (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+                if (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                     input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
                 }
 
@@ -533,7 +533,7 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
         unsafe {
             if len != 0 && msg.as_bytes()[len - 1] != b':' {
                 input = (*ctxt).input;
-                if (*input).filename.is_null() && (*ctxt).input_tab.len() > 1 {
+                if (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                     input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
                 }
 

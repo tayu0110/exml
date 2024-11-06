@@ -481,12 +481,13 @@ unsafe extern "C" fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
 
     let len = strlen(BUFFER.as_ptr());
     if !input.is_null() {
-        if !(*input).filename.is_null() {
+        if (*input).filename.is_some() {
+            let filename = CString::new((*input).filename.as_deref().unwrap()).unwrap();
             snprintf(
                 addr_of_mut!(BUFFER[len]) as _,
                 BUFFER.len() - len,
                 c"%s:%d: ".as_ptr(),
-                (*input).filename,
+                filename.as_ptr(),
                 (*input).line,
             );
         } else {
@@ -2369,7 +2370,7 @@ unsafe extern "C" fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
  *            Tree Test processing                *
  *                                    *
  ************************************************************************/
-unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlParserCtxtPtr) {
+unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr) {
     let mut doc: XmlDocPtr = null_mut();
     #[cfg(feature = "tree")]
     let tmp: XmlDocPtr;
@@ -2378,7 +2379,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         start_timer();
     }
 
-    if cfg!(feature = "tree") && filename.is_null() {
+    if cfg!(feature = "tree") && filename.is_none() {
         #[cfg(feature = "tree")]
         {
             if GENERATE != 0 {
@@ -2395,10 +2396,11 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 static stdin: *mut FILE;
             }
 
-            let f = if *filename.add(0) == b'-' as i8 && *filename.add(1) == 0 {
+            let f = if filename == Some("-") {
                 stdin
             } else {
-                fopen(filename, c"rb".as_ptr())
+                let f = CString::new(filename.unwrap()).unwrap();
+                fopen(f.as_ptr(), c"rb".as_ptr())
             };
             if !f.is_null() {
                 let mut res: c_int;
@@ -2407,12 +2409,13 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
 
                 res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                 if res > 0 {
+                    let filename = filename.map(|f| CString::new(f).unwrap());
                     ctxt = html_create_push_parser_ctxt(
                         null_mut(),
                         None,
                         chars.as_ptr(),
                         res,
-                        filename,
+                        filename.map_or(null(), |f| f.as_ptr()),
                         XmlCharEncoding::None,
                     );
                     if ctxt.is_null() {
@@ -2442,11 +2445,11 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         #[cfg(feature = "html")]
         {
             let mut info: stat = unsafe { zeroed() };
-
-            if stat(filename, addr_of_mut!(info)) < 0 {
+            let fname = CString::new(filename.unwrap()).unwrap();
+            if stat(fname.as_ptr(), addr_of_mut!(info)) < 0 {
                 return;
             }
-            let fd: c_int = open(filename, O_RDONLY);
+            let fd: c_int = open(fname.as_ptr(), O_RDONLY);
             if fd < 0 {
                 return;
             }
@@ -2454,10 +2457,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
             if base == MAP_FAILED as _ {
                 close(fd);
-                eprintln!(
-                    "mmap failure for file {}",
-                    CStr::from_ptr(filename).to_string_lossy()
-                );
+                eprintln!("mmap failure for file {}", filename.unwrap());
                 PROGRESULT = XmllintReturnCode::ErrRdfile;
                 return;
             }
@@ -2471,7 +2471,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
     } else if cfg!(feature = "html") && HTML != 0 {
         #[cfg(feature = "html")]
         {
-            doc = html_read_file(filename, None, OPTIONS);
+            let filename = filename.map(|f| CString::new(f).unwrap());
+            doc = html_read_file(filename.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
         }
     } else if cfg!(feature = "push") && PUSH != 0 {
         /*
@@ -2483,11 +2484,15 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 static stdin: *mut FILE;
             }
 
+            let fname = filename.map(|f| CString::new(f).unwrap());
             /* '-' Usually means stdin -<sven@zen.org> */
-            let f = if *filename.add(0) == b'-' as i8 && *filename.add(1) == 0 {
+            let f = if filename == Some("-") {
                 stdin
             } else {
-                fopen(filename, c"rb".as_ptr())
+                fopen(
+                    fname.as_ref().map_or(null(), |f| f.as_ptr()),
+                    c"rb".as_ptr(),
+                )
             };
             if !f.is_null() {
                 let ret: c_int;
@@ -2504,7 +2509,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                         None,
                         chars.as_ptr(),
                         res,
-                        filename,
+                        fname.map_or(null(), |s| s.as_ptr()),
                     );
                     if ctxt.is_null() {
                         PROGRESULT = XmllintReturnCode::ErrMem;
@@ -2535,11 +2540,12 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             }
         }
     } else if TEST_IO != 0 {
-        if *filename.add(0) == b'-' as i8 && *filename.add(1) == 0 {
-            doc = xml_read_io(stdin(), null_mut(), None, OPTIONS);
+        if filename == Some("-") {
+            doc = xml_read_io(stdin(), None, None, OPTIONS);
         } else {
-            let f: *mut FILE = fopen(filename, c"rb".as_ptr());
-            if let Ok(f) = File::open(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
+            let fname = filename.map(|s| CString::new(s).unwrap());
+            let f: *mut FILE = fopen(fname.map_or(null(), |f| f.as_ptr()), c"rb".as_ptr());
+            if let Some(Ok(f)) = filename.map(File::open) {
                 if rectxt.is_null() {
                     doc = xml_read_io(f, filename, None, OPTIONS);
                 } else {
@@ -2567,18 +2573,24 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         (*ctxt).vctxt.error = Some(xml_html_validity_error);
         (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 
-        doc = xml_ctxt_read_file(ctxt, filename, None, OPTIONS);
+        let fname = filename.map(|f| CString::new(f).unwrap());
+        doc = xml_ctxt_read_file(ctxt, fname.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
 
         if rectxt.is_null() {
             xml_free_parser_ctxt(ctxt);
         }
     } else if MEMORY != 0 {
         let mut info: stat = unsafe { zeroed() };
+        let fname = filename.map(|f| CString::new(f).unwrap());
 
-        if stat(filename, addr_of_mut!(info)) < 0 {
+        if stat(
+            fname.as_ref().map_or(null(), |f| f.as_ptr()),
+            addr_of_mut!(info),
+        ) < 0
+        {
             return;
         }
-        let fd: c_int = open(filename, O_RDONLY);
+        let fd: c_int = open(fname.map_or(null(), |f| f.as_ptr()), O_RDONLY);
         if fd < 0 {
             return;
         }
@@ -2586,10 +2598,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
         if base == MAP_FAILED as _ {
             close(fd);
-            eprintln!(
-                "mmap failure for file {}",
-                CStr::from_ptr(filename).to_string_lossy()
-            );
+            eprintln!("mmap failure for file {}", filename.unwrap());
             PROGRESULT = XmllintReturnCode::ErrRdfile;
             return;
         }
@@ -2618,7 +2627,8 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 ctxt = rectxt;
             }
 
-            doc = xml_ctxt_read_file(ctxt, filename, None, OPTIONS);
+            let fname = filename.map(|f| CString::new(f).unwrap());
+            doc = xml_ctxt_read_file(ctxt, fname.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
 
             if (*ctxt).valid == 0 {
                 PROGRESULT = XmllintReturnCode::ErrRdfile;
@@ -2628,9 +2638,11 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
             }
         }
     } else if !rectxt.is_null() {
-        doc = xml_ctxt_read_file(rectxt, filename, None, OPTIONS);
+        let fname = filename.map(|f| CString::new(f).unwrap());
+        doc = xml_ctxt_read_file(rectxt, fname.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
     } else {
-        doc = xml_read_file(filename, None, OPTIONS);
+        let fname = filename.map(|f| CString::new(f).unwrap());
+        doc = xml_read_file(fname.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
     }
 
     /*
@@ -2685,7 +2697,13 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
     #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
     if SHELL != 0 {
         xml_xpath_order_doc_elems(doc);
-        xml_shell(doc, filename, Some(xml_shell_readline), stdout);
+        let fname = filename.map(|f| CString::new(f).unwrap());
+        xml_shell(
+            doc,
+            fname.map_or(null_mut(), |f| f.as_ptr() as _),
+            Some(xml_shell_readline),
+            stdout,
+        );
     }
 
     /*
@@ -3113,7 +3131,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
                 start_timer();
             }
             if xml_validate_dtd(cvp, doc, dtd) == 0 {
-                let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
+                let filename = filename.unwrap();
                 if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
                     generic_error!(
                         "Document {filename} does not validate against {}\n",
@@ -3153,7 +3171,7 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         (*cvp).error = Some(generic_error_default);
         (*cvp).warning = Some(generic_error_default);
         if xml_validate_document(cvp, doc) == 0 {
-            let filename = CStr::from_ptr(filename).to_string_lossy();
+            let filename = filename.unwrap();
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
@@ -3186,20 +3204,17 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
                 if QUIET == 0 {
-                    eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
+                    eprintln!("{} validates", filename.unwrap());
                 }
             }
             std::cmp::Ordering::Greater => {
-                eprintln!(
-                    "{} fails to validate",
-                    CStr::from_ptr(filename).to_string_lossy()
-                );
+                eprintln!("{} fails to validate", filename.unwrap());
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
             std::cmp::Ordering::Less => {
                 eprintln!(
                     "{} validation generated an internal error",
-                    CStr::from_ptr(filename).to_string_lossy()
+                    filename.unwrap()
                 );
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
@@ -3231,20 +3246,17 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         match xml_relaxng_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
                 if QUIET == 0 {
-                    eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
+                    eprintln!("{} validates", filename.unwrap());
                 }
             }
             std::cmp::Ordering::Greater => {
-                eprintln!(
-                    "{} fails to validate",
-                    CStr::from_ptr(filename).to_string_lossy()
-                );
+                eprintln!("{} fails to validate", filename.unwrap());
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
             std::cmp::Ordering::Less => {
                 eprintln!(
                     "{} validation generated an internal error",
-                    CStr::from_ptr(filename).to_string_lossy()
+                    filename.unwrap()
                 );
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
@@ -3274,20 +3286,17 @@ unsafe extern "C" fn parse_and_print_file(filename: *mut c_char, rectxt: XmlPars
         match xml_schema_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
                 if QUIET == 0 {
-                    eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
+                    eprintln!("{} validates", filename.unwrap());
                 }
             }
             std::cmp::Ordering::Greater => {
-                eprintln!(
-                    "{} fails to validate",
-                    CStr::from_ptr(filename).to_string_lossy()
-                );
+                eprintln!("{} fails to validate", filename.unwrap());
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
             std::cmp::Ordering::Less => {
                 eprintln!(
                     "{} validation generated an internal error",
-                    CStr::from_ptr(filename).to_string_lossy()
+                    filename.unwrap()
                 );
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
@@ -4185,20 +4194,21 @@ fn main() {
             if !arg.starts_with('-') || arg == "-" {
                 if REPEAT != 0 {
                     let mut ctxt: XmlParserCtxtPtr = null_mut();
-                    let arg = CString::new(arg).expect("Failed to construct argument");
 
                     for _ in 0..REPEAT {
                         #[cfg(feature = "libxml_reader")]
                         {
+                            let carg =
+                                CString::new(arg.as_str()).expect("Failed to construct argument");
                             if STREAM != 0 {
-                                stream_file(arg.as_ptr() as _);
+                                stream_file(carg.as_ptr() as _);
                             } else if SAX != 0 {
-                                test_sax(arg.as_ptr());
+                                test_sax(carg.as_ptr());
                             } else {
                                 if ctxt.is_null() {
                                     ctxt = xml_new_parser_ctxt();
                                 }
-                                parse_and_print_file(arg.as_ptr() as _, ctxt);
+                                parse_and_print_file(Some(&arg), ctxt);
                             }
                         }
                         #[cfg(not(feature = "libxml_reader"))]
@@ -4218,16 +4228,17 @@ fn main() {
                     }
                 } else {
                     NBREGISTER = 0;
+                    let carg = CString::new(arg.as_str()).expect("Failed to construct argument");
 
                     if cfg!(feature = "libxml_reader") && STREAM != 0 {
                         #[cfg(feature = "libxml_reader")]
                         {
-                            stream_file(arg.as_ptr() as _);
+                            stream_file(carg.as_ptr() as _);
                         }
                     } else if SAX != 0 {
-                        test_sax(arg.as_ptr() as _);
+                        test_sax(carg.as_ptr() as _);
                     } else {
-                        parse_and_print_file(arg.as_ptr() as _, null_mut());
+                        parse_and_print_file(Some(&arg), null_mut());
                     }
 
                     if CHKREGISTER != 0 && NBREGISTER != 0 {
@@ -4242,7 +4253,7 @@ fn main() {
             }
         }
         if GENERATE != 0 {
-            parse_and_print_file(null_mut(), null_mut());
+            parse_and_print_file(None, null_mut());
         }
         if HTMLOUT != 0 && NOWRAP == 0 {
             generic_error!("</body></html>\n");

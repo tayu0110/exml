@@ -8695,7 +8695,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
         }
     } else if !(*ctxt).buffer.is_null() {
         let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize).to_vec();
-        doc = xml_read_memory(mem, null_mut(), None, 0);
+        doc = xml_read_memory(mem, None, None, 0);
         if doc.is_null() {
             xml_rng_perr(
                 ctxt,

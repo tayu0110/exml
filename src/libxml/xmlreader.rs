@@ -1037,9 +1037,17 @@ pub unsafe fn xml_text_reader_setup(
             }
 
             if url.is_null() {
-                (*input_stream).filename = null_mut();
+                (*input_stream).filename = None;
             } else {
-                (*input_stream).filename = xml_canonic_path(url as _) as _;
+                let canonic = xml_canonic_path(url as _);
+                if !canonic.is_null() {
+                    (*input_stream).filename = Some(
+                        CStr::from_ptr(canonic as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                    xml_free(canonic as _);
+                }
             }
             (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
             (*input_stream).reset_base();
@@ -1119,9 +1127,10 @@ pub unsafe fn xml_text_reader_setup(
     }
     if !url.is_null()
         && !(*(*reader).ctxt).input.is_null()
-        && (*(*(*reader).ctxt).input).filename.is_null()
+        && (*(*(*reader).ctxt).input).filename.is_none()
     {
-        (*(*(*reader).ctxt).input).filename = xml_strdup(url as _) as _;
+        (*(*(*reader).ctxt).input).filename =
+            Some(CStr::from_ptr(url).to_string_lossy().into_owned());
     }
 
     (*reader).doc = null_mut();
@@ -5403,15 +5412,17 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_set_schema(
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 unsafe extern "C" fn xml_text_reader_locator(
     ctx: *mut c_void,
-    file: *mut *const c_char,
+    file: *mut Option<String>,
     line: *mut c_ulong,
 ) -> c_int {
+    use std::ffi::CStr;
+
     if ctx.is_null() || (file.is_null() && line.is_null()) {
         return -1;
     }
 
     if !file.is_null() {
-        *file = null_mut();
+        *file = None;
     }
     if !line.is_null() {
         *line = 0;
@@ -5420,7 +5431,7 @@ unsafe extern "C" fn xml_text_reader_locator(
     let reader: XmlTextReaderPtr = ctx as XmlTextReaderPtr;
     if !(*reader).ctxt.is_null() && !(*(*reader).ctxt).input.is_null() {
         if !file.is_null() {
-            *file = (*(*(*reader).ctxt).input).filename;
+            *file = (*(*(*reader).ctxt).input).filename.clone();
         }
         if !line.is_null() {
             *line = (*(*(*reader).ctxt).input).line as _;
@@ -5442,7 +5453,11 @@ unsafe extern "C" fn xml_text_reader_locator(
         if !file.is_null() {
             let doc: XmlDocPtr = (*(*reader).node).doc;
             if !doc.is_null() && !(*doc).url.is_null() {
-                *file = (*doc).url as _;
+                *file = Some(
+                    CStr::from_ptr((*doc).url as *const i8)
+                        .to_string_lossy()
+                        .into_owned(),
+                );
             } else {
                 ret = -1;
             }
@@ -6231,7 +6246,7 @@ pub unsafe extern "C" fn xml_text_reader_locator_line_number(
         /* inspired from error.c */
         let mut input: XmlParserInputPtr;
         input = (*ctx).input;
-        if (*input).filename.is_null() && (*ctx).input_tab.len() > 1 {
+        if (*input).filename.is_none() && (*ctx).input_tab.len() > 1 {
             input = (*ctx).input_tab[(*ctx).input_tab.len() as usize - 2];
         }
         if !input.is_null() {
@@ -6258,6 +6273,8 @@ pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
     locator: XmlTextReaderLocatorPtr,
 ) -> *mut XmlChar {
     /* we know that locator is a xmlParserCtxtPtr */
+
+    use std::ffi::CString;
     let ctx: XmlParserCtxtPtr = locator as XmlParserCtxtPtr;
     let ret: *mut XmlChar;
 
@@ -6270,11 +6287,16 @@ pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
         /* inspired from error.c */
         let mut input: XmlParserInputPtr;
         input = (*ctx).input;
-        if (*input).filename.is_null() && (*ctx).input_tab.len() > 1 {
+        if (*input).filename.is_none() && (*ctx).input_tab.len() > 1 {
             input = (*ctx).input_tab[(*ctx).input_tab.len() as usize - 2];
         }
         if !input.is_null() {
-            ret = xml_strdup((*input).filename as _);
+            if let Some(filename) = (*input).filename.as_deref() {
+                let filename = CString::new(filename).unwrap();
+                ret = xml_strdup(filename.as_ptr() as _);
+            } else {
+                ret = null_mut()
+            }
         } else {
             ret = null_mut();
         }

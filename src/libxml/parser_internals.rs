@@ -359,7 +359,7 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
         return null_mut();
     }
 
-    (*input).filename = null_mut();
+    (*input).filename = None;
     (*input).buf = Some(Rc::new(RefCell::new(buf)));
     (*input).reset_base();
 
@@ -792,8 +792,11 @@ pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
         return null_mut();
     }
     if !(*entity).uri.load(Ordering::Relaxed).is_null() {
-        (*input).filename =
-            xml_strdup((*entity).uri.load(Ordering::Relaxed) as *mut XmlChar) as *mut c_char;
+        (*input).filename = Some(
+            CStr::from_ptr((*entity).uri.load(Ordering::Relaxed) as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
     (*input).base = (*entity).content.load(Ordering::Relaxed) as _;
     if (*entity).length == 0 {
@@ -1014,10 +1017,10 @@ pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParser
     }
 
     if get_parser_debug_entities() != 0 {
-        if !(*ctxt).input.is_null() && !(*(*ctxt).input).filename.is_null() {
+        if !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_some() {
             generic_error!(
                 "{}({}): ",
-                CStr::from_ptr((*(*ctxt).input).filename).to_string_lossy(),
+                (*(*ctxt).input).filename.as_ref().unwrap(),
                 (*(*ctxt).input).line
             );
         }
@@ -1057,9 +1060,7 @@ pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
         return;
     }
 
-    if !(*input).filename.is_null() {
-        xml_free((*input).filename as _);
-    }
+    (*input).filename = None;
     if !(*input).directory.is_null() {
         xml_free((*input).directory as _);
     }
@@ -1141,16 +1142,24 @@ pub unsafe extern "C" fn xml_new_input_from_file(
         return null_mut();
     }
 
-    let uri = if (*input_stream).filename.is_null() {
-        xml_strdup(filename as *mut XmlChar)
+    let uri = if let Some(filename) = (*input_stream).filename.as_deref() {
+        let filename = CString::new(filename).unwrap();
+        xml_strdup(filename.as_ptr() as *mut XmlChar)
     } else {
-        xml_strdup((*input_stream).filename as *mut XmlChar)
+        xml_strdup(filename as *mut XmlChar)
     };
     let directory: *mut c_char = xml_parser_get_directory(uri as *const c_char);
-    if !(*input_stream).filename.is_null() {
-        xml_free((*input_stream).filename as _);
+    {
+        let canonic = xml_canonic_path(uri as *const XmlChar);
+        if !canonic.is_null() {
+            (*input_stream).filename = Some(
+                CStr::from_ptr(canonic as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(canonic as _);
+        }
     }
-    (*input_stream).filename = xml_canonic_path(uri as *const XmlChar) as *mut c_char;
     if !uri.is_null() {
         xml_free(uri as _);
     }
