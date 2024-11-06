@@ -96,10 +96,7 @@ use crate::{
         xmlerror::XmlParserErrors,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
-        xmlstring::{
-            xml_char_strdup, xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strndup,
-            XmlChar,
-        },
+        xmlstring::{xml_char_strdup, xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
         xpath::xml_init_xpath_internal,
     },
     private::{
@@ -5123,8 +5120,8 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             (*new_doc).dict = (*doc).dict;
             xml_dict_reference((*new_doc).dict);
         }
-        if !(*doc).url.is_null() {
-            (*new_doc).url = xml_strdup((*doc).url);
+        if (*doc).url.is_some() {
+            (*new_doc).url = (*doc).url.clone();
         }
     }
     let new_root: XmlNodePtr =

@@ -8707,7 +8707,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
             );
             return null_mut();
         }
-        (*doc).url = xml_strdup(c"in_memory_buffer".as_ptr() as _);
+        (*doc).url = Some("in_memory_buffer".to_owned());
         (*ctxt).url = xml_strdup(c"in_memory_buffer".as_ptr() as _);
     } else if !(*ctxt).document.is_null() {
         doc = (*ctxt).document;
@@ -9073,6 +9073,8 @@ unsafe extern "C" fn xml_relaxng_dump_grammar(
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_relaxng_dump(output: *mut FILE, schema: XmlRelaxNGPtr) {
+    use std::ffi::CString;
+
     if output.is_null() {
         return;
     }
@@ -9086,8 +9088,9 @@ pub unsafe extern "C" fn xml_relaxng_dump(output: *mut FILE, schema: XmlRelaxNGP
     fprintf(output, c"RelaxNG: ".as_ptr() as _);
     if (*schema).doc.is_null() {
         fprintf(output, c"no document\n".as_ptr() as _);
-    } else if !(*(*schema).doc).url.is_null() {
-        fprintf(output, c"%s\n".as_ptr() as _, (*(*schema).doc).url);
+    } else if let Some(url) = (*(*schema).doc).url.as_deref() {
+        let url = CString::new(url).unwrap();
+        fprintf(output, c"%s\n".as_ptr() as _, url.as_ptr());
     } else {
         fprintf(output, c"\n".as_ptr() as _);
     }

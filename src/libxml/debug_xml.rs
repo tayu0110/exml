@@ -1673,9 +1673,10 @@ unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Xml
             xml_ctxt_dump_string(ctxt, encoding.as_ptr() as *const u8);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
-        if !(*doc).url.is_null() {
+        if let Some(url) = (*doc).url.as_deref() {
             fprintf((*ctxt).output, c"URL=".as_ptr());
-            xml_ctxt_dump_string(ctxt, (*doc).url);
+            let url = CString::new(url).unwrap();
+            xml_ctxt_dump_string(ctxt, url.as_ptr() as *const u8);
             fprintf((*ctxt).output, c"\n".as_ptr());
         }
         if (*doc).standalone != 0 {

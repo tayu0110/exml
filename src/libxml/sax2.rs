@@ -1325,13 +1325,23 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
         }
     }
     if !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).url.is_null()
+        && (*(*ctxt).my_doc).url.is_none()
         && !(*ctxt).input.is_null()
         && (*(*ctxt).input).filename.is_some()
     {
         let filename = CString::new((*(*ctxt).input).filename.as_deref().unwrap()).unwrap();
-        (*(*ctxt).my_doc).url = xml_path_to_uri(filename.as_ptr() as _);
-        if (*(*ctxt).my_doc).url.is_null() {
+        let url = xml_path_to_uri(filename.as_ptr() as _);
+        if !url.is_null() {
+            (*(*ctxt).my_doc).url = Some(
+                CStr::from_ptr(url as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(url as _);
+        } else {
+            (*(*ctxt).my_doc).url = None;
+        }
+        if (*(*ctxt).my_doc).url.is_none() {
             xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
         }
     }

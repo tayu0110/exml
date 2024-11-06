@@ -4851,6 +4851,8 @@ pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlD
  */
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> c_int {
+    use std::ffi::CString;
+
     use crate::libxml::parser::xml_parse_dtd;
 
     use super::uri::xml_build_uri;
@@ -4876,7 +4878,11 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
     {
         let sys_id: *mut XmlChar;
         if !(*(*doc).int_subset).system_id.is_null() {
-            sys_id = xml_build_uri((*(*doc).int_subset).system_id, (*doc).url);
+            let url = (*doc).url.as_deref().map(|u| CString::new(u).unwrap());
+            sys_id = xml_build_uri(
+                (*(*doc).int_subset).system_id,
+                url.map_or(null(), |u| u.as_ptr() as *const u8),
+            );
             if sys_id.is_null() {
                 xml_err_valid(
                     ctxt,

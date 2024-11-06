@@ -3701,9 +3701,7 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
     if !(*cur).old_ns.is_null() {
         xml_free_ns_list((*cur).old_ns);
     }
-    if !(*cur).url.is_null() {
-        xml_free((*cur).url as _);
-    }
+    (*cur).url = None;
     if !(*cur).dict.is_null() {
         xml_dict_free((*cur).dict);
     }
@@ -5415,8 +5413,6 @@ unsafe extern "C" fn xml_text_reader_locator(
     file: *mut Option<String>,
     line: *mut c_ulong,
 ) -> c_int {
-    use std::ffi::CStr;
-
     if ctx.is_null() || (file.is_null() && line.is_null()) {
         return -1;
     }
@@ -5452,12 +5448,8 @@ unsafe extern "C" fn xml_text_reader_locator(
         }
         if !file.is_null() {
             let doc: XmlDocPtr = (*(*reader).node).doc;
-            if !doc.is_null() && !(*doc).url.is_null() {
-                *file = Some(
-                    CStr::from_ptr((*doc).url as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
+            if !doc.is_null() && (*doc).url.is_some() {
+                *file = (*doc).url.clone();
             } else {
                 ret = -1;
             }

@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::{c_char, c_int, CStr},
+    ffi::{c_char, c_int, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -464,9 +464,6 @@ unsafe extern "C" fn xml_xinclude_free_ref(refe: XmlXincludeRefPtr) {
     if refe.is_null() {
         return;
     }
-    // #ifdef DEBUG_XINCLUDE
-    //     xmlGenericError(xmlGenericErrorContext, c"Freeing ref\n".as_ptr() as _);
-    // #endif
     if !(*refe).uri.is_null() {
         xml_free((*refe).uri as _);
     }
@@ -491,9 +488,6 @@ unsafe extern "C" fn xml_xinclude_new_ref(
     uri: *const XmlChar,
     elem: XmlNodePtr,
 ) -> XmlXincludeRefPtr {
-    // #ifdef DEBUG_XINCLUDE
-    //     xmlGenericError(xmlGenericErrorContext, c"New ref %s\n".as_ptr() as _, URI);
-    // #endif
     let ret: XmlXincludeRefPtr = xml_malloc(size_of::<XmlXincludeRef>()) as XmlXincludeRefPtr;
     if ret.is_null() {
         xml_xinclude_err_memory(ctxt, elem, c"growing XInclude context".as_ptr() as _);
@@ -564,9 +558,6 @@ unsafe extern "C" fn xml_xinclude_add_node(
         return null_mut();
     }
 
-    // #ifdef DEBUG_XINCLUDE
-    //     xmlGenericError(xmlGenericErrorContext, c"Add node\n".as_ptr() as _);
-    // #endif
     /*
      * read the attributes
      */
@@ -606,7 +597,11 @@ unsafe extern "C" fn xml_xinclude_add_node(
      */
     let base: *mut XmlChar = xml_node_get_base((*ctxt).doc, cur);
     if base.is_null() {
-        uri = xml_build_uri(href, (*(*ctxt).doc).url);
+        let url = (*(*ctxt).doc)
+            .url
+            .as_deref()
+            .map(|u| CString::new(u).unwrap());
+        uri = xml_build_uri(href, url.map_or(null(), |u| u.as_ptr() as *const u8));
     } else {
         uri = xml_build_uri(href, base);
     }
@@ -706,7 +701,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
     }
     xml_free(uri as _);
 
-    if xml_str_equal(url, (*(*ctxt).doc).url) {
+    if (*(*ctxt).doc).url.as_deref() == CStr::from_ptr(url as *const i8).to_str().ok() {
         local = 1;
     }
 
@@ -1604,9 +1599,6 @@ unsafe extern "C" fn xml_xinclude_load_doc(
     #[cfg(feature = "libxml_xptr")]
     let save_flags: c_int;
 
-    // #ifdef DEBUG_XINCLUDE
-    //     xmlGenericError(xmlGenericErrorContext, c"Loading doc %s\n".as_ptr() as _, url);
-    // #endif
     /*
      * Check the URL and remove any fragment identifier
      */
@@ -1658,7 +1650,9 @@ unsafe extern "C" fn xml_xinclude_load_doc(
         'load: {
             if *url.add(0) == 0
                 || *url.add(0) == b'#'
-                || (!(*ctxt).doc.is_null() && xml_str_equal(url, (*(*ctxt).doc).url))
+                || (!(*ctxt).doc.is_null()
+                    && (*(*ctxt).doc).url.as_deref()
+                        == CStr::from_ptr(url as *const i8).to_str().ok())
             {
                 doc = (*ctxt).doc;
                 break 'load;
@@ -1668,9 +1662,6 @@ unsafe extern "C" fn xml_xinclude_load_doc(
              */
             for i in 0..(*ctxt).url_nr {
                 if xml_str_equal(url, (*(*ctxt).url_tab.add(i as usize)).url) {
-                    // #ifdef DEBUG_XINCLUDE
-                    //         printf("Already loaded %s\n".as_ptr() as _, URL);
-                    // #endif
                     if (*(*ctxt).url_tab.add(i as usize)).expanding != 0 {
                         xml_xinclude_err(
                             ctxt,
@@ -1692,9 +1683,6 @@ unsafe extern "C" fn xml_xinclude_load_doc(
             /*
              * Load it.
              */
-            // #ifdef DEBUG_XINCLUDE
-            //     printf("loading %s\n".as_ptr() as _, URL);
-            // #endif
             #[cfg(feature = "libxml_xptr")]
             {
                 /*
@@ -1753,9 +1741,10 @@ unsafe extern "C" fn xml_xinclude_load_doc(
              * To check for this, we compare the URL with that of the doc
              * and change it if they disagree (bug 146988).
              */
-            if !xml_str_equal(url, (*doc).url) {
+            if (*doc).url.as_deref() != CStr::from_ptr(url as *const i8).to_str().ok() {
                 xml_free(url as _);
-                url = xml_strdup((*doc).url);
+                let new = CString::new((*doc).url.as_deref().unwrap()).unwrap();
+                url = xml_strdup(new.as_ptr() as *const u8);
             }
 
             /*
@@ -2003,7 +1992,9 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                              * URL of the document, then reset it to be
                              * the specified xml:base or the relative URI
                              */
-                            if xml_str_equal(cur_base, (*(*node).doc).url) {
+                            if (*(*node).doc).url.as_deref()
+                                == CStr::from_ptr(cur_base as *const i8).to_str().ok()
+                            {
                                 xml_node_set_base(node, base);
                             } else {
                                 /*
@@ -2454,7 +2445,11 @@ unsafe extern "C" fn xml_xinclude_load_node(
      */
     let base: *mut XmlChar = xml_node_get_base((*ctxt).doc, cur);
     if base.is_null() {
-        uri = xml_build_uri(href, (*(*ctxt).doc).url);
+        let url = (*(*ctxt).doc)
+            .url
+            .as_deref()
+            .map(|u| CString::new(u).unwrap());
+        uri = xml_build_uri(href, url.map_or(null(), |u| u.as_ptr() as *const u8));
     } else {
         uri = xml_build_uri(href, base);
     }
@@ -2491,11 +2486,6 @@ unsafe extern "C" fn xml_xinclude_load_node(
         }
         return -1;
     }
-    // #ifdef DEBUG_XINCLUDE
-    //     xmlGenericError(xmlGenericErrorContext, c"parse: %s\n".as_ptr() as _,
-    //         xml ? "xml": "text".as_ptr() as _);
-    //     xmlGenericError(xmlGenericErrorContext, c"URI: %s\n".as_ptr() as _, URI);
-    // #endif
 
     /*
      * Save the base for this include (saving the current one)
@@ -2521,9 +2511,6 @@ unsafe extern "C" fn xml_xinclude_load_node(
         /*
          * Time to try a fallback if available
          */
-        // #ifdef DEBUG_XINCLUDE
-        //     xmlGenericError(xmlGenericErrorContext, c"error looking for fallback\n".as_ptr() as _);
-        // #endif
         children = (*cur).children;
         while !children.is_null() {
             if (*children).typ == XmlElementType::XmlElementNode
@@ -2893,7 +2880,11 @@ pub unsafe extern "C" fn xml_xinclude_process_tree_flags_data(
         return -1;
     }
     (*ctxt)._private = data;
-    (*ctxt).base = xml_strdup((*(*tree).doc).url);
+    let url = (*(*tree).doc)
+        .url
+        .as_deref()
+        .map(|u| CString::new(u).unwrap());
+    (*ctxt).base = xml_strdup(url.map_or(null(), |u| u.as_ptr() as *const u8));
     xml_xinclude_set_flags(ctxt, flags);
     ret = xml_xinclude_do_process(ctxt, tree);
     if ret >= 0 && (*ctxt).nb_errors > 0 {
@@ -2960,9 +2951,6 @@ pub unsafe extern "C" fn xml_xinclude_process_tree_flags(tree: XmlNodePtr, flags
  * Returns the new set
  */
 pub unsafe extern "C" fn xml_xinclude_new_context(doc: XmlDocPtr) -> XmlXincludeCtxtPtr {
-    // #ifdef DEBUG_XINCLUDE
-    //     xmlGenericError(xmlGenericErrorContext, c"New context\n".as_ptr() as _);
-    // #endif
     if doc.is_null() {
         return null_mut();
     }
@@ -3008,9 +2996,6 @@ pub unsafe extern "C" fn xml_xinclude_set_flags(ctxt: XmlXincludeCtxtPtr, flags:
  * Free an XInclude context
  */
 pub unsafe extern "C" fn xml_xinclude_free_context(ctxt: XmlXincludeCtxtPtr) {
-    // #ifdef DEBUG_XINCLUDE
-    //     xmlGenericError(xmlGenericErrorContext, c"Freeing context\n".as_ptr() as _);
-    // #endif
     if ctxt.is_null() {
         return;
     }

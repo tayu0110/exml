@@ -679,14 +679,22 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         }
     }
     if !(*ctxt).my_doc.is_null()
-        && ((*(*ctxt).my_doc).url.is_null())
+        && (*(*ctxt).my_doc).url.is_none()
         && !(*ctxt).input.is_null()
         && (*(*ctxt).input).filename.is_some()
     {
         let filename = CString::new((*(*ctxt).input).filename.as_deref().unwrap()).unwrap();
-        (*(*ctxt).my_doc).url = xml_canonic_path(filename.as_ptr() as _);
-        if (*(*ctxt).my_doc).url.is_null() {
-            (*(*ctxt).my_doc).url = xml_strdup(filename.as_ptr() as _);
+        let url = xml_canonic_path(filename.as_ptr() as _);
+        if !url.is_null() {
+            (*(*ctxt).my_doc).url = Some(
+                CStr::from_ptr(url as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(url as _);
+        }
+        if (*(*ctxt).my_doc).url.is_none() {
+            (*(*ctxt).my_doc).url = (*(*ctxt).input).filename.clone()
         }
     }
 }

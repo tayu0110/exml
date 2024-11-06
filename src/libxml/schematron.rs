@@ -1228,7 +1228,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
             );
             return null_mut();
         }
-        (*doc).url = xml_strdup(c"in_memory_buffer".as_ptr() as _);
+        (*doc).url = Some("in_memory_buffer".to_owned());
         (*ctxt).url = xml_dict_lookup((*ctxt).dict, c"in_memory_buffer".as_ptr() as _, -1);
         (*ctxt).preserve = 0;
     } else if !(*ctxt).doc.is_null() {

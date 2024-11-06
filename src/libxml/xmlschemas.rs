@@ -1519,7 +1519,11 @@ unsafe fn xml_schema_err4_line(
                  * Get filename.
                  */
                 if !(*vctxt).doc.is_null() {
-                    file = (*(*vctxt).doc).url as _;
+                    dummy = (*(*vctxt).doc)
+                        .url
+                        .as_deref()
+                        .map(|u| CString::new(u).unwrap());
+                    file = dummy.as_ref().map_or(null(), |c| c.as_ptr());
                 } else if !(*vctxt).parser_ctxt.is_null()
                     && !(*(*vctxt).parser_ctxt).input.is_null()
                 {
@@ -5873,8 +5877,10 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                     /* Don' free this one, since it was provided by the caller. */
                     preserve_doc = 1;
                     /* TODO: Does the context or the doc hold the location? */
-                    if !(*schema_doc).url.is_null() {
-                        schema_location = xml_dict_lookup((*pctxt).dict, (*schema_doc).url, -1);
+                    if let Some(url) = (*schema_doc).url.as_deref() {
+                        let url = CString::new(url).unwrap();
+                        schema_location =
+                            xml_dict_lookup((*pctxt).dict, url.as_ptr() as *const u8, -1);
                     } else {
                         schema_location = c"in_memory_buffer".as_ptr() as _;
                     }
@@ -5919,7 +5925,11 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                         );
                         schema_location = c"in_memory_buffer".as_ptr() as _;
                         if !doc.is_null() {
-                            (*doc).url = xml_strdup(schema_location);
+                            (*doc).url = Some(
+                                CStr::from_ptr(schema_location as *const i8)
+                                    .to_string_lossy()
+                                    .into_owned(),
+                            );
                         }
                     }
                     /*
@@ -7419,7 +7429,11 @@ unsafe extern "C" fn xml_schema_build_absolute_uri(
 
             let base: *mut XmlChar = xml_node_get_base((*ctxt_node).doc, ctxt_node);
             if base.is_null() {
-                uri = xml_build_uri(location, (*(*ctxt_node).doc).url);
+                let url = (*(*ctxt_node).doc)
+                    .url
+                    .as_deref()
+                    .map(|u| CString::new(u).unwrap());
+                uri = xml_build_uri(location, url.map_or(null(), |u| u.as_ptr() as *const u8));
             } else {
                 uri = xml_build_uri(location, base);
                 xml_free(base as _);
@@ -7641,7 +7655,14 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
         }
         let base = xml_node_get_base((*node).doc, node);
         if base.is_null() {
-            uri = xml_build_uri(*schema_location, (*(*node).doc).url);
+            let url = (*(*node).doc)
+                .url
+                .as_deref()
+                .map(|u| CString::new(u).unwrap());
+            uri = xml_build_uri(
+                *schema_location,
+                url.map_or(null(), |u| u.as_ptr() as *const u8),
+            );
         } else {
             uri = xml_build_uri(*schema_location, base);
             xml_free(base as _);

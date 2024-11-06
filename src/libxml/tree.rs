@@ -5,7 +5,7 @@
 
 use std::{
     any::type_name,
-    ffi::{c_char, c_int, c_long, c_ulong, c_ushort, CStr},
+    ffi::{c_char, c_int, c_long, c_ulong, c_ushort, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -707,7 +707,7 @@ pub struct XmlDoc {
     pub(crate) encoding: Option<String>, /* external initial encoding, if any */
     pub(crate) ids: *mut c_void,        /* Hash table for ID attributes if any */
     pub(crate) refs: *mut c_void,       /* Hash table for IDREFs attributes if any */
-    pub(crate) url: *const XmlChar,     /* The URI for that document */
+    pub(crate) url: Option<String>,     /* The URI for that document */
     pub(crate) charset: XmlCharEncoding, /* Internal flag for charset handling,
                                         actually an xmlCharEncoding */
     pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
@@ -739,7 +739,7 @@ impl Default for XmlDoc {
             encoding: None,
             ids: null_mut(),
             refs: null_mut(),
-            url: null(),
+            url: None,
             charset: XmlCharEncoding::None,
             dict: null_mut(),
             psvi: null_mut(),
@@ -2039,7 +2039,7 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
     DICT_FREE!(dict, (*cur).version);
     DICT_FREE!(dict, (*cur).name);
     (*cur).encoding = None;
-    DICT_FREE!(dict, (*cur).url);
+    (*cur).url = None;
     xml_free(cur as _);
     if !dict.is_null() {
         xml_dict_free(dict);
@@ -3088,8 +3088,8 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: c_int) -> XmlDo
         (*ret).name = xml_mem_strdup((*doc).name as _) as _;
     }
     (*ret).encoding = (*doc).encoding.clone();
-    if !(*doc).url.is_null() {
-        (*ret).url = xml_strdup((*doc).url);
+    if let Some(url) = (*doc).url.as_deref() {
+        (*ret).url = Some(url.to_owned());
     }
     (*ret).charset = (*doc).charset;
     (*ret).compression = (*doc).compression;
@@ -7997,11 +7997,12 @@ pub unsafe extern "C" fn xml_node_get_base(
         }
         cur = (*cur).parent;
     }
-    if !doc.is_null() && !(*doc).url.is_null() {
+    if !doc.is_null() && (*doc).url.is_some() {
+        let url = CString::new((*doc).url.as_deref().unwrap()).unwrap();
         if oldbase.is_null() {
-            return xml_strdup((*doc).url);
+            return xml_strdup(url.as_ptr() as *const u8);
         }
-        newbase = xml_build_uri(oldbase, (*doc).url);
+        newbase = xml_build_uri(oldbase, url.as_ptr() as *const u8);
         xml_free(oldbase as _);
         return newbase;
     }
@@ -8046,13 +8047,20 @@ pub unsafe extern "C" fn xml_node_set_base(cur: XmlNodePtr, uri: *const XmlChar)
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
             let doc: XmlDocPtr = cur as _;
 
-            if !(*doc).url.is_null() {
-                xml_free((*doc).url as _);
-            }
             if uri.is_null() {
-                (*doc).url = null_mut();
+                (*doc).url = None;
             } else {
-                (*doc).url = xml_path_to_uri(uri);
+                let uri = xml_path_to_uri(uri);
+                if !uri.is_null() {
+                    (*doc).url = Some(
+                        CStr::from_ptr(uri as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                    xml_free(uri as _);
+                } else {
+                    (*doc).url = None;
+                }
             }
             return;
         }

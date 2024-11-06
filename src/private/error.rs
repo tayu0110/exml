@@ -163,7 +163,7 @@ macro_rules! __xml_raise_error {
                         }
                         to = &mut (*ctxt).last_error;
                     } else if !node.is_null() && file.is_null() {
-                        if !(*node).doc.is_null() && !(*(*node).doc).url.is_null() {
+                        if !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
                             baseptr = node;
                         /*	    file = (const c_char *) (*(*node).doc).URL; */
                         }
@@ -173,7 +173,7 @@ macro_rules! __xml_raise_error {
                             }
                             node = (*node).parent;
                         }
-                        if baseptr.is_null() && !node.is_null() && !(*node).doc.is_null() && !(*(*node).doc).url.is_null() {
+                        if baseptr.is_null() && !node.is_null() && !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
                             baseptr = node;
                         }
 
@@ -228,11 +228,7 @@ macro_rules! __xml_raise_error {
                             if !href.is_null() {
                                 to.file = Some(CStr::from_ptr(href).to_string_lossy().into());
                             } else {
-                                to.file = (!(*(*baseptr).doc).url.is_null()).then(|| {
-                                    CStr::from_ptr((*(*baseptr).doc).url as *const i8)
-                                        .to_string_lossy()
-                                        .into()
-                                });
+                                to.file = (*(*baseptr).doc).url.as_deref().map(|u| Cow::Owned(u.to_owned()));
                             }
                         }
                         #[cfg(not(feature = "xinclude"))] {
@@ -243,11 +239,7 @@ macro_rules! __xml_raise_error {
                             });
                         }
                         if to.file.is_none() && !node.is_null() && !(*node).doc.is_null() {
-                            to.file = (!(*(*node).doc).url.is_null()).then(|| {
-                                CStr::from_ptr((*(*node).doc).url as *const i8)
-                                    .to_string_lossy()
-                                    .into()
-                            });
+                            to.file = (*(*node).doc).url.as_deref().map(|u| Cow::Owned(u.to_owned()));
                         }
                     }
                     to.line = line as usize;
