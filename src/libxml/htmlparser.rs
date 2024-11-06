@@ -21,7 +21,7 @@ use libc::{
 use crate::{
     __xml_raise_error,
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
-    error::{parser_validity_error, parser_validity_warning},
+    error::{parser_validity_error, parser_validity_warning, XmlParserErrors},
     globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
@@ -45,7 +45,6 @@ use crate::{
             xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
         },
         uri::xml_canonic_path,
-        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strcmp, xml_strdup, xml_strlen,
             xml_strncasecmp, xml_strndup, XmlChar,

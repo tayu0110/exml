@@ -15,9 +15,10 @@ use crate::{
         get_encoding_handler, xml_encoding_err, EncodingError, XmlCharEncoding,
         XmlCharEncodingHandler,
     },
+    error::XmlParserErrors,
     globals::GLOBAL_STATE,
     io::DefaultHTTPIOCallbacks,
-    libxml::{tree::XmlBufferAllocationScheme, xmlerror::XmlParserErrors},
+    libxml::tree::XmlBufferAllocationScheme,
     nanohttp::XmlNanoHTTPCtxt,
 };
 

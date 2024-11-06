@@ -23,7 +23,7 @@ use crate::libxml::xpointer::{
 };
 use crate::{
     __xml_raise_error,
-    error::{XmlErrorDomain, XmlErrorLevel},
+    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
@@ -48,7 +48,6 @@ use crate::{
             XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
         },
         valid::xml_get_id,
-        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strchr, xml_strdup, xml_strlen, xml_strncmp,
             xml_strndup, xml_strstr, xml_utf8_strlen, xml_utf8_strloc, xml_utf8_strpos,

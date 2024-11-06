@@ -36,7 +36,7 @@ use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncodingHandler},
-    error::{XmlErrorDomain, XmlErrorLevel},
+    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{GenericError, StructuredError, GLOBAL_STATE},
     libxml::{
         catalog::{
@@ -56,7 +56,6 @@ use crate::{
         parser_internals::{xml_free_input_stream, xml_new_input_from_file},
         tree::XmlBufferAllocationScheme,
         uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
-        xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strdup, xml_strncasecmp, XmlChar},
     },
     nanohttp::XmlNanoHTTPCtxt,

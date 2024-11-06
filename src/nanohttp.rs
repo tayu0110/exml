@@ -17,7 +17,10 @@ use std::{
 
 use url::Url;
 
-use crate::{error::XmlErrorDomain, io::__xml_ioerr, libxml::xmlerror::XmlParserErrors};
+use crate::{
+    error::{XmlErrorDomain, XmlParserErrors},
+    io::__xml_ioerr,
+};
 
 const XML_NANO_HTTP_MAX_REDIR: usize = 10;
 const XML_NANO_HTTP_CHUNK: usize = 4096;

@@ -7,9 +7,9 @@ use std::ptr::null;
 
 use crate::{
     __xml_raise_error,
+    error::XmlParserErrors,
     libxml::{
         parser::{XmlParserCtxtPtr, XmlParserInputState},
-        xmlerror::XmlParserErrors,
         xmlstring::XmlChar,
     },
 };

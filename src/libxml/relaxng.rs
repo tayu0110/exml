@@ -16,7 +16,9 @@ use std::{
 use libc::{fprintf, memcpy, memset, ptrdiff_t, snprintf, FILE};
 
 use crate::{
-    __xml_raise_error, generic_error,
+    __xml_raise_error,
+    error::XmlParserErrors,
+    generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -43,7 +45,6 @@ use crate::{
             xml_automata_set_final_state, xml_automata_set_flags, xml_free_automata,
             xml_new_automata, XmlAutomataPtr, XmlAutomataStatePtr,
         },
-        xmlerror::XmlParserErrors,
         xmlregexp::{
             xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_exec_ctxt,
             xml_reg_free_regexp, xml_reg_new_exec_ctxt, xml_regexp_is_determinist,

@@ -9,12 +9,11 @@ use std::{
 use anyhow::{bail, ensure};
 
 use crate::{
-    error::XmlErrorDomain,
+    error::{XmlErrorDomain, XmlParserErrors},
     globals::GLOBAL_STATE,
     libxml::{
         parser_internals::XML_MAX_TEXT_LENGTH,
         tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
-        xmlerror::XmlParserErrors,
     },
     private::error::__xml_simple_error,
 };

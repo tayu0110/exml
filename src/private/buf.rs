@@ -17,7 +17,6 @@ use crate::libxml::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
     parser_internals::XML_MAX_TEXT_LENGTH,
     tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
-    xmlerror::XmlParserErrors,
     xmlstring::{xml_strchr, xml_strlen, XmlChar},
 };
 
@@ -29,7 +28,7 @@ mod legacy {
     use std::ffi::c_uint;
 
     use crate::{
-        error::XmlErrorDomain,
+        error::{XmlErrorDomain, XmlParserErrors},
         globals::{
             get_default_buffer_allocation_scheme, get_default_buffer_size,
             set_default_buffer_allocation_scheme,

@@ -19,6 +19,7 @@ use libc::{close, fprintf, getenv, memset, open, read, snprintf, stat, FILE, O_R
 use crate::{
     __xml_raise_error,
     encoding::XmlCharEncoding,
+    error::XmlParserErrors,
     generic_error,
     hash::XmlHashTableRef,
     io::{xml_parser_get_directory, XmlParserInputBuffer},
@@ -45,7 +46,6 @@ use crate::{
             xml_set_prop, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
         },
         uri::{xml_build_uri, xml_canonic_path},
-        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },

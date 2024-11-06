@@ -25,7 +25,7 @@ use crate::{
     __xml_raise_error,
     buf::{libxml_api::xml_buf_create, xml_buf_overflow_error, XmlBufRef},
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
-    error::{parser_validity_error, parser_validity_warning, XmlError},
+    error::{parser_validity_error, parser_validity_warning, XmlError, XmlParserErrors},
     generic_error,
     globals::{
         get_do_validity_checking_default_value, get_get_warnings_default_value,
@@ -93,7 +93,6 @@ use crate::{
             xml_free_doc_element_content, xml_free_enumeration, xml_is_mixed_element,
             xml_new_doc_element_content, xml_validate_root, XmlValidCtxt,
         },
-        xmlerror::XmlParserErrors,
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},

@@ -16,6 +16,7 @@ use libc::{memcpy, memset};
 
 use crate::{
     __xml_raise_error,
+    error::XmlParserErrors,
     io::{
         xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_create_filename,
         XmlOutputBufferPtr,
@@ -35,7 +36,6 @@ use super::{
         XML_XML_NAMESPACE,
     },
     uri::{xml_build_uri, xml_free_uri, xml_parse_uri, XmlURIPtr},
-    xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcat, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
     xpath::XmlNodeSetPtr,
     xpath_internals::xml_xpath_node_set_contains,

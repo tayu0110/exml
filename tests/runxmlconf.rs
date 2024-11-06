@@ -11,7 +11,7 @@ use std::{
 };
 
 use exml::{
-    error::{XmlError, XmlErrorDomain, XmlErrorLevel},
+    error::{XmlError, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     globals::{
         get_last_error, reset_last_error, set_get_warnings_default_value, set_structured_error,
         GenericErrorContext,
@@ -28,7 +28,6 @@ use exml::{
             xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop,
             xml_node_get_base, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
         },
-        xmlerror::XmlParserErrors,
         xmlmemory::{
             xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,

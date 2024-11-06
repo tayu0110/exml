@@ -13,7 +13,7 @@ use std::{
 
 use exml::{
     encoding::XmlCharEncoding,
-    error::XmlError,
+    error::{XmlError, XmlParserErrors},
     globals::{get_last_error, set_structured_error, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
@@ -24,7 +24,6 @@ use exml::{
         },
         parser_internals::xml_new_input_stream,
         tree::{xml_free_doc, XmlDocPtr},
-        xmlerror::XmlParserErrors,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },

@@ -13,8 +13,8 @@ use std::{
 use crate::{
     buf::XmlBufRef,
     encoding::{floor_char_boundary, xml_encoding_err, EncodingError, XmlCharEncodingHandler},
+    error::XmlParserErrors,
     io::{xml_io_http_close_put, xml_io_http_dflt_open_w, xml_io_http_match, xml_io_http_write},
-    libxml::xmlerror::XmlParserErrors,
 };
 
 use super::{

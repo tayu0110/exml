@@ -14,7 +14,7 @@ use std::{
 use libc::{memcpy, memmove, memset, snprintf, sscanf};
 
 use crate::{
-    error::XmlErrorDomain,
+    error::{XmlErrorDomain, XmlParserErrors},
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
@@ -37,7 +37,6 @@ use crate::{
         },
         uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
         valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
-        xmlerror::XmlParserErrors,
         xmlregexp::{xml_reg_free_regexp, xml_regexp_compile, xml_regexp_exec},
         xmlschemas::{
             xml_schema_custom_err, xml_schema_custom_err4, xml_schema_facet_type_to_string,

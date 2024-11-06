@@ -16,6 +16,7 @@ use std::sync::atomic::Ordering;
 pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
+use crate::error::XmlParserErrors;
 #[cfg(feature = "catalog")]
 use crate::{
     __xml_raise_error,
@@ -70,7 +71,6 @@ use crate::{
             xml_create_enumeration, xml_free_doc_element_content, xml_free_enumeration,
             xml_new_doc_element_content, xml_validate_element, xml_validate_root,
         },
-        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strncmp,
             xml_strndup, XmlChar,

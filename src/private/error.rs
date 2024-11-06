@@ -6,8 +6,8 @@
 use std::{ffi::c_char, ptr::null};
 
 use crate::{
-    error::XmlErrorDomain,
-    libxml::{tree::XmlNodePtr, xmlerror::XmlParserErrors},
+    error::{XmlErrorDomain, XmlParserErrors},
+    libxml::tree::XmlNodePtr,
 };
 
 /**
@@ -47,13 +47,12 @@ macro_rules! __xml_raise_error {
         use $crate::{
             globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
             error::{
-                generic_error_default, parser_error, parser_warning, parser_validity_error,
-                parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel,
+                XML_MAX_ERRORS, generic_error_default, parser_error, parser_warning, parser_validity_error,
+                parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors,
             },
             libxml::{
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
                 tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
-                xmlerror::{XmlParserErrors, XML_MAX_ERRORS},
             }
         };
         (|mut schannel: Option<StructuredError>,

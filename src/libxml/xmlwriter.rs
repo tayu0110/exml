@@ -25,6 +25,7 @@ use crate::{
     __xml_raise_error,
     buf::XmlBufRef,
     encoding::find_encoding_handler,
+    error::XmlParserErrors,
     globals::GenericErrorContext,
     io::{
         xml_output_buffer_close, xml_output_buffer_create_filename, xml_output_buffer_create_io,
@@ -46,7 +47,6 @@ use crate::{
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
         tree::{xml_free_doc, xml_new_doc, xml_set_doc_compress_mode, XmlDocPtr, XmlNodePtr},
         uri::xml_canonic_path,
-        xmlerror::XmlParserErrors,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
     private::save::xml_buf_attr_serialize_txt_content,

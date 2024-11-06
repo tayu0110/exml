@@ -15,6 +15,7 @@ use libc::{fprintf, memcpy, memset, snprintf, strlen, FILE, INT_MAX};
 use crate::{
     __xml_raise_error,
     buf::libxml_api::{xml_buf_cat, xml_buf_ccat, XmlBufPtr},
+    error::XmlParserErrors,
     libxml::{
         dict::{xml_dict_lookup, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -22,7 +23,6 @@ use crate::{
         xmlautomata::{
             xml_free_automata, xml_new_automata, XmlAutomata, XmlAutomataPtr, XmlAutomataState,
         },
-        xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strchr, xml_strdup, xml_strndup, XmlChar},
         xmlunicode::{
             xml_ucs_is_block, xml_ucs_is_cat_c, xml_ucs_is_cat_cc, xml_ucs_is_cat_cf,

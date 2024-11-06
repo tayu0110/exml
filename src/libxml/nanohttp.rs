@@ -21,12 +21,11 @@ use libc::{
 };
 
 use crate::{
-    error::XmlErrorDomain,
+    error::{XmlErrorDomain, XmlParserErrors},
     io::__xml_ioerr,
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc},
         uri::{xml_free_uri, xml_parse_uri_raw, XmlURIPtr},
-        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_char_strndup, xml_strcat, xml_strdup, xml_strncasecmp, xml_strndup, xml_strstr,
             XmlChar,

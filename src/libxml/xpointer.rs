@@ -14,12 +14,11 @@ use libc::{c_void, memset};
 
 use crate::{
     __xml_raise_error,
-    error::{XmlErrorDomain, XmlErrorLevel},
+    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
         parser::xml_init_parser,
         tree::{XmlDocPtr, XmlElementType, XmlNodePtr},
-        xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strlen, XmlChar},
         xpath::{
             xml_xpath_free_object, xml_xpath_new_context, XmlNodeSetPtr, XmlXPathContextPtr,

@@ -10,6 +10,7 @@ use libc::{fclose, fopen, snprintf, FILE};
 use crate::{
     buf::XmlBuf,
     encoding::XmlCharEncoding,
+    error::XmlParserErrors,
     io::{XmlOutputBufferPtr, XmlParserInputBuffer},
     libxml::{
         catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
@@ -53,7 +54,6 @@ use crate::{
         },
         xinclude::XmlXincludeCtxtPtr,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
-        xmlerror::XmlParserErrors,
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderErrorFunc, XmlTextReaderLocatorPtr, XmlTextReaderPtr},
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},

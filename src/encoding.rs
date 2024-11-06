@@ -14,7 +14,7 @@ use encoding_rs::{
     ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, SHIFT_JIS, WINDOWS_1254,
 };
 
-use crate::{__xml_raise_error, libxml::xmlerror::XmlParserErrors};
+use crate::{__xml_raise_error, error::XmlParserErrors};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlCharEncoding {

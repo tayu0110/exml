@@ -21,7 +21,7 @@ use crate::{
     buf::libxml_api::{
         xml_buf_add, xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string, XmlBufPtr,
     },
-    error::XmlErrorDomain,
+    error::{XmlErrorDomain, XmlParserErrors},
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         globals::{xml_free, xml_malloc},
@@ -33,7 +33,6 @@ use crate::{
             xml_free_node_list, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode,
             XmlNodePtr,
         },
-        xmlerror::XmlParserErrors,
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strchr, xml_strdup, xml_strlen, xml_strndup,
             xml_strstr, XmlChar,

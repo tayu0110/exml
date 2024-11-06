@@ -17,7 +17,7 @@ use libc::{malloc, memset, snprintf, sprintf, FILE};
 use crate::{
     __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
-    error::XmlErrorDomain,
+    error::{XmlErrorDomain, XmlParserErrors},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
@@ -36,7 +36,6 @@ use super::{
         xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_no_ns_prop,
         xml_get_node_path, xml_node_get_content, XmlDocPtr, XmlNodePtr,
     },
-    xmlerror::XmlParserErrors,
     xmlstring::{xml_strcat, xml_strdup, xml_strlen, XmlChar},
     xpath::{
         xml_xpath_compiled_eval, xml_xpath_eval, xml_xpath_free_comp_expr, xml_xpath_free_context,

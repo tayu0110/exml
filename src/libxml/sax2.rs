@@ -16,7 +16,7 @@ use libc::{memcpy, memset, INT_MAX};
 use crate::{
     __xml_raise_error,
     encoding::{detect_encoding, XmlCharEncoding},
-    error::{parser_error, parser_warning},
+    error::{parser_error, parser_warning, XmlParserErrors},
     globals::{GenericErrorContext, StructuredError},
     libxml::{
         entities::XmlEntityPtr,
@@ -73,7 +73,6 @@ use super::{
         xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
         xml_validate_root,
     },
-    xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strndup},
 };
 

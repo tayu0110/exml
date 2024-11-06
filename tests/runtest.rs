@@ -19,7 +19,10 @@ use std::{
 
 use const_format::concatcp;
 use exml::{
-    error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
+    error::{
+        parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel,
+        XmlParserErrors,
+    },
     globals::{reset_last_error, set_generic_error, set_structured_error, GenericErrorContext},
     io::{
         pop_input_callbacks, register_input_callbacks, xml_no_net_external_entity_loader,
@@ -52,7 +55,6 @@ use exml::{
         },
         valid::xml_free_enumeration,
         xinclude::xml_xinclude_process_flags,
-        xmlerror::XmlParserErrors,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,

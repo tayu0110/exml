@@ -6,11 +6,11 @@
 use std::{ffi::c_int, ptr::null_mut, sync::atomic::Ordering};
 
 use crate::{
+    error::XmlParserErrors,
     io::XmlOutputBufferPtr,
     libxml::{
         chvalid::xml_is_char,
         tree::{XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlNsPtr},
-        xmlerror::XmlParserErrors,
         xmlsave::{xml_ns_dump_output, xml_save_err, xml_serialize_hex_char_ref},
         xmlstring::XmlChar,
     },

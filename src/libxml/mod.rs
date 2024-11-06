@@ -41,7 +41,6 @@ pub mod xinclude;
 pub mod xlink;
 #[cfg(any(feature = "regexp", feature = "libxml_automata"))]
 pub mod xmlautomata;
-pub mod xmlerror;
 pub mod xmlmemory;
 #[cfg(feature = "libxml_modules")]
 pub mod xmlmodule;

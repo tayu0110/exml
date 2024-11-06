@@ -12,7 +12,7 @@ use std::{
 
 use libc::{memset, FILE};
 
-use crate::{encoding::XmlCharEncoding, io::XmlOutputBufferPtr};
+use crate::{encoding::XmlCharEncoding, error::XmlParserErrors, io::XmlOutputBufferPtr};
 
 use super::{
     globals::{xml_malloc, xml_register_node_default_value},
@@ -22,7 +22,6 @@ use super::{
         xml_new_doc_node, xml_new_prop, xml_set_prop, xml_unlink_node, XmlAttrPtr, XmlBufPtr,
         XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
-    xmlerror::XmlParserErrors,
     xmlstring::{xml_str_equal, xml_strcasecmp, xml_strstr, XmlChar},
 };
 
@@ -496,8 +495,6 @@ pub unsafe extern "C" fn html_doc_dump_memory(
 unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
     use crate::{error::XmlErrorDomain, private::error::__xml_simple_error};
 
-    use super::xmlerror::XmlParserErrors;
-
     let msg = match code {
         XmlParserErrors::XmlSaveNotUTF8 => c"string is not in UTF-8\n".as_ptr() as _,
         XmlParserErrors::XmlSaveCharInvalid => c"invalid character value\n".as_ptr() as _,
@@ -530,7 +527,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_alloc_output_buffer_internal, xml_output_buffer_close, XmlOutputBufferPtr},
-        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors, xmlstring::xml_strndup},
+        libxml::{parser::xml_init_parser, xmlstring::xml_strndup},
     };
 
     xml_init_parser();
@@ -617,7 +614,7 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
-        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
+        libxml::parser::xml_init_parser,
     };
 
     xml_init_parser();
@@ -673,7 +670,7 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_filename, XmlOutputBufferPtr},
-        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
+        libxml::parser::xml_init_parser,
     };
 
     if cur.is_null() || filename.is_null() {
@@ -729,10 +726,7 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
  */
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
-    use crate::{
-        error::XmlErrorDomain, libxml::xmlerror::XmlParserErrors,
-        private::error::__xml_simple_error,
-    };
+    use crate::{error::XmlErrorDomain, private::error::__xml_simple_error};
 
     __xml_simple_error(
         XmlErrorDomain::XmlFromOutput,
@@ -869,7 +863,7 @@ pub unsafe extern "C" fn html_node_dump_file_format(
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
-        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
+        libxml::parser::xml_init_parser,
     };
 
     xml_init_parser();
@@ -952,7 +946,7 @@ pub unsafe fn html_save_file_format(
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         io::{xml_output_buffer_close, xml_output_buffer_create_filename, XmlOutputBufferPtr},
-        libxml::{parser::xml_init_parser, xmlerror::XmlParserErrors},
+        libxml::parser::xml_init_parser,
     };
 
     if cur.is_null() || filename.is_null() {
@@ -1021,7 +1015,7 @@ unsafe extern "C" fn html_dtd_dump_output(
 ) {
     use std::ffi::CStr;
 
-    use crate::libxml::{xmlerror::XmlParserErrors, xmlstring::xml_strcmp};
+    use crate::libxml::xmlstring::xml_strcmp;
 
     use super::tree::XmlDtdPtr;
 

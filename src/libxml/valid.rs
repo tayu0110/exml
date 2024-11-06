@@ -30,6 +30,7 @@ use crate::libxml::xmlstring::xml_strncmp;
 use crate::{
     __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
+    error::XmlParserErrors,
     globals::{GenericError, GenericErrorContext, StructuredError},
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
@@ -61,7 +62,6 @@ use crate::{
             xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
             XmlAutomataStatePtr,
         },
-        xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
     private::parser::XML_VCTXT_USE_PCTXT,

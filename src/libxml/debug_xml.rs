@@ -14,7 +14,9 @@ use std::{
 use libc::{fprintf, fputc, strlen, FILE};
 
 use crate::{
-    __xml_raise_error, generic_error,
+    __xml_raise_error,
+    error::XmlParserErrors,
+    generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
 };
 
@@ -32,7 +34,6 @@ use super::{
         XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
     },
     valid::xml_snprintf_element_content,
-    xmlerror::XmlParserErrors,
     xmlstring::{xml_check_utf8, xml_str_equal, xml_strchr, xml_strlen, xml_strstr, XmlChar},
     xpath::XmlXPathObjectType,
 };

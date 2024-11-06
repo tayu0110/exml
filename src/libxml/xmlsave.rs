@@ -20,7 +20,7 @@ use libc::memset;
 use crate::{
     buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
-    error::XmlErrorDomain,
+    error::{XmlErrorDomain, XmlParserErrors},
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::{
         xml_output_buffer_close, xml_output_buffer_create_filename, xml_output_buffer_create_io,
@@ -43,7 +43,6 @@ use crate::{
             xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table,
             XmlNotationTablePtr,
         },
-        xmlerror::XmlParserErrors,
         xmlstring::{xml_str_equal, XmlChar},
     },
     private::{

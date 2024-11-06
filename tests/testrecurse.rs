@@ -13,7 +13,10 @@ use std::{
 };
 
 use exml::{
-    error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
+    error::{
+        parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel,
+        XmlParserErrors,
+    },
     globals::{
         reset_last_error, set_get_warnings_default_value, set_structured_error, GenericErrorContext,
     },
@@ -26,7 +29,6 @@ use exml::{
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
         },
         tree::{xml_free_doc, XmlDocPtr, XmlElementType},
-        xmlerror::XmlParserErrors,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,

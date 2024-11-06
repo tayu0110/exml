@@ -19,7 +19,7 @@ use libc::{fprintf, memcpy, memset, snprintf, strchr, FILE};
 use crate::{
     __xml_raise_error,
     encoding::XmlCharEncoding,
-    error::{XmlErrorDomain, XmlErrorLevel},
+    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     io::XmlParserInputBuffer,
@@ -105,7 +105,6 @@ use crate::{
             xml_automata_new_transition2, xml_automata_set_final_state, xml_free_automata,
             xml_new_automata, XmlAutomataPtr, XmlAutomataStatePtr,
         },
-        xmlerror::XmlParserErrors,
         xmlreader::{xml_text_reader_lookup_namespace, XmlTextReaderPtr},
         xmlregexp::{
             xml_reg_exec_err_info, xml_reg_exec_next_values, xml_reg_exec_push_string,
