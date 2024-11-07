@@ -18,8 +18,8 @@ use crate::{
     error::XmlParserErrors,
     globals::GLOBAL_STATE,
     io::DefaultHTTPIOCallbacks,
-    libxml::tree::XmlBufferAllocationScheme,
     nanohttp::XmlNanoHTTPCtxt,
+    tree::XmlBufferAllocationScheme,
 };
 
 use super::{xml_ioerr, xml_ioerr_memory, DefaultFileIOCallbacks, MINLEN};

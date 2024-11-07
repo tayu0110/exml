@@ -85,16 +85,6 @@ use crate::{
             XML_SCHEMAS_TYPE_WHITESPACE_COLLAPSE, XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE,
             XML_SCHEMAS_TYPE_WHITESPACE_REPLACE,
         },
-        tree::{
-            xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_node,
-            xml_get_no_ns_prop, xml_get_ns_list, xml_has_prop, xml_new_doc_text, xml_new_ns,
-            xml_new_ns_prop, xml_new_prop, xml_node_get_base, xml_node_get_content,
-            xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns,
-            xml_search_ns_by_href, xml_split_qname2, xml_split_qname3, xml_unlink_node,
-            xml_validate_ncname, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlDocPtr,
-            XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr,
-            XmlNsPtr, XML_XML_NAMESPACE,
-        },
         uri::xml_build_uri,
         valid::{xml_add_id, xml_free_enumeration},
         xmlautomata::{
@@ -129,6 +119,15 @@ use crate::{
             xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strcat, xml_strdup,
             xml_strlen, xml_strncat, xml_strncat_new, xml_strndup, XmlChar,
         },
+    },
+    tree::{
+        xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_get_no_ns_prop,
+        xml_get_ns_list, xml_has_prop, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
+        xml_node_get_base, xml_node_get_content, xml_node_get_space_preserve,
+        xml_node_list_get_string, xml_search_ns, xml_search_ns_by_href, xml_split_qname2,
+        xml_split_qname3, xml_unlink_node, xml_validate_ncname, xml_validate_qname, XmlAttrPtr,
+        XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
+        XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 

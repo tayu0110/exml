@@ -31,14 +31,6 @@ use crate::{
             XmlParserOption, XML_DETECT_IDS,
         },
         parser_internals::{xml_free_input_stream, xml_string_current_char},
-        tree::{
-            xml_add_next_sibling, xml_add_prev_sibling, xml_create_int_subset, xml_doc_copy_node,
-            xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_free_node_list,
-            xml_get_ns_prop, xml_get_prop, xml_new_doc_node, xml_new_doc_text,
-            xml_node_add_content_len, xml_node_get_base, xml_node_set_base, xml_static_copy_node,
-            xml_static_copy_node_list, xml_unlink_node, xml_unset_prop, XmlDocPtr, XmlDtdPtr,
-            XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
-        },
         uri::{
             xml_build_relative_uri, xml_build_uri, xml_free_uri, xml_parse_uri, xml_save_uri,
             xml_uri_escape, XmlURIPtr,
@@ -49,6 +41,14 @@ use crate::{
             XmlXPathObjectPtr, XmlXPathObjectType,
         },
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
+    },
+    tree::{
+        xml_add_next_sibling, xml_add_prev_sibling, xml_create_int_subset, xml_doc_copy_node,
+        xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_free_node_list, xml_get_ns_prop,
+        xml_get_prop, xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len,
+        xml_node_get_base, xml_node_set_base, xml_static_copy_node, xml_static_copy_node_list,
+        xml_unlink_node, xml_unset_prop, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
+        XML_XML_NAMESPACE,
     },
 };
 

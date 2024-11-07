@@ -16,7 +16,6 @@ pub(crate) use crate::buf::libxml_api::*;
 use crate::libxml::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
     parser_internals::XML_MAX_TEXT_LENGTH,
-    tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
     xmlstring::{xml_strchr, xml_strlen, XmlChar},
 };
 
@@ -31,6 +30,7 @@ mod legacy {
             get_default_buffer_allocation_scheme, get_default_buffer_size,
             set_default_buffer_allocation_scheme,
         },
+        tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
     };
 
     use super::*;

@@ -34,11 +34,6 @@ use crate::{
         },
         parser::xml_init_parser,
         parser_internals::XML_STRING_TEXT_NOENC,
-        tree::{
-            xml_get_int_subset, xml_is_xhtml, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
-            XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
-            XmlNodePtr, XmlNsPtr, XML_LOCAL_NAMESPACE,
-        },
         valid::{
             xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table,
             XmlNotationTablePtr,
@@ -46,6 +41,11 @@ use crate::{
         xmlstring::{xml_str_equal, XmlChar},
     },
     private::{buf::xml_buf_set_allocation_scheme, save::xml_buf_attr_serialize_txt_content},
+    tree::{
+        xml_get_int_subset, xml_is_xhtml, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
+        XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr,
+        XmlNsPtr, XML_LOCAL_NAMESPACE,
+    },
 };
 
 const MAX_INDENT: usize = 60;
@@ -908,7 +908,7 @@ unsafe extern "C" fn xml_ns_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr
  */
 #[cfg(feature = "html")]
 unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr) {
-    use crate::libxml::tree::{xml_free_node, xml_new_doc_text};
+    use crate::tree::{xml_free_node, xml_new_doc_text};
 
     use super::htmltree::html_is_boolean_attr;
 
@@ -1105,8 +1105,9 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
  */
 #[cfg(feature = "html")]
 pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlNodePtr) {
-    use crate::libxml::{
-        parser_internals::XML_STRING_TEXT, tree::xml_get_prop, xmlstring::xml_strcasecmp,
+    use crate::{
+        libxml::{parser_internals::XML_STRING_TEXT, xmlstring::xml_strcasecmp},
+        tree::xml_get_prop,
     };
 
     let format: i32 = (*ctxt).format;

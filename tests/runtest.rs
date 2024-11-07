@@ -45,10 +45,6 @@ use exml::{
         parser_internals::xml_create_file_parser_ctxt,
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::{xml_relaxng_init_types, XmlRelaxNGPtr},
-        tree::{
-            xml_doc_dump_memory, xml_free_doc, xml_save_file, XmlDoc, XmlDocPtr,
-            XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlNodePtr,
-        },
         uri::{
             xml_build_uri, xml_create_uri, xml_free_uri, xml_normalize_uri_path,
             xml_parse_uri_reference, xml_print_uri, XmlURIPtr,
@@ -65,6 +61,10 @@ use exml::{
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{xml_strlen, XmlChar},
         xpath::XmlXPathObjectPtr,
+    },
+    tree::{
+        xml_doc_dump_memory, xml_free_doc, xml_save_file, XmlDoc, XmlDocPtr, XmlElementContentPtr,
+        XmlElementType, XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -2271,8 +2271,8 @@ unsafe fn push_boundary_test(
                 xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
             },
             sax2::{xml_sax2_init_html_default_sax_handler, xml_sax_version},
-            tree::xml_doc_dump_memory,
         },
+        tree::xml_doc_dump_memory,
     };
     use libc::memset;
 
@@ -3004,15 +3004,17 @@ fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     use std::sync::atomic::Ordering;
 
-    use exml::libxml::{
-        tree::xml_doc_get_root_element,
-        xpath::{
-            xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_eval_expression,
-            xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
-            xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
+    use exml::{
+        libxml::{
+            xpath::{
+                xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_eval_expression,
+                xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
+                xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
+            },
+            xpath_internals::xml_xpath_debug_dump_object,
+            xpointer::{xml_xptr_eval, xml_xptr_new_context},
         },
-        xpath_internals::xml_xpath_debug_dump_object,
-        xpointer::{xml_xptr_eval, xml_xptr_new_context},
+        tree::xml_doc_get_root_element,
     };
 
     let res: XmlXPathObjectPtr;
@@ -4467,14 +4469,16 @@ unsafe extern "C" fn pattern_node(
     patternc: XmlPatternPtr,
     mut patstream: XmlStreamCtxtPtr,
 ) {
-    use exml::libxml::{
-        pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-        tree::xml_get_node_path,
-        xmlreader::{
-            xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri,
-            xml_text_reader_current_node, xml_text_reader_is_empty_element,
-            xml_text_reader_node_type, XmlReaderTypes,
+    use exml::{
+        libxml::{
+            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
+            xmlreader::{
+                xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri,
+                xml_text_reader_current_node, xml_text_reader_is_empty_element,
+                xml_text_reader_node_type, XmlReaderTypes,
+            },
         },
+        tree::xml_get_node_path,
     };
 
     let mut path: *mut XmlChar = null_mut();
@@ -4560,13 +4564,15 @@ unsafe fn pattern_test(
 ) -> c_int {
     use std::sync::atomic::Ordering;
 
-    use exml::libxml::{
-        pattern::{
-            xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
-            xml_patterncompile, xml_stream_push,
+    use exml::{
+        libxml::{
+            pattern::{
+                xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
+                xml_patterncompile, xml_stream_push,
+            },
+            xmlreader::{xml_free_text_reader, xml_reader_walker, xml_text_reader_read},
         },
         tree::{xml_doc_get_root_element, XmlNsPtr},
-        xmlreader::{xml_free_text_reader, xml_reader_walker, xml_text_reader_read},
     };
 
     let mut patternc: XmlPatternPtr;
@@ -4741,7 +4747,6 @@ unsafe extern "C" fn load_xpath_expr(
                 xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS,
                 XML_DETECT_IDS,
             },
-            tree::{xml_doc_get_root_element, xml_node_get_content, XmlNsPtr},
             xmlstring::xml_str_equal,
             xpath::{
                 xml_xpath_eval_expression, xml_xpath_free_context, xml_xpath_new_context,
@@ -4749,6 +4754,7 @@ unsafe extern "C" fn load_xpath_expr(
             },
             xpath_internals::xml_xpath_register_ns,
         },
+        tree::{xml_doc_get_root_element, xml_node_get_content, XmlNsPtr},
     };
 
     let mut node: XmlNodePtr;
@@ -4946,9 +4952,9 @@ unsafe extern "C" fn c14n_run_test(
                 xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS,
                 XML_DETECT_IDS,
             },
-            tree::xml_doc_get_root_element,
             xpath::xml_xpath_free_object,
         },
+        tree::xml_doc_get_root_element,
     };
 
     let mut xpath: XmlXPathObjectPtr = null_mut();

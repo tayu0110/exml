@@ -30,10 +30,6 @@ use crate::{
         hash::{xml_hash_create, XmlHashTablePtr},
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
-        tree::{
-            xml_free_node_list, xml_node_get_content, XmlDocPtr, XmlElementType, XmlNodePtr,
-            XmlNsPtr,
-        },
         xmlstring::{xml_strdup, xml_strlen, XmlChar},
         xpath_internals::{
             value_pop, xml_xpath_compile_expr, xml_xpath_err_memory, xml_xpath_eval_expr,
@@ -47,6 +43,9 @@ use crate::{
             xml_xpatherror, XmlPointerListPtr, XmlXpathContextCache, XmlXpathContextCachePtr,
             XML_NODESET_DEFAULT,
         },
+    },
+    tree::{
+        xml_free_node_list, xml_node_get_content, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
     },
 };
 

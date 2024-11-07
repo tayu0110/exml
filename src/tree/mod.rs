@@ -20,10 +20,32 @@ use crate::{
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     io::XmlOutputBufferPtr,
     libxml::{
-        dict::xml_dict_free,
-        entities::XmlEntityPtr,
+        chvalid::xml_is_blank_char,
+        dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, XmlDict, XmlDictPtr},
+        entities::{
+            xml_encode_entities_reentrant, xml_free_entities_table, xml_get_doc_entity,
+            XmlEntitiesTablePtr, XmlEntityPtr, XmlEntityType,
+        },
+        globals::{
+            xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic,
+            xml_realloc, xml_register_node_default_value,
+        },
+        hash::{xml_hash_lookup, xml_hash_remove_entry},
+        parser_internals::{
+            xml_copy_char_multi_byte, XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC,
+        },
+        uri::xml_build_uri,
+        valid::{
+            xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_notation_table,
+            xml_get_dtd_attr_desc, xml_is_id, XmlAttributeTablePtr, XmlElementTablePtr,
+            XmlNotationTablePtr,
+        },
         valid::{xml_free_id_table, xml_free_ref_table, xml_get_dtd_qattr_desc, xml_remove_id},
-        xmlstring::XmlChar,
+        xmlregexp::XmlRegexpPtr,
+        xmlstring::{
+            xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
+            xml_strncat_new, xml_strncmp, xml_strndup, XmlChar,
+        },
     },
     private::{
         buf::{
@@ -31,34 +53,6 @@ use crate::{
             xml_buf_free, xml_buf_is_empty, xml_buf_set_allocation_scheme,
         },
         entities::{xml_encode_attribute_entities, XML_ENT_EXPANDING, XML_ENT_PARSED},
-    },
-};
-
-use super::{
-    chvalid::xml_is_blank_char,
-    dict::{xml_dict_lookup, xml_dict_owns, XmlDict, XmlDictPtr},
-    entities::{
-        xml_encode_entities_reentrant, xml_free_entities_table, xml_get_doc_entity,
-        XmlEntitiesTablePtr, XmlEntityType,
-    },
-    globals::{
-        xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc,
-        xml_register_node_default_value,
-    },
-    hash::{xml_hash_lookup, xml_hash_remove_entry},
-    parser_internals::{
-        xml_copy_char_multi_byte, XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC,
-    },
-    uri::xml_build_uri,
-    valid::{
-        xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_notation_table,
-        xml_get_dtd_attr_desc, xml_is_id, XmlAttributeTablePtr, XmlElementTablePtr,
-        XmlNotationTablePtr,
-    },
-    xmlregexp::XmlRegexpPtr,
-    xmlstring::{
-        xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
-        xml_strncat_new, xml_strncmp, xml_strndup,
     },
 };
 
@@ -3065,7 +3059,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
  */
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocPtr {
-    use super::globals::xml_mem_strdup;
+    use crate::libxml::globals::xml_mem_strdup;
 
     if doc.is_null() {
         return null_mut();
@@ -7174,7 +7168,7 @@ pub unsafe extern "C" fn xml_node_list_get_raw_string(
     list: *const XmlNode,
     in_line: i32,
 ) -> *mut XmlChar {
-    use super::entities::xml_encode_special_chars;
+    use crate::libxml::entities::xml_encode_special_chars;
 
     let mut node: *const XmlNode = list;
     let mut ret: *mut XmlChar = null_mut();
@@ -8007,7 +8001,7 @@ pub unsafe extern "C" fn xml_node_get_base(
  */
 #[cfg(any(feature = "tree", feature = "xinclude"))]
 pub unsafe extern "C" fn xml_node_set_base(cur: XmlNodePtr, uri: *const XmlChar) {
-    use super::uri::xml_path_to_uri;
+    use crate::libxml::uri::xml_path_to_uri;
 
     if cur.is_null() {
         return;
@@ -8587,7 +8581,7 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
         libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
-    use super::xmlsave::XmlSaveCtxt;
+    use crate::libxml::xmlsave::XmlSaveCtxt;
 
     let mut ctxt = XmlSaveCtxt::default();
 
@@ -8749,7 +8743,7 @@ pub unsafe extern "C" fn xml_buf_node_dump(
         private::buf::xml_buf_get_allocation_scheme,
     };
 
-    use super::parser::xml_init_parser;
+    use crate::libxml::parser::xml_init_parser;
 
     xml_init_parser();
 
@@ -8844,7 +8838,7 @@ pub unsafe fn xml_save_file_to(
         libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
-    use super::xmlsave::XmlSaveCtxt;
+    use crate::libxml::xmlsave::XmlSaveCtxt;
 
     let mut ctxt = XmlSaveCtxt::default();
 
@@ -8891,7 +8885,7 @@ pub unsafe fn xml_save_format_file_to(
         libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
     };
 
-    use super::xmlsave::XmlSaveCtxt;
+    use crate::libxml::xmlsave::XmlSaveCtxt;
 
     let mut ctxt = XmlSaveCtxt::default();
 
@@ -8946,7 +8940,7 @@ pub unsafe fn xml_node_dump_output(
         },
     };
 
-    use super::xmlsave::XmlSaveCtxt;
+    use crate::libxml::xmlsave::XmlSaveCtxt;
 
     let mut ctxt = XmlSaveCtxt::default();
     #[cfg(feature = "html")]
@@ -9018,10 +9012,10 @@ pub unsafe fn xml_save_format_file_enc(
     use crate::{
         encoding::find_encoding_handler,
         io::{xml_output_buffer_close, xml_output_buffer_create_filename},
-        libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
+        libxml::xmlsave::{
+            xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveCtxt, XmlSaveOption,
+        },
     };
-
-    use super::xmlsave::XmlSaveCtxt;
 
     let mut ctxt = XmlSaveCtxt::default();
 

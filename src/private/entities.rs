@@ -3,7 +3,10 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use crate::libxml::{entities::xml_encode_entities_internal, tree::XmlDocPtr, xmlstring::XmlChar};
+use crate::{
+    libxml::{entities::xml_encode_entities_internal, xmlstring::XmlChar},
+    tree::XmlDocPtr,
+};
 
 /*
  * Entity flags

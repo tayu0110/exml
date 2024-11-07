@@ -10,10 +10,10 @@ use crate::{
     io::XmlOutputBufferPtr,
     libxml::{
         chvalid::xml_is_char,
-        tree::{XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlNsPtr},
         xmlsave::{xml_ns_dump_output, xml_save_err, xml_serialize_hex_char_ref},
         xmlstring::XmlChar,
     },
+    tree::{XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlNsPtr},
 };
 
 use super::buf::xml_buf_add;

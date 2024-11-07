@@ -34,10 +34,6 @@ use exml::{
             xml_relaxng_validate_doc, XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr,
             XmlRelaxNGValidCtxtPtr,
         },
-        tree::{
-            xml_buf_node_dump, xml_doc_get_root_element, xml_free_doc, xml_get_line_no,
-            xml_get_prop, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr,
-        },
         uri::xml_build_uri,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -58,6 +54,10 @@ use exml::{
             XmlXPathObjectType,
         },
         xpath_internals::xml_xpath_register_ns,
+    },
+    tree::{
+        xml_buf_node_dump, xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop,
+        XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr,
     },
 };
 use libc::{snprintf, strcmp, strstr};

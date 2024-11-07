@@ -18,7 +18,6 @@ use crate::{
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
         parser::xml_init_parser,
-        tree::{XmlDocPtr, XmlElementType, XmlNodePtr},
         xmlstring::{xml_str_equal, xml_strlen, XmlChar},
         xpath::{
             xml_xpath_free_object, xml_xpath_new_context, XmlNodeSetPtr, XmlXPathContextPtr,
@@ -31,6 +30,7 @@ use crate::{
             xml_xpath_register_ns, xml_xpath_root,
         },
     },
+    tree::{XmlDocPtr, XmlElementType, XmlNodePtr},
     CHECK_ERROR, CHECK_TYPE, XP_ERROR,
 };
 #[cfg(feature = "libxml_xptr_locs")]

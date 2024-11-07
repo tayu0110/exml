@@ -45,15 +45,6 @@ use crate::{
             XmlRelaxNGValidCtxtPtr,
         },
         sax2::xml_sax_version,
-        tree::{
-            xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd,
-            xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-            xml_free_ns_list, xml_get_line_no, xml_get_no_ns_prop, xml_get_ns_prop,
-            xml_is_blank_node, xml_new_doc_text, xml_node_get_base, xml_node_get_lang,
-            xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns, xml_split_qname2,
-            xml_unlink_node, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr,
-            XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
-        },
         uri::xml_canonic_path,
         valid::{
             xml_free_id_table, xml_free_ref_table, xml_validate_pop_element,
@@ -74,6 +65,15 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, XmlChar},
     },
     private::buf::{xml_buf_create_size, xml_buf_empty, xml_buf_set_allocation_scheme},
+    tree::{
+        xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd,
+        xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
+        xml_free_ns_list, xml_get_line_no, xml_get_no_ns_prop, xml_get_ns_prop, xml_is_blank_node,
+        xml_new_doc_text, xml_node_get_base, xml_node_get_lang, xml_node_get_space_preserve,
+        xml_node_list_get_string, xml_search_ns, xml_split_qname2, xml_unlink_node, XmlAttrPtr,
+        XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
+        __XML_REGISTER_CALLBACKS,
+    },
 };
 
 /**
@@ -2447,7 +2447,7 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
 ) -> *mut XmlChar {
     use crate::{buf::XmlBufRef, private::buf::xml_buf_detach};
 
-    use super::tree::xml_buf_node_dump;
+    use crate::tree::xml_buf_node_dump;
 
     let mut node: XmlNodePtr;
     let mut cur_node: XmlNodePtr;
@@ -2501,7 +2501,7 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
 pub unsafe extern "C" fn xml_text_reader_read_outer_xml(
     reader: &mut XmlTextReader,
 ) -> *mut XmlChar {
-    use crate::{buf::XmlBufRef, libxml::tree::xml_buf_node_dump};
+    use crate::{buf::XmlBufRef, tree::xml_buf_node_dump};
 
     let mut node: XmlNodePtr;
 

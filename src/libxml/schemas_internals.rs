@@ -5,9 +5,10 @@
 
 use std::{any::type_name, os::raw::c_void};
 
+use crate::tree::XmlNodePtr;
+
 use super::{
     globals::xml_free,
-    tree::XmlNodePtr,
     xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr},
     xmlschemas::XmlSchemaItemListPtr,
     xmlschemastypes::{xml_schema_free_facet, XmlSchemaValPtr},

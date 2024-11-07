@@ -12,9 +12,12 @@ use std::{
 
 use libc::snprintf;
 
+use crate::tree::{
+    xml_get_ns_prop, xml_search_ns, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
+};
+
 use super::{
     globals::xml_free,
-    tree::{xml_get_ns_prop, xml_search_ns, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
     xmlstring::{xml_str_equal, XmlChar},
 };
 

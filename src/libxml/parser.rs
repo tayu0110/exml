@@ -79,15 +79,6 @@ use crate::{
             xml_sax2_entity_decl, xml_sax2_get_entity, xml_sax2_ignorable_whitespace,
             xml_sax_version,
         },
-        tree::{
-            xml_add_child, xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node,
-            xml_free_node_list, xml_get_last_child, xml_new_doc, xml_new_doc_comment,
-            xml_new_doc_node, xml_new_dtd, xml_node_is_text, xml_search_ns_by_href,
-            xml_set_tree_doc, xml_unlink_node, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType,
-            XmlBufferAllocationScheme, XmlDocProperties, XmlDocPtr, XmlDtdPtr,
-            XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-            XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
-        },
         uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, XmlURIPtr},
         valid::{
             xml_free_doc_element_content, xml_free_enumeration, xml_is_mixed_element,
@@ -109,6 +100,15 @@ use crate::{
             __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock,
             xml_cleanup_threads_internal, xml_init_threads_internal,
         },
+    },
+    tree::{
+        xml_add_child, xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node,
+        xml_free_node_list, xml_get_last_child, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
+        xml_new_dtd, xml_node_is_text, xml_search_ns_by_href, xml_set_tree_doc, xml_unlink_node,
+        XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme,
+        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
+        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
+        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 

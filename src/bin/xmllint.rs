@@ -68,14 +68,6 @@ use exml::{
             xml_schematron_validate_doc, XmlSchematron, XmlSchematronParserCtxtPtr,
             XmlSchematronValidCtxtPtr, XmlSchematronValidOptions,
         },
-        tree::{
-            xml_copy_doc, xml_doc_dump, xml_doc_dump_format_memory, xml_doc_dump_format_memory_enc,
-            xml_doc_dump_memory, xml_doc_dump_memory_enc, xml_doc_set_root_element, xml_free_doc,
-            xml_free_dtd, xml_get_int_subset, xml_new_doc, xml_new_doc_node, xml_node_set_content,
-            xml_save_file, xml_save_file_enc, xml_save_format_file, xml_save_format_file_enc,
-            xml_set_compress_mode, xml_unlink_node, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-            XmlEnumerationPtr, XmlNodePtr,
-        },
         valid::{
             xml_free_enumeration, xml_free_valid_ctxt, xml_new_valid_ctxt,
             xml_valid_get_valid_elements, xml_validate_document, xml_validate_dtd,
@@ -99,6 +91,14 @@ use exml::{
         },
         xmlstring::XmlChar,
         xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
+    },
+    tree::{
+        xml_copy_doc, xml_doc_dump, xml_doc_dump_format_memory, xml_doc_dump_format_memory_enc,
+        xml_doc_dump_memory, xml_doc_dump_memory_enc, xml_doc_set_root_element, xml_free_doc,
+        xml_free_dtd, xml_get_int_subset, xml_new_doc, xml_new_doc_node, xml_node_set_content,
+        xml_save_file, xml_save_file_enc, xml_save_format_file, xml_save_format_file_enc,
+        xml_set_compress_mode, xml_unlink_node, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+        XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -1814,15 +1814,17 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
  ************************************************************************/
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
-    use exml::libxml::{
-        pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-        tree::xml_get_node_path,
-        xmlreader::{
-            xml_text_reader_const_local_name, xml_text_reader_const_name,
-            xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
-            xml_text_reader_current_node, xml_text_reader_depth, xml_text_reader_has_value,
-            xml_text_reader_is_empty_element, xml_text_reader_node_type, XmlReaderTypes,
+    use exml::{
+        libxml::{
+            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
+            xmlreader::{
+                xml_text_reader_const_local_name, xml_text_reader_const_name,
+                xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
+                xml_text_reader_current_node, xml_text_reader_depth, xml_text_reader_has_value,
+                xml_text_reader_is_empty_element, xml_text_reader_node_type, XmlReaderTypes,
+            },
         },
+        tree::xml_get_node_path,
     };
 
     let mut name: *const XmlChar;
@@ -2146,12 +2148,15 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
 unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
     use std::{ptr::null, sync::atomic::Ordering};
 
-    use exml::libxml::{
-        pattern::{
-            xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile, xml_stream_push,
+    use exml::{
+        libxml::{
+            pattern::{
+                xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile,
+                xml_stream_push,
+            },
+            xmlreader::{xml_free_text_reader, xml_reader_walker, xml_text_reader_read},
         },
         tree::{xml_doc_get_root_element, XmlNodePtr},
-        xmlreader::{xml_free_text_reader, xml_reader_walker, xml_text_reader_read},
     };
 
     let mut ret: c_int;
@@ -2257,10 +2262,8 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
 unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     use exml::{
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
-        libxml::{
-            tree::{xml_node_dump_output, XmlNodePtr},
-            xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
-        },
+        libxml::xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
+        tree::{xml_node_dump_output, XmlNodePtr},
     };
 
     match (*cur).typ {
@@ -2338,12 +2341,12 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 
 #[cfg(feature = "xpath")]
 unsafe extern "C" fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
-    use exml::libxml::{
-        tree::XmlNodePtr,
-        xpath::{
+    use exml::{
+        libxml::xpath::{
             xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
             XmlXPathContextPtr,
         },
+        tree::XmlNodePtr,
     };
 
     let ctxt: XmlXPathContextPtr = xml_xpath_new_context(doc);

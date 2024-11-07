@@ -20,10 +20,10 @@ use crate::{
             xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
             xml_sax2_get_system_id,
         },
-        tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
         xmlstring::xml_strdup,
     },
+    tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
 };
 
 pub type GenericError = for<'a> fn(Option<GenericErrorContext>, &str);

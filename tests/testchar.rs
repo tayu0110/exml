@@ -23,10 +23,10 @@ use exml::{
             xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
         },
         parser_internals::xml_new_input_stream,
-        tree::{xml_free_doc, XmlDocPtr},
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
+    tree::{xml_free_doc, XmlDocPtr},
 };
 use libc::{memset, strlen};
 

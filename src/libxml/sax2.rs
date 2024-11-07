@@ -22,16 +22,24 @@ use crate::{
         entities::XmlEntityPtr,
         htmltree::html_new_doc_no_dtd,
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlSAXLocatorPtr},
-        tree::{
-            xml_validate_ncname, XmlAttributePtr, XmlDocProperties, XmlElementPtr, XmlNode,
-            XmlNsPtr,
-        },
         valid::{
             xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
         },
         xmlstring::XmlChar,
     },
     private::parser::{xml_err_memory, XML_VCTXT_DTD_VALIDATED},
+    tree::{
+        xml_add_child, xml_add_sibling, xml_build_qname, xml_create_int_subset, xml_free_dtd,
+        xml_free_node, xml_get_int_subset, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_doc_node_eat_name, xml_new_doc_pi,
+        xml_new_doc_text, xml_new_dtd, xml_new_ns, xml_new_ns_prop, xml_new_ns_prop_eat_name,
+        xml_new_reference, xml_search_ns, xml_set_ns, xml_string_get_node_list,
+        xml_string_len_get_node_list, xml_text_concat, xml_unlink_node, xml_validate_ncname,
+        XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType,
+        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlElementPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr,
+        XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    },
 };
 
 use super::{
@@ -50,17 +58,6 @@ use super::{
         xml_free_input_stream, xml_parse_external_subset, xml_push_input, xml_split_qname,
         xml_string_decode_entities, xml_string_len_decode_entities, xml_switch_encoding,
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
-    },
-    tree::{
-        xml_add_child, xml_add_sibling, xml_build_qname, xml_create_int_subset, xml_free_dtd,
-        xml_free_node, xml_get_int_subset, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
-        xml_new_doc_comment, xml_new_doc_node, xml_new_doc_node_eat_name, xml_new_doc_pi,
-        xml_new_doc_text, xml_new_dtd, xml_new_ns, xml_new_ns_prop, xml_new_ns_prop_eat_name,
-        xml_new_reference, xml_search_ns, xml_set_ns, xml_string_get_node_list,
-        xml_string_len_get_node_list, xml_text_concat, xml_unlink_node, XmlAttr, XmlAttrPtr,
-        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNotationPtr,
-        __XML_REGISTER_CALLBACKS,
     },
     uri::{
         xml_build_uri, xml_canonic_path, xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr,

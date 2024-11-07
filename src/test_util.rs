@@ -39,14 +39,6 @@ use crate::{
         },
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
         schematron::XmlSchematronValidCtxtPtr,
-        tree::{
-            xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, xml_new_text,
-            xml_set_prop, xml_unlink_node, XmlAttr, XmlAttrPtr, XmlAttributeDefault,
-            XmlAttributePtr, XmlAttributeType, XmlBufferAllocationScheme, XmlDOMWrapCtxtPtr,
-            XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementContentType,
-            XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
-            XmlNodePtr, XmlNotationPtr, XmlNs, XmlNsPtr,
-        },
         uri::XmlURIPtr,
         valid::{
             xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
@@ -69,6 +61,13 @@ use crate::{
             XmlNodeSetPtr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
             XmlXPathParserContextPtr,
         },
+    },
+    tree::{
+        xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, xml_new_text,
+        xml_set_prop, xml_unlink_node, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlBufferAllocationScheme, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr, XmlDtd,
+        XmlDtdPtr, XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
+        XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNs, XmlNsPtr,
     },
 };
 

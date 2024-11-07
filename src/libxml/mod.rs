@@ -32,7 +32,6 @@ pub mod schemas_internals;
 #[cfg(feature = "libxml_schematron")]
 pub mod schematron;
 pub mod threads;
-pub mod tree;
 pub mod uri;
 pub mod valid;
 #[cfg(feature = "xinclude")]

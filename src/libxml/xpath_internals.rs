@@ -42,11 +42,6 @@ use crate::{
             xml_stream_push_node, xml_stream_wants_any_node, XmlPatternFlags, XmlPatternPtr,
             XmlStreamCtxtPtr,
         },
-        tree::{
-            xml_buf_content, xml_build_qname, xml_doc_get_root_element, xml_get_ns_list,
-            xml_node_get_content, xml_node_get_lang, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
-            XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
-        },
         valid::xml_get_id,
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strchr, xml_strdup, xml_strlen, xml_strncmp,
@@ -69,6 +64,11 @@ use crate::{
         },
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
+    tree::{
+        xml_buf_content, xml_build_qname, xml_doc_get_root_element, xml_get_ns_list,
+        xml_node_get_content, xml_node_get_lang, XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlElementType,
+        XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+    },
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
 };
 

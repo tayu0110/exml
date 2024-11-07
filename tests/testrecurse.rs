@@ -28,13 +28,13 @@ use exml::{
             xml_new_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
         },
-        tree::{xml_free_doc, XmlDocPtr, XmlElementType},
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
         },
         xmlstring::{xml_strlen, XmlChar},
     },
+    tree::{xml_free_doc, XmlDocPtr, XmlElementType},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
 

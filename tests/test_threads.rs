@@ -16,9 +16,9 @@ use exml::{
     libxml::{
         catalog::{xml_catalog_cleanup, xml_load_catalog},
         parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
-        tree::{xml_free_doc, XmlDocPtr},
         xmlmemory::xml_memory_dump,
     },
+    tree::{xml_free_doc, XmlDocPtr},
 };
 use libc::{memset, pthread_create, pthread_join, pthread_t, strcmp};
 

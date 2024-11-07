@@ -28,15 +28,6 @@ use crate::{
         },
         parser::{xml_read_file, xml_read_memory},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
-        tree::{
-            xml_add_child, xml_add_next_sibling, xml_add_prev_sibling, xml_copy_doc,
-            xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_get_prop, xml_has_prop,
-            xml_is_blank_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
-            xml_node_get_base, xml_node_get_content, xml_node_list_get_string,
-            xml_node_set_content, xml_search_ns, xml_set_prop, xml_split_qname2, xml_unlink_node,
-            xml_unset_prop, xml_validate_ncname, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode,
-            XmlNodePtr, XmlNs, XmlNsPtr,
-        },
         uri::{xml_build_uri, xml_free_uri, xml_parse_uri, xml_uri_escape_str, XmlURIPtr},
         valid::{xml_validate_document_final, XmlValidCtxt},
         xmlautomata::{
@@ -60,6 +51,14 @@ use crate::{
             xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strcat, xml_strdup,
             xml_strlen, XmlChar,
         },
+    },
+    tree::{
+        xml_add_child, xml_add_next_sibling, xml_add_prev_sibling, xml_copy_doc,
+        xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_get_prop, xml_has_prop,
+        xml_is_blank_node, xml_new_child, xml_new_doc_node, xml_new_doc_text, xml_node_get_base,
+        xml_node_get_content, xml_node_list_get_string, xml_node_set_content, xml_search_ns,
+        xml_set_prop, xml_split_qname2, xml_unlink_node, xml_unset_prop, xml_validate_ncname,
+        XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -9104,7 +9103,7 @@ pub unsafe extern "C" fn xml_relaxng_dump(output: *mut FILE, schema: XmlRelaxNGP
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_relaxng_dump_tree(output: *mut FILE, schema: XmlRelaxNGPtr) {
-    use crate::libxml::tree::xml_doc_dump;
+    use crate::tree::xml_doc_dump;
 
     if output.is_null() {
         return;

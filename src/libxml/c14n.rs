@@ -22,6 +22,11 @@ use crate::{
         XmlOutputBufferPtr,
     },
     private::buf::xml_buf_write_quoted_string,
+    tree::{
+        xml_free_prop_list, xml_has_ns_prop, xml_new_ns_prop, xml_node_list_get_string,
+        xml_search_ns, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr,
+        XML_XML_NAMESPACE,
+    },
 };
 
 use super::{
@@ -29,11 +34,6 @@ use super::{
     list::{
         xml_list_create, xml_list_delete, xml_list_insert, xml_list_search, xml_list_walk,
         XmlListPtr,
-    },
-    tree::{
-        xml_free_prop_list, xml_has_ns_prop, xml_new_ns_prop, xml_node_list_get_string,
-        xml_search_ns, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr,
-        XML_XML_NAMESPACE,
     },
     uri::{xml_build_uri, xml_free_uri, xml_parse_uri, XmlURIPtr},
     xmlstring::{xml_str_equal, xml_strcat, xml_strcmp, xml_strlen, xml_strndup, XmlChar},

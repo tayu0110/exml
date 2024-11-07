@@ -12,16 +12,20 @@ use std::{
 
 use libc::{memset, FILE};
 
-use crate::{encoding::XmlCharEncoding, error::XmlParserErrors, io::XmlOutputBufferPtr};
-
-use super::{
-    globals::{xml_malloc, xml_register_node_default_value},
-    htmlparser::{html_err_memory, HtmlDocPtr, HtmlNodePtr},
+use crate::{
+    encoding::XmlCharEncoding,
+    error::XmlParserErrors,
+    io::XmlOutputBufferPtr,
     tree::{
         xml_add_child, xml_add_prev_sibling, xml_create_int_subset, xml_free_node,
         xml_new_doc_node, xml_new_prop, xml_set_prop, xml_unlink_node, XmlAttrPtr, XmlBufPtr,
         XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
+};
+
+use super::{
+    globals::{xml_malloc, xml_register_node_default_value},
+    htmlparser::{html_err_memory, HtmlDocPtr, HtmlNodePtr},
     xmlstring::{xml_str_equal, xml_strcasecmp, xml_strstr, XmlChar},
 };
 
@@ -358,9 +362,9 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         }
     }
 
-    let create = |mut meta: *mut super::tree::XmlNode,
+    let create = |mut meta: *mut crate::tree::XmlNode,
                   encoding: Option<&str>,
-                  head: *mut super::tree::XmlNode,
+                  head: *mut crate::tree::XmlNode,
                   newcontent: &str,
                   content: Option<&str>| {
         if meta.is_null() {
@@ -758,7 +762,8 @@ unsafe extern "C" fn html_buf_node_dump_format(
     use crate::{
         buf::XmlBufRef,
         io::{XmlOutputBuffer, XmlOutputBufferPtr},
-        libxml::{globals::xml_free, tree::xml_buf_use},
+        libxml::globals::xml_free,
+        tree::xml_buf_use,
     };
 
     if cur.is_null() {
@@ -1017,7 +1022,7 @@ unsafe extern "C" fn html_dtd_dump_output(
 
     use crate::libxml::xmlstring::xml_strcmp;
 
-    use super::tree::XmlDtdPtr;
+    use crate::tree::XmlDtdPtr;
 
     let cur: XmlDtdPtr = (*doc).int_subset;
 
@@ -1066,9 +1071,9 @@ unsafe extern "C" fn html_attr_dump_output(
 ) {
     use std::ffi::CStr;
 
-    use crate::libxml::{
-        chvalid::xml_is_blank_char, globals::xml_free, tree::xml_node_list_get_string,
-        uri::xml_uri_escape_str,
+    use crate::{
+        libxml::{chvalid::xml_is_blank_char, globals::xml_free, uri::xml_uri_escape_str},
+        tree::xml_node_list_get_string,
     };
 
     let value: *mut XmlChar;

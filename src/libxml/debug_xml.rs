@@ -18,6 +18,11 @@ use crate::{
     error::XmlParserErrors,
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
+    tree::{
+        xml_add_child_list, xml_free_node_list, xml_get_node_path, xml_validate_name, XmlAttrPtr,
+        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
+    },
 };
 
 #[cfg(feature = "xpath")]
@@ -28,11 +33,6 @@ use super::{
     hash::xml_hash_scan,
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-    tree::{
-        xml_add_child_list, xml_free_node_list, xml_get_node_path, xml_validate_name, XmlAttrPtr,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
-    },
     valid::xml_snprintf_element_content,
     xmlstring::{xml_check_utf8, xml_str_equal, xml_strchr, xml_strlen, xml_strstr, XmlChar},
     xpath::XmlXPathObjectType,
@@ -2295,7 +2295,7 @@ pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *
  */
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
-    use crate::libxml::tree::{xml_doc_dump, xml_elem_dump};
+    use crate::tree::{xml_doc_dump, xml_elem_dump};
 
     if !node.is_null() {
         return;
@@ -2456,8 +2456,7 @@ pub unsafe extern "C" fn xml_shell_base(
     _node2: XmlNodePtr,
 ) -> i32 {
     use crate::libxml::globals::xml_free;
-
-    use super::tree::xml_node_get_base;
+    use crate::tree::xml_node_get_base;
 
     if ctxt.is_null() {
         return 0;
@@ -2543,7 +2542,7 @@ pub unsafe extern "C" fn xml_shell_load(
         xpath::{xml_xpath_free_context, xml_xpath_new_context},
     };
 
-    use super::tree::xml_free_doc;
+    use crate::tree::xml_free_doc;
 
     let doc: XmlDocPtr;
     let mut html: i32 = 0;
@@ -2621,8 +2620,8 @@ pub unsafe extern "C" fn xml_shell_cat(
     node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use crate::libxml::{
-        htmltree::{html_doc_dump, html_node_dump_file},
+    use crate::{
+        libxml::htmltree::{html_doc_dump, html_node_dump_file},
         tree::{xml_doc_dump, xml_elem_dump},
     };
 
@@ -2679,9 +2678,8 @@ pub unsafe extern "C" fn xml_shell_write(
 ) -> i32 {
     use libc::{fclose, fopen};
 
-    use crate::libxml::{htmltree::html_save_file, tree::xml_elem_dump};
-
-    use super::tree::xml_save_file;
+    use crate::libxml::htmltree::html_save_file;
+    use crate::tree::{xml_elem_dump, xml_save_file};
 
     if node.is_null() {
         return -1;
@@ -2754,7 +2752,7 @@ pub unsafe extern "C" fn xml_shell_save(
 ) -> i32 {
     use crate::libxml::htmltree::html_save_file;
 
-    use super::tree::xml_save_file;
+    use crate::tree::xml_save_file;
 
     if ctxt.is_null() || (*ctxt).doc.is_null() {
         return -1;
@@ -2826,9 +2824,9 @@ pub unsafe extern "C" fn xml_shell_validate(
         globals::GLOBAL_STATE,
         libxml::{
             parser::xml_parse_dtd,
-            tree::xml_free_dtd,
             valid::{xml_validate_document, xml_validate_dtd},
         },
+        tree::xml_free_dtd,
     };
 
     use super::valid::XmlValidCtxt;
@@ -3348,7 +3346,7 @@ unsafe extern "C" fn xml_shell_set_base(
     node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use super::tree::xml_node_set_base;
+    use crate::tree::xml_node_set_base;
 
     xml_node_set_base(node, arg as *mut XmlChar);
     0
@@ -3379,15 +3377,18 @@ pub unsafe extern "C" fn xml_shell(
 
     use libc::{free, snprintf, sscanf, strcmp};
 
-    use crate::libxml::{
-        globals::{xml_free, xml_malloc},
-        tree::{xml_doc_get_root_element, xml_free_doc},
-        xmlmemory::xml_mem_show,
-        xmlstring::xml_strdup,
-        xpath::{
-            xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
+    use crate::{
+        libxml::{
+            globals::{xml_free, xml_malloc},
+            xmlmemory::xml_mem_show,
+            xmlstring::xml_strdup,
+            xpath::{
+                xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object,
+                xml_xpath_new_context,
+            },
+            xpath_internals::xml_xpath_debug_dump_object,
         },
-        xpath_internals::xml_xpath_debug_dump_object,
+        tree::{xml_doc_get_root_element, xml_free_doc},
     };
 
     let mut prompt: [u8; 500] = [0; 500];

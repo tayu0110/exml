@@ -12,13 +12,15 @@ use std::{
 
 use libc::memset;
 
-use crate::libxml::{
-    chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-    dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDict, XmlDictPtr},
-    globals::{xml_free, xml_malloc, xml_realloc},
-    parser_internals::{xml_is_letter, xml_string_current_char},
+use crate::{
+    libxml::{
+        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDict, XmlDictPtr},
+        globals::{xml_free, xml_malloc, xml_realloc},
+        parser_internals::{xml_is_letter, xml_string_current_char},
+        xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
+    },
     tree::{XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
-    xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
 };
 
 const XML_STREAM_STEP_DESC: usize = 1;

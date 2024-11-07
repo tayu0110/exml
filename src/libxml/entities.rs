@@ -29,14 +29,14 @@ use crate::{
             xml_hash_add_entry, xml_hash_copy, xml_hash_create, xml_hash_create_dict,
             xml_hash_free, xml_hash_lookup, xml_hash_scan, XmlHashTable,
         },
-        tree::{
-            xml_free_node_list, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode,
-            XmlNodePtr,
-        },
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strchr, xml_strdup, xml_strlen, xml_strndup,
             xml_strstr, XmlChar,
         },
+    },
+    tree::{
+        xml_free_node_list, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode,
+        XmlNodePtr,
     },
 };
 

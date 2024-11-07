@@ -39,16 +39,16 @@ use crate::{
             xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
             XmlRMutex,
         },
-        tree::{
-            xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_ns, xml_get_ns_prop,
-            xml_get_prop, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
-            xml_node_get_base, xml_save_format_file_to, xml_search_ns_by_href, xml_set_ns_prop,
-            xml_set_prop, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
-        },
         uri::{xml_build_uri, xml_canonic_path},
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
+    },
+    tree::{
+        xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_ns, xml_get_ns_prop,
+        xml_get_prop, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns, xml_node_get_base,
+        xml_save_format_file_to, xml_search_ns_by_href, xml_set_ns_prop, xml_set_prop, XmlDocPtr,
+        XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     SYSCONFDIR,
 };

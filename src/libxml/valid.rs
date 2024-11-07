@@ -48,16 +48,6 @@ use crate::{
         },
         parser::{XmlParserCtxtPtr, XmlParserMode},
         parser_internals::xml_string_current_char,
-        tree::{
-            xml_build_qname, xml_doc_get_root_element, xml_free_node, xml_get_line_no,
-            xml_is_blank_node, xml_new_doc_node, xml_node_list_get_string, xml_split_qname2,
-            xml_split_qname3, xml_unlink_node, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,
-            XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement,
-            XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-            XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr,
-            XmlID, XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef,
-            XmlRefPtr,
-        },
         xmlautomata::{
             xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
             XmlAutomataStatePtr,
@@ -65,6 +55,15 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
     private::parser::XML_VCTXT_USE_PCTXT,
+    tree::{
+        xml_build_qname, xml_doc_get_root_element, xml_free_node, xml_get_line_no,
+        xml_is_blank_node, xml_new_doc_node, xml_node_list_get_string, xml_split_qname2,
+        xml_split_qname3, xml_unlink_node, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,
+        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement,
+        XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID,
+        XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
+    },
 };
 
 use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};

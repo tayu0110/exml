@@ -54,12 +54,12 @@ use crate::{
             XML_SAX2_MAGIC,
         },
         parser_internals::{xml_free_input_stream, xml_new_input_from_file},
-        tree::XmlBufferAllocationScheme,
         uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
         xmlstring::{xml_str_equal, xml_strdup, xml_strncasecmp, XmlChar},
     },
     nanohttp::XmlNanoHTTPCtxt,
     private::parser::__xml_err_encoding,
+    tree::XmlBufferAllocationScheme,
     xml_str_printf,
 };
 

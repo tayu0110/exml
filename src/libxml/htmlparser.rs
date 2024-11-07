@@ -40,10 +40,6 @@ use crate::{
             XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
-        tree::{
-            xml_create_int_subset, xml_free_doc, xml_get_int_subset, xml_get_last_child,
-            xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
-        },
         uri::xml_canonic_path,
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strcmp, xml_strdup, xml_strlen,
@@ -51,6 +47,10 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
+    tree::{
+        xml_create_int_subset, xml_free_doc, xml_get_int_subset, xml_get_last_child,
+        xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
+    },
 };
 
 use super::{

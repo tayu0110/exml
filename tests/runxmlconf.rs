@@ -24,10 +24,6 @@ use exml::{
             xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
         },
         parser_internals::xml_new_input_from_file,
-        tree::{
-            xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop,
-            xml_node_get_base, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
-        },
         xmlmemory::{
             xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
@@ -37,6 +33,10 @@ use exml::{
             xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context,
             XmlXPathContext,
         },
+    },
+    tree::{
+        xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop, xml_node_get_base,
+        XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
     },
 };
 use libc::{fdopen, snprintf, strcmp};

@@ -26,6 +26,7 @@ use crate::{
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
     private::threads::{__xml_global_init_mutex_destroy, xml_cleanup_mutex, xml_init_mutex},
+    tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
 };
 
 use super::{
@@ -42,7 +43,6 @@ use super::{
         xml_sax2_start_element, xml_sax2_unparsed_entity_decl,
     },
     threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
-    tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
     xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
     xmlversion::LIBXML_VERSION_STRING,
 };

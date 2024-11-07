@@ -21,7 +21,11 @@ use crate::{
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
-    libxml::{tree::XmlElementType, xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
+    libxml::{xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
+    tree::{
+        xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_no_ns_prop,
+        xml_get_node_path, xml_node_get_content, XmlDocPtr, XmlElementType, XmlNodePtr,
+    },
 };
 
 use super::{
@@ -30,10 +34,6 @@ use super::{
     parser::{xml_read_file, xml_read_memory, XmlParserOption},
     pattern::{
         xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternFlags, XmlPatternPtr,
-    },
-    tree::{
-        xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_no_ns_prop,
-        xml_get_node_path, xml_node_get_content, XmlDocPtr, XmlNodePtr,
     },
     xmlstring::{xml_strcat, xml_strdup, xml_strlen, XmlChar},
     xpath::{

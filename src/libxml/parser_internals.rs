@@ -58,14 +58,6 @@ use crate::{
             XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
-        tree::{
-            xml_add_child, xml_add_child_list, xml_create_int_subset, xml_doc_copy_node,
-            xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc, xml_new_doc_node,
-            xml_set_tree_doc, xml_split_qname3, XmlAttributeDefault, XmlAttributeType,
-            XmlDocProperties, XmlDocPtr, XmlElementContentOccur, XmlElementContentPtr,
-            XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
-            XmlNodePtr, XML_XML_NAMESPACE,
-        },
         uri::{xml_build_uri, xml_canonic_path},
         valid::{
             xml_create_enumeration, xml_free_doc_element_content, xml_free_enumeration,
@@ -82,6 +74,13 @@ use crate::{
             XML_ENT_PARSED,
         },
         parser::{__xml_err_encoding, xml_err_memory},
+    },
+    tree::{
+        xml_add_child, xml_add_child_list, xml_create_int_subset, xml_doc_copy_node, xml_free_doc,
+        xml_free_node, xml_free_node_list, xml_new_doc, xml_new_doc_node, xml_set_tree_doc,
+        xml_split_qname3, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
+        XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 

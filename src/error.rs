@@ -9,10 +9,8 @@ use std::{
 
 use crate::{
     globals::{GenericError, GenericErrorContext, GLOBAL_STATE},
-    libxml::{
-        parser::{XmlParserCtxtPtr, XmlParserInputPtr},
-        tree::{XmlElementType, XmlNode, XmlNodePtr},
-    },
+    libxml::parser::{XmlParserCtxtPtr, XmlParserInputPtr},
+    tree::{XmlElementType, XmlNode, XmlNodePtr},
 };
 
 /**
@@ -1421,8 +1419,8 @@ macro_rules! __xml_raise_error {
             },
             libxml::{
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
-                tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
-            }
+            },
+            tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
         };
         (|mut schannel: Option<StructuredError>,
             mut channel: Option<GenericError>,

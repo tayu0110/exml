@@ -30,11 +30,6 @@ use crate::{
             XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE, XML_SCHEMAS_TYPE_HAS_FACETS,
             XML_SCHEMAS_TYPE_VARIETY_ATOMIC, XML_SCHEMAS_TYPE_VARIETY_LIST,
         },
-        tree::{
-            xml_search_ns, xml_split_qname2, xml_validate_name, xml_validate_ncname,
-            xml_validate_nmtoken, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlElementType,
-            XmlIDPtr, XmlNodePtr, XmlNsPtr,
-        },
         uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
         valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
         xmlregexp::{xml_reg_free_regexp, xml_regexp_compile, xml_regexp_exec},
@@ -50,6 +45,11 @@ use crate::{
             XmlChar,
         },
         xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
+    },
+    tree::{
+        xml_search_ns, xml_split_qname2, xml_validate_name, xml_validate_ncname,
+        xml_validate_nmtoken, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlElementType,
+        XmlIDPtr, XmlNodePtr, XmlNsPtr,
     },
 };
 
