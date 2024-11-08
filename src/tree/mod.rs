@@ -12,7 +12,7 @@ mod node;
 
 use std::{
     any::type_name,
-    ffi::{c_char, CStr, CString},
+    ffi::{c_char, CStr},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -39,7 +39,6 @@ use crate::{
         parser_internals::{
             xml_copy_char_multi_byte, XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC,
         },
-        uri::xml_build_uri,
         valid::{
             xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_notation_table,
             xml_get_dtd_attr_desc, xml_is_id, XmlAttributeTablePtr, XmlElementTablePtr,
@@ -47,8 +46,8 @@ use crate::{
         },
         valid::{xml_free_id_table, xml_free_ref_table, xml_get_dtd_qattr_desc, xml_remove_id},
         xmlstring::{
-            xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
-            xml_strncat_new, xml_strncmp, xml_strndup, XmlChar,
+            xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new,
+            xml_strndup, XmlChar,
         },
     },
     private::{
@@ -5702,106 +5701,6 @@ pub unsafe extern "C" fn xml_node_set_space_preserve(cur: XmlNodePtr, val: i32) 
         }
         _ => {}
     }
-}
-
-/**
- * xmlNodeGetBase:
- * @doc:  the document the node pertains to
- * @cur:  the node being checked
- *
- * Searches for the BASE URL. The code should work on both XML
- * and HTML document even if base mechanisms are completely different.
- * It returns the base as defined in RFC 2396 sections
- * 5.1.1. Base URI within Document Content
- * and
- * 5.1.2. Base URI from the Encapsulating Entity
- * However it does not return the document base (5.1.3), use
- * (*doc).URL in this case
- *
- * Returns a pointer to the base URL, or null_mut() if not found
- *     It's up to the caller to free the memory with xml_free( as _).
- */
-pub unsafe extern "C" fn xml_node_get_base(
-    mut doc: *const XmlDoc,
-    mut cur: *const XmlNode,
-) -> *mut XmlChar {
-    let mut oldbase: *mut XmlChar = null_mut();
-    let mut base: *mut XmlChar;
-    let mut newbase: *mut XmlChar;
-
-    if cur.is_null() && doc.is_null() {
-        return null_mut();
-    }
-    if !cur.is_null() && matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    if doc.is_null() {
-        doc = (*cur).doc;
-    }
-    if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
-        cur = (*doc).children;
-        while !cur.is_null() && !(*cur).name.is_null() {
-            if !matches!((*cur).typ, XmlElementType::XmlElementNode) {
-                cur = (*cur).next;
-                continue;
-            }
-            if xml_strcasecmp((*cur).name, c"html".as_ptr() as _) == 0 {
-                cur = (*cur).children;
-                continue;
-            }
-            if xml_strcasecmp((*cur).name, c"head".as_ptr() as _) == 0 {
-                cur = (*cur).children;
-                continue;
-            }
-            if xml_strcasecmp((*cur).name, c"base".as_ptr() as _) == 0 {
-                return xml_get_prop(cur, c"href".as_ptr() as _);
-            }
-            cur = (*cur).next;
-        }
-        return null_mut();
-    }
-    while !cur.is_null() {
-        if matches!((*cur).typ, XmlElementType::XmlEntityDecl) {
-            let ent: XmlEntityPtr = cur as _;
-            return xml_strdup((*ent).uri.load(Ordering::Relaxed));
-        }
-        if matches!((*cur).typ, XmlElementType::XmlElementNode) {
-            base = xml_get_ns_prop(cur, c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
-            if !base.is_null() {
-                if !oldbase.is_null() {
-                    newbase = xml_build_uri(oldbase, base);
-                    if !newbase.is_null() {
-                        xml_free(oldbase as _);
-                        xml_free(base as _);
-                        oldbase = newbase;
-                    } else {
-                        xml_free(oldbase as _);
-                        xml_free(base as _);
-                        return null_mut();
-                    }
-                } else {
-                    oldbase = base;
-                }
-                if xml_strncmp(oldbase, c"http://".as_ptr() as _, 7) == 0
-                    || xml_strncmp(oldbase, c"ftp://".as_ptr() as _, 6) == 0
-                    || xml_strncmp(oldbase, c"urn:".as_ptr() as _, 4) == 0
-                {
-                    return oldbase;
-                }
-            }
-        }
-        cur = (*cur).parent;
-    }
-    if !doc.is_null() && (*doc).url.is_some() {
-        let url = CString::new((*doc).url.as_deref().unwrap()).unwrap();
-        if oldbase.is_null() {
-            return xml_strdup(url.as_ptr() as *const u8);
-        }
-        newbase = xml_build_uri(oldbase, url.as_ptr() as *const u8);
-        xml_free(oldbase as _);
-        return newbase;
-    }
-    oldbase
 }
 
 /**
@@ -12264,36 +12163,6 @@ mod tests {
                             eprint!(" {}", n_content);
                             eprintln!(" {}", n_len);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_get_base() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_const_xml_doc_ptr(n_doc, 0);
-                    let cur = gen_const_xml_node_ptr(n_cur, 1);
-
-                    let ret_val = xml_node_get_base(doc, cur);
-                    desret_xml_char_ptr(ret_val);
-                    des_const_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_node_ptr(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNodeGetBase",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeGetBase()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_cur);
                     }
                 }
             }

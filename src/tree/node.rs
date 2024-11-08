@@ -1,17 +1,20 @@
-use std::{os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
+use std::{ffi::CString, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
 use crate::{
     hash::{xml_hash_lookup, xml_hash_remove_entry},
     libxml::{
+        entities::XmlEntityPtr,
         globals::xml_free,
-        xmlstring::{xml_strcat, xml_strdup, XmlChar},
+        uri::xml_build_uri,
+        xmlstring::{xml_strcasecmp, xml_strcat, xml_strdup, xml_strncmp, XmlChar},
     },
 };
 
 use super::{
-    xml_free_node, xml_free_prop, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content,
-    xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlAttrPtr, XmlDoc, XmlDtd,
-    XmlElementType, XmlNs, XmlNsPtr,
+    xml_free_node, xml_free_prop, xml_get_ns_prop, xml_get_prop, xml_has_ns_prop,
+    xml_is_blank_char, xml_node_add_content, xml_node_set_content, xml_remove_prop,
+    xml_set_tree_doc, XmlAttr, XmlAttrPtr, XmlDoc, XmlDtd, XmlElementType, XmlNs, XmlNsPtr,
+    XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -699,6 +702,93 @@ impl XmlNode {
             return null_mut();
         }
         self.last
+    }
+
+    /// Searches for the BASE URL. The code should work on both XML
+    /// and HTML document even if base mechanisms are completely different.  
+    /// It returns the base as defined in RFC 2396 sections
+    /// 5.1.1. Base URI within Document Content and  5.1.2. Base URI from the Encapsulating Entity.  
+    /// However it does not return the document base (5.1.3), use `doc.url` in this case
+    ///
+    /// Returns a pointer to the base URL, or NULL if not found.  
+    /// It's up to the caller to free the memory with `xml_free()`.
+    #[doc(alias = "xmlNodeGetBase")]
+    pub unsafe fn get_base(&self, mut doc: *const XmlDoc) -> *mut XmlChar {
+        let mut oldbase: *mut XmlChar = null_mut();
+        let mut base: *mut XmlChar;
+        let mut newbase: *mut XmlChar;
+
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        if doc.is_null() {
+            doc = self.doc;
+        }
+        let mut cur = self as *const XmlNode;
+        if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
+            cur = (*doc).children;
+            while !cur.is_null() && !(*cur).name.is_null() {
+                if !matches!((*cur).typ, XmlElementType::XmlElementNode) {
+                    cur = (*cur).next;
+                    continue;
+                }
+                if xml_strcasecmp((*cur).name, c"html".as_ptr() as _) == 0 {
+                    cur = (*cur).children;
+                    continue;
+                }
+                if xml_strcasecmp((*cur).name, c"head".as_ptr() as _) == 0 {
+                    cur = (*cur).children;
+                    continue;
+                }
+                if xml_strcasecmp((*cur).name, c"base".as_ptr() as _) == 0 {
+                    return xml_get_prop(cur, c"href".as_ptr() as _);
+                }
+                cur = (*cur).next;
+            }
+            return null_mut();
+        }
+        while !cur.is_null() {
+            if matches!((*cur).typ, XmlElementType::XmlEntityDecl) {
+                let ent = cur as XmlEntityPtr;
+                return xml_strdup((*ent).uri.load(Ordering::Relaxed));
+            }
+            if matches!((*cur).typ, XmlElementType::XmlElementNode) {
+                base = xml_get_ns_prop(cur, c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+                if !base.is_null() {
+                    if !oldbase.is_null() {
+                        newbase = xml_build_uri(oldbase, base);
+                        if !newbase.is_null() {
+                            xml_free(oldbase as _);
+                            xml_free(base as _);
+                            oldbase = newbase;
+                        } else {
+                            xml_free(oldbase as _);
+                            xml_free(base as _);
+                            return null_mut();
+                        }
+                    } else {
+                        oldbase = base;
+                    }
+                    if xml_strncmp(oldbase, c"http://".as_ptr() as _, 7) == 0
+                        || xml_strncmp(oldbase, c"ftp://".as_ptr() as _, 6) == 0
+                        || xml_strncmp(oldbase, c"urn:".as_ptr() as _, 4) == 0
+                    {
+                        return oldbase;
+                    }
+                }
+            }
+            cur = (*cur).parent;
+        }
+        if !doc.is_null() && (*doc).url.is_some() {
+            let url = CString::new((*doc).url.as_deref().unwrap()).unwrap();
+            if oldbase.is_null() {
+                return xml_strdup(url.as_ptr() as *const u8);
+            }
+            newbase = xml_build_uri(oldbase, url.as_ptr() as *const u8);
+            xml_free(oldbase as _);
+            return newbase;
+        }
+        oldbase
     }
 
     /// Set (or reset) the name of a node.

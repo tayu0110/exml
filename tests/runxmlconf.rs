@@ -34,10 +34,7 @@ use exml::{
             XmlXPathContext,
         },
     },
-    tree::{
-        xml_free_doc, xml_get_prop, xml_node_get_base, XmlDocProperties, XmlDocPtr, XmlElementType,
-        XmlNodePtr,
-    },
+    tree::{xml_free_doc, xml_get_prop, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
 };
 use libc::{fdopen, snprintf, strcmp};
 
@@ -441,7 +438,7 @@ unsafe extern "C" fn xmlconf_test_item(
                 );
                 // goto error;
             } else {
-                base = xml_node_get_base(doc, cur);
+                base = (*cur).get_base(doc);
                 filename = compose_dir(base, uri);
                 if !check_test_file(
                     CStr::from_ptr(filename as *const c_char)

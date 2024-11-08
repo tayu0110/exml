@@ -45,7 +45,7 @@ use crate::{
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_ns_prop, xml_get_prop, xml_new_doc_node, xml_new_doc_text,
-        xml_node_add_content_len, xml_node_get_base, xml_node_set_base, xml_static_copy_node,
+        xml_node_add_content_len, xml_node_set_base, xml_static_copy_node,
         xml_static_copy_node_list, xml_unset_prop, NodeCommon, XmlDocPtr, XmlDtdPtr,
         XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
@@ -594,7 +594,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
     /*
      * compute the URI
      */
-    let base: *mut XmlChar = xml_node_get_base((*ctxt).doc, cur);
+    let base: *mut XmlChar = (*cur).get_base((*ctxt).doc);
     if base.is_null() {
         let url = (*(*ctxt).doc)
             .url
@@ -1996,7 +1996,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 while !node.is_null() {
                     /* Only work on element nodes */
                     if (*node).typ == XmlElementType::XmlElementNode {
-                        cur_base = xml_node_get_base((*node).doc, node);
+                        cur_base = (*node).get_base((*node).doc);
                         /* If no current base, set it */
                         if cur_base.is_null() {
                             xml_node_set_base(node, base);
@@ -2457,7 +2457,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
     /*
      * compute the URI
      */
-    let base: *mut XmlChar = xml_node_get_base((*ctxt).doc, cur);
+    let base: *mut XmlChar = (*cur).get_base((*ctxt).doc);
     if base.is_null() {
         let url = (*(*ctxt).doc)
             .url
@@ -2942,7 +2942,7 @@ pub unsafe extern "C" fn xml_xinclude_process_tree_flags(tree: XmlNodePtr, flags
     if ctxt.is_null() {
         return -1;
     }
-    (*ctxt).base = xml_node_get_base((*tree).doc, tree);
+    (*ctxt).base = (*tree).get_base((*tree).doc);
     xml_xinclude_set_flags(ctxt, flags);
     ret = xml_xinclude_do_process(ctxt, tree);
     if ret >= 0 && (*ctxt).nb_errors > 0 {

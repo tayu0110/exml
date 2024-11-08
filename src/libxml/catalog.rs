@@ -46,8 +46,8 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_ns, xml_get_ns_prop, xml_get_prop, xml_new_doc, xml_new_doc_node,
-        xml_new_dtd, xml_new_ns, xml_node_get_base, xml_save_format_file_to, xml_search_ns_by_href,
-        xml_set_prop, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_new_dtd, xml_new_ns, xml_save_format_file_to, xml_search_ns_by_href, xml_set_prop,
+        XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     SYSCONFDIR,
 };
@@ -1334,7 +1334,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
         return null_mut();
     }
 
-    let base: *mut XmlChar = xml_node_get_base((*cur).doc, cur);
+    let base: *mut XmlChar = (*cur).get_base((*cur).doc);
     let url: *mut XmlChar = xml_build_uri(uri_value, base);
     if !url.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) > 1 {

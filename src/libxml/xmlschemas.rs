@@ -122,8 +122,8 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_get_no_ns_prop, xml_get_ns_list, xml_has_prop,
-        xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop, xml_node_get_base,
-        xml_node_get_content, xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns,
+        xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop, xml_node_get_content,
+        xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns,
         xml_search_ns_by_href, xml_split_qname2, xml_split_qname3, xml_validate_ncname,
         xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType, XmlDocPtr,
         XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr,
@@ -7424,7 +7424,7 @@ unsafe extern "C" fn xml_schema_build_absolute_uri(
             let uri: *mut XmlChar;
             let ret: *const XmlChar;
 
-            let base: *mut XmlChar = xml_node_get_base((*ctxt_node).doc, ctxt_node);
+            let base: *mut XmlChar = (*ctxt_node).get_base((*ctxt_node).doc);
             if base.is_null() {
                 let url = (*(*ctxt_node).doc)
                     .url
@@ -7650,7 +7650,7 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
             // goto exit_error;
             return (*pctxt).err;
         }
-        let base = xml_node_get_base((*node).doc, node);
+        let base = (*node).get_base((*node).doc);
         if base.is_null() {
             let url = (*(*node).doc)
                 .url

@@ -2456,7 +2456,6 @@ pub unsafe extern "C" fn xml_shell_base(
     _node2: XmlNodePtr,
 ) -> i32 {
     use crate::libxml::globals::xml_free;
-    use crate::tree::xml_node_get_base;
 
     if ctxt.is_null() {
         return 0;
@@ -2466,7 +2465,7 @@ pub unsafe extern "C" fn xml_shell_base(
         return 0;
     }
 
-    let base: *mut XmlChar = xml_node_get_base((*node).doc, node);
+    let base: *mut XmlChar = (*node).get_base((*node).doc);
 
     if base.is_null() {
         fprintf((*ctxt).output, c" No base found !!!\n".as_ptr());
