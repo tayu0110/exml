@@ -3564,40 +3564,6 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
  * Navigating.
  */
 
-/**
- * xmlIsBlankNode:
- * @node:  the node
- *
- * Checks whether this node is an empty or whitespace only
- * (and possibly ignorable) text-node.
- *
- * Returns 1 yes, 0 no
- */
-pub unsafe extern "C" fn xml_is_blank_node(node: *const XmlNode) -> i32 {
-    let mut cur: *const XmlChar;
-    if node.is_null() {
-        return 0;
-    }
-
-    if !matches!((*node).typ, XmlElementType::XmlTextNode)
-        && !matches!((*node).typ, XmlElementType::XmlCdataSectionNode)
-    {
-        return 0;
-    }
-    if (*node).content.is_null() {
-        return 1;
-    }
-    cur = (*node).content;
-    while *cur != 0 {
-        if !xml_is_blank_char(*cur as u32) {
-            return 0;
-        }
-        cur = cur.add(1);
-    }
-
-    1
-}
-
 /*
  * Changing the structure.
  */
@@ -12815,31 +12781,6 @@ mod tests {
                         eprint!(" {}", n_node);
                         eprintln!(" {}", n_name);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_is_blank_node() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let node = gen_const_xml_node_ptr(n_node, 0);
-
-                let ret_val = xml_is_blank_node(node);
-                desret_int(ret_val);
-                des_const_xml_node_ptr(n_node, node, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlIsBlankNode",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlIsBlankNode()");
-                    eprintln!(" {}", n_node);
                 }
             }
         }

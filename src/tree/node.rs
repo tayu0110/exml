@@ -2,7 +2,7 @@ use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::xmlstring::XmlChar;
 
-use super::{XmlAttr, XmlDoc, XmlElementType, XmlNs};
+use super::{xml_is_blank_char, XmlAttr, XmlDoc, XmlElementType, XmlNs};
 
 /// A node in an XML tree.
 pub type XmlNodePtr = *mut XmlNode;
@@ -33,6 +33,29 @@ impl XmlNode {
     #[doc(alias = "xmlNodeIsText")]
     pub fn is_text_node(&self) -> bool {
         matches!(self.typ, XmlElementType::XmlTextNode)
+    }
+
+    /// Checks whether this node is an empty or whitespace only (and possibly ignorable) text-node.
+    #[doc(alias = "xmlIsBlankNode")]
+    pub unsafe fn is_blank_node(&self) -> bool {
+        if !matches!(
+            self.typ,
+            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+        ) {
+            return false;
+        }
+        if self.content.is_null() {
+            return true;
+        }
+        let mut cur = self.content;
+        while *cur != 0 {
+            if !xml_is_blank_char(*cur as u32) {
+                return false;
+            }
+            cur = cur.add(1);
+        }
+
+        true
     }
 
     /// Get line number of `self`.

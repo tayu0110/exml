@@ -68,11 +68,10 @@ use crate::{
     tree::{
         xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd,
         xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_get_no_ns_prop, xml_get_ns_prop, xml_is_blank_node, xml_new_doc_text,
-        xml_node_get_base, xml_node_get_lang, xml_node_get_space_preserve,
-        xml_node_list_get_string, xml_search_ns, xml_split_qname2, xml_unlink_node, XmlAttrPtr,
-        XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
-        __XML_REGISTER_CALLBACKS,
+        xml_free_ns_list, xml_get_no_ns_prop, xml_get_ns_prop, xml_new_doc_text, xml_node_get_base,
+        xml_node_get_lang, xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns,
+        xml_split_qname2, xml_unlink_node, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr,
+        XmlDtdPtr, XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -2959,7 +2958,7 @@ pub unsafe extern "C" fn xml_text_reader_node_type(reader: &mut XmlTextReader) -
             XmlReaderTypes::XmlReaderTypeAttribute as i32
         }
         XmlElementType::XmlTextNode => {
-            if xml_is_blank_node(reader.node) != 0 {
+            if (*reader.node).is_blank_node() {
                 if xml_node_get_space_preserve(reader.node) != 0 {
                     XmlReaderTypes::XmlReaderTypeSignificantWhitespace as i32
                 } else {

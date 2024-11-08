@@ -56,13 +56,13 @@ use crate::{
     },
     private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
-        xml_build_qname, xml_free_node, xml_is_blank_node, xml_new_doc_node,
-        xml_node_list_get_string, xml_split_qname2, xml_split_qname3, xml_unlink_node, XmlAttrPtr,
-        XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties,
-        XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur,
-        XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
-        XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr, XmlNode, XmlNodePtr,
-        XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
+        xml_build_qname, xml_free_node, xml_new_doc_node, xml_node_list_get_string,
+        xml_split_qname2, xml_split_qname3, xml_unlink_node, XmlAttrPtr, XmlAttribute,
+        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
+        XmlElementContentType, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration,
+        XmlEnumerationPtr, XmlID, XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr,
+        XmlNsPtr, XmlRef, XmlRefPtr,
     },
 };
 
@@ -5301,7 +5301,7 @@ unsafe extern "C" fn xml_snprintf_elements(
             ty @ XmlElementType::XmlTextNode
             | ty @ XmlElementType::XmlCdataSectionNode
             | ty @ XmlElementType::XmlEntityRefNode => 'to_break: {
-                if matches!(ty, XmlElementType::XmlTextNode) && xml_is_blank_node(cur) != 0 {
+                if matches!(ty, XmlElementType::XmlTextNode) && (*cur).is_blank_node() {
                     break 'to_break;
                 }
                 strcat(buf, c"CDATA".as_ptr() as _);
@@ -5936,7 +5936,7 @@ unsafe extern "C" fn xml_validate_element_content(
                                 }
                             }
                             XmlElementType::XmlTextNode => {
-                                if xml_is_blank_node(cur) != 0 {
+                                if (*cur).is_blank_node() {
                                     //  break;
                                 } else {
                                     ret = 0;

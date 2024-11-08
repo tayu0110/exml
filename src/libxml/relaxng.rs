@@ -54,11 +54,11 @@ use crate::{
     },
     tree::{
         xml_add_child, xml_add_next_sibling, xml_add_prev_sibling, xml_copy_doc, xml_free_doc,
-        xml_free_node, xml_get_prop, xml_has_prop, xml_is_blank_node, xml_new_child,
-        xml_new_doc_node, xml_new_doc_text, xml_node_get_base, xml_node_get_content,
-        xml_node_list_get_string, xml_node_set_content, xml_search_ns, xml_set_prop,
-        xml_split_qname2, xml_unlink_node, xml_unset_prop, xml_validate_ncname, XmlAttrPtr,
-        XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_free_node, xml_get_prop, xml_has_prop, xml_new_child, xml_new_doc_node,
+        xml_new_doc_text, xml_node_get_base, xml_node_get_content, xml_node_list_get_string,
+        xml_node_set_content, xml_search_ns, xml_set_prop, xml_split_qname2, xml_unlink_node,
+        xml_unset_prop, xml_validate_ncname, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode,
+        XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -10400,7 +10400,7 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
         (*(*ctxt).state).seq = cur;
         match (*cur).typ {
             XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode => {
-                if xml_is_blank_node(cur) != 0 {
+                if (*cur).is_blank_node() {
                     // break;
                 } else {
                     ret = xml_reg_exec_push_string(exec, c"#text".as_ptr() as _, ctxt as _);
