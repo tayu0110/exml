@@ -35,8 +35,8 @@ use exml::{
         },
     },
     tree::{
-        xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop, xml_node_get_base,
-        XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
+        xml_doc_get_root_element, xml_free_doc, xml_get_prop, xml_node_get_base, XmlDocProperties,
+        XmlDocPtr, XmlElementType, XmlNodePtr,
     },
 };
 use libc::{fdopen, snprintf, strcmp};
@@ -380,7 +380,7 @@ unsafe extern "C" fn xmlconf_test_item(
     NB_FATAL = 0;
     let id: *mut XmlChar = xml_get_prop(cur, c"ID".as_ptr() as _);
     if id.is_null() {
-        test_log!(logfile, "test missing ID, line {}\n", xml_get_line_no(cur));
+        test_log!(logfile, "test missing ID, line {}\n", (*cur).get_line_no());
     // goto error;
     } else {
         for i in (0..).take_while(|&i| !SKIPPED_TESTS[i].is_null()) {

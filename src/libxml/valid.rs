@@ -56,13 +56,13 @@ use crate::{
     },
     private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
-        xml_build_qname, xml_doc_get_root_element, xml_free_node, xml_get_line_no,
-        xml_is_blank_node, xml_new_doc_node, xml_node_list_get_string, xml_split_qname2,
-        xml_split_qname3, xml_unlink_node, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,
-        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement,
-        XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID,
-        XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
+        xml_build_qname, xml_doc_get_root_element, xml_free_node, xml_is_blank_node,
+        xml_new_doc_node, xml_node_list_get_string, xml_split_qname2, xml_split_qname3,
+        xml_unlink_node, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr,
+        XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
     },
 };
 
@@ -3023,7 +3023,11 @@ pub unsafe extern "C" fn xml_add_id(
         (*ret).attr = attr;
         (*ret).name = null_mut();
     }
-    (*ret).lineno = xml_get_line_no((*attr).parent) as _;
+    (*ret).lineno = if (*attr).parent.is_null() {
+        -1
+    } else {
+        (*(*attr).parent).get_line_no() as _
+    };
 
     if xml_hash_add_entry(table, value, ret as _) < 0 {
         /*
@@ -3375,7 +3379,11 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
         (*ret).name = null_mut();
         (*ret).attr = attr;
     }
-    (*ret).lineno = xml_get_line_no((*attr).parent) as _;
+    (*ret).lineno = if (*attr).parent.is_null() {
+        -1
+    } else {
+        (*(*attr).parent).get_line_no() as _
+    };
 
     /* To add a reference :-
      * References are maintained as a list of references,

@@ -56,7 +56,7 @@ use exml::{
         xpath_internals::xml_xpath_register_ns,
     },
     tree::{
-        xml_buf_node_dump, xml_doc_get_root_element, xml_free_doc, xml_get_line_no, xml_get_prop,
+        xml_buf_node_dump, xml_doc_get_root_element, xml_free_doc, xml_get_prop,
         XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr,
     },
 };
@@ -334,7 +334,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         test_log!(
             logfile,
             "Failed to find test in correct line {}\n",
-            xml_get_line_no(cur)
+            (*cur).get_line_no()
         );
         return 1;
     }
@@ -368,7 +368,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         test_log!(
             logfile,
             "Failed to detect incorrect RNG line {}\n",
-            xml_get_line_no(test)
+            (*test).get_line_no()
         );
         ret = 1;
     }
@@ -385,7 +385,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         test_log!(
             logfile,
             "Validation of tests starting line {} leaked {}\n",
-            xml_get_line_no(cur),
+            (*cur).get_line_no(),
             xml_mem_used() - memt
         );
         NB_LEAKS += 1;
@@ -498,7 +498,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
     if test.is_null() {
         eprintln!(
             "Failed to find test in correct line {}",
-            xml_get_line_no(cur)
+            (*cur).get_line_no()
         );
         return 1;
     }
@@ -535,7 +535,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         test_log!(
             logfile,
             "Failed to parse RNGtest line {}\n",
-            xml_get_line_no(test)
+            (*test).get_line_no()
         );
         NB_ERRORS += 1;
         ret = 1;
@@ -550,7 +550,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             test_log!(
                 logfile,
                 "Validation of tests starting line {} leaked {}\n",
-                xml_get_line_no(cur),
+                (*cur).get_line_no(),
                 xml_mem_used() - memt
             );
             NB_LEAKS += 1;
@@ -567,7 +567,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         if test.is_null() {
             eprintln!(
                 "Failed to find test in <valid> line {}\n",
-                xml_get_line_no(tmp),
+                (*tmp).get_line_no(),
             );
         } else {
             xml_buf_empty(buf);
@@ -587,7 +587,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 test_log!(
                     logfile,
                     "Failed to parse valid instance line {}\n",
-                    xml_get_line_no(tmp)
+                    (*tmp).get_line_no()
                 );
                 NB_ERRORS += 1;
             } else {
@@ -606,7 +606,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                         test_log!(
                             logfile,
                             "Failed to validate valid instance line {}\n",
-                            xml_get_line_no(tmp)
+                            (*tmp).get_line_no()
                         );
                         NB_ERRORS += 1;
                     }
@@ -614,7 +614,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                         test_log!(
                             logfile,
                             "Internal error validating instance line {}\n",
-                            xml_get_line_no(tmp)
+                            (*tmp).get_line_no()
                         );
                         NB_ERRORS += 1;
                     }
@@ -627,7 +627,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 test_log!(
                     logfile,
                     "Validation of instance line {} leaked {}\n",
-                    xml_get_line_no(tmp),
+                    (*tmp).get_line_no(),
                     xml_mem_used() - mem
                 );
                 xml_memory_dump();
@@ -648,7 +648,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         if test.is_null() {
             eprintln!(
                 "Failed to find test in <invalid> line {}",
-                xml_get_line_no(tmp)
+                (*tmp).get_line_no()
             );
         } else {
             xml_buf_empty(buf);
@@ -665,7 +665,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 test_log!(
                     logfile,
                     "Failed to parse valid instance line {}\n",
-                    xml_get_line_no(tmp)
+                    (*tmp).get_line_no()
                 );
                 NB_ERRORS += 1;
             } else {
@@ -684,7 +684,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                         test_log!(
                             logfile,
                             "Failed to detect invalid instance line {}\n",
-                            xml_get_line_no(tmp)
+                            (*tmp).get_line_no()
                         );
                         NB_ERRORS += 1;
                     }
@@ -692,7 +692,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                         test_log!(
                             logfile,
                             "Internal error validating instance line {}\n",
-                            xml_get_line_no(tmp)
+                            (*tmp).get_line_no()
                         );
                         NB_ERRORS += 1;
                     }
@@ -705,7 +705,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 test_log!(
                     logfile,
                     "Validation of instance line {} leaked {}\n",
-                    xml_get_line_no(tmp),
+                    (*tmp).get_line_no(),
                     xml_mem_used() - mem
                 );
                 xml_memory_dump();
@@ -726,7 +726,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         test_log!(
             logfile,
             "Validation of tests starting line {} leaked {}\n",
-            xml_get_line_no(cur),
+            (*cur).get_line_no(),
             xml_mem_used() - memt
         );
         NB_LEAKS += 1;
@@ -942,7 +942,7 @@ unsafe extern "C" fn xstc_test_instance(
         test_log!(
             logfile,
             "testGroup line {} misses href for schemaDocument\n",
-            xml_get_line_no(cur)
+            (*cur).get_line_no()
         );
         ret = -1;
     // goto done;
@@ -951,7 +951,7 @@ unsafe extern "C" fn xstc_test_instance(
         if path.is_null() {
             eprintln!(
                 "Failed to build path to schemas testGroup line {} : {}",
-                xml_get_line_no(cur),
+                (*cur).get_line_no(),
                 CStr::from_ptr(href as _).to_string_lossy()
             );
             ret = -1;
@@ -964,7 +964,7 @@ unsafe extern "C" fn xstc_test_instance(
             test_log!(
                 logfile,
                 "schemas for testGroup line {} is missing: {}\n",
-                xml_get_line_no(cur),
+                (*cur).get_line_no(),
                 CStr::from_ptr(path as _).to_string_lossy()
             );
             ret = -1;
@@ -974,7 +974,7 @@ unsafe extern "C" fn xstc_test_instance(
             if validity.is_null() {
                 eprintln!(
                     "instanceDocument line {} misses expected validity",
-                    xml_get_line_no(cur)
+                    (*cur).get_line_no()
                 );
                 ret = -1;
                 // goto done;
@@ -1040,7 +1040,7 @@ unsafe extern "C" fn xstc_test_instance(
                         test_log!(
                             logfile,
                             "instanceDocument line {} has unexpected validity value{}\n",
-                            xml_get_line_no(cur),
+                            (*cur).get_line_no(),
                             CStr::from_ptr(validity as _).to_string_lossy()
                         );
                         ret = -1;
@@ -1072,7 +1072,7 @@ unsafe extern "C" fn xstc_test_instance(
         test_log!(
             logfile,
             "Validation of tests starting line {} leaked {}\n",
-            xml_get_line_no(cur),
+            (*cur).get_line_no(),
             xml_mem_used() - mem
         );
         NB_LEAKS += 1;
@@ -1104,7 +1104,7 @@ unsafe extern "C" fn xstc_test_group(
         test_log!(
             logfile,
             "testGroup line {} misses href for schemaDocument\n",
-            xml_get_line_no(cur)
+            (*cur).get_line_no()
         );
         ret = -1;
     // goto done;
@@ -1114,7 +1114,7 @@ unsafe extern "C" fn xstc_test_group(
             test_log!(
                 logfile,
                 "Failed to build path to schemas testGroup line {} : {}\n",
-                xml_get_line_no(cur),
+                (*cur).get_line_no(),
                 CStr::from_ptr(href as _).to_string_lossy()
             );
             ret = -1;
@@ -1127,7 +1127,7 @@ unsafe extern "C" fn xstc_test_group(
             test_log!(
                 logfile,
                 "schemas for testGroup line {} is missing: {}\n",
-                xml_get_line_no(cur),
+                (*cur).get_line_no(),
                 CStr::from_ptr(path as _).to_string_lossy()
             );
             ret = -1;
@@ -1141,7 +1141,7 @@ unsafe extern "C" fn xstc_test_group(
                 test_log!(
                     logfile,
                     "testGroup line {} misses expected validity\n",
-                    xml_get_line_no(cur)
+                    (*cur).get_line_no()
                 );
                 ret = -1;
                 // goto done;
@@ -1231,7 +1231,7 @@ unsafe extern "C" fn xstc_test_group(
                     test_log!(
                         logfile,
                         "testGroup line {} misses unexpected validity value{}\n",
-                        xml_get_line_no(cur),
+                        (*cur).get_line_no(),
                         CStr::from_ptr(validity as _).to_string_lossy()
                     );
                     ret = -1;
@@ -1259,7 +1259,7 @@ unsafe extern "C" fn xstc_test_group(
         test_log!(
             logfile,
             "Processing test line {} {} leaked {}\n",
-            xml_get_line_no(cur),
+            (*cur).get_line_no(),
             CStr::from_ptr(path as _).to_string_lossy(),
             xml_mem_used() - mem
         );

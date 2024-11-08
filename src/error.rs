@@ -1420,7 +1420,7 @@ macro_rules! __xml_raise_error {
             libxml::{
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
             },
-            tree::{XmlElementType, xml_get_line_no, xml_get_prop, XmlNodePtr},
+            tree::{XmlElementType, xml_get_prop, XmlNodePtr},
         };
         (|mut schannel: Option<StructuredError>,
             mut channel: Option<GenericError>,
@@ -1547,7 +1547,7 @@ macro_rules! __xml_raise_error {
                             line = (*node).line as _;
                         }
                         if line == 0 || line == 65535 {
-                            line = xml_get_line_no(node) as _;
+                            line = if node.is_null() { -1 } else { (*node).get_line_no() as _ };
                         }
                     }
 

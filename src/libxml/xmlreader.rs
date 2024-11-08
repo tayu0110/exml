@@ -68,8 +68,8 @@ use crate::{
     tree::{
         xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd,
         xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_get_line_no, xml_get_no_ns_prop, xml_get_ns_prop, xml_is_blank_node,
-        xml_new_doc_text, xml_node_get_base, xml_node_get_lang, xml_node_get_space_preserve,
+        xml_free_ns_list, xml_get_no_ns_prop, xml_get_ns_prop, xml_is_blank_node, xml_new_doc_text,
+        xml_node_get_base, xml_node_get_lang, xml_node_get_space_preserve,
         xml_node_list_get_string, xml_search_ns, xml_split_qname2, xml_unlink_node, XmlAttrPtr,
         XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
         __XML_REGISTER_CALLBACKS,
@@ -5432,7 +5432,7 @@ unsafe extern "C" fn xml_text_reader_locator(
         let mut ret: i32 = 0;
 
         if !line.is_null() {
-            res = xml_get_line_no((*reader).node);
+            res = (*(*reader).node).get_line_no();
             if res > 0 {
                 *line = res as u64;
             } else {
@@ -6229,7 +6229,7 @@ pub unsafe extern "C" fn xml_text_reader_locator_line_number(
         return -1;
     }
     if !(*ctx).node.is_null() {
-        ret = xml_get_line_no((*ctx).node) as _;
+        ret = (*(*ctx).node).get_line_no() as _;
     } else {
         /* inspired from error.c */
         let mut input: XmlParserInputPtr;

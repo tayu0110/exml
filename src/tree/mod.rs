@@ -3560,79 +3560,9 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
     cur
 }
 
-/**
- * xmlGetLineNoInternal:
- * @node: valid node
- * @depth: used to limit any risk of recursion
- *
- * Get line number of @node.
- * Try to override the limitation of lines being store in 16 bits ints
- *
- * Returns the line number if successful, -1 otherwise
- */
-unsafe extern "C" fn xml_get_line_no_internal(node: *const XmlNode, depth: i32) -> i64 {
-    let mut result: i64 = -1;
-
-    if depth >= 5 {
-        return -1;
-    }
-
-    if node.is_null() {
-        return result;
-    }
-    if (matches!((*node).typ, XmlElementType::XmlElementNode)
-        || matches!((*node).typ, XmlElementType::XmlTextNode)
-        || matches!((*node).typ, XmlElementType::XmlCommentNode)
-        || matches!((*node).typ, XmlElementType::XmlPiNode))
-    {
-        if (*node).line == 65535 {
-            if (matches!((*node).typ, XmlElementType::XmlTextNode) && !(*node).psvi.is_null()) {
-                result = (*node).psvi as isize as i64;
-            } else if (matches!((*node).typ, XmlElementType::XmlElementNode)
-                && !(*node).children.is_null())
-            {
-                result = xml_get_line_no_internal((*node).children, depth + 1);
-            } else if !(*node).next.is_null() {
-                result = xml_get_line_no_internal((*node).next, depth + 1);
-            } else if !(*node).prev.is_null() {
-                result = xml_get_line_no_internal((*node).prev, depth + 1);
-            }
-        }
-        if (result == -1) || (result == 65535) {
-            result = (*node).line as i64;
-        }
-    } else if !(*node).prev.is_null()
-        && (matches!((*(*node).prev).typ, XmlElementType::XmlElementNode)
-            || matches!((*(*node).prev).typ, XmlElementType::XmlTextNode)
-            || matches!((*(*node).prev).typ, XmlElementType::XmlCommentNode)
-            || matches!((*(*node).prev).typ, XmlElementType::XmlPiNode))
-    {
-        result = xml_get_line_no_internal((*node).prev, depth + 1);
-    } else if !(*node).parent.is_null()
-        && matches!((*(*node).parent).typ, XmlElementType::XmlElementNode)
-    {
-        result = xml_get_line_no_internal((*node).parent, depth + 1);
-    }
-
-    result
-}
-
 /*
  * Navigating.
  */
-/**
- * xmlGetLineNo:
- * @node: valid node
- *
- * Get line number of @node.
- * Try to override the limitation of lines being store in 16 bits ints
- * if XML_PARSE_BIG_LINES parser option was used
- *
- * Returns the line number if successful, -1 otherwise
- */
-pub unsafe extern "C" fn xml_get_line_no(node: *const XmlNode) -> i64 {
-    xml_get_line_no_internal(node, 0)
-}
 
 /**
  * xmlGetNodePath:
@@ -13168,31 +13098,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlGetLastChild()");
                     eprintln!(" {}", n_parent);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_line_no() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let node = gen_const_xml_node_ptr(n_node, 0);
-
-                let ret_val = xml_get_line_no(node);
-                desret_long(ret_val);
-                des_const_xml_node_ptr(n_node, node, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlGetLineNo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlGetLineNo()");
-                    eprintln!(" {}", n_node);
                 }
             }
         }
