@@ -458,6 +458,68 @@ impl XmlNode {
         self.last
     }
 
+    /// Set (or reset) the name of a node.
+    #[doc(alias = "xmlNodeSetName")]
+    #[cfg(feature = "tree")]
+    pub unsafe fn set_name(&mut self, name: *const XmlChar) {
+        use crate::{
+            dict::{xml_dict_lookup, xml_dict_owns},
+            libxml::{globals::xml_free, xmlstring::xml_strdup},
+        };
+
+        let mut freeme: *const XmlChar = null_mut();
+
+        if name.is_null() {
+            return;
+        }
+        match self.typ {
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlHtmlDocumentNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXincludeStart
+            | XmlElementType::XmlXincludeEnd => {
+                return;
+            }
+            XmlElementType::XmlElementNode
+            | XmlElementType::XmlAttributeNode
+            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl => {}
+            _ => unreachable!(),
+        }
+        let doc = self.doc;
+        let dict = if !doc.is_null() {
+            (*doc).dict
+        } else {
+            null_mut()
+        };
+        if !dict.is_null() {
+            if !self.name.is_null() && xml_dict_owns(dict, self.name) == 0 {
+                freeme = self.name;
+            }
+            self.name = xml_dict_lookup(dict, name, -1);
+        } else {
+            if !self.name.is_null() {
+                freeme = self.name;
+            }
+            self.name = xml_strdup(name);
+        }
+
+        if !freeme.is_null() {
+            xml_free(freeme as _);
+        }
+    }
+
     /// Add a new element `elem` to the list of siblings of `self`
     /// merging adjacent TEXT nodes (`elem` may be freed)  
     /// If the new element was already inserted in a document

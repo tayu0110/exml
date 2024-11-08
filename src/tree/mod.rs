@@ -3561,77 +3561,8 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
 }
 
 /*
- * Navigating.
- */
-
-/*
  * Changing the structure.
  */
-
-/**
- * xmlNodeSetName:
- * @cur:  the node being changed
- * @name:  the new tag name
- *
- * Set (or reset) the name of a node.
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_node_set_name(cur: XmlNodePtr, name: *const XmlChar) {
-    let mut freeme: *const XmlChar = null_mut();
-
-    if cur.is_null() {
-        return;
-    }
-    if name.is_null() {
-        return;
-    }
-    match (*cur).typ {
-        XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
-        | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlHtmlDocumentNode
-        | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {
-            return;
-        }
-        XmlElementType::XmlElementNode
-        | XmlElementType::XmlAttributeNode
-        | XmlElementType::XmlPiNode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlDtdNode
-        | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlElementDecl
-        | XmlElementType::XmlAttributeDecl
-        | XmlElementType::XmlEntityDecl => {}
-        _ => unreachable!(),
-    }
-    let doc: XmlDocPtr = (*cur).doc;
-    let dict = if !doc.is_null() {
-        (*doc).dict
-    } else {
-        null_mut()
-    };
-    if !dict.is_null() {
-        if !(*cur).name.is_null() && xml_dict_owns(dict, (*cur).name) == 0 {
-            freeme = (*cur).name;
-        }
-        (*cur).name = xml_dict_lookup(dict, name, -1);
-    } else {
-        if !(*cur).name.is_null() {
-            freeme = (*cur).name;
-        }
-        (*cur).name = xml_strdup(name);
-    }
-
-    if !freeme.is_null() {
-        xml_free(freeme as _);
-    }
-}
 
 /**
  * xmlAddChild:
@@ -13952,37 +13883,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeSetLang()");
                         eprint!(" {}", n_cur);
                         eprintln!(" {}", n_lang);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_set_name() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    xml_node_set_name(cur, name);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNodeSetName",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeSetName()");
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_name);
                     }
                 }
             }
