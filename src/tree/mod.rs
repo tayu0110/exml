@@ -3567,49 +3567,6 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
 /*
  * Changing the structure.
  */
-/**
- * xmlDocSetRootElement:
- * @doc:  the document
- * @root:  the new document root element, if root is null_mut() no action is taken,
- *         to remove a node from a document use xmlUnlinkNode(root) instead.
- *
- * Set the root element of the document ((*doc).children is a list
- * containing possibly comments, PIs, etc ...).
- *
- * Returns the old root element if any was found, null_mut() if root was null_mut()
- */
-#[cfg(any(feature = "tree", feature = "writer"))]
-pub unsafe extern "C" fn xml_doc_set_root_element(doc: XmlDocPtr, root: XmlNodePtr) -> XmlNodePtr {
-    let mut old: XmlNodePtr;
-
-    if doc.is_null() {
-        return null_mut();
-    }
-    if root.is_null() || matches!((*root).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    xml_unlink_node(root);
-    xml_set_tree_doc(root, doc);
-    (*root).parent = doc as _;
-    old = (*doc).children;
-    while !old.is_null() {
-        if matches!((*old).typ, XmlElementType::XmlElementNode) {
-            break;
-        }
-        old = (*old).next;
-    }
-    if old.is_null() {
-        if (*doc).children.is_null() {
-            (*doc).children = root;
-            (*doc).last = root;
-        } else {
-            xml_add_sibling((*doc).children, root);
-        }
-    } else {
-        xml_replace_node(old, root);
-    }
-    old
-}
 
 /**
  * xmlNodeSetName:
@@ -12458,45 +12415,6 @@ mod tests {
                             eprint!(" {}", n_cur);
                             eprintln!(" {}", n_format);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_doc_set_root_element() {
-        #[cfg(any(feature = "tree", feature = "writer"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_root in 0..GEN_NB_XML_NODE_PTR_IN {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let mut root = gen_xml_node_ptr_in(n_root, 1);
-
-                    let ret_val = xml_doc_set_root_element(doc, root);
-                    if doc.is_null() {
-                        xml_free_node(root);
-                        root = null_mut();
-                    }
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_xml_node_ptr_in(n_root, root, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDocSetRootElement",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDocSetRootElement()"
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_root);
                     }
                 }
             }

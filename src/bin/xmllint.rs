@@ -94,10 +94,10 @@ use exml::{
     },
     tree::{
         xml_copy_doc, xml_doc_dump, xml_doc_dump_format_memory, xml_doc_dump_format_memory_enc,
-        xml_doc_dump_memory, xml_doc_dump_memory_enc, xml_doc_set_root_element, xml_free_doc,
-        xml_free_dtd, xml_new_doc, xml_new_doc_node, xml_node_set_content, xml_save_file,
-        xml_save_file_enc, xml_save_format_file, xml_save_format_file_enc, xml_set_compress_mode,
-        xml_unlink_node, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
+        xml_doc_dump_memory, xml_doc_dump_memory_enc, xml_free_doc, xml_free_dtd, xml_new_doc,
+        xml_new_doc_node, xml_node_set_content, xml_save_file, xml_save_file_enc,
+        xml_save_format_file, xml_save_format_file_enc, xml_set_compress_mode, xml_unlink_node,
+        XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -2389,7 +2389,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 doc = xml_new_doc(Some("1.0"));
                 let n = xml_new_doc_node(doc, null_mut(), c"info".as_ptr() as _, null_mut());
                 xml_node_set_content(n, c"abc".as_ptr() as _);
-                xml_doc_set_root_element(doc, n);
+                (*doc).set_root_element(n);
             }
         }
     } else if cfg!(feature = "html") && cfg!(feature = "push") && HTML != 0 && PUSH != 0 {

@@ -76,6 +76,43 @@ impl XmlDoc {
         }
         ret
     }
+
+    /// Set the root element of the document.
+    /// (self.children is a list containing possibly comments, PIs, etc ...).
+    ///
+    /// Returns the old root element if any was found, NULL if root was NULL
+    #[doc(alias = "xmlDocSetRootElement")]
+    #[cfg(any(feature = "tree", feature = "writer"))]
+    pub unsafe fn set_root_element(&mut self, root: XmlNodePtr) -> XmlNodePtr {
+        use crate::tree::{xml_add_sibling, xml_replace_node, xml_set_tree_doc};
+
+        use super::xml_unlink_node;
+
+        if root.is_null() || matches!((*root).typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        xml_unlink_node(root);
+        xml_set_tree_doc(root, self);
+        (*root).parent = self as *mut XmlDoc as *mut XmlNode;
+        let mut old = self.children;
+        while !old.is_null() {
+            if matches!((*old).typ, XmlElementType::XmlElementNode) {
+                break;
+            }
+            old = (*old).next;
+        }
+        if old.is_null() {
+            if self.children.is_null() {
+                self.children = root;
+                self.last = root;
+            } else {
+                xml_add_sibling(self.children, root);
+            }
+        } else {
+            xml_replace_node(old, root);
+        }
+        old
+    }
 }
 
 impl Default for XmlDoc {
