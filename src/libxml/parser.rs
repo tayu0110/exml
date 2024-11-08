@@ -104,11 +104,10 @@ use crate::{
     tree::{
         xml_add_child, xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
-        xml_node_is_text, xml_search_ns_by_href, xml_set_tree_doc, xml_unlink_node, XmlAttrPtr,
-        XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties,
-        XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        xml_search_ns_by_href, xml_set_tree_doc, xml_unlink_node, XmlAttrPtr, XmlAttributeDefault,
+        XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties, XmlDocPtr, XmlDtdPtr,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
+        XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -9551,8 +9550,8 @@ unsafe extern "C" fn are_blanks(
         {
             return 0;
         }
-    } else if xml_node_is_text(last_child) != 0
-        || (!(*(*ctxt).node).children.is_null() && xml_node_is_text((*(*ctxt).node).children) != 0)
+    } else if (*last_child).is_text_node()
+        || (!(*(*ctxt).node).children.is_null() && (*(*(*ctxt).node).children).is_text_node())
     {
         return 0;
     }

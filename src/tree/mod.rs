@@ -3565,24 +3565,6 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
  */
 
 /**
- * xmlNodeIsText:
- * @node:  the node
- *
- * Is this node a Text node ?
- * Returns 1 yes, 0 no
- */
-pub unsafe extern "C" fn xml_node_is_text(node: *const XmlNode) -> i32 {
-    if node.is_null() {
-        return 0;
-    }
-
-    if matches!((*node).typ, XmlElementType::XmlTextNode) {
-        return 1;
-    }
-    0
-}
-
-/**
  * xmlIsBlankNode:
  * @node:  the node
  *
@@ -14007,31 +13989,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlNodeGetSpacePreserve()"
                     );
                     eprintln!(" {}", n_cur);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_is_text() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let node = gen_const_xml_node_ptr(n_node, 0);
-
-                let ret_val = xml_node_is_text(node);
-                desret_int(ret_val);
-                des_const_xml_node_ptr(n_node, node, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNodeIsText",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeIsText()");
-                    eprintln!(" {}", n_node);
                 }
             }
         }

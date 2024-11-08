@@ -29,6 +29,12 @@ pub struct XmlNode {
 }
 
 impl XmlNode {
+    /// Check whether this node is a Text node or not.
+    #[doc(alias = "xmlNodeIsText")]
+    pub fn is_text_node(&self) -> bool {
+        matches!(self.typ, XmlElementType::XmlTextNode)
+    }
+
     /// Get line number of `self`.
     /// Try to override the limitation of lines being store in 16 bits ints
     ///

@@ -47,10 +47,7 @@ use crate::{
         },
     },
     private::parser::XML_VCTXT_USE_PCTXT,
-    tree::{
-        xml_create_int_subset, xml_free_doc, xml_node_is_text, XmlDocPtr, XmlDtdPtr,
-        XmlElementType, XmlNodePtr,
-    },
+    tree::{xml_create_int_subset, xml_free_doc, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr},
 };
 
 use super::{
@@ -8897,7 +8894,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
                 return 0;
             }
         }
-    } else if xml_node_is_text(last_child) != 0 {
+    } else if (*last_child).is_text_node() {
         return 0;
     } else {
         /* keep ws in constructs like <p><b>xy</b> <i>z</i><p>
