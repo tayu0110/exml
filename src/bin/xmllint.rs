@@ -1813,17 +1813,14 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
  ************************************************************************/
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
-    use exml::{
-        libxml::{
-            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-            xmlreader::{
-                xml_text_reader_const_local_name, xml_text_reader_const_name,
-                xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
-                xml_text_reader_current_node, xml_text_reader_depth, xml_text_reader_has_value,
-                xml_text_reader_is_empty_element, xml_text_reader_node_type, XmlReaderTypes,
-            },
+    use exml::libxml::{
+        pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
+        xmlreader::{
+            xml_text_reader_const_local_name, xml_text_reader_const_name,
+            xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
+            xml_text_reader_current_node, xml_text_reader_depth, xml_text_reader_has_value,
+            xml_text_reader_is_empty_element, xml_text_reader_node_type, XmlReaderTypes,
         },
-        tree::xml_get_node_path,
     };
 
     let mut name: *const XmlChar;
@@ -1869,7 +1866,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
             if is_match != 0 {
                 #[cfg(any(feature = "tree", feature = "libxml_debug"))]
                 {
-                    path = xml_get_node_path(xml_text_reader_current_node(&mut *reader));
+                    path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
                     println!(
                         "Node {} matches pattern {}",
                         CStr::from_ptr(path as _).to_string_lossy(),
@@ -1902,7 +1899,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                 } else if ret != is_match {
                     #[cfg(any(feature = "tree", feature = "libxml_debug"))]
                     if path.is_null() {
-                        path = xml_get_node_path(xml_text_reader_current_node(&mut *reader));
+                        path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
                     }
                     eprintln!("xmlPatternMatch and xmlStreamPush disagree");
                     if !path.is_null() {

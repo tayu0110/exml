@@ -23,8 +23,8 @@ use crate::{
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::{xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
     tree::{
-        xml_doc_get_root_element, xml_free_doc, xml_get_no_ns_prop, xml_get_node_path,
-        xml_node_get_content, XmlDocPtr, XmlElementType, XmlNodePtr,
+        xml_doc_get_root_element, xml_free_doc, xml_get_no_ns_prop, xml_node_get_content,
+        XmlDocPtr, XmlElementType, XmlNodePtr,
     },
 };
 
@@ -1897,7 +1897,7 @@ unsafe extern "C" fn xml_schematron_report_success(
             return;
         }
         let line: i64 = (*cur).get_line_no();
-        path = xml_get_node_path(cur);
+        path = (*cur).get_node_path();
         if path.is_null() {
             path = (*cur).name as _;
         }

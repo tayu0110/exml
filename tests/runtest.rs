@@ -4469,16 +4469,13 @@ unsafe extern "C" fn pattern_node(
     patternc: XmlPatternPtr,
     mut patstream: XmlStreamCtxtPtr,
 ) {
-    use exml::{
-        libxml::{
-            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-            xmlreader::{
-                xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri,
-                xml_text_reader_current_node, xml_text_reader_is_empty_element,
-                xml_text_reader_node_type, XmlReaderTypes,
-            },
+    use exml::libxml::{
+        pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
+        xmlreader::{
+            xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri,
+            xml_text_reader_current_node, xml_text_reader_is_empty_element,
+            xml_text_reader_node_type, XmlReaderTypes,
         },
-        tree::xml_get_node_path,
     };
 
     let mut path: *mut XmlChar = null_mut();
@@ -4492,7 +4489,7 @@ unsafe extern "C" fn pattern_node(
         is_match = xml_pattern_match(patternc, xml_text_reader_current_node(&mut *reader));
 
         if is_match != 0 {
-            path = xml_get_node_path(xml_text_reader_current_node(&mut *reader));
+            path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
             writeln!(
                 out,
                 "Node {} matches pattern {}",
@@ -4517,7 +4514,7 @@ unsafe extern "C" fn pattern_node(
                 patstream = null_mut();
             } else if ret != is_match {
                 if path.is_null() {
-                    path = xml_get_node_path(xml_text_reader_current_node(&mut *reader));
+                    path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
                 }
                 writeln!(out, "xmlPatternMatch and xmlStreamPush disagree").ok();
                 writeln!(

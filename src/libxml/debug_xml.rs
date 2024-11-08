@@ -19,9 +19,9 @@ use crate::{
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{
-        xml_add_child_list, xml_free_node_list, xml_get_node_path, xml_validate_name, XmlAttrPtr,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
+        xml_add_child_list, xml_free_node_list, xml_validate_name, XmlAttrPtr, XmlAttributeDefault,
+        XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
+        XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
     },
 };
 
@@ -2979,7 +2979,7 @@ pub unsafe extern "C" fn xml_shell_pwd(
         return -1;
     }
 
-    let path: *mut XmlChar = xml_get_node_path(node);
+    let path: *mut XmlChar = (*node).get_node_path();
     if path.is_null() {
         return -1;
     }
@@ -3104,7 +3104,7 @@ unsafe extern "C" fn xml_shell_grep(
     while !node.is_null() {
         if (*node).typ == XmlElementType::XmlCommentNode {
             if !xml_strstr((*node).content, arg as *mut XmlChar).is_null() {
-                fprintf((*ctxt).output, c"%s : ".as_ptr(), xml_get_node_path(node));
+                fprintf((*ctxt).output, c"%s : ".as_ptr(), (*node).get_node_path());
                 xml_shell_list(ctxt, null_mut(), node, null_mut());
             }
         } else if (*node).typ == XmlElementType::XmlTextNode
@@ -3113,7 +3113,7 @@ unsafe extern "C" fn xml_shell_grep(
             fprintf(
                 (*ctxt).output,
                 c"%s : ".as_ptr(),
-                xml_get_node_path((*node).parent),
+                (*(*node).parent).get_node_path(),
             );
             xml_shell_list(ctxt, null_mut(), (*node).parent, null_mut());
         }
