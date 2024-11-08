@@ -3785,67 +3785,6 @@ pub unsafe extern "C" fn xml_search_ns_by_href(
 }
 
 /**
- * xmlGetNsList:
- * @doc:  the document
- * @node:  the current node
- *
- * Search all the namespace applying to a given element.
- * Returns an null_mut() terminated array of all the #xmlNsPtr found
- *         that need to be freed by the caller or null_mut() if no
- *         namespace if defined
- */
-#[cfg(any(feature = "tree", feature = "xpath", feature = "schema"))]
-pub unsafe extern "C" fn xml_get_ns_list(
-    _doc: *const XmlDoc,
-    mut node: *const XmlNode,
-) -> *mut XmlNsPtr {
-    let mut cur: XmlNsPtr;
-    let mut ret: *mut XmlNsPtr = null_mut();
-    let mut nbns: i32 = 0;
-    let mut maxns: i32 = 0;
-
-    if node.is_null() || matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    while !node.is_null() {
-        if matches!((*node).typ, XmlElementType::XmlElementNode) {
-            cur = (*node).ns_def;
-            'b: while !cur.is_null() {
-                for i in 0..nbns {
-                    if ((*cur).prefix.load(Ordering::Relaxed)
-                        == (*(*ret.add(i as usize))).prefix.load(Ordering::Relaxed))
-                        || xml_str_equal(
-                            (*cur).prefix.load(Ordering::Relaxed),
-                            (*(*ret.add(i as usize))).prefix.load(Ordering::Relaxed),
-                        )
-                    {
-                        cur = (*cur).next.load(Ordering::Relaxed);
-                        continue 'b;
-                    }
-                }
-                if nbns >= maxns {
-                    maxns = if maxns != 0 { maxns * 2 } else { 10 };
-                    let tmp: *mut XmlNsPtr =
-                        xml_realloc(ret as _, (maxns as usize + 1) * size_of::<XmlNsPtr>()) as _;
-                    if tmp.is_null() {
-                        xml_tree_err_memory(c"getting namespace list".as_ptr() as _);
-                        xml_free(ret as _);
-                        return null_mut();
-                    }
-                    ret = tmp;
-                }
-                *ret.add(nbns as usize) = cur;
-                nbns += 1;
-                *ret.add(nbns as usize) = null_mut();
-            }
-        }
-        node = (*node).parent;
-    }
-    ret
-}
-
-/**
  * xmlSetNs:
  * @node:  a node in the document
  * @ns:  a namespace pointer
@@ -4074,7 +4013,7 @@ unsafe extern "C" fn xml_get_prop_node_internal(
                  * The ugly case: Search using the prefixes of in-scope
                  * ns-decls corresponding to @nsName.
                  */
-                let ns_list: *mut XmlNsPtr = xml_get_ns_list((*node).doc, node);
+                let ns_list: *mut XmlNsPtr = (*node).get_ns_list((*node).doc);
                 if ns_list.is_null() {
                     if !tmpstr.is_null() {
                         xml_free(tmpstr as _);

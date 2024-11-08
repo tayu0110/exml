@@ -121,8 +121,8 @@ use crate::{
         },
     },
     tree::{
-        xml_free_doc, xml_free_node, xml_get_no_ns_prop, xml_get_ns_list, xml_has_prop,
-        xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop, xml_node_get_space_preserve,
+        xml_free_doc, xml_free_node, xml_get_no_ns_prop, xml_has_prop, xml_new_doc_text,
+        xml_new_ns, xml_new_ns_prop, xml_new_prop, xml_node_get_space_preserve,
         xml_node_list_get_string, xml_search_ns, xml_search_ns_by_href, xml_split_qname2,
         xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon, XmlAttrPtr,
         XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
@@ -10931,7 +10931,7 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
         let ns_list = if attr.is_null() {
             null_mut()
         } else {
-            xml_get_ns_list((*attr).doc, (*attr).parent)
+            (*(*attr).parent).get_ns_list((*attr).doc)
         };
         /*
          * Build an array of prefixes and namespaces.

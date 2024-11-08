@@ -65,8 +65,8 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     tree::{
-        xml_buf_content, xml_build_qname, xml_get_ns_list, xml_node_get_lang, XmlAttrPtr,
-        XmlBufPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_buf_content, xml_build_qname, xml_node_get_lang, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
+        XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
 };
@@ -12212,7 +12212,7 @@ pub unsafe extern "C" fn xml_xpath_next_namespace(
             xml_free((*(*ctxt).context).tmp_ns_list as _);
         }
         (*(*ctxt).context).tmp_ns_list =
-            xml_get_ns_list((*(*ctxt).context).doc, (*(*ctxt).context).node);
+            (*(*(*ctxt).context).node).get_ns_list((*(*ctxt).context).doc);
         (*(*ctxt).context).tmp_ns_nr = 0;
         if !(*(*ctxt).context).tmp_ns_list.is_null() {
             while !(*(*(*ctxt).context)
