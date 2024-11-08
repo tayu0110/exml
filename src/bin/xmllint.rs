@@ -2152,7 +2152,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
             },
             xmlreader::{xml_free_text_reader, xml_reader_walker, xml_text_reader_read},
         },
-        tree::{xml_doc_get_root_element, XmlNodePtr},
+        tree::XmlNodePtr,
     };
 
     let mut ret: c_int;
@@ -2161,7 +2161,11 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
     {
         let mut namespaces: [*const XmlChar; 22] = [null(); 22];
 
-        let root: XmlNodePtr = xml_doc_get_root_element(doc);
+        let root: XmlNodePtr = if doc.is_null() {
+            null_mut()
+        } else {
+            (*doc).get_root_element()
+        };
         if root.is_null() {
             generic_error!("Document does not have a root element");
             PROGRESULT = XmllintReturnCode::ErrUnclass;

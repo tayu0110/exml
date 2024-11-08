@@ -143,13 +143,14 @@ impl XmlNode {
 
         *buffer.add(0) = 0;
         let mut cur = self as *const XmlNode;
-        loop {
+        while !cur.is_null() {
             name = c"".as_ptr() as _;
             // sep = c"?".as_ptr() as _;
             occur = 0;
-            if (matches!((*cur).typ, XmlElementType::XmlDocumentNode)
-                || matches!((*cur).typ, XmlElementType::XmlHtmlDocumentNode))
-            {
+            if matches!(
+                (*cur).typ,
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+            ) {
                 if *buffer.add(0) == b'/' {
                     break;
                 }
@@ -255,9 +256,10 @@ impl XmlNode {
                 } else {
                     occur += 1;
                 }
-            } else if (matches!((*cur).typ, XmlElementType::XmlTextNode)
-                || matches!((*cur).typ, XmlElementType::XmlCdataSectionNode))
-            {
+            } else if matches!(
+                (*cur).typ,
+                XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+            ) {
                 sep = c"/".as_ptr() as _;
                 name = c"text()".as_ptr() as _;
                 next = (*cur).parent;
@@ -267,9 +269,10 @@ impl XmlNode {
                  */
                 tmp = (*cur).prev;
                 while !tmp.is_null() {
-                    if (matches!((*tmp).typ, XmlElementType::XmlTextNode)
-                        || matches!((*tmp).typ, XmlElementType::XmlCdataSectionNode))
-                    {
+                    if matches!(
+                        (*tmp).typ,
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                    ) {
                         occur += 1;
                     }
                     tmp = (*tmp).prev;
@@ -281,9 +284,10 @@ impl XmlNode {
                 if occur == 0 {
                     tmp = (*cur).next;
                     while !tmp.is_null() {
-                        if (matches!((*tmp).typ, XmlElementType::XmlTextNode)
-                            || matches!((*tmp).typ, XmlElementType::XmlCdataSectionNode))
-                        {
+                        if matches!(
+                            (*tmp).typ,
+                            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                        ) {
                             occur = 1;
                             break;
                         }
@@ -407,10 +411,6 @@ impl XmlNode {
             }
             snprintf(buffer as _, buf_len, c"%s".as_ptr() as _, buf);
             cur = next;
-
-            if cur.is_null() {
-                break;
-            }
         }
         xml_free(buf as _);
         buffer

@@ -35,8 +35,8 @@ use exml::{
         },
     },
     tree::{
-        xml_doc_get_root_element, xml_free_doc, xml_get_prop, xml_node_get_base, XmlDocProperties,
-        XmlDocPtr, XmlElementType, XmlNodePtr,
+        xml_free_doc, xml_get_prop, xml_node_get_base, XmlDocProperties, XmlDocPtr, XmlElementType,
+        XmlNodePtr,
     },
 };
 use libc::{fdopen, snprintf, strcmp};
@@ -848,7 +848,7 @@ unsafe extern "C" fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         return -1;
     }
 
-    let cur: XmlNodePtr = xml_doc_get_root_element(doc);
+    let cur: XmlNodePtr = (*doc).get_root_element();
     let ret = if cur.is_null() || !xml_str_equal((*cur).name, c"TESTSUITE".as_ptr() as _) {
         eprintln!("Unexpected format {}", confxml.to_string_lossy());
         xmlconf_info();

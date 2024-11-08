@@ -23,8 +23,8 @@ use crate::{
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::{xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
     tree::{
-        xml_doc_get_root_element, xml_free_doc, xml_get_no_ns_prop, xml_node_get_content,
-        XmlDocPtr, XmlElementType, XmlNodePtr,
+        xml_free_doc, xml_get_no_ns_prop, xml_node_get_content, XmlDocPtr, XmlElementType,
+        XmlNodePtr,
     },
 };
 
@@ -1248,7 +1248,11 @@ pub unsafe extern "C" fn xml_schematron_parse(
     /*
      * Then extract the root and Schematron parse it
      */
-    let root: XmlNodePtr = xml_doc_get_root_element(doc);
+    let root: XmlNodePtr = if doc.is_null() {
+        null_mut()
+    } else {
+        (*doc).get_root_element()
+    };
     if root.is_null() {
         xml_schematron_perr(
             ctxt,
@@ -2184,7 +2188,7 @@ pub unsafe extern "C" fn xml_schematron_validate_doc(
         return -1;
     }
     (*ctxt).nberrors = 0;
-    let root: XmlNodePtr = xml_doc_get_root_element(instance);
+    let root: XmlNodePtr = (*instance).get_root_element();
     if root.is_null() {
         // TODO
         (*ctxt).nberrors += 1;

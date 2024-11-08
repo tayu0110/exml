@@ -44,11 +44,10 @@ use crate::{
     },
     tree::{
         xml_add_next_sibling, xml_add_prev_sibling, xml_create_int_subset, xml_doc_copy_node,
-        xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_free_node_list, xml_get_ns_prop,
-        xml_get_prop, xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len,
-        xml_node_get_base, xml_node_set_base, xml_static_copy_node, xml_static_copy_node_list,
-        xml_unlink_node, xml_unset_prop, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
-        XML_XML_NAMESPACE,
+        xml_free_doc, xml_free_node, xml_free_node_list, xml_get_ns_prop, xml_get_prop,
+        xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len, xml_node_get_base,
+        xml_node_set_base, xml_static_copy_node, xml_static_copy_node_list, xml_unlink_node,
+        xml_unset_prop, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -230,7 +229,7 @@ pub unsafe extern "C" fn xml_xinclude_process_flags_data(
     if doc.is_null() {
         return -1;
     }
-    let tree: XmlNodePtr = xml_doc_get_root_element(doc);
+    let tree: XmlNodePtr = (*doc).get_root_element();
     if tree.is_null() {
         return -1;
     }
@@ -980,7 +979,11 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
 
     target = (*doc).int_subset;
     if target.is_null() {
-        cur = xml_doc_get_root_element(doc);
+        cur = if doc.is_null() {
+            null_mut()
+        } else {
+            (*doc).get_root_element()
+        };
         if cur.is_null() {
             return -1;
         }
@@ -1050,7 +1053,14 @@ unsafe extern "C" fn xml_xinclude_recurse_doc(
     (*ctxt).inc_tab = null_mut();
     (*ctxt).is_stream = 0;
 
-    xml_xinclude_do_process(ctxt, xml_doc_get_root_element(doc));
+    xml_xinclude_do_process(
+        ctxt,
+        if doc.is_null() {
+            null_mut()
+        } else {
+            (*doc).get_root_element()
+        },
+    );
 
     if !(*ctxt).inc_tab.is_null() {
         for i in 0..(*ctxt).inc_nr {
@@ -1497,7 +1507,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                 match (*(*(*set).node_tab.add(i as usize))).typ {
                     XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
                         node =
-                            xml_doc_get_root_element(*(*set).node_tab.add(i as usize) as XmlDocPtr);
+                            (*(*(*set).node_tab.add(i as usize) as XmlDocPtr)).get_root_element();
                         if node.is_null() {
                             xml_xinclude_err(
                                 ctxt,
@@ -1781,7 +1791,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
             /*
              * Add the top children list as the replacement copy.
              */
-            (*refe).inc = xml_doc_copy_node(xml_doc_get_root_element(doc), (*ctxt).doc, 1);
+            (*refe).inc = xml_doc_copy_node((*doc).get_root_element(), (*ctxt).doc, 1);
         } else {
             #[cfg(feature = "libxml_xptr")]
             {

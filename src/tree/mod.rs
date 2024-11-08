@@ -3565,31 +3565,6 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
  */
 
 /**
- * xmlDocGetRootElement:
- * @doc:  the document
- *
- * Get the root element of the document ((*doc).children is a list
- * containing possibly comments, PIs, etc ...).
- *
- * Returns the #XmlNodePtr for the root or null_mut()
- */
-pub unsafe extern "C" fn xml_doc_get_root_element(doc: *const XmlDoc) -> XmlNodePtr {
-    let mut ret: XmlNodePtr;
-
-    if doc.is_null() {
-        return null_mut();
-    }
-    ret = (*doc).children;
-    while !ret.is_null() {
-        if matches!((*ret).typ, XmlElementType::XmlElementNode) {
-            return ret;
-        }
-        ret = (*ret).next;
-    }
-    ret
-}
-
-/**
  * xmlGetLastChild:
  * @parent:  the parent node
  *
@@ -12550,34 +12525,6 @@ mod tests {
                             eprintln!(" {}", n_format);
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_doc_get_root_element() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_const_xml_doc_ptr(n_doc, 0);
-
-                let ret_val = xml_doc_get_root_element(doc);
-                desret_xml_node_ptr(ret_val);
-                des_const_xml_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlDocGetRootElement",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlDocGetRootElement()"
-                    );
-                    eprintln!(" {}", n_doc);
                 }
             }
         }

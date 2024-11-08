@@ -56,13 +56,13 @@ use crate::{
     },
     private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
-        xml_build_qname, xml_doc_get_root_element, xml_free_node, xml_is_blank_node,
-        xml_new_doc_node, xml_node_list_get_string, xml_split_qname2, xml_split_qname3,
-        xml_unlink_node, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
-        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent,
-        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementPtr,
-        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr,
-        XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
+        xml_build_qname, xml_free_node, xml_is_blank_node, xml_new_doc_node,
+        xml_node_list_get_string, xml_split_qname2, xml_split_qname3, xml_unlink_node, XmlAttrPtr,
+        XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties,
+        XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
+        XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr, XmlNode, XmlNodePtr,
+        XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
     },
 };
 
@@ -3710,7 +3710,7 @@ pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr
         return 0;
     }
 
-    let root: XmlNodePtr = xml_doc_get_root_element(doc);
+    let root: XmlNodePtr = (*doc).get_root_element();
     if root.is_null() || (*root).name.is_null() {
         xml_err_valid(
             ctxt,
@@ -4484,7 +4484,7 @@ pub unsafe extern "C" fn xml_validate_dtd(
         xml_free_ref_table((*doc).refs as _);
         (*doc).refs = null_mut();
     }
-    let root: XmlNodePtr = xml_doc_get_root_element(doc);
+    let root: XmlNodePtr = (*doc).get_root_element();
     ret = xml_validate_element(ctxt, doc, root);
     ret &= xml_validate_document_final(ctxt, doc);
     (*doc).ext_subset = old_ext;
@@ -4940,7 +4940,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         return 0;
     }
 
-    let root: XmlNodePtr = xml_doc_get_root_element(doc);
+    let root: XmlNodePtr = (*doc).get_root_element();
     ret &= xml_validate_element(ctxt, doc, root);
     ret &= xml_validate_document_final(ctxt, doc);
     ret

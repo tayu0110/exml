@@ -3004,17 +3004,14 @@ fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     use std::sync::atomic::Ordering;
 
-    use exml::{
-        libxml::{
-            xpath::{
-                xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_eval_expression,
-                xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
-                xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
-            },
-            xpath_internals::xml_xpath_debug_dump_object,
-            xpointer::{xml_xptr_eval, xml_xptr_new_context},
+    use exml::libxml::{
+        xpath::{
+            xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_eval_expression,
+            xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
+            xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
         },
-        tree::xml_doc_get_root_element,
+        xpath_internals::xml_xpath_debug_dump_object,
+        xpointer::{xml_xptr_eval, xml_xptr_new_context},
     };
 
     let res: XmlXPathObjectPtr;
@@ -3035,8 +3032,13 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
             res = xml_xptr_eval(str as _, ctxt);
         }
     } else {
-        ctxt = xml_xpath_new_context(XPATH_DOCUMENT.load(Ordering::Relaxed));
-        (*ctxt).node = xml_doc_get_root_element(XPATH_DOCUMENT.load(Ordering::Relaxed));
+        let xpath_document = XPATH_DOCUMENT.load(Ordering::Relaxed);
+        ctxt = xml_xpath_new_context(xpath_document);
+        (*ctxt).node = if xpath_document.is_null() {
+            null_mut()
+        } else {
+            (*xpath_document).get_root_element()
+        };
         if expr != 0 {
             res = xml_xpath_eval_expression(str as _, ctxt);
         } else {
@@ -4569,7 +4571,7 @@ unsafe fn pattern_test(
             },
             xmlreader::{xml_free_text_reader, xml_reader_walker, xml_text_reader_read},
         },
-        tree::{xml_doc_get_root_element, XmlNsPtr},
+        tree::XmlNsPtr,
     };
 
     let mut patternc: XmlPatternPtr;
@@ -4660,7 +4662,7 @@ unsafe fn pattern_test(
                     let mut namespaces: [*const XmlChar; 22] = [null(); 22];
                     let mut ns: XmlNsPtr;
 
-                    let root: XmlNodePtr = xml_doc_get_root_element(doc);
+                    let root: XmlNodePtr = (*doc).get_root_element();
                     ns = (*root).ns_def;
                     let mut j = 0;
                     while j < 20 && !ns.is_null() {
@@ -4751,7 +4753,7 @@ unsafe extern "C" fn load_xpath_expr(
             },
             xpath_internals::xml_xpath_register_ns,
         },
-        tree::{xml_doc_get_root_element, xml_node_get_content, XmlNsPtr},
+        tree::{xml_node_get_content, XmlNsPtr},
     };
 
     let mut node: XmlNodePtr;
@@ -4779,7 +4781,7 @@ unsafe extern "C" fn load_xpath_expr(
     /*
      * Check the document is of the right kind
      */
-    if xml_doc_get_root_element(doc).is_null() {
+    if (*doc).get_root_element().is_null() {
         eprintln!(
             "Error: empty document for file \"{}\"",
             CStr::from_ptr(filename).to_string_lossy()
@@ -4951,7 +4953,6 @@ unsafe extern "C" fn c14n_run_test(
             },
             xpath::xml_xpath_free_object,
         },
-        tree::xml_doc_get_root_element,
     };
 
     let mut xpath: XmlXPathObjectPtr = null_mut();
@@ -4984,7 +4985,7 @@ unsafe extern "C" fn c14n_run_test(
     /*
      * Check the document is of the right kind
      */
-    if xml_doc_get_root_element(doc).is_null() {
+    if (*doc).get_root_element().is_null() {
         eprintln!(
             "Error: empty document for file \"{}\"",
             CStr::from_ptr(xml_filename).to_string_lossy(),

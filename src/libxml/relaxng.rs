@@ -53,12 +53,12 @@ use crate::{
         },
     },
     tree::{
-        xml_add_child, xml_add_next_sibling, xml_add_prev_sibling, xml_copy_doc,
-        xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_get_prop, xml_has_prop,
-        xml_is_blank_node, xml_new_child, xml_new_doc_node, xml_new_doc_text, xml_node_get_base,
-        xml_node_get_content, xml_node_list_get_string, xml_node_set_content, xml_search_ns,
-        xml_set_prop, xml_split_qname2, xml_unlink_node, xml_unset_prop, xml_validate_ncname,
-        XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_add_child, xml_add_next_sibling, xml_add_prev_sibling, xml_copy_doc, xml_free_doc,
+        xml_free_node, xml_get_prop, xml_has_prop, xml_is_blank_node, xml_new_child,
+        xml_new_doc_node, xml_new_doc_text, xml_node_get_base, xml_node_get_content,
+        xml_node_list_get_string, xml_node_set_content, xml_search_ns, xml_set_prop,
+        xml_split_qname2, xml_unlink_node, xml_unset_prop, xml_validate_ncname, XmlAttrPtr,
+        XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -3343,7 +3343,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
      * transmit the ns if needed
      */
     if !ns.is_null() {
-        root = xml_doc_get_root_element(doc);
+        root = (*doc).get_root_element();
         if !root.is_null() && xml_has_prop(root, c"ns".as_ptr() as _).is_null() {
             xml_set_prop(root, c"ns".as_ptr() as _, ns);
         }
@@ -3543,7 +3543,7 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
                 && xml_relaxng_remove_redefine(
                     _ctxt,
                     href,
-                    (*xml_doc_get_root_element((*inc).doc)).children,
+                    (*(*(*inc).doc).get_root_element()).children,
                     name,
                 ) == 1
             {
@@ -3633,7 +3633,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
      * transmit the ns if needed
      */
     if !ns.is_null() {
-        root = xml_doc_get_root_element(doc);
+        root = (*doc).get_root_element();
         if !root.is_null() && xml_has_prop(root, c"ns".as_ptr() as _).is_null() {
             xml_set_prop(root, c"ns".as_ptr() as _, ns);
         }
@@ -3663,7 +3663,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
     /*
      * Check that the top element is a grammar
      */
-    root = xml_doc_get_root_element(doc);
+    root = (*doc).get_root_element();
     if root.is_null() {
         xml_rng_perr(
             ctxt,
@@ -4316,7 +4316,11 @@ unsafe extern "C" fn xml_relaxng_cleanup_doc(
     /*
      * Extract the root
      */
-    let root: XmlNodePtr = xml_doc_get_root_element(doc);
+    let root: XmlNodePtr = if doc.is_null() {
+        null_mut()
+    } else {
+        (*doc).get_root_element()
+    };
     if root.is_null() {
         xml_rng_perr(
             ctxt,
@@ -5665,7 +5669,11 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
             /*
              * Then do the parsing for good
              */
-            root = xml_doc_get_root_element((*docu).doc);
+            root = if (*docu).doc.is_null() {
+                null_mut()
+            } else {
+                (*(*docu).doc).get_root_element()
+            };
             if root.is_null() {
                 xml_rng_perr(
                     ctxt,
@@ -6566,7 +6574,11 @@ unsafe extern "C" fn xml_relaxng_parse_include(
         );
         return -1;
     }
-    let root: XmlNodePtr = xml_doc_get_root_element((*incl).doc);
+    let root: XmlNodePtr = if (*incl).doc.is_null() {
+        null_mut()
+    } else {
+        (*(*incl).doc).get_root_element()
+    };
     if root.is_null() {
         xml_rng_perr(
             ctxt,
@@ -8730,7 +8742,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
     /*
      * Then do the parsing for good
      */
-    let root: XmlNodePtr = xml_doc_get_root_element(doc);
+    let root: XmlNodePtr = (*doc).get_root_element();
     if root.is_null() {
         xml_rng_perr(
             ctxt,
@@ -9478,7 +9490,11 @@ unsafe extern "C" fn xml_relaxng_new_valid_state(
     let mut root: XmlNodePtr = null_mut();
 
     if node.is_null() {
-        root = xml_doc_get_root_element((*ctxt).doc);
+        root = if (*ctxt).doc.is_null() {
+            null_mut()
+        } else {
+            (*(*ctxt).doc).get_root_element()
+        };
         if root.is_null() {
             return null_mut();
         }

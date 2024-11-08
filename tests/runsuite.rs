@@ -56,8 +56,8 @@ use exml::{
         xpath_internals::xml_xpath_register_ns,
     },
     tree::{
-        xml_buf_node_dump, xml_doc_get_root_element, xml_free_doc, xml_get_prop,
-        XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr,
+        xml_buf_node_dump, xml_free_doc, xml_get_prop, XmlBufferAllocationScheme, XmlDocPtr,
+        XmlNodePtr,
     },
 };
 use libc::{snprintf, strcmp, strstr};
@@ -769,7 +769,7 @@ unsafe extern "C" fn xsd_test(logfile: &mut Option<File>) -> c_int {
     println!("## XML Schemas datatypes test suite from James Clark");
     test_log!(logfile, "filename: {}", filename.to_string_lossy());
 
-    cur = xml_doc_get_root_element(doc);
+    cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
@@ -840,7 +840,7 @@ unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
     println!("## Relax NG test suite from James Clark");
     test_log!(logfile, "filename: {}", filename.to_string_lossy());
 
-    cur = xml_doc_get_root_element(doc);
+    cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
@@ -887,7 +887,7 @@ unsafe extern "C" fn rng_test2(logfile: &mut Option<File>) -> c_int {
     println!("## Relax NG test suite for libxml2");
     test_log!(logfile, "filename: {}", filename.to_string_lossy());
 
-    cur = xml_doc_get_root_element(doc);
+    cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename.to_string_lossy());
         ret = -1;
@@ -1287,7 +1287,7 @@ unsafe extern "C" fn xstc_metadata(
         return -1;
     }
 
-    cur = xml_doc_get_root_element(doc);
+    cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSet".as_ptr() as _) {
         eprintln!(
             "Unexpected format {}",

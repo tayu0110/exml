@@ -60,6 +60,22 @@ impl XmlDoc {
         }
         self.int_subset
     }
+
+    /// Get the root element of the document  
+    /// (self.children is a list containing possibly comments, PIs, etc ...).
+    ///
+    /// Returns the `XmlNodePtr` for the root or NULL
+    #[doc(alias = "xmlDocGetRootElement")]
+    pub unsafe fn get_root_element(&self) -> XmlNodePtr {
+        let mut ret = self.children;
+        while !ret.is_null() {
+            if matches!((*ret).typ, XmlElementType::XmlElementNode) {
+                return ret;
+            }
+            ret = (*ret).next;
+        }
+        ret
+    }
 }
 
 impl Default for XmlDoc {

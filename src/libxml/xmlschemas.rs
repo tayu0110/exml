@@ -121,8 +121,8 @@ use crate::{
         },
     },
     tree::{
-        xml_add_child, xml_doc_get_root_element, xml_free_doc, xml_free_node, xml_get_no_ns_prop,
-        xml_get_ns_list, xml_has_prop, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
+        xml_add_child, xml_free_doc, xml_free_node, xml_get_no_ns_prop, xml_get_ns_list,
+        xml_has_prop, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_node_get_base, xml_node_get_content, xml_node_get_space_preserve,
         xml_node_list_get_string, xml_search_ns, xml_search_ns_by_href, xml_split_qname2,
         xml_split_qname3, xml_unlink_node, xml_validate_ncname, xml_validate_qname, XmlAttrPtr,
@@ -5989,7 +5989,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                  */
                 if !doc.is_null() {
                     located = 1;
-                    let doc_elem: XmlNodePtr = xml_doc_get_root_element(doc);
+                    let doc_elem: XmlNodePtr = (*doc).get_root_element();
                     if doc_elem.is_null() {
                         xml_schema_custom_err(
                             pctxt as XmlSchemaAbstractCtxtPtr,
@@ -14806,7 +14806,11 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
     /* Mark it as parsed, even if parsing fails. */
     (*bucket).parsed += 1;
     /* Compile the schema doc. */
-    let node: XmlNodePtr = xml_doc_get_root_element((*bucket).doc);
+    let node: XmlNodePtr = if (*bucket).doc.is_null() {
+        null_mut()
+    } else {
+        (*(*bucket).doc).get_root_element()
+    };
     ret = xml_schema_parse_schema_element(pctxt, schema, node);
     if ret != 0 {
         // goto exit;
@@ -30294,8 +30298,10 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     /* DOC VAL TODO: Move this to the start function. */
     let val_root = if !(*vctxt).validation_root.is_null() {
         (*vctxt).validation_root
+    } else if (*vctxt).doc.is_null() {
+        null_mut()
     } else {
-        xml_doc_get_root_element((*vctxt).doc)
+        (*(*vctxt).doc).get_root_element()
     };
     if val_root.is_null() {
         /* VAL TODO: Error code? */
@@ -30756,7 +30762,7 @@ pub unsafe extern "C" fn xml_schema_validate_doc(
     }
 
     (*ctxt).doc = doc;
-    (*ctxt).node = xml_doc_get_root_element(doc);
+    (*ctxt).node = (*doc).get_root_element();
     if (*ctxt).node.is_null() {
         xml_schema_custom_err(
             ctxt as XmlSchemaAbstractCtxtPtr,

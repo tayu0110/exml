@@ -3388,7 +3388,7 @@ pub unsafe extern "C" fn xml_shell(
             },
             xpath_internals::xml_xpath_debug_dump_object,
         },
-        tree::{xml_doc_get_root_element, xml_free_doc},
+        tree::xml_free_doc,
     };
 
     let mut prompt: [u8; 500] = [0; 500];
@@ -3834,7 +3834,7 @@ pub unsafe extern "C" fn xml_shell(
         } {
             #[cfg(feature = "xpath")]
             {
-                let root: XmlNodePtr = xml_doc_get_root_element((*ctxt).doc);
+                let root: XmlNodePtr = (*(*ctxt).doc).get_root_element();
                 xml_shell_register_root_namespaces(ctxt, null_mut(), root, null_mut());
             }
         } else if {

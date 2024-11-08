@@ -65,9 +65,9 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     tree::{
-        xml_buf_content, xml_build_qname, xml_doc_get_root_element, xml_get_ns_list,
-        xml_node_get_content, xml_node_get_lang, XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlElementType,
-        XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_buf_content, xml_build_qname, xml_get_ns_list, xml_node_get_content, xml_node_get_lang,
+        XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr,
+        XML_XML_NAMESPACE,
     },
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
 };
@@ -6798,7 +6798,7 @@ unsafe extern "C" fn xml_xpath_next_child_element(
                 return null_mut();
             }
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
-                return xml_doc_get_root_element(cur as XmlDocPtr);
+                return (*(cur as XmlDocPtr)).get_root_element();
             }
             _ => {
                 return null_mut();
@@ -10351,7 +10351,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
     }
 
     if matches!((*node).typ, XmlElementType::XmlDocumentNode) {
-        tmp = xml_doc_get_root_element(node as XmlDocPtr);
+        tmp = (*(node as XmlDocPtr)).get_root_element();
         if tmp.is_null() {
             node = (*node).children;
         } else {
