@@ -5703,77 +5703,6 @@ pub unsafe extern "C" fn xml_node_set_space_preserve(cur: XmlNodePtr, val: i32) 
     }
 }
 
-/**
- * xmlNodeSetBase:
- * @cur:  the node being changed
- * @uri:  the new base URI
- *
- * Set (or reset) the base URI of a node, i.e. the value of the
- * xml:base attribute.
- */
-#[cfg(any(feature = "tree", feature = "xinclude"))]
-pub unsafe extern "C" fn xml_node_set_base(cur: XmlNodePtr, uri: *const XmlChar) {
-    use crate::libxml::uri::xml_path_to_uri;
-
-    if cur.is_null() {
-        return;
-    }
-    match (*cur).typ {
-        XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
-        | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDtdNode
-        | XmlElementType::XmlElementDecl
-        | XmlElementType::XmlAttributeDecl
-        | XmlElementType::XmlEntityDecl
-        | XmlElementType::XmlPiNode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {
-            return;
-        }
-        XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
-            let doc: XmlDocPtr = cur as _;
-
-            if uri.is_null() {
-                (*doc).url = None;
-            } else {
-                let uri = xml_path_to_uri(uri);
-                if !uri.is_null() {
-                    (*doc).url = Some(
-                        CStr::from_ptr(uri as *const i8)
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                    xml_free(uri as _);
-                } else {
-                    (*doc).url = None;
-                }
-            }
-            return;
-        }
-        _ => unreachable!(),
-    }
-
-    let ns: XmlNsPtr = xml_search_ns_by_href((*cur).doc, cur, XML_XML_NAMESPACE.as_ptr() as _);
-    if ns.is_null() {
-        return;
-    }
-    let fixed: *mut XmlChar = xml_path_to_uri(uri);
-    if !fixed.is_null() {
-        (*cur).set_ns_prop(ns, c"base".as_ptr() as _, fixed);
-        xml_free(fixed as _);
-    } else {
-        (*cur).set_ns_prop(ns, c"base".as_ptr() as _, uri);
-    }
-}
-
 /*
  * Removing content.
  */
@@ -12319,37 +12248,6 @@ mod tests {
                             eprint!(" {}", n_list);
                             eprintln!(" {}", n_in_line);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_set_base() {
-        #[cfg(any(feature = "tree", feature = "xinclude"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let uri = gen_const_xml_char_ptr(n_uri, 1);
-
-                    xml_node_set_base(cur, uri);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_const_xml_char_ptr(n_uri, uri, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNodeSetBase",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeSetBase()");
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_uri);
                     }
                 }
             }

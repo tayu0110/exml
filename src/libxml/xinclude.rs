@@ -45,9 +45,8 @@ use crate::{
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_ns_prop, xml_get_prop, xml_new_doc_node, xml_new_doc_text,
-        xml_node_add_content_len, xml_node_set_base, xml_static_copy_node,
-        xml_static_copy_node_list, xml_unset_prop, NodeCommon, XmlDocPtr, XmlDtdPtr,
-        XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_node_add_content_len, xml_static_copy_node, xml_static_copy_node_list, xml_unset_prop,
+        NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -1999,7 +1998,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         cur_base = (*node).get_base((*node).doc);
                         /* If no current base, set it */
                         if cur_base.is_null() {
-                            xml_node_set_base(node, base);
+                            (*node).set_base(base);
                         } else {
                             /*
                              * If the current base is the same as the
@@ -2009,7 +2008,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                             if (*(*node).doc).url.as_deref()
                                 == CStr::from_ptr(cur_base as *const i8).to_str().ok()
                             {
-                                xml_node_set_base(node, base);
+                                (*node).set_base(base);
                             } else {
                                 /*
                                  * If the element already has an xml:base
@@ -2033,7 +2032,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                             xml_base,
                                         );
                                     } else {
-                                        xml_node_set_base(node, rel_base);
+                                        (*node).set_base(rel_base);
                                         xml_free(rel_base as _);
                                     }
                                     xml_free(xml_base as _);

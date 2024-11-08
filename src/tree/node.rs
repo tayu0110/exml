@@ -929,6 +929,73 @@ impl XmlNode {
         xml_new_prop_internal(self, ns, name, value, 0)
     }
 
+    /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
+    #[doc(alias = "xmlNodeSetBase")]
+    #[cfg(any(feature = "tree", feature = "xinclude"))]
+    pub unsafe fn set_base(&mut self, uri: *const XmlChar) {
+        use std::ffi::CStr;
+
+        use crate::{
+            libxml::uri::xml_path_to_uri,
+            tree::{xml_search_ns_by_href, XmlDocPtr},
+        };
+
+        match self.typ {
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXincludeStart
+            | XmlElementType::XmlXincludeEnd => {
+                return;
+            }
+            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+                let doc = self as *mut XmlNode as XmlDocPtr;
+
+                if uri.is_null() {
+                    (*doc).url = None;
+                } else {
+                    let uri = xml_path_to_uri(uri);
+                    if !uri.is_null() {
+                        (*doc).url = Some(
+                            CStr::from_ptr(uri as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
+                        xml_free(uri as _);
+                    } else {
+                        (*doc).url = None;
+                    }
+                }
+                return;
+            }
+            _ => unreachable!(),
+        }
+
+        let ns: XmlNsPtr = xml_search_ns_by_href(self.doc, self, XML_XML_NAMESPACE.as_ptr() as _);
+        if ns.is_null() {
+            return;
+        }
+        let fixed: *mut XmlChar = xml_path_to_uri(uri);
+        if !fixed.is_null() {
+            self.set_ns_prop(ns, c"base".as_ptr() as _, fixed);
+            xml_free(fixed as _);
+        } else {
+            self.set_ns_prop(ns, c"base".as_ptr() as _, uri);
+        }
+    }
+
     /// Add a new element `elem` to the list of siblings of `self`
     /// merging adjacent TEXT nodes (`elem` may be freed)  
     /// If the new element was already inserted in a document

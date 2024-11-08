@@ -3345,9 +3345,10 @@ unsafe extern "C" fn xml_shell_set_base(
     node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use crate::tree::xml_node_set_base;
-
-    xml_node_set_base(node, arg as *mut XmlChar);
+    if node.is_null() {
+        return 0;
+    }
+    (*node).set_base(arg as *mut XmlChar);
     0
 }
 
