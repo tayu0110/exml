@@ -47,8 +47,7 @@ use crate::{
     tree::{
         xml_free_doc, xml_free_ns, xml_get_ns_prop, xml_get_prop, xml_new_doc, xml_new_doc_node,
         xml_new_dtd, xml_new_ns, xml_node_get_base, xml_save_format_file_to, xml_search_ns_by_href,
-        xml_set_ns_prop, xml_set_prop, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        xml_set_prop, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     SYSCONFDIR,
 };
@@ -3228,7 +3227,7 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
                         let xns: XmlNsPtr =
                             xml_search_ns_by_href(doc, node, XML_XML_NAMESPACE.as_ptr() as _);
                         if !xns.is_null() {
-                            xml_set_ns_prop(node, xns, c"base".as_ptr() as _, (*cur).value);
+                            (*node).set_ns_prop(xns, c"base".as_ptr() as _, (*cur).value);
                         }
                     }
                     match (*cur).prefer {

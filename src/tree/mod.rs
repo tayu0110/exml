@@ -3963,10 +3963,10 @@ pub unsafe extern "C" fn xml_set_prop(
             xml_free(prefix as _);
         }
         if !ns.is_null() {
-            return xml_set_ns_prop(node, ns, nqname, value);
+            return (*node).set_ns_prop(ns, nqname, value);
         }
     }
-    xml_set_ns_prop(node, null_mut(), name, value)
+    (*node).set_ns_prop(null_mut(), name, value)
 }
 
 unsafe extern "C" fn xml_get_prop_node_internal(
@@ -4122,82 +4122,6 @@ unsafe extern "C" fn xml_get_prop_node_internal(
         }
     }
     null_mut()
-}
-
-/**
- * xmlSetNsProp:
- * @node:  the node
- * @ns:  the namespace definition
- * @name:  the attribute name
- * @value:  the attribute value
- *
- * Set (or reset) an attribute carried by a node.
- * The ns structure must be in scope, this is not checked
- *
- * Returns the attribute pointer.
- */
-#[cfg(any(
-    feature = "tree",
-    feature = "xinclude",
-    feature = "schema",
-    feature = "html"
-))]
-pub unsafe extern "C" fn xml_set_ns_prop(
-    node: XmlNodePtr,
-    ns: XmlNsPtr,
-    name: *const XmlChar,
-    value: *const XmlChar,
-) -> XmlAttrPtr {
-    if !ns.is_null() && (*ns).href.load(Ordering::Relaxed).is_null() {
-        return null_mut();
-    }
-    let prop: XmlAttrPtr = xml_get_prop_node_internal(
-        node,
-        name,
-        if !ns.is_null() {
-            (*ns).href.load(Ordering::Relaxed)
-        } else {
-            null_mut()
-        },
-        0,
-    );
-    if !prop.is_null() {
-        /*
-        	* Modify the attribute's value.
-        	*/
-        if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeId)) {
-            xml_remove_id((*node).doc, prop);
-            (*prop).atype = Some(XmlAttributeType::XmlAttributeId);
-        }
-        if !(*prop).children.is_null() {
-            xml_free_node_list((*prop).children);
-        }
-        (*prop).children = null_mut();
-        (*prop).last = null_mut();
-        (*prop).ns = ns;
-        if !value.is_null() {
-            let mut tmp: XmlNodePtr;
-
-            (*prop).children = xml_new_doc_text((*node).doc, value);
-            (*prop).last = null_mut();
-            tmp = (*prop).children;
-            while !tmp.is_null() {
-                (*tmp).parent = prop as _;
-                if (*tmp).next.is_null() {
-                    (*prop).last = tmp;
-                }
-                tmp = (*tmp).next;
-            }
-        }
-        if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeId)) {
-            xml_add_id(null_mut(), (*node).doc, value, prop);
-        }
-        return prop;
-    }
-    /*
-     * No equal attr found; create a new one.
-     */
-    xml_new_prop_internal(node, ns, name, value, 0)
 }
 
 static XML_CHECK_DTD: AtomicI32 = AtomicI32::new(1);
@@ -5725,7 +5649,7 @@ pub unsafe extern "C" fn xml_node_set_lang(cur: XmlNodePtr, lang: *const XmlChar
     if ns.is_null() {
         return;
     }
-    xml_set_ns_prop(cur, ns, c"lang".as_ptr() as _, lang);
+    (*cur).set_ns_prop(ns, c"lang".as_ptr() as _, lang);
 }
 
 /**
@@ -5771,10 +5695,10 @@ pub unsafe extern "C" fn xml_node_set_space_preserve(cur: XmlNodePtr, val: i32) 
     }
     match val {
         0 => {
-            xml_set_ns_prop(cur, ns, c"space".as_ptr() as _, c"default".as_ptr() as _);
+            (*cur).set_ns_prop(ns, c"space".as_ptr() as _, c"default".as_ptr() as _);
         }
         1 => {
-            xml_set_ns_prop(cur, ns, c"space".as_ptr() as _, c"preserve".as_ptr() as _);
+            (*cur).set_ns_prop(ns, c"space".as_ptr() as _, c"preserve".as_ptr() as _);
         }
         _ => {}
     }
@@ -5944,10 +5868,10 @@ pub unsafe extern "C" fn xml_node_set_base(cur: XmlNodePtr, uri: *const XmlChar)
     }
     let fixed: *mut XmlChar = xml_path_to_uri(uri);
     if !fixed.is_null() {
-        xml_set_ns_prop(cur, ns, c"base".as_ptr() as _, fixed);
+        (*cur).set_ns_prop(ns, c"base".as_ptr() as _, fixed);
         xml_free(fixed as _);
     } else {
-        xml_set_ns_prop(cur, ns, c"base".as_ptr() as _, uri);
+        (*cur).set_ns_prop(ns, c"base".as_ptr() as _, uri);
     }
 }
 
@@ -13010,53 +12934,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlSetNs()");
                         eprint!(" {}", n_node);
                         eprintln!(" {}", n_ns);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_set_ns_prop() {
-        #[cfg(any(
-            feature = "tree",
-            feature = "xinclude",
-            feature = "schema",
-            feature = "html"
-        ))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_ns in 0..GEN_NB_XML_NS_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let node = gen_xml_node_ptr(n_node, 0);
-                            let ns = gen_xml_ns_ptr(n_ns, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let value = gen_const_xml_char_ptr(n_value, 3);
-
-                            let ret_val = xml_set_ns_prop(node, ns, name, value);
-                            desret_xml_attr_ptr(ret_val);
-                            des_xml_node_ptr(n_node, node, 0);
-                            des_xml_ns_ptr(n_ns, ns, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_value, value, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlSetNsProp",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlSetNsProp()");
-                                eprint!(" {}", n_node);
-                                eprint!(" {}", n_ns);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_value);
-                            }
-                        }
                     }
                 }
             }

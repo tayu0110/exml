@@ -10,8 +10,8 @@ use crate::{
 
 use super::{
     xml_free_node, xml_free_prop, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content,
-    xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlDoc, XmlDtd,
-    XmlElementType, XmlNs,
+    xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlAttrPtr, XmlDoc, XmlDtd,
+    XmlElementType, XmlNs, XmlNsPtr,
 };
 
 pub trait NodeCommon {
@@ -761,6 +761,82 @@ impl XmlNode {
         if !freeme.is_null() {
             xml_free(freeme as _);
         }
+    }
+
+    /// Set (or reset) an attribute carried by a node.  
+    /// The ns structure must be in scope, this is not checked.
+    ///
+    /// Returns the attribute pointer.
+    #[doc(alias = "xmlSetNsProp")]
+    #[cfg(any(
+        feature = "tree",
+        feature = "xinclude",
+        feature = "schema",
+        feature = "html"
+    ))]
+    pub unsafe fn set_ns_prop(
+        &mut self,
+        ns: XmlNsPtr,
+        name: *const XmlChar,
+        value: *const XmlChar,
+    ) -> XmlAttrPtr {
+        use crate::{
+            libxml::valid::{xml_add_id, xml_remove_id},
+            tree::{xml_free_node_list, xml_new_doc_text, xml_new_prop_internal, XmlAttributeType},
+        };
+
+        use super::xml_get_prop_node_internal;
+
+        if !ns.is_null() && (*ns).href.load(Ordering::Relaxed).is_null() {
+            return null_mut();
+        }
+        let prop = xml_get_prop_node_internal(
+            self,
+            name,
+            if !ns.is_null() {
+                (*ns).href.load(Ordering::Relaxed)
+            } else {
+                null_mut()
+            },
+            0,
+        );
+        if !prop.is_null() {
+            /*
+            	* Modify the attribute's value.
+            	*/
+            if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeId)) {
+                xml_remove_id(self.doc, prop);
+                (*prop).atype = Some(XmlAttributeType::XmlAttributeId);
+            }
+            if !(*prop).children.is_null() {
+                xml_free_node_list((*prop).children);
+            }
+            (*prop).children = null_mut();
+            (*prop).last = null_mut();
+            (*prop).ns = ns;
+            if !value.is_null() {
+                let mut tmp: XmlNodePtr;
+
+                (*prop).children = xml_new_doc_text(self.doc, value);
+                (*prop).last = null_mut();
+                tmp = (*prop).children;
+                while !tmp.is_null() {
+                    (*tmp).parent = prop as _;
+                    if (*tmp).next.is_null() {
+                        (*prop).last = tmp;
+                    }
+                    tmp = (*tmp).next;
+                }
+            }
+            if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeId)) {
+                xml_add_id(null_mut(), self.doc, value, prop);
+            }
+            return prop;
+        }
+        /*
+         * No equal attr found; create a new one.
+         */
+        xml_new_prop_internal(self, ns, name, value, 0)
     }
 
     /// Add a new element `elem` to the list of siblings of `self`
