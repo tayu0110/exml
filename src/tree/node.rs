@@ -932,7 +932,7 @@ impl XmlNode {
                     && !matches!((*lastattr).typ, XmlElementType::XmlAttributeDecl)
                 {
                     /* different instance, destroy it (attributes must be unique) */
-                    (*(lastattr as *mut XmlNode)).unlink();
+                    (*lastattr).unlink();
                     xml_free_prop(lastattr);
                 }
                 if lastattr == cur as _ {

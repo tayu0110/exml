@@ -2,7 +2,7 @@ use std::os::raw::c_void;
 
 use crate::libxml::xmlstring::XmlChar;
 
-use super::{XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs};
+use super::{NodeCommon, XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs};
 
 /// An attribute on an XML node.
 pub type XmlAttrPtr = *mut XmlAttr;
@@ -20,4 +20,34 @@ pub struct XmlAttr {
     pub(crate) ns: *mut XmlNs,                  /* pointer to the associated namespace */
     pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
     pub(crate) psvi: *mut c_void,               /* for type/PSVI information */
+}
+
+impl NodeCommon for XmlAttr {
+    fn document(&self) -> *mut XmlDoc {
+        self.doc
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> *const u8 {
+        self.name
+    }
+    fn next(&self) -> *mut XmlNode {
+        self.next as *mut XmlNode
+    }
+    fn set_next(&mut self, next: *mut XmlNode) {
+        self.next = next as *mut XmlAttr;
+    }
+    fn prev(&self) -> *mut XmlNode {
+        self.prev as *mut XmlNode
+    }
+    fn set_prev(&mut self, prev: *mut XmlNode) {
+        self.prev = prev as *mut XmlAttr;
+    }
+    fn parent(&self) -> *mut XmlNode {
+        self.parent
+    }
+    fn set_parent(&mut self, parent: *mut XmlNode) {
+        self.parent = parent;
+    }
 }

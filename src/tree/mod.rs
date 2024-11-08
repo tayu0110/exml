@@ -1638,12 +1638,12 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
         ext_subset = null_mut();
     }
     if !ext_subset.is_null() {
-        (*((*cur).ext_subset as *mut XmlNode)).unlink();
+        (*(*cur).ext_subset).unlink();
         (*cur).ext_subset = null_mut();
         xml_free_dtd(ext_subset);
     }
     if !int_subset.is_null() {
-        (*((*cur).int_subset as *mut XmlNode)).unlink();
+        (*(*cur).int_subset).unlink();
         (*cur).int_subset = null_mut();
         xml_free_dtd(int_subset);
     }
@@ -6551,7 +6551,7 @@ pub unsafe extern "C" fn xml_unset_ns_prop(
     if prop.is_null() {
         return -1;
     }
-    (*(prop as *mut XmlNode)).unlink();
+    (*prop).unlink();
     xml_free_prop(prop);
     0
 }
@@ -6571,7 +6571,7 @@ pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) 
     if prop.is_null() {
         return -1;
     }
-    (*(prop as *mut XmlNode)).unlink();
+    (*prop).unlink();
     xml_free_prop(prop);
     0
 }

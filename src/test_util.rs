@@ -947,7 +947,7 @@ pub(crate) unsafe extern "C" fn des_xml_dtd_ptr(no: c_int, val: XmlDtdPtr, _nr: 
     if no == 1 {
         free_api_doc();
     } else if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink();
+        (*val).unlink();
         xml_free_node(val as XmlNodePtr);
     }
 }
@@ -1213,20 +1213,20 @@ pub(crate) unsafe extern "C" fn desret_xml_node_ptr(val: XmlNodePtr) {
 }
 pub(crate) unsafe extern "C" fn desret_xml_attr_ptr(val: XmlAttrPtr) {
     if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink();
+        (*val).unlink();
         xml_free_node(val as XmlNodePtr);
     }
 }
 
 pub(crate) unsafe extern "C" fn desret_xml_element_ptr(val: XmlElementPtr) {
     if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink();
+        (*val).unlink();
     }
 }
 
 pub(crate) unsafe extern "C" fn desret_xml_attribute_ptr(val: XmlAttributePtr) {
     if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink();
+        (*val).unlink();
     }
 }
 
@@ -1633,7 +1633,7 @@ pub(crate) unsafe extern "C" fn desret_xml_parser_input_ptr(val: XmlParserInputP
 
 pub(crate) unsafe extern "C" fn desret_xml_entity_ptr(val: XmlEntityPtr) {
     if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink();
+        (*val).unlink();
         xml_free_node(val as XmlNodePtr);
     }
 }

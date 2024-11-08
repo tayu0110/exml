@@ -12,7 +12,7 @@ pub use notation::*;
 
 use crate::libxml::{entities::XmlEntityPtr, xmlstring::XmlChar};
 
-use super::{XmlDoc, XmlElementType, XmlNode};
+use super::{NodeCommon, XmlDoc, XmlElementType, XmlNode};
 
 /// An XML DTD, as defined by <!DOCTYPE ... There is actually one for
 /// the internal subset and for the external subset.
@@ -56,5 +56,35 @@ impl XmlDtd {
             return xml_hash_lookup(table, name) as _;
         }
         null_mut()
+    }
+}
+
+impl NodeCommon for XmlDtd {
+    fn document(&self) -> *mut XmlDoc {
+        self.doc
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> *const u8 {
+        self.name
+    }
+    fn next(&self) -> *mut XmlNode {
+        self.next
+    }
+    fn set_next(&mut self, next: *mut XmlNode) {
+        self.next = next;
+    }
+    fn prev(&self) -> *mut XmlNode {
+        self.prev
+    }
+    fn set_prev(&mut self, prev: *mut XmlNode) {
+        self.prev = prev;
+    }
+    fn parent(&self) -> *mut XmlNode {
+        self.parent as *mut XmlNode
+    }
+    fn set_parent(&mut self, parent: *mut XmlNode) {
+        self.parent = parent as *mut XmlDoc;
     }
 }

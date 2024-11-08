@@ -35,8 +35,8 @@ use crate::{
         },
     },
     tree::{
-        xml_free_node_list, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode,
-        XmlNodePtr,
+        xml_free_node_list, NodeCommon, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType,
+        XmlNode, XmlNodePtr,
     },
 };
 
@@ -109,6 +109,36 @@ pub struct XmlEntity {
     pub(crate) owner: i32,                  /* does the entity own the childrens */
     pub(crate) flags: i32,                  /* various flags */
     pub expanded_size: u64,                 /* expanded size */
+}
+
+impl NodeCommon for XmlEntity {
+    fn document(&self) -> *mut XmlDoc {
+        self.doc.load(Ordering::Relaxed)
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> *const u8 {
+        self.name.load(Ordering::Relaxed)
+    }
+    fn next(&self) -> *mut XmlNode {
+        self.next.load(Ordering::Relaxed)
+    }
+    fn set_next(&mut self, next: *mut XmlNode) {
+        self.next.store(next, Ordering::Relaxed);
+    }
+    fn prev(&self) -> *mut XmlNode {
+        self.prev.load(Ordering::Relaxed)
+    }
+    fn set_prev(&mut self, prev: *mut XmlNode) {
+        self.prev.store(prev, Ordering::Relaxed);
+    }
+    fn parent(&self) -> *mut XmlNode {
+        self.parent.load(Ordering::Relaxed) as *mut XmlNode
+    }
+    fn set_parent(&mut self, parent: *mut XmlNode) {
+        self.parent.store(parent as *mut XmlDtd, Ordering::Relaxed);
+    }
 }
 
 /*

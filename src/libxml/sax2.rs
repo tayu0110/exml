@@ -311,7 +311,7 @@ pub unsafe fn xml_sax2_internal_subset(
         if (*ctxt).html != 0 {
             return;
         }
-        (*(dtd as XmlNodePtr)).unlink();
+        (*dtd).unlink();
         xml_free_dtd(dtd);
         (*(*ctxt).my_doc).int_subset = null_mut();
     }

@@ -1089,7 +1089,7 @@ unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
     if elem.is_null() {
         return;
     }
-    (*(elem as XmlNodePtr)).unlink();
+    (*elem).unlink();
     xml_free_doc_element_content((*elem).doc, (*elem).content);
     if !(*elem).name.is_null() {
         xml_free((*elem).name as _);
@@ -2245,7 +2245,7 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
     } else {
         null_mut()
     };
-    (*(attr as XmlNodePtr)).unlink();
+    (*attr).unlink();
     if !(*attr).tree.is_null() {
         xml_free_enumeration((*attr).tree);
     }

@@ -3,8 +3,8 @@ use std::os::raw::c_void;
 use crate::{
     libxml::xmlstring::XmlChar,
     tree::{
-        XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElementType, XmlEnumerationPtr,
-        XmlNode,
+        NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElementType,
+        XmlEnumerationPtr, XmlNode,
     },
 };
 
@@ -30,4 +30,34 @@ pub struct XmlAttribute {
     pub(crate) tree: XmlEnumerationPtr,  /* or the enumeration tree if any */
     pub(crate) prefix: *const XmlChar,   /* the namespace prefix if any */
     pub(crate) elem: *const XmlChar,     /* Element holding the attribute */
+}
+
+impl NodeCommon for XmlAttribute {
+    fn document(&self) -> *mut XmlDoc {
+        self.doc
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> *const u8 {
+        self.name
+    }
+    fn next(&self) -> *mut XmlNode {
+        self.next
+    }
+    fn set_next(&mut self, next: *mut XmlNode) {
+        self.next = next;
+    }
+    fn prev(&self) -> *mut XmlNode {
+        self.prev
+    }
+    fn set_prev(&mut self, prev: *mut XmlNode) {
+        self.prev = prev;
+    }
+    fn parent(&self) -> *mut XmlNode {
+        self.parent as *mut XmlNode
+    }
+    fn set_parent(&mut self, parent: *mut XmlNode) {
+        self.parent = parent as *mut XmlDtd;
+    }
 }

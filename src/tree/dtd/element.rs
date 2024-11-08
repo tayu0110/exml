@@ -2,7 +2,10 @@ use std::os::raw::c_void;
 
 use crate::{
     libxml::{xmlregexp::XmlRegexpPtr, xmlstring::XmlChar},
-    tree::{XmlDoc, XmlDtd, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlNode},
+    tree::{
+        NodeCommon, XmlDoc, XmlDtd, XmlElementContentPtr, XmlElementType, XmlElementTypeVal,
+        XmlNode,
+    },
 };
 
 use super::XmlAttributePtr;
@@ -29,4 +32,34 @@ pub struct XmlElement {
     pub(crate) cont_model: XmlRegexpPtr, /* the validating regexp */
     #[cfg(not(feature = "regexp"))]
     pub(crate) cont_model: *mut c_void,
+}
+
+impl NodeCommon for XmlElement {
+    fn document(&self) -> *mut XmlDoc {
+        self.doc
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> *const u8 {
+        self.name
+    }
+    fn next(&self) -> *mut XmlNode {
+        self.next
+    }
+    fn set_next(&mut self, next: *mut XmlNode) {
+        self.next = next;
+    }
+    fn prev(&self) -> *mut XmlNode {
+        self.prev
+    }
+    fn set_prev(&mut self, prev: *mut XmlNode) {
+        self.prev = prev;
+    }
+    fn parent(&self) -> *mut XmlNode {
+        self.parent as *mut XmlNode
+    }
+    fn set_parent(&mut self, parent: *mut XmlNode) {
+        self.parent = parent as *mut XmlDtd;
+    }
 }

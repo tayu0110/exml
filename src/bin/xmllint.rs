@@ -2666,7 +2666,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     if DROPDTD != 0 {
         let dtd: XmlDtdPtr = (*doc).get_int_subset();
         if !dtd.is_null() {
-            (*(dtd as XmlNodePtr)).unlink();
+            (*dtd).unlink();
             (*doc).int_subset = null_mut();
             xml_free_dtd(dtd);
         }

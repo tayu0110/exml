@@ -3682,12 +3682,12 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
         ext_subset = null_mut();
     }
     if !ext_subset.is_null() {
-        (*((*cur).ext_subset as XmlNodePtr)).unlink();
+        (*(*cur).ext_subset).unlink();
         (*cur).ext_subset = null_mut();
         xml_free_dtd(ext_subset);
     }
     if !int_subset.is_null() {
-        (*((*cur).int_subset as XmlNodePtr)).unlink();
+        (*(*cur).int_subset).unlink();
         (*cur).int_subset = null_mut();
         xml_free_dtd(int_subset);
     }
