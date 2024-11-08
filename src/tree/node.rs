@@ -6,17 +6,20 @@ use crate::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         globals::xml_free,
         uri::xml_build_uri,
-        xmlstring::{xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, XmlChar},
+        valid::xml_get_dtd_attr_desc,
+        xmlstring::{
+            xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, XmlChar,
+        },
     },
 };
 
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
     xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop_node_internal,
-    xml_get_prop_node_value_internal, xml_has_ns_prop, xml_has_prop, xml_is_blank_char,
-    xml_node_add_content_len, xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr,
-    XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDtd, XmlElementType, XmlNs, XmlNsPtr,
-    XML_CHECK_DTD, XML_XML_NAMESPACE,
+    xml_get_prop_node_value_internal, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content_len,
+    xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlAttrPtr,
+    XmlBufferAllocationScheme, XmlDoc, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD,
+    XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -916,7 +919,7 @@ impl XmlNode {
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetProp")]
     pub unsafe fn get_prop(&self, name: *const XmlChar) -> *mut XmlChar {
-        let prop: XmlAttrPtr = xml_has_prop(self, name);
+        let prop: XmlAttrPtr = self.has_prop(name);
         if prop.is_null() {
             return null_mut();
         }
@@ -1275,6 +1278,50 @@ impl XmlNode {
         } else {
             self.set_ns_prop(ns, c"base".as_ptr() as _, uri);
         }
+    }
+
+    /// Search an attribute associated to a node.  
+    ///
+    /// This function also looks in DTD attribute declaration for #FIXED or
+    /// default declaration values unless DTD use has been turned off.
+    ///
+    /// Returns the attribute or the attribute declaration or NULL if neither was found.
+    #[doc(alias = "xmlHasProp")]
+    pub unsafe fn has_prop(&self, name: *const XmlChar) -> XmlAttrPtr {
+        if !matches!(self.typ, XmlElementType::XmlElementNode) || name.is_null() {
+            return null_mut();
+        }
+        /*
+         * Check on the properties attached to the node
+         */
+        let mut prop = self.properties;
+        while !prop.is_null() {
+            if xml_str_equal((*prop).name, name) {
+                return prop;
+            }
+            prop = (*prop).next;
+        }
+        if XML_CHECK_DTD.load(Ordering::Relaxed) == 0 {
+            return null_mut();
+        }
+
+        /*
+         * Check if there is a default declaration in the internal
+         * or external subsets
+         */
+        let doc = self.doc;
+        if !doc.is_null() && !(*doc).int_subset.is_null() {
+            let mut attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, self.name, name);
+            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
+                attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, self.name, name);
+            }
+            if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
+                // return attribute declaration only if a default value is given
+                // (that includes #FIXED declarations)
+                return attr_decl as _;
+            }
+        }
+        null_mut()
     }
 
     /// Add a new element `elem` to the list of siblings of `self`

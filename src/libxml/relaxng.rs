@@ -53,7 +53,7 @@ use crate::{
         },
     },
     tree::{
-        xml_copy_doc, xml_free_doc, xml_free_node, xml_has_prop, xml_new_child, xml_new_doc_node,
+        xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
         xml_new_doc_text, xml_node_list_get_string, xml_node_set_content, xml_search_ns,
         xml_split_qname2, xml_unset_prop, xml_validate_ncname, NodeCommon, XmlAttrPtr, XmlDocPtr,
         XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
@@ -3342,7 +3342,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
      */
     if !ns.is_null() {
         root = (*doc).get_root_element();
-        if !root.is_null() && xml_has_prop(root, c"ns".as_ptr() as _).is_null() {
+        if !root.is_null() && (*root).has_prop(c"ns".as_ptr() as _).is_null() {
             (*root).set_prop(c"ns".as_ptr() as _, ns);
         }
     }
@@ -3632,7 +3632,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
      */
     if !ns.is_null() {
         root = (*doc).get_root_element();
-        if !root.is_null() && xml_has_prop(root, c"ns".as_ptr() as _).is_null() {
+        if !root.is_null() && (*root).has_prop(c"ns".as_ptr() as _).is_null() {
             (*root).set_prop(c"ns".as_ptr() as _, ns);
         }
     }
@@ -4057,7 +4057,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                          * Simplification 4.8. name attribute of element
                          * and attribute elements
                          */
-                        if xml_has_prop(cur, c"ns".as_ptr() as _).is_null() {
+                        if (*cur).has_prop(c"ns".as_ptr() as _).is_null() {
                             let mut node: XmlNodePtr;
                             let mut ns: *mut XmlChar = null_mut();
 
@@ -4191,7 +4191,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         child = (*cur).children;
                         ins = cur;
                         while !child.is_null() {
-                            if !ns.is_null() && xml_has_prop(child, c"ns".as_ptr() as _).is_null() {
+                            if !ns.is_null() && (*child).has_prop(c"ns".as_ptr() as _).is_null() {
                                 (*child).set_prop(c"ns".as_ptr() as _, ns);
                             }
                             tmp = (*child).next;

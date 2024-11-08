@@ -41,8 +41,7 @@ use crate::{
         },
         valid::{
             xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_notation_table,
-            xml_get_dtd_attr_desc, xml_is_id, XmlAttributeTablePtr, XmlElementTablePtr,
-            XmlNotationTablePtr,
+            xml_is_id, XmlAttributeTablePtr, XmlElementTablePtr, XmlNotationTablePtr,
         },
         valid::{xml_free_id_table, xml_free_ref_table, xml_get_dtd_qattr_desc, xml_remove_id},
         xmlstring::{
@@ -4080,60 +4079,6 @@ pub unsafe extern "C" fn xml_get_no_ns_prop(
         return null_mut();
     }
     xml_get_prop_node_value_internal(prop)
-}
-
-/**
- * xmlHasProp:
- * @node:  the node
- * @name:  the attribute name
- *
- * Search an attribute associated to a node
- * This function also looks in DTD attribute declaration for #FIXED or
- * default declaration values unless DTD use has been turned off.
- *
- * Returns the attribute or the attribute declaration or null_mut() if
- *         neither was found.
- */
-pub unsafe extern "C" fn xml_has_prop(node: *const XmlNode, name: *const XmlChar) -> XmlAttrPtr {
-    let mut prop: XmlAttrPtr;
-
-    if node.is_null() || !matches!((*node).typ, XmlElementType::XmlElementNode) || name.is_null() {
-        return null_mut();
-    }
-    /*
-     * Check on the properties attached to the node
-     */
-    prop = (*node).properties;
-    while !prop.is_null() {
-        if xml_str_equal((*prop).name, name) {
-            return prop;
-        }
-        prop = (*prop).next;
-    }
-    if XML_CHECK_DTD.load(Ordering::Relaxed) == 0 {
-        return null_mut();
-    }
-
-    /*
-     * Check if there is a default declaration in the internal
-     * or external subsets
-     */
-    let doc: XmlDocPtr = (*node).doc;
-    if !doc.is_null() {
-        let mut attr_decl: XmlAttributePtr;
-        if !(*doc).int_subset.is_null() {
-            attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, (*node).name, name);
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, (*node).name, name);
-            }
-            if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
-                /* return attribute declaration only if a default value is given
-                (that includes #FIXED declarations) */
-                return attr_decl as _;
-            }
-        }
-    }
-    null_mut()
 }
 
 /**
@@ -10640,36 +10585,6 @@ mod tests {
                             eprint!(" {}", n_name);
                             eprintln!(" {}", n_name_space);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_has_prop() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let node = gen_const_xml_node_ptr(n_node, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_has_prop(node, name);
-                    desret_xml_attr_ptr(ret_val);
-                    des_const_xml_node_ptr(n_node, node, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlHasProp",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlHasProp()");
-                        eprint!(" {}", n_node);
-                        eprintln!(" {}", n_name);
                     }
                 }
             }
