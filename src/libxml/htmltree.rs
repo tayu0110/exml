@@ -17,9 +17,9 @@ use crate::{
     error::XmlParserErrors,
     io::XmlOutputBufferPtr,
     tree::{
-        xml_add_child, xml_add_prev_sibling, xml_create_int_subset, xml_free_node,
-        xml_new_doc_node, xml_new_prop, xml_set_prop, xml_unlink_node, XmlAttrPtr, XmlBufPtr,
-        XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
+        xml_add_child, xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop,
+        xml_set_prop, xml_unlink_node, XmlAttrPtr, XmlBufPtr, XmlDoc, XmlDocProperties, XmlDocPtr,
+        XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -377,7 +377,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                 if (*head).children.is_null() {
                     xml_add_child(head, meta);
                 } else {
-                    xml_add_prev_sibling((*head).children, meta);
+                    (*(*head).children).add_prev_sibling(meta);
                 }
                 xml_new_prop(
                     meta,

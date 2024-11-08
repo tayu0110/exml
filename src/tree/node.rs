@@ -584,4 +584,82 @@ impl XmlNode {
 
         elem
     }
+
+    /// Add a new node `elem` as the previous sibling of `self`
+    /// merging adjacent TEXT nodes (`elem` may be freed)  
+    /// If the new node was already inserted in a document it is
+    /// first unlinked from its existing context.  
+    /// If the new node is ATTRIBUTE, it is added into properties instead of children.  
+    /// If there is an attribute with equal name, it is first destroyed.
+    ///
+    /// See the note regarding namespaces in xmlAddChild.
+    ///
+    /// Returns the new node or null_mut() in case of error.
+    #[doc(alias = "xmlAddPrevSibling")]
+    #[cfg(any(
+        feature = "tree",
+        feature = "html",
+        feature = "schema",
+        feature = "xinclude"
+    ))]
+    pub unsafe fn add_prev_sibling(&mut self, elem: XmlNodePtr) -> XmlNodePtr {
+        use crate::{
+            libxml::{
+                globals::xml_free,
+                xmlstring::{xml_strcat, xml_strdup},
+            },
+            tree::xml_node_set_content,
+        };
+
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if self as *mut XmlNode == elem {
+            return null_mut();
+        }
+
+        xml_unlink_node(elem);
+
+        if matches!((*elem).typ, XmlElementType::XmlTextNode) {
+            if matches!(self.typ, XmlElementType::XmlTextNode) {
+                let mut tmp: *mut XmlChar;
+
+                tmp = xml_strdup((*elem).content);
+                tmp = xml_strcat(tmp, self.content);
+                xml_node_set_content(self, tmp);
+                xml_free(tmp as _);
+                xml_free_node(elem);
+                return self as *mut XmlNode;
+            }
+            if !self.prev.is_null()
+                && matches!((*self.prev).typ, XmlElementType::XmlTextNode)
+                && (self.name == (*self.prev).name)
+            {
+                xml_node_add_content(self.prev, (*elem).content);
+                xml_free_node(elem);
+                return self.prev;
+            }
+        } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
+            return xml_add_prop_sibling(self.prev, self, elem);
+        }
+
+        if (*elem).doc != self.doc {
+            xml_set_tree_doc(elem, self.doc);
+        }
+        (*elem).parent = self.parent;
+        (*elem).next = self as *mut XmlNode;
+        (*elem).prev = self.prev;
+        self.prev = elem;
+        if !(*elem).prev.is_null() {
+            (*(*elem).prev).next = elem;
+        }
+        if !(*elem).parent.is_null() && (*(*elem).parent).children == self as *mut XmlNode {
+            (*(*elem).parent).children = elem;
+        }
+        elem
+    }
 }

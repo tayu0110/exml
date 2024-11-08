@@ -3905,81 +3905,6 @@ unsafe extern "C" fn xml_add_prop_sibling(
 }
 
 /**
- * xmlAddPrevSibling:
- * @cur:  the child node
- * @elem:  the new node
- *
- * Add a new node @elem as the previous sibling of @cur
- * merging adjacent TEXT nodes (@elem may be freed)
- * If the new node was already inserted in a document it is
- * first unlinked from its existing context.
- * If the new node is ATTRIBUTE, it is added into properties instead of children.
- * If there is an attribute with equal name, it is first destroyed.
- *
- * See the note regarding namespaces in xmlAddChild.
- *
- * Returns the new node or null_mut() in case of error.
- */
-#[cfg(any(
-    feature = "tree",
-    feature = "html",
-    feature = "schema",
-    feature = "xinclude"
-))]
-pub unsafe extern "C" fn xml_add_prev_sibling(cur: XmlNodePtr, elem: XmlNodePtr) -> XmlNodePtr {
-    if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    if cur == elem {
-        return null_mut();
-    }
-
-    xml_unlink_node(elem);
-
-    if matches!((*elem).typ, XmlElementType::XmlTextNode) {
-        if matches!((*cur).typ, XmlElementType::XmlTextNode) {
-            let mut tmp: *mut XmlChar;
-
-            tmp = xml_strdup((*elem).content);
-            tmp = xml_strcat(tmp, (*cur).content);
-            xml_node_set_content(cur, tmp);
-            xml_free(tmp as _);
-            xml_free_node(elem);
-            return cur;
-        }
-        if !(*cur).prev.is_null()
-            && matches!((*(*cur).prev).typ, XmlElementType::XmlTextNode)
-            && ((*cur).name == (*(*cur).prev).name)
-        {
-            xml_node_add_content((*cur).prev, (*elem).content);
-            xml_free_node(elem);
-            return (*cur).prev;
-        }
-    } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
-        return xml_add_prop_sibling((*cur).prev, cur, elem);
-    }
-
-    if (*elem).doc != (*cur).doc {
-        xml_set_tree_doc(elem, (*cur).doc);
-    }
-    (*elem).parent = (*cur).parent;
-    (*elem).next = cur;
-    (*elem).prev = (*cur).prev;
-    (*cur).prev = elem;
-    if !(*elem).prev.is_null() {
-        (*(*elem).prev).next = elem;
-    }
-    if !(*elem).parent.is_null() && (*(*elem).parent).children == cur {
-        (*(*elem).parent).children = elem;
-    }
-    elem
-}
-
-/**
  * xmlAddNextSibling:
  * @cur:  the child node
  * @elem:  the new node
@@ -11401,47 +11326,6 @@ mod tests {
                             xml_mem_blocks() - mem_base
                         );
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlAddNextSibling()");
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_elem);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_add_prev_sibling() {
-        #[cfg(any(
-            feature = "tree",
-            feature = "html",
-            feature = "schema",
-            feature = "xinclude"
-        ))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR_IN {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let mut elem = gen_xml_node_ptr_in(n_elem, 1);
-
-                    let ret_val = xml_add_prev_sibling(cur, elem);
-                    if ret_val.is_null() {
-                        xml_free_node(elem);
-                        elem = null_mut();
-                    }
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_xml_node_ptr_in(n_elem, elem, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlAddPrevSibling",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlAddPrevSibling()");
                         eprint!(" {}", n_cur);
                         eprintln!(" {}", n_elem);
                     }

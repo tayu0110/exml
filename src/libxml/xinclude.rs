@@ -43,11 +43,11 @@ use crate::{
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     tree::{
-        xml_add_next_sibling, xml_add_prev_sibling, xml_create_int_subset, xml_doc_copy_node,
-        xml_free_doc, xml_free_node, xml_free_node_list, xml_get_ns_prop, xml_get_prop,
-        xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len, xml_node_get_base,
-        xml_node_set_base, xml_static_copy_node, xml_static_copy_node_list, xml_unlink_node,
-        xml_unset_prop, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_add_next_sibling, xml_create_int_subset, xml_doc_copy_node, xml_free_doc,
+        xml_free_node, xml_free_node_list, xml_get_ns_prop, xml_get_prop, xml_new_doc_node,
+        xml_new_doc_text, xml_node_add_content_len, xml_node_get_base, xml_node_set_base,
+        xml_static_copy_node, xml_static_copy_node_list, xml_unlink_node, xml_unset_prop,
+        XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -2705,7 +2705,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
             end = list;
             list = (*list).next;
 
-            xml_add_prev_sibling(cur, end);
+            (*cur).add_prev_sibling(end);
         }
         /*
          * FIXME: xmlUnlinkNode doesn't coalesce text nodes.
@@ -2755,7 +2755,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
             cur = list;
             list = (*list).next;
 
-            xml_add_prev_sibling(end, cur);
+            (*end).add_prev_sibling(cur);
         }
     }
 
