@@ -77,9 +77,9 @@ use crate::{
         parser::{__xml_err_encoding, xml_err_memory},
     },
     tree::{
-        xml_add_child_list, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
-        xml_free_node_list, xml_new_doc, xml_new_doc_node, xml_set_tree_doc, xml_split_qname3,
-        XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlElementContentOccur,
+        xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
+        xml_new_doc, xml_new_doc_node, xml_set_tree_doc, xml_split_qname3, XmlAttributeDefault,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlElementContentOccur,
         XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
         XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
     },
@@ -4558,7 +4558,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 {
                     (*(*ent).last.load(Ordering::Relaxed)).name = nbktext;
                 }
-                xml_add_child_list((*ctxt).node, (*ent).children.load(Ordering::Relaxed));
+                (*(*ctxt).node).add_child_list((*ent).children.load(Ordering::Relaxed));
             }
 
             /*

@@ -19,9 +19,9 @@ use crate::{
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{
-        xml_add_child_list, xml_free_node_list, xml_validate_name, XmlAttrPtr, XmlAttributeDefault,
-        XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
-        XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
+        xml_free_node_list, xml_validate_name, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal,
+        XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
     },
 };
 
@@ -3196,7 +3196,7 @@ unsafe extern "C" fn xml_shell_set_content(
             (*node).children = null_mut();
             (*node).last = null_mut();
         }
-        xml_add_child_list(node, results);
+        (*node).add_child_list(results);
     } else {
         fprintf((*ctxt).output, c"failed to parse content\n".as_ptr());
     }

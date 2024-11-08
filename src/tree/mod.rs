@@ -3565,76 +3565,6 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
  */
 
 /**
- * xmlAddChildList:
- * @parent:  the parent node
- * @cur:  the first node in the list
- *
- * Add a list of node at the end of the child list of the parent
- * merging adjacent TEXT nodes (@cur may be freed)
- *
- * See the note regarding namespaces in xmlAddChild.
- *
- * Returns the last child or null_mut() in case of error.
- */
-pub unsafe extern "C" fn xml_add_child_list(parent: XmlNodePtr, mut cur: XmlNodePtr) -> XmlNodePtr {
-    let mut prev: XmlNodePtr;
-
-    if parent.is_null() || matches!((*parent).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    /*
-     * add the first element at the end of the children list.
-     */
-
-    if (*parent).children.is_null() {
-        (*parent).children = cur;
-    } else {
-        /*
-         * If cur and (*parent).last both are TEXT nodes, then merge them.
-         */
-        if matches!((*cur).typ, XmlElementType::XmlTextNode)
-            && matches!((*(*parent).last).typ, XmlElementType::XmlTextNode)
-            && ((*cur).name == (*(*parent).last).name)
-        {
-            xml_node_add_content((*parent).last, (*cur).content);
-            /*
-             * if it's the only child, nothing more to be done.
-             */
-            if (*cur).next.is_null() {
-                xml_free_node(cur);
-                return (*parent).last;
-            }
-            prev = cur;
-            cur = (*cur).next;
-            xml_free_node(prev);
-        }
-        prev = (*parent).last;
-        (*prev).next = cur;
-        (*cur).prev = prev;
-    }
-    while !(*cur).next.is_null() {
-        (*cur).parent = parent;
-        if (*cur).doc != (*parent).doc {
-            xml_set_tree_doc(cur, (*parent).doc);
-        }
-        cur = (*cur).next;
-    }
-    (*cur).parent = parent;
-    /* the parent may not be linked to a doc ! */
-    if (*cur).doc != (*parent).doc {
-        xml_set_tree_doc(cur, (*parent).doc);
-    }
-    (*parent).last = cur;
-
-    cur
-}
-
-/**
  * xmlReplaceNode:
  * @old:  the old node
  * @cur:  the node
@@ -10889,40 +10819,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_add_child_list() {
-        unsafe {
-            let mut leaks = 0;
-            for n_parent in 0..GEN_NB_XML_NODE_PTR {
-                for n_cur in 0..GEN_NB_XML_NODE_PTR_IN {
-                    let mem_base = xml_mem_blocks();
-                    let parent = gen_xml_node_ptr(n_parent, 0);
-                    let mut cur = gen_xml_node_ptr_in(n_cur, 1);
-
-                    let ret_val = xml_add_child_list(parent, cur);
-                    if ret_val.is_null() {
-                        xml_free_node_list(cur);
-                        cur = null_mut();
-                    }
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_node_ptr(n_parent, parent, 0);
-                    des_xml_node_ptr_in(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlAddChildList",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlAddChildList()");
-                        eprint!(" {}", n_parent);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_build_qname() {

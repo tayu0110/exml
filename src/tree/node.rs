@@ -857,6 +857,71 @@ impl XmlNode {
         cur
     }
 
+    /// Add a list of node at the end of the child list of the parent
+    /// merging adjacent TEXT nodes (`cur` may be freed)
+    ///
+    /// See the note regarding namespaces in xmlAddChild.
+    ///
+    /// Returns the last child or NULL in case of error.
+    #[doc(alias = "xmlAddChildList")]
+    pub unsafe fn add_child_list(&mut self, mut cur: XmlNodePtr) -> XmlNodePtr {
+        let mut prev: XmlNodePtr;
+
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        /*
+         * add the first element at the end of the children list.
+         */
+
+        if self.children.is_null() {
+            self.children = cur;
+        } else {
+            /*
+             * If cur and self.last both are TEXT nodes, then merge them.
+             */
+            if matches!((*cur).typ, XmlElementType::XmlTextNode)
+                && matches!((*self.last).typ, XmlElementType::XmlTextNode)
+                && (*cur).name == (*self.last).name
+            {
+                xml_node_add_content(self.last, (*cur).content);
+                /*
+                 * if it's the only child, nothing more to be done.
+                 */
+                if (*cur).next.is_null() {
+                    xml_free_node(cur);
+                    return self.last;
+                }
+                prev = cur;
+                cur = (*cur).next;
+                xml_free_node(prev);
+            }
+            prev = self.last;
+            (*prev).next = cur;
+            (*cur).prev = prev;
+        }
+        while !(*cur).next.is_null() {
+            (*cur).parent = self;
+            if (*cur).doc != self.doc {
+                xml_set_tree_doc(cur, self.doc);
+            }
+            cur = (*cur).next;
+        }
+        (*cur).parent = self;
+        /* the parent may not be linked to a doc ! */
+        if (*cur).doc != self.doc {
+            xml_set_tree_doc(cur, self.doc);
+        }
+        self.last = cur;
+
+        cur
+    }
+
     /// Unlink a node from it's current context, the node is not freed.  
     /// If one need to free the node, use xmlFreeNode() routine after the unlink to discard it.  
     ///
