@@ -2154,7 +2154,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
          * nodes coalesced, the somewhat confusing call to xmlAddChild
          * could be removed.
          */
-        let tmp: XmlNodePtr = xml_add_child(parent, ret);
+        let tmp: XmlNodePtr = (*parent).add_child(ret);
         /* node could have coalesced */
         if tmp != ret {
             return tmp;
@@ -2319,10 +2319,10 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
                     (*q).doc = doc;
                     (*q).parent = parent;
                     (*doc).int_subset = q as _;
-                    xml_add_child(parent, q);
+                    (*parent).add_child(q);
                 } else {
                     q = (*doc).int_subset as _;
-                    xml_add_child(parent, q);
+                    (*parent).add_child(q);
                 }
             } else {
                 q = xml_static_copy_node(node, doc, parent, 1);
@@ -3563,139 +3563,6 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
 /*
  * Changing the structure.
  */
-
-/**
- * xmlAddChild:
- * @parent:  the parent node
- * @cur:  the child node
- *
- * Add a new node to @parent, at the end of the child (or property) list
- * merging adjacent TEXT nodes (in which case @cur is freed)
- * If the new node is ATTRIBUTE, it is added into properties instead of children.
- * If there is an attribute with equal name, it is first destroyed.
- *
- * All tree manipulation functions can safely move nodes within a document.
- * But when moving nodes from one document to another, references to
- * namespaces in element or attribute nodes are NOT fixed. In this case,
- * you MUST call xmlReconciliateNs after the move operation to avoid
- * memory errors.
- *
- * Returns the child or null_mut() in case of error.
- */
-pub unsafe extern "C" fn xml_add_child(parent: XmlNodePtr, cur: XmlNodePtr) -> XmlNodePtr {
-    let mut prev: XmlNodePtr;
-
-    if parent.is_null() || matches!((*parent).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    if parent == cur {
-        return null_mut();
-    }
-    /*
-     * If cur is a TEXT node, merge its content with adjacent TEXT nodes
-     * cur is then freed.
-     */
-    if matches!((*cur).typ, XmlElementType::XmlTextNode) {
-        if matches!((*parent).typ, XmlElementType::XmlTextNode)
-            && !(*parent).content.is_null()
-            && (*parent).name == (*cur).name
-        {
-            xml_node_add_content(parent, (*cur).content);
-            xml_free_node(cur);
-            return parent;
-        }
-        if !(*parent).last.is_null()
-            && matches!((*(*parent).last).typ, XmlElementType::XmlTextNode)
-            && ((*(*parent).last).name == (*cur).name)
-            && ((*parent).last != cur)
-        {
-            xml_node_add_content((*parent).last, (*cur).content);
-            xml_free_node(cur);
-            return (*parent).last;
-        }
-    }
-
-    /*
-     * add the new element at the end of the children list.
-     */
-    prev = (*cur).parent;
-    (*cur).parent = parent;
-    if (*cur).doc != (*parent).doc {
-        xml_set_tree_doc(cur, (*parent).doc);
-    }
-    /* this check prevents a loop on tree-traversions if a developer
-     * tries to add a node to its parent multiple times
-     */
-    if prev == parent {
-        return cur;
-    }
-
-    /*
-     * Coalescing
-     */
-    if matches!((*parent).typ, XmlElementType::XmlTextNode)
-        && !(*parent).content.is_null()
-        && parent != cur
-    {
-        xml_node_add_content(parent, (*cur).content);
-        xml_free_node(cur);
-        return parent;
-    }
-    if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
-        if !matches!((*parent).typ, XmlElementType::XmlElementNode) {
-            return null_mut();
-        }
-        if !(*parent).properties.is_null() {
-            /* check if an attribute with the same name exists */
-
-            let lastattr = if (*cur).ns.is_null() {
-                xml_has_ns_prop(parent, (*cur).name, null_mut())
-            } else {
-                xml_has_ns_prop(
-                    parent,
-                    (*cur).name,
-                    (*(*cur).ns).href.load(Ordering::Relaxed),
-                )
-            };
-            if !lastattr.is_null()
-                && lastattr != cur as _
-                && !matches!((*lastattr).typ, XmlElementType::XmlAttributeDecl)
-            {
-                /* different instance, destroy it (attributes must be unique) */
-                (*(lastattr as *mut XmlNode)).unlink_node();
-                xml_free_prop(lastattr);
-            }
-            if lastattr == cur as _ {
-                return cur;
-            }
-        }
-        if (*parent).properties.is_null() {
-            (*parent).properties = cur as _;
-        } else {
-            /* find the end */
-            let mut lastattr: XmlAttrPtr = (*parent).properties;
-            while !(*lastattr).next.is_null() {
-                lastattr = (*lastattr).next;
-            }
-            (*lastattr).next = cur as _;
-            (*(cur as XmlAttrPtr)).prev = lastattr;
-        }
-    } else if (*parent).children.is_null() {
-        (*parent).children = cur;
-        (*parent).last = cur;
-    } else {
-        prev = (*parent).last;
-        (*prev).next = cur;
-        (*cur).prev = prev;
-        (*parent).last = cur;
-    }
-    cur
-}
 
 /**
  * xmlAddChildList:
@@ -6074,7 +5941,7 @@ pub unsafe extern "C" fn xml_node_add_content_len(
             let last: XmlNodePtr = (*cur).last;
             let new_node: XmlNodePtr = xml_new_doc_text_len((*cur).doc, content, len);
             if !new_node.is_null() {
-                tmp = xml_add_child(cur, new_node);
+                tmp = (*cur).add_child(new_node);
                 if tmp != new_node {
                     return;
                 }
@@ -11022,40 +10889,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_add_child() {
-        unsafe {
-            let mut leaks = 0;
-            for n_parent in 0..GEN_NB_XML_NODE_PTR {
-                for n_cur in 0..GEN_NB_XML_NODE_PTR_IN {
-                    let mem_base = xml_mem_blocks();
-                    let parent = gen_xml_node_ptr(n_parent, 0);
-                    let mut cur = gen_xml_node_ptr_in(n_cur, 1);
-
-                    let ret_val = xml_add_child(parent, cur);
-                    if ret_val.is_null() {
-                        xml_free_node(cur);
-                        cur = null_mut();
-                    }
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_node_ptr(n_parent, parent, 0);
-                    des_xml_node_ptr_in(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlAddChild",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlAddChild()");
-                        eprint!(" {}", n_parent);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_add_child_list() {

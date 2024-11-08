@@ -53,8 +53,8 @@ use crate::{
         },
     },
     tree::{
-        xml_add_child, xml_copy_doc, xml_free_doc, xml_free_node, xml_get_prop, xml_has_prop,
-        xml_new_child, xml_new_doc_node, xml_new_doc_text, xml_node_get_base, xml_node_get_content,
+        xml_copy_doc, xml_free_doc, xml_free_node, xml_get_prop, xml_has_prop, xml_new_child,
+        xml_new_doc_node, xml_new_doc_text, xml_node_get_base, xml_node_get_content,
         xml_node_list_get_string, xml_node_set_content, xml_search_ns, xml_set_prop,
         xml_split_qname2, xml_unset_prop, xml_validate_ncname, XmlAttrPtr, XmlDocPtr,
         XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
@@ -4023,7 +4023,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 if !node.is_null() {
                                     (*(*cur).children).add_prev_sibling(node);
                                     text = xml_new_doc_text((*node).doc, name);
-                                    xml_add_child(node, text);
+                                    (*node).add_child(text);
                                     text = node;
                                 }
                             }

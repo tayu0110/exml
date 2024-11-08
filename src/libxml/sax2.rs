@@ -29,8 +29,8 @@ use crate::{
     },
     private::parser::{xml_err_memory, XML_VCTXT_DTD_VALIDATED},
     tree::{
-        xml_add_child, xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node,
-        xml_new_cdata_block, xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
+        xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
+        xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
         xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns,
         xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_search_ns, xml_set_ns,
         xml_string_get_node_list, xml_string_len_get_node_list, xml_text_concat,
@@ -2322,7 +2322,7 @@ pub unsafe fn xml_sax2_start_element(
         return;
     }
     if (*(*ctxt).my_doc).children.is_null() {
-        xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        (*((*ctxt).my_doc as XmlNodePtr)).add_child(ret as XmlNodePtr);
     } else if parent.is_null() {
         parent = (*(*ctxt).my_doc).children;
     }
@@ -2352,7 +2352,7 @@ pub unsafe fn xml_sax2_start_element(
      */
     if !parent.is_null() {
         if matches!((*parent).typ, XmlElementType::XmlElementNode) {
-            xml_add_child(parent, ret);
+            (*parent).add_child(ret);
         } else {
             (*parent).add_sibling(ret);
         }
@@ -2665,7 +2665,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
 
     if parent.is_null() {
-        xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        (*((*ctxt).my_doc as XmlNodePtr)).add_child(ret as XmlNodePtr);
     }
     /*
      * Build the namespace list
@@ -2731,7 +2731,7 @@ pub unsafe fn xml_sax2_start_element_ns(
      */
     if !parent.is_null() {
         if matches!((*parent).typ, XmlElementType::XmlElementNode) {
-            xml_add_child(parent, ret);
+            (*parent).add_child(ret);
         } else {
             (*parent).add_sibling(ret);
         }
@@ -3359,7 +3359,7 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: *const 
     } else {
         xml_new_reference((*ctxt).my_doc, name)
     };
-    if xml_add_child((*ctxt).node, ret).is_null() {
+    if (*ctxt).node.is_null() || (*(*ctxt).node).add_child(ret).is_null() {
         xml_free_node(ret);
     }
 }
@@ -3503,7 +3503,7 @@ unsafe extern "C" fn xml_sax2_text(
                 last_child = xml_new_cdata_block((*ctxt).my_doc, ch, len);
             }
             if !last_child.is_null() {
-                xml_add_child((*ctxt).node, last_child);
+                (*(*ctxt).node).add_child(last_child);
                 if !(*(*ctxt).node).children.is_null() {
                     (*ctxt).nodelen = len;
                     (*ctxt).nodemem = len + 1;
@@ -3590,18 +3590,18 @@ pub unsafe fn xml_sax2_processing_instruction(
         }
     }
     if (*ctxt).in_subset == 1 {
-        xml_add_child((*(*ctxt).my_doc).int_subset as XmlNodePtr, ret);
+        (*((*(*ctxt).my_doc).int_subset as XmlNodePtr)).add_child(ret);
         return;
     } else if (*ctxt).in_subset == 2 {
-        xml_add_child((*(*ctxt).my_doc).ext_subset as XmlNodePtr, ret);
+        (*((*(*ctxt).my_doc).ext_subset as XmlNodePtr)).add_child(ret);
         return;
     }
     if parent.is_null() {
-        xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        (*((*ctxt).my_doc as XmlNodePtr)).add_child(ret as XmlNodePtr);
         return;
     }
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
-        xml_add_child(parent, ret);
+        (*parent).add_child(ret);
     } else {
         (*parent).add_sibling(ret);
     }
@@ -3637,18 +3637,18 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const X
     }
 
     if (*ctxt).in_subset == 1 {
-        xml_add_child((*(*ctxt).my_doc).int_subset as XmlNodePtr, ret);
+        (*((*(*ctxt).my_doc).int_subset as XmlNodePtr)).add_child(ret);
         return;
     } else if (*ctxt).in_subset == 2 {
-        xml_add_child((*(*ctxt).my_doc).ext_subset as XmlNodePtr, ret);
+        (*((*(*ctxt).my_doc).ext_subset as XmlNodePtr)).add_child(ret);
         return;
     }
     if parent.is_null() {
-        xml_add_child((*ctxt).my_doc as XmlNodePtr, ret as XmlNodePtr);
+        (*((*ctxt).my_doc as XmlNodePtr)).add_child(ret as XmlNodePtr);
         return;
     }
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
-        xml_add_child(parent, ret);
+        (*parent).add_child(ret);
     } else {
         (*parent).add_sibling(ret);
     }

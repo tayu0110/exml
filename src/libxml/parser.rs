@@ -102,9 +102,9 @@ use crate::{
         },
     },
     tree::{
-        xml_add_child, xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node,
-        xml_free_node_list, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
-        xml_search_ns_by_href, xml_set_tree_doc, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType,
+        xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, xml_search_ns_by_href,
+        xml_set_tree_doc, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType,
         XmlBufferAllocationScheme, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur,
         XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
         XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
@@ -4753,7 +4753,7 @@ pub unsafe fn xml_parse_in_node_context(
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
     }
-    xml_add_child(node, fake);
+    (*node).add_child(fake);
 
     if (*node).typ == XmlElementType::XmlElementNode {
         (*ctxt).node_push(node);
@@ -4961,7 +4961,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         xml_free_doc(new_doc);
         return -1;
     }
-    xml_add_child(new_doc as XmlNodePtr, new_root);
+    (*(new_doc as XmlNodePtr)).add_child(new_root);
     (*ctxt).node_push(new_root);
     /* doc.is_null() is only supported for historic reasons */
     if doc.is_null() {
@@ -5132,7 +5132,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         xml_free_doc(new_doc);
         return XmlParserErrors::XmlErrInternalError;
     }
-    xml_add_child(new_doc as XmlNodePtr, new_root);
+    (*(new_doc as XmlNodePtr)).add_child(new_root);
     (*ctxt).node_push((*new_doc).children);
     if doc.is_null() {
         (*ctxt).my_doc = new_doc;

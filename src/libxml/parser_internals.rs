@@ -17,6 +17,7 @@ pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
 use crate::error::XmlParserErrors;
+use crate::tree::XmlNode;
 #[cfg(feature = "catalog")]
 use crate::{
     __xml_raise_error,
@@ -76,11 +77,11 @@ use crate::{
         parser::{__xml_err_encoding, xml_err_memory},
     },
     tree::{
-        xml_add_child, xml_add_child_list, xml_create_int_subset, xml_doc_copy_node, xml_free_doc,
-        xml_free_node, xml_free_node_list, xml_new_doc, xml_new_doc_node, xml_set_tree_doc,
-        xml_split_qname3, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
-        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_add_child_list, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
+        xml_free_node_list, xml_new_doc, xml_new_doc_node, xml_set_tree_doc, xml_split_qname3,
+        XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
+        XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -3906,7 +3907,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     }
     (*(*ctxt).my_doc).children = null_mut();
     (*(*ctxt).my_doc).last = null_mut();
-    xml_add_child((*ctxt).my_doc as _, new_root);
+    (*((*ctxt).my_doc as *mut XmlNode)).add_child(new_root);
     (*ctxt).node_push((*(*ctxt).my_doc).children);
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).depth = (*oldctxt).depth;
@@ -4463,7 +4464,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         if first_child.is_null() {
                             first_child = nw;
                         }
-                        nw = xml_add_child((*ctxt).node, nw);
+                        nw = (*(*ctxt).node).add_child(nw);
                     }
                     if cur == (*ent).last.load(Ordering::Relaxed) as _ {
                         /*
@@ -4517,9 +4518,9 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         if first_child.is_null() {
                             first_child = cur;
                         }
-                        xml_add_child(ent as XmlNodePtr, nw);
+                        (*(ent as XmlNodePtr)).add_child(nw);
                     }
-                    xml_add_child((*ctxt).node, cur);
+                    (*(*ctxt).node).add_child(cur);
                     if cur == last {
                         break;
                     }
