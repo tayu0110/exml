@@ -1361,7 +1361,7 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
                     | XmlElementType::XmlAttributeDecl
                     | XmlElementType::XmlEntityDecl
             ) {
-                (*c).unlink_node();
+                (*c).unlink();
                 xml_free_node(c);
             }
             c = next;
@@ -1638,12 +1638,12 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
         ext_subset = null_mut();
     }
     if !ext_subset.is_null() {
-        (*((*cur).ext_subset as *mut XmlNode)).unlink_node();
+        (*((*cur).ext_subset as *mut XmlNode)).unlink();
         (*cur).ext_subset = null_mut();
         xml_free_dtd(ext_subset);
     }
     if !int_subset.is_null() {
-        (*((*cur).int_subset as *mut XmlNode)).unlink_node();
+        (*((*cur).int_subset as *mut XmlNode)).unlink();
         (*cur).int_subset = null_mut();
         xml_free_dtd(int_subset);
     }
@@ -3589,7 +3589,7 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
         return null_mut();
     }
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        (*old).unlink_node();
+        (*old).unlink();
         return old;
     }
     if cur == old {
@@ -3605,7 +3605,7 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
     {
         return old;
     }
-    (*cur).unlink_node();
+    (*cur).unlink();
     xml_set_tree_doc(cur, (*old).doc);
     (*cur).parent = (*old).parent;
     (*cur).next = (*old).next;
@@ -3661,7 +3661,7 @@ pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -
         return first;
     }
     xml_node_add_content(first, (*second).content);
-    (*second).unlink_node();
+    (*second).unlink();
     xml_free_node(second);
     first
 }
@@ -6551,7 +6551,7 @@ pub unsafe extern "C" fn xml_unset_ns_prop(
     if prop.is_null() {
         return -1;
     }
-    (*(prop as *mut XmlNode)).unlink_node();
+    (*(prop as *mut XmlNode)).unlink();
     xml_free_prop(prop);
     0
 }
@@ -6571,7 +6571,7 @@ pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) 
     if prop.is_null() {
         return -1;
     }
-    (*(prop as *mut XmlNode)).unlink_node();
+    (*(prop as *mut XmlNode)).unlink();
     xml_free_prop(prop);
     0
 }
@@ -9616,7 +9616,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
      * Unlink only if @node was not already added to @destParent.
      */
     if !(*node).parent.is_null() && dest_parent != (*node).parent {
-        (*node).unlink_node();
+        (*node).unlink();
     }
 
     if matches!((*node).typ, XmlElementType::XmlElementNode) {
@@ -9718,7 +9718,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlPiNode
         | XmlElementType::XmlCommentNode => {
-            (*node).unlink_node();
+            (*node).unlink();
             return 0;
         }
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
@@ -9726,7 +9726,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
             return 1;
         }
     }
-    (*node).unlink_node();
+    (*node).unlink();
     /*
      * Save out-of-scope ns-references in (*doc).oldNs.
      */

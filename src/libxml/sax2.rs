@@ -34,7 +34,7 @@ use crate::{
         xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns,
         xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_search_ns, xml_set_ns,
         xml_string_get_node_list, xml_string_len_get_node_list, xml_text_concat,
-        xml_validate_ncname, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
+        xml_validate_ncname, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
         XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
         XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
@@ -311,7 +311,7 @@ pub unsafe fn xml_sax2_internal_subset(
         if (*ctxt).html != 0 {
             return;
         }
-        (*(dtd as XmlNodePtr)).unlink_node();
+        (*(dtd as XmlNodePtr)).unlink();
         xml_free_dtd(dtd);
         (*(*ctxt).my_doc).int_subset = null_mut();
     }
@@ -2339,7 +2339,7 @@ pub unsafe fn xml_sax2_start_element(
      * We are parsing a new node.
      */
     if (*ctxt).node_push(ret) < 0 {
-        (*ret).unlink_node();
+        (*ret).unlink();
         xml_free_node(ret);
         if !prefix.is_null() {
             xml_free(prefix as _);
@@ -2721,7 +2721,7 @@ pub unsafe fn xml_sax2_start_element_ns(
      * We are parsing a new node.
      */
     if (*ctxt).node_push(ret) < 0 {
-        (*ret).unlink_node();
+        (*ret).unlink();
         xml_free_node(ret);
         return;
     }

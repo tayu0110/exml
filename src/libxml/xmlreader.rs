@@ -1906,6 +1906,8 @@ unsafe extern "C" fn xml_text_reader_ent_pop(reader: &mut XmlTextReader) -> XmlN
  */
 #[cfg(all(feature = "libxml_reader", feature = "regexp"))]
 unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader) {
+    use crate::tree::NodeCommon;
+
     let oldnode: XmlNodePtr = reader.node;
     let mut node: XmlNodePtr = reader.node;
 
@@ -1981,7 +1983,7 @@ unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader)
                             !tmp.is_null()
                         } {
                             if (*tmp).extra & NODE_IS_PRESERVED as u16 == 0 {
-                                (*tmp).unlink_node();
+                                (*tmp).unlink();
                                 xml_text_reader_free_node(reader, tmp);
                             } else {
                                 break;
@@ -2030,7 +2032,10 @@ unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader)
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32 {
-    use crate::libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS};
+    use crate::{
+        libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS},
+        tree::NodeCommon,
+    };
 
     let mut val: i32;
     let mut olddepth = 0;
@@ -2199,7 +2204,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                             if oldnode == tmp {
                                 oldnode = null_mut();
                             }
-                            (*tmp).unlink_node();
+                            (*tmp).unlink();
                             xml_text_reader_free_node(reader, tmp);
                         }
                     }
@@ -2254,7 +2259,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                         && (*oldnode).typ != XmlElementType::XmlDtdNode
                         && (*oldnode).extra & NODE_IS_PRESERVED as u16 == 0
                     {
-                        (*oldnode).unlink_node();
+                        (*oldnode).unlink();
                         xml_text_reader_free_node(reader, oldnode);
                     }
 
@@ -2274,7 +2279,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                     && (*(*reader.node).last).extra & NODE_IS_PRESERVED as u16 == 0
                 {
                     let tmp: XmlNodePtr = (*reader.node).last;
-                    (*tmp).unlink_node();
+                    (*tmp).unlink();
                     xml_text_reader_free_node(reader, tmp);
                 }
                 reader.depth -= 1;
@@ -3645,6 +3650,8 @@ pub unsafe extern "C" fn xml_text_reader_value(reader: &mut XmlTextReader) -> *m
  */
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
+    use crate::tree::NodeCommon;
+
     let mut ext_subset: XmlDtdPtr;
 
     if cur.is_null() {
@@ -3675,12 +3682,12 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
         ext_subset = null_mut();
     }
     if !ext_subset.is_null() {
-        (*((*cur).ext_subset as XmlNodePtr)).unlink_node();
+        (*((*cur).ext_subset as XmlNodePtr)).unlink();
         (*cur).ext_subset = null_mut();
         xml_free_dtd(ext_subset);
     }
     if !int_subset.is_null() {
-        (*((*cur).int_subset as XmlNodePtr)).unlink_node();
+        (*((*cur).int_subset as XmlNodePtr)).unlink();
         (*cur).int_subset = null_mut();
         xml_free_dtd(int_subset);
     }

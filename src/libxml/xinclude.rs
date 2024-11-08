@@ -46,8 +46,8 @@ use crate::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_ns_prop, xml_get_prop, xml_new_doc_node, xml_new_doc_text,
         xml_node_add_content_len, xml_node_get_base, xml_node_set_base, xml_static_copy_node,
-        xml_static_copy_node_list, xml_unset_prop, XmlDocPtr, XmlDtdPtr, XmlElementType,
-        XmlNodePtr, XML_XML_NAMESPACE,
+        xml_static_copy_node_list, xml_unset_prop, NodeCommon, XmlDocPtr, XmlDtdPtr,
+        XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -2710,7 +2710,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
         /*
          * FIXME: xmlUnlinkNode doesn't coalesce text nodes.
          */
-        (*cur).unlink_node();
+        (*cur).unlink();
         xml_free_node(cur);
     } else {
         let mut child: XmlNodePtr;
@@ -2728,7 +2728,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
         child = (*cur).children;
         while !child.is_null() {
             next = (*child).next;
-            (*child).unlink_node();
+            (*child).unlink();
             xml_free_node(child);
 
             child = next;

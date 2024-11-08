@@ -14,6 +14,111 @@ use super::{
     XmlElementType, XmlNs,
 };
 
+pub trait NodeCommon {
+    fn element_type(&self) -> XmlElementType;
+    fn name(&self) -> *const u8;
+    fn parent(&self) -> *mut XmlNode;
+    fn set_parent(&mut self, parent: *mut XmlNode);
+    fn next(&self) -> *mut XmlNode;
+    fn set_next(&mut self, next: *mut XmlNode);
+    fn prev(&self) -> *mut XmlNode;
+    fn set_prev(&mut self, prev: *mut XmlNode);
+    fn document(&self) -> *mut XmlDoc;
+
+    /// Unlink a node from it's current context, the node is not freed.  
+    /// If one need to free the node, use xmlFreeNode() routine after the unlink to discard it.  
+    ///
+    /// Note that namespace nodes can't be unlinked as they do not have pointer to their parent.
+    #[doc(alias = "xmlUnlinkNode")]
+
+    unsafe fn unlink(&mut self) {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return;
+        }
+
+        if matches!(self.element_type(), XmlElementType::XmlDtdNode) {
+            let doc = self.document();
+            if !doc.is_null() {
+                if (*doc).int_subset == self as *mut Self as *mut XmlDtd {
+                    (*doc).int_subset = null_mut();
+                }
+                if (*doc).ext_subset == self as *mut Self as *mut XmlDtd {
+                    (*doc).ext_subset = null_mut();
+                }
+            }
+        }
+        if matches!(self.element_type(), XmlElementType::XmlEntityDecl) {
+            let doc = self.document();
+            if !doc.is_null() {
+                if !(*doc).int_subset.is_null() {
+                    if xml_hash_lookup((*(*doc).int_subset).entities as _, self.name())
+                        == self as *mut Self as *mut c_void
+                    {
+                        xml_hash_remove_entry(
+                            (*(*doc).int_subset).entities as _,
+                            self.name(),
+                            None,
+                        );
+                    }
+                    if xml_hash_lookup((*(*doc).int_subset).pentities as _, self.name())
+                        == self as *mut Self as *mut c_void
+                    {
+                        xml_hash_remove_entry(
+                            (*(*doc).int_subset).pentities as _,
+                            self.name(),
+                            None,
+                        );
+                    }
+                }
+                if !(*doc).ext_subset.is_null() {
+                    if xml_hash_lookup((*(*doc).ext_subset).entities as _, self.name())
+                        == self as *mut Self as *mut c_void
+                    {
+                        xml_hash_remove_entry(
+                            (*(*doc).ext_subset).entities as _,
+                            self.name(),
+                            None,
+                        );
+                    }
+                    if xml_hash_lookup((*(*doc).ext_subset).pentities as _, self.name())
+                        == self as *mut Self as *mut c_void
+                    {
+                        xml_hash_remove_entry(
+                            (*(*doc).ext_subset).pentities as _,
+                            self.name(),
+                            None,
+                        );
+                    }
+                }
+            }
+        }
+        if !self.parent().is_null() {
+            let parent = self.parent();
+            if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
+                if (*parent).properties == self as *mut Self as *mut XmlAttr {
+                    (*parent).properties = (*(self as *mut Self as *mut XmlAttr)).next;
+                }
+            } else {
+                if (*parent).children == self as *mut Self as *mut XmlNode {
+                    (*parent).children = self.next();
+                }
+                if (*parent).last == self as *mut Self as *mut XmlNode {
+                    (*parent).last = self.prev();
+                }
+            }
+            self.set_parent(null_mut());
+        }
+        if !self.next().is_null() {
+            (*self.next()).prev = self.prev();
+        }
+        if !self.prev().is_null() {
+            (*self.prev()).next = self.next();
+        }
+        self.set_next(null_mut());
+        self.set_prev(null_mut());
+    }
+}
+
 /// A node in an XML tree.
 pub type XmlNodePtr = *mut XmlNode;
 #[repr(C)]
@@ -564,7 +669,7 @@ impl XmlNode {
             }
         }
 
-        (*elem).unlink_node();
+        (*elem).unlink();
 
         if (matches!((*cur).typ, XmlElementType::XmlTextNode)
             && matches!((*elem).typ, XmlElementType::XmlTextNode)
@@ -629,7 +734,7 @@ impl XmlNode {
             return null_mut();
         }
 
-        (*elem).unlink_node();
+        (*elem).unlink();
 
         if matches!((*elem).typ, XmlElementType::XmlTextNode) {
             if matches!(self.typ, XmlElementType::XmlTextNode) {
@@ -693,7 +798,7 @@ impl XmlNode {
             return null_mut();
         }
 
-        (*elem).unlink_node();
+        (*elem).unlink();
 
         if matches!((*elem).typ, XmlElementType::XmlTextNode) {
             if matches!(self.typ, XmlElementType::XmlTextNode) {
@@ -827,7 +932,7 @@ impl XmlNode {
                     && !matches!((*lastattr).typ, XmlElementType::XmlAttributeDecl)
                 {
                     /* different instance, destroy it (attributes must be unique) */
-                    (*(lastattr as *mut XmlNode)).unlink_node();
+                    (*(lastattr as *mut XmlNode)).unlink();
                     xml_free_prop(lastattr);
                 }
                 if lastattr == cur as _ {
@@ -921,81 +1026,35 @@ impl XmlNode {
 
         cur
     }
+}
 
-    /// Unlink a node from it's current context, the node is not freed.  
-    /// If one need to free the node, use xmlFreeNode() routine after the unlink to discard it.  
-    ///
-    /// Note that namespace nodes can't be unlinked as they do not have pointer to their parent.
-    #[doc(alias = "xmlUnlinkNode")]
-    pub unsafe fn unlink_node(&mut self) {
-        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
-            return;
-        }
-
-        if matches!(self.typ, XmlElementType::XmlDtdNode) {
-            let doc = self.doc;
-            if !doc.is_null() {
-                if (*doc).int_subset == self as *mut XmlNode as *mut XmlDtd {
-                    (*doc).int_subset = null_mut();
-                }
-                if (*doc).ext_subset == self as *mut XmlNode as *mut XmlDtd {
-                    (*doc).ext_subset = null_mut();
-                }
-            }
-        }
-        if matches!(self.typ, XmlElementType::XmlEntityDecl) {
-            let doc = self.doc;
-            if !doc.is_null() {
-                if !(*doc).int_subset.is_null() {
-                    if xml_hash_lookup((*(*doc).int_subset).entities as _, self.name)
-                        == self as *mut XmlNode as *mut c_void
-                    {
-                        xml_hash_remove_entry((*(*doc).int_subset).entities as _, self.name, None);
-                    }
-                    if xml_hash_lookup((*(*doc).int_subset).pentities as _, self.name)
-                        == self as *mut XmlNode as *mut c_void
-                    {
-                        xml_hash_remove_entry((*(*doc).int_subset).pentities as _, self.name, None);
-                    }
-                }
-                if !(*doc).ext_subset.is_null() {
-                    if xml_hash_lookup((*(*doc).ext_subset).entities as _, self.name)
-                        == self as *mut XmlNode as *mut c_void
-                    {
-                        xml_hash_remove_entry((*(*doc).ext_subset).entities as _, self.name, None);
-                    }
-                    if xml_hash_lookup((*(*doc).ext_subset).pentities as _, self.name)
-                        == self as *mut XmlNode as *mut c_void
-                    {
-                        xml_hash_remove_entry((*(*doc).ext_subset).pentities as _, self.name, None);
-                    }
-                }
-            }
-        }
-        if !self.parent.is_null() {
-            let parent: XmlNodePtr = self.parent;
-            if matches!(self.typ, XmlElementType::XmlAttributeNode) {
-                if (*parent).properties == self as *mut XmlNode as *mut XmlAttr {
-                    (*parent).properties = (*(self as *mut XmlNode as *mut XmlAttr)).next;
-                }
-            } else {
-                if (*parent).children == self as *mut XmlNode {
-                    (*parent).children = self.next;
-                }
-                if (*parent).last == self as *mut XmlNode {
-                    (*parent).last = self.prev;
-                }
-            }
-            self.parent = null_mut();
-        }
-        if !self.next.is_null() {
-            (*self.next).prev = self.prev;
-        }
-        if !self.prev.is_null() {
-            (*self.prev).next = self.next;
-        }
-        self.next = null_mut();
-        self.prev = null_mut();
+impl NodeCommon for XmlNode {
+    fn document(&self) -> *mut XmlDoc {
+        self.doc
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> *const u8 {
+        self.name
+    }
+    fn next(&self) -> *mut XmlNode {
+        self.next
+    }
+    fn set_next(&mut self, next: *mut XmlNode) {
+        self.next = next;
+    }
+    fn prev(&self) -> *mut XmlNode {
+        self.prev
+    }
+    fn set_prev(&mut self, prev: *mut XmlNode) {
+        self.prev = prev;
+    }
+    fn parent(&self) -> *mut XmlNode {
+        self.parent
+    }
+    fn set_parent(&mut self, parent: *mut XmlNode) {
+        self.parent = parent;
     }
 }
 

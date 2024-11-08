@@ -64,9 +64,9 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, xml_new_text,
-        xml_set_prop, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType,
-        XmlBufferAllocationScheme, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
-        XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
+        xml_set_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlBufferAllocationScheme, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr, XmlDtd,
+        XmlDtdPtr, XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
         XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNs, XmlNsPtr,
     },
 };
@@ -947,7 +947,7 @@ pub(crate) unsafe extern "C" fn des_xml_dtd_ptr(no: c_int, val: XmlDtdPtr, _nr: 
     if no == 1 {
         free_api_doc();
     } else if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink_node();
+        (*(val as XmlNodePtr)).unlink();
         xml_free_node(val as XmlNodePtr);
     }
 }
@@ -1207,26 +1207,26 @@ pub(crate) unsafe extern "C" fn desret_xml_node_ptr(val: XmlNodePtr) {
         && val != API_ROOT.load(Ordering::Relaxed)
         && val != API_DOC.load(Ordering::Relaxed) as XmlNodePtr
     {
-        (*val).unlink_node();
+        (*val).unlink();
         xml_free_node(val);
     }
 }
 pub(crate) unsafe extern "C" fn desret_xml_attr_ptr(val: XmlAttrPtr) {
     if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink_node();
+        (*(val as XmlNodePtr)).unlink();
         xml_free_node(val as XmlNodePtr);
     }
 }
 
 pub(crate) unsafe extern "C" fn desret_xml_element_ptr(val: XmlElementPtr) {
     if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink_node();
+        (*(val as XmlNodePtr)).unlink();
     }
 }
 
 pub(crate) unsafe extern "C" fn desret_xml_attribute_ptr(val: XmlAttributePtr) {
     if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink_node();
+        (*(val as XmlNodePtr)).unlink();
     }
 }
 
@@ -1633,7 +1633,7 @@ pub(crate) unsafe extern "C" fn desret_xml_parser_input_ptr(val: XmlParserInputP
 
 pub(crate) unsafe extern "C" fn desret_xml_entity_ptr(val: XmlEntityPtr) {
     if !val.is_null() {
-        (*(val as XmlNodePtr)).unlink_node();
+        (*(val as XmlNodePtr)).unlink();
         xml_free_node(val as XmlNodePtr);
     }
 }
@@ -1724,7 +1724,7 @@ pub(crate) unsafe extern "C" fn des_xml_node_ptr(no: c_int, val: XmlNodePtr, _nr
     if no == 1 {
         free_api_doc();
     } else if !val.is_null() {
-        (*val).unlink_node();
+        (*val).unlink();
         xml_free_node(val);
     }
 }
