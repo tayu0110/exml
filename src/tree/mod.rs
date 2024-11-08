@@ -3,6 +3,13 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+mod attribute;
+mod document;
+mod dtd;
+mod id;
+mod namespace;
+mod node;
+
 use std::{
     any::type_name,
     ffi::{c_char, CStr, CString},
@@ -21,7 +28,7 @@ use crate::{
     io::XmlOutputBufferPtr,
     libxml::{
         chvalid::xml_is_blank_char,
-        dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, XmlDict, XmlDictPtr},
+        dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         entities::{
             xml_encode_entities_reentrant, xml_free_entities_table, xml_get_doc_entity,
             XmlEntitiesTablePtr, XmlEntityPtr, XmlEntityType,
@@ -41,7 +48,6 @@ use crate::{
             XmlNotationTablePtr,
         },
         valid::{xml_free_id_table, xml_free_ref_table, xml_get_dtd_qattr_desc, xml_remove_id},
-        xmlregexp::XmlRegexpPtr,
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
             xml_strncat_new, xml_strncmp, xml_strndup, XmlChar,
@@ -56,21 +62,19 @@ use crate::{
     },
 };
 
+pub use attribute::*;
+pub use document::*;
+pub use dtd::*;
+pub use id::*;
+pub use namespace::*;
+pub use node::*;
+
 /**
  * BASE_BUFFER_SIZE:
  *
  * default buffer size 4000.
  */
 pub const BASE_BUFFER_SIZE: usize = 4096;
-
-/**
- * LIBXML_NAMESPACE_DICT:
- *
- * Defines experimental behaviour:
- * 1) xmlNs gets an additional field @context (a xmlDoc)
- * 2) when creating a tree, xmlNs->href is stored in the dict of xmlDoc.
- */
-/* #define LIBXML_NAMESPACE_DICT */
 
 /**
  *    xmlBufferAllocationScheme:
@@ -114,15 +118,6 @@ impl TryFrom<i32> for XmlBufferAllocationScheme {
 }
 
 pub(crate) static __XML_REGISTER_CALLBACKS: AtomicI32 = AtomicI32::new(0);
-
-/*
- * LIBXML2_NEW_BUFFER:
- *
- * Macro used to express that the API use the new buffers for
- * xmlParserInputBuffer and xmlOutputBuffer. The change was
- * introduced in 2.9.0.
- */
-// #define LIBXML2_NEW_BUFFER
 
 /**
  * XML_XML_NAMESPACE:
@@ -233,19 +228,6 @@ impl TryFrom<i32> for XmlElementType {
 /** DOC_ENABLE */
 
 /**
- * xmlNotation:
- *
- * A DTD Notation definition.
- */
-pub type XmlNotationPtr = *mut XmlNotation;
-#[repr(C)]
-pub struct XmlNotation {
-    pub(crate) name: *const XmlChar,      /* Notation name */
-    pub(crate) public_id: *const XmlChar, /* Public identifier, if any */
-    pub(crate) system_id: *const XmlChar, /* System identifier, if any */
-}
-
-/**
  * xmlAttributeType:
  *
  * A DTD Attribute type definition.
@@ -334,46 +316,6 @@ impl TryFrom<i32> for XmlAttributeDefault {
 }
 
 /**
- * xmlEnumeration:
- *
- * List structure used when there is an enumeration in DTDs.
- */
-pub type XmlEnumerationPtr = *mut XmlEnumeration;
-#[repr(C)]
-pub struct XmlEnumeration {
-    pub(crate) next: *mut XmlEnumeration, /* next one */
-    pub(crate) name: *const XmlChar,      /* Enumeration name */
-}
-
-/**
- * xmlAttribute:
- *
- * An Attribute declaration in a DTD.
- */
-pub type XmlAttributePtr = *mut XmlAttribute;
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct XmlAttribute {
-    pub(crate) _private: *mut c_void,  /* application data */
-    pub(crate) typ: XmlElementType,    /* XML_ATTRIBUTE_DECL, must be second ! */
-    pub(crate) name: *const XmlChar,   /* Attribute name */
-    pub(crate) children: *mut XmlNode, /* NULL */
-    pub(crate) last: *mut XmlNode,     /* NULL */
-    pub(crate) parent: *mut XmlDtd,    /* -> DTD */
-    pub(crate) next: *mut XmlNode,     /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,     /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,       /* the containing document */
-
-    pub(crate) nexth: *mut XmlAttribute, /* next in hash table */
-    pub(crate) atype: XmlAttributeType,  /* The attribute type */
-    pub(crate) def: XmlAttributeDefault, /* the default */
-    pub(crate) default_value: *const XmlChar, /* or the default value */
-    pub(crate) tree: XmlEnumerationPtr,  /* or the enumeration tree if any */
-    pub(crate) prefix: *const XmlChar,   /* the namespace prefix if any */
-    pub(crate) elem: *const XmlChar,     /* Element holding the attribute */
-}
-
-/**
  * xmlElementContentType:
  *
  * Possible definitions of element content types.
@@ -458,193 +400,12 @@ impl TryFrom<i32> for XmlElementTypeVal {
 }
 
 /**
- * xmlElement:
- *
- * An XML Element declaration from a DTD.
- */
-pub type XmlElementPtr = *mut XmlElement;
-#[repr(C)]
-pub struct XmlElement {
-    pub(crate) _private: *mut c_void,  /* application data */
-    pub(crate) typ: XmlElementType,    /* XML_ELEMENT_DECL, must be second ! */
-    pub(crate) name: *const XmlChar,   /* Element name */
-    pub(crate) children: *mut XmlNode, /* NULL */
-    pub(crate) last: *mut XmlNode,     /* NULL */
-    pub(crate) parent: *mut XmlDtd,    /* -> DTD */
-    pub(crate) next: *mut XmlNode,     /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,     /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,       /* the containing document */
-
-    pub(crate) etype: XmlElementTypeVal,      /* The type */
-    pub(crate) content: XmlElementContentPtr, /* the allowed element content */
-    pub(crate) attributes: XmlAttributePtr,   /* List of the declared attributes */
-    pub(crate) prefix: *const XmlChar,        /* the namespace prefix if any */
-    #[cfg(feature = "regexp")]
-    pub(crate) cont_model: XmlRegexpPtr, /* the validating regexp */
-    #[cfg(not(feature = "regexp"))]
-    pub(crate) cont_model: *mut c_void,
-}
-
-/**
  * XML_LOCAL_NAMESPACE:
  *
  * A namespace declaration node.
  */
 pub(crate) const XML_LOCAL_NAMESPACE: XmlElementType = XmlElementType::XmlNamespaceDecl;
 pub type XmlNsType = XmlElementType;
-
-/**
- * xmlNs:
- *
- * An XML namespace.
- * Note that prefix == NULL is valid, it defines the default namespace
- * within the subtree (until overridden).
- *
- * xmlNsType is unified with xmlElementType.
- */
-
-pub type XmlNsPtr = *mut XmlNs;
-#[repr(C)]
-pub struct XmlNs {
-    pub next: AtomicPtr<XmlNs>,             /* next Ns link for this node  */
-    pub(crate) typ: Option<XmlNsType>,      /* global or local */
-    pub href: AtomicPtr<XmlChar>,           /* URL for the namespace */
-    pub prefix: AtomicPtr<XmlChar>,         /* prefix for the namespace */
-    pub(crate) _private: AtomicPtr<c_void>, /* application data */
-    pub(crate) context: AtomicPtr<XmlDoc>,  /* normally an xmlDoc */
-}
-
-/**
- * xmlDtd:
- *
- * An XML DTD, as defined by <!DOCTYPE ... There is actually one for
- * the internal subset and for the external subset.
- */
-pub type XmlDtdPtr = *mut XmlDtd;
-#[repr(C)]
-pub struct XmlDtd {
-    pub(crate) _private: *mut c_void,  /* application data */
-    pub(crate) typ: XmlElementType,    /* XML_DTD_NODE, must be second ! */
-    pub(crate) name: *const XmlChar,   /* Name of the DTD */
-    pub(crate) children: *mut XmlNode, /* the value of the property link */
-    pub(crate) last: *mut XmlNode,     /* last child link */
-    pub(crate) parent: *mut XmlDoc,    /* child->parent link */
-    pub(crate) next: *mut XmlNode,     /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,     /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,       /* the containing document */
-
-    /* End of common part */
-    pub(crate) notations: *mut c_void, /* Hash table for notations if any */
-    pub(crate) elements: *mut c_void,  /* Hash table for elements if any */
-    pub(crate) attributes: *mut c_void, /* Hash table for attributes if any */
-    pub(crate) entities: *mut c_void,  /* Hash table for entities if any */
-    pub(crate) external_id: *const XmlChar, /* External identifier for PUBLIC DTD */
-    pub(crate) system_id: *const XmlChar, /* URI for a SYSTEM or PUBLIC DTD */
-    pub(crate) pentities: *mut c_void, /* Hash table for param entities if any */
-}
-
-/**
- * xmlAttr:
- *
- * An attribute on an XML node.
- */
-pub type XmlAttrPtr = *mut XmlAttr;
-#[repr(C)]
-pub struct XmlAttr {
-    pub(crate) _private: *mut c_void,           /* application data */
-    pub(crate) typ: XmlElementType,             /* XML_ATTRIBUTE_NODE, must be second ! */
-    pub(crate) name: *const XmlChar,            /* the name of the property */
-    pub(crate) children: *mut XmlNode,          /* the value of the property */
-    pub(crate) last: *mut XmlNode,              /* NULL */
-    pub(crate) parent: *mut XmlNode,            /* child->parent link */
-    pub(crate) next: *mut XmlAttr,              /* next sibling link  */
-    pub(crate) prev: *mut XmlAttr,              /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,                /* the containing document */
-    pub(crate) ns: *mut XmlNs,                  /* pointer to the associated namespace */
-    pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
-    pub(crate) psvi: *mut c_void,               /* for type/PSVI information */
-}
-
-/**
- * xmlID:
- *
- * An XML ID instance.
- */
-pub type XmlIDPtr = *mut XmlID;
-#[repr(C)]
-pub struct XmlID {
-    pub(crate) next: *mut XmlID,      /* next ID */
-    pub(crate) value: *const XmlChar, /* The ID name */
-    pub(crate) attr: XmlAttrPtr,      /* The attribute holding it */
-    pub(crate) name: *const XmlChar,  /* The attribute if attr is not available */
-    pub(crate) lineno: i32,           /* The line number if attr is not available */
-    pub(crate) doc: *mut XmlDoc,      /* The document holding the ID */
-}
-
-/**
- * xmlRef:
- *
- * An XML IDREF instance.
- */
-pub type XmlRefPtr = *mut XmlRef;
-#[repr(C)]
-pub struct XmlRef {
-    pub(crate) next: *mut XmlRef,     /* next Ref */
-    pub(crate) value: *const XmlChar, /* The Ref name */
-    pub(crate) attr: XmlAttrPtr,      /* The attribute holding it */
-    pub(crate) name: *const XmlChar,  /* The attribute if attr is not available */
-    pub(crate) lineno: i32,           /* The line number if attr is not available */
-}
-
-/**
- * xmlNode:
- *
- * A node in an XML tree.
- */
-pub type XmlNodePtr = *mut XmlNode;
-#[repr(C)]
-pub struct XmlNode {
-    pub _private: *mut c_void,       /* application data */
-    pub typ: XmlElementType,         /* type number, must be second ! */
-    pub name: *const XmlChar,        /* the name of the node, or the entity */
-    pub children: *mut XmlNode,      /* parent->childs link */
-    pub last: *mut XmlNode,          /* last child link */
-    pub(crate) parent: *mut XmlNode, /* child->parent link */
-    pub next: *mut XmlNode,          /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,   /* previous sibling link  */
-    pub doc: *mut XmlDoc,            /* the containing document */
-
-    /* End of common part */
-    pub(crate) ns: *mut XmlNs, /* pointer to the associated namespace */
-    pub content: *mut XmlChar, /* the content */
-    pub(crate) properties: *mut XmlAttr, /* properties list */
-    pub ns_def: *mut XmlNs,    /* namespace definitions on this node */
-    pub(crate) psvi: *mut c_void, /* for type/PSVI information */
-    pub(crate) line: u16,      /* line number */
-    pub(crate) extra: u16,     /* extra data for XPath/XSLT */
-}
-
-/**
- * XML_GET_CONTENT:
- *
- * Macro to extract the content pointer of a node.
- */
-// macro_rules! XML_GET_CONTENT {
-// 	( $( $n:tt )* ) => {
-// 		($( $n )*->type == XML_ELEMENT_NODE ? NULL : $( $n )*->content)
-// 	}
-// }
-
-/**
- * XML_GET_LINE:
- *
- * Macro to extract the line number of an element node.
- */
-// macro_rules! XML_GET_LINE {
-// 	( $( $n:tt )* ) => {
-// 		(xmlGetLineNo$( $n )*)
-// 	}
-// }
 
 /**
  * xmlDocProperty
@@ -664,81 +425,6 @@ pub enum XmlDocProperties {
                                and not by parsing an instance */
     XmlDocInternal = 1 << 6, /* built for internal processing */
     XmlDocHtml = 1 << 7,     /* parsed or built HTML document */
-}
-
-/**
- * xmlDoc:
- *
- * An XML document.
- */
-pub type XmlDocPtr = *mut XmlDoc;
-#[repr(C)]
-pub struct XmlDoc {
-    pub(crate) _private: *mut c_void, /* application data */
-    pub(crate) typ: XmlElementType,   /* XML_DOCUMENT_NODE, must be second ! */
-    pub(crate) name: *mut c_char,     /* name/filename/URI of the document */
-    pub children: *mut XmlNode,       /* the document tree */
-    pub(crate) last: *mut XmlNode,    /* last child link */
-    pub(crate) parent: *mut XmlNode,  /* child->parent link */
-    pub(crate) next: *mut XmlNode,    /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,    /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,      /* autoreference to itself */
-
-    /* End of common part */
-    pub(crate) compression: i32, /* level of zlib compression */
-    pub(crate) standalone: i32,  /* standalone document (no external refs)
-                                  1 if standalone="yes"
-                                  0 if standalone="no"
-                                 -1 if there is no XML declaration
-                                 -2 if there is an XML declaration, but no
-                                 standalone attribute was specified */
-    pub int_subset: *mut XmlDtd,        /* the document internal subset */
-    pub(crate) ext_subset: *mut XmlDtd, /* the document external subset */
-    pub(crate) old_ns: *mut XmlNs,      /* Global namespace, the old way */
-    pub(crate) version: Option<String>, /* the XML version string */
-    pub(crate) encoding: Option<String>, /* external initial encoding, if any */
-    pub(crate) ids: *mut c_void,        /* Hash table for ID attributes if any */
-    pub(crate) refs: *mut c_void,       /* Hash table for IDREFs attributes if any */
-    pub(crate) url: Option<String>,     /* The URI for that document */
-    pub(crate) charset: XmlCharEncoding, /* Internal flag for charset handling,
-                                        actually an xmlCharEncoding */
-    pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
-    pub(crate) psvi: *mut c_void, /* for type/PSVI information */
-    pub(crate) parse_flags: i32,  /* set of xmlParserOption used to parse the
-                                  document */
-    pub properties: i32, /* set of xmlDocProperties for this document
-                         set at the end of parsing */
-}
-
-impl Default for XmlDoc {
-    fn default() -> Self {
-        Self {
-            _private: null_mut(),
-            typ: XmlElementType::default(),
-            name: null_mut(),
-            children: null_mut(),
-            last: null_mut(),
-            parent: null_mut(),
-            next: null_mut(),
-            prev: null_mut(),
-            doc: null_mut(),
-            compression: 0,
-            standalone: 0,
-            int_subset: null_mut(),
-            ext_subset: null_mut(),
-            old_ns: null_mut(),
-            version: None,
-            encoding: None,
-            ids: null_mut(),
-            refs: null_mut(),
-            url: None,
-            charset: XmlCharEncoding::None,
-            dict: null_mut(),
-            psvi: null_mut(),
-            parse_flags: 0,
-            properties: 0,
-        }
-    }
 }
 
 /**
@@ -811,26 +497,6 @@ pub struct XmlNsMap {
     pool: XmlNsMapItemPtr,
 }
 
-/**
- * xmlChildrenNode:
- *
- * Macro for compatibility naming layer with libxml1. Maps
- * to "children."
- */
-// #ifndef xmlChildrenNode
-// #define xmlChildrenNode children
-// #endif
-
-/**
- * xmlRootNode:
- *
- * Macro for compatibility naming layer with libxml1. Maps
- * to "children".
- */
-// #ifndef xmlRootNode
-// #define xmlRootNode children
-// #endif
-
 macro_rules! CUR_SCHAR {
     ($s:expr, $l:expr) => {
         $crate::libxml::parser_internals::xml_string_current_char(
@@ -840,15 +506,6 @@ macro_rules! CUR_SCHAR {
         )
     };
 }
-
-/*
- * A few public routines for xmlBuf. As those are expected to be used
- * mostly internally the bulk of the routines are internal in buf.h
- */
-
-/*
- * Variables.
- */
 
 /*
  * Some helper functions
