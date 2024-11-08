@@ -3,7 +3,7 @@ mod element;
 mod enumeration;
 mod notation;
 
-use std::{os::raw::c_void, ptr::null_mut};
+use std::os::raw::c_void;
 
 pub use attribute::*;
 pub use element::*;
@@ -12,7 +12,7 @@ pub use notation::*;
 
 use crate::libxml::{entities::XmlEntityPtr, xmlstring::XmlChar};
 
-use super::{xml_set_tree_doc, NodeCommon, XmlDoc, XmlElementType, XmlNode, XmlNodePtr};
+use super::{NodeCommon, XmlDoc, XmlElementType, XmlNode};
 
 /// An XML DTD, as defined by <!DOCTYPE ... There is actually one for
 /// the internal subset and for the external subset.
@@ -69,6 +69,18 @@ impl NodeCommon for XmlDtd {
     fn name(&self) -> *const u8 {
         self.name
     }
+    fn children(&self) -> *mut XmlNode {
+        self.children
+    }
+    fn set_children(&mut self, children: *mut XmlNode) {
+        self.children = children
+    }
+    fn last(&self) -> *mut XmlNode {
+        self.last
+    }
+    fn set_last(&mut self, last: *mut XmlNode) {
+        self.last = last;
+    }
     fn next(&self) -> *mut XmlNode {
         self.next
     }
@@ -86,47 +98,5 @@ impl NodeCommon for XmlDtd {
     }
     fn set_parent(&mut self, parent: *mut XmlNode) {
         self.parent = parent as *mut XmlDoc;
-    }
-
-    unsafe fn add_child(&mut self, cur: XmlNodePtr) -> XmlNodePtr {
-        let mut prev: XmlNodePtr;
-
-        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-
-        if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-
-        if self as *mut Self as *mut XmlNode == cur {
-            return null_mut();
-        }
-
-        /*
-         * add the new element at the end of the children list.
-         */
-        prev = (*cur).parent;
-        (*cur).parent = self as *mut Self as *mut XmlNode;
-        if (*cur).doc != self.doc {
-            xml_set_tree_doc(cur, self.doc);
-        }
-        /* this check prevents a loop on tree-traversions if a developer
-         * tries to add a node to its parent multiple times
-         */
-        if prev == self as *mut Self as *mut XmlNode {
-            return cur;
-        }
-
-        if self.children.is_null() {
-            self.children = cur;
-            self.last = cur;
-        } else {
-            prev = self.last;
-            (*prev).next = cur;
-            (*cur).prev = prev;
-            self.last = cur;
-        }
-        cur
     }
 }

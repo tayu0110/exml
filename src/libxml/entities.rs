@@ -35,8 +35,8 @@ use crate::{
         },
     },
     tree::{
-        xml_free_node_list, xml_set_tree_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
-        XmlElementType, XmlNode, XmlNodePtr,
+        xml_free_node_list, NodeCommon, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType,
+        XmlNode, XmlNodePtr,
     },
 };
 
@@ -121,6 +121,18 @@ impl NodeCommon for XmlEntity {
     fn name(&self) -> *const u8 {
         self.name.load(Ordering::Relaxed)
     }
+    fn children(&self) -> *mut XmlNode {
+        self.children.load(Ordering::Relaxed)
+    }
+    fn set_children(&mut self, children: *mut XmlNode) {
+        self.children.store(children, Ordering::Relaxed);
+    }
+    fn last(&self) -> *mut XmlNode {
+        self.last.load(Ordering::Relaxed)
+    }
+    fn set_last(&mut self, last: *mut XmlNode) {
+        self.last.store(last, Ordering::Relaxed);
+    }
     fn next(&self) -> *mut XmlNode {
         self.next.load(Ordering::Relaxed)
     }
@@ -138,48 +150,6 @@ impl NodeCommon for XmlEntity {
     }
     fn set_parent(&mut self, parent: *mut XmlNode) {
         self.parent.store(parent as *mut XmlDtd, Ordering::Relaxed);
-    }
-
-    unsafe fn add_child(&mut self, cur: XmlNodePtr) -> XmlNodePtr {
-        let mut prev: XmlNodePtr;
-
-        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-
-        if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-
-        if self as *mut Self as *mut XmlNode == cur {
-            return null_mut();
-        }
-
-        /*
-         * add the new element at the end of the children list.
-         */
-        prev = (*cur).parent;
-        (*cur).parent = self as *mut Self as *mut XmlNode;
-        if (*cur).doc != self.document() {
-            xml_set_tree_doc(cur, self.document());
-        }
-        /* this check prevents a loop on tree-traversions if a developer
-         * tries to add a node to its parent multiple times
-         */
-        if prev == self as *mut Self as *mut XmlNode {
-            return cur;
-        }
-
-        if self.children.load(Ordering::Relaxed).is_null() {
-            self.children.store(cur, Ordering::Relaxed);
-            self.last.store(cur, Ordering::Relaxed);
-        } else {
-            prev = self.last.load(Ordering::Relaxed);
-            (*prev).next = cur;
-            (*cur).prev = prev;
-            self.last.store(cur, Ordering::Relaxed);
-        }
-        cur
     }
 }
 

@@ -17,6 +17,10 @@ use super::{
 pub trait NodeCommon {
     fn element_type(&self) -> XmlElementType;
     fn name(&self) -> *const u8;
+    fn children(&self) -> *mut XmlNode;
+    fn set_children(&mut self, children: *mut XmlNode);
+    fn last(&self) -> *mut XmlNode;
+    fn set_last(&mut self, last: *mut XmlNode);
     fn parent(&self) -> *mut XmlNode;
     fn set_parent(&mut self, parent: *mut XmlNode);
     fn next(&self) -> *mut XmlNode;
@@ -37,8 +41,119 @@ pub trait NodeCommon {
     ///
     /// Returns the child or NULL in case of error.
     #[doc(alias = "xmlAddChild")]
-    unsafe fn add_child(&mut self, _cur: XmlNodePtr) -> XmlNodePtr {
-        todo!()
+    unsafe fn add_child(&mut self, cur: XmlNodePtr) -> XmlNodePtr {
+        let mut prev: XmlNodePtr;
+
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if cur.is_null() || matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if self as *mut Self as *mut XmlNode == cur {
+            return null_mut();
+        }
+        /*
+         * If cur is a TEXT node, merge its content with adjacent TEXT nodes
+         * cur is then freed.
+         */
+        if matches!((*cur).typ, XmlElementType::XmlTextNode) {
+            if matches!(self.element_type(), XmlElementType::XmlTextNode)
+                && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
+                && self.name() == (*cur).name
+            {
+                xml_node_add_content(self as *mut Self as *mut XmlNode, (*cur).content);
+                xml_free_node(cur);
+                return self as *mut Self as *mut XmlNode;
+            }
+            if !self.last().is_null()
+                && matches!((*self.last()).typ, XmlElementType::XmlTextNode)
+                && ((*self.last()).name == (*cur).name)
+                && (self.last() != cur)
+            {
+                xml_node_add_content(self.last(), (*cur).content);
+                xml_free_node(cur);
+                return self.last();
+            }
+        }
+
+        /*
+         * add the new element at the end of the children list.
+         */
+        prev = (*cur).parent;
+        (*cur).parent = self as *mut Self as *mut XmlNode;
+        if (*cur).doc != self.document() {
+            xml_set_tree_doc(cur, self.document());
+        }
+        /* this check prevents a loop on tree-traversions if a developer
+         * tries to add a node to its parent multiple times
+         */
+        if prev == self as *mut Self as *mut XmlNode {
+            return cur;
+        }
+
+        /*
+         * Coalescing
+         */
+        if matches!(self.element_type(), XmlElementType::XmlTextNode)
+            && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
+            && self as *mut Self as *mut XmlNode != cur
+        {
+            xml_node_add_content(self as *mut Self as *mut XmlNode, (*cur).content);
+            xml_free_node(cur);
+            return self as *mut Self as *mut XmlNode;
+        }
+        if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
+            if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
+                return null_mut();
+            }
+            if !(*(self as *mut Self as *mut XmlNode)).properties.is_null() {
+                /* check if an attribute with the same name exists */
+
+                let lastattr = if (*cur).ns.is_null() {
+                    xml_has_ns_prop(self as *mut Self as *mut XmlNode, (*cur).name, null_mut())
+                } else {
+                    xml_has_ns_prop(
+                        self as *mut Self as *mut XmlNode,
+                        (*cur).name,
+                        (*(*cur).ns).href.load(Ordering::Relaxed),
+                    )
+                };
+                if !lastattr.is_null()
+                    && lastattr != cur as _
+                    && !matches!((*lastattr).typ, XmlElementType::XmlAttributeDecl)
+                {
+                    /* different instance, destroy it (attributes must be unique) */
+                    (*lastattr).unlink();
+                    xml_free_prop(lastattr);
+                }
+                if lastattr == cur as _ {
+                    return cur;
+                }
+            }
+            if (*(self as *mut Self as *mut XmlNode)).properties.is_null() {
+                (*(self as *mut Self as *mut XmlNode)).properties = cur as _;
+            } else {
+                /* find the end */
+                let mut lastattr = (*(self as *mut Self as *mut XmlNode)).properties;
+                while !(*lastattr).next.is_null() {
+                    lastattr = (*lastattr).next;
+                }
+                (*lastattr).next = cur as _;
+                (*(cur as *mut XmlAttr)).prev = lastattr;
+            }
+        } else if self.children().is_null() {
+            self.set_children(cur);
+            self.set_last(cur);
+        } else {
+            prev = self.last();
+            (*prev).next = cur;
+            (*cur).prev = prev;
+            self.set_last(cur);
+        }
+        cur
     }
 
     /// Unlink a node from it's current context, the node is not freed.  
@@ -931,6 +1046,18 @@ impl NodeCommon for XmlNode {
     fn name(&self) -> *const u8 {
         self.name
     }
+    fn children(&self) -> *mut XmlNode {
+        self.children
+    }
+    fn set_children(&mut self, children: *mut XmlNode) {
+        self.children = children
+    }
+    fn last(&self) -> *mut XmlNode {
+        self.last
+    }
+    fn set_last(&mut self, last: *mut XmlNode) {
+        self.last = last;
+    }
     fn next(&self) -> *mut XmlNode {
         self.next
     }
@@ -948,117 +1075,6 @@ impl NodeCommon for XmlNode {
     }
     fn set_parent(&mut self, parent: *mut XmlNode) {
         self.parent = parent;
-    }
-
-    unsafe fn add_child(&mut self, cur: XmlNodePtr) -> XmlNodePtr {
-        let mut prev: XmlNodePtr;
-
-        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-
-        if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-
-        if self as *mut XmlNode == cur {
-            return null_mut();
-        }
-        /*
-         * If cur is a TEXT node, merge its content with adjacent TEXT nodes
-         * cur is then freed.
-         */
-        if matches!((*cur).typ, XmlElementType::XmlTextNode) {
-            if matches!(self.typ, XmlElementType::XmlTextNode)
-                && !self.content.is_null()
-                && self.name == (*cur).name
-            {
-                xml_node_add_content(self, (*cur).content);
-                xml_free_node(cur);
-                return self;
-            }
-            if !self.last.is_null()
-                && matches!((*self.last).typ, XmlElementType::XmlTextNode)
-                && ((*self.last).name == (*cur).name)
-                && (self.last != cur)
-            {
-                xml_node_add_content(self.last, (*cur).content);
-                xml_free_node(cur);
-                return self.last;
-            }
-        }
-
-        /*
-         * add the new element at the end of the children list.
-         */
-        prev = (*cur).parent;
-        (*cur).parent = self as *mut XmlNode;
-        if (*cur).doc != self.doc {
-            xml_set_tree_doc(cur, self.doc);
-        }
-        /* this check prevents a loop on tree-traversions if a developer
-         * tries to add a node to its parent multiple times
-         */
-        if prev == self as *mut XmlNode {
-            return cur;
-        }
-
-        /*
-         * Coalescing
-         */
-        if matches!(self.typ, XmlElementType::XmlTextNode)
-            && !self.content.is_null()
-            && self as *mut XmlNode != cur
-        {
-            xml_node_add_content(self, (*cur).content);
-            xml_free_node(cur);
-            return self as *mut XmlNode;
-        }
-        if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
-            if !matches!(self.typ, XmlElementType::XmlElementNode) {
-                return null_mut();
-            }
-            if !self.properties.is_null() {
-                /* check if an attribute with the same name exists */
-
-                let lastattr = if (*cur).ns.is_null() {
-                    xml_has_ns_prop(self, (*cur).name, null_mut())
-                } else {
-                    xml_has_ns_prop(self, (*cur).name, (*(*cur).ns).href.load(Ordering::Relaxed))
-                };
-                if !lastattr.is_null()
-                    && lastattr != cur as _
-                    && !matches!((*lastattr).typ, XmlElementType::XmlAttributeDecl)
-                {
-                    /* different instance, destroy it (attributes must be unique) */
-                    (*lastattr).unlink();
-                    xml_free_prop(lastattr);
-                }
-                if lastattr == cur as _ {
-                    return cur;
-                }
-            }
-            if self.properties.is_null() {
-                self.properties = cur as _;
-            } else {
-                /* find the end */
-                let mut lastattr = self.properties;
-                while !(*lastattr).next.is_null() {
-                    lastattr = (*lastattr).next;
-                }
-                (*lastattr).next = cur as _;
-                (*(cur as *mut XmlAttr)).prev = lastattr;
-            }
-        } else if self.children.is_null() {
-            self.children = cur;
-            self.last = cur;
-        } else {
-            prev = self.last;
-            (*prev).next = cur;
-            (*cur).prev = prev;
-            self.last = cur;
-        }
-        cur
     }
 }
 

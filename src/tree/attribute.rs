@@ -32,6 +32,18 @@ impl NodeCommon for XmlAttr {
     fn name(&self) -> *const u8 {
         self.name
     }
+    fn children(&self) -> *mut XmlNode {
+        self.children
+    }
+    fn set_children(&mut self, children: *mut XmlNode) {
+        self.children = children
+    }
+    fn last(&self) -> *mut XmlNode {
+        self.last
+    }
+    fn set_last(&mut self, last: *mut XmlNode) {
+        self.last = last;
+    }
     fn next(&self) -> *mut XmlNode {
         self.next as *mut XmlNode
     }
