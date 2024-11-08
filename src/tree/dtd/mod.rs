@@ -65,6 +65,23 @@ impl XmlDtd {
         }
         null_mut()
     }
+
+    /// Do an entity lookup in the DTD parameter entity hash table and
+    /// return the corresponding entity, if found.
+    ///
+    /// Returns A pointer to the entity structure or NULL if not found.
+    #[doc(alias = "xmlGetParameterEntityFromDtd")]
+    #[cfg(feature = "tree")]
+    pub(super) unsafe fn get_parameter_entity(&self, name: *const XmlChar) -> XmlEntityPtr {
+        use crate::{hash::xml_hash_lookup, libxml::entities::XmlEntitiesTablePtr};
+
+        if !self.pentities.is_null() {
+            let table = self.pentities as XmlEntitiesTablePtr;
+            return xml_hash_lookup(table, name) as _;
+            /* return(xmlGetEntityFromTable(table, name)); */
+        }
+        null_mut()
+    }
 }
 
 impl NodeCommon for XmlDtd {

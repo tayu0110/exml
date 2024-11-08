@@ -30,13 +30,12 @@ use crate::{
         dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         entities::{
             xml_encode_entities_reentrant, xml_free_entities_table, xml_get_doc_entity,
-            XmlEntitiesTablePtr, XmlEntityPtr, XmlEntityType,
+            XmlEntityPtr, XmlEntityType,
         },
         globals::{
             xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic,
             xml_realloc, xml_register_node_default_value,
         },
-        hash::xml_hash_lookup,
         parser_internals::{
             xml_copy_char_multi_byte, XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC,
         },
@@ -2027,31 +2026,6 @@ pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttr
 }
 
 /**
- * xmlGetParameterEntityFromDtd:
- * @dtd:  A pointer to the DTD to search
- * @name:  The entity name
- *
- * Do an entity lookup in the DTD parameter entity hash table and
- * return the corresponding entity, if found.
- *
- * Returns A pointer to the entity structure or null_mut() if not found.
- */
-#[cfg(feature = "tree")]
-unsafe extern "C" fn xml_get_parameter_entity_from_dtd(
-    dtd: *const XmlDtd,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
-    let table: XmlEntitiesTablePtr;
-
-    if !dtd.is_null() && !(*dtd).pentities.is_null() {
-        table = (*dtd).pentities as _;
-        return xml_hash_lookup(table, name) as _;
-        /* return(xmlGetEntityFromTable(table, name)); */
-    }
-    null_mut()
-}
-
-/**
  * xmlCopyDtd:
  * @dtd:  the dtd
  *
@@ -2116,8 +2090,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
                 }
                 Some(XmlEntityType::XmlInternalParameterEntity)
                 | Some(XmlEntityType::XmlExternalParameterEntity) => {
-                    q = xml_get_parameter_entity_from_dtd(ret, (*tmp).name.load(Ordering::Relaxed))
-                        as _;
+                    q = (*ret).get_parameter_entity((*tmp).name.load(Ordering::Relaxed)) as _;
                 }
                 Some(XmlEntityType::XmlInternalPredefinedEntity) => {}
                 _ => unreachable!(),
