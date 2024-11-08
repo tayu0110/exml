@@ -1,13 +1,16 @@
 use std::{os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
-use crate::libxml::{
-    globals::xml_free,
-    xmlstring::{xml_strcat, xml_strdup, XmlChar},
+use crate::{
+    hash::{xml_hash_lookup, xml_hash_remove_entry},
+    libxml::{
+        globals::xml_free,
+        xmlstring::{xml_strcat, xml_strdup, XmlChar},
+    },
 };
 
 use super::{
     xml_free_node, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content, xml_node_set_content,
-    xml_remove_prop, xml_set_tree_doc, xml_unlink_node, XmlAttr, XmlDoc, XmlElementType, XmlNs,
+    xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlDoc, XmlDtd, XmlElementType, XmlNs,
 };
 
 /// A node in an XML tree.
@@ -560,7 +563,7 @@ impl XmlNode {
             }
         }
 
-        xml_unlink_node(elem);
+        (*elem).unlink_node();
 
         if (matches!((*cur).typ, XmlElementType::XmlTextNode)
             && matches!((*elem).typ, XmlElementType::XmlTextNode)
@@ -625,7 +628,7 @@ impl XmlNode {
             return null_mut();
         }
 
-        xml_unlink_node(elem);
+        (*elem).unlink_node();
 
         if matches!((*elem).typ, XmlElementType::XmlTextNode) {
             if matches!(self.typ, XmlElementType::XmlTextNode) {
@@ -689,7 +692,7 @@ impl XmlNode {
             return null_mut();
         }
 
-        xml_unlink_node(elem);
+        (*elem).unlink_node();
 
         if matches!((*elem).typ, XmlElementType::XmlTextNode) {
             if matches!(self.typ, XmlElementType::XmlTextNode) {
@@ -728,6 +731,82 @@ impl XmlNode {
             (*(*elem).parent).last = elem;
         }
         elem
+    }
+
+    /// Unlink a node from it's current context, the node is not freed.  
+    /// If one need to free the node, use xmlFreeNode() routine after the unlink to discard it.  
+    ///
+    /// Note that namespace nodes can't be unlinked as they do not have pointer to their parent.
+    #[doc(alias = "xmlUnlinkNode")]
+    pub unsafe fn unlink_node(&mut self) {
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return;
+        }
+
+        if matches!(self.typ, XmlElementType::XmlDtdNode) {
+            let doc = self.doc;
+            if !doc.is_null() {
+                if (*doc).int_subset == self as *mut XmlNode as *mut XmlDtd {
+                    (*doc).int_subset = null_mut();
+                }
+                if (*doc).ext_subset == self as *mut XmlNode as *mut XmlDtd {
+                    (*doc).ext_subset = null_mut();
+                }
+            }
+        }
+        if matches!(self.typ, XmlElementType::XmlEntityDecl) {
+            let doc = self.doc;
+            if !doc.is_null() {
+                if !(*doc).int_subset.is_null() {
+                    if xml_hash_lookup((*(*doc).int_subset).entities as _, self.name)
+                        == self as *mut XmlNode as *mut c_void
+                    {
+                        xml_hash_remove_entry((*(*doc).int_subset).entities as _, self.name, None);
+                    }
+                    if xml_hash_lookup((*(*doc).int_subset).pentities as _, self.name)
+                        == self as *mut XmlNode as *mut c_void
+                    {
+                        xml_hash_remove_entry((*(*doc).int_subset).pentities as _, self.name, None);
+                    }
+                }
+                if !(*doc).ext_subset.is_null() {
+                    if xml_hash_lookup((*(*doc).ext_subset).entities as _, self.name)
+                        == self as *mut XmlNode as *mut c_void
+                    {
+                        xml_hash_remove_entry((*(*doc).ext_subset).entities as _, self.name, None);
+                    }
+                    if xml_hash_lookup((*(*doc).ext_subset).pentities as _, self.name)
+                        == self as *mut XmlNode as *mut c_void
+                    {
+                        xml_hash_remove_entry((*(*doc).ext_subset).pentities as _, self.name, None);
+                    }
+                }
+            }
+        }
+        if !self.parent.is_null() {
+            let parent: XmlNodePtr = self.parent;
+            if matches!(self.typ, XmlElementType::XmlAttributeNode) {
+                if (*parent).properties == self as *mut XmlNode as *mut XmlAttr {
+                    (*parent).properties = (*(self as *mut XmlNode as *mut XmlAttr)).next;
+                }
+            } else {
+                if (*parent).children == self as *mut XmlNode {
+                    (*parent).children = self.next;
+                }
+                if (*parent).last == self as *mut XmlNode {
+                    (*parent).last = self.prev;
+                }
+            }
+            self.parent = null_mut();
+        }
+        if !self.next.is_null() {
+            (*self.next).prev = self.prev;
+        }
+        if !self.prev.is_null() {
+            (*self.prev).next = self.next;
+        }
+        self.next = null_mut();
+        self.prev = null_mut();
     }
 }
 

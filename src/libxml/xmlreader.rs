@@ -70,8 +70,8 @@ use crate::{
         xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
         xml_free_ns_list, xml_get_no_ns_prop, xml_get_ns_prop, xml_new_doc_text, xml_node_get_base,
         xml_node_get_lang, xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns,
-        xml_split_qname2, xml_unlink_node, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr,
-        XmlDtdPtr, XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_split_qname2, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr,
+        XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -1981,7 +1981,7 @@ unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader)
                             !tmp.is_null()
                         } {
                             if (*tmp).extra & NODE_IS_PRESERVED as u16 == 0 {
-                                xml_unlink_node(tmp);
+                                (*tmp).unlink_node();
                                 xml_text_reader_free_node(reader, tmp);
                             } else {
                                 break;
@@ -2199,7 +2199,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                             if oldnode == tmp {
                                 oldnode = null_mut();
                             }
-                            xml_unlink_node(tmp);
+                            (*tmp).unlink_node();
                             xml_text_reader_free_node(reader, tmp);
                         }
                     }
@@ -2254,7 +2254,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                         && (*oldnode).typ != XmlElementType::XmlDtdNode
                         && (*oldnode).extra & NODE_IS_PRESERVED as u16 == 0
                     {
-                        xml_unlink_node(oldnode);
+                        (*oldnode).unlink_node();
                         xml_text_reader_free_node(reader, oldnode);
                     }
 
@@ -2274,7 +2274,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                     && (*(*reader.node).last).extra & NODE_IS_PRESERVED as u16 == 0
                 {
                     let tmp: XmlNodePtr = (*reader.node).last;
-                    xml_unlink_node(tmp);
+                    (*tmp).unlink_node();
                     xml_text_reader_free_node(reader, tmp);
                 }
                 reader.depth -= 1;
@@ -3675,12 +3675,12 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
         ext_subset = null_mut();
     }
     if !ext_subset.is_null() {
-        xml_unlink_node((*cur).ext_subset as XmlNodePtr);
+        (*((*cur).ext_subset as XmlNodePtr)).unlink_node();
         (*cur).ext_subset = null_mut();
         xml_free_dtd(ext_subset);
     }
     if !int_subset.is_null() {
-        xml_unlink_node((*cur).int_subset as XmlNodePtr);
+        (*((*cur).int_subset as XmlNodePtr)).unlink_node();
         (*cur).int_subset = null_mut();
         xml_free_dtd(int_subset);
     }

@@ -86,12 +86,10 @@ impl XmlDoc {
     pub unsafe fn set_root_element(&mut self, root: XmlNodePtr) -> XmlNodePtr {
         use crate::tree::{xml_replace_node, xml_set_tree_doc};
 
-        use super::xml_unlink_node;
-
         if root.is_null() || matches!((*root).typ, XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
-        xml_unlink_node(root);
+        (*root).unlink_node();
         xml_set_tree_doc(root, self);
         (*root).parent = self as *mut XmlDoc as *mut XmlNode;
         let mut old = self.children;

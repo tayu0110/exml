@@ -125,9 +125,9 @@ use crate::{
         xml_has_prop, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_node_get_base, xml_node_get_content, xml_node_get_space_preserve,
         xml_node_list_get_string, xml_search_ns, xml_search_ns_by_href, xml_split_qname2,
-        xml_split_qname3, xml_unlink_node, xml_validate_ncname, xml_validate_qname, XmlAttrPtr,
-        XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
-        XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_split_qname3, xml_validate_ncname, xml_validate_qname, XmlAttrPtr, XmlAttributeType,
+        XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr,
+        XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -5057,7 +5057,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
     cur = root;
     'main: while !cur.is_null() {
         if !delete.is_null() {
-            xml_unlink_node(delete);
+            (*delete).unlink_node();
             xml_free_node(delete);
             delete = null_mut();
         }
@@ -5116,7 +5116,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
         }
     }
     if !delete.is_null() {
-        xml_unlink_node(delete);
+        (*delete).unlink_node();
         xml_free_node(delete);
         // delete = null_mut();
     }

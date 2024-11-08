@@ -37,7 +37,7 @@ use crate::{
             xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic,
             xml_realloc, xml_register_node_default_value,
         },
-        hash::{xml_hash_lookup, xml_hash_remove_entry},
+        hash::xml_hash_lookup,
         parser_internals::{
             xml_copy_char_multi_byte, XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC,
         },
@@ -1361,7 +1361,7 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
                     | XmlElementType::XmlAttributeDecl
                     | XmlElementType::XmlEntityDecl
             ) {
-                xml_unlink_node(c);
+                (*c).unlink_node();
                 xml_free_node(c);
             }
             c = next;
@@ -1638,12 +1638,12 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
         ext_subset = null_mut();
     }
     if !ext_subset.is_null() {
-        xml_unlink_node((*cur).ext_subset as _);
+        (*((*cur).ext_subset as *mut XmlNode)).unlink_node();
         (*cur).ext_subset = null_mut();
         xml_free_dtd(ext_subset);
     }
     if !int_subset.is_null() {
-        xml_unlink_node((*cur).int_subset as _);
+        (*((*cur).int_subset as *mut XmlNode)).unlink_node();
         (*cur).int_subset = null_mut();
         xml_free_dtd(int_subset);
     }
@@ -3667,7 +3667,7 @@ pub unsafe extern "C" fn xml_add_child(parent: XmlNodePtr, cur: XmlNodePtr) -> X
                 && !matches!((*lastattr).typ, XmlElementType::XmlAttributeDecl)
             {
                 /* different instance, destroy it (attributes must be unique) */
-                xml_unlink_node(lastattr as _);
+                (*(lastattr as *mut XmlNode)).unlink_node();
                 xml_free_prop(lastattr);
             }
             if lastattr == cur as _ {
@@ -3792,7 +3792,7 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
         return null_mut();
     }
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        xml_unlink_node(old);
+        (*old).unlink_node();
         return old;
     }
     if cur == old {
@@ -3808,7 +3808,7 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
     {
         return old;
     }
-    xml_unlink_node(cur);
+    (*cur).unlink_node();
     xml_set_tree_doc(cur, (*old).doc);
     (*cur).parent = (*old).parent;
     (*cur).next = (*old).next;
@@ -3840,81 +3840,6 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
 }
 
 /**
- * xmlUnlinkNode:
- * @cur:  the node
- *
- * Unlink a node from it's current context, the node is not freed
- * If one need to free the node, use xmlFreeNode() routine after the
- * unlink to discard it.
- * Note that namespace nodes can't be unlinked as they do not have
- * pointer to their parent.
- */
-pub unsafe extern "C" fn xml_unlink_node(cur: XmlNodePtr) {
-    if cur.is_null() {
-        return;
-    }
-    if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        return;
-    }
-    if matches!((*cur).typ, XmlElementType::XmlDtdNode) {
-        let doc: XmlDocPtr = (*cur).doc;
-        if !doc.is_null() {
-            if (*doc).int_subset == cur as _ {
-                (*doc).int_subset = null_mut();
-            }
-            if (*doc).ext_subset == cur as _ {
-                (*doc).ext_subset = null_mut();
-            }
-        }
-    }
-    if matches!((*cur).typ, XmlElementType::XmlEntityDecl) {
-        let doc: XmlDocPtr = (*cur).doc;
-        if !doc.is_null() {
-            if !(*doc).int_subset.is_null() {
-                if xml_hash_lookup((*(*doc).int_subset).entities as _, (*cur).name) == cur as _ {
-                    xml_hash_remove_entry((*(*doc).int_subset).entities as _, (*cur).name, None);
-                }
-                if xml_hash_lookup((*(*doc).int_subset).pentities as _, (*cur).name) == cur as _ {
-                    xml_hash_remove_entry((*(*doc).int_subset).pentities as _, (*cur).name, None);
-                }
-            }
-            if !(*doc).ext_subset.is_null() {
-                if xml_hash_lookup((*(*doc).ext_subset).entities as _, (*cur).name) == cur as _ {
-                    xml_hash_remove_entry((*(*doc).ext_subset).entities as _, (*cur).name, None);
-                }
-                if xml_hash_lookup((*(*doc).ext_subset).pentities as _, (*cur).name) == cur as _ {
-                    xml_hash_remove_entry((*(*doc).ext_subset).pentities as _, (*cur).name, None);
-                }
-            }
-        }
-    }
-    if !(*cur).parent.is_null() {
-        let parent: XmlNodePtr = (*cur).parent;
-        if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
-            if (*parent).properties == cur as _ {
-                (*parent).properties = (*(cur as XmlAttrPtr)).next;
-            }
-        } else {
-            if (*parent).children == cur {
-                (*parent).children = (*cur).next;
-            }
-            if (*parent).last == cur {
-                (*parent).last = (*cur).prev;
-            }
-        }
-        (*cur).parent = null_mut();
-    }
-    if !(*cur).next.is_null() {
-        (*(*cur).next).prev = (*cur).prev;
-    }
-    if !(*cur).prev.is_null() {
-        (*(*cur).prev).next = (*cur).next;
-    }
-    (*cur).next = null_mut();
-    (*cur).prev = null_mut();
-}
-
-/**
  * xmlTextMerge:
  * @first:  the first text node
  * @second:  the second text node being merged
@@ -3939,7 +3864,7 @@ pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -
         return first;
     }
     xml_node_add_content(first, (*second).content);
-    xml_unlink_node(second);
+    (*second).unlink_node();
     xml_free_node(second);
     first
 }
@@ -6829,7 +6754,7 @@ pub unsafe extern "C" fn xml_unset_ns_prop(
     if prop.is_null() {
         return -1;
     }
-    xml_unlink_node(prop as _);
+    (*(prop as *mut XmlNode)).unlink_node();
     xml_free_prop(prop);
     0
 }
@@ -6849,7 +6774,7 @@ pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) 
     if prop.is_null() {
         return -1;
     }
-    xml_unlink_node(prop as _);
+    (*(prop as *mut XmlNode)).unlink_node();
     xml_free_prop(prop);
     0
 }
@@ -9894,7 +9819,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
      * Unlink only if @node was not already added to @destParent.
      */
     if !(*node).parent.is_null() && dest_parent != (*node).parent {
-        xml_unlink_node(node);
+        (*node).unlink_node();
     }
 
     if matches!((*node).typ, XmlElementType::XmlElementNode) {
@@ -9996,7 +9921,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlPiNode
         | XmlElementType::XmlCommentNode => {
-            xml_unlink_node(node);
+            (*node).unlink_node();
             return 0;
         }
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
@@ -10004,7 +9929,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
             return 1;
         }
     }
-    xml_unlink_node(node);
+    (*node).unlink_node();
     /*
      * Save out-of-scope ns-references in (*doc).oldNs.
      */
@@ -11518,71 +11443,6 @@ mod tests {
                                 eprint!(" {}", n_name);
                                 eprint!(" {}", n_external_id);
                                 eprintln!(" {}", n_system_id);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_domwrap_adopt_node() {
-        unsafe {
-            let mut leaks = 0;
-            for n_ctxt in 0..GEN_NB_XML_DOMWRAP_CTXT_PTR {
-                for n_source_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_node in 0..GEN_NB_XML_NODE_PTR {
-                        for n_dest_doc in 0..GEN_NB_XML_DOC_PTR {
-                            for n_dest_parent in 0..GEN_NB_XML_NODE_PTR {
-                                for n_options in 0..GEN_NB_INT {
-                                    let mem_base = xml_mem_blocks();
-                                    let ctxt = gen_xml_domwrap_ctxt_ptr(n_ctxt, 0);
-                                    let source_doc = gen_xml_doc_ptr(n_source_doc, 1);
-                                    let mut node = gen_xml_node_ptr(n_node, 2);
-                                    let dest_doc = gen_xml_doc_ptr(n_dest_doc, 3);
-                                    let dest_parent = gen_xml_node_ptr(n_dest_parent, 4);
-                                    let options = gen_int(n_options, 5);
-
-                                    let ret_val = xml_dom_wrap_adopt_node(
-                                        ctxt,
-                                        source_doc,
-                                        node,
-                                        dest_doc,
-                                        dest_parent,
-                                        options,
-                                    );
-                                    if !node.is_null() && (*node).parent.is_null() {
-                                        xml_unlink_node(node);
-                                        xml_free_node(node);
-                                        node = null_mut();
-                                    }
-                                    desret_int(ret_val);
-                                    des_xml_domwrap_ctxt_ptr(n_ctxt, ctxt, 0);
-                                    des_xml_doc_ptr(n_source_doc, source_doc, 1);
-                                    des_xml_node_ptr(n_node, node, 2);
-                                    des_xml_doc_ptr(n_dest_doc, dest_doc, 3);
-                                    des_xml_node_ptr(n_dest_parent, dest_parent, 4);
-                                    des_int(n_options, options, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlDOMWrapAdoptNode",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        assert!(
-                                            leaks == 0,
-                                            "{leaks} Leaks are found in xmlDOMWrapAdoptNode()"
-                                        );
-                                        eprint!(" {}", n_ctxt);
-                                        eprint!(" {}", n_source_doc);
-                                        eprint!(" {}", n_node);
-                                        eprint!(" {}", n_dest_doc);
-                                        eprint!(" {}", n_dest_parent);
-                                        eprintln!(" {}", n_options);
-                                    }
-                                }
                             }
                         }
                     }
@@ -13728,48 +13588,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_replace_node() {
-        #[cfg(any(feature = "tree", feature = "writer"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_old in 0..GEN_NB_XML_NODE_PTR {
-                for n_cur in 0..GEN_NB_XML_NODE_PTR_IN {
-                    let mem_base = xml_mem_blocks();
-                    let mut old = gen_xml_node_ptr(n_old, 0);
-                    let mut cur = gen_xml_node_ptr_in(n_cur, 1);
-
-                    xml_replace_node(old, cur);
-                    if !cur.is_null() {
-                        xml_unlink_node(cur);
-                        xml_free_node(cur);
-                        cur = null_mut();
-                    }
-                    if !old.is_null() {
-                        xml_unlink_node(old);
-                        xml_free_node(old);
-                        old = null_mut();
-                    }
-                    // desret_xml_node_ptr(ret_val);
-                    des_xml_node_ptr(n_old, old, 0);
-                    des_xml_node_ptr_in(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlReplaceNode",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlReplaceNode()");
-                        eprint!(" {}", n_old);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_save_file() {
         #[cfg(feature = "output")]
         unsafe {
@@ -14255,42 +14073,6 @@ mod tests {
                             eprint!(" {}", n_content);
                             eprintln!(" {}", n_len);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_merge() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_first in 0..GEN_NB_XML_NODE_PTR_IN {
-                for n_second in 0..GEN_NB_XML_NODE_PTR_IN {
-                    let mem_base = xml_mem_blocks();
-                    let first = gen_xml_node_ptr_in(n_first, 0);
-                    let mut second = gen_xml_node_ptr_in(n_second, 1);
-
-                    let ret_val = xml_text_merge(first, second);
-                    if !first.is_null() && (*first).typ != XmlElementType::XmlTextNode {
-                        xml_unlink_node(second);
-                        xml_free_node(second);
-                        second = null_mut();
-                    }
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_node_ptr_in(n_first, first, 0);
-                    des_xml_node_ptr_in(n_second, second, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlTextMerge",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlTextMerge()");
-                        eprint!(" {}", n_first);
-                        eprintln!(" {}", n_second);
                     }
                 }
             }

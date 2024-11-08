@@ -57,12 +57,11 @@ use crate::{
     private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
         xml_build_qname, xml_free_node, xml_new_doc_node, xml_node_list_get_string,
-        xml_split_qname2, xml_split_qname3, xml_unlink_node, XmlAttrPtr, XmlAttribute,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
-        XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
-        XmlElementContentType, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration,
-        XmlEnumerationPtr, XmlID, XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr,
-        XmlNsPtr, XmlRef, XmlRefPtr,
+        xml_split_qname2, xml_split_qname3, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,
+        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement,
+        XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID,
+        XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
     },
 };
 
@@ -1089,7 +1088,7 @@ unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
     if elem.is_null() {
         return;
     }
-    xml_unlink_node(elem as XmlNodePtr);
+    (*(elem as XmlNodePtr)).unlink_node();
     xml_free_doc_element_content((*elem).doc, (*elem).content);
     if !(*elem).name.is_null() {
         xml_free((*elem).name as _);
@@ -2245,7 +2244,7 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
     } else {
         null_mut()
     };
-    xml_unlink_node(attr as XmlNodePtr);
+    (*(attr as XmlNodePtr)).unlink_node();
     if !(*attr).tree.is_null() {
         xml_free_enumeration((*attr).tree);
     }

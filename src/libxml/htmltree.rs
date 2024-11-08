@@ -18,8 +18,8 @@ use crate::{
     io::XmlOutputBufferPtr,
     tree::{
         xml_add_child, xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop,
-        xml_set_prop, xml_unlink_node, XmlAttrPtr, XmlBufPtr, XmlDoc, XmlDocProperties, XmlDocPtr,
-        XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
+        xml_set_prop, XmlAttrPtr, XmlBufPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType,
+        XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -389,7 +389,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         } else {
             /* remove the meta tag if NULL is passed */
             if encoding.is_none() {
-                xml_unlink_node(meta);
+                (*meta).unlink_node();
                 xml_free_node(meta);
             }
             /* change the document only if there is a real encoding change */
