@@ -2,7 +2,9 @@ use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::{dict::XmlDict, encoding::XmlCharEncoding};
 
-use super::{XmlDtd, XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs};
+use super::{
+    xml_set_tree_doc, NodeCommon, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs,
+};
 
 /// An XML document.
 pub type XmlDocPtr = *mut XmlDoc;
@@ -110,6 +112,78 @@ impl XmlDoc {
             xml_replace_node(old, root);
         }
         old
+    }
+}
+
+impl NodeCommon for XmlDoc {
+    fn document(&self) -> *mut XmlDoc {
+        self.doc
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> *const u8 {
+        self.name as *const u8
+    }
+    fn next(&self) -> *mut XmlNode {
+        self.next
+    }
+    fn set_next(&mut self, next: *mut XmlNode) {
+        self.next = next;
+    }
+    fn prev(&self) -> *mut XmlNode {
+        self.prev
+    }
+    fn set_prev(&mut self, prev: *mut XmlNode) {
+        self.prev = prev;
+    }
+    fn parent(&self) -> *mut XmlNode {
+        self.parent
+    }
+    fn set_parent(&mut self, parent: *mut XmlNode) {
+        self.parent = parent;
+    }
+
+    unsafe fn add_child(&mut self, cur: XmlNodePtr) -> XmlNodePtr {
+        let mut prev: XmlNodePtr;
+
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if self as *mut XmlDoc as *mut XmlNode == cur {
+            return null_mut();
+        }
+
+        /*
+         * add the new element at the end of the children list.
+         */
+        prev = (*cur).parent;
+        (*cur).parent = self as *mut XmlDoc as *mut XmlNode;
+        if (*cur).doc != self.doc {
+            xml_set_tree_doc(cur, self.doc);
+        }
+        /* this check prevents a loop on tree-traversions if a developer
+         * tries to add a node to its parent multiple times
+         */
+        if prev == self as *mut XmlDoc as *mut XmlNode {
+            return cur;
+        }
+
+        if self.children.is_null() {
+            self.children = cur;
+            self.last = cur;
+        } else {
+            prev = self.last;
+            (*prev).next = cur;
+            (*cur).prev = prev;
+            self.last = cur;
+        }
+        cur
     }
 }
 

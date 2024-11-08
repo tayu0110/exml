@@ -17,7 +17,7 @@ pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
 use crate::error::XmlParserErrors;
-use crate::tree::XmlNode;
+use crate::tree::NodeCommon;
 #[cfg(feature = "catalog")]
 use crate::{
     __xml_raise_error,
@@ -3907,7 +3907,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     }
     (*(*ctxt).my_doc).children = null_mut();
     (*(*ctxt).my_doc).last = null_mut();
-    (*((*ctxt).my_doc as *mut XmlNode)).add_child(new_root);
+    (*(*ctxt).my_doc).add_child(new_root);
     (*ctxt).node_push((*(*ctxt).my_doc).children);
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).depth = (*oldctxt).depth;
@@ -4518,7 +4518,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         if first_child.is_null() {
                             first_child = cur;
                         }
-                        (*(ent as XmlNodePtr)).add_child(nw);
+                        (*ent).add_child(nw);
                     }
                     (*(*ctxt).node).add_child(cur);
                     if cur == last {

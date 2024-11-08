@@ -3197,6 +3197,8 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
     ns: XmlNsPtr,
     cgroup: XmlCatalogEntryPtr,
 ) {
+    use crate::tree::NodeCommon;
+
     let mut node: XmlNodePtr;
     let mut cur: XmlCatalogEntryPtr;
     /*
@@ -3315,7 +3317,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
 
     use crate::{
         io::{xml_output_buffer_create_file, XmlOutputBufferPtr},
-        tree::XmlNode,
+        tree::NodeCommon,
     };
     let doc: XmlDocPtr = xml_new_doc(None);
     if doc.is_null() {
@@ -3328,7 +3330,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
         c"http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd".as_ptr() as _,
     );
 
-    (*(doc as *mut XmlNode)).add_child(dtd as _);
+    (*doc).add_child(dtd as _);
 
     let ns: XmlNsPtr = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, null_mut());
     if ns.is_null() {
@@ -3342,7 +3344,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
         return -1;
     }
     (*catalog).ns_def = ns;
-    (*(doc as *mut XmlNode)).add_child(catalog as _);
+    (*doc).add_child(catalog as _);
 
     xml_dump_xml_catalog_node(catal, catalog, doc, ns, null_mut());
 

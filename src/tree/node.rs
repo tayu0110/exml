@@ -25,6 +25,22 @@ pub trait NodeCommon {
     fn set_prev(&mut self, prev: *mut XmlNode);
     fn document(&self) -> *mut XmlDoc;
 
+    /// Add a new node to `self`, at the end of the child (or property) list
+    /// merging adjacent TEXT nodes (in which case `cur` is freed)  
+    /// If the new node is ATTRIBUTE, it is added into properties instead of children.  
+    /// If there is an attribute with equal name, it is first destroyed.  
+    ///
+    /// All tree manipulation functions can safely move nodes within a document.  
+    /// But when moving nodes from one document to another, references to
+    /// namespaces in element or attribute nodes are NOT fixed. In this case,
+    /// you MUST call xmlReconciliateNs after the move operation to avoid memory errors.
+    ///
+    /// Returns the child or NULL in case of error.
+    #[doc(alias = "xmlAddChild")]
+    unsafe fn add_child(&mut self, _cur: XmlNodePtr) -> XmlNodePtr {
+        todo!()
+    }
+
     /// Unlink a node from it's current context, the node is not freed.  
     /// If one need to free the node, use xmlFreeNode() routine after the unlink to discard it.  
     ///
@@ -839,19 +855,102 @@ impl XmlNode {
         elem
     }
 
-    /// Add a new node to `self`, at the end of the child (or property) list
-    /// merging adjacent TEXT nodes (in which case `cur` is freed)  
-    /// If the new node is ATTRIBUTE, it is added into properties instead of children.  
-    /// If there is an attribute with equal name, it is first destroyed.  
+    /// Add a list of node at the end of the child list of the parent
+    /// merging adjacent TEXT nodes (`cur` may be freed)
     ///
-    /// All tree manipulation functions can safely move nodes within a document.  
-    /// But when moving nodes from one document to another, references to
-    /// namespaces in element or attribute nodes are NOT fixed. In this case,
-    /// you MUST call xmlReconciliateNs after the move operation to avoid memory errors.
+    /// See the note regarding namespaces in xmlAddChild.
     ///
-    /// Returns the child or NULL in case of error.
-    #[doc(alias = "xmlAddChild")]
-    pub unsafe fn add_child(&mut self, cur: XmlNodePtr) -> XmlNodePtr {
+    /// Returns the last child or NULL in case of error.
+    #[doc(alias = "xmlAddChildList")]
+    pub unsafe fn add_child_list(&mut self, mut cur: XmlNodePtr) -> XmlNodePtr {
+        let mut prev: XmlNodePtr;
+
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        /*
+         * add the first element at the end of the children list.
+         */
+
+        if self.children.is_null() {
+            self.children = cur;
+        } else {
+            /*
+             * If cur and self.last both are TEXT nodes, then merge them.
+             */
+            if matches!((*cur).typ, XmlElementType::XmlTextNode)
+                && matches!((*self.last).typ, XmlElementType::XmlTextNode)
+                && (*cur).name == (*self.last).name
+            {
+                xml_node_add_content(self.last, (*cur).content);
+                /*
+                 * if it's the only child, nothing more to be done.
+                 */
+                if (*cur).next.is_null() {
+                    xml_free_node(cur);
+                    return self.last;
+                }
+                prev = cur;
+                cur = (*cur).next;
+                xml_free_node(prev);
+            }
+            prev = self.last;
+            (*prev).next = cur;
+            (*cur).prev = prev;
+        }
+        while !(*cur).next.is_null() {
+            (*cur).parent = self;
+            if (*cur).doc != self.doc {
+                xml_set_tree_doc(cur, self.doc);
+            }
+            cur = (*cur).next;
+        }
+        (*cur).parent = self;
+        /* the parent may not be linked to a doc ! */
+        if (*cur).doc != self.doc {
+            xml_set_tree_doc(cur, self.doc);
+        }
+        self.last = cur;
+
+        cur
+    }
+}
+
+impl NodeCommon for XmlNode {
+    fn document(&self) -> *mut XmlDoc {
+        self.doc
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> *const u8 {
+        self.name
+    }
+    fn next(&self) -> *mut XmlNode {
+        self.next
+    }
+    fn set_next(&mut self, next: *mut XmlNode) {
+        self.next = next;
+    }
+    fn prev(&self) -> *mut XmlNode {
+        self.prev
+    }
+    fn set_prev(&mut self, prev: *mut XmlNode) {
+        self.prev = prev;
+    }
+    fn parent(&self) -> *mut XmlNode {
+        self.parent
+    }
+    fn set_parent(&mut self, parent: *mut XmlNode) {
+        self.parent = parent;
+    }
+
+    unsafe fn add_child(&mut self, cur: XmlNodePtr) -> XmlNodePtr {
         let mut prev: XmlNodePtr;
 
         if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
@@ -960,101 +1059,6 @@ impl XmlNode {
             self.last = cur;
         }
         cur
-    }
-
-    /// Add a list of node at the end of the child list of the parent
-    /// merging adjacent TEXT nodes (`cur` may be freed)
-    ///
-    /// See the note regarding namespaces in xmlAddChild.
-    ///
-    /// Returns the last child or NULL in case of error.
-    #[doc(alias = "xmlAddChildList")]
-    pub unsafe fn add_child_list(&mut self, mut cur: XmlNodePtr) -> XmlNodePtr {
-        let mut prev: XmlNodePtr;
-
-        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-
-        if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-
-        /*
-         * add the first element at the end of the children list.
-         */
-
-        if self.children.is_null() {
-            self.children = cur;
-        } else {
-            /*
-             * If cur and self.last both are TEXT nodes, then merge them.
-             */
-            if matches!((*cur).typ, XmlElementType::XmlTextNode)
-                && matches!((*self.last).typ, XmlElementType::XmlTextNode)
-                && (*cur).name == (*self.last).name
-            {
-                xml_node_add_content(self.last, (*cur).content);
-                /*
-                 * if it's the only child, nothing more to be done.
-                 */
-                if (*cur).next.is_null() {
-                    xml_free_node(cur);
-                    return self.last;
-                }
-                prev = cur;
-                cur = (*cur).next;
-                xml_free_node(prev);
-            }
-            prev = self.last;
-            (*prev).next = cur;
-            (*cur).prev = prev;
-        }
-        while !(*cur).next.is_null() {
-            (*cur).parent = self;
-            if (*cur).doc != self.doc {
-                xml_set_tree_doc(cur, self.doc);
-            }
-            cur = (*cur).next;
-        }
-        (*cur).parent = self;
-        /* the parent may not be linked to a doc ! */
-        if (*cur).doc != self.doc {
-            xml_set_tree_doc(cur, self.doc);
-        }
-        self.last = cur;
-
-        cur
-    }
-}
-
-impl NodeCommon for XmlNode {
-    fn document(&self) -> *mut XmlDoc {
-        self.doc
-    }
-    fn element_type(&self) -> XmlElementType {
-        self.typ
-    }
-    fn name(&self) -> *const u8 {
-        self.name
-    }
-    fn next(&self) -> *mut XmlNode {
-        self.next
-    }
-    fn set_next(&mut self, next: *mut XmlNode) {
-        self.next = next;
-    }
-    fn prev(&self) -> *mut XmlNode {
-        self.prev
-    }
-    fn set_prev(&mut self, prev: *mut XmlNode) {
-        self.prev = prev;
-    }
-    fn parent(&self) -> *mut XmlNode {
-        self.parent
-    }
-    fn set_parent(&mut self, parent: *mut XmlNode) {
-        self.parent = parent;
     }
 }
 

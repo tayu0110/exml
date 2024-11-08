@@ -2322,7 +2322,7 @@ pub unsafe fn xml_sax2_start_element(
         return;
     }
     if (*(*ctxt).my_doc).children.is_null() {
-        (*((*ctxt).my_doc as XmlNodePtr)).add_child(ret as XmlNodePtr);
+        (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
     } else if parent.is_null() {
         parent = (*(*ctxt).my_doc).children;
     }
@@ -2665,7 +2665,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
 
     if parent.is_null() {
-        (*((*ctxt).my_doc as XmlNodePtr)).add_child(ret as XmlNodePtr);
+        (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
     }
     /*
      * Build the namespace list
@@ -3590,14 +3590,14 @@ pub unsafe fn xml_sax2_processing_instruction(
         }
     }
     if (*ctxt).in_subset == 1 {
-        (*((*(*ctxt).my_doc).int_subset as XmlNodePtr)).add_child(ret);
+        (*(*(*ctxt).my_doc).int_subset).add_child(ret);
         return;
     } else if (*ctxt).in_subset == 2 {
-        (*((*(*ctxt).my_doc).ext_subset as XmlNodePtr)).add_child(ret);
+        (*(*(*ctxt).my_doc).ext_subset).add_child(ret);
         return;
     }
     if parent.is_null() {
-        (*((*ctxt).my_doc as XmlNodePtr)).add_child(ret as XmlNodePtr);
+        (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
         return;
     }
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
@@ -3637,14 +3637,14 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const X
     }
 
     if (*ctxt).in_subset == 1 {
-        (*((*(*ctxt).my_doc).int_subset as XmlNodePtr)).add_child(ret);
+        (*(*(*ctxt).my_doc).int_subset).add_child(ret);
         return;
     } else if (*ctxt).in_subset == 2 {
-        (*((*(*ctxt).my_doc).ext_subset as XmlNodePtr)).add_child(ret);
+        (*(*(*ctxt).my_doc).ext_subset).add_child(ret);
         return;
     }
     if parent.is_null() {
-        (*((*ctxt).my_doc as XmlNodePtr)).add_child(ret as XmlNodePtr);
+        (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
         return;
     }
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {

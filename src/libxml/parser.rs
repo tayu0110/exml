@@ -4961,7 +4961,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         xml_free_doc(new_doc);
         return -1;
     }
-    (*(new_doc as XmlNodePtr)).add_child(new_root);
+    (*new_doc).add_child(new_root);
     (*ctxt).node_push(new_root);
     /* doc.is_null() is only supported for historic reasons */
     if doc.is_null() {
@@ -5132,7 +5132,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         xml_free_doc(new_doc);
         return XmlParserErrors::XmlErrInternalError;
     }
-    (*(new_doc as XmlNodePtr)).add_child(new_root);
+    (*new_doc).add_child(new_root);
     (*ctxt).node_push((*new_doc).children);
     if doc.is_null() {
         (*ctxt).my_doc = new_doc;
