@@ -4753,7 +4753,7 @@ unsafe extern "C" fn load_xpath_expr(
             },
             xpath_internals::xml_xpath_register_ns,
         },
-        tree::{xml_node_get_content, XmlNsPtr},
+        tree::XmlNsPtr,
     };
 
     let mut node: XmlNodePtr;
@@ -4804,7 +4804,7 @@ unsafe extern "C" fn load_xpath_expr(
         return null_mut();
     }
 
-    let expr: *mut XmlChar = xml_node_get_content(node);
+    let expr: *mut XmlChar = (*node).get_content();
     if expr.is_null() {
         eprintln!(
             "Error: XPath content element is NULL \"{}\"",

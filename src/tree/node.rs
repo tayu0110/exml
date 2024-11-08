@@ -3,7 +3,7 @@ use std::{ffi::CString, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 use crate::{
     hash::{xml_hash_lookup, xml_hash_remove_entry},
     libxml::{
-        entities::XmlEntityPtr,
+        entities::{xml_get_doc_entity, XmlEntityPtr},
         globals::xml_free,
         uri::xml_build_uri,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strdup, xml_strncmp, XmlChar},
@@ -11,10 +11,11 @@ use crate::{
 };
 
 use super::{
-    xml_free_node, xml_free_prop, xml_get_ns_prop, xml_get_prop, xml_has_ns_prop,
-    xml_is_blank_char, xml_node_add_content, xml_node_set_content, xml_remove_prop,
-    xml_set_tree_doc, XmlAttr, XmlAttrPtr, XmlDoc, XmlDtd, XmlElementType, XmlNs, XmlNsPtr,
-    XML_XML_NAMESPACE,
+    xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
+    xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_ns_prop, xml_get_prop,
+    xml_get_prop_node_value_internal, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content,
+    xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlAttrPtr,
+    XmlBufferAllocationScheme, XmlDoc, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -789,6 +790,114 @@ impl XmlNode {
             return newbase;
         }
         oldbase
+    }
+
+    /// Read the value of a node, this can be either the text carried
+    /// directly by this node if it's a TEXT node or the aggregate string
+    /// of the values carried by this node child's (TEXT and ENTITY_REF).  
+    ///
+    /// Entity references are substituted.
+    ///
+    /// Returns a new #XmlChar * or null_mut() if no content is available.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlNodeGetContent")]
+    pub unsafe fn get_content(&self) -> *mut XmlChar {
+        match self.typ {
+            XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
+                let buf = xml_buf_create_size(64);
+                if buf.is_null() {
+                    return null_mut();
+                }
+                xml_buf_set_allocation_scheme(
+                    buf,
+                    XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
+                );
+                xml_buf_get_node_content(buf, self);
+                let ret: *mut XmlChar = xml_buf_detach(buf);
+                xml_buf_free(buf);
+                ret
+            }
+            XmlElementType::XmlAttributeNode => {
+                xml_get_prop_node_value_internal(self as *const XmlNode as *const XmlAttr)
+            }
+            XmlElementType::XmlCommentNode | XmlElementType::XmlPiNode => {
+                if !self.content.is_null() {
+                    return xml_strdup(self.content);
+                }
+                null_mut()
+            }
+            XmlElementType::XmlEntityRefNode => {
+                /* lookup entity declaration */
+                let ent: XmlEntityPtr = xml_get_doc_entity(self.doc, self.name);
+                if ent.is_null() {
+                    return null_mut();
+                }
+
+                let buf = xml_buf_create();
+                if buf.is_null() {
+                    return null_mut();
+                }
+                xml_buf_set_allocation_scheme(
+                    buf,
+                    XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
+                );
+
+                xml_buf_get_node_content(buf, self);
+
+                let ret: *mut XmlChar = xml_buf_detach(buf);
+                xml_buf_free(buf);
+                ret
+            }
+            XmlElementType::XmlEntityNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlXincludeStart
+            | XmlElementType::XmlXincludeEnd => null_mut(),
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+                let buf = xml_buf_create();
+                if buf.is_null() {
+                    return null_mut();
+                }
+                xml_buf_set_allocation_scheme(
+                    buf,
+                    XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
+                );
+
+                xml_buf_get_node_content(buf, self);
+
+                let ret: *mut XmlChar = xml_buf_detach(buf);
+                xml_buf_free(buf);
+                ret
+            }
+            XmlElementType::XmlNamespaceDecl => {
+                let tmp: *mut XmlChar = xml_strdup(
+                    (*(self as *const XmlNode as *const XmlNs))
+                        .href
+                        .load(Ordering::Relaxed),
+                );
+                tmp
+            }
+            XmlElementType::XmlElementDecl => {
+                /* TODO !!! */
+                null_mut()
+            }
+            XmlElementType::XmlAttributeDecl => {
+                /* TODO !!! */
+                null_mut()
+            }
+            XmlElementType::XmlEntityDecl => {
+                /* TODO !!! */
+                null_mut()
+            }
+            XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
+                if !self.content.is_null() {
+                    return xml_strdup(self.content);
+                }
+                null_mut()
+            }
+            _ => unreachable!(),
+        }
     }
 
     /// Set (or reset) the name of a node.

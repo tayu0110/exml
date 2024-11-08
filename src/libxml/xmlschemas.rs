@@ -122,12 +122,11 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_get_no_ns_prop, xml_get_ns_list, xml_has_prop,
-        xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop, xml_node_get_content,
-        xml_node_get_space_preserve, xml_node_list_get_string, xml_search_ns,
-        xml_search_ns_by_href, xml_split_qname2, xml_split_qname3, xml_validate_ncname,
-        xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop, xml_node_get_space_preserve,
+        xml_node_list_get_string, xml_search_ns, xml_search_ns_by_href, xml_split_qname2,
+        xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon, XmlAttrPtr,
+        XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
+        XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -6150,7 +6149,7 @@ unsafe extern "C" fn xml_schema_get_prop_node(node: XmlNodePtr, name: *const c_c
 }
 
 unsafe extern "C" fn xml_schema_get_node_content_no_dict(node: XmlNodePtr) -> *const XmlChar {
-    xml_node_get_content(node)
+    (*node).get_content()
 }
 
 /**
@@ -6443,9 +6442,11 @@ unsafe extern "C" fn xml_schema_get_node_content(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
 ) -> *const XmlChar {
-    let mut val: *mut XmlChar;
-
-    val = xml_node_get_content(node);
+    let mut val = if node.is_null() {
+        null_mut()
+    } else {
+        (*node).get_content()
+    };
     if val.is_null() {
         val = xml_strdup(c"".as_ptr() as _);
     }
@@ -8655,7 +8656,7 @@ unsafe extern "C" fn xml_schema_pget_bool_node_value(
 ) -> i32 {
     let mut res: i32 = 0;
 
-    let value: *mut XmlChar = xml_node_get_content(node);
+    let value: *mut XmlChar = (*node).get_content();
     /*
      * 3.2.2.1 Lexical representation
      * An instance of a datatype that is defined as `boolean`
@@ -23999,7 +24000,7 @@ unsafe extern "C" fn xml_schema_annot_dump(output: *mut FILE, annot: XmlSchemaAn
         return;
     }
 
-    let content: *mut XmlChar = xml_node_get_content((*annot).content);
+    let content: *mut XmlChar = (*(*annot).content).get_content();
     if !content.is_null() {
         fprintf(output, c"  Annot: %s\n".as_ptr() as _, content);
         xml_free(content as _);

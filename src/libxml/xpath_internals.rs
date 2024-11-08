@@ -65,9 +65,8 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     tree::{
-        xml_buf_content, xml_build_qname, xml_get_ns_list, xml_node_get_content, xml_node_get_lang,
-        XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        xml_buf_content, xml_build_qname, xml_get_ns_list, xml_node_get_lang, XmlAttrPtr,
+        XmlBufPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
 };
@@ -10576,12 +10575,10 @@ unsafe extern "C" fn xml_xpath_equal_node_sets(
                 }
             } else {
                 if (*values1.add(i as usize)).is_null() {
-                    *values1.add(i as usize) =
-                        xml_node_get_content(*(*ns1).node_tab.add(i as usize));
+                    *values1.add(i as usize) = (**(*ns1).node_tab.add(i as usize)).get_content();
                 }
                 if (*values2.add(j as usize)).is_null() {
-                    *values2.add(j as usize) =
-                        xml_node_get_content(*(*ns2).node_tab.add(j as usize));
+                    *values2.add(j as usize) = (**(*ns2).node_tab.add(j as usize)).get_content();
                 }
                 ret =
                     xml_str_equal(*values1.add(i as usize), *values2.add(j as usize)) as i32 ^ neq;
@@ -10737,7 +10734,7 @@ unsafe extern "C" fn xml_xpath_equal_node_set_string(
     let hash: u32 = xml_xpath_string_hash(str);
     for i in 0..(*ns).node_nr {
         if xml_xpath_node_val_hash(*(*ns).node_tab.add(i as usize)) == hash {
-            str2 = xml_node_get_content(*(*ns).node_tab.add(i as usize));
+            str2 = (**(*ns).node_tab.add(i as usize)).get_content();
             if !str2.is_null() && xml_str_equal(str, str2) {
                 xml_free(str2 as _);
                 if neq != 0 {
@@ -13735,7 +13732,7 @@ pub unsafe extern "C" fn xml_xpath_number_function(ctxt: XmlXPathParserContextPt
         if (*(*ctxt).context).node.is_null() {
             value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, 0.0));
         } else {
-            let content: *mut XmlChar = xml_node_get_content((*(*ctxt).context).node);
+            let content: *mut XmlChar = (*(*(*ctxt).context).node).get_content();
 
             res = xml_xpath_string_eval_number(content);
             value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, res));

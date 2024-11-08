@@ -5310,105 +5310,6 @@ pub unsafe extern "C" fn xml_node_add_content_len(
 }
 
 /**
- * xmlNodeGetContent:
- * @cur:  the node being read
- *
- * Read the value of a node, this can be either the text carried
- * directly by this node if it's a TEXT node or the aggregate string
- * of the values carried by this node child's (TEXT and ENTITY_REF).
- * Entity references are substituted.
- * Returns a new #XmlChar * or null_mut() if no content is available.
- *     It's up to the caller to free the memory with xml_free( as _).
- */
-pub unsafe extern "C" fn xml_node_get_content(cur: *const XmlNode) -> *mut XmlChar {
-    if cur.is_null() {
-        return null_mut();
-    }
-    match (*cur).typ {
-        XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
-            let buf: XmlBufPtr = xml_buf_create_size(64);
-            if buf.is_null() {
-                return null_mut();
-            }
-            xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-            xml_buf_get_node_content(buf, cur);
-            let ret: *mut XmlChar = xml_buf_detach(buf);
-            xml_buf_free(buf);
-            ret
-        }
-        XmlElementType::XmlAttributeNode => xml_get_prop_node_value_internal(cur as _),
-        XmlElementType::XmlCommentNode | XmlElementType::XmlPiNode => {
-            if !(*cur).content.is_null() {
-                return xml_strdup((*cur).content);
-            }
-            null_mut()
-        }
-        XmlElementType::XmlEntityRefNode => {
-            /* lookup entity declaration */
-            let ent: XmlEntityPtr = xml_get_doc_entity((*cur).doc, (*cur).name);
-            if ent.is_null() {
-                return null_mut();
-            }
-
-            let buf: XmlBufPtr = xml_buf_create();
-            if buf.is_null() {
-                return null_mut();
-            }
-            xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-
-            xml_buf_get_node_content(buf, cur);
-
-            let ret: *mut XmlChar = xml_buf_detach(buf);
-            xml_buf_free(buf);
-            ret
-        }
-        XmlElementType::XmlEntityNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDtdNode
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => null_mut(),
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
-            let buf: XmlBufPtr = xml_buf_create();
-            if buf.is_null() {
-                return null_mut();
-            }
-            xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-
-            xml_buf_get_node_content(buf, cur);
-
-            let ret: *mut XmlChar = xml_buf_detach(buf);
-            xml_buf_free(buf);
-            ret
-        }
-        XmlElementType::XmlNamespaceDecl => {
-            let tmp: *mut XmlChar = xml_strdup((*(cur as XmlNsPtr)).href.load(Ordering::Relaxed));
-            tmp
-        }
-        XmlElementType::XmlElementDecl => {
-            /* TODO !!! */
-            null_mut()
-        }
-        XmlElementType::XmlAttributeDecl => {
-            /* TODO !!! */
-            null_mut()
-        }
-        XmlElementType::XmlEntityDecl => {
-            /* TODO !!! */
-            null_mut()
-        }
-        XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
-            if !(*cur).content.is_null() {
-                return xml_strdup((*cur).content);
-            }
-            null_mut()
-        }
-        _ => unreachable!(),
-    }
-    // return null_mut();
-}
-
-/**
  * xmlBufGetNodeContent:
  * @buf:  a buffer xmlBufPtr
  * @cur:  the node being read
@@ -12093,31 +11994,6 @@ mod tests {
                             eprintln!(" {}", n_len);
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_get_content() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let cur = gen_const_xml_node_ptr(n_cur, 0);
-
-                let ret_val = xml_node_get_content(cur);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_node_ptr(n_cur, cur, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNodeGetContent",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeGetContent()");
-                    eprintln!(" {}", n_cur);
                 }
             }
         }

@@ -44,9 +44,7 @@ use crate::{
             XML_NODESET_DEFAULT,
         },
     },
-    tree::{
-        xml_free_node_list, xml_node_get_content, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
-    },
+    tree::{xml_free_node_list, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
 };
 
 /*
@@ -1462,7 +1460,11 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlCh
  */
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> *mut XmlChar {
-    let mut ret: *mut XmlChar = xml_node_get_content(node);
+    let mut ret: *mut XmlChar = if node.is_null() {
+        null_mut()
+    } else {
+        (*node).get_content()
+    };
     if ret.is_null() {
         ret = xml_strdup(c"".as_ptr() as *const XmlChar);
     }

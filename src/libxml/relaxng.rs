@@ -54,10 +54,9 @@ use crate::{
     },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_get_prop, xml_has_prop, xml_new_child,
-        xml_new_doc_node, xml_new_doc_text, xml_node_get_content, xml_node_list_get_string,
-        xml_node_set_content, xml_search_ns, xml_set_prop, xml_split_qname2, xml_unset_prop,
-        xml_validate_ncname, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode,
-        XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_new_doc_node, xml_new_doc_text, xml_node_list_get_string, xml_node_set_content,
+        xml_search_ns, xml_set_prop, xml_split_qname2, xml_unset_prop, xml_validate_ncname,
+        NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -4084,7 +4083,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             /*
                              * Simplification: 4.10. QNames
                              */
-                            let name: *mut XmlChar = xml_node_get_content(cur);
+                            let name: *mut XmlChar = (*cur).get_content();
                             if !name.is_null() {
                                 local = xml_split_qname2(name, addr_of_mut!(prefix));
                                 if !local.is_null() {
@@ -4788,7 +4787,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
         }
     }
     if IS_RELAXNG!(node, c"name".as_ptr() as _) {
-        val = xml_node_get_content(node);
+        val = (*node).get_content();
         xml_relaxng_norm_ext_space(val);
         if xml_validate_ncname(val, 0) != 0 {
             if !(*node).parent.is_null() {
@@ -5151,7 +5150,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                         null_mut(),
                     );
                 }
-                (*param).value = xml_node_get_content(content);
+                (*param).value = (*content).get_content();
                 if lastparam.is_null() {
                     (*def).attrs = param;
                     lastparam = param;
@@ -5425,7 +5424,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
             null_mut(),
         );
     } else if !def.is_null() {
-        (*def).value = xml_node_get_content(node);
+        (*def).value = (*node).get_content();
         if (*def).value.is_null() {
             xml_rng_perr(
                 ctxt,

@@ -22,10 +22,7 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::{xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
-    tree::{
-        xml_free_doc, xml_get_no_ns_prop, xml_node_get_content, XmlDocPtr, XmlElementType,
-        XmlNodePtr,
-    },
+    tree::{xml_free_doc, xml_get_no_ns_prop, XmlDocPtr, XmlElementType, XmlNodePtr},
 };
 
 use super::{
@@ -1031,7 +1028,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 xml_free(test as _);
             } else {
                 xml_schematron_parse_test_report_msg(ctxt, cur);
-                report = xml_node_get_content(cur);
+                report = (*cur).get_content();
 
                 testptr = xml_schematron_add_test(
                     ctxt,
@@ -1069,7 +1066,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 xml_free(test as _);
             } else {
                 xml_schematron_parse_test_report_msg(ctxt, cur);
-                report = xml_node_get_content(cur);
+                report = (*cur).get_content();
 
                 testptr = xml_schematron_add_test(
                     ctxt,
@@ -1291,7 +1288,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
             cur = (*root).children;
             NEXT_SCHEMATRON!(cur);
             if IS_SCHEMATRON!(cur, c"title".as_ptr() as _) {
-                let title: *mut XmlChar = xml_node_get_content(cur);
+                let title: *mut XmlChar = (*cur).get_content();
                 if !title.is_null() {
                     (*ret).title = xml_dict_lookup((*ret).dict, title, -1);
                     xml_free(title as _);
