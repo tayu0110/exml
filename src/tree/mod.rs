@@ -3130,7 +3130,7 @@ pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -
     if (*second).name != (*first).name {
         return first;
     }
-    xml_node_add_content(first, (*second).content);
+    (*first).add_content((*second).content);
     (*second).unlink();
     xml_free_node(second);
     first
@@ -5213,27 +5213,6 @@ pub unsafe extern "C" fn xml_node_set_content_len(
         XmlElementType::XmlEntityDecl => { /* TODO !!! */ }
         _ => unreachable!(),
     }
-}
-
-/**
- * xmlNodeAddContent:
- * @cur:  the node being modified
- * @content:  extra content
- *
- * Append the extra substring to the node content.
- * NOTE: In contrast to xmlNodeSetContent(), @content is supposed to be
- *       raw text, so unescaped XML special chars are allowed, entity
- *       references are not supported.
- */
-pub unsafe extern "C" fn xml_node_add_content(cur: XmlNodePtr, content: *const XmlChar) {
-    if cur.is_null() {
-        return;
-    }
-    if content.is_null() {
-        return;
-    }
-    let len: i32 = xml_strlen(content);
-    xml_node_add_content_len(cur, content, len);
 }
 
 /**
@@ -11925,35 +11904,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlNextElementSibling()"
                     );
                     eprintln!(" {}", n_node);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_add_content() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    xml_node_add_content(cur, content);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNodeAddContent",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeAddContent()");
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_content);
-                    }
                 }
             }
         }

@@ -6,14 +6,14 @@ use crate::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         globals::xml_free,
         uri::xml_build_uri,
-        xmlstring::{xml_strcasecmp, xml_strcat, xml_strdup, xml_strncmp, XmlChar},
+        xmlstring::{xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, XmlChar},
     },
 };
 
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
     xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_ns_prop, xml_get_prop,
-    xml_get_prop_node_value_internal, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content,
+    xml_get_prop_node_value_internal, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content_len,
     xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlAttrPtr,
     XmlBufferAllocationScheme, XmlDoc, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
 };
@@ -68,7 +68,7 @@ pub trait NodeCommon {
                 && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
                 && self.name() == (*cur).name
             {
-                xml_node_add_content(self as *mut Self as *mut XmlNode, (*cur).content);
+                (*(self as *mut Self as *mut XmlNode)).add_content((*cur).content);
                 xml_free_node(cur);
                 return self as *mut Self as *mut XmlNode;
             }
@@ -77,7 +77,7 @@ pub trait NodeCommon {
                 && ((*self.last()).name == (*cur).name)
                 && (self.last() != cur)
             {
-                xml_node_add_content(self.last(), (*cur).content);
+                (*self.last()).add_content((*cur).content);
                 xml_free_node(cur);
                 return self.last();
             }
@@ -105,7 +105,7 @@ pub trait NodeCommon {
             && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
             && self as *mut Self as *mut XmlNode != cur
         {
-            xml_node_add_content(self as *mut Self as *mut XmlNode, (*cur).content);
+            (*(self as *mut Self as *mut XmlNode)).add_content((*cur).content);
             xml_free_node(cur);
             return self as *mut Self as *mut XmlNode;
         }
@@ -1148,7 +1148,7 @@ impl XmlNode {
             && matches!((*elem).typ, XmlElementType::XmlTextNode)
             && (*cur).name == (*elem).name)
         {
-            xml_node_add_content(cur, (*elem).content);
+            (*cur).add_content((*elem).content);
             xml_free_node(elem);
             return cur;
         } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
@@ -1224,7 +1224,7 @@ impl XmlNode {
                 && matches!((*self.prev).typ, XmlElementType::XmlTextNode)
                 && (self.name == (*self.prev).name)
             {
-                xml_node_add_content(self.prev, (*elem).content);
+                (*self.prev).add_content((*elem).content);
                 xml_free_node(elem);
                 return self.prev;
             }
@@ -1275,7 +1275,7 @@ impl XmlNode {
 
         if matches!((*elem).typ, XmlElementType::XmlTextNode) {
             if matches!(self.typ, XmlElementType::XmlTextNode) {
-                xml_node_add_content(self, (*elem).content);
+                self.add_content((*elem).content);
                 xml_free_node(elem);
                 return self as *mut XmlNode;
             }
@@ -1344,7 +1344,7 @@ impl XmlNode {
                 && matches!((*self.last).typ, XmlElementType::XmlTextNode)
                 && (*cur).name == (*self.last).name
             {
-                xml_node_add_content(self.last, (*cur).content);
+                (*self.last).add_content((*cur).content);
                 /*
                  * if it's the only child, nothing more to be done.
                  */
@@ -1375,6 +1375,20 @@ impl XmlNode {
         self.last = cur;
 
         cur
+    }
+
+    /// Append the extra substring to the node content.
+    ///
+    /// # Note
+    /// In contrast to xmlNodeSetContent(), @content is supposed to be raw text,
+    /// so unescaped XML special chars are allowed, entity references are not supported.
+    #[doc(alias = "xmlNodeAddContent")]
+    pub unsafe fn add_content(&mut self, content: *const XmlChar) {
+        if content.is_null() {
+            return;
+        }
+        let len: i32 = xml_strlen(content);
+        xml_node_add_content_len(self, content, len);
     }
 }
 
