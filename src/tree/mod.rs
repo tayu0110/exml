@@ -4298,38 +4298,6 @@ pub unsafe extern "C" fn xml_has_ns_prop(
 }
 
 /**
- * xmlGetNsProp:
- * @node:  the node
- * @name:  the attribute name
- * @nameSpace:  the URI of the namespace
- *
- * Search and get the value of an attribute associated to a node
- * This attribute has to be anchored in the namespace specified.
- * This does the entity substitution.
- * This function looks in DTD attribute declaration for #FIXED or
- * default declaration values unless DTD use has been turned off.
- *
- * Returns the attribute value or null_mut() if not found.
- *     It's up to the caller to free the memory with xml_free( as _).
- */
-pub unsafe extern "C" fn xml_get_ns_prop(
-    node: *const XmlNode,
-    name: *const XmlChar,
-    name_space: *const XmlChar,
-) -> *mut XmlChar {
-    let prop: XmlAttrPtr = xml_get_prop_node_internal(
-        node,
-        name,
-        name_space,
-        XML_CHECK_DTD.load(Ordering::Relaxed),
-    );
-    if prop.is_null() {
-        return null_mut();
-    }
-    xml_get_prop_node_value_internal(prop)
-}
-
-/**
  * xmlTreeErr:
  * @code:  the error number
  * @extra:  extra information
@@ -5444,7 +5412,7 @@ pub unsafe extern "C" fn xml_node_get_lang(mut cur: *const XmlNode) -> *mut XmlC
         return null_mut();
     }
     while !cur.is_null() {
-        lang = xml_get_ns_prop(cur, c"lang".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+        lang = (*cur).get_ns_prop(c"lang".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
         if !lang.is_null() {
             return lang;
         }
@@ -5470,7 +5438,7 @@ pub unsafe extern "C" fn xml_node_get_space_preserve(mut cur: *const XmlNode) ->
         return -1;
     }
     while !cur.is_null() {
-        space = xml_get_ns_prop(cur, c"space".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+        space = (*cur).get_ns_prop(c"space".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
         if !space.is_null() {
             if xml_str_equal(space, c"preserve".as_ptr() as _) {
                 xml_free(space as _);
@@ -10795,47 +10763,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlGetNoNsProp()");
                         eprint!(" {}", n_node);
                         eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_ns_list() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_get_ns_prop() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_name_space in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let node = gen_const_xml_node_ptr(n_node, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let name_space = gen_const_xml_char_ptr(n_name_space, 2);
-
-                        let ret_val = xml_get_ns_prop(node, name, name_space);
-                        desret_xml_char_ptr(ret_val);
-                        des_const_xml_node_ptr(n_node, node, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_name_space, name_space, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlGetNsProp",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlGetNsProp()");
-                            eprint!(" {}", n_node);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_name_space);
-                        }
                     }
                 }
             }

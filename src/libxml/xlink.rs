@@ -12,9 +12,7 @@ use std::{
 
 use libc::snprintf;
 
-use crate::tree::{
-    xml_get_ns_prop, xml_search_ns, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
-};
+use crate::tree::{xml_search_ns, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr};
 
 use super::{
     globals::xml_free,
@@ -274,12 +272,12 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
      * XHTML elements
      */
     let typ: *mut XmlChar =
-        xml_get_ns_prop(node, c"type".as_ptr() as _, XLINK_NAMESPACE.as_ptr() as _);
+        (*node).get_ns_prop(c"type".as_ptr() as _, XLINK_NAMESPACE.as_ptr() as _);
     if !typ.is_null() {
         if xml_str_equal(typ, c"simple".as_ptr() as _) {
             ret = XlinkType::XlinkTypeSimple;
         } else if xml_str_equal(typ, c"extended".as_ptr() as _) {
-            role = xml_get_ns_prop(node, c"role".as_ptr() as _, XLINK_NAMESPACE.as_ptr() as _);
+            role = (*node).get_ns_prop(c"role".as_ptr() as _, XLINK_NAMESPACE.as_ptr() as _);
             if !role.is_null() {
                 let xlink: XmlNsPtr = xml_search_ns(doc, node, XLINK_NAMESPACE.as_ptr() as _);
                 if xlink.is_null() {

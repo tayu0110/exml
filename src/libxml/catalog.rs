@@ -45,9 +45,9 @@ use crate::{
         },
     },
     tree::{
-        xml_free_doc, xml_free_ns, xml_get_ns_prop, xml_get_prop, xml_new_doc, xml_new_doc_node,
-        xml_new_dtd, xml_new_ns, xml_save_format_file_to, xml_search_ns_by_href, xml_set_prop,
-        XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_doc, xml_free_ns, xml_get_prop, xml_new_doc, xml_new_doc_node, xml_new_dtd,
+        xml_new_ns, xml_save_format_file_to, xml_search_ns_by_href, xml_set_prop, XmlDocPtr,
+        XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     SYSCONFDIR,
 };
@@ -1428,7 +1428,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             pref = prefer;
         }
         prop = xml_get_prop(cur, c"id".as_ptr() as _);
-        base = xml_get_ns_prop(cur, c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+        base = (*cur).get_ns_prop(c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
         entry = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataGroup,
             prop,

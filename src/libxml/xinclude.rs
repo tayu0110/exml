@@ -44,9 +44,9 @@ use crate::{
     },
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
-        xml_get_ns_prop, xml_get_prop, xml_new_doc_node, xml_new_doc_text,
-        xml_node_add_content_len, xml_static_copy_node, xml_static_copy_node_list, xml_unset_prop,
-        NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_get_prop, xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len,
+        xml_static_copy_node, xml_static_copy_node_list, xml_unset_prop, NodeCommon, XmlDocPtr,
+        XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -403,12 +403,12 @@ unsafe extern "C" fn xml_xinclude_get_prop(
 ) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
 
-    ret = xml_get_ns_prop(cur, XINCLUDE_NS.as_ptr() as _, name);
+    ret = (*cur).get_ns_prop(XINCLUDE_NS.as_ptr() as _, name);
     if !ret.is_null() {
         return ret;
     }
     if (*ctxt).legacy != 0 {
-        ret = xml_get_ns_prop(cur, XINCLUDE_OLD_NS.as_ptr() as _, name);
+        ret = (*cur).get_ns_prop(XINCLUDE_OLD_NS.as_ptr() as _, name);
         if !ret.is_null() {
             return ret;
         }
@@ -1960,11 +1960,8 @@ unsafe extern "C" fn xml_xinclude_load_doc(
              * The base is only adjusted if "necessary", i.e. if the xinclude node
              * has a base specified, or the URL is relative
              */
-            base = xml_get_ns_prop(
-                (*refe).elem,
-                c"base".as_ptr() as _,
-                XML_XML_NAMESPACE.as_ptr() as _,
-            );
+            base =
+                (*(*refe).elem).get_ns_prop(c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
             if base.is_null() {
                 /*
                  * No xml:base on the xinclude node, so we check whether the
@@ -2015,8 +2012,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                  * set, then relativise it if necessary
                                  */
 
-                                let xml_base: *mut XmlChar = xml_get_ns_prop(
-                                    node,
+                                let xml_base: *mut XmlChar = (*node).get_ns_prop(
                                     c"base".as_ptr() as _,
                                     XML_XML_NAMESPACE.as_ptr() as _,
                                 );

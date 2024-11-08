@@ -12,10 +12,11 @@ use crate::{
 
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
-    xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_ns_prop, xml_get_prop,
-    xml_get_prop_node_value_internal, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content_len,
-    xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlAttrPtr,
-    XmlBufferAllocationScheme, XmlDoc, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+    xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop,
+    xml_get_prop_node_internal, xml_get_prop_node_value_internal, xml_has_ns_prop,
+    xml_is_blank_char, xml_node_add_content_len, xml_node_set_content, xml_remove_prop,
+    xml_set_tree_doc, XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDtd,
+    XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -754,7 +755,7 @@ impl XmlNode {
                 return xml_strdup((*ent).uri.load(Ordering::Relaxed));
             }
             if matches!((*cur).typ, XmlElementType::XmlElementNode) {
-                base = xml_get_ns_prop(cur, c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+                base = (*cur).get_ns_prop(c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
                 if !base.is_null() {
                     if !oldbase.is_null() {
                         newbase = xml_build_uri(oldbase, base);
@@ -898,6 +899,35 @@ impl XmlNode {
             }
             _ => unreachable!(),
         }
+    }
+
+    /// Search and get the value of an attribute associated to a node.
+    ///
+    /// This attribute has to be anchored in the namespace specified.
+    ///
+    /// This does the entity substitution.
+    ///
+    /// This function looks in DTD attribute declaration for #FIXED or
+    /// default declaration values unless DTD use has been turned off.
+    ///
+    /// Returns the attribute value or NULL if not found.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlGetNsProp")]
+    pub unsafe fn get_ns_prop(
+        &self,
+        name: *const XmlChar,
+        name_space: *const XmlChar,
+    ) -> *mut XmlChar {
+        let prop: XmlAttrPtr = xml_get_prop_node_internal(
+            self,
+            name,
+            name_space,
+            XML_CHECK_DTD.load(Ordering::Relaxed),
+        );
+        if prop.is_null() {
+            return null_mut();
+        }
+        xml_get_prop_node_value_internal(prop)
     }
 
     /// Set (or reset) the name of a node.
