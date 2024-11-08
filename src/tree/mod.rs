@@ -4049,78 +4049,6 @@ pub unsafe extern "C" fn xml_add_prev_sibling(cur: XmlNodePtr, elem: XmlNodePtr)
 }
 
 /**
- * xmlAddSibling:
- * @cur:  the child node
- * @elem:  the new node
- *
- * Add a new element @elem to the list of siblings of @cur
- * merging adjacent TEXT nodes (@elem may be freed)
- * If the new element was already inserted in a document it is
- * first unlinked from its existing context.
- *
- * See the note regarding namespaces in xmlAddChild.
- *
- * Returns the new element or null_mut() in case of error.
- */
-pub unsafe extern "C" fn xml_add_sibling(mut cur: XmlNodePtr, elem: XmlNodePtr) -> XmlNodePtr {
-    if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    if cur == elem {
-        return null_mut();
-    }
-
-    /*
-     * Constant time is we can rely on the ->(*parent).last to find
-     * the last sibling.
-     */
-    if !matches!((*cur).typ, XmlElementType::XmlAttributeNode)
-        && !(*cur).parent.is_null()
-        && !(*(*cur).parent).children.is_null()
-        && !(*(*cur).parent).last.is_null()
-        && (*(*(*cur).parent).last).next.is_null()
-    {
-        cur = (*(*cur).parent).last;
-    } else {
-        while !(*cur).next.is_null() {
-            cur = (*cur).next;
-        }
-    }
-
-    xml_unlink_node(elem);
-
-    if (matches!((*cur).typ, XmlElementType::XmlTextNode)
-        && matches!((*elem).typ, XmlElementType::XmlTextNode)
-        && (*cur).name == (*elem).name)
-    {
-        xml_node_add_content(cur, (*elem).content);
-        xml_free_node(elem);
-        return cur;
-    } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
-        return xml_add_prop_sibling(cur, cur, elem);
-    }
-
-    if (*elem).doc != (*cur).doc {
-        xml_set_tree_doc(elem, (*cur).doc);
-    }
-    let parent: XmlNodePtr = (*cur).parent;
-    (*elem).prev = cur;
-    (*elem).next = null_mut();
-    (*elem).parent = parent;
-    (*cur).next = elem;
-    if !parent.is_null() {
-        (*parent).last = elem;
-    }
-
-    elem
-}
-
-/**
  * xmlAddNextSibling:
  * @cur:  the child node
  * @elem:  the new node
@@ -11583,40 +11511,6 @@ mod tests {
                             xml_mem_blocks() - mem_base
                         );
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlAddPrevSibling()");
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_elem);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_add_sibling() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR_IN {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let mut elem = gen_xml_node_ptr_in(n_elem, 1);
-
-                    let ret_val = xml_add_sibling(cur, elem);
-                    if ret_val.is_null() {
-                        xml_free_node(elem);
-                        elem = null_mut();
-                    }
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_xml_node_ptr_in(n_elem, elem, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlAddSibling",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlAddSibling()");
                         eprint!(" {}", n_cur);
                         eprintln!(" {}", n_elem);
                     }

@@ -2,7 +2,10 @@ use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::xmlstring::XmlChar;
 
-use super::{xml_is_blank_char, XmlAttr, XmlDoc, XmlElementType, XmlNs};
+use super::{
+    xml_add_prop_sibling, xml_free_node, xml_is_blank_char, xml_node_add_content, xml_set_tree_doc,
+    xml_unlink_node, XmlAttr, XmlDoc, XmlElementType, XmlNs,
+};
 
 /// A node in an XML tree.
 pub type XmlNodePtr = *mut XmlNode;
@@ -453,5 +456,70 @@ impl XmlNode {
             return null_mut();
         }
         self.last
+    }
+
+    /// Add a new element `elem` to the list of siblings of `self`
+    /// merging adjacent TEXT nodes (`elem` may be freed)  
+    /// If the new element was already inserted in a document
+    /// it is first unlinked from its existing context.
+    ///
+    /// See the note regarding namespaces in xmlAddChild.
+    ///
+    /// Returns the new element or NULL in case of error.
+    #[doc(alias = "xmlAddSibling")]
+    pub unsafe fn add_sibling(&mut self, elem: XmlNodePtr) -> XmlNodePtr {
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        let mut cur = self as *mut XmlNode;
+        if cur == elem {
+            return null_mut();
+        }
+
+        // Constant time is we can rely on the -> parent -> last to find the last sibling.
+        if !matches!(self.typ, XmlElementType::XmlAttributeNode)
+            && !self.parent.is_null()
+            && !(*self.parent).children.is_null()
+            && !(*self.parent).last.is_null()
+            && (*(*self.parent).last).next.is_null()
+        {
+            cur = (*(*cur).parent).last;
+        } else {
+            while !(*cur).next.is_null() {
+                cur = (*cur).next;
+            }
+        }
+
+        xml_unlink_node(elem);
+
+        if (matches!((*cur).typ, XmlElementType::XmlTextNode)
+            && matches!((*elem).typ, XmlElementType::XmlTextNode)
+            && (*cur).name == (*elem).name)
+        {
+            xml_node_add_content(cur, (*elem).content);
+            xml_free_node(elem);
+            return cur;
+        } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
+            return xml_add_prop_sibling(cur, cur, elem);
+        }
+
+        if (*elem).doc != (*cur).doc {
+            xml_set_tree_doc(elem, (*cur).doc);
+        }
+        let parent: XmlNodePtr = (*cur).parent;
+        (*elem).prev = cur;
+        (*elem).next = null_mut();
+        (*elem).parent = parent;
+        (*cur).next = elem;
+        if !parent.is_null() {
+            (*parent).last = elem;
+        }
+
+        elem
     }
 }

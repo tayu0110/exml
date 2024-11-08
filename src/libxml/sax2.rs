@@ -29,15 +29,15 @@ use crate::{
     },
     private::parser::{xml_err_memory, XML_VCTXT_DTD_VALIDATED},
     tree::{
-        xml_add_child, xml_add_sibling, xml_build_qname, xml_create_int_subset, xml_free_dtd,
-        xml_free_node, xml_new_cdata_block, xml_new_char_ref, xml_new_doc, xml_new_doc_comment,
-        xml_new_doc_node, xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
-        xml_new_ns, xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_search_ns,
-        xml_set_ns, xml_string_get_node_list, xml_string_len_get_node_list, xml_text_concat,
-        xml_unlink_node, xml_validate_ncname, XmlAttr, XmlAttrPtr, XmlAttributeDefault,
-        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
-        XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_add_child, xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node,
+        xml_new_cdata_block, xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
+        xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns,
+        xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_search_ns, xml_set_ns,
+        xml_string_get_node_list, xml_string_len_get_node_list, xml_text_concat, xml_unlink_node,
+        xml_validate_ncname, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
+        XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -2354,7 +2354,7 @@ pub unsafe fn xml_sax2_start_element(
         if matches!((*parent).typ, XmlElementType::XmlElementNode) {
             xml_add_child(parent, ret);
         } else {
-            xml_add_sibling(parent, ret);
+            (*parent).add_sibling(ret);
         }
     }
 
@@ -2733,7 +2733,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         if matches!((*parent).typ, XmlElementType::XmlElementNode) {
             xml_add_child(parent, ret);
         } else {
-            xml_add_sibling(parent, ret);
+            (*parent).add_sibling(ret);
         }
     }
 
@@ -3603,7 +3603,7 @@ pub unsafe fn xml_sax2_processing_instruction(
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
         xml_add_child(parent, ret);
     } else {
-        xml_add_sibling(parent, ret);
+        (*parent).add_sibling(ret);
     }
 }
 
@@ -3650,7 +3650,7 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const X
     if matches!((*parent).typ, XmlElementType::XmlElementNode) {
         xml_add_child(parent, ret);
     } else {
-        xml_add_sibling(parent, ret);
+        (*parent).add_sibling(ret);
     }
 }
 

@@ -84,7 +84,7 @@ impl XmlDoc {
     #[doc(alias = "xmlDocSetRootElement")]
     #[cfg(any(feature = "tree", feature = "writer"))]
     pub unsafe fn set_root_element(&mut self, root: XmlNodePtr) -> XmlNodePtr {
-        use crate::tree::{xml_add_sibling, xml_replace_node, xml_set_tree_doc};
+        use crate::tree::{xml_replace_node, xml_set_tree_doc};
 
         use super::xml_unlink_node;
 
@@ -106,7 +106,7 @@ impl XmlDoc {
                 self.children = root;
                 self.last = root;
             } else {
-                xml_add_sibling(self.children, root);
+                (*self.children).add_sibling(root);
             }
         } else {
             xml_replace_node(old, root);
