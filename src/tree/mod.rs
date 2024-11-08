@@ -3905,75 +3905,6 @@ unsafe extern "C" fn xml_add_prop_sibling(
 }
 
 /**
- * xmlAddNextSibling:
- * @cur:  the child node
- * @elem:  the new node
- *
- * Add a new node @elem as the next sibling of @cur
- * If the new node was already inserted in a document it is
- * first unlinked from its existing context.
- * As a result of text merging @elem may be freed.
- * If the new node is ATTRIBUTE, it is added into properties instead of children.
- * If there is an attribute with equal name, it is first destroyed.
- *
- * See the note regarding namespaces in xmlAddChild.
- *
- * Returns the new node or null_mut() in case of error.
- */
-pub unsafe extern "C" fn xml_add_next_sibling(cur: XmlNodePtr, elem: XmlNodePtr) -> XmlNodePtr {
-    if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-
-    if cur == elem {
-        return null_mut();
-    }
-
-    xml_unlink_node(elem);
-
-    if matches!((*elem).typ, XmlElementType::XmlTextNode) {
-        if matches!((*cur).typ, XmlElementType::XmlTextNode) {
-            xml_node_add_content(cur, (*elem).content);
-            xml_free_node(elem);
-            return cur;
-        }
-        if !(*cur).next.is_null()
-            && matches!((*(*cur).next).typ, XmlElementType::XmlTextNode)
-            && (*cur).name == (*(*cur).next).name
-        {
-            let mut tmp: *mut XmlChar;
-
-            tmp = xml_strdup((*elem).content);
-            tmp = xml_strcat(tmp, (*(*cur).next).content);
-            xml_node_set_content((*cur).next, tmp);
-            xml_free(tmp as _);
-            xml_free_node(elem);
-            return (*cur).next;
-        }
-    } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
-        return xml_add_prop_sibling(cur, cur, elem);
-    }
-
-    if (*elem).doc != (*cur).doc {
-        xml_set_tree_doc(elem, (*cur).doc);
-    }
-    (*elem).parent = (*cur).parent;
-    (*elem).prev = cur;
-    (*elem).next = (*cur).next;
-    (*cur).next = elem;
-    if !(*elem).next.is_null() {
-        (*(*elem).next).prev = elem;
-    }
-    if !(*elem).parent.is_null() && (*(*elem).parent).last == cur {
-        (*(*elem).parent).last = elem;
-    }
-    elem
-}
-
-/**
  * xmlUnlinkNode:
  * @cur:  the node
  *
@@ -5533,7 +5464,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
                                 last = node;
                                 head = node;
                             } else {
-                                last = xml_add_next_sibling(last, node);
+                                last = (*last).add_next_sibling(node);
                             }
                         }
 
@@ -5581,7 +5512,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
                             last = node;
                             head = node
                         } else {
-                            last = xml_add_next_sibling(last, node);
+                            last = (*last).add_next_sibling(node);
                         }
                     }
                     xml_free(val as _);
@@ -5638,7 +5569,7 @@ pub unsafe extern "C" fn xml_string_get_node_list(
         if last.is_null() {
             head = node;
         } else {
-            xml_add_next_sibling(last, node);
+            (*last).add_next_sibling(node);
         }
     }
 
@@ -5827,7 +5758,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
                                 last = node;
                                 ret = node;
                             } else {
-                                last = xml_add_next_sibling(last, node);
+                                last = (*last).add_next_sibling(node);
                             }
                         }
 
@@ -5871,7 +5802,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
                             last = node;
                             ret = node;
                         } else {
-                            last = xml_add_next_sibling(last, node);
+                            last = (*last).add_next_sibling(node);
                         }
                     }
                     xml_free(val as _);
@@ -5920,7 +5851,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
         if last.is_null() {
             ret = node;
         } else {
-            xml_add_next_sibling(last, node);
+            (*last).add_next_sibling(node);
         }
     } else if ret.is_null() {
         ret = xml_new_doc_text(doc, c"".as_ptr() as _);
@@ -11294,40 +11225,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlAddChildList()");
                         eprint!(" {}", n_parent);
                         eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_add_next_sibling() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR_IN {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let mut elem = gen_xml_node_ptr_in(n_elem, 1);
-
-                    let ret_val = xml_add_next_sibling(cur, elem);
-                    if ret_val.is_null() {
-                        xml_free_node(elem);
-                        elem = null_mut();
-                    }
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_xml_node_ptr_in(n_elem, elem, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlAddNextSibling",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlAddNextSibling()");
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_elem);
                     }
                 }
             }

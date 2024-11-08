@@ -1,10 +1,14 @@
 use std::{os::raw::c_void, ptr::null_mut};
 
-use crate::libxml::xmlstring::XmlChar;
+use crate::libxml::{
+    globals::xml_free,
+    xmlstring::{xml_strcat, xml_strdup, XmlChar},
+};
 
 use super::{
-    xml_add_prop_sibling, xml_free_node, xml_is_blank_char, xml_node_add_content, xml_set_tree_doc,
-    xml_unlink_node, XmlAttr, XmlDoc, XmlElementType, XmlNs,
+    xml_add_prop_sibling, xml_free_node, xml_is_blank_char, xml_node_add_content,
+    xml_node_set_content, xml_set_tree_doc, xml_unlink_node, XmlAttr, XmlDoc, XmlElementType,
+    XmlNs,
 };
 
 /// A node in an XML tree.
@@ -659,6 +663,70 @@ impl XmlNode {
         }
         if !(*elem).parent.is_null() && (*(*elem).parent).children == self as *mut XmlNode {
             (*(*elem).parent).children = elem;
+        }
+        elem
+    }
+
+    /// Add a new node `elem` as the next sibling of `self`.  
+    /// If the new node was already inserted in a document it is
+    /// first unlinked from its existing context.
+    /// As a result of text merging `elem` may be freed.  
+    /// If the new node is ATTRIBUTE, it is added into properties instead of children.  
+    /// If there is an attribute with equal name, it is first destroyed.  
+    ///
+    /// See the note regarding namespaces in xmlAddChild.
+    ///
+    /// Returns the new node or NULL in case of error.
+    #[doc(alias = "xmlAddNextSibling")]
+    pub unsafe extern "C" fn add_next_sibling(&mut self, elem: XmlNodePtr) -> XmlNodePtr {
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        if elem.is_null() || ((*elem).typ == XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if self as *mut XmlNode == elem {
+            return null_mut();
+        }
+
+        xml_unlink_node(elem);
+
+        if matches!((*elem).typ, XmlElementType::XmlTextNode) {
+            if matches!(self.typ, XmlElementType::XmlTextNode) {
+                xml_node_add_content(self, (*elem).content);
+                xml_free_node(elem);
+                return self as *mut XmlNode;
+            }
+            if !self.next.is_null()
+                && matches!((*self.next).typ, XmlElementType::XmlTextNode)
+                && self.name == (*self.next).name
+            {
+                let mut tmp: *mut XmlChar;
+
+                tmp = xml_strdup((*elem).content);
+                tmp = xml_strcat(tmp, (*self.next).content);
+                xml_node_set_content(self.next, tmp);
+                xml_free(tmp as _);
+                xml_free_node(elem);
+                return self.next;
+            }
+        } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
+            return xml_add_prop_sibling(self, self, elem);
+        }
+
+        if (*elem).doc != self.doc {
+            xml_set_tree_doc(elem, self.doc);
+        }
+        (*elem).parent = self.parent;
+        (*elem).prev = self as *mut XmlNode;
+        (*elem).next = self.next;
+        self.next = elem;
+        if !(*elem).next.is_null() {
+            (*(*elem).next).prev = elem;
+        }
+        if !(*elem).parent.is_null() && (*(*elem).parent).last == self as *mut XmlNode {
+            (*(*elem).parent).last = elem;
         }
         elem
     }
