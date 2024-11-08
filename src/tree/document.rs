@@ -1,8 +1,17 @@
-use std::{os::raw::c_void, ptr::null_mut};
+use std::{os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
-use crate::{dict::XmlDict, encoding::XmlCharEncoding};
+use libc::memset;
 
-use super::{NodeCommon, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs};
+use crate::{
+    dict::XmlDict,
+    encoding::XmlCharEncoding,
+    libxml::globals::{xml_malloc, xml_register_node_default_value},
+};
+
+use super::{
+    xml_tree_err_memory, NodeCommon, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode,
+    XmlNodePtr, XmlNs, __XML_REGISTER_CALLBACKS,
+};
 
 /// An XML document.
 pub type XmlDocPtr = *mut XmlDoc;
@@ -184,4 +193,44 @@ impl Default for XmlDoc {
             properties: 0,
         }
     }
+}
+
+/// Creates a new XML document
+///
+/// Returns a new document
+#[doc(alias = "xmlNewDoc")]
+pub unsafe fn xml_new_doc(version: Option<&str>) -> XmlDocPtr {
+    let version = version.unwrap_or("1.0");
+
+    /*
+     * Allocate a new document and fill the fields.
+     */
+    let cur: XmlDocPtr = xml_malloc(size_of::<XmlDoc>()) as _;
+    if cur.is_null() {
+        xml_tree_err_memory(c"building doc".as_ptr() as _);
+        return null_mut();
+    }
+    memset(cur as _, 0, size_of::<XmlDoc>());
+    std::ptr::write(&mut *cur, XmlDoc::default());
+    (*cur).typ = XmlElementType::XmlDocumentNode;
+
+    (*cur).version = Some(version.to_owned());
+    (*cur).standalone = -1;
+    (*cur).compression = -1; /* not initialized */
+    (*cur).doc = cur;
+    (*cur).parse_flags = 0;
+    (*cur).properties = XmlDocProperties::XmlDocUserbuilt as i32;
+    /*
+     * The in memory encoding is always UTF8
+     * This field will never change and would
+     * be obsolete if not for binary compatibility.
+     */
+    (*cur).charset = XmlCharEncoding::UTF8;
+
+    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+    //  && xmlRegisterNodeDefaultValue.is_some()
+    {
+        xml_register_node_default_value(cur as _);
+    }
+    cur
 }
