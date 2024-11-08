@@ -10,7 +10,7 @@ pub use element::*;
 pub use enumeration::*;
 pub use notation::*;
 
-use crate::libxml::xmlstring::XmlChar;
+use crate::libxml::{entities::XmlEntityPtr, xmlstring::XmlChar};
 
 use super::{XmlDoc, XmlElementType, XmlNode};
 
@@ -37,4 +37,24 @@ pub struct XmlDtd {
     pub(crate) external_id: *const XmlChar, /* External identifier for PUBLIC DTD */
     pub(crate) system_id: *const XmlChar, /* URI for a SYSTEM or PUBLIC DTD */
     pub(crate) pentities: *mut c_void, /* Hash table for param entities if any */
+}
+
+impl XmlDtd {
+    /// Do an entity lookup in the DTD entity hash table and
+    /// return the corresponding entity, if found.
+    ///
+    /// Returns A pointer to the entity structure or null_mut() if not found.
+    #[doc(alias = "xmlGetEntityFromDtd")]
+    #[cfg(feature = "tree")]
+    pub(super) unsafe fn get_entity(&self, name: *const XmlChar) -> XmlEntityPtr {
+        use std::ptr::null_mut;
+
+        use crate::hash::xml_hash_lookup;
+
+        if !self.entities.is_null() {
+            let table = self.entities as _;
+            return xml_hash_lookup(table, name) as _;
+        }
+        null_mut()
+    }
 }

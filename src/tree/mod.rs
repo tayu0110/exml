@@ -2529,31 +2529,6 @@ pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttr
 }
 
 /**
- * xmlGetEntityFromDtd:
- * @dtd:  A pointer to the DTD to search
- * @name:  The entity name
- *
- * Do an entity lookup in the DTD entity hash table and
- * return the corresponding entity, if found.
- *
- * Returns A pointer to the entity structure or null_mut() if not found.
- */
-#[cfg(feature = "tree")]
-unsafe extern "C" fn xml_get_entity_from_dtd(
-    dtd: *const XmlDtd,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
-    let table: XmlEntitiesTablePtr;
-
-    if !dtd.is_null() && !(*dtd).entities.is_null() {
-        table = (*dtd).entities as _;
-        return xml_hash_lookup(table, name) as _;
-        /* return(xmlGetEntityFromTable(table, name)); */
-    }
-    null_mut()
-}
-
-/**
  * xmlGetParameterEntityFromDtd:
  * @dtd:  A pointer to the DTD to search
  * @name:  The entity name
@@ -2639,7 +2614,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
                 Some(XmlEntityType::XmlInternalGeneralEntity)
                 | Some(XmlEntityType::XmlExternalGeneralParsedEntity)
                 | Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                    q = xml_get_entity_from_dtd(ret, (*tmp).name.load(Ordering::Relaxed)) as _;
+                    q = (*ret).get_entity((*tmp).name.load(Ordering::Relaxed)) as _;
                 }
                 Some(XmlEntityType::XmlInternalParameterEntity)
                 | Some(XmlEntityType::XmlExternalParameterEntity) => {
