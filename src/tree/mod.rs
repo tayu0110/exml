@@ -5264,32 +5264,6 @@ pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *cons
 }
 
 /**
- * xmlNodeGetLang:
- * @cur:  the node being checked
- *
- * Searches the language of a node, i.e. the values of the xml:lang
- * attribute or the one carried by the nearest ancestor.
- *
- * Returns a pointer to the lang value, or null_mut() if not found
- *     It's up to the caller to free the memory with xml_free( as _).
- */
-pub unsafe extern "C" fn xml_node_get_lang(mut cur: *const XmlNode) -> *mut XmlChar {
-    let mut lang: *mut XmlChar;
-
-    if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    while !cur.is_null() {
-        lang = (*cur).get_ns_prop(c"lang".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
-        if !lang.is_null() {
-            return lang;
-        }
-        cur = (*cur).parent;
-    }
-    null_mut()
-}
-
-/**
  * xmlNodeGetSpacePreserve:
  * @cur:  the node being checked
  *
@@ -11709,31 +11683,6 @@ mod tests {
                             eprintln!(" {}", n_len);
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_get_lang() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let cur = gen_const_xml_node_ptr(n_cur, 0);
-
-                let ret_val = xml_node_get_lang(cur);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_node_ptr(n_cur, cur, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNodeGetLang",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeGetLang()");
-                    eprintln!(" {}", n_cur);
                 }
             }
         }

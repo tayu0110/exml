@@ -1012,6 +1012,27 @@ impl XmlNode {
         ret
     }
 
+    /// Searches the language of a node, i.e. the values of the xml:lang
+    /// attribute or the one carried by the nearest ancestor.
+    ///
+    /// Returns a pointer to the lang value, or null_mut() if not found.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlNodeGetLang")]
+    pub unsafe fn get_lang(&self) -> *mut XmlChar {
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        let mut cur = self as *const XmlNode;
+        while !cur.is_null() {
+            let lang = (*cur).get_ns_prop(c"lang".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+            if !lang.is_null() {
+                return lang;
+            }
+            cur = (*cur).parent;
+        }
+        null_mut()
+    }
+
     /// Set (or reset) the name of a node.
     #[doc(alias = "xmlNodeSetName")]
     #[cfg(feature = "tree")]

@@ -65,8 +65,8 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     tree::{
-        xml_buf_content, xml_build_qname, xml_node_get_lang, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
-        XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_buf_content, xml_build_qname, XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlElementType,
+        XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
 };
@@ -13664,7 +13664,7 @@ pub unsafe extern "C" fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr,
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathString);
     let val = value_pop(ctxt);
     let lang: *const XmlChar = (*val).stringval;
-    let the_lang = xml_node_get_lang((*(*ctxt).context).node);
+    let the_lang = (*(*(*ctxt).context).node).get_lang();
     'not_equal: {
         if !the_lang.is_null() && !lang.is_null() {
             let mut i = 0;
