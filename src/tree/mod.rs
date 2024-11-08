@@ -3565,20 +3565,6 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
  */
 
 /**
- * xmlGetLastChild:
- * @parent:  the parent node
- *
- * Search the last child of a node.
- * Returns the last child or null_mut() if none.
- */
-pub unsafe extern "C" fn xml_get_last_child(parent: *const XmlNode) -> XmlNodePtr {
-    if parent.is_null() || matches!((*parent).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    (*parent).last
-}
-
-/**
  * xmlNodeIsText:
  * @node:  the node
  *
@@ -12681,31 +12667,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlGetDocCompressMode()"
                     );
                     eprintln!(" {}", n_doc);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_last_child() {
-        unsafe {
-            let mut leaks = 0;
-            for n_parent in 0..GEN_NB_CONST_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let parent = gen_const_xml_node_ptr(n_parent, 0);
-
-                let ret_val = xml_get_last_child(parent);
-                desret_xml_node_ptr(ret_val);
-                des_const_xml_node_ptr(n_parent, parent, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlGetLastChild",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlGetLastChild()");
-                    eprintln!(" {}", n_parent);
                 }
             }
         }

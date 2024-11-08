@@ -1,4 +1,4 @@
-use std::os::raw::c_void;
+use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::libxml::xmlstring::XmlChar;
 
@@ -414,5 +414,15 @@ impl XmlNode {
         }
         xml_free(buf as _);
         buffer
+    }
+
+    /// Search the last child of a node.
+    /// Returns the last child or null_mut() if none.
+    #[doc(alias = "xmlGetLastChild")]
+    pub fn get_last_child(&self) -> XmlNodePtr {
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        self.last
     }
 }

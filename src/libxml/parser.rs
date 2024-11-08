@@ -103,12 +103,12 @@ use crate::{
     },
     tree::{
         xml_add_child, xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node,
-        xml_free_node_list, xml_get_last_child, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
-        xml_new_dtd, xml_node_is_text, xml_search_ns_by_href, xml_set_tree_doc, xml_unlink_node,
-        XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme,
-        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
-        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
-        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_node_list, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
+        xml_node_is_text, xml_search_ns_by_href, xml_set_tree_doc, xml_unlink_node, XmlAttrPtr,
+        XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties,
+        XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
+        XML_XML_NAMESPACE,
     },
 };
 
@@ -9544,7 +9544,7 @@ unsafe extern "C" fn are_blanks(
         return 0;
     }
 
-    let last_child: XmlNodePtr = xml_get_last_child((*ctxt).node);
+    let last_child: XmlNodePtr = (*(*ctxt).node).get_last_child();
     if last_child.is_null() {
         if (*(*ctxt).node).typ != XmlElementType::XmlElementNode
             && !(*(*ctxt).node).content.is_null()

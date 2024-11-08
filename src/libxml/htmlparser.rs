@@ -48,8 +48,8 @@ use crate::{
     },
     private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
-        xml_create_int_subset, xml_free_doc, xml_get_last_child, xml_node_is_text, XmlDocPtr,
-        XmlDtdPtr, XmlElementType, XmlNodePtr,
+        xml_create_int_subset, xml_free_doc, xml_node_is_text, XmlDocPtr, XmlDtdPtr,
+        XmlElementType, XmlNodePtr,
     },
 };
 
@@ -8880,7 +8880,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
     if (*ctxt).node.is_null() {
         return 0;
     }
-    last_child = xml_get_last_child((*ctxt).node);
+    last_child = (*(*ctxt).node).get_last_child();
     while !last_child.is_null() && (*last_child).typ == XmlElementType::XmlCommentNode {
         last_child = (*last_child).prev;
     }
