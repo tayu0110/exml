@@ -1,4 +1,4 @@
-use std::{os::raw::c_void, ptr::null_mut};
+use std::{os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
 use crate::libxml::{
     globals::xml_free,
@@ -6,9 +6,8 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_add_prop_sibling, xml_free_node, xml_is_blank_char, xml_node_add_content,
-    xml_node_set_content, xml_set_tree_doc, xml_unlink_node, XmlAttr, XmlDoc, XmlElementType,
-    XmlNs,
+    xml_free_node, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content, xml_node_set_content,
+    xml_remove_prop, xml_set_tree_doc, xml_unlink_node, XmlAttr, XmlDoc, XmlElementType, XmlNs,
 };
 
 /// A node in an XML tree.
@@ -571,7 +570,7 @@ impl XmlNode {
             xml_free_node(elem);
             return cur;
         } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
-            return xml_add_prop_sibling(cur, cur, elem);
+            return add_prop_sibling(cur, cur, elem);
         }
 
         if (*elem).doc != (*cur).doc {
@@ -648,7 +647,7 @@ impl XmlNode {
                 return self.prev;
             }
         } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
-            return xml_add_prop_sibling(self.prev, self, elem);
+            return add_prop_sibling(self.prev, self, elem);
         }
 
         if (*elem).doc != self.doc {
@@ -712,7 +711,7 @@ impl XmlNode {
                 return self.next;
             }
         } else if matches!((*elem).typ, XmlElementType::XmlAttributeNode) {
-            return xml_add_prop_sibling(self, self, elem);
+            return add_prop_sibling(self, self, elem);
         }
 
         if (*elem).doc != self.doc {
@@ -730,4 +729,59 @@ impl XmlNode {
         }
         elem
     }
+}
+
+/// Add a new attribute after `prev` using `cur` as base attribute.  
+/// When inserting before `cur`, `prev` is passed as `cur.prev`.  
+/// When inserting after `cur`, `prev` is passed as `cur`.  
+/// If an existing attribute is found it is destroyed prior to adding `prop`.  
+///
+/// See the note regarding namespaces in xmlAddChild.
+///
+/// Returns the attribute being inserted or NULL in case of error.
+#[doc(alias = "xmlAddPropSibling")]
+unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) -> XmlNodePtr {
+    if cur.is_null()
+        || !matches!((*cur).typ, XmlElementType::XmlAttributeNode)
+        || prop.is_null()
+        || !matches!((*prop).typ, XmlElementType::XmlAttributeNode)
+        || (!prev.is_null() && !matches!((*prev).typ, XmlElementType::XmlAttributeNode))
+    {
+        return null_mut();
+    }
+
+    /* check if an attribute with the same name exists */
+    let attr = if (*prop).ns.is_null() {
+        xml_has_ns_prop((*cur).parent, (*prop).name, null_mut())
+    } else {
+        xml_has_ns_prop(
+            (*cur).parent,
+            (*prop).name,
+            (*(*prop).ns).href.load(Ordering::Relaxed),
+        )
+    };
+
+    if (*prop).doc != (*cur).doc {
+        xml_set_tree_doc(prop, (*cur).doc);
+    }
+    (*prop).parent = (*cur).parent;
+    (*prop).prev = prev;
+    if !prev.is_null() {
+        (*prop).next = (*prev).next;
+        (*prev).next = prop;
+        if !(*prop).next.is_null() {
+            (*(*prop).next).prev = prop;
+        }
+    } else {
+        (*prop).next = cur;
+        (*cur).prev = prop;
+    }
+    if (*prop).prev.is_null() && !(*prop).parent.is_null() {
+        (*(*prop).parent).properties = prop as _;
+    }
+    if !attr.is_null() && ((*attr).typ != XmlElementType::XmlAttributeDecl) {
+        /* different instance, destroy it (attributes must be unique) */
+        xml_remove_prop(attr);
+    }
+    prop
 }
