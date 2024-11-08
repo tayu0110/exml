@@ -17,9 +17,9 @@ use crate::{
     error::XmlParserErrors,
     io::XmlOutputBufferPtr,
     tree::{
-        xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, xml_set_prop,
-        NodeCommon, XmlAttrPtr, XmlBufPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType,
-        XmlNodePtr, __XML_REGISTER_CALLBACKS,
+        xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon,
+        XmlAttrPtr, XmlBufPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
+        __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -398,7 +398,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                     .contains(&encoding.unwrap().to_ascii_lowercase())
             }) {
                 let newcontent = CString::new(newcontent).unwrap();
-                xml_set_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
+                (*meta).set_prop(c"content".as_ptr() as _, newcontent.as_ptr() as _);
             }
         }
 

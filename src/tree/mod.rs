@@ -3859,53 +3859,6 @@ pub unsafe extern "C" fn xml_copy_namespace_list(mut cur: XmlNsPtr) -> XmlNsPtr 
 /*
  * Changing the content.
  */
-/**
- * xmlSetProp:
- * @node:  the node
- * @name:  the attribute name (a QName)
- * @value:  the attribute value
- *
- * Set (or reset) an attribute carried by a node.
- * If @name has a prefix, then the corresponding
- * namespace-binding will be used, if in scope; it is an
- * error it there's no such ns-binding for the prefix in
- * scope.
- * Returns the attribute pointer.
- *
- */
-#[cfg(any(
-    feature = "tree",
-    feature = "xinclude",
-    feature = "schema",
-    feature = "html"
-))]
-pub unsafe extern "C" fn xml_set_prop(
-    node: XmlNodePtr,
-    name: *const XmlChar,
-    value: *const XmlChar,
-) -> XmlAttrPtr {
-    let mut len: i32 = 0;
-
-    if node.is_null() || name.is_null() || !matches!((*node).typ, XmlElementType::XmlElementNode) {
-        return null_mut();
-    }
-
-    /*
-     * handle QNames
-     */
-    let nqname: *const XmlChar = xml_split_qname3(name, addr_of_mut!(len));
-    if !nqname.is_null() {
-        let prefix: *mut XmlChar = xml_strndup(name, len);
-        let ns: XmlNsPtr = xml_search_ns((*node).doc, node, prefix);
-        if !prefix.is_null() {
-            xml_free(prefix as _);
-        }
-        if !ns.is_null() {
-            return (*node).set_ns_prop(ns, nqname, value);
-        }
-    }
-    (*node).set_ns_prop(null_mut(), name, value)
-}
 
 unsafe extern "C" fn xml_get_prop_node_internal(
     node: *const XmlNode,
@@ -12393,48 +12346,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlSetNs()");
                         eprint!(" {}", n_node);
                         eprintln!(" {}", n_ns);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_set_prop() {
-        #[cfg(any(
-            feature = "tree",
-            feature = "xinclude",
-            feature = "schema",
-            feature = "html"
-        ))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let node = gen_xml_node_ptr(n_node, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let value = gen_const_xml_char_ptr(n_value, 2);
-
-                        let ret_val = xml_set_prop(node, name, value);
-                        desret_xml_attr_ptr(ret_val);
-                        des_xml_node_ptr(n_node, node, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_value, value, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSetProp",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlSetProp()");
-                            eprint!(" {}", n_node);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_value);
-                        }
                     }
                 }
             }

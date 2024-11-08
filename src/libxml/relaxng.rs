@@ -55,8 +55,8 @@ use crate::{
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_get_prop, xml_has_prop, xml_new_child,
         xml_new_doc_node, xml_new_doc_text, xml_node_list_get_string, xml_node_set_content,
-        xml_search_ns, xml_set_prop, xml_split_qname2, xml_unset_prop, xml_validate_ncname,
-        NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_search_ns, xml_split_qname2, xml_unset_prop, xml_validate_ncname, NodeCommon,
+        XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -3343,7 +3343,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
     if !ns.is_null() {
         root = (*doc).get_root_element();
         if !root.is_null() && xml_has_prop(root, c"ns".as_ptr() as _).is_null() {
-            xml_set_prop(root, c"ns".as_ptr() as _, ns);
+            (*root).set_prop(c"ns".as_ptr() as _, ns);
         }
     }
 
@@ -3633,7 +3633,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
     if !ns.is_null() {
         root = (*doc).get_root_element();
         if !root.is_null() && xml_has_prop(root, c"ns".as_ptr() as _).is_null() {
-            xml_set_prop(root, c"ns".as_ptr() as _, ns);
+            (*root).set_prop(c"ns".as_ptr() as _, ns);
         }
     }
 
@@ -4041,12 +4041,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             ns = xml_get_prop(cur, c"ns".as_ptr() as _);
                             if !ns.is_null() {
                                 if !text.is_null() {
-                                    xml_set_prop(text, c"ns".as_ptr() as _, ns);
+                                    (*text).set_prop(c"ns".as_ptr() as _, ns);
                                     /* xmlUnsetProp(cur, c"ns".as_ptr() as _); */
                                 }
                                 xml_free(ns as _);
                             } else if xml_str_equal((*cur).name, c"attribute".as_ptr() as _) {
-                                xml_set_prop(text, c"ns".as_ptr() as _, c"".as_ptr() as _);
+                                (*text).set_prop(c"ns".as_ptr() as _, c"".as_ptr() as _);
                             }
                         }
                     } else if xml_str_equal((*cur).name, c"name".as_ptr() as _)
@@ -4070,9 +4070,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 node = (*node).parent;
                             }
                             if ns.is_null() {
-                                xml_set_prop(cur, c"ns".as_ptr() as _, c"".as_ptr() as _);
+                                (*cur).set_prop(c"ns".as_ptr() as _, c"".as_ptr() as _);
                             } else {
-                                xml_set_prop(cur, c"ns".as_ptr() as _, ns);
+                                (*cur).set_prop(c"ns".as_ptr() as _, ns);
                                 xml_free(ns as _);
                             }
                         }
@@ -4100,8 +4100,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                             null_mut(),
                                         );
                                     } else {
-                                        xml_set_prop(
-                                            cur,
+                                        (*cur).set_prop(
                                             c"ns".as_ptr() as _,
                                             (*ns).href.load(Ordering::Relaxed),
                                         );
@@ -4193,7 +4192,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         ins = cur;
                         while !child.is_null() {
                             if !ns.is_null() && xml_has_prop(child, c"ns".as_ptr() as _).is_null() {
-                                xml_set_prop(child, c"ns".as_ptr() as _, ns);
+                                (*child).set_prop(c"ns".as_ptr() as _, ns);
                             }
                             tmp = (*child).next;
                             (*child).unlink();
@@ -5697,7 +5696,7 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
                     tmp = (*tmp).parent;
                 }
                 if !ns.is_null() {
-                    xml_set_prop(root, c"ns".as_ptr() as _, ns);
+                    (*root).set_prop(c"ns".as_ptr() as _, ns);
                     new_ns = 1;
                     xml_free(ns as _);
                 }

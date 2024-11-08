@@ -64,9 +64,9 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, xml_new_text,
-        xml_set_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
-        XmlAttributeType, XmlBufferAllocationScheme, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr, XmlDtd,
-        XmlDtdPtr, XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
+        NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType,
+        XmlBufferAllocationScheme, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
+        XmlElementContentPtr, XmlElementContentType, XmlElementPtr, XmlElementType,
         XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNs, XmlNsPtr,
     },
 };
@@ -1021,11 +1021,7 @@ unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
         snprintf(name.as_mut_ptr() as _, 20, c"foo%d".as_ptr() as _, NR);
         NR += 1;
         API_ATTR.store(
-            xml_set_prop(
-                API_ROOT.load(Ordering::Relaxed),
-                name.as_ptr() as _,
-                c"bar".as_ptr() as _,
-            ),
+            (*API_ROOT.load(Ordering::Relaxed)).set_prop(name.as_ptr() as _, c"bar".as_ptr() as _),
             Ordering::Relaxed,
         );
     }

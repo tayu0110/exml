@@ -1052,6 +1052,45 @@ impl XmlNode {
         }
     }
 
+    /// Set (or reset) an attribute carried by a node.
+    ///
+    /// If `name` has a prefix, then the corresponding namespace-binding will be used,
+    /// if in scope; it is an error it there's no such ns-binding for the prefix in scope.
+    ///
+    /// Returns the attribute pointer.
+    #[doc(alias = "xmlSetProp")]
+    #[cfg(any(
+        feature = "tree",
+        feature = "xinclude",
+        feature = "schema",
+        feature = "html"
+    ))]
+    pub unsafe fn set_prop(&mut self, name: *const XmlChar, value: *const XmlChar) -> XmlAttrPtr {
+        use crate::{libxml::xmlstring::xml_strndup, tree::xml_search_ns};
+
+        use super::xml_split_qname3;
+
+        let mut len: i32 = 0;
+
+        if name.is_null() || !matches!(self.typ, XmlElementType::XmlElementNode) {
+            return null_mut();
+        }
+
+        // handle QNames
+        let nqname: *const XmlChar = xml_split_qname3(name, &raw mut len);
+        if !nqname.is_null() {
+            let prefix: *mut XmlChar = xml_strndup(name, len);
+            let ns: XmlNsPtr = xml_search_ns(self.doc, self, prefix);
+            if !prefix.is_null() {
+                xml_free(prefix as _);
+            }
+            if !ns.is_null() {
+                return self.set_ns_prop(ns, nqname, value);
+            }
+        }
+        self.set_ns_prop(null_mut(), name, value)
+    }
+
     /// Set (or reset) an attribute carried by a node.  
     /// The ns structure must be in scope, this is not checked.
     ///
