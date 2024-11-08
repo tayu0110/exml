@@ -44,9 +44,9 @@ use crate::{
     },
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
-        xml_get_prop, xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len,
-        xml_static_copy_node, xml_static_copy_node_list, xml_unset_prop, NodeCommon, XmlDocPtr,
-        XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len, xml_static_copy_node,
+        xml_static_copy_node_list, xml_unset_prop, NodeCommon, XmlDocPtr, XmlDtdPtr,
+        XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -413,7 +413,7 @@ unsafe extern "C" fn xml_xinclude_get_prop(
             return ret;
         }
     }
-    ret = xml_get_prop(cur, name);
+    ret = (*cur).get_prop(name);
     ret
 }
 
@@ -2181,7 +2181,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
      * Try to get the encoding if available
      */
     if !(*refe).elem.is_null() {
-        encoding = xml_get_prop((*refe).elem, XINCLUDE_PARSE_ENCODING.as_ptr() as _);
+        encoding = (*(*refe).elem).get_prop(XINCLUDE_PARSE_ENCODING.as_ptr() as _);
     }
     if !encoding.is_null() {
         /*

@@ -1420,7 +1420,7 @@ macro_rules! __xml_raise_error {
             libxml::{
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
             },
-            tree::{XmlElementType, xml_get_prop, XmlNodePtr},
+            tree::{XmlElementType, XmlNodePtr},
         };
         (|mut schannel: Option<StructuredError>,
             mut channel: Option<GenericError>,
@@ -1581,7 +1581,7 @@ macro_rules! __xml_raise_error {
                                         if inclcount > 0 {
                                             inclcount -= 1;
                                         } else {
-                                            href = xml_get_prop(prev, c"href".as_ptr() as _) as *mut c_char;
+                                            href = (*prev).get_prop(c"href".as_ptr() as _) as *mut c_char;
                                             if !href.is_null() {
                                                 break;
                                             }

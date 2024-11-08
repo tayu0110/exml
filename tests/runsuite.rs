@@ -55,10 +55,7 @@ use exml::{
         },
         xpath_internals::xml_xpath_register_ns,
     },
-    tree::{
-        xml_buf_node_dump, xml_free_doc, xml_get_prop, XmlBufferAllocationScheme, XmlDocPtr,
-        XmlNodePtr,
-    },
+    tree::{xml_buf_node_dump, xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
 };
 use libc::{snprintf, strcmp, strstr};
 
@@ -562,7 +559,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
      */
     tmp = get_next(cur, c"following-sibling::valid[1]".as_ptr() as _);
     while !tmp.is_null() {
-        dtd = xml_get_prop(tmp, c"dtd".as_ptr() as _);
+        dtd = (*tmp).get_prop(c"dtd".as_ptr() as _);
         test = get_next(tmp, c"./*".as_ptr() as _);
         if test.is_null() {
             eprintln!(
@@ -1295,11 +1292,11 @@ unsafe extern "C" fn xstc_metadata(
         );
         return -1;
     }
-    contributor = xml_get_prop(cur, c"contributor".as_ptr() as _);
+    contributor = (*cur).get_prop(c"contributor".as_ptr() as _);
     if contributor.is_null() {
         contributor = xml_strdup(c"Unknown".as_ptr() as _);
     }
-    name = xml_get_prop(cur, c"name".as_ptr() as _);
+    name = (*cur).get_prop(c"name".as_ptr() as _);
     if name.is_null() {
         name = xml_strdup(c"Unknown".as_ptr() as _);
     }

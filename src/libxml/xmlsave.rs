@@ -1104,10 +1104,7 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
  */
 #[cfg(feature = "html")]
 pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlNodePtr) {
-    use crate::{
-        libxml::{parser_internals::XML_STRING_TEXT, xmlstring::xml_strcasecmp},
-        tree::xml_get_prop,
-    };
+    use crate::libxml::{parser_internals::XML_STRING_TEXT, xmlstring::xml_strcasecmp};
 
     let format: i32 = (*ctxt).format;
     let mut addmeta: i32;
@@ -1222,7 +1219,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     while !tmp.is_null() {
                         if xml_str_equal((*tmp).name, c"meta".as_ptr() as _) {
                             let httpequiv: *mut XmlChar =
-                                xml_get_prop(tmp, c"http-equiv".as_ptr() as _);
+                                (*tmp).get_prop(c"http-equiv".as_ptr() as _);
                             if !httpequiv.is_null() {
                                 if xml_strcasecmp(httpequiv, c"Content-Type".as_ptr() as _) == 0 {
                                     xml_free(httpequiv as _);

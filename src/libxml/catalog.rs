@@ -45,9 +45,9 @@ use crate::{
         },
     },
     tree::{
-        xml_free_doc, xml_free_ns, xml_get_prop, xml_new_doc, xml_new_doc_node, xml_new_dtd,
-        xml_new_ns, xml_save_format_file_to, xml_search_ns_by_href, XmlDocPtr, XmlDtdPtr,
-        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
+        xml_save_format_file_to, xml_search_ns_by_href, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr,
+        XML_XML_NAMESPACE,
     },
     SYSCONFDIR,
 };
@@ -1297,7 +1297,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
     let mut ret: XmlCatalogEntryPtr = null_mut();
 
     if !attr_name.is_null() {
-        name_value = xml_get_prop(cur, attr_name);
+        name_value = (*cur).get_prop(attr_name);
         if name_value.is_null() {
             xml_catalog_err(
                 ret,
@@ -1311,7 +1311,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             ok = 0;
         }
     }
-    let uri_value: *mut XmlChar = xml_get_prop(cur, uri_attr_name);
+    let uri_value: *mut XmlChar = (*cur).get_prop(uri_attr_name);
     if uri_value.is_null() {
         xml_catalog_err(
             ret,
@@ -1407,7 +1407,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
         let mut prop: *mut XmlChar;
         let mut pref: XmlCatalogPrefer = XmlCatalogPrefer::None;
 
-        prop = xml_get_prop(cur, c"prefer".as_ptr() as _);
+        prop = (*cur).get_prop(c"prefer".as_ptr() as _);
         if !prop.is_null() {
             if xml_str_equal(prop, c"system".as_ptr() as _) {
                 prefer = XmlCatalogPrefer::System;
@@ -1427,7 +1427,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             xml_free(prop as _);
             pref = prefer;
         }
-        prop = xml_get_prop(cur, c"id".as_ptr() as _);
+        prop = (*cur).get_prop(c"id".as_ptr() as _);
         base = (*cur).get_ns_prop(c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
         entry = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataGroup,
@@ -1653,7 +1653,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
             return null_mut();
         }
 
-        prop = xml_get_prop(cur, c"prefer".as_ptr() as _);
+        prop = (*cur).get_prop(c"prefer".as_ptr() as _);
         if !prop.is_null() {
             if xml_str_equal(prop, c"system".as_ptr() as _) {
                 prefer = XmlCatalogPrefer::System;
