@@ -1157,7 +1157,7 @@ pub unsafe extern "C" fn xml_create_int_subset(
     external_id: *const XmlChar,
     system_id: *const XmlChar,
 ) -> XmlDtdPtr {
-    if !doc.is_null() && !xml_get_int_subset(doc).is_null() {
+    if !doc.is_null() && !(*doc).get_int_subset().is_null() {
         return null_mut();
     }
 
@@ -1303,29 +1303,6 @@ pub unsafe extern "C" fn xml_new_dtd(
         xml_register_node_default_value(cur as _);
     }
     cur
-}
-
-/**
- * xmlGetIntSubset:
- * @doc:  the document pointer
- *
- * Get the internal subset of a document
- * Returns a pointer to the DTD structure or null_mut() if not found
- */
-pub unsafe extern "C" fn xml_get_int_subset(doc: *const XmlDoc) -> XmlDtdPtr {
-    let mut cur: XmlNodePtr;
-
-    if doc.is_null() {
-        return null_mut();
-    }
-    cur = (*doc).children;
-    while !cur.is_null() {
-        if matches!((*cur).typ, XmlElementType::XmlDtdNode) {
-            return cur as _;
-        }
-        cur = (*cur).next;
-    }
-    (*doc).int_subset
 }
 
 /**
@@ -6795,13 +6772,6 @@ pub unsafe extern "C" fn xml_node_list_get_string(
                 ret = xml_strncat(ret, buf.as_ptr() as _, 1);
             }
         }
-        // #if 0
-        //         else {
-        //             xmlGenericError(xmlGenericErrorContext,
-        //                             "xmlGetNodeListString : invalid node type %d\n",
-        //                             (*node).typ);
-        //         }
-        // #endif
         node = (*node).next;
     }
     ret
@@ -6883,13 +6853,6 @@ pub unsafe extern "C" fn xml_node_list_get_raw_string(
                 ret = xml_strncat(ret, buf.as_ptr(), 1);
             }
         }
-        // #if 0
-        //         else {
-        //             xmlGenericError(xmlGenericErrorContext,
-        //                             "xmlGetNodeListString : invalid node type %d\n",
-        //                             (*node).typ);
-        //         }
-        // #endif
         node = (*node).next;
     }
     ret
@@ -7223,35 +7186,6 @@ pub unsafe extern "C" fn xml_node_get_content(cur: *const XmlNode) -> *mut XmlCh
     }
     // return null_mut();
 }
-
-// /**
-//  * xmlNodeBufGetContent:
-//  * @buffer:  a buffer
-//  * @cur:  the node being read
-//  *
-//  * Read the value of a node @cur, this can be either the text carried
-//  * directly by this node if it's a TEXT node or the aggregate string
-//  * of the values carried by this node child's (TEXT and ENTITY_REF).
-//  * Entity references are substituted.
-//  * Fills up the buffer @buffer with this value
-//  *
-//  * Returns 0 in case of success and -1 in case of error.
-//  */
-// pub unsafe extern "C" fn xml_node_buf_get_content(
-//     mut buffer: XmlBufferPtr,
-//     cur: *const XmlNode,
-// ) -> i32 {
-//     if cur.is_null() || buffer.is_null() {
-//         return -1;
-//     }
-//     let buf: XmlBufPtr = xml_buf_from_buffer(buffer);
-//     let ret: i32 = xml_buf_get_node_content(buf, cur);
-//     buffer = xml_buf_back_to_buffer(buf);
-//     if ret < 0 || buffer.is_null() {
-//         return -1;
-//     }
-//     0
-// }
 
 /**
  * xmlBufGetNodeContent:
@@ -8433,45 +8367,6 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     ret as _
 }
 
-// /**
-//  * xmlNodeDump:
-//  * @buf:  the XML buffer output
-//  * @doc:  the document
-//  * @cur:  the current node
-//  * @level: the imbrication level for indenting
-//  * @format: is formatting allowed
-//  *
-//  * Dump an XML node, recursive behaviour,children are printed too.
-//  * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
-//  * or xmlKeepBlanksDefault(0) was called.
-//  * Since this is using xmlBuffer structures it is limited to 2GB and somehow
-//  * deprecated, use xmlNodeDumpOutput() instead.
-//  *
-//  * Returns the number of bytes written to the buffer or -1 in case of error
-//  */
-// #[cfg(feature = "output")]
-// pub unsafe extern "C" fn xml_node_dump(
-//     buf: XmlBufferPtr,
-//     doc: XmlDocPtr,
-//     cur: XmlNodePtr,
-//     level: i32,
-//     format: i32,
-// ) -> i32 {
-//     if buf.is_null() || cur.is_null() {
-//         return -1;
-//     }
-//     let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
-//     if buffer.is_null() {
-//         return -1;
-//     }
-//     let ret: usize = xml_buf_node_dump(buffer, doc, cur, level, format);
-//     xml_buf_back_to_buffer(buffer);
-//     if ret > i32::MAX as usize {
-//         return -1;
-//     }
-//     ret as _
-// }
-
 /**
  * xmlSaveFileTo:
  * @buf:  an output I/O buffer
@@ -8624,7 +8519,11 @@ pub unsafe fn xml_node_dump_output(
 
     #[cfg(feature = "html")]
     {
-        dtd = xml_get_int_subset(doc);
+        dtd = if doc.is_null() {
+            null_mut()
+        } else {
+            (*doc).get_int_subset()
+        };
         if !dtd.is_null() {
             is_xhtml = xml_is_xhtml((*dtd).system_id, (*dtd).external_id);
             if is_xhtml < 0 {
@@ -13268,31 +13167,6 @@ mod tests {
                         leaks == 0,
                         "{leaks} Leaks are found in xmlGetDocCompressMode()"
                     );
-                    eprintln!(" {}", n_doc);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_int_subset() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_const_xml_doc_ptr(n_doc, 0);
-
-                let ret_val = xml_get_int_subset(doc);
-                desret_xml_dtd_ptr(ret_val);
-                des_const_xml_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlGetIntSubset",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlGetIntSubset()");
                     eprintln!(" {}", n_doc);
                 }
             }

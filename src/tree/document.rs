@@ -2,7 +2,7 @@ use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::{dict::XmlDict, encoding::XmlCharEncoding};
 
-use super::{XmlDtd, XmlElementType, XmlNode, XmlNs};
+use super::{XmlDtd, XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs};
 
 /// An XML document.
 pub type XmlDocPtr = *mut XmlDoc;
@@ -42,6 +42,24 @@ pub struct XmlDoc {
                                   document */
     pub properties: i32, /* set of xmlDocProperties for this document
                          set at the end of parsing */
+}
+
+impl XmlDoc {
+    /// Get the internal subset of a document
+    /// Returns a pointer to the DTD structure or null_mut() if not found
+    #[doc(alias = "xmlGetIntSubset")]
+    pub unsafe fn get_int_subset(&self) -> XmlDtdPtr {
+        let mut cur: XmlNodePtr;
+
+        cur = self.children;
+        while !cur.is_null() {
+            if matches!((*cur).typ, XmlElementType::XmlDtdNode) {
+                return cur as _;
+            }
+            cur = (*cur).next;
+        }
+        self.int_subset
+    }
 }
 
 impl Default for XmlDoc {

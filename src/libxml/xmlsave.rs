@@ -42,9 +42,8 @@ use crate::{
     },
     private::{buf::xml_buf_set_allocation_scheme, save::xml_buf_attr_serialize_txt_content},
     tree::{
-        xml_get_int_subset, xml_is_xhtml, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
-        XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr,
-        XmlNsPtr, XML_LOCAL_NAMESPACE,
+        xml_is_xhtml, XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr,
+        XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -1665,7 +1664,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                 is_xhtml = 1;
             }
             if (*ctxt).options & XmlSaveOption::XmlSaveNoXhtml as i32 == 0 {
-                dtd = xml_get_int_subset(cur);
+                dtd = (*cur).get_int_subset();
                 if !dtd.is_null() {
                     is_xhtml = xml_is_xhtml((*dtd).system_id, (*dtd).external_id);
                     if is_xhtml < 0 {

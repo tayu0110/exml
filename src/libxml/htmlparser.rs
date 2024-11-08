@@ -48,8 +48,8 @@ use crate::{
     },
     private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
-        xml_create_int_subset, xml_free_doc, xml_get_int_subset, xml_get_last_child,
-        xml_node_is_text, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
+        xml_create_int_subset, xml_free_doc, xml_get_last_child, xml_node_is_text, XmlDocPtr,
+        XmlDtdPtr, XmlElementType, XmlNodePtr,
     },
 };
 
@@ -8864,7 +8864,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
 
     /* Only strip CDATA children of the body tag for strict HTML DTDs */
     if xml_str_equal((*ctxt).name, c"body".as_ptr() as _) && !(*ctxt).my_doc.is_null() {
-        dtd = xml_get_int_subset((*ctxt).my_doc);
+        dtd = (*(*ctxt).my_doc).get_int_subset();
         if !dtd.is_null()
             && !(*dtd).external_id.is_null()
             && (xml_strcasecmp(
@@ -10028,7 +10028,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
     if (*ctxt).options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0
         && !(*ctxt).my_doc.is_null()
     {
-        dtd = xml_get_int_subset((*ctxt).my_doc);
+        dtd = (*(*ctxt).my_doc).get_int_subset();
         if dtd.is_null() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,
@@ -11604,7 +11604,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
             ))
     {
-        let dtd: XmlDtdPtr = xml_get_int_subset((*ctxt).my_doc);
+        let dtd: XmlDtdPtr = (*(*ctxt).my_doc).get_int_subset();
         if dtd.is_null() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,

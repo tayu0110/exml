@@ -95,10 +95,9 @@ use exml::{
     tree::{
         xml_copy_doc, xml_doc_dump, xml_doc_dump_format_memory, xml_doc_dump_format_memory_enc,
         xml_doc_dump_memory, xml_doc_dump_memory_enc, xml_doc_set_root_element, xml_free_doc,
-        xml_free_dtd, xml_get_int_subset, xml_new_doc, xml_new_doc_node, xml_node_set_content,
-        xml_save_file, xml_save_file_enc, xml_save_format_file, xml_save_format_file_enc,
-        xml_set_compress_mode, xml_unlink_node, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-        XmlEnumerationPtr, XmlNodePtr,
+        xml_free_dtd, xml_new_doc, xml_new_doc_node, xml_node_set_content, xml_save_file,
+        xml_save_file_enc, xml_save_format_file, xml_save_format_file_enc, xml_set_compress_mode,
+        xml_unlink_node, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -2664,7 +2663,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
      * Remove DOCTYPE nodes
      */
     if DROPDTD != 0 {
-        let dtd: XmlDtdPtr = xml_get_int_subset(doc);
+        let dtd: XmlDtdPtr = (*doc).get_int_subset();
         if !dtd.is_null() {
             xml_unlink_node(dtd as XmlNodePtr);
             (*doc).int_subset = null_mut();
