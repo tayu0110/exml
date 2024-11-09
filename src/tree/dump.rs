@@ -8,7 +8,10 @@ use libc::{memset, FILE};
 use crate::{
     encoding::find_encoding_handler,
     error::XmlParserErrors,
-    io::{xml_alloc_output_buffer, xml_output_buffer_close, XmlOutputBufferPtr},
+    io::{
+        xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_create_file,
+        XmlOutputBufferPtr,
+    },
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::xml_init_parser,
@@ -154,61 +157,47 @@ impl XmlDoc {
     ) {
         self.dump_format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
     }
-}
 
-/**
- * xmlDocFormatDump:
- * @f:  the FILE*
- * @cur:  the document
- * @format: should formatting spaces been added
- *
- * Dump an XML document to an open FILE.
- *
- * returns: the number of bytes written or -1 in case of failure.
- * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
- * or xmlKeepBlanksDefault(0) was called
- */
-pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, format: i32) -> i32 {
-    use crate::{
-        encoding::find_encoding_handler,
-        io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
-        libxml::xmlsave::{xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveOption},
-    };
+    /// Dump an XML document to an open FILE.
+    ///
+    /// returns: the number of bytes written or -1 in case of failure.
+    ///
+    /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
+    /// or `xmlKeepBlanksDefault(0)` was called
+    #[doc(alias = "xmlDocFormatDump")]
+    pub unsafe fn dump_format_file(&mut self, f: *mut FILE, format: i32) -> i32 {
+        let mut encoding = self.encoding.clone();
 
-    use crate::libxml::xmlsave::XmlSaveCtxt;
-
-    let mut ctxt = XmlSaveCtxt::default();
-
-    if cur.is_null() {
-        return -1;
-    }
-    let mut encoding = (*cur).encoding.clone();
-
-    let handler = if let Some(enc) = (*cur).encoding.as_deref() {
-        if let Some(handler) = find_encoding_handler(enc) {
-            Some(handler)
+        let handler = if let Some(enc) = self.encoding.as_deref() {
+            if let Some(handler) = find_encoding_handler(enc) {
+                Some(handler)
+            } else {
+                self.encoding = None;
+                encoding = None;
+                None
+            }
         } else {
-            (*cur).encoding = None;
-            encoding = None;
             None
+        };
+        let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, handler);
+        if buf.is_null() {
+            return -1;
         }
-    } else {
-        None
-    };
-    let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, handler);
-    if buf.is_null() {
-        return -1;
-    }
-    ctxt.buf = buf;
-    ctxt.level = 0;
-    ctxt.format = if format != 0 { 1 } else { 0 };
-    ctxt.encoding = encoding;
-    xml_save_ctxt_init(&mut ctxt);
-    ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-    xml_doc_content_dump_output(&raw mut ctxt as _, cur);
 
-    let ret: i32 = xml_output_buffer_close(buf);
-    ret
+        let mut ctxt = XmlSaveCtxt {
+            buf,
+            level: 0,
+            format: (format != 0) as i32,
+            encoding,
+            ..Default::default()
+        };
+        xml_save_ctxt_init(&mut ctxt);
+        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        xml_doc_content_dump_output(&raw mut ctxt as _, self);
+
+        let ret: i32 = xml_output_buffer_close(buf);
+        ret
+    }
 }
 
 /**
@@ -222,7 +211,11 @@ pub unsafe extern "C" fn xml_doc_format_dump(f: *mut FILE, cur: XmlDocPtr, forma
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
-    xml_doc_format_dump(f, cur, 0)
+    if !cur.is_null() {
+        (*cur).dump_format_file(f, 0)
+    } else {
+        -1
+    }
 }
 
 /**
