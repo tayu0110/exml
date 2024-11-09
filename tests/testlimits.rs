@@ -190,13 +190,17 @@ unsafe extern "C" fn huge_close(context: *mut c_void) -> i32 {
 
 const CHUNK: usize = 4096;
 
-static mut FILLING: [i8; CHUNK + 1] = [0; CHUNK + 1];
+thread_local! {
+    static FILLING: RefCell<[i8; CHUNK + 1]> = const { RefCell::new([0; CHUNK + 1]) };
+}
 
-unsafe extern "C" fn fill_filling() {
-    for f in FILLING.iter_mut().take(CHUNK) {
-        *f = b'a' as _;
-    }
-    FILLING[CHUNK] = 0;
+fn fill_filling() {
+    FILLING.with_borrow_mut(|filling| {
+        for f in filling.iter_mut().take(CHUNK) {
+            *f = b'a' as _;
+        }
+        filling[CHUNK] = 0;
+    })
 }
 
 /**
@@ -244,7 +248,9 @@ unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i
             if len as usize > CHUNK {
                 len = CHUNK as i32;
             }
-            memcpy(buffer as _, FILLING.as_ptr() as _, len as usize);
+            FILLING.with_borrow_mut(|filling| {
+                memcpy(buffer as _, filling.as_ptr() as _, len as usize);
+            });
             context.curlen += len as usize;
             if context.curlen >= context.maxlen {
                 context.rlen = strlen(HUGE_TESTS[context.current_test].end.as_ptr() as _) as _;
@@ -374,7 +380,9 @@ unsafe extern "C" fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: 
             if len as usize > CHUNK {
                 len = CHUNK as i32;
             }
-            memcpy(buffer as _, FILLING.as_ptr() as _, len as _);
+            FILLING.with_borrow_mut(|filling| {
+                memcpy(buffer as _, filling.as_ptr() as _, len as _);
+            });
             context.curlen += len as usize;
             if context.curlen >= context.maxlen {
                 context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX;
