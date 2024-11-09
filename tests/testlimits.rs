@@ -402,10 +402,12 @@ unsafe extern "C" fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: 
  *									*
  ************************************************************************/
 
-static mut NB_TESTS: i32 = 0;
-static mut NB_ERRORS: i32 = 0;
-static mut NB_LEAKS: i32 = 0;
-static mut EXTRA_MEMORY_FROM_RESOLVER: i32 = 0;
+thread_local! {
+    static NB_TESTS: Cell<i32> = const { Cell::new(0) };
+    static NB_ERRORS: Cell<i32> = const { Cell::new(0) };
+    static NB_LEAKS: Cell<i32> = const { Cell::new(0) };
+    static EXTRA_MEMORY_FROM_RESOLVER: Cell<i32> = const { Cell::new(0) };
+}
 
 /*
  * We need to trap calls to the resolver to not account memory for the catalog
@@ -420,7 +422,7 @@ unsafe extern "C" fn test_external_entity_loader(
     let memused: i32 = xml_mem_used();
 
     let ret: XmlParserInputPtr = xml_no_net_external_entity_loader(url, id, ctxt);
-    EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
+    EXTRA_MEMORY_FROM_RESOLVER.set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
 
     ret
 }
@@ -983,7 +985,7 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
     let res: i32;
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
 
     DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
     let ctxt: XmlParserCtxtPtr =
@@ -1039,7 +1041,7 @@ unsafe extern "C" fn reader_test(
 
     let mut res: i32;
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
 
     DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
     let reader: XmlTextReaderPtr = xml_reader_for_file(filename, null_mut(), options);
@@ -1258,7 +1260,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
         let name = CString::new(descr.name).unwrap();
         res = tst.func.unwrap()(name.as_ptr() as _, limit, descr.options, fail);
         if res != 0 {
-            NB_ERRORS += 1;
+            NB_ERRORS.set(NB_ERRORS.get() + 1);
             err += 1;
         }
     }
@@ -1268,9 +1270,9 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
 unsafe extern "C" fn runtest(i: u32) -> i32 {
     let mut ret: i32 = 0;
 
-    let old_errors: i32 = NB_ERRORS;
-    let old_tests: i32 = NB_TESTS;
-    let old_leaks: i32 = NB_LEAKS;
+    let old_errors: i32 = NB_ERRORS.get();
+    let old_tests: i32 = NB_TESTS.get();
+    let old_leaks: i32 = NB_LEAKS.get();
     if TEST_DESCRIPTIONS[i as usize].desc.is_some() {
         println!("## {}", TEST_DESCRIPTIONS[i as usize].desc.unwrap());
     }
@@ -1279,14 +1281,14 @@ unsafe extern "C" fn runtest(i: u32) -> i32 {
     if res != 0 {
         ret += 1;
     }
-    if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
-        println!("Ran {} tests, no errors", NB_TESTS - old_tests);
+    if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
+        println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
     } else {
         println!(
             "Ran {} tests, {} errors, {} leaks",
-            NB_TESTS - old_tests,
-            NB_ERRORS - old_errors,
-            NB_LEAKS - old_leaks
+            NB_TESTS.get() - old_tests,
+            NB_ERRORS.get() - old_errors,
+            NB_LEAKS.get() - old_leaks
         );
     }
     ret
@@ -1304,7 +1306,7 @@ unsafe extern "C" fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
         fail,
     );
     if res != 0 {
-        NB_ERRORS += 1;
+        NB_ERRORS.set(NB_ERRORS.get() + 1);
         err += 1;
     }
     eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
@@ -1325,7 +1327,7 @@ unsafe extern "C" fn launch_crazy(test: u32, fail: i32) -> i32 {
         fail,
     );
     if res != 0 {
-        NB_ERRORS += 1;
+        NB_ERRORS.set(NB_ERRORS.get() + 1);
         err += 1;
     }
     eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
@@ -1361,9 +1363,9 @@ unsafe extern "C" fn runcrazy() -> i32 {
     let mut ret: i32 = 0;
     let mut res: i32 = 0;
 
-    let old_errors: i32 = NB_ERRORS;
-    let old_tests: i32 = NB_TESTS;
-    let old_leaks: i32 = NB_LEAKS;
+    let old_errors: i32 = NB_ERRORS.get();
+    let old_tests: i32 = NB_TESTS.get();
+    let old_leaks: i32 = NB_LEAKS.get();
 
     #[cfg(feature = "libxml_reader")]
     {
@@ -1384,14 +1386,14 @@ unsafe extern "C" fn runcrazy() -> i32 {
         }
     }
     eprintln!();
-    if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
-        println!("Ran {} tests, no errors", NB_TESTS - old_tests);
+    if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
+        println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
     } else {
         println!(
             "Ran {} tests, {} errors, {} leaks",
-            NB_TESTS - old_tests,
-            NB_ERRORS - old_errors,
-            NB_LEAKS - old_leaks
+            NB_TESTS.get() - old_tests,
+            NB_ERRORS.get() - old_errors,
+            NB_LEAKS.get() - old_leaks
         );
     }
     ret
@@ -1417,14 +1419,16 @@ fn main() {
             }
         }
         assert_eq!(runcrazy(), 0, "Failed to pass runcrazy()");
-        if NB_ERRORS == 0 && NB_LEAKS == 0 {
+        if NB_ERRORS.get() == 0 && NB_LEAKS.get() == 0 {
             ret = 0;
-            println!("Total {} tests, no errors", NB_TESTS);
+            println!("Total {} tests, no errors", NB_TESTS.get());
         } else {
             ret = 1;
             println!(
                 "Total {} tests, {} errors, {} leaks\n",
-                NB_TESTS, NB_ERRORS, NB_LEAKS,
+                NB_TESTS.get(),
+                NB_ERRORS.get(),
+                NB_LEAKS.get(),
             );
         }
         xml_cleanup_parser();
