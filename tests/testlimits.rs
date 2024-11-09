@@ -2,7 +2,7 @@
 //! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     env::args,
     ffi::{CStr, CString},
     io::{self, Read},
@@ -272,8 +272,9 @@ unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i
  *		Crazy document generator				*
  *									*
  ************************************************************************/
-
-static mut CRAZY_INDX: usize = 0;
+thread_local! {
+    static CRAZY_INDX: Cell<usize> = const { Cell::new(0) };
+}
 
 const CRAZY: &CStr = c"<?xml version='1.0' encoding='UTF-8'?><?tst ?><!-- tst --><!DOCTYPE foo [<?tst ?><!-- tst --><!ELEMENT foo (#PCDATA)><!ELEMENT p (#PCDATA|emph)* >]><?tst ?><!-- tst --><foo bar='foo'><?tst ?><!-- tst -->foo<![CDATA[ ]]></foo><?tst ?><!-- tst -->";
 
@@ -298,17 +299,17 @@ fn crazy_match(uri: &str) -> i32 {
  *
  * Returns an Input context or NULL in case or error
  */
-unsafe fn crazy_open(uri: &str) -> *mut c_void {
+fn crazy_open(uri: &str) -> *mut c_void {
     if !uri.starts_with("crazy:") {
         return null_mut();
     }
 
-    if CRAZY_INDX > CRAZY.to_bytes().len() {
+    if CRAZY_INDX.get() > CRAZY.to_bytes().len() {
         return null_mut();
     }
     reset_timout();
     DOCUMENT_CONTEXT.with_borrow_mut(|context| {
-        context.rlen = CRAZY_INDX;
+        context.rlen = CRAZY_INDX.get();
         context.current = CRAZY.as_ptr();
         context.instate = 0;
         context.current as _
@@ -347,9 +348,9 @@ unsafe extern "C" fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: 
 
     DOCUMENT_CONTEXT.with_borrow_mut(|context| {
         if check_time() <= 0 && context.instate == 1 {
-            eprintln!("\ntimeout in crazy({})", CRAZY_INDX);
-            context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX;
-            context.current = CRAZY.as_ptr().add(CRAZY_INDX) as _;
+            eprintln!("\ntimeout in crazy({})", CRAZY_INDX.get());
+            context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX.get();
+            context.current = CRAZY.as_ptr().add(CRAZY_INDX.get()) as _;
             context.instate = 2;
         }
         if context.instate == 0 {
@@ -385,8 +386,8 @@ unsafe extern "C" fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: 
             });
             context.curlen += len as usize;
             if context.curlen >= context.maxlen {
-                context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX;
-                context.current = CRAZY.as_ptr().add(CRAZY_INDX) as _;
+                context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX.get();
+                context.current = CRAZY.as_ptr().add(CRAZY_INDX.get()) as _;
                 context.instate = 2;
             }
         } else {
@@ -659,7 +660,7 @@ unsafe extern "C" fn initialize_libxml2() {
             crazy_match(filename) != 0
         }
         fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
-            let ptr = unsafe { crazy_open(filename) };
+            let ptr = crazy_open(filename);
             if ptr.is_null() {
                 Err(io::Error::other("Failed to execute crazy_open"))
             } else {
@@ -1059,8 +1060,9 @@ unsafe extern "C" fn reader_test(
         } else {
             if strncmp(filename, c"crazy:".as_ptr(), 6) == 0 {
                 eprintln!(
-                    "Failed to parse '{}' {CRAZY_INDX}",
-                    CStr::from_ptr(filename).to_string_lossy()
+                    "Failed to parse '{}' {}",
+                    CStr::from_ptr(filename).to_string_lossy(),
+                    CRAZY_INDX.get()
                 );
             } else {
                 eprintln!(
@@ -1073,8 +1075,9 @@ unsafe extern "C" fn reader_test(
     } else if fail != 0 {
         if strncmp(filename, c"crazy:".as_ptr(), 6) == 0 {
             eprintln!(
-                "Failed to get failure for '{}' {CRAZY_INDX}",
-                CStr::from_ptr(filename).to_string_lossy()
+                "Failed to get failure for '{}' {}",
+                CStr::from_ptr(filename).to_string_lossy(),
+                CRAZY_INDX.get()
             );
         } else {
             eprintln!(
@@ -1292,7 +1295,7 @@ unsafe extern "C" fn runtest(i: u32) -> i32 {
 unsafe extern "C" fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
     let mut err: i32 = 0;
 
-    CRAZY_INDX = test as _;
+    CRAZY_INDX.set(test as usize);
 
     let res = sax_test(
         c"crazy::test".as_ptr(),
@@ -1313,7 +1316,7 @@ unsafe extern "C" fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
 unsafe extern "C" fn launch_crazy(test: u32, fail: i32) -> i32 {
     let mut err: i32 = 0;
 
-    CRAZY_INDX = test as _;
+    CRAZY_INDX.set(test as usize);
 
     let res = reader_test(
         c"crazy::test".as_ptr(),
