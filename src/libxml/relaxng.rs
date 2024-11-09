@@ -9112,8 +9112,6 @@ pub unsafe extern "C" fn xml_relaxng_dump(output: *mut FILE, schema: XmlRelaxNGP
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_relaxng_dump_tree(output: *mut FILE, schema: XmlRelaxNGPtr) {
-    use crate::tree::xml_doc_dump;
-
     if output.is_null() {
         return;
     }
@@ -9127,7 +9125,7 @@ pub unsafe extern "C" fn xml_relaxng_dump_tree(output: *mut FILE, schema: XmlRel
     if (*schema).doc.is_null() {
         fprintf(output, c"no document\n".as_ptr() as _);
     } else {
-        xml_doc_dump(output, (*schema).doc);
+        (*(*schema).doc).dump_file(output);
     }
 }
 

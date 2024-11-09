@@ -198,23 +198,14 @@ impl XmlDoc {
         let ret: i32 = xml_output_buffer_close(buf);
         ret
     }
-}
 
-/**
- * xmlDocDump:
- * @f:  the FILE*
- * @cur:  the document
- *
- * Dump an XML document to an open FILE.
- *
- * returns: the number of bytes written or -1 in case of failure.
- */
-#[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
-    if !cur.is_null() {
-        (*cur).dump_format_file(f, 0)
-    } else {
-        -1
+    /// Dump an XML document to an open FILE.
+    ///
+    /// returns: the number of bytes written or -1 in case of failure.
+    #[doc(alias = "xmlDocDump")]
+    #[cfg(feature = "output")]
+    pub unsafe fn dump_file(&mut self, f: *mut FILE) -> i32 {
+        self.dump_format_file(f, 0)
     }
 }
 

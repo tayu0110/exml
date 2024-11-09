@@ -2295,7 +2295,7 @@ pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *
  */
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
-    use crate::tree::{xml_doc_dump, xml_elem_dump};
+    use crate::tree::xml_elem_dump;
 
     if !node.is_null() {
         return;
@@ -2312,7 +2312,7 @@ unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlN
     };
 
     if (*node).typ == XmlElementType::XmlDocumentNode {
-        xml_doc_dump(fp, node as XmlDocPtr);
+        (*(node as XmlDocPtr)).dump_file(fp);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
         xml_debug_dump_attr_list(fp, node as XmlAttrPtr, 0);
     } else {
@@ -2621,7 +2621,7 @@ pub unsafe extern "C" fn xml_shell_cat(
 ) -> i32 {
     use crate::{
         libxml::htmltree::{html_doc_dump, html_node_dump_file},
-        tree::{xml_doc_dump, xml_elem_dump},
+        tree::xml_elem_dump,
     };
 
     use super::htmlparser::HtmlDocPtr;
@@ -2642,12 +2642,12 @@ pub unsafe extern "C" fn xml_shell_cat(
         }
         #[cfg(not(feature = "html"))]
         if (*node).typ == XmlElementType::XmlDocumentNode {
-            xml_doc_dump((*ctxt).output, node as XmlDocPtr);
+            (*(node as XmlDocPtr)).dump_file((*ctxt).output);
         } else {
             xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
         }
     } else if (*node).typ == XmlElementType::XmlDocumentNode {
-        xml_doc_dump((*ctxt).output, node as XmlDocPtr);
+        (*(node as XmlDocPtr)).dump_file((*ctxt).output);
     } else {
         xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
     }

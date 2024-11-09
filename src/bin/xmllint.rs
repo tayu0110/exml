@@ -93,7 +93,7 @@ use exml::{
         xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     },
     tree::{
-        xml_copy_doc, xml_doc_dump, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
+        xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
         xml_node_set_content, xml_save_file, xml_save_file_enc, xml_save_format_file,
         xml_save_format_file_enc, xml_set_compress_mode, NodeCommon, XmlDocPtr, XmlDtdPtr,
         XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
@@ -2987,7 +2987,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         .as_ref()
                         .map_or(stdout, |o| fopen(o.as_ptr(), c"wb".as_ptr()));
                     if !out.is_null() {
-                        if xml_doc_dump(out, doc) < 0 {
+                        if doc.is_null() || (*doc).dump_file(out) < 0 {
                             PROGRESULT = XmllintReturnCode::ErrOut;
                         }
 

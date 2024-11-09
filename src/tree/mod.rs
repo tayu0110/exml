@@ -9594,38 +9594,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_doc_dump() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_f in 0..GEN_NB_FILE_PTR {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let f = gen_file_ptr(n_f, 0);
-                    let cur = gen_xml_doc_ptr(n_cur, 1);
-
-                    let ret_val = xml_doc_dump(f, cur);
-                    desret_int(ret_val);
-                    des_file_ptr(n_f, f, 0);
-                    des_xml_doc_ptr(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDocDump",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlDocDump()");
-                        eprint!(" {}", n_f);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_elem_dump() {
         #[cfg(feature = "output")]
         unsafe {
