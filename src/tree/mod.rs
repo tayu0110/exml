@@ -8659,214 +8659,6 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
     ret
 }
 
-/*
- * 5 interfaces from DOM ElementTraversal, but different in entities
- * traversal.
- */
-/**
- * xmlChildElementCount:
- * @parent: the parent node
- *
- * Finds the current number of child nodes of that element which are
- * element nodes.
- * Note the handling of entities references is different than in
- * the W3C DOM element traversal spec since we don't have back reference
- * from entities content to entities references.
- *
- * Returns the count of element child or 0 if not available
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_child_element_count(parent: XmlNodePtr) -> u64 {
-    let mut ret: u64 = 0;
-    let mut cur: XmlNodePtr;
-
-    if parent.is_null() {
-        return 0;
-    }
-    match (*parent).typ {
-        XmlElementType::XmlElementNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlHtmlDocumentNode => {
-            cur = (*parent).children;
-        }
-        _ => {
-            return 0;
-        }
-    }
-    while !cur.is_null() {
-        if matches!((*cur).typ, XmlElementType::XmlElementNode) {
-            ret += 1;
-        }
-        cur = (*cur).next;
-    }
-    ret
-}
-
-/**
- * xmlNextElementSibling:
- * @node: the current node
- *
- * Finds the first closest next sibling of the node which is an
- * element node.
- * Note the handling of entities references is different than in
- * the W3C DOM element traversal spec since we don't have back reference
- * from entities content to entities references.
- *
- * Returns the next element sibling or null_mut() if not available
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_next_element_sibling(mut node: XmlNodePtr) -> XmlNodePtr {
-    if node.is_null() {
-        return null_mut();
-    }
-    match (*node).typ {
-        XmlElementType::XmlElementNode
-        | XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPiNode
-        | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlDtdNode
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {
-            node = (*node).next;
-        }
-        _ => {
-            return null_mut();
-        }
-    }
-    while !node.is_null() {
-        if matches!((*node).typ, XmlElementType::XmlElementNode) {
-            return node;
-        }
-        node = (*node).next;
-    }
-    null_mut()
-}
-
-/**
- * xmlFirstElementChild:
- * @parent: the parent node
- *
- * Finds the first child node of that element which is a Element node
- * Note the handling of entities references is different than in
- * the W3C DOM element traversal spec since we don't have back reference
- * from entities content to entities references.
- *
- * Returns the first element child or null_mut() if not available
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_first_element_child(parent: XmlNodePtr) -> XmlNodePtr {
-    let mut cur: XmlNodePtr;
-
-    if parent.is_null() {
-        return null_mut();
-    }
-    match (*parent).typ {
-        XmlElementType::XmlElementNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlHtmlDocumentNode => {
-            cur = (*parent).children;
-        }
-        _ => {
-            return null_mut();
-        }
-    }
-    while !cur.is_null() {
-        if matches!((*cur).typ, XmlElementType::XmlElementNode) {
-            return cur;
-        }
-        cur = (*cur).next;
-    }
-    null_mut()
-}
-
-/**
- * xmlLastElementChild:
- * @parent: the parent node
- *
- * Finds the last child node of that element which is a Element node
- * Note the handling of entities references is different than in
- * the W3C DOM element traversal spec since we don't have back reference
- * from entities content to entities references.
- *
- * Returns the last element child or null_mut() if not available
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_last_element_child(parent: XmlNodePtr) -> XmlNodePtr {
-    let mut cur: XmlNodePtr;
-
-    if parent.is_null() {
-        return null_mut();
-    }
-    match (*parent).typ {
-        XmlElementType::XmlElementNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlHtmlDocumentNode => {
-            cur = (*parent).last;
-        }
-        _ => {
-            return null_mut();
-        }
-    }
-    while !cur.is_null() {
-        if matches!((*cur).typ, XmlElementType::XmlElementNode) {
-            return cur;
-        }
-        cur = (*cur).prev;
-    }
-    null_mut()
-}
-
-/**
- * xmlPreviousElementSibling:
- * @node: the current node
- *
- * Finds the first closest previous sibling of the node which is an
- * element node.
- * Note the handling of entities references is different than in
- * the W3C DOM element traversal spec since we don't have back reference
- * from entities content to entities references.
- *
- * Returns the previous element sibling or null_mut() if not available
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_previous_element_sibling(mut node: XmlNodePtr) -> XmlNodePtr {
-    if node.is_null() {
-        return null_mut();
-    }
-    match (*node).typ {
-        XmlElementType::XmlElementNode
-        | XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPiNode
-        | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {
-            node = (*node).prev;
-        }
-        _ => {
-            return null_mut();
-        }
-    }
-    while !node.is_null() {
-        if matches!((*node).typ, XmlElementType::XmlElementNode) {
-            return node;
-        }
-        node = (*node).prev;
-    }
-    null_mut()
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
@@ -8920,36 +8712,6 @@ mod tests {
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_child_element_count() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_parent in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let parent = gen_xml_node_ptr(n_parent, 0);
-
-                let ret_val = xml_child_element_count(parent);
-                desret_unsigned_long(ret_val);
-                des_xml_node_ptr(n_parent, parent, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlChildElementCount",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlChildElementCount()"
-                    );
-                    eprintln!(" {}", n_parent);
                 }
             }
         }
@@ -9456,36 +9218,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_first_element_child() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_parent in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let parent = gen_xml_node_ptr(n_parent, 0);
-
-                let ret_val = xml_first_element_child(parent);
-                desret_xml_node_ptr(ret_val);
-                des_xml_node_ptr(n_parent, parent, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlFirstElementChild",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlFirstElementChild()"
-                    );
-                    eprintln!(" {}", n_parent);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_get_compress_mode() {
         unsafe {
             let mut leaks = 0;
@@ -9626,36 +9358,6 @@ mod tests {
                         eprint!(" {}", n_system_id);
                         eprintln!(" {}", n_public_id);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_last_element_child() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_parent in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let parent = gen_xml_node_ptr(n_parent, 0);
-
-                let ret_val = xml_last_element_child(parent);
-                desret_xml_node_ptr(ret_val);
-                des_xml_node_ptr(n_parent, parent, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlLastElementChild",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlLastElementChild()"
-                    );
-                    eprintln!(" {}", n_parent);
                 }
             }
         }
@@ -10544,36 +10246,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_next_element_sibling() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let node = gen_xml_node_ptr(n_node, 0);
-
-                let ret_val = xml_next_element_sibling(node);
-                desret_xml_node_ptr(ret_val);
-                des_xml_node_ptr(n_node, node, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNextElementSibling",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlNextElementSibling()"
-                    );
-                    eprintln!(" {}", n_node);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_node_add_content_len() {
         unsafe {
             let mut leaks = 0;
@@ -10850,36 +10522,6 @@ mod tests {
                         eprint!(" {}", n_cur);
                         eprintln!(" {}", n_val);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_previous_element_sibling() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let node = gen_xml_node_ptr(n_node, 0);
-
-                let ret_val = xml_previous_element_sibling(node);
-                desret_xml_node_ptr(ret_val);
-                des_xml_node_ptr(n_node, node, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlPreviousElementSibling",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlPreviousElementSibling()"
-                    );
-                    eprintln!(" {}", n_node);
                 }
             }
         }
