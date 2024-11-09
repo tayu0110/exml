@@ -5,12 +5,15 @@ use libc::memset;
 use crate::{
     dict::XmlDict,
     encoding::XmlCharEncoding,
-    libxml::globals::{xml_malloc, xml_register_node_default_value},
+    libxml::{
+        globals::{xml_malloc, xml_register_node_default_value},
+        xmlstring::xml_strdup,
+    },
 };
 
 use super::{
     xml_tree_err_memory, NodeCommon, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode,
-    XmlNodePtr, XmlNs, __XML_REGISTER_CALLBACKS,
+    XmlNodePtr, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
 /// An XML document.
@@ -119,6 +122,34 @@ impl XmlDoc {
             xml_replace_node(old, root);
         }
         old
+    }
+
+    /// Ensures that there is an XML namespace declaration on the doc.
+    ///
+    /// Returns the XML ns-struct or null_mut() on API and internal errors.
+    #[doc(alias = "xmlTreeEnsureXMLDecl")]
+    pub(super) unsafe fn ensure_xmldecl(&mut self) -> XmlNsPtr {
+        if !self.old_ns.is_null() {
+            return self.old_ns;
+        }
+        {
+            let ns = xml_malloc(size_of::<XmlNs>()) as XmlNsPtr;
+            if ns.is_null() {
+                xml_tree_err_memory(c"allocating the XML namespace".as_ptr() as _);
+                return null_mut();
+            }
+            memset(ns as _, 0, size_of::<XmlNs>());
+            (*ns).typ = Some(XML_LOCAL_NAMESPACE);
+            (*ns).href.store(
+                xml_strdup(XML_XML_NAMESPACE.as_ptr() as _) as _,
+                Ordering::Relaxed,
+            );
+            (*ns)
+                .prefix
+                .store(xml_strdup(c"xml".as_ptr() as _) as _, Ordering::Relaxed);
+            self.old_ns = ns;
+            ns
+        }
     }
 }
 

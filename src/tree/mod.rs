@@ -66,19 +66,11 @@ pub use id::*;
 pub use namespace::*;
 pub use node::*;
 
-/**
- * BASE_BUFFER_SIZE:
- *
- * default buffer size 4000.
- */
+/// default buffer size 4000.
 pub const BASE_BUFFER_SIZE: usize = 4096;
 
-/**
- *    xmlBufferAllocationScheme:
- *
- * A buffer allocation scheme can be defined to either match exactly the
- * need or double it's allocated size each time it is found too small.
- */
+/// A buffer allocation scheme can be defined to either match exactly the
+/// need or double it's allocated size each time it is found too small.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlBufferAllocationScheme {
@@ -116,30 +108,21 @@ impl TryFrom<i32> for XmlBufferAllocationScheme {
 
 pub(crate) static __XML_REGISTER_CALLBACKS: AtomicI32 = AtomicI32::new(0);
 
-/**
- * XML_XML_NAMESPACE:
- *
- * This is the namespace for the special xml: prefix predefined in the
- * XML Namespace specification.
- */
+/// This is the namespace for the special xml: prefix predefined in the
+/// XML Namespace specification.
 pub const XML_XML_NAMESPACE: &CStr = c"http://www.w3.org/XML/1998/namespace";
 
-/**
- * XML_XML_ID:
- *
- * This is the name for the special xml:id attribute
- */
+/// This is the name for the special xml:id attribute
 pub const XML_XML_ID: *const XmlChar = c"xml:id".as_ptr() as _;
 
-/*
- * The different element types carried by an XML tree.
- *
- * NOTE: This is synchronized with DOM Level1 values
- *       See http://www.w3.org/TR/REC-DOM-Level-1/
- *
- * Actually this had diverged a bit, and now XML_DOCUMENT_TYPE_NODE should
- * be deprecated to use an XML_DTD_NODE.
- */
+/// The different element types carried by an XML tree.
+///
+/// # NOTE
+/// This is synchronized with DOM Level1 values.  
+/// See http://www.w3.org/TR/REC-DOM-Level-1/
+///
+/// Actually this had diverged a bit, and now XML_DOCUMENT_TYPE_NODE should
+/// be deprecated to use an XML_DTD_NODE.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlElementType {
@@ -219,11 +202,7 @@ impl TryFrom<i32> for XmlElementType {
     }
 }
 
-/**
- * xmlAttributeType:
- *
- * A DTD Attribute type definition.
- */
+/// A DTD Attribute type definition.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlAttributeType {
@@ -271,12 +250,7 @@ impl TryFrom<i32> for XmlAttributeType {
     }
 }
 
-/**
- * xmlAttributeDefault:
- *
- * A DTD Attribute default definition.
- */
-
+/// A DTD Attribute default definition.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlAttributeDefault {
@@ -306,11 +280,7 @@ impl TryFrom<i32> for XmlAttributeDefault {
     }
 }
 
-/**
- * xmlElementContentType:
- *
- * Possible definitions of element content types.
- */
+/// Possible definitions of element content types.
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum XmlElementContentType {
@@ -320,11 +290,7 @@ pub enum XmlElementContentType {
     XmlElementContentOr,
 }
 
-/**
- * xmlElementContentOccur:
- *
- * Possible definitions of element content occurrences.
- */
+/// Possible definitions of element content occurrences.
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum XmlElementContentOccur {
@@ -334,12 +300,7 @@ pub enum XmlElementContentOccur {
     XmlElementContentPlus,
 }
 
-/**
- * xmlElementContent:
- *
- * An XML Element content as stored after parsing an element definition
- * in a DTD.
- */
+/// An XML Element content as stored after parsing an element definition in a DTD.
 pub type XmlElementContentPtr = *mut XmlElementContent;
 #[repr(C)]
 pub struct XmlElementContent {
@@ -352,12 +313,7 @@ pub struct XmlElementContent {
     pub(crate) prefix: *const XmlChar,     /* Namespace prefix */
 }
 
-/**
- * xmlElementTypeVal:
- *
- * The different possibilities for an element content type.
- */
-
+/// The different possibilities for an element content type.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlElementTypeVal {
@@ -390,20 +346,13 @@ impl TryFrom<i32> for XmlElementTypeVal {
     }
 }
 
-/**
- * XML_LOCAL_NAMESPACE:
- *
- * A namespace declaration node.
- */
+/// A namespace declaration node.
 pub(crate) const XML_LOCAL_NAMESPACE: XmlElementType = XmlElementType::XmlNamespaceDecl;
 pub type XmlNsType = XmlElementType;
 
-/**
- * xmlDocProperty
- *
- * Set of properties of the document as found by the parser
- * Some of them are linked to similarly named xmlParserOption
- */
+/// Set of properties of the document as found by the parser.
+///
+/// Some of them are linked to similarly named `xmlParserOption`.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlDocProperties {
@@ -445,19 +394,13 @@ pub type XmlDOMWrapCtxtPtr = *mut XmlDOMWrapCtxt;
 #[repr(C)]
 pub struct XmlDOMWrapCtxt {
     _private: *mut c_void,
-    /*
-     * The type of this context, just in case we need specialized
-     * contexts in the future.
-     */
+    /// The type of this context, just in case we need specialized
+    /// contexts in the future.
     typ: i32,
-    /*
-     * Internal namespace map used for various operations.
-     */
+    /// Internal namespace map used for various operations.
     namespace_map: *mut c_void,
-    /*
-     * Use this one to acquire an xmlNsPtr intended for node->ns.
-     * (Note that this is not intended for elem->nsDef).
-     */
+    /// Use this one to acquire an xmlNsPtr intended for node->ns.  
+    /// (Note that this is not intended for elem->nsDef).
     get_ns_for_node_func: Option<XmlDOMWrapAcquireNsFunction>,
 }
 
@@ -469,14 +412,12 @@ pub struct XmlNsMapItem {
     old_ns: XmlNsPtr,  /* old ns decl reference */
     new_ns: XmlNsPtr,  /* new ns decl reference */
     shadow_depth: i32, /* Shadowed at this depth */
-    /*
-     * depth:
-     * >= 0 == @node's ns-decls
-     * -1   == @parent's ns-decls
-     * -2   == the (*doc).oldNs XML ns-decl
-     * -3   == the (*doc).oldNs storage ns-decls
-     * -4   == ns-decls provided via custom ns-handling
-     */
+    /// depth:
+    /// `>= 0` == @node's ns-decls
+    /// `-1`   == @parent's ns-decls
+    /// `-2`   == the (*doc).oldNs XML ns-decl
+    /// `-3`   == the (*doc).oldNs storage ns-decls
+    /// `-4`   == ns-decls provided via custom ns-handling
     depth: i32,
 }
 
@@ -3472,41 +3413,6 @@ pub unsafe extern "C" fn xml_set_list_doc(list: XmlNodePtr, doc: XmlDocPtr) {
 }
 
 /*
-* xmlTreeEnsureXMLDecl:
-* @doc: the doc
-*
-* Ensures that there is an XML namespace declaration on the doc.
-*
-* Returns the XML ns-struct or null_mut() on API and internal errors.
-*/
-unsafe extern "C" fn xml_tree_ensure_xmldecl(doc: XmlDocPtr) -> XmlNsPtr {
-    if doc.is_null() {
-        return null_mut();
-    }
-    if !(*doc).old_ns.is_null() {
-        return (*doc).old_ns;
-    }
-    {
-        let ns: XmlNsPtr = xml_malloc(size_of::<XmlNs>()) as _;
-        if ns.is_null() {
-            xml_tree_err_memory(c"allocating the XML namespace".as_ptr() as _);
-            return null_mut();
-        }
-        memset(ns as _, 0, size_of::<XmlNs>());
-        (*ns).typ = Some(XML_LOCAL_NAMESPACE);
-        (*ns).href.store(
-            xml_strdup(XML_XML_NAMESPACE.as_ptr() as _) as _,
-            Ordering::Relaxed,
-        );
-        (*ns)
-            .prefix
-            .store(xml_strdup(c"xml".as_ptr() as _) as _, Ordering::Relaxed);
-        (*doc).old_ns = ns;
-        ns
-    }
-}
-
-/*
  * Namespaces.
  */
 /**
@@ -3571,7 +3477,7 @@ pub unsafe extern "C" fn xml_search_ns(
         	* Return the XML namespace declaration held by the doc.
         	*/
         if (*doc).old_ns.is_null() {
-            return xml_tree_ensure_xmldecl(doc) as _;
+            return (*doc).ensure_xmldecl() as _;
         } else {
             return (*doc).old_ns;
         }
@@ -3734,7 +3640,7 @@ pub unsafe extern "C" fn xml_search_ns_by_href(
         	* Return the XML namespace declaration held by the doc.
         	*/
         if (*doc).old_ns.is_null() {
-            return xml_tree_ensure_xmldecl(doc);
+            return (*doc).ensure_xmldecl();
         } else {
             return (*doc).old_ns;
         }
@@ -6153,7 +6059,7 @@ unsafe extern "C" fn xml_dom_wrap_store_ns(
     if doc.is_null() {
         return null_mut();
     }
-    ns = xml_tree_ensure_xmldecl(doc);
+    ns = (*doc).ensure_xmldecl();
     if ns.is_null() {
         return null_mut();
     }
@@ -6250,7 +6156,7 @@ unsafe extern "C" fn xml_search_ns_by_prefix_strict(
     }
     if IS_STR_XML!(prefix) {
         if !ret_ns.is_null() {
-            *ret_ns = xml_tree_ensure_xmldecl(doc);
+            *ret_ns = (*doc).ensure_xmldecl();
             if (*ret_ns).is_null() {
                 return -1;
             }
@@ -6435,7 +6341,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
         /*
         	* Insert XML namespace mapping.
         	*/
-        *ret_ns = xml_tree_ensure_xmldecl(doc);
+        *ret_ns = (*doc).ensure_xmldecl();
         if (*ret_ns).is_null() {
             return -1;
         }
@@ -7474,7 +7380,7 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
 
     *ret_ns = null_mut();
     if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
-        *ret_ns = xml_tree_ensure_xmldecl(doc);
+        *ret_ns = (*doc).ensure_xmldecl();
         if (*ret_ns).is_null() {
             return -1;
         }
@@ -7614,7 +7520,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
         if !ctxt.is_null() { /* TODO: User defined. */ }
         /* XML Namespace. */
         if IS_STR_XML!((*(*attr).ns).prefix.load(Ordering::Relaxed)) {
-            ns = xml_tree_ensure_xmldecl(dest_doc);
+            ns = (*dest_doc).ensure_xmldecl();
         } else if dest_parent.is_null() {
             /*
              * Store in @(*destDoc).oldNs.
