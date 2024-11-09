@@ -682,15 +682,16 @@ unsafe extern "C" fn initialize_libxml2() {
  *		SAX empty callbacks                                     *
  *									*
  ************************************************************************/
-
-static CALLBACKS: AtomicU64 = AtomicU64::new(0);
+thread_local! {
+    static CALLBACKS: AtomicU64 = const { AtomicU64::new(0) };
+}
 
 /// Is this document tagged standalone ?
 ///
 /// Returns 1 if true
 #[doc(alias = "isStandaloneCallback")]
 fn is_standalone_callback(_ctx: Option<GenericErrorContext>) -> i32 {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     0
 }
 
@@ -699,7 +700,7 @@ fn is_standalone_callback(_ctx: Option<GenericErrorContext>) -> i32 {
 /// Returns 1 if true
 #[doc(alias = "hasInternalSubsetCallback")]
 fn has_internal_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     0
 }
 
@@ -708,7 +709,7 @@ fn has_internal_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
 /// Returns 1 if true
 #[doc(alias = "hasExternalSubsetCallback")]
 fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     0
 }
 
@@ -720,7 +721,7 @@ fn internal_subset_callback(
     _external_id: *const XmlChar,
     _system_id: *const XmlChar,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// Does this document has an external subset
@@ -731,7 +732,7 @@ fn external_subset_callback(
     _external_id: *const XmlChar,
     _system_id: *const XmlChar,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// Special entity resolver, better left to the parser, it has
@@ -747,7 +748,7 @@ fn resolve_entity_callback(
     _public_id: *const XmlChar,
     _system_id: *const XmlChar,
 ) -> XmlParserInputPtr {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
 
@@ -756,7 +757,7 @@ fn resolve_entity_callback(
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityCallback")]
 fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) -> XmlEntityPtr {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
 
@@ -768,7 +769,7 @@ fn get_parameter_entity_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
 ) -> XmlEntityPtr {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
 
@@ -782,7 +783,7 @@ fn entity_decl_callback(
     _system_id: *const XmlChar,
     _content: *mut XmlChar,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// An attribute definition has been parsed
@@ -796,7 +797,7 @@ fn attribute_decl_callback(
     _default_value: *const XmlChar,
     _tree: XmlEnumerationPtr,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// An element definition has been parsed
@@ -807,7 +808,7 @@ fn element_decl_callback(
     _typ: i32,
     _content: XmlElementContentPtr,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// What to do when a notation declaration has been parsed.
@@ -818,7 +819,7 @@ fn notation_decl_callback(
     _public_id: *const XmlChar,
     _system_id: *const XmlChar,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// What to do when an unparsed entity declaration is parsed
@@ -830,39 +831,39 @@ fn unparsed_entity_decl_callback(
     _system_id: *const XmlChar,
     _notation_name: *const XmlChar,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "setDocumentLocatorCallback")]
 fn set_document_locator_callback(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when the document start being processed.
 #[doc(alias = "startDocumentCallback")]
 fn start_document_callback(_ctx: Option<GenericErrorContext>) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when the document end has been detected.
 #[doc(alias = "endDocumentCallback")]
 fn end_document_callback(_ctx: Option<GenericErrorContext>) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// receiving some chars from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "charactersCallback")]
 fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: *const XmlChar, _len: i32) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when an entity reference is detected.
 #[doc(alias = "referenceCallback")]
 fn reference_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// receiving some ignorable whitespaces from the parser.
@@ -873,7 +874,7 @@ fn ignorable_whitespace_callback(
     _ch: *const XmlChar,
     _len: i32,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// A processing instruction has been parsed.
@@ -883,33 +884,33 @@ fn processing_instruction_callback(
     _target: *const XmlChar,
     _data: *const XmlChar,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when a pcdata block has been parsed
 #[doc(alias = "cdataBlockCallback")]
 fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar, _len: i32) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// A comment has been parsed.
 #[doc(alias = "commentCallback")]
 fn comment_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// Display and format a warning messages, gives file, line, position and
 /// extra parameters.
 #[doc(alias = "warningCallback")]
 fn warning_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// Display and format a error messages, gives file, line, position and
 /// extra parameters.
 #[doc(alias = "errorCallback")]
 fn error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// Display and format a fatalError messages, gives file, line, position and
@@ -931,7 +932,7 @@ fn start_element_ns_callback(
     _nb_defaulted: i32,
     _attributes: *mut *const XmlChar,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when the end of an element has been detected.
@@ -942,7 +943,7 @@ fn end_element_ns_callback(
     _prefix: *const XmlChar,
     _uri: *const XmlChar,
 ) {
-    CALLBACKS.fetch_add(1, Ordering::Relaxed);
+    CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
