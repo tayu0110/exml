@@ -5,7 +5,7 @@
 
 mod attribute;
 mod document;
-mod dom;
+mod dom_wrapper;
 mod dtd;
 #[cfg(feature = "output")]
 mod dump;
@@ -61,7 +61,7 @@ use crate::{
 
 pub use attribute::*;
 pub use document::*;
-pub use dom::*;
+pub use dom_wrapper::*;
 pub use dtd::*;
 pub use id::*;
 pub use namespace::*;
