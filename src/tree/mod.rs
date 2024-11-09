@@ -11118,43 +11118,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_save_format_file() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    for n_format in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let filename = gen_fileoutput(n_filename, 0);
-                        let cur = gen_xml_doc_ptr(n_cur, 1);
-                        let format = gen_int(n_format, 2);
-
-                        let ret_val = xml_save_format_file(filename, cur, format);
-                        desret_int(ret_val);
-                        des_fileoutput(n_filename, filename, 0);
-                        des_xml_doc_ptr(n_cur, cur, 1);
-                        des_int(n_format, format, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSaveFormatFile",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlSaveFormatFile()");
-                            eprint!(" {}", n_filename);
-                            eprint!(" {}", n_cur);
-                            eprintln!(" {}", n_format);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_search_ns() {
         unsafe {
             let mut leaks = 0;

@@ -265,6 +265,20 @@ impl XmlDoc {
         ret
     }
 
+    /// Dump an XML document to a file. Will use compression if compiled in and enabled.  
+    ///
+    /// If `filename` is "-" the stdout file is used.   
+    /// If `format` is set then the document will be indented on output.
+    ///
+    /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
+    /// or `xmlKeepBlanksDefault(0)` was called.
+    ///
+    /// returns: the number of bytes written or -1 in case of failure.
+    #[doc(alias = "xmlSaveFormatFile")]
+    pub unsafe fn save_format_file(&mut self, filename: *const i8, format: i32) -> i32 {
+        self.save_format_file_enc(filename, None, format)
+    }
+
     /// Dump an XML document, converting it to the given encoding.
     ///
     /// returns: the number of bytes written or -1 in case of failure.
@@ -319,32 +333,6 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
         xml_node_dump_output(outbuf, doc, cur, 0, 1, None);
     }
     xml_output_buffer_close(outbuf);
-}
-
-/**
- * xmlSaveFormatFile:
- * @filename:  the filename (or URL)
- * @cur:  the document
- * @format:  should formatting spaces been added
- *
- * Dump an XML document to a file. Will use compression if
- * compiled in and enabled. If @filename is "-" the stdout file is
- * used. If @format is set then the document will be indented on output.
- * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
- * or xmlKeepBlanksDefault(0) was called
- *
- * returns: the number of bytes written or -1 in case of failure.
- */
-pub unsafe extern "C" fn xml_save_format_file(
-    filename: *const i8,
-    cur: XmlDocPtr,
-    format: i32,
-) -> i32 {
-    if !cur.is_null() {
-        (*cur).save_format_file_enc(filename, None, format)
-    } else {
-        -1
-    }
 }
 
 /**
