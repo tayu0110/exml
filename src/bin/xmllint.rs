@@ -93,11 +93,10 @@ use exml::{
         xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     },
     tree::{
-        xml_copy_doc, xml_doc_dump, xml_doc_dump_format_memory, xml_doc_dump_memory,
-        xml_doc_dump_memory_enc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
-        xml_node_set_content, xml_save_file, xml_save_file_enc, xml_save_format_file,
-        xml_save_format_file_enc, xml_set_compress_mode, NodeCommon, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
+        xml_copy_doc, xml_doc_dump, xml_doc_dump_memory, xml_doc_dump_memory_enc, xml_free_doc,
+        xml_free_dtd, xml_new_doc, xml_new_doc_node, xml_node_set_content, xml_save_file,
+        xml_save_file_enc, xml_save_format_file, xml_save_format_file_enc, xml_set_compress_mode,
+        NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -2926,7 +2925,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         );
                     }
                 } else if FORMAT == 1 {
-                    xml_doc_dump_format_memory(doc, addr_of_mut!(result), addr_of_mut!(len), 1);
+                    (*doc).format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
                 } else {
                     xml_doc_dump_memory(doc, addr_of_mut!(result), addr_of_mut!(len));
                 }

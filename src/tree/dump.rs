@@ -116,29 +116,15 @@ impl XmlDoc {
             xml_save_err_memory(c"creating output".as_ptr() as _);
         }
     }
-}
 
-/**
- * xmlDocDumpFormatMemory:
- * @cur:  the document
- * @mem:  OUT: the memory pointer
- * @size:  OUT: the memory length
- * @format:  should formatting spaces been added
- *
- *
- * Dump an XML document in memory and return the #XmlChar * and it's size.
- * It's up to the caller to free the memory with xml_free().
- * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
- * or xmlKeepBlanksDefault(0) was called
- */
-pub unsafe extern "C" fn xml_doc_dump_format_memory(
-    cur: XmlDocPtr,
-    mem: *mut *mut XmlChar,
-    size: *mut i32,
-    format: i32,
-) {
-    if !cur.is_null() {
-        (*cur).format_memory_enc(mem, size, None, format);
+    /// Dump an XML document in memory and return the `*mut XmlChar` and it's size.  
+    /// It's up to the caller to free the memory with xml_free().
+    ///
+    /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
+    /// or `xmlKeepBlanksDefault(0)` was called
+    #[doc(alias = "xmlDocDumpFormatMemory")]
+    pub unsafe fn format_memory(&mut self, mem: *mut *mut XmlChar, size: *mut i32, format: i32) {
+        self.format_memory_enc(mem, size, None, format);
     }
 }
 
