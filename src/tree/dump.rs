@@ -141,27 +141,18 @@ impl XmlDoc {
     pub unsafe fn dump_memory(&mut self, mem: *mut *mut XmlChar, size: *mut i32) {
         self.dump_format_memory_enc(mem, size, None, 0);
     }
-}
 
-/**
- * xmlDocDumpMemoryEnc:
- * @out_doc:  Document to generate XML text from
- * @doc_txt_ptr:  Memory pointer for allocated XML text
- * @doc_txt_len:  Length of the generated XML text
- * @txt_encoding:  Character encoding to use when generating XML text
- *
- * Dump the current DOM tree into memory using the character encoding specified
- * by the caller.  Note it is up to the caller of this function to free the
- * allocated memory with xml_free().
- */
-pub unsafe fn xml_doc_dump_memory_enc(
-    out_doc: XmlDocPtr,
-    doc_txt_ptr: *mut *mut XmlChar,
-    doc_txt_len: *mut i32,
-    txt_encoding: Option<&str>,
-) {
-    if !out_doc.is_null() {
-        (*out_doc).dump_format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
+    /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
+    ///
+    /// Note it is up to the caller of this function to free the allocated memory with `xml_free()`.
+    #[doc(alias = "xmlDocDumpMemoryEnc")]
+    pub unsafe fn dump_memory_enc(
+        &mut self,
+        doc_txt_ptr: *mut *mut XmlChar,
+        doc_txt_len: *mut i32,
+        txt_encoding: Option<&str>,
+    ) {
+        self.dump_format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
     }
 }
 
