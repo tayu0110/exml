@@ -5,6 +5,7 @@
 
 mod attribute;
 mod document;
+mod dom;
 mod dtd;
 #[cfg(feature = "output")]
 mod dump;
@@ -16,7 +17,6 @@ use std::{
     any::type_name,
     ffi::{c_char, CStr},
     mem::size_of,
-    os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::{AtomicI32, Ordering},
 };
@@ -61,6 +61,7 @@ use crate::{
 
 pub use attribute::*;
 pub use document::*;
+pub use dom::*;
 pub use dtd::*;
 pub use id::*;
 pub use namespace::*;
@@ -365,43 +366,6 @@ pub enum XmlDocProperties {
                                and not by parsing an instance */
     XmlDocInternal = 1 << 6, /* built for internal processing */
     XmlDocHtml = 1 << 7,     /* parsed or built HTML document */
-}
-
-/**
- * xmlDOMWrapAcquireNsFunction:
- * @ctxt:  a DOM wrapper context
- * @node:  the context node (element or attribute)
- * @nsName:  the requested namespace name
- * @nsPrefix:  the requested namespace prefix
- *
- * A function called to acquire namespaces (xmlNs) from the wrapper.
- *
- * Returns an xmlNsPtr or NULL in case of an error.
- */
-pub type XmlDOMWrapAcquireNsFunction = unsafe extern "C" fn(
-    ctxt: XmlDOMWrapCtxtPtr,
-    node: XmlNodePtr,
-    nsName: *const XmlChar,
-    nsPrefix: *const XmlChar,
-) -> XmlNsPtr;
-
-/**
- * xmlDOMWrapCtxt:
- *
- * Context for DOM wrapper-operations.
- */
-pub type XmlDOMWrapCtxtPtr = *mut XmlDOMWrapCtxt;
-#[repr(C)]
-pub struct XmlDOMWrapCtxt {
-    _private: *mut c_void,
-    /// The type of this context, just in case we need specialized
-    /// contexts in the future.
-    typ: i32,
-    /// Internal namespace map used for various operations.
-    namespace_map: *mut c_void,
-    /// Use this one to acquire an xmlNsPtr intended for node->ns.  
-    /// (Note that this is not intended for elem->nsDef).
-    get_ns_for_node_func: Option<XmlDOMWrapAcquireNsFunction>,
 }
 
 pub type XmlNsMapItemPtr = *mut XmlNsMapItem;
