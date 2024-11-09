@@ -63,8 +63,8 @@ use exml::{
         xpath::XmlXPathObjectPtr,
     },
     tree::{
-        xml_doc_dump_memory, xml_free_doc, xml_save_file, XmlDoc, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlEnumerationPtr, XmlNodePtr,
+        xml_free_doc, xml_save_file, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
+        XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -2063,11 +2063,7 @@ unsafe fn push_parse_test(
             addr_of_mut!(size),
         );
     } else {
-        xml_doc_dump_memory(
-            doc,
-            addr_of_mut!(base) as *mut *mut XmlChar,
-            addr_of_mut!(size),
-        );
+        (*doc).dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
     }
     #[cfg(not(feature = "html"))]
     {
@@ -2272,7 +2268,6 @@ unsafe fn push_boundary_test(
             },
             sax2::{xml_sax2_init_html_default_sax_handler, xml_sax_version},
         },
-        tree::xml_doc_dump_memory,
     };
     use libc::memset;
 
@@ -2506,11 +2501,7 @@ unsafe fn push_boundary_test(
             addr_of_mut!(size),
         );
     } else {
-        xml_doc_dump_memory(
-            doc,
-            addr_of_mut!(base) as *mut *mut XmlChar,
-            addr_of_mut!(size),
-        );
+        (*doc).dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
     }
     #[cfg(not(feature = "html"))]
     {
@@ -2579,11 +2570,7 @@ unsafe fn mem_parse_test(
     if doc.is_null() {
         return 1;
     }
-    xml_doc_dump_memory(
-        doc,
-        addr_of_mut!(base) as *mut *mut XmlChar,
-        addr_of_mut!(size),
-    );
+    (*doc).dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
     xml_free_doc(doc);
     let res: c_int = compare_file_mem(
         result.as_deref().unwrap(),
@@ -2714,11 +2701,7 @@ unsafe fn err_parse_test(
                     addr_of_mut!(size),
                 );
             } else {
-                xml_doc_dump_memory(
-                    doc,
-                    addr_of_mut!(base) as *mut *mut XmlChar,
-                    addr_of_mut!(size),
-                );
+                (*doc).dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
             }
             #[cfg(not(feature = "html"))]
             {

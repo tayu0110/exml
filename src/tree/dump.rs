@@ -31,7 +31,7 @@ impl XmlDoc {
     /// Note that `format` = 1 provide node indenting only if xmlIndentTreeOutput = 1
     /// or xmlKeepBlanksDefault(0) was called
     #[doc(alias = "xmlDocDumpFormatMemoryEnc")]
-    pub unsafe fn format_memory_enc(
+    pub unsafe fn dump_format_memory_enc(
         &mut self,
         doc_txt_ptr: *mut *mut XmlChar,
         mut doc_txt_len: *mut i32,
@@ -123,29 +123,23 @@ impl XmlDoc {
     /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
     /// or `xmlKeepBlanksDefault(0)` was called
     #[doc(alias = "xmlDocDumpFormatMemory")]
-    pub unsafe fn format_memory(&mut self, mem: *mut *mut XmlChar, size: *mut i32, format: i32) {
-        self.format_memory_enc(mem, size, None, format);
+    pub unsafe fn dump_format_memory(
+        &mut self,
+        mem: *mut *mut XmlChar,
+        size: *mut i32,
+        format: i32,
+    ) {
+        self.dump_format_memory_enc(mem, size, None, format);
     }
-}
 
-/**
- * xmlDocDumpMemory:
- * @cur:  the document
- * @mem:  OUT: the memory pointer
- * @size:  OUT: the memory length
- *
- * Dump an XML document in memory and return the #XmlChar * and it's size
- * in bytes. It's up to the caller to free the memory with xml_free().
- * The resulting byte array is zero terminated, though the last 0 is not
- * included in the returned size.
- */
-pub unsafe extern "C" fn xml_doc_dump_memory(
-    cur: XmlDocPtr,
-    mem: *mut *mut XmlChar,
-    size: *mut i32,
-) {
-    if !cur.is_null() {
-        (*cur).format_memory_enc(mem, size, None, 0);
+    /// Dump an XML document in memory and return the `*mut XmlChar` and it's size in bytes.   
+    /// It's up to the caller to free the memory with xml_free().
+    ///
+    /// The resulting byte array is zero terminated, though the last 0 is not
+    /// included in the returned size.
+    #[doc(alias = "xmlDocDumpMemory")]
+    pub unsafe fn dump_memory(&mut self, mem: *mut *mut XmlChar, size: *mut i32) {
+        self.dump_format_memory_enc(mem, size, None, 0);
     }
 }
 
@@ -167,7 +161,7 @@ pub unsafe fn xml_doc_dump_memory_enc(
     txt_encoding: Option<&str>,
 ) {
     if !out_doc.is_null() {
-        (*out_doc).format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
+        (*out_doc).dump_format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
     }
 }
 
