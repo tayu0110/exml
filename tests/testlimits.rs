@@ -2,6 +2,7 @@
 //! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
+    cell::RefCell,
     env::args,
     ffi::{CStr, CString},
     io::{self, Read},
@@ -33,9 +34,6 @@ use exml::{
     tree::{xml_free_doc, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr},
 };
 use libc::{memcpy, strlen, strncmp};
-
-static mut VERBOSE: i32 = 0;
-static mut TESTS_QUIET: i32 = 0;
 
 /* maximum time for one parsing before declaring a timeout */
 const MAX_TIME: u64 = 2; /* seconds */
@@ -105,10 +103,33 @@ static HUGE_TESTS: &[HugeTest] = &[
     },
 ];
 
-static mut CURRENT: AtomicPtr<i8> = AtomicPtr::new(null_mut());
-static mut RLEN: usize = 0;
-static mut CURRENT_TEST: usize = 0;
-static mut INSTATE: i32 = 0;
+struct DocumentContext {
+    current: *const i8,
+    rlen: usize,
+    current_test: usize,
+    instate: i32,
+    maxlen: usize,
+    curlen: usize,
+    dotlen: usize,
+}
+
+impl Default for DocumentContext {
+    fn default() -> Self {
+        Self {
+            current: null_mut(),
+            rlen: 0,
+            current_test: 0,
+            instate: 0,
+            maxlen: 64 * 1024 * 1024,
+            curlen: 0,
+            dotlen: 0,
+        }
+    }
+}
+
+thread_local! {
+    static DOCUMENT_CONTEXT: RefCell<DocumentContext> = RefCell::new(DocumentContext::default());
+}
 
 /**
  * hugeMatch:
@@ -136,21 +157,19 @@ unsafe fn huge_open(uri: &str) -> *mut c_void {
         return null_mut();
     }
 
-    CURRENT_TEST = 0;
-    while CURRENT_TEST < HUGE_TESTS.len() {
-        if HUGE_TESTS[CURRENT_TEST].name == uri {
-            RLEN = HUGE_TESTS[CURRENT_TEST].start.to_bytes().len();
-            CURRENT.store(
-                HUGE_TESTS[CURRENT_TEST].start.as_ptr() as _,
-                Ordering::Relaxed,
-            );
-            INSTATE = 0;
-            return CURRENT.load(Ordering::Relaxed) as _;
+    DOCUMENT_CONTEXT.with_borrow_mut(|context| {
+        context.current_test = 0;
+        while context.current_test < HUGE_TESTS.len() {
+            if HUGE_TESTS[context.current_test].name == uri {
+                context.rlen = HUGE_TESTS[context.current_test].start.to_bytes().len();
+                context.current = HUGE_TESTS[context.current_test].start.as_ptr() as _;
+                context.instate = 0;
+                return context.current as *mut c_void;
+            }
+            context.current_test += 1;
         }
-        CURRENT_TEST += 1;
-    }
-
-    null_mut()
+        null_mut()
+    })
 }
 
 /**
@@ -180,10 +199,6 @@ unsafe extern "C" fn fill_filling() {
     FILLING[CHUNK] = 0;
 }
 
-static mut MAXLEN: usize = 64 * 1024 * 1024;
-static mut CURLEN: usize = 0;
-static mut DOTLEN: usize = 0;
-
 /**
  * hugeRead:
  * @context: the read context
@@ -199,72 +214,51 @@ unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i
         return -1;
     }
 
-    if INSTATE == 0 {
-        if len >= RLEN as i32 {
-            len = RLEN as i32;
-            RLEN = 0;
-            memcpy(
-                buffer as _,
-                CURRENT.load(Ordering::Relaxed) as _,
-                len as usize,
-            );
-            INSTATE = 1;
-            CURLEN = 0;
-            DOTLEN = MAXLEN / 10;
+    DOCUMENT_CONTEXT.with_borrow_mut(|context| {
+        if context.instate == 0 {
+            if len >= context.rlen as i32 {
+                len = context.rlen as i32;
+                context.rlen = 0;
+                memcpy(buffer as _, context.current as _, len as usize);
+                context.instate = 1;
+                context.curlen = 0;
+                context.dotlen = context.maxlen / 10;
+            } else {
+                memcpy(buffer as _, context.current as _, len as usize);
+                context.rlen -= len as usize;
+                context.current = context.current.add(len as usize);
+            }
+        } else if context.instate == 2 {
+            if len >= context.rlen as i32 {
+                len = context.rlen as i32;
+                context.rlen = 0;
+                memcpy(buffer as _, context.current as _, len as usize);
+                context.instate = 3;
+                context.curlen = 0;
+            } else {
+                memcpy(buffer as _, context.current as _, len as usize);
+                context.rlen -= len as usize;
+                context.current = context.current.add(len as usize);
+            }
+        } else if context.instate == 1 {
+            if len as usize > CHUNK {
+                len = CHUNK as i32;
+            }
+            memcpy(buffer as _, FILLING.as_ptr() as _, len as usize);
+            context.curlen += len as usize;
+            if context.curlen >= context.maxlen {
+                context.rlen = strlen(HUGE_TESTS[context.current_test].end.as_ptr() as _) as _;
+                context.current = HUGE_TESTS[context.current_test].end.as_ptr() as _;
+                context.instate = 2;
+            } else if context.curlen > context.dotlen {
+                print!(".");
+                context.dotlen += context.maxlen / 10;
+            }
         } else {
-            memcpy(
-                buffer as _,
-                CURRENT.load(Ordering::Relaxed) as _,
-                len as usize,
-            );
-            RLEN -= len as usize;
-            let _ = CURRENT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |c| {
-                Some(c.add(len as usize))
-            });
+            len = 0;
         }
-    } else if INSTATE == 2 {
-        if len >= RLEN as i32 {
-            len = RLEN as i32;
-            RLEN = 0;
-            memcpy(
-                buffer as _,
-                CURRENT.load(Ordering::Relaxed) as _,
-                len as usize,
-            );
-            INSTATE = 3;
-            CURLEN = 0;
-        } else {
-            memcpy(
-                buffer as _,
-                CURRENT.load(Ordering::Relaxed) as _,
-                len as usize,
-            );
-            RLEN -= len as usize;
-            let _ = CURRENT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |c| {
-                Some(c.add(len as usize))
-            });
-        }
-    } else if INSTATE == 1 {
-        if len as usize > CHUNK {
-            len = CHUNK as i32;
-        }
-        memcpy(buffer as _, FILLING.as_ptr() as _, len as usize);
-        CURLEN += len as usize;
-        if CURLEN >= MAXLEN {
-            RLEN = strlen(HUGE_TESTS[CURRENT_TEST].end.as_ptr() as _) as _;
-            CURRENT.store(
-                HUGE_TESTS[CURRENT_TEST].end.as_ptr() as _,
-                Ordering::Relaxed,
-            );
-            INSTATE = 2;
-        } else if CURLEN > DOTLEN {
-            print!(".");
-            DOTLEN += MAXLEN / 10;
-        }
-    } else {
-        len = 0;
-    }
-    len
+        len
+    })
 }
 
 /************************************************************************
@@ -307,10 +301,12 @@ unsafe fn crazy_open(uri: &str) -> *mut c_void {
         return null_mut();
     }
     reset_timout();
-    RLEN = CRAZY_INDX;
-    CURRENT.store(CRAZY.as_ptr() as _, Ordering::Relaxed);
-    INSTATE = 0;
-    CURRENT.load(Ordering::Relaxed) as _
+    DOCUMENT_CONTEXT.with_borrow_mut(|context| {
+        context.rlen = CRAZY_INDX;
+        context.current = CRAZY.as_ptr();
+        context.instate = 0;
+        context.current as _
+    })
 }
 
 /**
@@ -343,55 +339,53 @@ unsafe extern "C" fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: 
         return -1;
     }
 
-    if check_time() <= 0 && INSTATE == 1 {
-        eprintln!("\ntimeout in crazy({})", CRAZY_INDX);
-        RLEN = CRAZY.to_bytes().len() - CRAZY_INDX;
-        CURRENT.store(CRAZY.as_ptr().add(CRAZY_INDX) as _, Ordering::Relaxed);
-        INSTATE = 2;
-    }
-    if INSTATE == 0 {
-        if len >= RLEN as i32 {
-            len = RLEN as i32;
-            RLEN = 0;
-            memcpy(buffer as _, CURRENT.load(Ordering::Relaxed) as _, len as _);
-            INSTATE = 1;
-            CURLEN = 0;
+    DOCUMENT_CONTEXT.with_borrow_mut(|context| {
+        if check_time() <= 0 && context.instate == 1 {
+            eprintln!("\ntimeout in crazy({})", CRAZY_INDX);
+            context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX;
+            context.current = CRAZY.as_ptr().add(CRAZY_INDX) as _;
+            context.instate = 2;
+        }
+        if context.instate == 0 {
+            if len >= context.rlen as i32 {
+                len = context.rlen as i32;
+                context.rlen = 0;
+                memcpy(buffer as _, context.current as _, len as _);
+                context.instate = 1;
+                context.curlen = 0;
+            } else {
+                memcpy(buffer as _, context.current as _, len as _);
+                context.rlen -= len as usize;
+                context.current = context.current.add(len as usize);
+            }
+        } else if context.instate == 2 {
+            if len >= context.rlen as i32 {
+                len = context.rlen as i32;
+                context.rlen = 0;
+                memcpy(buffer as _, context.current as _, len as _);
+                context.instate = 3;
+                context.curlen = 0;
+            } else {
+                memcpy(buffer as _, context.current as _, len as _);
+                context.rlen -= len as usize;
+                context.current = context.current.add(len as usize);
+            }
+        } else if context.instate == 1 {
+            if len as usize > CHUNK {
+                len = CHUNK as i32;
+            }
+            memcpy(buffer as _, FILLING.as_ptr() as _, len as _);
+            context.curlen += len as usize;
+            if context.curlen >= context.maxlen {
+                context.rlen = CRAZY.to_bytes().len() - CRAZY_INDX;
+                context.current = CRAZY.as_ptr().add(CRAZY_INDX) as _;
+                context.instate = 2;
+            }
         } else {
-            memcpy(buffer as _, CURRENT.load(Ordering::Relaxed) as _, len as _);
-            RLEN -= len as usize;
-            let _ = CURRENT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |c| {
-                Some(c.add(len as usize))
-            });
+            len = 0;
         }
-    } else if INSTATE == 2 {
-        if len >= RLEN as i32 {
-            len = RLEN as i32;
-            RLEN = 0;
-            memcpy(buffer as _, CURRENT.load(Ordering::Relaxed) as _, len as _);
-            INSTATE = 3;
-            CURLEN = 0;
-        } else {
-            memcpy(buffer as _, CURRENT.load(Ordering::Relaxed) as _, len as _);
-            RLEN -= len as usize;
-            let _ = CURRENT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |c| {
-                Some(c.add(len as usize))
-            });
-        }
-    } else if INSTATE == 1 {
-        if len as usize > CHUNK {
-            len = CHUNK as i32;
-        }
-        memcpy(buffer as _, FILLING.as_ptr() as _, len as _);
-        CURLEN += len as usize;
-        if CURLEN >= MAXLEN {
-            RLEN = CRAZY.to_bytes().len() - CRAZY_INDX;
-            CURRENT.store(CRAZY.as_ptr().add(CRAZY_INDX) as _, Ordering::Relaxed);
-            INSTATE = 2;
-        }
-    } else {
-        len = 0;
-    }
-    len
+        len
+    })
 }
 /************************************************************************
  *									*
@@ -982,7 +976,7 @@ unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, f
 
     NB_TESTS += 1;
 
-    MAXLEN = limit;
+    DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
     let ctxt: XmlParserCtxtPtr =
         xml_new_sax_parser_ctxt(addr_of!(CALLBACK_SAX2_HANDLER_STRUCT), None);
     if ctxt.is_null() {
@@ -1038,7 +1032,7 @@ unsafe extern "C" fn reader_test(
 
     NB_TESTS += 1;
 
-    MAXLEN = limit;
+    DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
     let reader: XmlTextReaderPtr = xml_reader_for_file(filename, null_mut(), options);
     if reader.is_null() {
         eprintln!(
@@ -1266,7 +1260,7 @@ unsafe extern "C" fn runtest(i: u32) -> i32 {
     let old_errors: i32 = NB_ERRORS;
     let old_tests: i32 = NB_TESTS;
     let old_leaks: i32 = NB_LEAKS;
-    if TESTS_QUIET == 0 && TEST_DESCRIPTIONS[i as usize].desc.is_some() {
+    if TEST_DESCRIPTIONS[i as usize].desc.is_some() {
         println!("## {}", TEST_DESCRIPTIONS[i as usize].desc.unwrap());
     }
     let tmp = TEST_DESCRIPTIONS[i as usize];
@@ -1274,17 +1268,15 @@ unsafe extern "C" fn runtest(i: u32) -> i32 {
     if res != 0 {
         ret += 1;
     }
-    if VERBOSE != 0 {
-        if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
-            println!("Ran {} tests, no errors", NB_TESTS - old_tests);
-        } else {
-            println!(
-                "Ran {} tests, {} errors, {} leaks",
-                NB_TESTS - old_tests,
-                NB_ERRORS - old_errors,
-                NB_LEAKS - old_leaks
-            );
-        }
+    if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
+        println!("Ran {} tests, no errors", NB_TESTS - old_tests);
+    } else {
+        println!(
+            "Ran {} tests, {} errors, {} leaks",
+            NB_TESTS - old_tests,
+            NB_ERRORS - old_errors,
+            NB_LEAKS - old_leaks
+        );
     }
     ret
 }
@@ -1304,9 +1296,7 @@ unsafe extern "C" fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
         NB_ERRORS += 1;
         err += 1;
     }
-    if TESTS_QUIET == 0 {
-        eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
-    }
+    eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
 
     err
 }
@@ -1327,9 +1317,7 @@ unsafe extern "C" fn launch_crazy(test: u32, fail: i32) -> i32 {
         NB_ERRORS += 1;
         err += 1;
     }
-    if TESTS_QUIET == 0 {
-        eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
-    }
+    eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
 
     err
 }
@@ -1368,9 +1356,7 @@ unsafe extern "C" fn runcrazy() -> i32 {
 
     #[cfg(feature = "libxml_reader")]
     {
-        if TESTS_QUIET == 0 {
-            println!("## Crazy tests on reader");
-        }
+        println!("## Crazy tests on reader");
         for i in 0..CRAZY.to_bytes().len() {
             res += launch_crazy(i as _, get_crazy_fail(i as _));
             if res != 0 {
@@ -1379,29 +1365,23 @@ unsafe extern "C" fn runcrazy() -> i32 {
         }
     }
 
-    if TESTS_QUIET == 0 {
-        println!("\n## Crazy tests on SAX");
-    }
+    println!("\n## Crazy tests on SAX");
     for i in 0..CRAZY.to_bytes().len() {
         res += launch_crazy_sax(i as _, get_crazy_fail(i as _));
         if res != 0 {
             ret += 1;
         }
     }
-    if TESTS_QUIET == 0 {
-        eprintln!();
-    }
-    if VERBOSE != 0 {
-        if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
-            println!("Ran {} tests, no errors", NB_TESTS - old_tests);
-        } else {
-            println!(
-                "Ran {} tests, {} errors, {} leaks",
-                NB_TESTS - old_tests,
-                NB_ERRORS - old_errors,
-                NB_LEAKS - old_leaks
-            );
-        }
+    eprintln!();
+    if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
+        println!("Ran {} tests, no errors", NB_TESTS - old_tests);
+    } else {
+        println!(
+            "Ran {} tests, {} errors, {} leaks",
+            NB_TESTS - old_tests,
+            NB_ERRORS - old_errors,
+            NB_LEAKS - old_leaks
+        );
     }
     ret
 }
@@ -1416,11 +1396,7 @@ fn main() {
         initialize_libxml2();
 
         for arg in args() {
-            if arg == "-v" {
-                VERBOSE = 1;
-            } else if arg == "-quiet" {
-                TESTS_QUIET = 1;
-            } else if arg == "-crazy" {
+            if arg == "-crazy" {
                 subset = 1;
             }
         }
