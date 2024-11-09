@@ -21,11 +21,103 @@ use crate::{
     tree::{xml_buf_set_allocation_scheme, xml_buf_use, xml_is_xhtml, XmlBufferAllocationScheme},
 };
 
-use super::{XmlBufPtr, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr};
+use super::{XmlBufPtr, XmlDoc, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr};
 
-/*
- * Saving.
- */
+impl XmlDoc {
+    /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
+    ///
+    /// Note it is up to the caller of this function to free the allocated memory with xml_free().
+    ///
+    /// Note that `format` = 1 provide node indenting only if xmlIndentTreeOutput = 1
+    /// or xmlKeepBlanksDefault(0) was called
+    #[doc(alias = "xmlDocDumpFormatMemoryEnc")]
+    pub unsafe fn format_memory_enc(
+        &mut self,
+        doc_txt_ptr: *mut *mut XmlChar,
+        mut doc_txt_len: *mut i32,
+        txt_encoding: Option<&str>,
+        format: i32,
+    ) {
+        let mut ctxt = XmlSaveCtxt::default();
+        let mut dummy: i32 = 0;
+
+        if doc_txt_len.is_null() {
+            doc_txt_len = &raw mut dummy; /*  Continue, caller just won't get length */
+        }
+
+        if doc_txt_ptr.is_null() {
+            *doc_txt_len = 0;
+            return;
+        }
+
+        *doc_txt_ptr = null_mut();
+        *doc_txt_len = 0;
+
+        /*
+         *  Validate the encoding value, if provided.
+         *  This logic is copied from xmlSaveFileEnc.
+         */
+        let encoding = txt_encoding.map_or_else(
+            || self.encoding.as_ref().map(|e| e.to_owned()),
+            |e| Some(e.to_owned()),
+        );
+        let conv_hdlr = if let Some(encoding) = encoding.as_deref() {
+            let Some(handler) = find_encoding_handler(encoding) else {
+                let enc = CString::new(encoding).unwrap();
+                xml_save_err(
+                    XmlParserErrors::XmlSaveUnknownEncoding,
+                    self as *mut XmlDoc as XmlNodePtr,
+                    enc.as_ptr(),
+                );
+                return;
+            };
+            Some(handler)
+        } else {
+            None
+        };
+
+        let out_buff: XmlOutputBufferPtr = xml_alloc_output_buffer(conv_hdlr);
+        if out_buff.is_null() {
+            xml_save_err_memory(c"creating buffer".as_ptr() as _);
+            return;
+        }
+
+        ctxt.buf = out_buff;
+        ctxt.level = 0;
+        ctxt.format = (format != 0) as i32;
+        ctxt.encoding = encoding;
+        xml_save_ctxt_init(&mut ctxt);
+        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        xml_doc_content_dump_output(&raw mut ctxt, self);
+        (*out_buff).flush();
+        if let Some(conv) = (*out_buff).conv {
+            *doc_txt_len = conv.len() as i32;
+            *doc_txt_ptr = xml_strndup(
+                if conv.is_ok() {
+                    conv.as_ref().as_ptr()
+                } else {
+                    null()
+                },
+                *doc_txt_len,
+            );
+        } else {
+            *doc_txt_len = (*out_buff).buffer.map_or(0, |buf| buf.len() as i32);
+            *doc_txt_ptr = xml_strndup(
+                (*out_buff)
+                    .buffer
+                    .map_or(null(), |buf| buf.as_ref().as_ptr()),
+                *doc_txt_len,
+            );
+        }
+        xml_output_buffer_close(out_buff);
+
+        if (*doc_txt_ptr).is_null() && *doc_txt_len > 0 {
+            *doc_txt_len = 0;
+            xml_save_err_memory(c"creating output".as_ptr() as _);
+        }
+    }
+}
+
 /**
  * xmlDocDumpFormatMemory:
  * @cur:  the document
@@ -45,7 +137,9 @@ pub unsafe extern "C" fn xml_doc_dump_format_memory(
     size: *mut i32,
     format: i32,
 ) {
-    xml_doc_dump_format_memory_enc(cur, mem, size, None, format);
+    if !cur.is_null() {
+        (*cur).format_memory_enc(mem, size, None, format);
+    }
 }
 
 /**
@@ -64,7 +158,9 @@ pub unsafe extern "C" fn xml_doc_dump_memory(
     mem: *mut *mut XmlChar,
     size: *mut i32,
 ) {
-    xml_doc_dump_format_memory_enc(cur, mem, size, None, 0);
+    if !cur.is_null() {
+        (*cur).format_memory_enc(mem, size, None, 0);
+    }
 }
 
 /**
@@ -84,111 +180,8 @@ pub unsafe fn xml_doc_dump_memory_enc(
     doc_txt_len: *mut i32,
     txt_encoding: Option<&str>,
 ) {
-    xml_doc_dump_format_memory_enc(out_doc, doc_txt_ptr, doc_txt_len, txt_encoding, 0);
-}
-
-/**
- * xmlDocDumpFormatMemoryEnc:
- * @out_doc:  Document to generate XML text from
- * @doc_txt_ptr:  Memory pointer for allocated XML text
- * @doc_txt_len:  Length of the generated XML text
- * @txt_encoding:  Character encoding to use when generating XML text
- * @format:  should formatting spaces been added
- *
- * Dump the current DOM tree into memory using the character encoding specified
- * by the caller.  Note it is up to the caller of this function to free the
- * allocated memory with xml_free().
- * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
- * or xmlKeepBlanksDefault(0) was called
- */
-pub unsafe fn xml_doc_dump_format_memory_enc(
-    out_doc: XmlDocPtr,
-    doc_txt_ptr: *mut *mut XmlChar,
-    mut doc_txt_len: *mut i32,
-    mut txt_encoding: Option<&str>,
-    format: i32,
-) {
-    let mut ctxt = XmlSaveCtxt::default();
-    let mut dummy: i32 = 0;
-
-    if doc_txt_len.is_null() {
-        doc_txt_len = &raw mut dummy; /*  Continue, caller just won't get length */
-    }
-
-    if doc_txt_ptr.is_null() {
-        *doc_txt_len = 0;
-        return;
-    }
-
-    *doc_txt_ptr = null_mut();
-    *doc_txt_len = 0;
-
-    if out_doc.is_null() {
-        /*  No document, no output  */
-        return;
-    }
-
-    /*
-     *  Validate the encoding value, if provided.
-     *  This logic is copied from xmlSaveFileEnc.
-     */
-
-    if txt_encoding.is_none() {
-        txt_encoding = (*out_doc).encoding.as_deref();
-    }
-    let conv_hdlr = if let Some(encoding) = txt_encoding {
-        let Some(handler) = find_encoding_handler(encoding) else {
-            let enc = CString::new(encoding).unwrap();
-            xml_save_err(
-                XmlParserErrors::XmlSaveUnknownEncoding,
-                out_doc as XmlNodePtr,
-                enc.as_ptr(),
-            );
-            return;
-        };
-        Some(handler)
-    } else {
-        None
-    };
-
-    let out_buff: XmlOutputBufferPtr = xml_alloc_output_buffer(conv_hdlr);
-    if out_buff.is_null() {
-        xml_save_err_memory(c"creating buffer".as_ptr() as _);
-        return;
-    }
-
-    ctxt.buf = out_buff;
-    ctxt.level = 0;
-    ctxt.format = (format != 0) as i32;
-    ctxt.encoding = txt_encoding.map(|e| e.to_owned());
-    xml_save_ctxt_init(&mut ctxt);
-    ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-    xml_doc_content_dump_output(&raw mut ctxt, out_doc);
-    (*out_buff).flush();
-    if let Some(conv) = (*out_buff).conv {
-        *doc_txt_len = conv.len() as i32;
-        *doc_txt_ptr = xml_strndup(
-            if conv.is_ok() {
-                conv.as_ref().as_ptr()
-            } else {
-                null()
-            },
-            *doc_txt_len,
-        );
-    } else {
-        *doc_txt_len = (*out_buff).buffer.map_or(0, |buf| buf.len() as i32);
-        *doc_txt_ptr = xml_strndup(
-            (*out_buff)
-                .buffer
-                .map_or(null(), |buf| buf.as_ref().as_ptr()),
-            *doc_txt_len,
-        );
-    }
-    xml_output_buffer_close(out_buff);
-
-    if (*doc_txt_ptr).is_null() && *doc_txt_len > 0 {
-        *doc_txt_len = 0;
-        xml_save_err_memory(c"creating output".as_ptr() as _);
+    if !out_doc.is_null() {
+        (*out_doc).format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
     }
 }
 
