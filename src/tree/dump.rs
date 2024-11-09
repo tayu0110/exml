@@ -265,6 +265,14 @@ impl XmlDoc {
         ret
     }
 
+    /// Dump an XML document, converting it to the given encoding.
+    ///
+    /// returns: the number of bytes written or -1 in case of failure.
+    #[doc(alias = "xmlSaveFileEnc")]
+    pub unsafe fn save_file_enc(&mut self, filename: *const i8, encoding: Option<&str>) -> i32 {
+        self.save_format_file_enc(filename, encoding, 0)
+    }
+
     /// Dump an XML document to a file. Will use compression if compiled in and enabled.  
     ///
     /// If `filename` is "-" the stdout file is used.  
@@ -538,27 +546,5 @@ pub unsafe fn xml_node_dump_output(
     #[cfg(not(feature = "html"))]
     {
         xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
-    }
-}
-
-/**
- * xmlSaveFileEnc:
- * @filename:  the filename (or URL)
- * @cur:  the document
- * @encoding:  the name of an encoding (or NULL)
- *
- * Dump an XML document, converting it to the given encoding
- *
- * returns: the number of bytes written or -1 in case of failure.
- */
-pub unsafe fn xml_save_file_enc(
-    filename: *const i8,
-    cur: XmlDocPtr,
-    encoding: Option<&str>,
-) -> i32 {
-    if !cur.is_null() {
-        (*cur).save_format_file_enc(filename, encoding, 0)
-    } else {
-        -1
     }
 }
