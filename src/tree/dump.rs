@@ -1,19 +1,23 @@
 use std::{
+    cell::RefCell,
     ffi::CString,
     ptr::{null, null_mut},
+    rc::Rc,
 };
 
 use libc::{memset, FILE};
 
 use crate::{
+    buf::XmlBufRef,
     encoding::find_encoding_handler,
     error::XmlParserErrors,
     io::{
         xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_create_file,
-        XmlOutputBufferPtr,
+        xml_output_buffer_create_filename, XmlOutputBuffer, XmlOutputBufferPtr,
     },
     libxml::{
         globals::{xml_free, xml_malloc},
+        htmltree::html_node_dump_output,
         parser::xml_init_parser,
         xmlsave::{
             xhtml_node_dump_output, xml_doc_content_dump_output, xml_node_dump_output_internal,
@@ -24,7 +28,10 @@ use crate::{
     tree::{xml_buf_set_allocation_scheme, xml_buf_use, xml_is_xhtml, XmlBufferAllocationScheme},
 };
 
-use super::{XmlBufPtr, XmlDoc, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr};
+use super::{
+    xml_buf_get_allocation_scheme, XmlBufPtr, XmlDoc, XmlDocPtr, XmlDtdPtr, XmlElementType,
+    XmlNodePtr,
+};
 
 impl XmlDoc {
     /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
@@ -203,9 +210,59 @@ impl XmlDoc {
     ///
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlDocDump")]
-    #[cfg(feature = "output")]
     pub unsafe fn dump_file(&mut self, f: *mut FILE) -> i32 {
         self.dump_format_file(f, 0)
+    }
+
+    /// Dump an XML document to a file or an URL.
+    ///
+    /// Returns the number of bytes written or -1 in case of error.  
+    ///
+    /// Note that `format` = 1 provide node indenting only if `xmlIndentTreeOutput = 1`
+    /// or `xmlKeepBlanksDefault(0)` was called
+    #[doc(alias = "xmlSaveFormatFileEnc")]
+    pub unsafe fn save_format_file_enc(
+        &mut self,
+        filename: *const i8,
+        encoding: Option<&str>,
+        format: i32,
+    ) -> i32 {
+        let encoding = encoding.map_or_else(
+            || self.encoding.as_ref().map(|e| e.to_owned()),
+            |e| Some(e.to_owned()),
+        );
+        let handler = if let Some(enc) = encoding.as_deref() {
+            let Some(handler) = find_encoding_handler(enc) else {
+                return -1;
+            };
+            Some(handler)
+        } else {
+            None
+        };
+
+        // save the content to a temp buffer.
+        let buf: XmlOutputBufferPtr = xml_output_buffer_create_filename(
+            filename,
+            handler.map(|e| Rc::new(RefCell::new(e))),
+            self.compression,
+        );
+        if buf.is_null() {
+            return -1;
+        }
+        let mut ctxt = XmlSaveCtxt {
+            buf,
+            level: 0,
+            format: (format != 0) as i32,
+            encoding,
+            ..Default::default()
+        };
+        xml_save_ctxt_init(&mut ctxt);
+        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+
+        xml_doc_content_dump_output(&raw mut ctxt as _, self);
+
+        let ret: i32 = xml_output_buffer_close(buf);
+        ret
     }
 }
 
@@ -217,14 +274,7 @@ impl XmlDoc {
  *
  * Dump an XML/HTML node, recursive behaviour, children are printed too.
  */
-#[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNodePtr) {
-    use crate::{
-        io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
-        libxml::{htmltree::html_node_dump_output, parser::xml_init_parser},
-        tree::XmlElementType,
-    };
-
     xml_init_parser();
 
     if cur.is_null() {
@@ -265,7 +315,11 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
  * returns: the number of bytes written or -1 in case of failure.
  */
 pub unsafe extern "C" fn xml_save_file(filename: *const i8, cur: XmlDocPtr) -> i32 {
-    xml_save_format_file_enc(filename, cur, None, 0)
+    if !cur.is_null() {
+        (*cur).save_format_file_enc(filename, None, 0)
+    } else {
+        -1
+    }
 }
 
 /**
@@ -287,7 +341,11 @@ pub unsafe extern "C" fn xml_save_format_file(
     cur: XmlDocPtr,
     format: i32,
 ) -> i32 {
-    xml_save_format_file_enc(filename, cur, None, format)
+    if !cur.is_null() {
+        (*cur).save_format_file_enc(filename, None, format)
+    } else {
+        -1
+    }
 }
 
 /**
@@ -312,15 +370,6 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     level: i32,
     format: i32,
 ) -> usize {
-    use crate::{
-        buf::XmlBufRef,
-        io::{XmlOutputBuffer, XmlOutputBufferPtr},
-        libxml::xmlsave::xml_save_err_memory,
-        private::buf::xml_buf_get_allocation_scheme,
-    };
-
-    use crate::libxml::parser::xml_init_parser;
-
     xml_init_parser();
 
     if cur.is_null() {
@@ -502,81 +551,6 @@ pub unsafe fn xml_node_dump_output(
 }
 
 /**
- * xmlSaveFormatFileEnc:
- * @filename:  the filename or URL to output
- * @cur:  the document being saved
- * @encoding:  the name of the encoding to use or NULL.
- * @format:  should formatting spaces be added.
- *
- * Dump an XML document to a file or an URL.
- *
- * Returns the number of bytes written or -1 in case of error.
- * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
- * or xmlKeepBlanksDefault(0) was called
- */
-pub unsafe fn xml_save_format_file_enc(
-    filename: *const i8,
-    cur: XmlDocPtr,
-    mut encoding: Option<&str>,
-    format: i32,
-) -> i32 {
-    use std::{cell::RefCell, rc::Rc};
-
-    use crate::{
-        encoding::find_encoding_handler,
-        io::{xml_output_buffer_close, xml_output_buffer_create_filename},
-        libxml::xmlsave::{
-            xml_doc_content_dump_output, xml_save_ctxt_init, XmlSaveCtxt, XmlSaveOption,
-        },
-    };
-
-    let mut ctxt = XmlSaveCtxt::default();
-
-    if cur.is_null() {
-        return -1;
-    }
-
-    if encoding.is_none() {
-        encoding = (*cur).encoding.as_deref();
-    }
-
-    let handler = if let Some(enc) = encoding {
-        let Some(handler) = find_encoding_handler(enc) else {
-            return -1;
-        };
-        Some(handler)
-    } else {
-        None
-    };
-
-    // #ifdef LIBXML_ZLIB_ENABLED
-    //     if ((*cur).compression < 0) (*cur).compression = xmlGetCompressMode();
-    // #endif
-    /*
-     * save the content to a temp buffer.
-     */
-    let buf: XmlOutputBufferPtr = xml_output_buffer_create_filename(
-        filename,
-        handler.map(|e| Rc::new(RefCell::new(e))),
-        (*cur).compression,
-    );
-    if buf.is_null() {
-        return -1;
-    }
-    ctxt.buf = buf;
-    ctxt.level = 0;
-    ctxt.format = if format != 0 { 1 } else { 0 };
-    ctxt.encoding = encoding.map(|e| e.to_owned());
-    xml_save_ctxt_init(&mut ctxt);
-    ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-
-    xml_doc_content_dump_output(&raw mut ctxt as _, cur);
-
-    let ret: i32 = xml_output_buffer_close(buf);
-    ret
-}
-
-/**
  * xmlSaveFileEnc:
  * @filename:  the filename (or URL)
  * @cur:  the document
@@ -591,5 +565,9 @@ pub unsafe fn xml_save_file_enc(
     cur: XmlDocPtr,
     encoding: Option<&str>,
 ) -> i32 {
-    xml_save_format_file_enc(filename, cur, encoding, 0)
+    if !cur.is_null() {
+        (*cur).save_format_file_enc(filename, encoding, 0)
+    } else {
+        -1
+    }
 }

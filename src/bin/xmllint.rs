@@ -95,8 +95,8 @@ use exml::{
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
         xml_node_set_content, xml_save_file, xml_save_file_enc, xml_save_format_file,
-        xml_save_format_file_enc, xml_set_compress_mode, NodeCommon, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
+        xml_set_compress_mode, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+        XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -2952,7 +2952,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                             .unwrap()
                             .as_ref()
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        ret = xml_save_format_file_enc(o, doc, Some(encoding.as_str()), 1);
+                        ret = (*doc).save_format_file_enc(o, Some(encoding.as_str()), 1);
                     } else {
                         let o = OUTPUT
                             .lock()
