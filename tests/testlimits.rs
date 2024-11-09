@@ -3,12 +3,11 @@
 
 use std::{
     cell::{Cell, RefCell},
-    env::args,
     ffi::{CStr, CString},
     io::{self, Read},
     os::raw::c_void,
     ptr::{addr_of, null_mut},
-    sync::atomic::{AtomicPtr, AtomicU64, Ordering},
+    sync::atomic::{AtomicPtr, AtomicU64, AtomicUsize, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -1298,7 +1297,7 @@ unsafe extern "C" fn runtest(i: u32) -> i32 {
     ret
 }
 
-unsafe extern "C" fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
+unsafe fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
     let mut err: i32 = 0;
 
     CRAZY_INDX.set(test as usize);
@@ -1319,7 +1318,7 @@ unsafe extern "C" fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn launch_crazy(test: u32, fail: i32) -> i32 {
+unsafe fn launch_crazy(test: u32, fail: i32) -> i32 {
     let mut err: i32 = 0;
 
     CRAZY_INDX.set(test as usize);
@@ -1363,7 +1362,9 @@ unsafe extern "C" fn get_crazy_fail(test: i32) -> i32 {
         (237..=242).contains(&test)/* Comment in Misc */) as i32
 }
 
-unsafe extern "C" fn runcrazy() -> i32 {
+fn runcrazy(launch: unsafe fn(u32, i32) -> i32) {
+    fill_filling();
+    initialize_test();
     let mut ret: i32 = 0;
     let mut res: i32 = 0;
 
@@ -1371,22 +1372,12 @@ unsafe extern "C" fn runcrazy() -> i32 {
     let old_tests: i32 = NB_TESTS.get();
     let old_leaks: i32 = NB_LEAKS.get();
 
-    #[cfg(feature = "libxml_reader")]
-    {
-        println!("## Crazy tests on reader");
+    unsafe {
         for i in 0..CRAZY.to_bytes().len() {
-            res += launch_crazy(i as _, get_crazy_fail(i as _));
+            res += launch(i as _, get_crazy_fail(i as _));
             if res != 0 {
                 ret += 1;
             }
-        }
-    }
-
-    println!("\n## Crazy tests on SAX");
-    for i in 0..CRAZY.to_bytes().len() {
-        res += launch_crazy_sax(i as _, get_crazy_fail(i as _));
-        if res != 0 {
-            ret += 1;
         }
     }
     eprintln!();
@@ -1400,29 +1391,79 @@ unsafe extern "C" fn runcrazy() -> i32 {
             NB_LEAKS.get() - old_leaks
         );
     }
-    ret
+    cleanup_test();
+    assert_eq!(
+        ret,
+        0,
+        "Failed to pass runcrazy()\nTotal {} tests, {} errors, {} leaks\n",
+        NB_TESTS.get(),
+        NB_ERRORS.get(),
+        NB_LEAKS.get(),
+    );
+}
+
+static NUM_LAUNCH_TEST: AtomicUsize = AtomicUsize::new(0);
+
+fn initialize_test() {
+    loop {
+        if NUM_LAUNCH_TEST
+            .fetch_update(Ordering::Release, Ordering::Acquire, |old| {
+                if old == 0 {
+                    unsafe {
+                        initialize_libxml2();
+                    }
+                }
+                Some(old + 1)
+            })
+            .is_ok()
+        {
+            break;
+        }
+    }
+}
+
+fn cleanup_test() {
+    loop {
+        if NUM_LAUNCH_TEST
+            .fetch_update(Ordering::Release, Ordering::Acquire, |old| {
+                if old == 1 {
+                    unsafe {
+                        xml_cleanup_parser();
+                        xml_memory_dump();
+                    }
+                }
+                old.checked_sub(1)
+            })
+            .is_ok()
+        {
+            break;
+        }
+    }
+}
+
+#[test]
+#[cfg(feature = "libxml_reader")]
+fn runcrazy_reader() {
+    println!("## Crazy tests on reader");
+    runcrazy(launch_crazy);
+}
+
+#[test]
+fn runcrazy_sax() {
+    println!("## Crazy tests on SAX");
+    runcrazy(launch_crazy_sax);
 }
 
 #[test]
 fn main() {
     let ret: i32;
-    let mut subset: i32 = 0;
+    fill_filling();
+    initialize_test();
 
     unsafe {
-        fill_filling();
-        initialize_libxml2();
-
-        for arg in args() {
-            if arg == "-crazy" {
-                subset = 1;
-            }
+        for i in (0..).take_while(|&i| TEST_DESCRIPTIONS[i].func.is_some()) {
+            assert_eq!(runtest(i as _), 0, "Failed to pass run_test({i})");
         }
-        if subset == 0 {
-            for i in (0..).take_while(|&i| TEST_DESCRIPTIONS[i].func.is_some()) {
-                assert_eq!(runtest(i as _), 0, "Failed to pass run_test({i})");
-            }
-        }
-        assert_eq!(runcrazy(), 0, "Failed to pass runcrazy()");
         if NB_ERRORS.get() == 0 && NB_LEAKS.get() == 0 {
             ret = 0;
             println!("Total {} tests, no errors", NB_TESTS.get());
@@ -1435,9 +1476,8 @@ fn main() {
                 NB_LEAKS.get(),
             );
         }
-        xml_cleanup_parser();
-        xml_memory_dump();
     }
+    cleanup_test();
 
     assert_eq!(ret, 0);
 }
