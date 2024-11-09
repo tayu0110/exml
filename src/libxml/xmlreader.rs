@@ -2451,8 +2451,6 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
 ) -> *mut XmlChar {
     use crate::{buf::XmlBufRef, private::buf::xml_buf_detach};
 
-    use crate::tree::xml_buf_node_dump;
-
     let mut node: XmlNodePtr;
     let mut cur_node: XmlNodePtr;
 
@@ -2472,7 +2470,7 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
         /* XXX: Why do we need a second buffer? */
         let buff2 = xml_buf_create();
         xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-        if xml_buf_node_dump(buff2, doc, node, 0, 0) == 0
+        if (*node).dump_memory(buff2, doc, 0, 0) == 0
             || !XmlBufRef::from_raw(buff2).unwrap().is_ok()
         {
             xml_free_node(node);
@@ -2505,7 +2503,7 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
 pub unsafe extern "C" fn xml_text_reader_read_outer_xml(
     reader: &mut XmlTextReader,
 ) -> *mut XmlChar {
-    use crate::{buf::XmlBufRef, tree::xml_buf_node_dump};
+    use crate::buf::XmlBufRef;
 
     let mut node: XmlNodePtr;
 
@@ -2522,8 +2520,7 @@ pub unsafe extern "C" fn xml_text_reader_read_outer_xml(
     }
     let buff = xml_buf_create();
     xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    if xml_buf_node_dump(buff, doc, node, 0, 0) == 0 || !XmlBufRef::from_raw(buff).unwrap().is_ok()
-    {
+    if (*node).dump_memory(buff, doc, 0, 0) == 0 || !XmlBufRef::from_raw(buff).unwrap().is_ok() {
         xml_free_node(node);
         xml_buf_free(buff);
         return null_mut();

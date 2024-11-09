@@ -447,57 +447,47 @@ impl XmlNode {
         }
         xml_output_buffer_close(outbuf);
     }
-}
 
-/**
- * xmlBufNodeDump:
- * @buf:  the XML buffer output
- * @doc:  the document
- * @cur:  the current node
- * @level: the imbrication level for indenting
- * @format: is formatting allowed
- *
- * Dump an XML node, recursive behaviour,children are printed too.
- * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
- * or xmlKeepBlanksDefault(0) was called
- *
- * Returns the number of bytes written to the buffer, in case of error 0
- *     is returned or @buf stores the error
- */
-pub unsafe extern "C" fn xml_buf_node_dump(
-    buf: XmlBufPtr,
-    doc: XmlDocPtr,
-    cur: XmlNodePtr,
-    level: i32,
-    format: i32,
-) -> usize {
-    xml_init_parser();
+    /// Dump an XML node, recursive behaviour,children are printed too.
+    ///
+    /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
+    /// or `xmlKeepBlanksDefault(0)` was called.
+    ///
+    /// Returns the number of bytes written to the buffer, in case of error 0
+    /// is returned or `buf` stores the error.
+    #[doc(alias = "xmlBufNodeDump")]
+    pub unsafe fn dump_memory(
+        &mut self,
+        buf: XmlBufPtr,
+        doc: XmlDocPtr,
+        level: i32,
+        format: i32,
+    ) -> usize {
+        xml_init_parser();
 
-    if cur.is_null() {
-        return usize::MAX;
-    }
-    if buf.is_null() {
-        return usize::MAX;
-    }
-    let outbuf: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as _;
-    if outbuf.is_null() {
-        xml_save_err_memory(c"creating buffer".as_ptr() as _);
-        return usize::MAX;
-    }
-    memset(outbuf as _, 0, size_of::<XmlOutputBuffer>());
-    (*outbuf).buffer = XmlBufRef::from_raw(buf);
-    (*outbuf).encoder = None;
-    (*outbuf).writecallback = None;
-    (*outbuf).closecallback = None;
-    (*outbuf).context = null_mut();
-    (*outbuf).written = 0;
+        if buf.is_null() {
+            return usize::MAX;
+        }
+        let outbuf: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as _;
+        if outbuf.is_null() {
+            xml_save_err_memory(c"creating buffer".as_ptr() as _);
+            return usize::MAX;
+        }
+        memset(outbuf as _, 0, size_of::<XmlOutputBuffer>());
+        (*outbuf).buffer = XmlBufRef::from_raw(buf);
+        (*outbuf).encoder = None;
+        (*outbuf).writecallback = None;
+        (*outbuf).closecallback = None;
+        (*outbuf).context = null_mut();
+        (*outbuf).written = 0;
 
-    let using: usize = xml_buf_use(buf);
-    let oldalloc: i32 = xml_buf_get_allocation_scheme(buf);
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    (*cur).dump_output(outbuf, doc, level, format, None);
-    xml_buf_set_allocation_scheme(buf, oldalloc.try_into().unwrap());
-    xml_free(outbuf as _);
-    let ret: i32 = (xml_buf_use(buf) - using) as i32;
-    ret as _
+        let using: usize = xml_buf_use(buf);
+        let oldalloc: i32 = xml_buf_get_allocation_scheme(buf);
+        xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+        self.dump_output(outbuf, doc, level, format, None);
+        xml_buf_set_allocation_scheme(buf, oldalloc.try_into().unwrap());
+        xml_free(outbuf as _);
+        let ret: i32 = (xml_buf_use(buf) - using) as i32;
+        ret as _
+    }
 }

@@ -55,7 +55,7 @@ use exml::{
         },
         xpath_internals::xml_xpath_register_ns,
     },
-    tree::{xml_buf_node_dump, xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
+    tree::{xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
 };
 use libc::{snprintf, strcmp, strstr};
 
@@ -348,7 +348,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
         fatal_error();
     }
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
+    (*test).dump_memory(buf, (*test).doc, 0, 0);
     let pctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_mem_parser_ctxt(
         xml_buf_content(buf) as *const c_char,
         xml_buf_use(buf) as _,
@@ -396,26 +396,20 @@ unsafe extern "C" fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar
     let mut content: *mut XmlChar;
     let mut res: *mut XmlChar;
 
-    // let buf: XmlBufferPtr = xml_buffer_create();
     let buf = xml_buf_create();
     if buf.is_null() {
         eprintln!("out of memory !");
         fatal_error();
     }
-    // xml_buffer_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    // xml_node_dump(buf, (*tst).doc, tst, 0, 0);
-    xml_buf_node_dump(buf, (*tst).doc, tst, 0, 0);
+    (*tst).dump_memory(buf, (*tst).doc, 0, 0);
 
     while !tst.is_null() {
         test = get_next(tst, c"./*".as_ptr() as _);
         if !test.is_null() {
-            // xml_buffer_empty(buf);
             xml_buf_empty(buf);
-            // xml_node_dump(buf, (*test).doc, test, 0, 0);
-            xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
+            (*test).dump_memory(buf, (*test).doc, 0, 0);
             name = get_string(tst, c"string(@name)".as_ptr() as _);
-            // content = xml_strdup((*buf).content);
             content = xml_strdup(xml_buf_content(buf));
             if !name.is_null() && !content.is_null() {
                 res = compose_dir(base, name);
@@ -511,7 +505,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         fatal_error();
     }
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
+    (*test).dump_memory(buf, (*test).doc, 0, 0);
     let pctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_mem_parser_ctxt(
         xml_buf_content(buf) as *const c_char,
         xml_buf_use(buf) as _,
@@ -571,7 +565,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             if !dtd.is_null() {
                 xml_buf_add(buf, dtd, -1);
             }
-            xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
+            (*test).dump_memory(buf, (*test).doc, 0, 0);
 
             /*
              * We are ready to run the test
@@ -649,7 +643,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             );
         } else {
             xml_buf_empty(buf);
-            xml_buf_node_dump(buf, (*test).doc, test, 0, 0);
+            (*test).dump_memory(buf, (*test).doc, 0, 0);
 
             /*
              * We are ready to run the test

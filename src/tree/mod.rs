@@ -62,8 +62,6 @@ use crate::{
 pub use attribute::*;
 pub use document::*;
 pub use dtd::*;
-#[cfg(feature = "output")]
-pub use dump::*;
 pub use id::*;
 pub use namespace::*;
 pub use node::*;
