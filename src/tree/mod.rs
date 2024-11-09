@@ -221,17 +221,11 @@ impl TryFrom<i32> for XmlElementType {
     }
 }
 
-/** DOC_DISABLE */
-/* For backward compatibility */
-// const XML_DOCB_DOCUMENT_NODE: usize = 21;
-/** DOC_ENABLE */
-
 /**
  * xmlAttributeType:
  *
  * A DTD Attribute type definition.
  */
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlAttributeType {

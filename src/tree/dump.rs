@@ -332,6 +332,31 @@ impl XmlDoc {
         let ret: i32 = xml_output_buffer_close(buf);
         ret
     }
+
+    /// Dump an XML document to an I/O buffer.
+    ///
+    /// returns: the number of bytes written or -1 in case of failure.
+    ///
+    /// # Warning
+    ///  This call xmlOutputBufferClose() on buf which is not available after this call.
+    #[doc(alias = "xmlSaveFileTo")]
+    pub unsafe fn save_file_to(&mut self, buf: XmlOutputBufferPtr, encoding: Option<&str>) -> i32 {
+        if buf.is_null() {
+            return -1;
+        }
+        let mut ctxt = XmlSaveCtxt {
+            buf,
+            level: 0,
+            format: 0,
+            encoding: encoding.map(|e| e.to_owned()),
+            ..Default::default()
+        };
+        xml_save_ctxt_init(&mut ctxt);
+        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        xml_doc_content_dump_output(&raw mut ctxt as _, self);
+        let ret: i32 = xml_output_buffer_close(buf);
+        ret
+    }
 }
 
 /**
@@ -423,43 +448,6 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     xml_free(outbuf as _);
     let ret: i32 = (xml_buf_use(buf) - using) as i32;
     ret as _
-}
-
-/**
- * xmlSaveFileTo:
- * @buf:  an output I/O buffer
- * @cur:  the document
- * @encoding:  the encoding if any assuming the I/O layer handles the transcoding
- *
- * Dump an XML document to an I/O buffer.
- * Warning ! This call xmlOutputBufferClose() on buf which is not available
- * after this call.
- *
- * returns: the number of bytes written or -1 in case of failure.
- */
-pub unsafe fn xml_save_file_to(
-    buf: XmlOutputBufferPtr,
-    cur: XmlDocPtr,
-    encoding: Option<&str>,
-) -> i32 {
-    let mut ctxt = XmlSaveCtxt::default();
-
-    if buf.is_null() {
-        return -1;
-    }
-    if cur.is_null() {
-        xml_output_buffer_close(buf);
-        return -1;
-    }
-    ctxt.buf = buf;
-    ctxt.level = 0;
-    ctxt.format = 0;
-    ctxt.encoding = encoding.map(|e| e.to_owned());
-    xml_save_ctxt_init(&mut ctxt);
-    ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-    xml_doc_content_dump_output(&raw mut ctxt as _, cur);
-    let ret: i32 = xml_output_buffer_close(buf);
-    ret
 }
 
 /**
