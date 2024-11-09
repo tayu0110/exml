@@ -419,44 +419,34 @@ impl XmlNode {
             xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
         }
     }
-}
 
-/**
- * xmlElemDump:
- * @f:  the FILE * for the output
- * @doc:  the document
- * @cur:  the current node
- *
- * Dump an XML/HTML node, recursive behaviour, children are printed too.
- */
-pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNodePtr) {
-    xml_init_parser();
+    /// Dump an XML/HTML node, recursive behaviour, children are printed too.
+    #[doc(alias = "xmlElemDump")]
+    pub unsafe fn dump_file(&mut self, f: *mut FILE, doc: XmlDocPtr) {
+        xml_init_parser();
 
-    if cur.is_null() {
-        return;
-    }
-
-    let outbuf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, None);
-    if outbuf.is_null() {
-        return;
-    }
-    if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
-        #[cfg(feature = "html")]
-        {
-            html_node_dump_output(outbuf, doc, cur, null_mut());
+        let outbuf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, None);
+        if outbuf.is_null() {
+            return;
         }
-        #[cfg(not(feature = "html"))]
-        {
-            xmlSaveErr(
-                XmlParserErrors::XmlErrInternalError,
-                cur,
-                c"HTML support not compiled in\n".as_ptr() as _,
-            );
+        if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
+            #[cfg(feature = "html")]
+            {
+                html_node_dump_output(outbuf, doc, self, null_mut());
+            }
+            #[cfg(not(feature = "html"))]
+            {
+                xmlSaveErr(
+                    XmlParserErrors::XmlErrInternalError,
+                    cur,
+                    c"HTML support not compiled in\n".as_ptr() as _,
+                );
+            }
+        } else {
+            self.dump_output(outbuf, doc, 0, 1, None);
         }
-    } else {
-        (*cur).dump_output(outbuf, doc, 0, 1, None);
+        xml_output_buffer_close(outbuf);
     }
-    xml_output_buffer_close(outbuf);
 }
 
 /**
