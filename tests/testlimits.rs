@@ -678,51 +678,35 @@ unsafe extern "C" fn initialize_libxml2() {
 
 static CALLBACKS: AtomicU64 = AtomicU64::new(0);
 
-/**
- * isStandaloneCallback:
- * @ctxt:  An XML parser context
- *
- * Is this document tagged standalone ?
- *
- * Returns 1 if true
- */
+/// Is this document tagged standalone ?
+///
+/// Returns 1 if true
+#[doc(alias = "isStandaloneCallback")]
 fn is_standalone_callback(_ctx: Option<GenericErrorContext>) -> i32 {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     0
 }
 
-/**
- * hasInternalSubsetCallback:
- * @ctxt:  An XML parser context
- *
- * Does this document has an internal subset
- *
- * Returns 1 if true
- */
+/// Does this document has an internal subset
+///
+/// Returns 1 if true
+#[doc(alias = "hasInternalSubsetCallback")]
 fn has_internal_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     0
 }
 
-/**
- * hasExternalSubsetCallback:
- * @ctxt:  An XML parser context
- *
- * Does this document has an external subset
- *
- * Returns 1 if true
- */
+/// Does this document has an external subset
+///
+/// Returns 1 if true
+#[doc(alias = "hasExternalSubsetCallback")]
 fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     0
 }
 
-/**
- * internalSubsetCallback:
- * @ctxt:  An XML parser context
- *
- * Does this document has an internal subset
- */
+/// Does this document has an internal subset
+#[doc(alias = "internalSubsetCallback")]
 fn internal_subset_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
@@ -732,12 +716,8 @@ fn internal_subset_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * externalSubsetCallback:
- * @ctxt:  An XML parser context
- *
- * Does this document has an external subset
- */
+/// Does this document has an external subset
+#[doc(alias = "externalSubsetCallback")]
 fn external_subset_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
@@ -747,20 +727,14 @@ fn external_subset_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * resolveEntityCallback:
- * @ctxt:  An XML parser context
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * Special entity resolver, better left to the parser, it has
- * more context than the application layer.
- * The default behaviour is to NOT resolve the entities, in that case
- * the ENTITY_REF nodes are built in the structure (and the parameter
- * values).
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
+/// Special entity resolver, better left to the parser, it has
+/// more context than the application layer.
+///
+/// The default behaviour is to NOT resolve the entities, in that case
+/// the ENTITY_REF nodes are built in the structure (and the parameter values).
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "resolveEntityCallback")]
 fn resolve_entity_callback(
     _ctx: Option<GenericErrorContext>,
     _public_id: *const XmlChar,
@@ -770,29 +744,19 @@ fn resolve_entity_callback(
     null_mut()
 }
 
-/**
- * getEntityCallback:
- * @ctxt:  An XML parser context
- * @name: The entity name
- *
- * Get an entity by name
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
+/// Get an entity by name
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "getEntityCallback")]
 fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) -> XmlEntityPtr {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     null_mut()
 }
 
-/**
- * getParameterEntityCallback:
- * @ctxt:  An XML parser context
- * @name: The entity name
- *
- * Get a parameter entity by name
- *
- * Returns the xmlParserInputPtr
- */
+/// Get a parameter entity by name
+///
+/// Returns the xmlParserInputPtr
+#[doc(alias = "getParameterEntityCallback")]
 fn get_parameter_entity_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
@@ -801,17 +765,8 @@ fn get_parameter_entity_callback(
     null_mut()
 }
 
-/**
- * entityDeclCallback:
- * @ctxt:  An XML parser context
- * @name:  the entity name
- * @type:  the entity type
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @content: the entity value (without processing).
- *
- * An entity definition has been parsed
- */
+/// An entity definition has been parsed
+#[doc(alias = "entityDeclCallback")]
 fn entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
@@ -823,14 +778,8 @@ fn entity_decl_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * attributeDeclCallback:
- * @ctxt:  An XML parser context
- * @name:  the attribute name
- * @type:  the attribute type
- *
- * An attribute definition has been parsed
- */
+/// An attribute definition has been parsed
+#[doc(alias = "attributeDeclCallback")]
 fn attribute_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _elem: *const XmlChar,
@@ -843,15 +792,8 @@ fn attribute_decl_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * elementDeclCallback:
- * @ctxt:  An XML parser context
- * @name:  the element name
- * @type:  the element type
- * @content: the element value (without processing).
- *
- * An element definition has been parsed
- */
+/// An element definition has been parsed
+#[doc(alias = "elementDeclCallback")]
 fn element_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
@@ -861,15 +803,8 @@ fn element_decl_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * notationDeclCallback:
- * @ctxt:  An XML parser context
- * @name: The name of the notation
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * What to do when a notation declaration has been parsed.
- */
+/// What to do when a notation declaration has been parsed.
+#[doc(alias = "notationDeclCallback")]
 fn notation_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
@@ -879,16 +814,8 @@ fn notation_decl_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * unparsedEntityDeclCallback:
- * @ctxt:  An XML parser context
- * @name: The name of the entity
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @notationName: the name of the notation
- *
- * What to do when an unparsed entity declaration is parsed
- */
+/// What to do when an unparsed entity declaration is parsed
+#[doc(alias = "unparsedEntityDeclCallback")]
 fn unparsed_entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
@@ -899,72 +826,41 @@ fn unparsed_entity_decl_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * setDocumentLocatorCallback:
- * @ctxt:  An XML parser context
- * @loc: A SAX Locator
- *
- * Receive the document locator at startup, actually xmlDefaultSAXLocator
- * Everything is available on the context, so this is useless in our case.
- */
+/// Receive the document locator at startup, actually xmlDefaultSAXLocator
+/// Everything is available on the context, so this is useless in our case.
+#[doc(alias = "setDocumentLocatorCallback")]
 fn set_document_locator_callback(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * startDocumentCallback:
- * @ctxt:  An XML parser context
- *
- * called when the document start being processed.
- */
+/// called when the document start being processed.
+#[doc(alias = "startDocumentCallback")]
 fn start_document_callback(_ctx: Option<GenericErrorContext>) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * endDocumentCallback:
- * @ctxt:  An XML parser context
- *
- * called when the document end has been detected.
- */
+/// called when the document end has been detected.
+#[doc(alias = "endDocumentCallback")]
 fn end_document_callback(_ctx: Option<GenericErrorContext>) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * charactersCallback:
- * @ctxt:  An XML parser context
- * @ch:  a xmlChar string
- * @len: the number of xmlChar
- *
- * receiving some chars from the parser.
- * Question: how much at a time ???
- */
+/// receiving some chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "charactersCallback")]
 fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: *const XmlChar, _len: i32) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * referenceCallback:
- * @ctxt:  An XML parser context
- * @name:  The entity name
- *
- * called when an entity reference is detected.
- */
+/// called when an entity reference is detected.
+#[doc(alias = "referenceCallback")]
 fn reference_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * ignorableWhitespaceCallback:
- * @ctxt:  An XML parser context
- * @ch:  a xmlChar string
- * @start: the first char in the string
- * @len: the number of xmlChar
- *
- * receiving some ignorable whitespaces from the parser.
- * Question: how much at a time ???
- */
+/// receiving some ignorable whitespaces from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "ignorableWhitespaceCallback")]
 fn ignorable_whitespace_callback(
     _ctx: Option<GenericErrorContext>,
     _ch: *const XmlChar,
@@ -973,15 +869,8 @@ fn ignorable_whitespace_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * processingInstructionCallback:
- * @ctxt:  An XML parser context
- * @target:  the target name
- * @data: the PI data's
- * @len: the number of xmlChar
- *
- * A processing instruction has been parsed.
- */
+/// A processing instruction has been parsed.
+#[doc(alias = "processingInstructionCallback")]
 fn processing_instruction_callback(
     _ctx: Option<GenericErrorContext>,
     _target: *const XmlChar,
@@ -990,77 +879,39 @@ fn processing_instruction_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * cdataBlockCallback:
- * @ctx: the user data (XML parser context)
- * @value:  The pcdata content
- * @len:  the block length
- *
- * called when a pcdata block has been parsed
- */
+/// called when a pcdata block has been parsed
+#[doc(alias = "cdataBlockCallback")]
 fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar, _len: i32) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * commentCallback:
- * @ctxt:  An XML parser context
- * @value:  the comment content
- *
- * A comment has been parsed.
- */
+/// A comment has been parsed.
+#[doc(alias = "commentCallback")]
 fn comment_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * warningCallback:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a warning messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a warning messages, gives file, line, position and
+/// extra parameters.
+#[doc(alias = "warningCallback")]
 fn warning_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * errorCallback:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a error messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a error messages, gives file, line, position and
+/// extra parameters.
+#[doc(alias = "errorCallback")]
 fn error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * fatalErrorCallback:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a fatalError messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a fatalError messages, gives file, line, position and
+/// extra parameters.
+#[doc(alias = "fatalErrorCallback")]
 fn fatal_error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
-/*
- * SAX2 specific callbacks
- */
-
-/**
- * startElementNsCallback:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementNsCallback")]
 #[allow(clippy::too_many_arguments)]
 fn start_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
@@ -1076,13 +927,8 @@ fn start_element_ns_callback(
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
 }
 
-/**
- * endElementCallback:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementCallback")]
 fn end_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
     _localname: *const XmlChar,
@@ -1127,17 +973,10 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-/**
- * readerTest:
- * @filename: the file to parse
- * @max_size: size of the limit to test
- * @options: parsing options
- * @fail: should a failure be reported
- *
- * Parse a memory generated file using SAX
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a memory generated file using SAX
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "readerTest")]
 unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
     let res: i32;
 
@@ -1180,17 +1019,10 @@ unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, f
     res
 }
 
-/**
- * readerTest:
- * @filename: the file to parse
- * @max_size: size of the limit to test
- * @options: parsing options
- * @fail: should a failure be reported
- *
- * Parse a memory generated file using the xmlReader
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a memory generated file using the xmlReader
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "readerTest")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn reader_test(
     filename: *const i8,
