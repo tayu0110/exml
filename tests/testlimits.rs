@@ -431,25 +431,27 @@ unsafe extern "C" fn test_external_entity_loader(
  * Trapping the error messages at the generic level to grab the equivalent of
  * stderr messages on CLI tools.
  */
-static mut TEST_ERRORS: [u8; 32769] = [0; 32769];
-static mut TEST_ERRORS_SIZE: usize = 0;
+thread_local! {
+    static TEST_ERRORS: RefCell<[u8; 32769]> = const { RefCell::new([0; 32769]) };
+    static TEST_ERRORS_SIZE: Cell<usize> = const { Cell::new(0) };
+}
 
 fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        if TEST_ERRORS_SIZE >= 32768 {
-            return;
-        }
-        if TEST_ERRORS_SIZE + msg.len() >= TEST_ERRORS.len() {
-            TEST_ERRORS[TEST_ERRORS_SIZE..]
-                .copy_from_slice(&msg.as_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-            TEST_ERRORS_SIZE = TEST_ERRORS.len() - 1;
-        } else {
-            TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + msg.len()]
-                .copy_from_slice(msg.as_bytes());
-            TEST_ERRORS_SIZE += msg.len();
-        }
-        TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
+    if TEST_ERRORS_SIZE.get() >= 32768 {
+        return;
     }
+    TEST_ERRORS.with_borrow_mut(|errors| {
+        if TEST_ERRORS_SIZE.get() + msg.len() >= errors.len() {
+            let until = errors.len() - TEST_ERRORS_SIZE.get();
+            errors[TEST_ERRORS_SIZE.get()..].copy_from_slice(&msg.as_bytes()[..until]);
+            TEST_ERRORS_SIZE.set(errors.len() - 1);
+        } else {
+            errors[TEST_ERRORS_SIZE.get()..TEST_ERRORS_SIZE.get() + msg.len()]
+                .copy_from_slice(msg.as_bytes());
+            TEST_ERRORS_SIZE.set(TEST_ERRORS_SIZE.get() + msg.len())
+        }
+        errors[TEST_ERRORS_SIZE.get()] = 0;
+    })
 }
 
 fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
