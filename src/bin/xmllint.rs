@@ -2261,7 +2261,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     use exml::{
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
         libxml::xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
-        tree::{xml_node_dump_output, XmlNodePtr},
+        tree::XmlNodePtr,
     };
 
     match (*cur).typ {
@@ -2287,7 +2287,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     }
                     for i in 0..(*(*cur).nodesetval).node_nr {
                         node = *(*(*cur).nodesetval).node_tab.add(i as usize);
-                        xml_node_dump_output(buf, null_mut(), node, 0, 0, None);
+                        (*node).dump_output(buf, null_mut(), 0, 0, None);
                         (*buf).write_bytes(b"\n");
                     }
                     xml_output_buffer_close(buf);

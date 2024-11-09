@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    xml_buf_get_allocation_scheme, XmlBufPtr, XmlDoc, XmlDocPtr, XmlDtdPtr, XmlElementType,
+    xml_buf_get_allocation_scheme, XmlBufPtr, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
     XmlNodePtr,
 };
 
@@ -359,6 +359,68 @@ impl XmlDoc {
     }
 }
 
+impl XmlNode {
+    /// Dump an XML node, recursive behaviour, children are printed too.  
+    ///
+    /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
+    /// or `xmlKeepBlanksDefault(0)` was called.
+    #[doc(alias = "xmlNodeDumpOutput")]
+    pub unsafe fn dump_output(
+        &mut self,
+        buf: XmlOutputBufferPtr,
+        doc: XmlDocPtr,
+        level: i32,
+        format: i32,
+        mut encoding: Option<&str>,
+    ) {
+        xml_init_parser();
+
+        if buf.is_null() {
+            return;
+        }
+
+        if encoding.is_none() {
+            encoding = Some("UTF-8");
+        }
+
+        let mut ctxt = XmlSaveCtxt {
+            buf,
+            level,
+            format: (format != 0) as i32,
+            encoding: encoding.map(|e| e.to_owned()),
+            ..Default::default()
+        };
+        xml_save_ctxt_init(&mut ctxt);
+        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+
+        #[cfg(feature = "html")]
+        {
+            let mut is_xhtml: i32 = 0;
+            let dtd = if doc.is_null() {
+                null_mut()
+            } else {
+                (*doc).get_int_subset()
+            };
+            if !dtd.is_null() {
+                is_xhtml = xml_is_xhtml((*dtd).system_id, (*dtd).external_id);
+                if is_xhtml < 0 {
+                    is_xhtml = 0;
+                }
+            }
+
+            if is_xhtml != 0 {
+                xhtml_node_dump_output(&raw mut ctxt as _, self);
+            } else {
+                xml_node_dump_output_internal(&raw mut ctxt as _, self);
+            }
+        }
+        #[cfg(not(feature = "html"))]
+        {
+            xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
+        }
+    }
+}
+
 /**
  * xmlElemDump:
  * @f:  the FILE * for the output
@@ -392,7 +454,7 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
             );
         }
     } else {
-        xml_node_dump_output(outbuf, doc, cur, 0, 1, None);
+        (*cur).dump_output(outbuf, doc, 0, 1, None);
     }
     xml_output_buffer_close(outbuf);
 }
@@ -443,79 +505,9 @@ pub unsafe extern "C" fn xml_buf_node_dump(
     let using: usize = xml_buf_use(buf);
     let oldalloc: i32 = xml_buf_get_allocation_scheme(buf);
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_node_dump_output(outbuf, doc, cur, level, format, None);
+    (*cur).dump_output(outbuf, doc, level, format, None);
     xml_buf_set_allocation_scheme(buf, oldalloc.try_into().unwrap());
     xml_free(outbuf as _);
     let ret: i32 = (xml_buf_use(buf) - using) as i32;
     ret as _
-}
-
-/**
- * xmlNodeDumpOutput:
- * @buf:  the XML buffer output
- * @doc:  the document
- * @cur:  the current node
- * @level: the imbrication level for indenting
- * @format: is formatting allowed
- * @encoding:  an optional encoding string
- *
- * Dump an XML node, recursive behaviour, children are printed too.
- * Note that @format = 1 provide node indenting only if xmlIndentTreeOutput = 1
- * or xmlKeepBlanksDefault(0) was called
- */
-pub unsafe fn xml_node_dump_output(
-    buf: XmlOutputBufferPtr,
-    doc: XmlDocPtr,
-    cur: XmlNodePtr,
-    level: i32,
-    format: i32,
-    mut encoding: Option<&str>,
-) {
-    let mut ctxt = XmlSaveCtxt::default();
-    #[cfg(feature = "html")]
-    let dtd: XmlDtdPtr;
-    #[cfg(feature = "html")]
-    let mut is_xhtml: i32 = 0;
-
-    xml_init_parser();
-
-    if buf.is_null() || cur.is_null() {
-        return;
-    }
-
-    if encoding.is_none() {
-        encoding = Some("UTF-8");
-    }
-
-    ctxt.buf = buf;
-    ctxt.level = level;
-    ctxt.format = if format != 0 { 1 } else { 0 };
-    ctxt.encoding = encoding.map(|e| e.to_owned());
-    xml_save_ctxt_init(&mut ctxt);
-    ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-
-    #[cfg(feature = "html")]
-    {
-        dtd = if doc.is_null() {
-            null_mut()
-        } else {
-            (*doc).get_int_subset()
-        };
-        if !dtd.is_null() {
-            is_xhtml = xml_is_xhtml((*dtd).system_id, (*dtd).external_id);
-            if is_xhtml < 0 {
-                is_xhtml = 0;
-            }
-        }
-
-        if is_xhtml != 0 {
-            xhtml_node_dump_output(&raw mut ctxt as _, cur);
-        } else {
-            xml_node_dump_output_internal(&raw mut ctxt as _, cur);
-        }
-    }
-    #[cfg(not(feature = "html"))]
-    {
-        xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
-    }
 }
