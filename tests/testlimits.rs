@@ -8,7 +8,7 @@ use std::{
     io::{self, Read},
     os::raw::c_void,
     ptr::{addr_of, null_mut},
-    sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering},
+    sync::atomic::{AtomicPtr, AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -38,17 +38,18 @@ use libc::{memcpy, strlen, strncmp};
 /* maximum time for one parsing before declaring a timeout */
 const MAX_TIME: u64 = 2; /* seconds */
 
-static T0: AtomicU64 = AtomicU64::new(0);
-static TIMEOUT: AtomicBool = AtomicBool::new(false);
+thread_local! {
+    static T0: Cell<u64> = const { Cell::new(0) };
+    static TIMEOUT: Cell<bool> = const { Cell::new(false) };
+}
 
 fn reset_timout() {
-    TIMEOUT.store(false, Ordering::Release);
-    T0.store(
+    TIMEOUT.set(false);
+    T0.set(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs(),
-        Ordering::Release,
     );
 }
 
@@ -57,8 +58,8 @@ fn check_time() -> i32 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    if tnow - T0.load(Ordering::Acquire) > MAX_TIME {
-        TIMEOUT.store(true, Ordering::Release);
+    if tnow - T0.get() > MAX_TIME {
+        TIMEOUT.set(true);
         return 0;
     }
     1
@@ -1094,7 +1095,7 @@ unsafe extern "C" fn reader_test(
     } else {
         res = 0;
     }
-    if TIMEOUT.load(Ordering::Acquire) {
+    if TIMEOUT.get() {
         res = 1;
     }
     xml_free_text_reader(reader);
