@@ -1,8 +1,8 @@
 use std::{
+    cell::{Cell, RefCell},
     ffi::{c_char, CStr},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
-    sync::atomic::{AtomicPtr, Ordering},
 };
 
 use libc::{fclose, fopen, snprintf, FILE};
@@ -60,15 +60,17 @@ use crate::{
     },
 };
 
-static mut CHARTAB: [XmlChar; 1024] = [0; 1024];
-static mut LONGTAB: [u64; 1024] = [0; 1024];
-static mut INTTAB: [i32; 1024] = [0; 1024];
+thread_local! {
+    static CHARTAB: RefCell<[XmlChar; 1024]> = const { RefCell::new([0; 1024]) };
+    static LONGTAB: RefCell<[u64; 1024]> = const { RefCell::new([0; 1024]) };
+    static INTTAB: RefCell<[i32; 1024]> = const { RefCell::new([0; 1024]) };
 
-static API_DOC: AtomicPtr<XmlDoc> = AtomicPtr::new(null_mut());
-static API_DTD: AtomicPtr<XmlDtd> = AtomicPtr::new(null_mut());
-static API_ROOT: AtomicPtr<XmlNode> = AtomicPtr::new(null_mut());
-static API_ATTR: AtomicPtr<XmlAttr> = AtomicPtr::new(null_mut());
-static API_NS: AtomicPtr<XmlNs> = AtomicPtr::new(null_mut());
+    static API_DOC: Cell<*mut XmlDoc> = const { Cell::new(null_mut()) };
+    static API_DTD: Cell<*mut XmlDtd> = const { Cell::new(null_mut()) };
+    static API_ROOT: Cell<*mut XmlNode> = const { Cell::new(null_mut()) };
+    static API_ATTR: Cell<*mut XmlAttr> = const { Cell::new(null_mut()) };
+    static API_NS: Cell<*mut XmlNs> = const { Cell::new(null_mut()) };
+}
 
 pub(crate) const GEN_NB_HTML_DOC_PTR: i32 = 3;
 pub(crate) const GEN_NB_UNSIGNED_CHAR_PTR: i32 = 1;
@@ -380,10 +382,12 @@ pub(crate) fn des_unsigned_long(_no: i32, _val: u64, _nr: i32) {}
 
 #[cfg(feature = "schema")]
 pub(crate) unsafe extern "C" fn gen_unsigned_long_ptr(no: i32, nr: i32) -> *mut u64 {
-    if no == 0 {
-        return addr_of_mut!(LONGTAB[nr as usize]);
-    }
-    null_mut()
+    LONGTAB.with_borrow_mut(|table| {
+        if no == 0 {
+            return addr_of_mut!(table[nr as usize]);
+        }
+        null_mut()
+    })
 }
 
 #[cfg(feature = "schema")]
@@ -759,13 +763,10 @@ pub(crate) fn des_eaten_name(_no: i32, _val: *mut XmlChar, _nr: i32) {}
 
 unsafe extern "C" fn get_api_ns() -> XmlNsPtr {
     get_api_root();
-    if !API_ROOT.load(Ordering::Relaxed).is_null() {
-        API_NS.store(
-            (*API_ROOT.load(Ordering::Relaxed)).ns_def,
-            Ordering::Relaxed,
-        );
+    if !API_ROOT.get().is_null() {
+        API_NS.set((*API_ROOT.get()).ns_def);
     }
-    API_NS.load(Ordering::Relaxed)
+    API_NS.get()
 }
 
 pub(crate) unsafe extern "C" fn gen_xml_ns_ptr(no: i32, _nr: i32) -> XmlNsPtr {
@@ -781,21 +782,16 @@ pub(crate) unsafe extern "C" fn des_xml_ns_ptr(no: i32, _val: XmlNsPtr, _nr: i32
 }
 
 unsafe extern "C" fn get_api_dtd() -> XmlDtdPtr {
-    if API_DTD.load(Ordering::Relaxed).is_null()
-        || (*API_DTD.load(Ordering::Relaxed)).typ != XmlElementType::XmlDtdNode
-    {
+    if API_DTD.get().is_null() || (*API_DTD.get()).typ != XmlElementType::XmlDtdNode {
         get_api_doc();
-        if !API_DOC.load(Ordering::Relaxed).is_null()
-            && !(*API_DOC.load(Ordering::Relaxed)).children.is_null()
-            && (*(*API_DOC.load(Ordering::Relaxed)).children).typ == XmlElementType::XmlDtdNode
+        if !API_DOC.get().is_null()
+            && !(*API_DOC.get()).children.is_null()
+            && (*(*API_DOC.get()).children).typ == XmlElementType::XmlDtdNode
         {
-            API_DTD.store(
-                (*API_DOC.load(Ordering::Relaxed)).children as XmlDtdPtr,
-                Ordering::Relaxed,
-            );
+            API_DTD.set((*API_DOC.get()).children as XmlDtdPtr);
         }
     }
-    API_DTD.load(Ordering::Relaxed)
+    API_DTD.get()
 }
 
 pub(crate) unsafe extern "C" fn gen_xml_dtd_ptr(no: i32, _nr: i32) -> XmlDtdPtr {
@@ -837,22 +833,17 @@ unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
     ))]
     let mut name: [XmlChar; 20] = [0; 20];
 
-    if API_ROOT.load(Ordering::Relaxed).is_null()
-        || (*API_ROOT.load(Ordering::Relaxed)).typ != XmlElementType::XmlElementNode
-    {
+    if API_ROOT.get().is_null() || (*API_ROOT.get()).typ != XmlElementType::XmlElementNode {
         get_api_root();
     }
-    if API_ROOT.load(Ordering::Relaxed).is_null() {
+    if API_ROOT.get().is_null() {
         return null_mut();
     }
-    if !(*API_ROOT.load(Ordering::Relaxed)).properties.is_null() {
-        API_ATTR.store(
-            (*API_ROOT.load(Ordering::Relaxed)).properties,
-            Ordering::Relaxed,
-        );
-        return (*API_ROOT.load(Ordering::Relaxed)).properties;
+    if !(*API_ROOT.get()).properties.is_null() {
+        API_ATTR.set((*API_ROOT.get()).properties);
+        return (*API_ROOT.get()).properties;
     }
-    API_ATTR.store(null_mut(), Ordering::Relaxed);
+    API_ATTR.set(null_mut());
     #[cfg(any(
         feature = "tree",
         feature = "xinclude",
@@ -862,12 +853,9 @@ unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
     {
         snprintf(name.as_mut_ptr() as _, 20, c"foo%d".as_ptr() as _, NR);
         NR += 1;
-        API_ATTR.store(
-            (*API_ROOT.load(Ordering::Relaxed)).set_prop(name.as_ptr() as _, c"bar".as_ptr() as _),
-            Ordering::Relaxed,
-        );
+        API_ATTR.set((*API_ROOT.get()).set_prop(name.as_ptr() as _, c"bar".as_ptr() as _));
     }
-    API_ATTR.load(Ordering::Relaxed)
+    API_ATTR.get()
 }
 
 pub(crate) unsafe extern "C" fn gen_xml_attr_ptr(no: i32, _nr: i32) -> XmlAttrPtr {
@@ -995,10 +983,7 @@ pub(crate) fn gen_xml_char(no: i32, _nr: i32) -> XmlChar {
 pub(crate) fn des_xml_char(_no: i32, _val: XmlChar, _nr: i32) {}
 
 pub(crate) unsafe extern "C" fn desret_xml_node_ptr(val: XmlNodePtr) {
-    if !val.is_null()
-        && val != API_ROOT.load(Ordering::Relaxed)
-        && val != API_DOC.load(Ordering::Relaxed) as XmlNodePtr
-    {
+    if !val.is_null() && val != API_ROOT.get() && val != API_DOC.get() as XmlNodePtr {
         (*val).unlink();
         xml_free_node(val);
     }
@@ -1199,7 +1184,7 @@ pub(crate) fn gen_const_xml_doc_ptr(_no: i32, _nr: i32) -> *const XmlDoc {
 pub(crate) fn des_const_xml_doc_ptr(_no: i32, _val: *const XmlDoc, _nr: i32) {}
 
 pub(crate) unsafe extern "C" fn desret_xml_doc_ptr(val: XmlDocPtr) {
-    if val != API_DOC.load(Ordering::Relaxed) {
+    if val != API_DOC.get() {
         xml_free_doc(val);
     }
 }
@@ -1280,10 +1265,12 @@ pub(crate) unsafe extern "C" fn desret_xml_entity_ptr(val: XmlEntityPtr) {
 }
 
 pub(crate) unsafe fn gen_xml_char_ptr(no: i32, _nr: i32) -> *mut XmlChar {
-    if no == 0 {
-        return addr_of_mut!(CHARTAB[0]);
-    }
-    null_mut()
+    CHARTAB.with_borrow_mut(|table| {
+        if no == 0 {
+            return addr_of_mut!(table[0]);
+        }
+        null_mut()
+    })
 }
 pub(crate) fn des_xml_char_ptr(_no: i32, _val: *mut XmlChar, _nr: i32) {}
 
@@ -1311,43 +1298,35 @@ pub(crate) fn gen_xml_enumeration_ptr(_no: i32, _nr: i32) -> XmlEnumerationPtr {
 pub(crate) fn des_xml_enumeration_ptr(_no: i32, _val: XmlEnumerationPtr, _nr: i32) {}
 
 unsafe extern "C" fn get_api_root() -> XmlNodePtr {
-    if (API_ROOT.load(Ordering::Relaxed).is_null())
-        || (*API_ROOT.load(Ordering::Relaxed)).typ != XmlElementType::XmlElementNode
-    {
+    if (API_ROOT.get().is_null()) || (*API_ROOT.get()).typ != XmlElementType::XmlElementNode {
         get_api_doc();
-        if !API_DOC.load(Ordering::Relaxed).is_null()
-            && !(*API_DOC.load(Ordering::Relaxed)).children.is_null()
-            && !(*(*API_DOC.load(Ordering::Relaxed)).children)
-                .next
-                .is_null()
-            && (*(*(*API_DOC.load(Ordering::Relaxed)).children).next).typ
-                == XmlElementType::XmlElementNode
+        if !API_DOC.get().is_null()
+            && !(*API_DOC.get()).children.is_null()
+            && !(*(*API_DOC.get()).children).next.is_null()
+            && (*(*(*API_DOC.get()).children).next).typ == XmlElementType::XmlElementNode
         {
-            API_ROOT.store(
-                (*(*API_DOC.load(Ordering::Relaxed)).children).next,
-                Ordering::Relaxed,
-            );
+            API_ROOT.set((*(*API_DOC.get()).children).next);
         }
     }
-    API_ROOT.load(Ordering::Relaxed)
+    API_ROOT.get()
 }
 
 unsafe extern "C" fn get_api_doc() -> XmlDocPtr {
-    if API_DOC.load(Ordering::Relaxed).is_null() {
-        API_DOC.store(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), Some("root_test"), None, 0), Ordering::Relaxed);
-        API_ROOT.store(null_mut(), Ordering::Relaxed);
-        API_ATTR.store(null_mut(), Ordering::Relaxed);
+    if API_DOC.get().is_null() {
+        API_DOC.set(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), Some("root_test"), None, 0));
+        API_ROOT.set(null_mut());
+        API_ATTR.set(null_mut());
     }
-    API_DOC.load(Ordering::Relaxed)
+    API_DOC.get()
 }
 
 unsafe extern "C" fn free_api_doc() {
-    xml_free_doc(API_DOC.load(Ordering::Relaxed));
-    API_DOC.store(null_mut(), Ordering::Relaxed);
-    API_DTD.store(null_mut(), Ordering::Relaxed);
-    API_ROOT.store(null_mut(), Ordering::Relaxed);
-    API_ATTR.store(null_mut(), Ordering::Relaxed);
-    API_NS.store(null_mut(), Ordering::Relaxed);
+    xml_free_doc(API_DOC.get());
+    API_DOC.set(null_mut());
+    API_DTD.set(null_mut());
+    API_ROOT.set(null_mut());
+    API_ATTR.set(null_mut());
+    API_NS.set(null_mut());
 }
 
 pub(crate) unsafe extern "C" fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePtr {
@@ -1375,11 +1354,13 @@ pub(crate) fn gen_unsigned_char_ptr(_no: i32, _nr: i32) -> *mut u8 {
 }
 
 pub(crate) unsafe extern "C" fn gen_int_ptr(no: i32, nr: i32) -> *mut i32 {
-    if no == 0 {
-        addr_of_mut!(INTTAB[nr as usize])
-    } else {
-        null_mut()
-    }
+    INTTAB.with_borrow_mut(|table| {
+        if no == 0 {
+            addr_of_mut!(table[nr as usize])
+        } else {
+            null_mut()
+        }
+    })
 }
 
 pub(crate) fn gen_const_unsigned_char_ptr(_no: i32, _nr: i32) -> *mut u8 {
@@ -1424,10 +1405,7 @@ pub(crate) unsafe extern "C" fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPt
 
 #[cfg(feature = "html")]
 pub(crate) unsafe extern "C" fn desret_html_doc_ptr(val: HtmlDocPtr) {
-    if !val.is_null()
-        && val != API_DOC.load(Ordering::Relaxed)
-        && (*val).doc != API_DOC.load(Ordering::Relaxed)
-    {
+    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
         xml_free_doc(val);
     }
 }
@@ -1441,10 +1419,7 @@ pub(crate) unsafe extern "C" fn des_html_node_ptr(_no: i32, _val: HtmlNodePtr, _
 
 #[cfg(feature = "html")]
 pub(crate) unsafe extern "C" fn des_html_doc_ptr(_no: i32, val: HtmlDocPtr, _nr: i32) {
-    if !val.is_null()
-        && val != API_DOC.load(Ordering::Relaxed)
-        && (*val).doc != API_DOC.load(Ordering::Relaxed)
-    {
+    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
         xml_free_doc(val);
     }
 }
@@ -1613,10 +1588,7 @@ pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: i32, _nr: i32) -> XmlDocPtr 
 }
 
 pub(crate) unsafe extern "C" fn des_xml_doc_ptr(_no: i32, val: XmlDocPtr, _nr: i32) {
-    if !val.is_null()
-        && val != API_DOC.load(Ordering::Relaxed)
-        && (*val).doc != API_DOC.load(Ordering::Relaxed)
-    {
+    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
         xml_free_doc(val);
     }
 }
