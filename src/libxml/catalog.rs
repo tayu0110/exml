@@ -46,8 +46,7 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
-        xml_save_format_file_to, xml_search_ns_by_href, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        xml_search_ns_by_href, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     SYSCONFDIR,
 };
@@ -3355,7 +3354,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
         xml_free_doc(doc);
         return -1;
     }
-    let ret: i32 = xml_save_format_file_to(buf, doc, None, 1);
+    let ret: i32 = (*doc).save_format_file_to(buf, None, 1);
 
     /*
      * Free it

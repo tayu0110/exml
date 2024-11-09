@@ -295,6 +295,43 @@ impl XmlDoc {
     pub unsafe fn save_file(&mut self, filename: *const i8) -> i32 {
         self.save_format_file_enc(filename, None, 0)
     }
+
+    /// Dump an XML document to an I/O buffer.
+    ///
+    /// returns: the number of bytes written or -1 in case of failure.
+    ///
+    /// # Warning
+    /// This call xmlOutputBufferClose() on buf which is not available after this call.
+    #[doc(alias = "xmlSaveFormatFileTo")]
+    pub unsafe fn save_format_file_to(
+        &mut self,
+        buf: XmlOutputBufferPtr,
+        encoding: Option<&str>,
+        format: i32,
+    ) -> i32 {
+        if buf.is_null() {
+            return -1;
+        }
+        if !matches!(
+            self.typ,
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+        ) {
+            xml_output_buffer_close(buf);
+            return -1;
+        }
+        let mut ctxt = XmlSaveCtxt {
+            buf,
+            level: 0,
+            format: (format != 0) as i32,
+            encoding: encoding.map(|e| e.to_owned()),
+            ..Default::default()
+        };
+        xml_save_ctxt_init(&mut ctxt);
+        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        xml_doc_content_dump_output(&raw mut ctxt as _, self);
+        let ret: i32 = xml_output_buffer_close(buf);
+        ret
+    }
 }
 
 /**
@@ -417,48 +454,6 @@ pub unsafe fn xml_save_file_to(
     ctxt.buf = buf;
     ctxt.level = 0;
     ctxt.format = 0;
-    ctxt.encoding = encoding.map(|e| e.to_owned());
-    xml_save_ctxt_init(&mut ctxt);
-    ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
-    xml_doc_content_dump_output(&raw mut ctxt as _, cur);
-    let ret: i32 = xml_output_buffer_close(buf);
-    ret
-}
-
-/**
- * xmlSaveFormatFileTo:
- * @buf:  an output I/O buffer
- * @cur:  the document
- * @encoding:  the encoding if any assuming the I/O layer handles the transcoding
- * @format: should formatting spaces been added
- *
- * Dump an XML document to an I/O buffer.
- * Warning ! This call xmlOutputBufferClose() on buf which is not available
- * after this call.
- *
- * returns: the number of bytes written or -1 in case of failure.
- */
-pub unsafe fn xml_save_format_file_to(
-    buf: XmlOutputBufferPtr,
-    cur: XmlDocPtr,
-    encoding: Option<&str>,
-    format: i32,
-) -> i32 {
-    let mut ctxt = XmlSaveCtxt::default();
-
-    if buf.is_null() {
-        return -1;
-    }
-    if cur.is_null()
-        || (!matches!((*cur).typ, XmlElementType::XmlDocumentNode)
-            && !matches!((*cur).typ, XmlElementType::XmlHtmlDocumentNode))
-    {
-        xml_output_buffer_close(buf);
-        return -1;
-    }
-    ctxt.buf = buf;
-    ctxt.level = 0;
-    ctxt.format = if format != 0 { 1 } else { 0 };
     ctxt.encoding = encoding.map(|e| e.to_owned());
     xml_save_ctxt_init(&mut ctxt);
     ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
