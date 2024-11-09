@@ -264,6 +264,15 @@ impl XmlDoc {
         let ret: i32 = xml_output_buffer_close(buf);
         ret
     }
+
+    /// Dump an XML document to a file. Will use compression if compiled in and enabled.  
+    ///
+    /// If `filename` is "-" the stdout file is used.  
+    /// returns: the number of bytes written or -1 in case of failure.
+    #[doc(alias = "xmlSaveFile")]
+    pub unsafe fn save_file(&mut self, filename: *const i8) -> i32 {
+        self.save_format_file_enc(filename, None, 0)
+    }
 }
 
 /**
@@ -302,24 +311,6 @@ pub unsafe extern "C" fn xml_elem_dump(f: *mut FILE, doc: XmlDocPtr, cur: XmlNod
         xml_node_dump_output(outbuf, doc, cur, 0, 1, None);
     }
     xml_output_buffer_close(outbuf);
-}
-
-/**
- * xmlSaveFile:
- * @filename:  the filename (or URL)
- * @cur:  the document
- *
- * Dump an XML document to a file. Will use compression if
- * compiled in and enabled. If @filename is "-" the stdout file is
- * used.
- * returns: the number of bytes written or -1 in case of failure.
- */
-pub unsafe extern "C" fn xml_save_file(filename: *const i8, cur: XmlDocPtr) -> i32 {
-    if !cur.is_null() {
-        (*cur).save_format_file_enc(filename, None, 0)
-    } else {
-        -1
-    }
 }
 
 /**

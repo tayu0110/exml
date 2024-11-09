@@ -2678,7 +2678,7 @@ pub unsafe extern "C" fn xml_shell_write(
     use libc::{fclose, fopen};
 
     use crate::libxml::htmltree::html_save_file;
-    use crate::tree::{xml_elem_dump, xml_save_file};
+    use crate::tree::xml_elem_dump;
 
     if node.is_null() {
         return -1;
@@ -2688,7 +2688,7 @@ pub unsafe extern "C" fn xml_shell_write(
     }
     match (*node).typ {
         XmlElementType::XmlDocumentNode => {
-            if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
+            if (*ctxt).doc.is_null() || (*(*ctxt).doc).save_file(filename as *mut c_char) < -1 {
                 generic_error!(
                     "Failed to write to {}\n",
                     CStr::from_ptr(filename as *const i8).to_string_lossy()
@@ -2751,8 +2751,6 @@ pub unsafe extern "C" fn xml_shell_save(
 ) -> i32 {
     use crate::libxml::htmltree::html_save_file;
 
-    use crate::tree::xml_save_file;
-
     if ctxt.is_null() || (*ctxt).doc.is_null() {
         return -1;
     }
@@ -2764,7 +2762,7 @@ pub unsafe extern "C" fn xml_shell_save(
     }
     match (*(*ctxt).doc).typ {
         XmlElementType::XmlDocumentNode => {
-            if xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
+            if (*ctxt).doc.is_null() || (*(*ctxt).doc).save_file(filename as *mut c_char) < 0 {
                 generic_error!(
                     "Failed to save to {}\n",
                     CStr::from_ptr(filename as *const i8).to_string_lossy()

@@ -63,8 +63,8 @@ use exml::{
         xpath::XmlXPathObjectPtr,
     },
     tree::{
-        xml_free_doc, xml_save_file, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-        XmlEnumerationPtr, XmlNodePtr,
+        xml_free_doc, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
+        XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -1903,7 +1903,7 @@ unsafe fn old_parse_test(
         Some(".res"),
     );
     let ctemp = CString::new(temp.as_str()).unwrap();
-    xml_save_file(ctemp.as_ptr(), doc);
+    (*doc).save_file(ctemp.as_ptr());
     if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
@@ -1923,7 +1923,7 @@ unsafe fn old_parse_test(
     if doc.is_null() {
         return 1;
     }
-    xml_save_file(ctemp.as_ptr(), doc);
+    (*doc).save_file(ctemp.as_ptr());
     if compare_files(temp.as_str(), result.unwrap()) != 0 {
         res = 1;
     }
@@ -2623,7 +2623,7 @@ unsafe fn noent_parse_test(
         Some(".res"),
     );
     let ctemp = CString::new(temp.as_str()).unwrap();
-    xml_save_file(ctemp.as_ptr(), doc);
+    (*doc).save_file(ctemp.as_ptr());
     if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
@@ -2636,7 +2636,7 @@ unsafe fn noent_parse_test(
     if doc.is_null() {
         return 1;
     }
-    xml_save_file(ctemp.as_ptr(), doc);
+    (*doc).save_file(ctemp.as_ptr());
     if compare_files(temp.as_str(), result.unwrap()) != 0 {
         res = 1;
     }
