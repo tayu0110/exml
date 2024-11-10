@@ -2,7 +2,7 @@
 //! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     env::args,
     ffi::{c_char, c_int, c_ulong, CStr, CString},
     fs::{metadata, remove_file, File},
@@ -127,46 +127,48 @@ unsafe extern "C" fn test_external_entity_loader(
  * Trapping the error messages at the generic level to grab the equivalent of
  * stderr messages on CLI tools.
  */
-static mut TEST_ERRORS: [XmlChar; 32769] = [0; 32769];
-static mut TEST_ERRORS_SIZE: usize = 0;
+thread_local! {
+    static TEST_ERRORS: RefCell<[XmlChar; 32769]> = const { RefCell::new([0; 32769]) };
+    static TEST_ERRORS_SIZE: Cell<usize> = const { Cell::new(0) };
+}
 
 fn test_error_handler(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        if TEST_ERRORS_SIZE >= 32768 {
-            return;
-        }
-
-        if TEST_ERRORS_SIZE + msg.len() >= 32768 {
-            TEST_ERRORS[TEST_ERRORS_SIZE..]
-                .copy_from_slice(&msg.as_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-            /* buffer is full */
-            TEST_ERRORS_SIZE = 32768;
-            TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
-        } else {
-            TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + msg.len()]
-                .copy_from_slice(msg.as_bytes());
-            TEST_ERRORS_SIZE += msg.len();
-        }
-        TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
+    if TEST_ERRORS_SIZE.get() >= 32768 {
+        return;
     }
+
+    TEST_ERRORS.with_borrow_mut(|errors| {
+        if TEST_ERRORS_SIZE.get() + msg.len() >= 32768 {
+            let until = errors.len() - TEST_ERRORS_SIZE.get();
+            errors[TEST_ERRORS_SIZE.get()..].copy_from_slice(&msg.as_bytes()[..until]);
+            /* buffer is full */
+            TEST_ERRORS_SIZE.set(32768);
+            errors[TEST_ERRORS_SIZE.get()] = 0;
+        } else {
+            errors[TEST_ERRORS_SIZE.get()..TEST_ERRORS_SIZE.get() + msg.len()]
+                .copy_from_slice(msg.as_bytes());
+            TEST_ERRORS_SIZE.set(TEST_ERRORS_SIZE.get() + msg.len());
+        }
+        errors[TEST_ERRORS_SIZE.get()] = 0;
+    });
 }
 
 fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        if TEST_ERRORS_SIZE >= 32768 {
-            return;
-        }
-        if TEST_ERRORS_SIZE + msg.len() >= TEST_ERRORS.len() {
-            TEST_ERRORS[TEST_ERRORS_SIZE..]
-                .copy_from_slice(&msg.as_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-            TEST_ERRORS_SIZE = TEST_ERRORS.len() - 1;
-        } else {
-            TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + msg.len()]
-                .copy_from_slice(msg.as_bytes());
-            TEST_ERRORS_SIZE += msg.len();
-        }
-        TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
+    if TEST_ERRORS_SIZE.get() >= 32768 {
+        return;
     }
+    TEST_ERRORS.with_borrow_mut(|errors| {
+        if TEST_ERRORS_SIZE.get() + msg.len() >= errors.len() {
+            let until = errors.len() - TEST_ERRORS_SIZE.get();
+            errors[TEST_ERRORS_SIZE.get()..].copy_from_slice(&msg.as_bytes()[..until]);
+            TEST_ERRORS_SIZE.set(errors.len() - 1);
+        } else {
+            errors[TEST_ERRORS_SIZE.get()..TEST_ERRORS_SIZE.get() + msg.len()]
+                .copy_from_slice(msg.as_bytes());
+            TEST_ERRORS_SIZE.set(TEST_ERRORS_SIZE.get() + msg.len());
+        }
+        errors[TEST_ERRORS_SIZE.get()] = 0;
+    });
 }
 
 fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
@@ -1999,7 +2001,8 @@ unsafe fn push_parse_test(
     }
     xml_free(base as _);
     if let Some(err) = err {
-        res = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
+        res = TEST_ERRORS
+            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2437,7 +2440,8 @@ unsafe fn push_boundary_test(
     }
     xml_free(base as _);
     if let Some(err) = err {
-        res = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
+        res = TEST_ERRORS
+            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2640,12 +2644,14 @@ unsafe fn err_parse_test(
         return -1;
     }
     if let Some(err) = err {
-        res = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
+        res = TEST_ERRORS
+            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
         }
-    } else if options & XmlParserOption::XmlParseDtdvalid as i32 != 0 && TEST_ERRORS_SIZE != 0 {
+    } else if options & XmlParserOption::XmlParseDtdvalid as i32 != 0 && TEST_ERRORS_SIZE.get() != 0
+    {
         eprintln!("Validation for {filename} failed",);
     }
 
@@ -2774,13 +2780,13 @@ unsafe fn stream_process_test(
         }
     }
     if let Some(err) = err {
-        ret = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
+        ret = TEST_ERRORS
+            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
         if ret != 0 {
-            eprintln!("Error for {filename} failed",);
-            print!(
-                "{}",
-                CStr::from_ptr(TEST_ERRORS.as_ptr() as _).to_string_lossy()
-            );
+            eprintln!("Error for {filename} failed");
+            TEST_ERRORS.with_borrow(|errors| {
+                print!("{}", CStr::from_ptr(errors.as_ptr() as _).to_string_lossy());
+            });
             return -1;
         }
     }
@@ -3308,7 +3314,8 @@ unsafe fn xmlid_doc_test(
     xml_free_doc(XPATH_DOCUMENT.load(Ordering::Relaxed));
 
     if let Some(err) = err {
-        ret = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
+        ret = TEST_ERRORS
+            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
         if ret != 0 {
             eprintln!("Error for {filename} failed",);
             res = 1;
@@ -3441,7 +3448,8 @@ unsafe fn uri_common_test(
         }
     }
     if let Some(err) = err {
-        ret = compare_file_mem(err, &TEST_ERRORS[..TEST_ERRORS_SIZE]);
+        ret = TEST_ERRORS
+            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
         if ret != 0 {
             eprintln!("Error for {filename} failed",);
             res = 1;
@@ -3857,7 +3865,7 @@ unsafe fn schemas_test(
     );
     let schemas: XmlSchemaPtr = xml_schema_parse(ctxt);
     xml_schema_free_parser_ctxt(ctxt);
-    let parse_errors_size: usize = TEST_ERRORS_SIZE;
+    let parse_errors_size = TEST_ERRORS_SIZE.get();
 
     /*
      * most of the mess is about the output filenames generated by the Makefile
@@ -3896,8 +3904,10 @@ unsafe fn schemas_test(
     globbuf.gl_offs = 0;
     glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
     for i in 0..globbuf.gl_pathc {
-        TEST_ERRORS_SIZE = parse_errors_size;
-        TEST_ERRORS[parse_errors_size] = 0;
+        TEST_ERRORS_SIZE.set(parse_errors_size);
+        TEST_ERRORS.with_borrow_mut(|errors| {
+            errors[parse_errors_size] = 0;
+        });
         instance = *globbuf.gl_pathv.add(i);
         let base2 = CString::new(base_filename(
             CStr::from_ptr(instance).to_string_lossy().as_ref(),
@@ -3947,17 +3957,19 @@ unsafe fn schemas_test(
                 res = ret;
             }
         }
-        if compare_file_mem(
-            CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
-            &TEST_ERRORS[..TEST_ERRORS_SIZE],
-        ) != 0
-        {
-            eprintln!(
-                "Error for {} on {filename} failed",
-                CStr::from_ptr(instance).to_string_lossy(),
-            );
-            res = 1;
-        }
+        TEST_ERRORS.with_borrow(|errors| {
+            if compare_file_mem(
+                CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
+                &errors[..TEST_ERRORS_SIZE.get()],
+            ) != 0
+            {
+                eprintln!(
+                    "Error for {} on {filename} failed",
+                    CStr::from_ptr(instance).to_string_lossy(),
+                );
+                res = 1;
+            }
+        });
     }
     globfree(addr_of_mut!(globbuf));
     xml_schema_free(schemas);
@@ -4104,7 +4116,7 @@ unsafe fn rng_test(
             format!("Relax-NG schema {filename} failed to compile\n").as_str(),
         );
     }
-    let parse_errors_size: usize = TEST_ERRORS_SIZE;
+    let parse_errors_size = TEST_ERRORS_SIZE.get();
 
     /*
      * most of the mess is about the output filenames generated by the Makefile
@@ -4131,8 +4143,8 @@ unsafe fn rng_test(
     globbuf.gl_offs = 0;
     glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
     for i in 0..globbuf.gl_pathc {
-        TEST_ERRORS_SIZE = parse_errors_size;
-        TEST_ERRORS[parse_errors_size] = 0;
+        TEST_ERRORS_SIZE.set(parse_errors_size);
+        TEST_ERRORS.with_borrow_mut(|errors| errors[parse_errors_size] = 0);
         instance = *globbuf.gl_pathv.add(i);
         let base2 = CString::new(base_filename(
             CStr::from_ptr(instance).to_string_lossy().as_ref(),
@@ -4182,17 +4194,19 @@ unsafe fn rng_test(
                 ret = res;
             }
         }
-        if compare_file_mem(
-            CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
-            &TEST_ERRORS[..TEST_ERRORS_SIZE],
-        ) != 0
-        {
-            eprintln!(
-                "Error for {} on {filename} failed",
-                CStr::from_ptr(instance).to_string_lossy(),
-            );
-            // res = 1;
-        }
+        TEST_ERRORS.with_borrow(|errors| {
+            if compare_file_mem(
+                CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
+                &errors[..TEST_ERRORS_SIZE.get()],
+            ) != 0
+            {
+                eprintln!(
+                    "Error for {} on {filename} failed",
+                    CStr::from_ptr(instance).to_string_lossy(),
+                );
+                // res = 1;
+            }
+        });
     }
     globfree(addr_of_mut!(globbuf));
     xml_relaxng_free(schemas);
@@ -4276,8 +4290,8 @@ unsafe fn rng_stream_test(
     globbuf.gl_offs = 0;
     glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
     for i in 0..globbuf.gl_pathc {
-        TEST_ERRORS_SIZE = 0;
-        TEST_ERRORS[0] = 0;
+        TEST_ERRORS_SIZE.set(0);
+        TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
         instance = *globbuf.gl_pathv.add(i);
         let base2 = CString::new(base_filename(
             CStr::from_ptr(instance).to_string_lossy().as_ref(),
@@ -5438,7 +5452,9 @@ unsafe fn regexp_test(
     }
     remove_file(temp).ok();
 
-    ret = compare_file_mem(err.as_deref().unwrap(), &TEST_ERRORS[..TEST_ERRORS_SIZE]);
+    ret = TEST_ERRORS.with_borrow(|errors| {
+        compare_file_mem(err.as_deref().unwrap(), &errors[..TEST_ERRORS_SIZE.get()])
+    });
     if ret != 0 {
         eprintln!("Error for {filename} failed",);
         res = 1;
@@ -6278,8 +6294,8 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
             }
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER.set(0);
-            TEST_ERRORS_SIZE = 0;
-            TEST_ERRORS[0] = 0;
+            TEST_ERRORS_SIZE.set(0);
+            TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
             res = (tst.func)(
                 &path,
                 result,
@@ -6299,11 +6315,11 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                 NB_LEAKS.set(NB_LEAKS.get() + 1);
                 err += 1;
             }
-            TEST_ERRORS_SIZE = 0;
+            TEST_ERRORS_SIZE.set(0);
         }
     } else {
-        TEST_ERRORS_SIZE = 0;
-        TEST_ERRORS[0] = 0;
+        TEST_ERRORS_SIZE.set(0);
+        TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
         EXTRA_MEMORY_FROM_RESOLVER.set(0);
         res = (tst.func)("", None, None, tst.options);
         if res != 0 {
