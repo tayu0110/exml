@@ -12,7 +12,10 @@ use std::{
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
-    sync::{atomic::AtomicPtr, Mutex, OnceLock},
+    sync::{
+        atomic::{AtomicPtr, AtomicUsize, Ordering},
+        Mutex, OnceLock,
+    },
 };
 
 use const_format::concatcp;
@@ -6330,14 +6333,73 @@ unsafe extern "C" fn runtest(i: usize) -> i32 {
     ret
 }
 
+static TEST_INITIALIZED: AtomicUsize = AtomicUsize::new(0);
+fn test_initialize() {
+    while TEST_INITIALIZED
+        .fetch_update(Ordering::Release, Ordering::Acquire, |old| {
+            if old == 0 {
+                unsafe {
+                    initialize_libxml2();
+                }
+            }
+            Some(old + 1)
+        })
+        .is_err()
+    {}
+}
+fn test_cleanup() {
+    while TEST_INITIALIZED
+        .fetch_update(Ordering::Release, Ordering::Acquire, |old| {
+            if old == 1 {
+                unsafe {
+                    xml_cleanup_parser();
+                    xml_memory_dump();
+                }
+            }
+            old.checked_sub(1)
+        })
+        .is_err()
+    {}
+}
+
+fn test_common(desc: &TestDesc) {
+    test_initialize();
+    let old_errors = NB_ERRORS.get();
+    let old_tests = NB_TESTS.get();
+    let old_leaks = NB_LEAKS.get();
+    println!("## {}", desc.desc);
+    let res: i32 = unsafe { launch_tests(desc) };
+    assert!(
+        res == 0 && NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks,
+        "Ran {} tests, {} errors, {} leaks",
+        NB_TESTS.get() - old_tests,
+        NB_ERRORS.get() - old_errors,
+        NB_LEAKS.get() - old_leaks,
+    );
+    test_cleanup();
+}
+
+#[test]
+#[cfg(feature = "libxml_automata")]
+fn automata_regression_test() {
+    test_common(&TestDesc {
+        desc: "Automata regression tests",
+        func: automata_test,
+        input: Some("./test/automata/*"),
+        out: Some("./result/automata/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
 #[test]
 fn main() {
     let mut ret: i32 = 0;
     let mut subset: i32 = 0;
 
+    test_initialize();
     unsafe {
-        initialize_libxml2();
-
         let mut args = args();
         while let Some(arg) = args.next() {
             if arg == "-u" {
@@ -6374,9 +6436,8 @@ fn main() {
                 NB_LEAKS.get(),
             );
         }
-        xml_cleanup_parser();
-        xml_memory_dump();
     }
+    test_cleanup();
 
     assert_eq!(ret, 0);
 }

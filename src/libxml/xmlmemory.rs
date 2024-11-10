@@ -3,6 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+use std::cell::Cell;
 use std::ffi::{c_char, c_void};
 use std::mem::{size_of, zeroed};
 use std::ptr::{addr_of_mut, null_mut};
@@ -22,9 +23,11 @@ use super::globals::{_XML_FREE, _XML_MALLOC, _XML_MALLOC_ATOMIC, _XML_MEM_STRDUP
 use super::threads::{xml_mutex_lock, xml_mutex_unlock, XmlMutex};
 use super::xmlstring::XmlChar;
 
-static mut DEBUG_MEM_SIZE: u64 = 0;
-static mut DEBUG_MEM_BLOCKS: u64 = 0;
-static mut DEBUG_MAX_MEM_SIZE: u64 = 0;
+thread_local! {
+    static DEBUG_MEM_SIZE: Cell<i64> = const { Cell::new(0) };
+    static DEBUG_MEM_BLOCKS: Cell<i64> = const { Cell::new(0) };
+    static DEBUG_MAX_MEM_SIZE: Cell<i64> = const { Cell::new(0) };
+}
 static mut XML_MEM_MUTEX: XmlMutex = unsafe { zeroed() };
 
 const MEMTAG: usize = 0x5aa5;
@@ -371,7 +374,7 @@ pub unsafe extern "C" fn xml_mem_size(ptr: *mut c_void) -> usize {
  * Returns an int representing the amount of memory allocated.
  */
 pub unsafe extern "C" fn xml_mem_used() -> i32 {
-    DEBUG_MEM_SIZE as _
+    DEBUG_MEM_SIZE.get() as _
 }
 
 /**
@@ -383,7 +386,7 @@ pub unsafe extern "C" fn xml_mem_used() -> i32 {
  */
 pub unsafe extern "C" fn xml_mem_blocks() -> i32 {
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
-    let res: i32 = DEBUG_MEM_BLOCKS as _;
+    let res: i32 = DEBUG_MEM_BLOCKS.get() as _;
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
     res
 }
@@ -535,8 +538,8 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
         (*p).mh_tag = !MEMTAG as _;
         memset(target as _, -1, (*p).mh_size);
         xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
-        DEBUG_MEM_SIZE -= (*p).mh_size as u64;
-        DEBUG_MEM_BLOCKS -= 1;
+        DEBUG_MEM_SIZE.set(DEBUG_MEM_SIZE.get() - (*p).mh_size as i64);
+        DEBUG_MEM_BLOCKS.set(DEBUG_MEM_BLOCKS.get() - 1);
         xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
         free(p as _);
@@ -599,10 +602,10 @@ pub unsafe extern "C" fn xml_malloc_loc(
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     BLOCK += 1;
     (*p).mh_number = BLOCK as _;
-    DEBUG_MEM_SIZE += size as u64;
-    DEBUG_MEM_BLOCKS += 1;
-    if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
-        DEBUG_MAX_MEM_SIZE = DEBUG_MEM_SIZE;
+    DEBUG_MEM_SIZE.set(DEBUG_MEM_SIZE.get() + size as i64);
+    DEBUG_MEM_BLOCKS.set(DEBUG_MEM_BLOCKS.get() + 1);
+    if DEBUG_MEM_SIZE.get() > DEBUG_MAX_MEM_SIZE.get() {
+        DEBUG_MAX_MEM_SIZE.set(DEBUG_MEM_SIZE.get());
     }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
@@ -661,8 +664,8 @@ pub unsafe extern "C" fn xml_realloc_loc(
     }
     (*p).mh_tag = !MEMTAG as _;
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
-    DEBUG_MEM_SIZE -= (*p).mh_size as u64;
-    DEBUG_MEM_BLOCKS -= 1;
+    DEBUG_MEM_SIZE.set(DEBUG_MEM_SIZE.get() - (*p).mh_size as i64);
+    DEBUG_MEM_BLOCKS.set(DEBUG_MEM_BLOCKS.get() - 1);
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
     if size > MAX_SIZE_T - RESERVE_SIZE {
@@ -694,10 +697,10 @@ pub unsafe extern "C" fn xml_realloc_loc(
     (*p).mh_file = file;
     (*p).mh_line = line as _;
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
-    DEBUG_MEM_SIZE += size as u64;
-    DEBUG_MEM_BLOCKS += 1;
-    if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
-        DEBUG_MAX_MEM_SIZE = DEBUG_MEM_SIZE;
+    DEBUG_MEM_SIZE.set(DEBUG_MEM_SIZE.get() + size as i64);
+    DEBUG_MEM_BLOCKS.set(DEBUG_MEM_BLOCKS.get() + 1);
+    if DEBUG_MEM_SIZE.get() > DEBUG_MAX_MEM_SIZE.get() {
+        DEBUG_MAX_MEM_SIZE.set(DEBUG_MEM_SIZE.get());
     }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
@@ -745,10 +748,10 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     BLOCK += 1;
     (*p).mh_number = BLOCK as _;
-    DEBUG_MEM_SIZE += size as u64;
-    DEBUG_MEM_BLOCKS += 1;
-    if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
-        DEBUG_MAX_MEM_SIZE = DEBUG_MEM_SIZE;
+    DEBUG_MEM_SIZE.set(DEBUG_MEM_SIZE.get() + size as i64);
+    DEBUG_MEM_BLOCKS.set(DEBUG_MEM_BLOCKS.get() + 1);
+    if DEBUG_MEM_SIZE.get() > DEBUG_MAX_MEM_SIZE.get() {
+        DEBUG_MAX_MEM_SIZE.set(DEBUG_MEM_SIZE.get());
     }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
@@ -807,10 +810,10 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     BLOCK += 1;
     (*p).mh_number = BLOCK as _;
-    DEBUG_MEM_SIZE += size as u64;
-    DEBUG_MEM_BLOCKS += 1;
-    if DEBUG_MEM_SIZE > DEBUG_MAX_MEM_SIZE {
-        DEBUG_MAX_MEM_SIZE = DEBUG_MEM_SIZE;
+    DEBUG_MEM_SIZE.set(DEBUG_MEM_SIZE.get() + size as i64);
+    DEBUG_MEM_BLOCKS.set(DEBUG_MEM_BLOCKS.get() + 1);
+    if DEBUG_MEM_SIZE.get() > DEBUG_MAX_MEM_SIZE.get() {
+        DEBUG_MAX_MEM_SIZE.set(DEBUG_MEM_SIZE.get());
     }
     xml_mutex_unlock(addr_of_mut!(XML_MEM_MUTEX));
 
