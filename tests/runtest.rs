@@ -6154,46 +6154,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: None,
         options: 0,
     },
-    #[cfg(feature = "libxml_c14n")]
-    TestDesc {
-        desc: "C14N without comments regression tests",
-        func: c14n_without_comment_test,
-        input: Some("./test/c14n/without-comments/*.xml"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "libxml_c14n")]
-    TestDesc {
-        desc: "C14N exclusive without comments regression tests",
-        func: c14n_exc_without_comment_test,
-        input: Some("./test/c14n/exc-without-comments/*.xml"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "libxml_c14n")]
-    TestDesc {
-        desc: "C14N 1.1 without comments regression tests",
-        func: c14n11_without_comment_test,
-        input: Some("./test/c14n/1-1-without-comments/*.xml"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    #[cfg(all(feature = "thread", feature = "catalog"))]
-    TestDesc {
-        desc: "Catalog and Threads regression tests",
-        func: threads_test,
-        input: None,
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
 ];
 
 unsafe extern "C" fn launch_tests(tst: &TestDesc) -> i32 {
@@ -6348,6 +6308,62 @@ fn test_common(desc: &TestDesc) {
         NB_LEAKS.get() - old_leaks,
     );
     test_cleanup();
+}
+
+#[test]
+#[cfg(feature = "libxml_c14n")]
+fn c14n_without_comments_regression_test() {
+    test_common(&TestDesc {
+        desc: "C14N without comments regression tests",
+        func: c14n_without_comment_test,
+        input: Some("./test/c14n/without-comments/*.xml"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(feature = "libxml_c14n")]
+fn c14n_exclusive_without_comments_regression_test() {
+    test_common(&TestDesc {
+        desc: "C14N exclusive without comments regression tests",
+        func: c14n_exc_without_comment_test,
+        input: Some("./test/c14n/exc-without-comments/*.xml"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(feature = "libxml_c14n")]
+fn c14n_1_1_without_comments_regression_test() {
+    test_common(&TestDesc {
+        desc: "C14N 1.1 without comments regression tests",
+        func: c14n11_without_comment_test,
+        input: Some("./test/c14n/1-1-without-comments/*.xml"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "thread", feature = "catalog"))]
+fn catalog_and_threads_regression_test() {
+    test_common(&TestDesc {
+        desc: "Catalog and Threads regression tests",
+        func: threads_test,
+        input: None,
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
 }
 
 #[test]
