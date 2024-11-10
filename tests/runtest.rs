@@ -608,7 +608,12 @@ static mut EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-static mut CALLBACKS: c_int = 0;
+thread_local! {
+    static CALLBACKS: Cell<i32> = const { Cell::new(0) };
+}
+fn increment_callbacks_counter() {
+    CALLBACKS.set(CALLBACKS.get() + 1);
+}
 
 /**
  * isStandaloneDebug:
@@ -619,7 +624,7 @@ static mut CALLBACKS: c_int = 0;
  * Returns 1 if true
  */
 unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!("SAX.isStandalone()");
     0
 }
@@ -633,7 +638,7 @@ unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
  * Returns 1 if true
  */
 unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!("SAX.hasInternalSubset()");
     0
 }
@@ -647,7 +652,7 @@ unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int 
  * Returns 1 if true
  */
 unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!("SAX.hasExternalSubset()");
     0
 }
@@ -664,7 +669,7 @@ unsafe fn internal_subset_debug(
     external_id: *const XmlChar,
     system_id: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     if name.is_null() {
         name = c"(null)".as_ptr() as _;
     }
@@ -696,7 +701,7 @@ unsafe fn external_subset_debug(
     external_id: *const XmlChar,
     system_id: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debug!(
         "SAX.externalSubset({},",
         CStr::from_ptr(name as _).to_string_lossy()
@@ -732,7 +737,7 @@ unsafe fn resolve_entity_debug(
     public_id: *const XmlChar,
     system_id: *const XmlChar,
 ) -> XmlParserInputPtr {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     /* xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx; */
 
     sax_debug!("SAX.resolveEntity(");
@@ -773,7 +778,7 @@ unsafe fn get_entity_debug(
     _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
 ) -> XmlEntityPtr {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.getEntity({})",
         CStr::from_ptr(name as _).to_string_lossy()
@@ -794,7 +799,7 @@ unsafe fn get_parameter_entity_debug(
     _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
 ) -> XmlEntityPtr {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.getParameterEntity({})",
         CStr::from_ptr(name as _).to_string_lossy()
@@ -832,7 +837,7 @@ unsafe fn entity_decl_debug(
     if content.is_null() {
         content = nullstr as *mut XmlChar;
     }
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.entityDecl({}, {}, {}, {}, {})",
         CStr::from_ptr(name as _).to_string_lossy(),
@@ -860,7 +865,7 @@ unsafe fn attribute_decl_debug(
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     if default_value.is_null() {
         sax_debugln!(
             "SAX.attributeDecl({}, {}, {}, {}, NULL, ...)",
@@ -897,7 +902,7 @@ unsafe fn element_decl_debug(
     typ: c_int,
     _content: XmlElementContentPtr,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.elementDecl({}, {}, ...)",
         CStr::from_ptr(name as _).to_string_lossy(),
@@ -920,7 +925,7 @@ unsafe fn notation_decl_debug(
     public_id: *const XmlChar,
     system_id: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.notationDecl({}, {}, {})",
         CStr::from_ptr(name as *mut c_char).to_string_lossy(),
@@ -957,7 +962,7 @@ unsafe fn unparsed_entity_decl_debug(
     if notation_name.is_null() {
         notation_name = nullstr;
     }
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.unparsedEntityDecl({}, {}, {}, {})",
         CStr::from_ptr(name as *mut c_char).to_string_lossy(),
@@ -976,7 +981,7 @@ unsafe fn unparsed_entity_decl_debug(
  * Everything is available on the context, so this is useless in our case.
  */
 unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!("SAX.setDocumentLocator()");
 }
 
@@ -987,7 +992,7 @@ unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: Xm
  * called when the document start being processed.
  */
 unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!("SAX.startDocument()");
 }
 
@@ -998,7 +1003,7 @@ unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
  * called when the document end has been detected.
  */
 unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!("SAX.endDocument()");
 }
 
@@ -1014,7 +1019,7 @@ unsafe fn start_element_debug(
     name: *const XmlChar,
     atts: *mut *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debug!(
         "SAX.startElement({}",
         CStr::from_ptr(name as *mut c_char).to_string_lossy()
@@ -1044,7 +1049,7 @@ unsafe fn start_element_debug(
  * called when the end of an element has been detected.
  */
 unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.endElement({})",
         CStr::from_ptr(name as *mut c_char).to_string_lossy()
@@ -1063,7 +1068,7 @@ unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: *const XmlC
 unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
     let mut output: [u8; 40] = [0; 40];
 
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     for (i, o) in output.iter_mut().take(len.min(30) as usize).enumerate() {
         *o = *ch.add(i);
     }
@@ -1088,7 +1093,7 @@ unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar
  * called when an entity reference is detected.
  */
 unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.reference({})",
         CStr::from_ptr(name as _).to_string_lossy()
@@ -1112,7 +1117,7 @@ unsafe fn ignorable_whitespace_debug(
 ) {
     let mut output: [u8; 40] = [0; 40];
 
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     for i in 0..len.min(30) {
         output[i as usize] = *ch.add(i as usize);
     }
@@ -1142,7 +1147,7 @@ unsafe fn processing_instruction_debug(
     target: *const XmlChar,
     data: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     if !data.is_null() {
         sax_debugln!(
             "SAX.processingInstruction({}, {})",
@@ -1166,7 +1171,7 @@ unsafe fn processing_instruction_debug(
  * called when a pcdata block has been parsed
  */
 unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar, len: c_int) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     let value = CStr::from_ptr(value as *mut c_char).to_bytes();
     let l = value.len().min(20);
     sax_debug!("SAX.pcdata(");
@@ -1188,7 +1193,7 @@ unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const Xml
  * A comment has been parsed.
  */
 unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debugln!(
         "SAX.comment({})",
         CStr::from_ptr(value as _).to_string_lossy()
@@ -1205,9 +1210,7 @@ unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar
  * extra parameters.
  */
 fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        CALLBACKS += 1;
-    }
+    increment_callbacks_counter();
     write!(
         SAX_DEBUG.lock().unwrap().as_mut().unwrap(),
         "SAX.warning: {}",
@@ -1226,9 +1229,7 @@ fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
  * extra parameters.
  */
 fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        CALLBACKS += 1;
-    }
+    increment_callbacks_counter();
     sax_debug!("SAX.error: {}", msg);
 }
 
@@ -1242,9 +1243,7 @@ fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
  * extra parameters.
  */
 fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        CALLBACKS += 1;
-    }
+    increment_callbacks_counter();
     sax_debug!("SAX.fatalError: {msg}");
 }
 
@@ -1302,7 +1301,7 @@ unsafe fn start_element_ns_debug(
     nb_defaulted: c_int,
     attributes: *mut *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debug!(
         "SAX.startElementNs({}",
         CStr::from_ptr(localname as *mut c_char).to_string_lossy()
@@ -1389,7 +1388,7 @@ unsafe fn end_element_ns_debug(
     prefix: *const XmlChar,
     uri: *const XmlChar,
 ) {
-    CALLBACKS += 1;
+    increment_callbacks_counter();
     sax_debug!(
         "SAX.endElementNs({}",
         CStr::from_ptr(localname as *mut c_char).to_string_lossy()
