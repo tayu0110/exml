@@ -12,10 +12,7 @@ use std::{
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
-    sync::{
-        atomic::{AtomicPtr, Ordering},
-        Mutex, OnceLock,
-    },
+    sync::{atomic::AtomicPtr, Mutex, OnceLock},
 };
 
 use const_format::concatcp;
@@ -3499,8 +3496,6 @@ unsafe fn uri_base_test(
     )
 }
 
-static mut URIP_SUCCESS: c_int = 1;
-static mut URIP_CURRENT: usize = 0;
 const URIP_TEST_URLS: &[&CStr] = &[
     c"urip://example.com/a b.html",
     c"urip://example.com/a%20b.html",
@@ -3530,8 +3525,12 @@ const URIP_RCVS_URLS: &[&str] = &[
     "urip://example.com/test?a=1&b=2%263&c=4#foo",
 ];
 const URIP_RES: &CStr = c"<list/>";
-static URIP_CUR: AtomicPtr<c_char> = AtomicPtr::new(null_mut());
-static mut URIP_RLEN: usize = 0;
+thread_local! {
+    static URIP_SUCCESS: Cell<i32> = const { Cell::new(1) };
+    static URIP_CURRENT: Cell<usize> = const { Cell::new(0) };
+    static URIP_CUR: Cell<*mut i8> = const { Cell::new(null_mut()) };
+    static URIP_RLEN: Cell<usize> = const { Cell::new(0) };
+}
 
 /**
  * uripMatch:
@@ -3547,8 +3546,8 @@ unsafe fn urip_match(uri: &str) -> c_int {
         return 0;
     }
     /* Verify we received the escaped URL */
-    if URIP_RCVS_URLS[URIP_CURRENT] != uri {
-        URIP_SUCCESS = 0;
+    if URIP_RCVS_URLS[URIP_CURRENT.get()] != uri {
+        URIP_SUCCESS.set(0);
     }
     1
 }
@@ -3568,12 +3567,12 @@ unsafe fn urip_open(uri: &str) -> *mut c_void {
         return null_mut();
     }
     /* Verify we received the escaped URL */
-    if URIP_RCVS_URLS[URIP_CURRENT] != uri {
-        URIP_SUCCESS = 0;
+    if URIP_RCVS_URLS[URIP_CURRENT.get()] != uri {
+        URIP_SUCCESS.set(0);
     }
-    URIP_CUR.store(URIP_RES.as_ptr() as _, Ordering::Relaxed);
-    URIP_RLEN = URIP_RES.to_bytes().len();
-    URIP_CUR.load(Ordering::Relaxed) as _
+    URIP_CUR.set(URIP_RES.as_ptr() as _);
+    URIP_RLEN.set(URIP_RES.to_bytes().len());
+    URIP_CUR.get() as _
 }
 
 /**
@@ -3588,8 +3587,8 @@ unsafe extern "C" fn urip_close(context: *mut c_void) -> c_int {
     if context.is_null() {
         return -1;
     }
-    URIP_CUR.store(null_mut(), Ordering::Relaxed);
-    URIP_RLEN = 0;
+    URIP_CUR.set(null_mut());
+    URIP_RLEN.set(0);
     0
 }
 
@@ -3610,11 +3609,11 @@ unsafe extern "C" fn urip_read(context: *mut c_void, buffer: *mut c_char, mut le
         return -1;
     }
 
-    if len > URIP_RLEN as _ {
-        len = URIP_RLEN as _;
+    if len > URIP_RLEN.get() as _ {
+        len = URIP_RLEN.get() as _;
     }
     memcpy(buffer as _, ptr as _, len as usize);
-    URIP_RLEN -= len as usize;
+    URIP_RLEN.set(URIP_RLEN.get() - len as usize);
     len
 }
 
@@ -3689,25 +3688,25 @@ unsafe fn uri_path_test(
         return -1;
     }
 
-    URIP_CURRENT = 0;
-    while URIP_CURRENT < URIP_TEST_URLS.len() {
-        URIP_SUCCESS = 1;
-        parsed = urip_check_url(URIP_TEST_URLS[URIP_CURRENT].as_ptr());
-        if URIP_SUCCESS != 1 {
+    URIP_CURRENT.set(0);
+    while URIP_CURRENT.get() < URIP_TEST_URLS.len() {
+        URIP_SUCCESS.set(1);
+        parsed = urip_check_url(URIP_TEST_URLS[URIP_CURRENT.get()].as_ptr());
+        if URIP_SUCCESS.get() != 1 {
             eprint!(
                 "failed the URL passing test for {}",
-                URIP_TEST_URLS[URIP_CURRENT].to_string_lossy(),
+                URIP_TEST_URLS[URIP_CURRENT.get()].to_string_lossy(),
             );
             failures += 1;
         } else if parsed != 1 {
             eprint!(
                 "failed the parsing test for {}",
-                URIP_TEST_URLS[URIP_CURRENT].to_string_lossy(),
+                URIP_TEST_URLS[URIP_CURRENT.get()].to_string_lossy(),
             );
             failures += 1;
         }
         NB_TESTS.set(NB_TESTS.get() + 1);
-        URIP_CURRENT += 1;
+        URIP_CURRENT.set(URIP_CURRENT.get() + 1);
     }
 
     pop_input_callbacks();
