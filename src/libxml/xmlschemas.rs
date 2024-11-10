@@ -22131,7 +22131,15 @@ unsafe extern "C" fn xml_schema_check_elem_props_correct(
                 let mut str_c: *mut XmlChar = null_mut();
 
                 ret = XmlParserErrors::XmlSchemapEPropsCorrect4 as i32;
-                xml_schema_pcustom_err_ext(pctxt, XmlParserErrors::XmlSchemapEPropsCorrect4, elem_decl as XmlSchemaBasicItemPtr, null_mut(), c"The type definition '%s' was either rejected by the substitution group affiliation '%s', or not validly derived from its type definition '%s'".as_ptr() as _, xml_schema_get_component_qname(addr_of_mut!(str_a), type_def as _), xml_schema_get_component_qname(addr_of_mut!(str_b), head as _), xml_schema_get_component_qname(addr_of_mut!(str_c), WXS_ELEM_TYPEDEF!(head) as _));
+                xml_schema_pcustom_err_ext(
+                    pctxt,
+                    XmlParserErrors::XmlSchemapEPropsCorrect4,
+                    elem_decl as XmlSchemaBasicItemPtr,
+                    null_mut(),
+                    c"The type definition '%s' was either rejected by the substitution group affiliation '%s', or not validly derived from its type definition '%s'".as_ptr() as _,
+                    xml_schema_get_component_qname(addr_of_mut!(str_a), type_def as _),
+                    xml_schema_get_component_qname(addr_of_mut!(str_b), head as _),
+                    xml_schema_get_component_qname(addr_of_mut!(str_c), WXS_ELEM_TYPEDEF!(head) as _));
                 FREE_AND_NULL!(str_a);
                 FREE_AND_NULL!(str_b);
                 FREE_AND_NULL!(str_c);

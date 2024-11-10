@@ -4,11 +4,12 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
+    cell::Cell,
     ffi::{c_char, CStr},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
-    sync::atomic::{AtomicBool, AtomicPtr, Ordering},
+    sync::atomic::Ordering,
 };
 
 use libc::{memcpy, memmove, memset, snprintf, sscanf};
@@ -182,65 +183,63 @@ pub struct XmlSchemaVal {
     value: XmlSchemaValInternal,
 }
 
-static XML_SCHEMA_TYPES_INITIALIZED: AtomicBool = AtomicBool::new(false);
-static XML_SCHEMA_TYPES_BANK: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
-    AtomicPtr::new(null_mut());
+thread_local! {
+    static XML_SCHEMA_TYPES_INITIALIZED: Cell<bool> = const { Cell::new(false) };
+    static XML_SCHEMA_TYPES_BANK: Cell<*mut XmlHashTable<'static, CVoidWrapper>> =
+        const { Cell::new(null_mut()) };
 
-/*
- * Basic types
- */
-static XML_SCHEMA_TYPE_STRING_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_ANY_TYPE_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_DECIMAL_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_DATETIME_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_DATE_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_TIME_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_GYEAR_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_GYEAR_MONTH_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_GDAY_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_GMONTH_DAY_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_GMONTH_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_DURATION_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_FLOAT_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_BOOLEAN_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_DOUBLE_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_HEX_BINARY_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_BASE64_BINARY_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_ANY_URIDEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
+    /// Basic types
+    static XML_SCHEMA_TYPE_STRING_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_ANY_TYPE_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_DECIMAL_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_DATETIME_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_DATE_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_TIME_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_GYEAR_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_GYEAR_MONTH_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_GDAY_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_GMONTH_DAY_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_GMONTH_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_DURATION_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_FLOAT_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_BOOLEAN_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_DOUBLE_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_HEX_BINARY_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_BASE64_BINARY_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_ANY_URIDEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
 
-/*
- * Derived types
- */
-static XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF: AtomicPtr<XmlSchemaType> =
-    AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF: AtomicPtr<XmlSchemaType> =
-    AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_INTEGER_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_LONG_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_INT_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_SHORT_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_BYTE_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_UNSIGNED_INT_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NORM_STRING_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_TOKEN_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_LANGUAGE_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NAME_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_QNAME_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NCNAME_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_ID_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_IDREF_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_IDREFS_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_ENTITY_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_ENTITIES_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NOTATION_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NMTOKEN_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
-static XML_SCHEMA_TYPE_NMTOKENS_DEF: AtomicPtr<XmlSchemaType> = AtomicPtr::new(null_mut());
+    /// Derived types
+    static XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF: Cell<*mut XmlSchemaType> =
+        const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF: Cell<*mut XmlSchemaType> =
+        const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_INTEGER_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_LONG_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_INT_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_SHORT_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_BYTE_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_UNSIGNED_INT_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NORM_STRING_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_TOKEN_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_LANGUAGE_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NAME_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_QNAME_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NCNAME_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_ID_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_IDREF_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_IDREFS_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_ENTITY_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_ENTITIES_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NOTATION_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NMTOKEN_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+    static XML_SCHEMA_TYPE_NMTOKENS_DEF: Cell<*mut XmlSchemaType> = const { Cell::new(null_mut()) };
+}
 
 macro_rules! IS_TZO_CHAR {
     ($c:expr) => {
@@ -385,7 +384,7 @@ unsafe extern "C" fn xml_schema_cleanup_types_internal() {
     /*
      * Free xs:anyType.
      */
-    let anytype_def = XML_SCHEMA_TYPE_ANY_TYPE_DEF.load(Ordering::Acquire);
+    let anytype_def = XML_SCHEMA_TYPE_ANY_TYPE_DEF.get();
     if !anytype_def.is_null() {
         /* Attribute wildcard. */
         xml_schema_free_wildcard((*anytype_def).attribute_wildcard);
@@ -400,14 +399,14 @@ unsafe extern "C" fn xml_schema_cleanup_types_internal() {
         xml_free((*particle).children as _);
         xml_free(particle as _);
         (*anytype_def).subtypes = null_mut();
-        XML_SCHEMA_TYPE_ANY_TYPE_DEF.store(null_mut(), Ordering::Release);
+        XML_SCHEMA_TYPE_ANY_TYPE_DEF.set(null_mut());
     }
 
     xml_hash_free(
-        XML_SCHEMA_TYPES_BANK.load(Ordering::Acquire),
+        XML_SCHEMA_TYPES_BANK.get(),
         Some(xml_schema_free_type_entry),
     );
-    XML_SCHEMA_TYPES_BANK.store(null_mut(), Ordering::Release);
+    XML_SCHEMA_TYPES_BANK.set(null_mut());
     /* Note that the xmlSchemaType*Def pointers aren't set to NULL. */
 }
 
@@ -530,7 +529,7 @@ unsafe extern "C" fn xml_schema_init_basic_type(
         }
     }
     xml_hash_add_entry2(
-        XML_SCHEMA_TYPES_BANK.load(Ordering::Relaxed),
+        XML_SCHEMA_TYPES_BANK.get(),
         (*ret).name,
         XML_SCHEMAS_NAMESPACE_NAME.as_ptr() as _,
         ret as _,
@@ -561,13 +560,13 @@ unsafe extern "C" fn xml_schema_add_particle() -> XmlSchemaParticlePtr {
  * Returns 0 on success, -1 on error.
  */
 pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
-    if XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) {
+    if XML_SCHEMA_TYPES_INITIALIZED.get() {
         return 0;
     }
 
     'error: {
-        XML_SCHEMA_TYPES_BANK.store(xml_hash_create(40), Ordering::Release);
-        if XML_SCHEMA_TYPES_BANK.load(Ordering::Acquire).is_null() {
+        XML_SCHEMA_TYPES_BANK.set(xml_hash_create(40));
+        if XML_SCHEMA_TYPES_BANK.get().is_null() {
             xml_schema_type_err_memory(null_mut(), null());
             break 'error;
         }
@@ -575,24 +574,18 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         /*
          * 3.4.7 Built-in Complex Type Definition
          */
-        XML_SCHEMA_TYPE_ANY_TYPE_DEF.store(
-            xml_schema_init_basic_type(
-                c"anyType".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasAnytype,
-                null_mut(),
-            ),
-            Ordering::Release,
-        );
-        if XML_SCHEMA_TYPE_ANY_TYPE_DEF
-            .load(Ordering::Acquire)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_ANY_TYPE_DEF.set(xml_schema_init_basic_type(
+            c"anyType".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasAnytype,
+            null_mut(),
+        ));
+        if XML_SCHEMA_TYPE_ANY_TYPE_DEF.get().is_null() {
             break 'error;
         }
         /*
          * Init the content type.
          */
-        let anytype_def = XML_SCHEMA_TYPE_ANY_TYPE_DEF.load(Ordering::Acquire);
+        let anytype_def = XML_SCHEMA_TYPE_ANY_TYPE_DEF.get();
         (*anytype_def).base_type = anytype_def;
         (*anytype_def).content_type = XmlSchemaContentType::XmlSchemaContentMixed;
         {
@@ -655,595 +648,385 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
             (*wild).process_contents = XML_SCHEMAS_ANY_LAX;
             (*anytype_def).attribute_wildcard = wild;
         }
-        XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.store(
-            xml_schema_init_basic_type(
-                c"anySimpleType".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasAnysimpletype,
-                XML_SCHEMA_TYPE_ANY_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.set(xml_schema_init_basic_type(
+            c"anySimpleType".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasAnysimpletype,
+            XML_SCHEMA_TYPE_ANY_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get().is_null() {
             break 'error;
         }
         /*
          * primitive datatypes
          */
-        XML_SCHEMA_TYPE_STRING_DEF.store(
-            xml_schema_init_basic_type(
-                c"string".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasString,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_STRING_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_STRING_DEF.set(xml_schema_init_basic_type(
+            c"string".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasString,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_STRING_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_DECIMAL_DEF.store(
-            xml_schema_init_basic_type(
-                c"decimal".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasDecimal,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_DECIMAL_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_DECIMAL_DEF.set(xml_schema_init_basic_type(
+            c"decimal".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasDecimal,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_DECIMAL_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_DATE_DEF.store(
-            xml_schema_init_basic_type(
-                c"date".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasDate,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_DATE_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_DATE_DEF.set(xml_schema_init_basic_type(
+            c"date".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasDate,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_DATE_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_DATETIME_DEF.store(
-            xml_schema_init_basic_type(
-                c"dateTime".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasDatetime,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_DATETIME_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_DATETIME_DEF.set(xml_schema_init_basic_type(
+            c"dateTime".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasDatetime,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_DATETIME_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_TIME_DEF.store(
-            xml_schema_init_basic_type(
-                c"time".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasTime,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_TIME_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_TIME_DEF.set(xml_schema_init_basic_type(
+            c"time".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasTime,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_TIME_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_GYEAR_DEF.store(
-            xml_schema_init_basic_type(
-                c"gYear".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGyear,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_GYEAR_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_GYEAR_DEF.set(xml_schema_init_basic_type(
+            c"gYear".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasGyear,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_GYEAR_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.store(
-            xml_schema_init_basic_type(
-                c"gYearMonth".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGyearmonth,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_GYEAR_MONTH_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.set(xml_schema_init_basic_type(
+            c"gYearMonth".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasGyearmonth,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_GMONTH_DEF.store(
-            xml_schema_init_basic_type(
-                c"gMonth".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGmonth,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_GMONTH_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_GMONTH_DEF.set(xml_schema_init_basic_type(
+            c"gMonth".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasGmonth,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_GMONTH_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_GMONTH_DAY_DEF.store(
-            xml_schema_init_basic_type(
-                c"gMonthDay".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGmonthday,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_GMONTH_DAY_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_GMONTH_DAY_DEF.set(xml_schema_init_basic_type(
+            c"gMonthDay".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasGmonthday,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_GDAY_DEF.store(
-            xml_schema_init_basic_type(
-                c"gDay".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGday,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_GDAY_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_GDAY_DEF.set(xml_schema_init_basic_type(
+            c"gDay".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasGday,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_GDAY_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_DURATION_DEF.store(
-            xml_schema_init_basic_type(
-                c"duration".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasDuration,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_DURATION_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_DURATION_DEF.set(xml_schema_init_basic_type(
+            c"duration".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasDuration,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_DURATION_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_FLOAT_DEF.store(
-            xml_schema_init_basic_type(
-                c"float".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasFloat,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_FLOAT_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_FLOAT_DEF.set(xml_schema_init_basic_type(
+            c"float".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasFloat,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_FLOAT_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_DOUBLE_DEF.store(
-            xml_schema_init_basic_type(
-                c"double".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasDouble,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_DOUBLE_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_DOUBLE_DEF.set(xml_schema_init_basic_type(
+            c"double".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasDouble,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_DOUBLE_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_BOOLEAN_DEF.store(
-            xml_schema_init_basic_type(
-                c"boolean".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasBoolean,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_BOOLEAN_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_BOOLEAN_DEF.set(xml_schema_init_basic_type(
+            c"boolean".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasBoolean,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_BOOLEAN_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_ANY_URIDEF.store(
-            xml_schema_init_basic_type(
-                c"anyURI".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasAnyuri,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_ANY_URIDEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_ANY_URIDEF.set(xml_schema_init_basic_type(
+            c"anyURI".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasAnyuri,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_ANY_URIDEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_HEX_BINARY_DEF.store(
-            xml_schema_init_basic_type(
-                c"hexBinary".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasHexbinary,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_HEX_BINARY_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_HEX_BINARY_DEF.set(xml_schema_init_basic_type(
+            c"hexBinary".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasHexbinary,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_HEX_BINARY_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_BASE64_BINARY_DEF.store(
-            xml_schema_init_basic_type(
-                c"base64Binary".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasBase64binary,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_BASE64_BINARY_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_BASE64_BINARY_DEF.set(xml_schema_init_basic_type(
+            c"base64Binary".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasBase64binary,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_BASE64_BINARY_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_NOTATION_DEF.store(
-            xml_schema_init_basic_type(
-                c"NOTATION".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNotation,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NOTATION_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_NOTATION_DEF.set(xml_schema_init_basic_type(
+            c"NOTATION".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasNotation,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NOTATION_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_QNAME_DEF.store(
-            xml_schema_init_basic_type(
-                c"QName".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasQname,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_QNAME_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_QNAME_DEF.set(xml_schema_init_basic_type(
+            c"QName".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasQname,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_QNAME_DEF.get().is_null() {
             break 'error;
         }
 
         /*
          * derived datatypes
          */
-        XML_SCHEMA_TYPE_INTEGER_DEF.store(
-            xml_schema_init_basic_type(
-                c"integer".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasInteger,
-                XML_SCHEMA_TYPE_DECIMAL_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_INTEGER_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_INTEGER_DEF.set(xml_schema_init_basic_type(
+            c"integer".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasInteger,
+            XML_SCHEMA_TYPE_DECIMAL_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_INTEGER_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.store(
-            xml_schema_init_basic_type(
-                c"nonPositiveInteger".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNpinteger,
-                XML_SCHEMA_TYPE_INTEGER_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
+            c"nonPositiveInteger".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasNpinteger,
+            XML_SCHEMA_TYPE_INTEGER_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.store(
-            xml_schema_init_basic_type(
-                c"negativeInteger".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNinteger,
-                XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
+            c"negativeInteger".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasNinteger,
+            XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_LONG_DEF.store(
-            xml_schema_init_basic_type(
-                c"long".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasLong,
-                XML_SCHEMA_TYPE_INTEGER_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_LONG_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_LONG_DEF.set(xml_schema_init_basic_type(
+            c"long".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasLong,
+            XML_SCHEMA_TYPE_INTEGER_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_LONG_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_INT_DEF.store(
-            xml_schema_init_basic_type(
-                c"int".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasInt,
-                XML_SCHEMA_TYPE_LONG_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_INT_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_INT_DEF.set(xml_schema_init_basic_type(
+            c"int".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasInt,
+            XML_SCHEMA_TYPE_LONG_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_INT_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_SHORT_DEF.store(
-            xml_schema_init_basic_type(
-                c"short".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasShort,
-                XML_SCHEMA_TYPE_INT_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_SHORT_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_SHORT_DEF.set(xml_schema_init_basic_type(
+            c"short".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasShort,
+            XML_SCHEMA_TYPE_INT_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_SHORT_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_BYTE_DEF.store(
-            xml_schema_init_basic_type(
-                c"byte".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasByte,
-                XML_SCHEMA_TYPE_SHORT_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_BYTE_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_BYTE_DEF.set(xml_schema_init_basic_type(
+            c"byte".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasByte,
+            XML_SCHEMA_TYPE_SHORT_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_BYTE_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.store(
-            xml_schema_init_basic_type(
-                c"nonNegativeInteger".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNninteger,
-                XML_SCHEMA_TYPE_INTEGER_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
+            c"nonNegativeInteger".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasNninteger,
+            XML_SCHEMA_TYPE_INTEGER_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.store(
-            xml_schema_init_basic_type(
-                c"unsignedLong".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasUlong,
-                XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.set(xml_schema_init_basic_type(
+            c"unsignedLong".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasUlong,
+            XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.store(
-            xml_schema_init_basic_type(
-                c"unsignedInt".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasUint,
-                XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_UNSIGNED_INT_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.set(xml_schema_init_basic_type(
+            c"unsignedInt".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasUint,
+            XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.store(
-            xml_schema_init_basic_type(
-                c"unsignedShort".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasUshort,
-                XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.set(xml_schema_init_basic_type(
+            c"unsignedShort".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasUshort,
+            XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.store(
-            xml_schema_init_basic_type(
-                c"unsignedByte".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasUbyte,
-                XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.set(xml_schema_init_basic_type(
+            c"unsignedByte".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasUbyte,
+            XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.store(
-            xml_schema_init_basic_type(
-                c"positiveInteger".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasPinteger,
-                XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
+            c"positiveInteger".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasPinteger,
+            XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_NORM_STRING_DEF.store(
-            xml_schema_init_basic_type(
-                c"normalizedString".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNormstring,
-                XML_SCHEMA_TYPE_STRING_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NORM_STRING_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_NORM_STRING_DEF.set(xml_schema_init_basic_type(
+            c"normalizedString".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasNormstring,
+            XML_SCHEMA_TYPE_STRING_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NORM_STRING_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_TOKEN_DEF.store(
-            xml_schema_init_basic_type(
-                c"token".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasToken,
-                XML_SCHEMA_TYPE_NORM_STRING_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_TOKEN_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_TOKEN_DEF.set(xml_schema_init_basic_type(
+            c"token".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasToken,
+            XML_SCHEMA_TYPE_NORM_STRING_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_TOKEN_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_LANGUAGE_DEF.store(
-            xml_schema_init_basic_type(
-                c"language".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasLanguage,
-                XML_SCHEMA_TYPE_TOKEN_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_LANGUAGE_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_LANGUAGE_DEF.set(xml_schema_init_basic_type(
+            c"language".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasLanguage,
+            XML_SCHEMA_TYPE_TOKEN_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_LANGUAGE_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_NAME_DEF.store(
-            xml_schema_init_basic_type(
-                c"Name".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasName,
-                XML_SCHEMA_TYPE_TOKEN_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NAME_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_NAME_DEF.set(xml_schema_init_basic_type(
+            c"Name".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasName,
+            XML_SCHEMA_TYPE_TOKEN_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NAME_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_NMTOKEN_DEF.store(
-            xml_schema_init_basic_type(
-                c"NMTOKEN".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNmtoken,
-                XML_SCHEMA_TYPE_TOKEN_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NMTOKEN_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_NMTOKEN_DEF.set(xml_schema_init_basic_type(
+            c"NMTOKEN".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasNmtoken,
+            XML_SCHEMA_TYPE_TOKEN_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NMTOKEN_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_NCNAME_DEF.store(
-            xml_schema_init_basic_type(
-                c"NCName".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNcname,
-                XML_SCHEMA_TYPE_NAME_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NCNAME_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_NCNAME_DEF.set(xml_schema_init_basic_type(
+            c"NCName".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasNcname,
+            XML_SCHEMA_TYPE_NAME_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NCNAME_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_ID_DEF.store(
-            xml_schema_init_basic_type(
-                c"ID".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasId,
-                XML_SCHEMA_TYPE_NCNAME_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_ID_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_ID_DEF.set(xml_schema_init_basic_type(
+            c"ID".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasId,
+            XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_ID_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_IDREF_DEF.store(
-            xml_schema_init_basic_type(
-                c"IDREF".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasIdref,
-                XML_SCHEMA_TYPE_NCNAME_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_IDREF_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_IDREF_DEF.set(xml_schema_init_basic_type(
+            c"IDREF".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasIdref,
+            XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_IDREF_DEF.get().is_null() {
             break 'error;
         }
-        XML_SCHEMA_TYPE_ENTITY_DEF.store(
-            xml_schema_init_basic_type(
-                c"ENTITY".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasEntity,
-                XML_SCHEMA_TYPE_NCNAME_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_ENTITY_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_ENTITY_DEF.set(xml_schema_init_basic_type(
+            c"ENTITY".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasEntity,
+            XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_ENTITY_DEF.get().is_null() {
             break 'error;
         }
         /*
          * Derived list types.
          */
         /* ENTITIES */
-        XML_SCHEMA_TYPE_ENTITIES_DEF.store(
-            xml_schema_init_basic_type(
-                c"ENTITIES".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasEntities,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_ENTITIES_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_ENTITIES_DEF.set(xml_schema_init_basic_type(
+            c"ENTITIES".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasEntities,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_ENTITIES_DEF.get().is_null() {
             break 'error;
         }
-        (*XML_SCHEMA_TYPE_ENTITIES_DEF.load(Ordering::Acquire)).subtypes =
-            XML_SCHEMA_TYPE_ENTITY_DEF.load(Ordering::Relaxed);
+        (*XML_SCHEMA_TYPE_ENTITIES_DEF.get()).subtypes = XML_SCHEMA_TYPE_ENTITY_DEF.get();
         /* IDREFS */
-        XML_SCHEMA_TYPE_IDREFS_DEF.store(
-            xml_schema_init_basic_type(
-                c"IDREFS".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasIdrefs,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_IDREFS_DEF.load(Ordering::Relaxed).is_null() {
+        XML_SCHEMA_TYPE_IDREFS_DEF.set(xml_schema_init_basic_type(
+            c"IDREFS".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasIdrefs,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_IDREFS_DEF.get().is_null() {
             break 'error;
         }
-        (*XML_SCHEMA_TYPE_IDREFS_DEF.load(Ordering::Relaxed)).subtypes =
-            XML_SCHEMA_TYPE_IDREF_DEF.load(Ordering::Relaxed);
+        (*XML_SCHEMA_TYPE_IDREFS_DEF.get()).subtypes = XML_SCHEMA_TYPE_IDREF_DEF.get();
 
         /* NMTOKENS */
-        XML_SCHEMA_TYPE_NMTOKENS_DEF.store(
-            xml_schema_init_basic_type(
-                c"NMTOKENS".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNmtokens,
-                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed),
-            ),
-            Ordering::Relaxed,
-        );
-        if XML_SCHEMA_TYPE_NMTOKENS_DEF
-            .load(Ordering::Relaxed)
-            .is_null()
-        {
+        XML_SCHEMA_TYPE_NMTOKENS_DEF.set(xml_schema_init_basic_type(
+            c"NMTOKENS".as_ptr() as _,
+            XmlSchemaValType::XmlSchemasNmtokens,
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        ));
+        if XML_SCHEMA_TYPE_NMTOKENS_DEF.get().is_null() {
             break 'error;
         }
-        (*XML_SCHEMA_TYPE_NMTOKENS_DEF.load(Ordering::Relaxed)).subtypes =
-            XML_SCHEMA_TYPE_NMTOKEN_DEF.load(Ordering::Relaxed);
+        (*XML_SCHEMA_TYPE_NMTOKENS_DEF.get()).subtypes = XML_SCHEMA_TYPE_NMTOKEN_DEF.get();
 
-        XML_SCHEMA_TYPES_INITIALIZED.store(true, Ordering::Release);
+        XML_SCHEMA_TYPES_INITIALIZED.set(true);
         return 0;
     }
 
@@ -1263,9 +1046,9 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
  * Cleanup the default XML Schemas type library
  */
 pub(crate) unsafe extern "C" fn xml_schema_cleanup_types() {
-    if XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) {
+    if XML_SCHEMA_TYPES_INITIALIZED.get() {
         xml_schema_cleanup_types_internal();
-        XML_SCHEMA_TYPES_INITIALIZED.store(false, Ordering::Release);
+        XML_SCHEMA_TYPES_INITIALIZED.set(false);
     }
 }
 
@@ -1282,13 +1065,13 @@ pub unsafe extern "C" fn xml_schema_get_predefined_type(
     name: *const XmlChar,
     ns: *const XmlChar,
 ) -> XmlSchemaTypePtr {
-    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) && xml_schema_init_types() < 0 {
+    if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
         return null_mut();
     }
     if name.is_null() {
         return null_mut();
     }
-    xml_hash_lookup2(XML_SCHEMA_TYPES_BANK.load(Ordering::Acquire), name, ns) as XmlSchemaTypePtr
+    xml_hash_lookup2(XML_SCHEMA_TYPES_BANK.get(), name, ns) as XmlSchemaTypePtr
 }
 
 /**
@@ -2413,7 +2196,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
     let mut norm: *mut XmlChar = null_mut();
     let mut ret: i32;
 
-    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Acquire) && xml_schema_init_types() < 0 {
+    if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
         return -1;
     }
     if typ.is_null() {
@@ -2757,8 +2540,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         break 'return1;
                                     }
                                     if !val.is_null() {
-                                        if typ == XML_SCHEMA_TYPE_FLOAT_DEF.load(Ordering::Relaxed)
-                                        {
+                                        if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
                                             v = xml_schema_new_value(
                                                 XmlSchemaValType::XmlSchemasFloat,
                                             );
@@ -2794,8 +2576,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         break 'return1;
                                     }
                                     if !val.is_null() {
-                                        if typ == XML_SCHEMA_TYPE_FLOAT_DEF.load(Ordering::Relaxed)
-                                        {
+                                        if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
                                             v = xml_schema_new_value(
                                                 XmlSchemaValType::XmlSchemasFloat,
                                             );
@@ -2867,7 +2648,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     break 'return1;
                                 }
                                 if !val.is_null() {
-                                    if typ == XML_SCHEMA_TYPE_FLOAT_DEF.load(Ordering::Relaxed) {
+                                    if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
                                         v = xml_schema_new_value(XmlSchemaValType::XmlSchemasFloat);
                                         if !v.is_null() {
                                             /*
@@ -3088,7 +2869,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                             }
                             XmlSchemaValType::XmlSchemasNmtokens => {
                                 ret = xml_schema_val_atomic_list_node(
-                                    XML_SCHEMA_TYPE_NMTOKEN_DEF.load(Ordering::Relaxed),
+                                    XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
                                     value,
                                     val,
                                     node,
@@ -3256,7 +3037,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                             }
                             XmlSchemaValType::XmlSchemasIdrefs => {
                                 ret = xml_schema_val_atomic_list_node(
-                                    XML_SCHEMA_TYPE_IDREF_DEF.load(Ordering::Relaxed),
+                                    XML_SCHEMA_TYPE_IDREF_DEF.get(),
                                     value,
                                     val,
                                     node,
@@ -3321,7 +3102,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     break 'return3;
                                 }
                                 ret = xml_schema_val_atomic_list_node(
-                                    XML_SCHEMA_TYPE_ENTITY_DEF.load(Ordering::Relaxed),
+                                    XML_SCHEMA_TYPE_ENTITY_DEF.get(),
                                     value,
                                     val,
                                     node,
@@ -6578,13 +6359,9 @@ pub unsafe extern "C" fn xml_schema_get_built_in_list_simple_type_item_type(
         return null_mut();
     }
     match XmlSchemaValType::try_from((*typ).built_in_type) {
-        Ok(XmlSchemaValType::XmlSchemasNmtokens) => {
-            XML_SCHEMA_TYPE_NMTOKEN_DEF.load(Ordering::Relaxed)
-        }
-        Ok(XmlSchemaValType::XmlSchemasIdrefs) => XML_SCHEMA_TYPE_IDREF_DEF.load(Ordering::Relaxed),
-        Ok(XmlSchemaValType::XmlSchemasEntities) => {
-            XML_SCHEMA_TYPE_ENTITY_DEF.load(Ordering::Relaxed)
-        }
+        Ok(XmlSchemaValType::XmlSchemasNmtokens) => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
+        Ok(XmlSchemaValType::XmlSchemasIdrefs) => XML_SCHEMA_TYPE_IDREF_DEF.get(),
+        Ok(XmlSchemaValType::XmlSchemasEntities) => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
         _ => null_mut(),
     }
 }
@@ -6656,96 +6433,56 @@ pub unsafe extern "C" fn xml_schema_validate_list_simple_type_facet(
  * Returns the type if found, NULL otherwise.
  */
 pub unsafe extern "C" fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> XmlSchemaTypePtr {
-    if !XML_SCHEMA_TYPES_INITIALIZED.load(Ordering::Relaxed) && xml_schema_init_types() < 0 {
+    if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
         return null_mut();
     }
     match typ {
-        XmlSchemaValType::XmlSchemasAnysimpletype => {
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasString => XML_SCHEMA_TYPE_STRING_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasNormstring => {
-            XML_SCHEMA_TYPE_NORM_STRING_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasDecimal => XML_SCHEMA_TYPE_DECIMAL_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasTime => XML_SCHEMA_TYPE_TIME_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasGday => XML_SCHEMA_TYPE_GDAY_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasGmonth => XML_SCHEMA_TYPE_GMONTH_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasGmonthday => {
-            XML_SCHEMA_TYPE_GMONTH_DAY_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasGyear => XML_SCHEMA_TYPE_GYEAR_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasGyearmonth => {
-            XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasDate => XML_SCHEMA_TYPE_DATE_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasDatetime => {
-            XML_SCHEMA_TYPE_DATETIME_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasDuration => {
-            XML_SCHEMA_TYPE_DURATION_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasFloat => XML_SCHEMA_TYPE_FLOAT_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasDouble => XML_SCHEMA_TYPE_DOUBLE_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasBoolean => XML_SCHEMA_TYPE_BOOLEAN_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasToken => XML_SCHEMA_TYPE_TOKEN_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasLanguage => {
-            XML_SCHEMA_TYPE_LANGUAGE_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasNmtoken => XML_SCHEMA_TYPE_NMTOKEN_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasNmtokens => {
-            XML_SCHEMA_TYPE_NMTOKENS_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasName => XML_SCHEMA_TYPE_NAME_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasQname => XML_SCHEMA_TYPE_QNAME_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasNcname => XML_SCHEMA_TYPE_NCNAME_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasId => XML_SCHEMA_TYPE_ID_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasIdref => XML_SCHEMA_TYPE_IDREF_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasIdrefs => XML_SCHEMA_TYPE_IDREFS_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasEntity => XML_SCHEMA_TYPE_ENTITY_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasEntities => {
-            XML_SCHEMA_TYPE_ENTITIES_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasNotation => {
-            XML_SCHEMA_TYPE_NOTATION_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasAnyuri => XML_SCHEMA_TYPE_ANY_URIDEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasInteger => XML_SCHEMA_TYPE_INTEGER_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasNpinteger => {
-            XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasNinteger => {
-            XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasNninteger => {
-            XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasPinteger => {
-            XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasInt => XML_SCHEMA_TYPE_INT_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasUint => {
-            XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasLong => XML_SCHEMA_TYPE_LONG_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasUlong => {
-            XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasShort => XML_SCHEMA_TYPE_SHORT_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasUshort => {
-            XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasByte => XML_SCHEMA_TYPE_BYTE_DEF.load(Ordering::Relaxed),
-        XmlSchemaValType::XmlSchemasUbyte => {
-            XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasHexbinary => {
-            XML_SCHEMA_TYPE_HEX_BINARY_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasBase64binary => {
-            XML_SCHEMA_TYPE_BASE64_BINARY_DEF.load(Ordering::Relaxed)
-        }
-        XmlSchemaValType::XmlSchemasAnytype => XML_SCHEMA_TYPE_ANY_TYPE_DEF.load(Ordering::Relaxed),
+        XmlSchemaValType::XmlSchemasAnysimpletype => XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+        XmlSchemaValType::XmlSchemasString => XML_SCHEMA_TYPE_STRING_DEF.get(),
+        XmlSchemaValType::XmlSchemasNormstring => XML_SCHEMA_TYPE_NORM_STRING_DEF.get(),
+        XmlSchemaValType::XmlSchemasDecimal => XML_SCHEMA_TYPE_DECIMAL_DEF.get(),
+        XmlSchemaValType::XmlSchemasTime => XML_SCHEMA_TYPE_TIME_DEF.get(),
+        XmlSchemaValType::XmlSchemasGday => XML_SCHEMA_TYPE_GDAY_DEF.get(),
+        XmlSchemaValType::XmlSchemasGmonth => XML_SCHEMA_TYPE_GMONTH_DEF.get(),
+        XmlSchemaValType::XmlSchemasGmonthday => XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get(),
+        XmlSchemaValType::XmlSchemasGyear => XML_SCHEMA_TYPE_GYEAR_DEF.get(),
+        XmlSchemaValType::XmlSchemasGyearmonth => XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get(),
+        XmlSchemaValType::XmlSchemasDate => XML_SCHEMA_TYPE_DATE_DEF.get(),
+        XmlSchemaValType::XmlSchemasDatetime => XML_SCHEMA_TYPE_DATETIME_DEF.get(),
+        XmlSchemaValType::XmlSchemasDuration => XML_SCHEMA_TYPE_DURATION_DEF.get(),
+        XmlSchemaValType::XmlSchemasFloat => XML_SCHEMA_TYPE_FLOAT_DEF.get(),
+        XmlSchemaValType::XmlSchemasDouble => XML_SCHEMA_TYPE_DOUBLE_DEF.get(),
+        XmlSchemaValType::XmlSchemasBoolean => XML_SCHEMA_TYPE_BOOLEAN_DEF.get(),
+        XmlSchemaValType::XmlSchemasToken => XML_SCHEMA_TYPE_TOKEN_DEF.get(),
+        XmlSchemaValType::XmlSchemasLanguage => XML_SCHEMA_TYPE_LANGUAGE_DEF.get(),
+        XmlSchemaValType::XmlSchemasNmtoken => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
+        XmlSchemaValType::XmlSchemasNmtokens => XML_SCHEMA_TYPE_NMTOKENS_DEF.get(),
+        XmlSchemaValType::XmlSchemasName => XML_SCHEMA_TYPE_NAME_DEF.get(),
+        XmlSchemaValType::XmlSchemasQname => XML_SCHEMA_TYPE_QNAME_DEF.get(),
+        XmlSchemaValType::XmlSchemasNcname => XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+        XmlSchemaValType::XmlSchemasId => XML_SCHEMA_TYPE_ID_DEF.get(),
+        XmlSchemaValType::XmlSchemasIdref => XML_SCHEMA_TYPE_IDREF_DEF.get(),
+        XmlSchemaValType::XmlSchemasIdrefs => XML_SCHEMA_TYPE_IDREFS_DEF.get(),
+        XmlSchemaValType::XmlSchemasEntity => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
+        XmlSchemaValType::XmlSchemasEntities => XML_SCHEMA_TYPE_ENTITIES_DEF.get(),
+        XmlSchemaValType::XmlSchemasNotation => XML_SCHEMA_TYPE_NOTATION_DEF.get(),
+        XmlSchemaValType::XmlSchemasAnyuri => XML_SCHEMA_TYPE_ANY_URIDEF.get(),
+        XmlSchemaValType::XmlSchemasInteger => XML_SCHEMA_TYPE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasNpinteger => XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasNinteger => XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasNninteger => XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasPinteger => XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasInt => XML_SCHEMA_TYPE_INT_DEF.get(),
+        XmlSchemaValType::XmlSchemasUint => XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
+        XmlSchemaValType::XmlSchemasLong => XML_SCHEMA_TYPE_LONG_DEF.get(),
+        XmlSchemaValType::XmlSchemasUlong => XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
+        XmlSchemaValType::XmlSchemasShort => XML_SCHEMA_TYPE_SHORT_DEF.get(),
+        XmlSchemaValType::XmlSchemasUshort => XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
+        XmlSchemaValType::XmlSchemasByte => XML_SCHEMA_TYPE_BYTE_DEF.get(),
+        XmlSchemaValType::XmlSchemasUbyte => XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get(),
+        XmlSchemaValType::XmlSchemasHexbinary => XML_SCHEMA_TYPE_HEX_BINARY_DEF.get(),
+        XmlSchemaValType::XmlSchemasBase64binary => XML_SCHEMA_TYPE_BASE64_BINARY_DEF.get(),
+        XmlSchemaValType::XmlSchemasAnytype => XML_SCHEMA_TYPE_ANY_TYPE_DEF.get(),
         _ => null_mut(),
     }
 }

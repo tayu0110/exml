@@ -5707,15 +5707,15 @@ unsafe fn automata_test(
 }
 
 const TEST_DESCRIPTIONS: &[TestDesc] = &[
-    #[cfg(all(feature = "html", feature = "push"))]
+    #[cfg(feature = "schema")]
     TestDesc {
-        desc: "for debug",
-        func: push_parse_test,
-        input: Some("./test/HTML/script2.html"),
-        out: Some("./result/HTML/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XML_PARSE_HTML,
+        desc: "Schemas regression tests",
+        func: schemas_test,
+        input: Some("./test/schemas/oss-fuzz-51295_0.xsd"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
     },
     TestDesc {
         desc: "XML regression tests",
@@ -6194,35 +6194,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: None,
         options: 0,
     },
-    TestDesc {
-        desc: "SVG parsing regression tests",
-        func: old_parse_test,
-        input: Some("./test/SVG/*.xml"),
-        out: Some("./result/SVG/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "regexp")]
-    TestDesc {
-        desc: "Regexp regression tests",
-        func: regexp_test,
-        input: Some("./test/regexp/*"),
-        out: Some("./result/regexp/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: 0,
-    },
-    #[cfg(feature = "libxml_automata")]
-    TestDesc {
-        desc: "Automata regression tests",
-        func: automata_test,
-        input: Some("./test/automata/*"),
-        out: Some("./result/automata/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
 ];
 
 unsafe extern "C" fn launch_tests(tst: &TestDesc) -> i32 {
@@ -6377,6 +6348,33 @@ fn test_common(desc: &TestDesc) {
         NB_LEAKS.get() - old_leaks,
     );
     test_cleanup();
+}
+
+#[test]
+fn svg_parsing_regression_test() {
+    test_common(&TestDesc {
+        desc: "SVG parsing regression tests",
+        func: old_parse_test,
+        input: Some("./test/SVG/*.xml"),
+        out: Some("./result/SVG/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(feature = "regexp")]
+fn regexp_regression_test() {
+    test_common(&TestDesc {
+        desc: "Regexp regression tests",
+        func: regexp_test,
+        input: Some("./test/regexp/*"),
+        out: Some("./result/regexp/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: 0,
+    });
 }
 
 #[test]
