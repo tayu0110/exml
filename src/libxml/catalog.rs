@@ -1857,10 +1857,14 @@ unsafe extern "C" fn xml_add_xml_catalog(
     let typ: XmlCatalogEntryType = xml_get_xml_catalog_entry_type(typs);
     if matches!(typ, XmlCatalogEntryType::XmlCataNone) {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            generic_error!(
-                "Failed to add unknown element {} to catalog\n",
-                CStr::from_ptr(typs as *const i8).to_string_lossy()
-            );
+            if typs.is_null() {
+                generic_error!("Failed to add unknown element (NULL) to catalog\n",);
+            } else {
+                generic_error!(
+                    "Failed to add unknown element {} to catalog\n",
+                    CStr::from_ptr(typs as *const i8).to_string_lossy()
+                );
+            }
         }
         return -1;
     }
@@ -1873,10 +1877,14 @@ unsafe extern "C" fn xml_add_xml_catalog(
         while !cur.is_null() {
             if !orig.is_null() && ((*cur).typ == typ) && xml_str_equal(orig, (*cur).name) {
                 if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-                    generic_error!(
-                        "Updating element {} to catalog\n",
-                        CStr::from_ptr(typs as *const i8).to_string_lossy()
-                    );
+                    if typs.is_null() {
+                        generic_error!("Updating element (NULL) to catalog\n",);
+                    } else {
+                        generic_error!(
+                            "Updating element {} to catalog\n",
+                            CStr::from_ptr(typs as *const i8).to_string_lossy()
+                        );
+                    }
                 }
                 if !(*cur).value.is_null() {
                     xml_free((*cur).value as _);
@@ -4417,12 +4425,17 @@ pub unsafe extern "C" fn xml_catalog_get_public(pub_id: *const XmlChar) -> *cons
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
     #[test]
     fn test_xml_acatalog_add() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4461,10 +4474,12 @@ mod tests {
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlACatalogAdd()");
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_acatalog_dump() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(all(feature = "catalog", feature = "output"))]
         unsafe {
             let mut leaks = 0;
@@ -4492,10 +4507,12 @@ mod tests {
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlACatalogDump()");
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_acatalog_remove() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4524,10 +4541,12 @@ mod tests {
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlACatalogRemove()");
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_acatalog_resolve() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4564,10 +4583,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlACatalogResolve()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_acatalog_resolve_public() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4599,10 +4620,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlACatalogResolvePublic()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_acatalog_resolve_system() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4634,10 +4657,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlACatalogResolveSystem()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_acatalog_resolve_uri() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4669,10 +4694,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlACatalogResolveURI()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_add() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4706,29 +4733,35 @@ mod tests {
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlCatalogAdd()");
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_cleanup() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             xml_catalog_cleanup();
             reset_last_error();
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_convert() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let ret_val = xml_catalog_convert();
             desret_int(ret_val);
             reset_last_error();
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_dump() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(all(feature = "catalog", feature = "output"))]
         unsafe {
             let mut leaks = 0;
@@ -4751,10 +4784,12 @@ mod tests {
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlCatalogDump()");
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_get_defaults() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4776,10 +4811,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlCatalogGetDefaults()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_is_empty() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4803,10 +4840,12 @@ mod tests {
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlCatalogIsEmpty()");
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_local_resolve() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4843,10 +4882,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlCatalogLocalResolve()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_local_resolve_uri() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4878,10 +4919,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlCatalogLocalResolveURI()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_remove() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
@@ -4893,10 +4936,12 @@ mod tests {
                 reset_last_error();
             }
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_resolve() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             for n_pub_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
@@ -4912,10 +4957,12 @@ mod tests {
                 }
             }
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_resolve_public() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4942,10 +4989,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlCatalogResolvePublic()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_resolve_system() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4972,10 +5021,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlCatalogResolveSystem()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_resolve_uri() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5002,10 +5053,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlCatalogResolveURI()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_set_default_prefer() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5032,10 +5085,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlCatalogSetDefaultPrefer()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_catalog_set_defaults() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5061,10 +5116,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlCatalogSetDefaults()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_convert_sgmlcatalog() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5091,10 +5148,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlConvertSGMLCatalog()"
             );
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_initialize_catalog() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5115,16 +5174,12 @@ mod tests {
                 "{leaks} Leaks are found in xmlInitializeCatalog()"
             );
         }
-    }
-
-    #[test]
-    fn test_xml_load_acatalog() {
-
-        /* missing type support */
+        drop(lock);
     }
 
     #[test]
     fn test_xml_load_catalog() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             for n_filename in 0..GEN_NB_FILEPATH {
@@ -5136,10 +5191,12 @@ mod tests {
                 reset_last_error();
             }
         }
+        drop(lock);
     }
 
     #[test]
     fn test_xml_load_catalogs() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             for n_pathss in 0..GEN_NB_CONST_CHAR_PTR {
@@ -5150,22 +5207,12 @@ mod tests {
                 reset_last_error();
             }
         }
-    }
-
-    #[test]
-    fn test_xml_load_sgmlsuper_catalog() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_new_catalog() {
-
-        /* missing type support */
+        drop(lock);
     }
 
     #[test]
     fn test_xml_parse_catalog_file() {
+        let lock = TEST_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5192,5 +5239,6 @@ mod tests {
                 "{leaks} Leaks are found in xmlParseCatalogFile()"
             );
         }
+        drop(lock);
     }
 }
