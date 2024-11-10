@@ -68,9 +68,7 @@ use exml::{
 };
 use libc::{fdopen, fflush, free, malloc, memcpy, pthread_t, size_t, snprintf, strcmp, strlen};
 
-/*
- * pseudo flag for the unification of HTML and XML tests
- */
+/// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;
 
 type Functest = unsafe fn(
@@ -542,11 +540,13 @@ unsafe extern "C" fn unload_mem(mem: *const c_char) -> c_int {
     0
 }
 
-static SAX_DEBUG: Mutex<Option<File>> = Mutex::new(None);
+thread_local! {
+    static SAX_DEBUG: RefCell<Option<File>> = const { RefCell::new(None) };
+}
 
 macro_rules! sax_debug {
     ( $fmt:literal, $( $args:expr ),* ) => {
-        write!(SAX_DEBUG.lock().unwrap().as_mut().unwrap(), $fmt, $( $args ),*).ok();
+        SAX_DEBUG.with_borrow_mut(|f| write!(f.as_mut().unwrap(), $fmt, $( $args ),*).ok());
     };
     ( $fmt:literal, $( $args:expr ),* ,) => {
         sax_debug!($fmt, $( $args ),*);
@@ -1074,13 +1074,12 @@ unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar
     output[len.clamp(0, 30) as usize] = 0;
 
     sax_debug!("SAX.characters(");
-    SAX_DEBUG
-        .lock()
-        .unwrap()
-        .as_mut()
-        .unwrap()
-        .write_all(&output[..len.clamp(0, 30) as usize])
-        .ok();
+    SAX_DEBUG.with_borrow_mut(|f| {
+        f.as_mut()
+            .unwrap()
+            .write_all(&output[..len.clamp(0, 30) as usize])
+            .ok()
+    });
     sax_debugln!(", {len})");
 }
 
@@ -1122,13 +1121,12 @@ unsafe fn ignorable_whitespace_debug(
     }
     output[len.clamp(0, 30) as usize] = 0;
     sax_debug!("SAX.ignorableWhitespace(");
-    SAX_DEBUG
-        .lock()
-        .unwrap()
-        .as_mut()
-        .unwrap()
-        .write_all(&output[..len.clamp(0, 30) as usize])
-        .ok();
+    SAX_DEBUG.with_borrow_mut(|f| {
+        f.as_mut()
+            .unwrap()
+            .write_all(&output[..len.clamp(0, 30) as usize])
+            .ok()
+    });
     sax_debugln!(", {len})");
 }
 
@@ -1174,13 +1172,7 @@ unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const Xml
     let value = CStr::from_ptr(value as *mut c_char).to_bytes();
     let l = value.len().min(20);
     sax_debug!("SAX.pcdata(");
-    SAX_DEBUG
-        .lock()
-        .unwrap()
-        .as_mut()
-        .unwrap()
-        .write_all(&value[..l])
-        .ok();
+    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&value[..l]).ok());
     sax_debugln!(", {len})");
 }
 
@@ -1210,12 +1202,8 @@ unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar
  */
 fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     increment_callbacks_counter();
-    write!(
-        SAX_DEBUG.lock().unwrap().as_mut().unwrap(),
-        "SAX.warning: {}",
-        msg
-    )
-    .ok();
+
+    SAX_DEBUG.with_borrow_mut(|f| write!(f.as_mut().unwrap(), "SAX.warning: {}", msg).ok());
 }
 
 /**
@@ -1358,13 +1346,7 @@ unsafe fn start_element_ns_debug(
             }
             let value = CStr::from_ptr(*attributes.add(i + 3) as _).to_bytes();
             let l = value.len().min(4);
-            SAX_DEBUG
-                .lock()
-                .unwrap()
-                .as_mut()
-                .unwrap()
-                .write_all(&value[..l])
-                .ok();
+            SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&value[..l]).ok());
             sax_debug!(
                 "...', {}",
                 (*attributes.add(i + 4)).offset_from(*attributes.add(i + 3))
@@ -1642,7 +1624,7 @@ unsafe fn sax_parse_test(
         eprintln!("Failed to write to {temp}",);
         return -1;
     };
-    *SAX_DEBUG.lock().unwrap() = Some(out);
+    SAX_DEBUG.with_borrow_mut(|f| *f = Some(out));
 
     /* for SAX we really want the callbacks though the context handlers */
     set_structured_error(None, None);
