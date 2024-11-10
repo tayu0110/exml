@@ -573,7 +573,7 @@ macro_rules! sax_debugln {
 /*
  * empty SAX block
  */
-static mut EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
+static EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: None,
     is_standalone: None,
     has_internal_subset: None,
@@ -1247,7 +1247,7 @@ fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     sax_debug!("SAX.fatalError: {msg}");
 }
 
-static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
+static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: Some(internal_subset_debug),
     is_standalone: Some(is_standalone_debug),
     has_internal_subset: Some(has_internal_subset_debug),
@@ -1411,7 +1411,7 @@ unsafe fn end_element_ns_debug(
     }
 }
 
-static mut DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
+static DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: Some(internal_subset_debug),
     is_standalone: Some(is_standalone_debug),
     has_internal_subset: Some(has_internal_subset_debug),
@@ -1573,7 +1573,7 @@ unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar,
 }
 
 #[cfg(feature = "html")]
-static mut DEBUG_HTMLSAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
+static DEBUG_HTMLSAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: Some(internal_subset_debug),
     is_standalone: Some(is_standalone_debug),
     has_internal_subset: Some(has_internal_subset_debug),
@@ -1652,7 +1652,7 @@ unsafe fn sax_parse_test(
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         let ctxt: HtmlParserCtxtPtr =
-            html_new_sax_parser_ctxt(addr_of_mut!(EMPTY_SAXHANDLER_STRUCT), None);
+            html_new_sax_parser_ctxt(&raw const EMPTY_SAXHANDLER_STRUCT, None);
         html_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
         html_free_parser_ctxt(ctxt);
         ret = 0;
@@ -1660,7 +1660,7 @@ unsafe fn sax_parse_test(
         let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(cfilename.as_ptr());
         memcpy(
             (*ctxt).sax as _,
-            addr_of_mut!(EMPTY_SAXHANDLER_STRUCT) as _,
+            &raw const EMPTY_SAXHANDLER_STRUCT as _,
             size_of::<XmlSAXHandler>(),
         );
         xml_ctxt_use_options(ctxt, options);
@@ -1702,7 +1702,7 @@ unsafe fn sax_parse_test(
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
             let ctxt: HtmlParserCtxtPtr =
-                html_new_sax_parser_ctxt(addr_of_mut!(DEBUG_HTMLSAXHANDLER_STRUCT), None);
+                html_new_sax_parser_ctxt(&raw const DEBUG_HTMLSAXHANDLER_STRUCT, None);
             html_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
             html_free_parser_ctxt(ctxt);
             ret = 0;
@@ -1711,14 +1711,14 @@ unsafe fn sax_parse_test(
             if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
                 memcpy(
                     (*ctxt).sax as _,
-                    addr_of_mut!(DEBUG_SAXHANDLER_STRUCT) as _,
+                    &raw const DEBUG_SAXHANDLER_STRUCT as _,
                     size_of::<XmlSAXHandler>(),
                 );
                 options -= XmlParserOption::XmlParseSax1 as i32;
             } else {
                 memcpy(
                     (*ctxt).sax as _,
-                    addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT) as _,
+                    &raw const DEBUG_SAX2_HANDLER_STRUCT as _,
                     size_of::<XmlSAXHandler>(),
                 );
             }
