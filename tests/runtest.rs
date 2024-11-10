@@ -5241,7 +5241,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
 }
 
 #[cfg(all(feature = "thread", feature = "catalog"))]
-static mut TID: [pthread_t; MAX_ARGC] = [0; MAX_ARGC];
+static TID: Mutex<[pthread_t; MAX_ARGC]> = Mutex::new([0; MAX_ARGC]);
 
 #[cfg(all(feature = "thread", feature = "catalog"))]
 unsafe extern "C" fn test_thread() -> c_int {
@@ -5253,15 +5253,16 @@ unsafe extern "C" fn test_thread() -> c_int {
 
     xml_init_parser();
 
+    let mut tid = TID.lock().unwrap();
     for _ in 0..500 {
         xml_load_catalog(CATALOG.as_ptr());
         NB_TESTS.set(NB_TESTS.get() + 1);
 
-        TID[..NUM_THREADS].fill(u64::MAX);
+        tid[..NUM_THREADS].fill(u64::MAX);
 
         for i in 0..NUM_THREADS {
             ret = pthread_create(
-                addr_of_mut!(TID[i]),
+                &raw mut tid[i],
                 null(),
                 thread_specific_data,
                 addr_of_mut!(THREAD_PARAMS[i]) as _,
@@ -5271,7 +5272,7 @@ unsafe extern "C" fn test_thread() -> c_int {
                 return 1;
             }
         }
-        for &tid in TID.iter().take(NUM_THREADS) {
+        for &tid in tid.iter().take(NUM_THREADS) {
             let mut result: *mut c_void = null_mut();
             ret = pthread_join(tid, addr_of_mut!(result));
             if ret != 0 {
