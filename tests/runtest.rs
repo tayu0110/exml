@@ -2,6 +2,7 @@
 //! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
+    cell::Cell,
     env::args,
     ffi::{c_char, c_int, c_ulong, CStr, CString},
     fs::{metadata, remove_file, File},
@@ -92,13 +93,15 @@ struct TestDesc<'a> {
     options: c_int,          /* parser options for the test */
 }
 
-static mut UPDATE_RESULTS: c_int = 0;
+static UPDATE_RESULTS: OnceLock<bool> = OnceLock::new();
 static TEMP_DIRECTORY: OnceLock<String> = OnceLock::new();
 
-static mut NB_TESTS: c_int = 0;
-static mut NB_ERRORS: c_int = 0;
-static mut NB_LEAKS: c_int = 0;
-static mut EXTRA_MEMORY_FROM_RESOLVER: c_int = 0;
+thread_local! {
+    static NB_TESTS: Cell<i32> = const { Cell::new(0) };
+    static NB_ERRORS: Cell<i32> = const { Cell::new(0) };
+    static NB_LEAKS: Cell<i32> = const { Cell::new(0) };
+    static EXTRA_MEMORY_FROM_RESOLVER: Cell<i32> = const { Cell::new(0) };
+}
 
 /*
  * We need to trap calls to the resolver to not account memory for the catalog
@@ -117,7 +120,7 @@ unsafe extern "C" fn test_external_entity_loader(
     } else {
         let memused: c_int = xml_mem_used();
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
-        EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
+        EXTRA_MEMORY_FROM_RESOLVER.set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
     }
 
     ret
@@ -362,7 +365,7 @@ fn compare_files(
         let mut bytes1: [u8; 4096] = [0; 4096];
         let mut bytes2: [u8; 4096] = [0; 4096];
 
-        if unsafe { UPDATE_RESULTS } != 0 {
+        if *UPDATE_RESULTS.get_or_init(|| false) {
             let Ok(mut fd1) = File::open(r1) else {
                 return -1;
             };
@@ -423,7 +426,7 @@ fn compare_file_mem(filename: impl AsRef<Path>, mem: &[u8]) -> c_int {
         let mut bytes: [u8; 4096] = [0; 4096];
         let size = mem.len();
 
-        if unsafe { UPDATE_RESULTS } != 0 {
+        if *UPDATE_RESULTS.get_or_init(|| false) {
             if size == 0 {
                 remove_file(filename).ok();
                 return 0;
@@ -1713,7 +1716,7 @@ unsafe fn sax_parse_test(
     let mut ret: c_int;
     let cfilename = CString::new(filename).unwrap();
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
     let temp = result_filename(
         filename,
         TEMP_DIRECTORY.get().cloned().as_deref(),
@@ -1886,7 +1889,7 @@ unsafe fn old_parse_test(
     let mut res: c_int = 0;
     let cfilename = CString::new(filename).unwrap();
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
     /*
      * base of the test, parse with the old API
      */
@@ -1966,7 +1969,8 @@ unsafe fn push_parse_test(
     let mut chunk_size: c_int = 4;
     let cfilename = CString::new(filename).unwrap();
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
+
     /*
      * load the document in memory and work from there.
      */
@@ -2289,7 +2293,7 @@ unsafe fn push_boundary_test(
      * processed as early as possible.
      */
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
 
     memset(addr_of_mut!(bnd_sax) as _, 0, size_of::<XmlSAXHandler>());
     #[cfg(feature = "html")]
@@ -2555,7 +2559,7 @@ unsafe fn mem_parse_test(
     let mut base: *const c_char = null();
     let mut size: c_int = 0;
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
     /*
      * load and parse the memory
      */
@@ -2609,7 +2613,7 @@ unsafe fn noent_parse_test(
     let mut res: c_int = 0;
     let cfilename = CString::new(filename).unwrap();
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
     /*
      * base of the test, parse with the old API
      */
@@ -2669,7 +2673,7 @@ unsafe fn err_parse_test(
     let cfilename = CString::new(filename).unwrap();
     let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
     if cfg!(feature = "html") && options & XML_PARSE_HTML != 0 {
         #[cfg(feature = "html")]
         {
@@ -2796,7 +2800,7 @@ unsafe fn stream_process_test(
         return -1;
     }
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
     let mut t = None;
     if result.is_some() {
         let tm = result_filename(
@@ -3003,7 +3007,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
     /* Don't print generic errors to stderr. */
     set_generic_error(Some(ignore_generic_error), None);
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
     if cfg!(feature = "libxml_xptr") && xptr != 0 {
         #[cfg(feature = "libxml_xptr")]
         {
@@ -3511,7 +3515,7 @@ unsafe fn uri_common_test(
                         str[len] = 0;
                     }
                 }
-                NB_TESTS += 1;
+                NB_TESTS.set(NB_TESTS.get() + 1);
                 handle_uri(str.as_ptr() as _, base, &mut o);
             }
             _ => {
@@ -3791,7 +3795,7 @@ unsafe fn uri_path_test(
             );
             failures += 1;
         }
-        NB_TESTS += 1;
+        NB_TESTS.set(NB_TESTS.get() + 1);
         URIP_CURRENT += 1;
     }
 
@@ -4021,7 +4025,7 @@ unsafe fn schemas_test(
             continue;
         }
         if !schemas.is_null() {
-            NB_TESTS += 1;
+            NB_TESTS.set(NB_TESTS.get() + 1);
             ret = schemas_one_test(
                 cfilename.as_ptr(),
                 instance,
@@ -4256,7 +4260,7 @@ unsafe fn rng_test(
             continue;
         }
         if !schemas.is_null() {
-            NB_TESTS += 1;
+            NB_TESTS.set(NB_TESTS.get() + 1);
             res = rng_one_test(
                 cfilename.as_ptr(),
                 instance,
@@ -4589,7 +4593,7 @@ unsafe fn pattern_test(
     memcpy(xml.as_mut_ptr().add(len) as _, c".xml".as_ptr() as _, 5);
 
     if !check_test_file(CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref())
-        && UPDATE_RESULTS == 0
+        && !*UPDATE_RESULTS.get_or_init(|| false)
     {
         eprintln!(
             "Missing xml file {}",
@@ -4680,7 +4684,7 @@ unsafe fn pattern_test(
                             patstream = null_mut();
                         }
                     }
-                    NB_TESTS += 1;
+                    NB_TESTS.set(NB_TESTS.get() + 1);
 
                     reader = xml_reader_walker(doc);
                     res = xml_text_reader_read(&mut *reader);
@@ -5130,7 +5134,7 @@ unsafe fn c14n_common_test(
         ns = strdup(buf.as_ptr());
     }
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
     if c14n_run_test(cfilename.as_ptr(), with_comments, mode, xpath, ns, result) < 0 {
         ret = 1;
     }
@@ -5316,19 +5320,9 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
             }
-            // if xml_generic_error_context() != stdout as _ {
-            //     println!("xmlGenericErrorContext override failed");
-            //     okay = 0;
-            // }
-        } else {
-            // if xml_generic_error_context() != stderr as _ {
-            //     println!("xmlGenericErrorContext override failed");
-            //     okay = 0;
-            // }
-            if get_do_validity_checking_default_value() != 1 {
-                println!("ValidityCheckingDefaultValue override failed");
-                okay = 0;
-            }
+        } else if get_do_validity_checking_default_value() != 1 {
+            println!("ValidityCheckingDefaultValue override failed");
+            okay = 0;
         }
         (*params).okay = okay;
     }
@@ -5350,7 +5344,7 @@ unsafe extern "C" fn test_thread() -> c_int {
 
     for _ in 0..500 {
         xml_load_catalog(CATALOG.as_ptr());
-        NB_TESTS += 1;
+        NB_TESTS.set(NB_TESTS.get() + 1);
 
         TID[..NUM_THREADS].fill(u64::MAX);
 
@@ -5438,7 +5432,7 @@ unsafe fn regexp_test(
     let mut ret: c_int;
     let mut res: c_int = 0;
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
 
     let mut input = match File::open(filename) {
         Ok(file) => BufReader::new(file),
@@ -5588,7 +5582,7 @@ unsafe fn automata_test(
     let mut regexp: XmlRegexpPtr = null_mut();
     let mut exec: XmlRegExecCtxtPtr = null_mut();
 
-    NB_TESTS += 1;
+    NB_TESTS.set(NB_TESTS.get() + 1);
 
     let mut input = match File::open(filename) {
         Ok(file) => BufReader::new(file),
@@ -6372,7 +6366,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                 error = None;
             }
             mem = xml_mem_used();
-            EXTRA_MEMORY_FROM_RESOLVER = 0;
+            EXTRA_MEMORY_FROM_RESOLVER.set(0);
             TEST_ERRORS_SIZE = 0;
             TEST_ERRORS[0] = 0;
             res = (tst.func)(
@@ -6384,14 +6378,14 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
             reset_last_error();
             if res != 0 {
                 eprintln!("File {} generated an error", path,);
-                NB_ERRORS += 1;
+                NB_ERRORS.set(NB_ERRORS.get() + 1);
                 err += 1;
             } else if xml_mem_used() != mem
                 && xml_mem_used() != mem
-                && EXTRA_MEMORY_FROM_RESOLVER == 0
+                && EXTRA_MEMORY_FROM_RESOLVER.get() == 0
             {
                 eprintln!("File {} leaked {} bytes", path, xml_mem_used() - mem,);
-                NB_LEAKS += 1;
+                NB_LEAKS.set(NB_LEAKS.get() + 1);
                 err += 1;
             }
             TEST_ERRORS_SIZE = 0;
@@ -6399,10 +6393,10 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
     } else {
         TEST_ERRORS_SIZE = 0;
         TEST_ERRORS[0] = 0;
-        EXTRA_MEMORY_FROM_RESOLVER = 0;
+        EXTRA_MEMORY_FROM_RESOLVER.set(0);
         res = (tst.func)("", None, None, tst.options);
         if res != 0 {
-            NB_ERRORS += 1;
+            NB_ERRORS.set(NB_ERRORS.get() + 1);
             err += 1;
         }
     }
@@ -6410,33 +6404,26 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
     err
 }
 
-static mut VERBOSE: c_int = 0;
-static mut TESTS_QUIET: c_int = 0;
-
 unsafe extern "C" fn runtest(i: usize) -> c_int {
     let mut ret: c_int = 0;
 
-    let old_errors: c_int = NB_ERRORS;
-    let old_tests: c_int = NB_TESTS;
-    let old_leaks: c_int = NB_LEAKS;
-    if TESTS_QUIET == 0 {
-        println!("## {}", TEST_DESCRIPTIONS[i].desc);
-    }
+    let old_errors = NB_ERRORS.get();
+    let old_tests = NB_TESTS.get();
+    let old_leaks = NB_LEAKS.get();
+    println!("## {}", TEST_DESCRIPTIONS[i].desc);
     let res: c_int = launch_tests(&TEST_DESCRIPTIONS[i]);
     if res != 0 {
         ret += 1;
     }
-    if VERBOSE != 0 {
-        if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
-            println!("Ran {} tests, no errors", NB_TESTS - old_tests);
-        } else {
-            println!(
-                "Ran {} tests, {} errors, {} leaks",
-                NB_TESTS - old_tests,
-                NB_ERRORS - old_errors,
-                NB_LEAKS - old_leaks,
-            );
-        }
+    if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
+        println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
+    } else {
+        println!(
+            "Ran {} tests, {} errors, {} leaks",
+            NB_TESTS.get() - old_tests,
+            NB_ERRORS.get() - old_errors,
+            NB_LEAKS.get() - old_leaks,
+        );
     }
     ret
 }
@@ -6451,12 +6438,10 @@ fn main() {
 
         let mut args = args();
         while let Some(arg) = args.next() {
-            if arg == "-v" {
-                VERBOSE = 1;
-            } else if arg == "-u" {
-                UPDATE_RESULTS = 1;
-            } else if arg == "-quiet" {
-                TESTS_QUIET = 1;
+            if arg == "-u" {
+                UPDATE_RESULTS
+                    .set(true)
+                    .expect("Failed to set `UPDATE_RESULTS`");
             } else if arg == "--out" {
                 if let Some(s) = args.next() {
                     TEMP_DIRECTORY.set(s).unwrap();
@@ -6475,14 +6460,16 @@ fn main() {
                 ret += runtest(i);
             }
         }
-        if NB_ERRORS == 0 && NB_LEAKS == 0 {
+        if NB_ERRORS.get() == 0 && NB_LEAKS.get() == 0 {
             ret = 0;
-            println!("Total {} tests, no errors", NB_TESTS);
+            println!("Total {} tests, no errors", NB_TESTS.get());
         } else {
             ret = 1;
             println!(
                 "Total {} tests, {} errors, {} leaks",
-                NB_TESTS, NB_ERRORS, NB_LEAKS,
+                NB_TESTS.get(),
+                NB_ERRORS.get(),
+                NB_LEAKS.get(),
             );
         }
         xml_cleanup_parser();
