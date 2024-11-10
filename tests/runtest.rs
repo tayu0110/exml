@@ -4,7 +4,7 @@
 use std::{
     cell::{Cell, RefCell},
     env::args,
-    ffi::{c_char, c_int, c_ulong, CStr, CString},
+    ffi::{c_char, CStr, CString},
     fs::{metadata, remove_file, File},
     io::{self, BufRead, BufReader, Read, Write},
     mem::zeroed,
@@ -71,12 +71,8 @@ use libc::{fdopen, fflush, free, malloc, memcpy, pthread_t, size_t, snprintf, st
 /// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;
 
-type Functest = unsafe fn(
-    filename: &str,
-    result: Option<String>,
-    error: Option<String>,
-    options: c_int,
-) -> c_int;
+type Functest =
+    unsafe fn(filename: &str, result: Option<String>, error: Option<String>, options: i32) -> i32;
 
 struct TestDesc<'a> {
     desc: &'a str,           /* description of the test */
@@ -85,7 +81,7 @@ struct TestDesc<'a> {
     out: Option<&'a str>,    /* output directory */
     suffix: Option<&'a str>, /* suffix for output files */
     err: Option<&'a str>,    /* suffix for error output files */
-    options: c_int,          /* parser options for the test */
+    options: i32,            /* parser options for the test */
 }
 
 static UPDATE_RESULTS: OnceLock<bool> = OnceLock::new();
@@ -113,7 +109,7 @@ unsafe extern "C" fn test_external_entity_loader(
     if check_test_file(CStr::from_ptr(url).to_string_lossy().as_ref()) {
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
-        let memused: c_int = xml_mem_used();
+        let memused: i32 = xml_mem_used();
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
         EXTRA_MEMORY_FROM_RESOLVER.set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
     }
@@ -357,7 +353,7 @@ fn check_test_file(filename: impl AsRef<Path>) -> bool {
 fn compare_files(
     r1: impl AsRef<Path>, /* temp */
     r2: impl AsRef<Path>, /* result */
-) -> c_int {
+) -> i32 {
     fn _compare_files(r1: &Path, r2: &Path) -> i32 {
         let mut bytes1: [u8; 4096] = [0; 4096];
         let mut bytes2: [u8; 4096] = [0; 4096];
@@ -418,7 +414,7 @@ fn compare_files(
     _compare_files(r1.as_ref(), r2.as_ref())
 }
 
-fn compare_file_mem(filename: impl AsRef<Path>, mem: &[u8]) -> c_int {
+fn compare_file_mem(filename: impl AsRef<Path>, mem: &[u8]) -> i32 {
     fn _compare_file_mem(filename: &Path, mem: &[u8]) -> i32 {
         let mut bytes: [u8; 4096] = [0; 4096];
         let size = mem.len();
@@ -496,7 +492,7 @@ fn compare_file_mem(filename: impl AsRef<Path>, mem: &[u8]) -> c_int {
     _compare_file_mem(filename.as_ref(), mem)
 }
 
-unsafe fn load_mem(filename: &str, mem: *mut *const c_char, size: *mut c_int) -> c_int {
+unsafe fn load_mem(filename: &str, mem: *mut *const c_char, size: *mut i32) -> i32 {
     match metadata(filename) {
         Ok(meta) => {
             let base: *mut c_char = malloc(meta.len() as usize + 1) as _;
@@ -535,7 +531,7 @@ unsafe fn load_mem(filename: &str, mem: *mut *const c_char, size: *mut c_int) ->
     }
 }
 
-unsafe extern "C" fn unload_mem(mem: *const c_char) -> c_int {
+unsafe extern "C" fn unload_mem(mem: *const c_char) -> i32 {
     free(mem as _);
     0
 }
@@ -622,7 +618,7 @@ fn increment_callbacks_counter() {
  *
  * Returns 1 if true
  */
-unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.isStandalone()");
     0
@@ -636,7 +632,7 @@ unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
  *
  * Returns 1 if true
  */
-unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.hasInternalSubset()");
     0
@@ -650,7 +646,7 @@ unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int 
  *
  * Returns 1 if true
  */
-unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.hasExternalSubset()");
     0
@@ -820,7 +816,7 @@ unsafe fn get_parameter_entity_debug(
 unsafe fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     mut public_id: *const XmlChar,
     mut system_id: *const XmlChar,
     mut content: *mut XmlChar,
@@ -859,8 +855,8 @@ unsafe fn attribute_decl_debug(
     _ctx: Option<GenericErrorContext>,
     elem: *const XmlChar,
     name: *const XmlChar,
-    typ: c_int,
-    def: c_int,
+    typ: i32,
+    def: i32,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
 ) {
@@ -898,7 +894,7 @@ unsafe fn attribute_decl_debug(
 unsafe fn element_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    typ: c_int,
+    typ: i32,
     _content: XmlElementContentPtr,
 ) {
     increment_callbacks_counter();
@@ -1064,7 +1060,7 @@ unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: *const XmlC
  * receiving some chars from the parser.
  * Question: how much at a time ???
  */
-unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
+unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     let mut output: [u8; 40] = [0; 40];
 
     increment_callbacks_counter();
@@ -1111,7 +1107,7 @@ unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: *const XmlCha
 unsafe fn ignorable_whitespace_debug(
     _ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
-    len: c_int,
+    len: i32,
 ) {
     let mut output: [u8; 40] = [0; 40];
 
@@ -1167,7 +1163,7 @@ unsafe fn processing_instruction_debug(
  *
  * called when a pcdata block has been parsed
  */
-unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar, len: c_int) {
+unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar, len: i32) {
     increment_callbacks_counter();
     let value = CStr::from_ptr(value as *mut c_char).to_bytes();
     let l = value.len().min(20);
@@ -1282,10 +1278,10 @@ unsafe fn start_element_ns_debug(
     localname: *const XmlChar,
     prefix: *const XmlChar,
     uri: *const XmlChar,
-    nb_namespaces: c_int,
+    nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
-    nb_attributes: c_int,
-    nb_defaulted: c_int,
+    nb_attributes: i32,
+    nb_defaulted: i32,
     attributes: *mut *const XmlChar,
 ) {
     increment_callbacks_counter();
@@ -1493,13 +1489,13 @@ unsafe fn htmlstart_element_debug(
  * Question: how much at a time ???
  */
 #[cfg(feature = "html")]
-unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
+unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
 
     let mut output: [c_uchar; 40] = [0; 40];
-    let mut inlen: c_int = len;
+    let mut inlen: i32 = len;
     let mut outlen: usize = 30;
 
     html_encode_entities(
@@ -1528,13 +1524,13 @@ unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: *const Xml
  * Question: how much at a time ???
  */
 #[cfg(feature = "html")]
-unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
+unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
 
     let mut output: [c_uchar; 40] = [0; 40];
-    let mut inlen: c_int = len;
+    let mut inlen: i32 = len;
     let mut outlen: usize = 30;
 
     html_encode_entities(
@@ -1603,9 +1599,9 @@ unsafe fn sax_parse_test(
     filename: &str,
     result: Option<String>,
     _err: Option<String>,
-    mut options: c_int,
-) -> c_int {
-    let mut ret: c_int;
+    mut options: i32,
+) -> i32 {
+    let mut ret: i32;
     let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS.set(NB_TESTS.get() + 1);
@@ -1776,9 +1772,9 @@ unsafe fn old_parse_test(
     filename: &str,
     result: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
-    let mut res: c_int = 0;
+    _options: i32,
+) -> i32 {
+    let mut res: i32 = 0;
     let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS.set(NB_TESTS.get() + 1);
@@ -1844,8 +1840,8 @@ unsafe fn push_parse_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use exml::{
         encoding::XmlCharEncoding,
         libxml::{
@@ -1855,10 +1851,10 @@ unsafe fn push_parse_test(
     };
 
     let mut base: *const c_char = null();
-    let mut size: c_int = 0;
-    let mut res: c_int;
-    let mut cur: c_int = 0;
-    let mut chunk_size: c_int = 4;
+    let mut size: i32 = 0;
+    let mut res: i32;
+    let mut cur: i32 = 0;
+    let mut chunk_size: i32 = 4;
     let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS.set(NB_TESTS.get() + 1);
@@ -1993,14 +1989,16 @@ unsafe fn push_parse_test(
     0
 }
 
-#[cfg(feature = "push")]
-static mut PUSH_BOUNDARY_COUNT: c_int = 0;
-#[cfg(feature = "push")]
-static mut PUSH_BOUNDARY_REF_COUNT: c_int = 0;
-#[cfg(feature = "push")]
-static mut PUSH_BOUNDARY_CHARS_COUNT: c_int = 0;
-#[cfg(feature = "push")]
-static mut PUSH_BOUNDARY_CDATA_COUNT: c_int = 0;
+thread_local! {
+    #[cfg(feature = "push")]
+    static PUSH_BOUNDARY_COUNT: Cell<i32> = const { Cell::new(0) };
+    #[cfg(feature = "push")]
+    static PUSH_BOUNDARY_REF_COUNT: Cell<i32> = const { Cell::new(0) };
+    #[cfg(feature = "push")]
+    static PUSH_BOUNDARY_CHARS_COUNT: Cell<i32> = const { Cell::new(0) };
+    #[cfg(feature = "push")]
+    static PUSH_BOUNDARY_CDATA_COUNT: Cell<i32> = const { Cell::new(0) };
+}
 
 #[cfg(feature = "push")]
 unsafe fn internal_subset_bnd(
@@ -2011,7 +2009,7 @@ unsafe fn internal_subset_bnd(
 ) {
     use exml::libxml::sax2::xml_sax2_internal_subset;
 
-    PUSH_BOUNDARY_COUNT += 1;
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     xml_sax2_internal_subset(ctx, name, external_id, system_id);
 }
 
@@ -2019,25 +2017,25 @@ unsafe fn internal_subset_bnd(
 unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
     use exml::libxml::sax2::xml_sax2_reference;
 
-    PUSH_BOUNDARY_REF_COUNT += 1;
+    PUSH_BOUNDARY_REF_COUNT.set(PUSH_BOUNDARY_REF_COUNT.get() + 1);
     xml_sax2_reference(ctx, name);
 }
 
 #[cfg(feature = "push")]
-unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
+unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     use exml::libxml::sax2::xml_sax2_characters;
 
-    PUSH_BOUNDARY_COUNT += 1;
-    PUSH_BOUNDARY_CHARS_COUNT += 1;
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+    PUSH_BOUNDARY_CHARS_COUNT.set(PUSH_BOUNDARY_CHARS_COUNT.get() + 1);
     xml_sax2_characters(ctx, ch, len);
 }
 
 #[cfg(feature = "push")]
-unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
+unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     use exml::libxml::sax2::xml_sax2_cdata_block;
 
-    PUSH_BOUNDARY_COUNT += 1;
-    PUSH_BOUNDARY_CDATA_COUNT += 1;
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+    PUSH_BOUNDARY_CDATA_COUNT.set(PUSH_BOUNDARY_CDATA_COUNT.get() + 1);
     xml_sax2_cdata_block(ctx, ch, len);
 }
 
@@ -2049,7 +2047,7 @@ unsafe fn processing_instruction_bnd(
 ) {
     use exml::libxml::sax2::xml_sax2_processing_instruction;
 
-    PUSH_BOUNDARY_COUNT += 1;
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     xml_sax2_processing_instruction(ctx, target, data);
 }
 
@@ -2063,7 +2061,7 @@ unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
     if (*ctxt).in_subset == 0 {
-        PUSH_BOUNDARY_COUNT += 1;
+        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     }
     xml_sax2_comment(ctx, value);
 }
@@ -2084,7 +2082,7 @@ unsafe fn start_element_bnd(
         && strcmp(name, c"head".as_ptr()) != 0
         && strcmp(name, c"p".as_ptr()) != 0
     {
-        PUSH_BOUNDARY_COUNT += 1;
+        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     }
     xml_sax2_start_element(ctx, xname, atts);
 }
@@ -2104,15 +2102,15 @@ unsafe fn start_element_ns_bnd(
     localname: *const XmlChar,
     prefix: *const XmlChar,
     uri: *const XmlChar,
-    nb_namespaces: c_int,
+    nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
-    nb_attributes: c_int,
-    nb_defaulted: c_int,
+    nb_attributes: i32,
+    nb_defaulted: i32,
     attributes: *mut *const XmlChar,
 ) {
     use exml::libxml::sax2::xml_sax2_start_element_ns;
 
-    PUSH_BOUNDARY_COUNT += 1;
+    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     xml_sax2_start_element_ns(
         ctx,
         localname,
@@ -2153,8 +2151,8 @@ unsafe fn push_boundary_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use exml::{
         encoding::XmlCharEncoding,
         libxml::{
@@ -2170,13 +2168,13 @@ unsafe fn push_boundary_test(
 
     let mut bnd_sax: XmlSAXHandler = unsafe { zeroed() };
     let mut base: *const c_char = null();
-    let mut size: c_int = 0;
-    let mut res: c_int;
-    let mut num_callbacks: c_int;
-    let mut cur: c_int;
-    let mut avail: c_ulong;
-    let mut old_consumed: c_ulong = 0;
-    let mut consumed: c_ulong;
+    let mut size: i32 = 0;
+    let mut res: i32;
+    let mut num_callbacks: i32;
+    let mut cur: i32;
+    let mut avail: u64;
+    let mut old_consumed: u64 = 0;
+    let mut consumed: u64;
     let cfilename = CString::new(filename).unwrap();
 
     /*
@@ -2249,11 +2247,11 @@ unsafe fn push_boundary_test(
     num_callbacks = 0;
     avail = 0;
     while cur < size && num_callbacks <= 1 && avail == 0 {
-        let terminate = (cur + 1 >= size) as c_int;
-        let mut is_text: c_int = 0;
+        let terminate = (cur + 1 >= size) as i32;
+        let mut is_text: i32 = 0;
 
         if (*ctxt).instate == XmlParserInputState::XmlParserContent {
-            let first_char: c_int = if (*(*ctxt).input).end > (*(*ctxt).input).cur {
+            let first_char: i32 = if (*(*ctxt).input).end > (*(*ctxt).input).cur {
                 *(*(*ctxt).input).cur as i32
             } else {
                 *base.add(cur as usize) as i32
@@ -2267,12 +2265,12 @@ unsafe fn push_boundary_test(
         }
 
         old_consumed = (*(*ctxt).input).consumed
-            + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as c_ulong;
+            + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
 
-        PUSH_BOUNDARY_COUNT = 0;
-        PUSH_BOUNDARY_REF_COUNT = 0;
-        PUSH_BOUNDARY_CHARS_COUNT = 0;
-        PUSH_BOUNDARY_CDATA_COUNT = 0;
+        PUSH_BOUNDARY_COUNT.set(0);
+        PUSH_BOUNDARY_REF_COUNT.set(0);
+        PUSH_BOUNDARY_CHARS_COUNT.set(0);
+        PUSH_BOUNDARY_CDATA_COUNT.set(0);
 
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
@@ -2289,17 +2287,17 @@ unsafe fn push_boundary_test(
         /*
          * Callback check: Check that only a single construct was parsed.
          */
-        if PUSH_BOUNDARY_REF_COUNT > 0 {
+        if PUSH_BOUNDARY_REF_COUNT.get() > 0 {
             num_callbacks = 1;
         } else {
-            num_callbacks = PUSH_BOUNDARY_COUNT;
-            if PUSH_BOUNDARY_CHARS_COUNT > 1 {
+            num_callbacks = PUSH_BOUNDARY_COUNT.get();
+            if PUSH_BOUNDARY_CHARS_COUNT.get() > 1 {
                 if options & XML_PARSE_HTML != 0 {
                     /*
                      * The HTML parser can generate a mix of chars and
                      * references.
                      */
-                    num_callbacks -= PUSH_BOUNDARY_CHARS_COUNT - 1;
+                    num_callbacks -= PUSH_BOUNDARY_CHARS_COUNT.get() - 1;
                 } else {
                     /*
                      * Allow two chars callbacks. This can happen when
@@ -2312,8 +2310,8 @@ unsafe fn push_boundary_test(
                 /*
                  * Allow multiple cdata callbacks in HTML mode.
                  */
-                if PUSH_BOUNDARY_CDATA_COUNT > 1 {
-                    num_callbacks -= PUSH_BOUNDARY_CDATA_COUNT - 1;
+                if PUSH_BOUNDARY_CDATA_COUNT.get() > 1 {
+                    num_callbacks -= PUSH_BOUNDARY_CDATA_COUNT.get() - 1;
                 }
             }
         }
@@ -2323,7 +2321,7 @@ unsafe fn push_boundary_test(
          * buffer is (almost) empty.
          */
         consumed = (*(*ctxt).input).consumed
-            + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as c_ulong;
+            + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
         if (*ctxt).instate != XmlParserInputState::XmlParserDTD
             && consumed >= 4
             && consumed != old_consumed
@@ -2338,7 +2336,7 @@ unsafe fn push_boundary_test(
                 /* Something related to script parsing. */
                 max = 3;
             } else if is_text != 0 {
-                let c: c_int = *(*(*ctxt).input).cur as i32;
+                let c: i32 = *(*(*ctxt).input).cur as i32;
 
                 /* 3 bytes for partial UTF-8 */
                 max = if c == b'<' as i32 || c == b'&' as i32 {
@@ -2448,10 +2446,10 @@ unsafe fn mem_parse_test(
     filename: &str,
     result: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     let mut base: *const c_char = null();
-    let mut size: c_int = 0;
+    let mut size: i32 = 0;
 
     NB_TESTS.set(NB_TESTS.get() + 1);
     /*
@@ -2470,7 +2468,7 @@ unsafe fn mem_parse_test(
     }
     (*doc).dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
     xml_free_doc(doc);
-    let res: c_int = compare_file_mem(
+    let res: i32 = compare_file_mem(
         result.as_deref().unwrap(),
         from_raw_parts(base as _, size as _),
     );
@@ -2501,10 +2499,10 @@ unsafe fn noent_parse_test(
     filename: &str,
     result: Option<String>,
     _err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     let mut doc: XmlDocPtr;
-    let mut res: c_int = 0;
+    let mut res: i32 = 0;
     let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS.set(NB_TESTS.get() + 1);
@@ -2558,12 +2556,12 @@ unsafe fn err_parse_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     let mut doc: XmlDocPtr;
     let mut base: *const c_char = null_mut();
-    let mut size: c_int = 0;
-    let mut res: c_int = 0;
+    let mut size: i32 = 0;
+    let mut res: i32 = 0;
     let cfilename = CString::new(filename).unwrap();
     let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
 
@@ -2649,8 +2647,8 @@ unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
 
     let mut name: *const XmlChar;
 
-    let typ: c_int = xml_text_reader_node_type(&mut *reader);
-    let empty: c_int = xml_text_reader_is_empty_element(&mut *reader);
+    let typ: i32 = xml_text_reader_node_type(&mut *reader);
+    let empty: i32 = xml_text_reader_is_empty_element(&mut *reader);
 
     name = xml_text_reader_const_name(&mut *reader);
     if name.is_null() {
@@ -2683,13 +2681,13 @@ unsafe fn stream_process_test(
     err: Option<String>,
     reader: XmlTextReaderPtr,
     rng: *const c_char,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     use exml::libxml::xmlreader::{
         xml_text_reader_is_valid, xml_text_reader_read, xml_text_reader_relaxng_validate,
     };
 
-    let mut ret: c_int;
+    let mut ret: i32;
     let mut temp = None;
 
     if reader.is_null() {
@@ -2791,14 +2789,14 @@ unsafe fn stream_parse_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
 
     let cfilename = CString::new(filename).unwrap();
 
     let reader: XmlTextReaderPtr = xml_reader_for_file(cfilename.as_ptr(), null_mut(), options);
-    let ret: c_int = stream_process_test(filename, result, err, reader, null_mut(), options);
+    let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
     xml_free_text_reader(reader);
     ret
 }
@@ -2818,8 +2816,8 @@ unsafe fn walker_parse_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_walker};
 
     let cfilename = CString::new(filename).unwrap();
@@ -2830,7 +2828,7 @@ unsafe fn walker_parse_test(
         return -1;
     }
     let reader: XmlTextReaderPtr = xml_reader_walker(doc);
-    let ret: c_int = stream_process_test(filename, result, err, reader, null_mut(), options);
+    let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
     xml_free_text_reader(reader);
     xml_free_doc(doc);
     ret
@@ -2851,12 +2849,12 @@ unsafe fn stream_mem_parse_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_memory};
 
     let mut base: *const c_char = null();
-    let mut size: c_int = 0;
+    let mut size: i32 = 0;
     let cfilename = CString::new(filename).unwrap();
 
     /*
@@ -2869,7 +2867,7 @@ unsafe fn stream_mem_parse_test(
     let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
     let reader: XmlTextReaderPtr =
         xml_reader_for_memory(buffer, cfilename.as_ptr(), null_mut(), options);
-    let ret: c_int = stream_process_test(filename, result, err, reader, null_mut(), options);
+    let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
     free(base as _);
     xml_free_text_reader(reader);
     ret
@@ -2884,7 +2882,7 @@ static XPATH_DOCUMENT: AtomicPtr<XmlDoc> = AtomicPtr::new(null_mut());
 fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
+unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     use std::sync::atomic::Ordering;
 
     use exml::libxml::{
@@ -2961,17 +2959,12 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: c_int, expr: c_int) {
  * Returns 0 in case of success, an error code otherwise
  */
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-unsafe fn xpath_common_test(
-    filename: &str,
-    result: Option<String>,
-    xptr: c_int,
-    expr: c_int,
-) -> c_int {
+unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, expr: i32) -> i32 {
     use std::io::{BufRead, BufReader};
 
     use exml::generic_error;
 
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
 
     let temp = result_filename(
         filename,
@@ -3052,8 +3045,8 @@ unsafe fn xpath_expr_test(
     filename: &str,
     result: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     xpath_common_test(filename, result, 0, 1)
 }
 
@@ -3073,8 +3066,8 @@ unsafe fn xpath_doc_test(
     filename: &str,
     _resul: Option<String>,
     _err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::{mem::zeroed, sync::atomic::Ordering};
 
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
@@ -3082,8 +3075,8 @@ unsafe fn xpath_doc_test(
     let mut pattern: [c_char; 500] = [0; 500];
     let mut result: [c_char; 500] = [0; 500];
     let mut globbuf: glob_t = unsafe { zeroed() };
-    let mut ret: c_int = 0;
-    let mut res: c_int;
+    let mut ret: i32 = 0;
+    let mut res: i32;
     let cfilename = CString::new(filename).unwrap();
 
     let xpath_document = xml_read_file(
@@ -3155,8 +3148,8 @@ unsafe fn xptr_doc_test(
     filename: &str,
     _resul: Option<String>,
     _err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::{mem::zeroed, sync::atomic::Ordering};
 
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
@@ -3164,8 +3157,8 @@ unsafe fn xptr_doc_test(
     let mut pattern: [c_char; 500] = [0; 500];
     let mut result: [c_char; 500] = [0; 500];
     let mut globbuf: glob_t = unsafe { zeroed() };
-    let mut ret: c_int = 0;
-    let mut res: c_int;
+    let mut ret: i32 = 0;
+    let mut res: i32;
     let subdir: *const c_char = if options == -1 {
         c"xptr-xp1".as_ptr()
     } else {
@@ -3244,12 +3237,12 @@ unsafe fn xmlid_doc_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::sync::atomic::Ordering;
 
-    let mut res: c_int = 0;
-    let mut ret: c_int;
+    let mut res: i32 = 0;
+    let mut ret: i32;
     let cfilename = CString::new(filename).unwrap();
 
     let xpath_document = xml_read_file(
@@ -3307,7 +3300,7 @@ unsafe fn xmlid_doc_test(
 }
 
 unsafe extern "C" fn handle_uri(str: *const c_char, base: *const c_char, o: &mut File) {
-    let ret: c_int;
+    let ret: i32;
     let mut res: *mut XmlChar = null_mut();
     let uri: XmlURIPtr = xml_create_uri();
 
@@ -3364,9 +3357,9 @@ unsafe fn uri_common_test(
     result: Option<String>,
     err: Option<String>,
     base: *const c_char,
-) -> c_int {
-    let mut res: c_int = 0;
-    let mut ret: c_int;
+) -> i32 {
+    let mut res: i32 = 0;
+    let mut ret: i32;
 
     let temp = result_filename(
         filename,
@@ -3456,8 +3449,8 @@ unsafe fn uri_parse_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     uri_common_test(filename, result, err, null_mut())
 }
 
@@ -3476,8 +3469,8 @@ unsafe fn uri_base_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     uri_common_test(
         filename,
         result,
@@ -3530,7 +3523,7 @@ thread_local! {
  *
  * Returns 1 if yes and 0 if another Input module should be used
  */
-unsafe fn urip_match(uri: &str) -> c_int {
+unsafe fn urip_match(uri: &str) -> i32 {
     const CATALOG_URL: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
     if uri == CATALOG_URL {
         return 0;
@@ -3573,7 +3566,7 @@ unsafe fn urip_open(uri: &str) -> *mut c_void {
  *
  * Returns 0 or -1 in case of error
  */
-unsafe extern "C" fn urip_close(context: *mut c_void) -> c_int {
+unsafe extern "C" fn urip_close(context: *mut c_void) -> i32 {
     if context.is_null() {
         return -1;
     }
@@ -3592,7 +3585,7 @@ unsafe extern "C" fn urip_close(context: *mut c_void) -> c_int {
  *
  * Returns the number of bytes read or -1 in case of error
  */
-unsafe extern "C" fn urip_read(context: *mut c_void, buffer: *mut c_char, mut len: c_int) -> c_int {
+unsafe extern "C" fn urip_read(context: *mut c_void, buffer: *mut c_char, mut len: i32) -> i32 {
     let ptr: *const c_char = context as *const c_char;
 
     if context.is_null() || buffer.is_null() || len < 0 {
@@ -3607,7 +3600,7 @@ unsafe extern "C" fn urip_read(context: *mut c_void, buffer: *mut c_char, mut le
     len
 }
 
-unsafe extern "C" fn urip_check_url(url: *const c_char) -> c_int {
+unsafe extern "C" fn urip_check_url(url: *const c_char) -> i32 {
     let doc: XmlDocPtr = xml_read_file(url, None, 0);
     if doc.is_null() {
         return -1;
@@ -3631,10 +3624,10 @@ unsafe fn uri_path_test(
     _filename: &str,
     _result: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
-    let mut parsed: c_int;
-    let mut failures: c_int = 0;
+    _options: i32,
+) -> i32 {
+    let mut parsed: i32;
+    let mut failures: i32 = 0;
 
     /*
      * register the new I/O handlers
@@ -3708,15 +3701,15 @@ unsafe fn schemas_one_test(
     sch: *const c_char,
     filename: *const c_char,
     result: *const c_char,
-    options: c_int,
+    options: i32,
     schemas: XmlSchemaPtr,
-) -> c_int {
+) -> i32 {
     use exml::libxml::xmlschemas::{
         xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt, xml_schema_set_valid_errors,
         xml_schema_validate_doc,
     };
 
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
 
     let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
@@ -3751,7 +3744,7 @@ unsafe fn schemas_one_test(
         Some(test_error_handler),
         Some(GenericErrorContext::new(ctxt)),
     );
-    let valid_result: c_int = xml_schema_validate_doc(ctxt, doc);
+    let valid_result: i32 = xml_schema_validate_doc(ctxt, doc);
     match valid_result.cmp(&0) {
         std::cmp::Ordering::Equal => {
             writeln!(
@@ -3813,8 +3806,8 @@ unsafe fn schemas_test(
     filename: &str,
     _resul: Option<String>,
     _errr: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::mem::zeroed;
 
     use exml::libxml::xmlschemas::{
@@ -3827,9 +3820,9 @@ unsafe fn schemas_test(
     let base = CString::new(base_filename(filename)).unwrap();
     let base = base.as_ptr();
     let mut instance: *const c_char;
-    let mut res: c_int = 0;
+    let mut res: i32 = 0;
     let mut len: usize;
-    let mut ret: c_int;
+    let mut ret: i32;
     let mut pattern: [c_char; 500] = [0; 500];
     let mut prefix: [c_char; 500] = [0; 500];
     let mut result: [c_char; 500] = [0; 500];
@@ -3964,15 +3957,15 @@ unsafe fn rng_one_test(
     sch: *const c_char,
     filename: *const c_char,
     result: *const c_char,
-    options: c_int,
+    options: i32,
     schemas: XmlRelaxNGPtr,
-) -> c_int {
+) -> i32 {
     use exml::libxml::relaxng::{
         xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_set_valid_errors,
         xml_relaxng_validate_doc, XmlRelaxNGValidCtxtPtr,
     };
 
-    let mut ret: c_int;
+    let mut ret: i32;
 
     let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
@@ -4058,8 +4051,8 @@ unsafe fn rng_test(
     filename: &str,
     _resul: Option<String>,
     _errr: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::mem::zeroed;
 
     use exml::libxml::relaxng::{
@@ -4072,9 +4065,9 @@ unsafe fn rng_test(
     let base = CString::new(base_filename(filename)).unwrap();
     let base = base.as_ptr();
     let mut instance: *const c_char;
-    let mut res: c_int;
+    let mut res: i32;
     let mut len: usize;
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
     let mut pattern: [c_char; 500] = [0; 500];
     let mut prefix: [c_char; 500] = [0; 500];
     let mut result: [c_char; 500] = [0; 500];
@@ -4211,8 +4204,8 @@ unsafe fn rng_stream_test(
     filename: &str,
     _resul: Option<String>,
     _errr: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::mem::zeroed;
 
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
@@ -4222,9 +4215,9 @@ unsafe fn rng_stream_test(
     let base = CString::new(base_filename(filename)).unwrap();
     let base = base.as_ptr();
     let mut instance: *const c_char;
-    let mut res: c_int = 0;
+    let mut res: i32 = 0;
     let mut len: usize;
-    let mut ret: c_int;
+    let mut ret: i32;
     let mut pattern: [c_char; 500] = [0; 500];
     let mut prefix: [c_char; 500] = [0; 500];
     let mut result: [c_char; 500] = [0; 500];
@@ -4232,7 +4225,7 @@ unsafe fn rng_stream_test(
     let mut globbuf: glob_t = unsafe { zeroed() };
     let mut count: c_char;
     let mut reader: XmlTextReaderPtr;
-    let mut disable_err: c_int = 0;
+    let mut disable_err: i32 = 0;
 
     /*
      * most of the mess is about the output filenames generated by the Makefile
@@ -4374,10 +4367,10 @@ unsafe extern "C" fn pattern_node(
     };
 
     let mut path: *mut XmlChar = null_mut();
-    let mut is_match: c_int = -1;
+    let mut is_match: i32 = -1;
 
-    let typ: c_int = xml_text_reader_node_type(&mut *reader);
-    let empty: c_int = xml_text_reader_is_empty_element(&mut *reader);
+    let typ: i32 = xml_text_reader_node_type(&mut *reader);
+    let empty: i32 = xml_text_reader_is_empty_element(&mut *reader);
 
     if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
         /* do the check only on element start */
@@ -4395,7 +4388,7 @@ unsafe extern "C" fn pattern_node(
         }
     }
     if !patstream.is_null() {
-        let mut ret: c_int;
+        let mut ret: i32;
 
         if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
             ret = xml_stream_push(
@@ -4452,8 +4445,8 @@ unsafe fn pattern_test(
     filename: &str,
     _resul: Option<String>,
     _err: Option<String>,
-    options: c_int,
-) -> c_int {
+    options: i32,
+) -> i32 {
     use std::sync::atomic::Ordering;
 
     use exml::{
@@ -4472,8 +4465,8 @@ unsafe fn pattern_test(
     let mut xml: [c_char; 500] = [0; 500];
     let mut result: [c_char; 500] = [0; 500];
     let mut len: usize;
-    let mut ret: c_int;
-    let mut res: c_int;
+    let mut ret: i32;
+    let mut res: i32;
     let cfilename = CString::new(filename).unwrap();
 
     let mut reader: XmlTextReaderPtr;
@@ -4830,12 +4823,12 @@ unsafe extern "C" fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
 #[cfg(feature = "libxml_c14n")]
 unsafe extern "C" fn c14n_run_test(
     xml_filename: *const c_char,
-    with_comments: c_int,
-    mode: c_int,
+    with_comments: i32,
+    mode: i32,
     xpath_filename: *const c_char,
     ns_filename: *const c_char,
     result_file: *const c_char,
-) -> c_int {
+) -> i32 {
     use exml::{
         globals::set_load_ext_dtd_default_value,
         libxml::{
@@ -4850,10 +4843,10 @@ unsafe extern "C" fn c14n_run_test(
 
     let mut xpath: XmlXPathObjectPtr = null_mut();
     let mut result: *mut XmlChar = null_mut();
-    let mut ret: c_int;
+    let mut ret: i32;
     let mut inclusive_namespaces: *mut *mut XmlChar = null_mut();
     let mut nslist: *const c_char = null_mut();
-    let mut nssize: c_int = 0;
+    let mut nssize: i32 = 0;
 
     /*
      * build an XML tree from a the file; we need to add default
@@ -4981,10 +4974,10 @@ unsafe extern "C" fn c14n_run_test(
 #[cfg(feature = "libxml_c14n")]
 unsafe fn c14n_common_test(
     filename: &str,
-    with_comments: c_int,
-    mode: c_int,
+    with_comments: i32,
+    mode: i32,
     subdir: *const c_char,
-) -> c_int {
+) -> i32 {
     use libc::strdup;
 
     let mut buf: [c_char; 500] = [0; 500];
@@ -4992,7 +4985,7 @@ unsafe fn c14n_common_test(
     let mut len: usize;
     let mut xpath: *mut c_char = null_mut();
     let mut ns: *mut c_char = null_mut();
-    let mut ret: c_int = 0;
+    let mut ret: i32 = 0;
     let cfilename = CString::new(filename).unwrap();
 
     let base = CString::new(base_filename(filename)).unwrap();
@@ -5062,8 +5055,8 @@ unsafe fn c14n_with_comment_test(
     filename: &str,
     _resul: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     use exml::libxml::c14n::XmlC14NMode;
 
     c14n_common_test(
@@ -5079,8 +5072,8 @@ unsafe fn c14n_without_comment_test(
     filename: &str,
     _resul: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     use exml::libxml::c14n::XmlC14NMode;
 
     c14n_common_test(
@@ -5096,8 +5089,8 @@ unsafe fn c14n_exc_without_comment_test(
     filename: &str,
     _resul: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     use exml::libxml::c14n::XmlC14NMode;
 
     c14n_common_test(
@@ -5113,8 +5106,8 @@ unsafe fn c14n11_without_comment_test(
     filename: &str,
     _resul: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     use exml::libxml::c14n::XmlC14NMode;
 
     c14n_common_test(
@@ -5135,7 +5128,7 @@ const MAX_ARGC: usize = 20;
 #[repr(C)]
 struct XmlThreadParams<'a> {
     filename: &'a CStr,
-    okay: c_int,
+    okay: i32,
 }
 
 #[cfg(all(feature = "thread", feature = "catalog"))]
@@ -5186,7 +5179,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         let my_doc: XmlDocPtr;
         let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
         let filename: *const c_char = (*params).filename.as_ptr();
-        let mut okay: c_int = 1;
+        let mut okay: i32 = 1;
 
         #[cfg(feature = "thread_alloc")]
         {
@@ -5239,12 +5232,12 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
 static TID: Mutex<[pthread_t; MAX_ARGC]> = Mutex::new([0; MAX_ARGC]);
 
 #[cfg(all(feature = "thread", feature = "catalog"))]
-unsafe extern "C" fn test_thread() -> c_int {
+unsafe extern "C" fn test_thread() -> i32 {
     use exml::libxml::catalog::{xml_catalog_cleanup, xml_load_catalog};
     use libc::{pthread_create, pthread_join};
 
-    let mut ret: c_int;
-    let mut res: c_int = 0;
+    let mut ret: i32;
+    let mut res: i32 = 0;
 
     xml_init_parser();
 
@@ -5296,8 +5289,8 @@ unsafe fn threads_test(
     _filename: &str,
     _resul: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     test_thread()
 }
 
@@ -5305,7 +5298,7 @@ unsafe fn threads_test(
 unsafe extern "C" fn test_regexp(output: &mut File, comp: XmlRegexpPtr, value: *const c_char) {
     use exml::libxml::xmlregexp::xml_regexp_exec;
 
-    let ret: c_int = xml_regexp_exec(comp, value as _);
+    let ret: i32 = xml_regexp_exec(comp, value as _);
     if ret == 1 {
         writeln!(output, "{}: Ok", CStr::from_ptr(value).to_string_lossy()).ok();
     } else if ret == 0 {
@@ -5326,8 +5319,8 @@ unsafe fn regexp_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     use std::io::{BufRead, BufReader};
 
     use exml::{
@@ -5336,8 +5329,8 @@ unsafe fn regexp_test(
     };
 
     let mut comp: XmlRegexpPtr = null_mut();
-    let mut ret: c_int;
-    let mut res: c_int = 0;
+    let mut ret: i32;
+    let mut res: i32 = 0;
 
     NB_TESTS.set(NB_TESTS.get() + 1);
 
@@ -5446,8 +5439,8 @@ unsafe fn regexp_test(
 }
 
 #[cfg(feature = "libxml_automata")]
-unsafe extern "C" fn scan_number(ptr: *mut *mut c_char) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn scan_number(ptr: *mut *mut c_char) -> i32 {
+    let mut ret: i32 = 0;
     let mut cur: *mut c_char;
 
     cur = *ptr;
@@ -5464,8 +5457,8 @@ unsafe fn automata_test(
     filename: &str,
     result: Option<String>,
     _err: Option<String>,
-    _options: c_int,
-) -> c_int {
+    _options: i32,
+) -> i32 {
     use std::io::{BufRead, BufReader};
 
     use exml::{
@@ -5484,8 +5477,8 @@ unsafe fn automata_test(
         },
     };
 
-    let mut ret: c_int;
-    let mut res: c_int = 0;
+    let mut ret: i32;
+    let mut res: i32 = 0;
     let mut am: XmlAutomataPtr;
     let mut states: [XmlAutomataStatePtr; 1000] = [null_mut(); 1000];
     let mut regexp: XmlRegexpPtr = null_mut();
@@ -5625,14 +5618,14 @@ unsafe fn automata_test(
                     states[to] = xml_automata_new_state(am);
                 }
                 ptr = ptr.add(1);
-                let min: c_int = scan_number(addr_of_mut!(ptr));
+                let min: i32 = scan_number(addr_of_mut!(ptr));
                 if *ptr != b' ' as i8 {
                     let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
                     generic_error!("Bad line {expr}\n");
                     break;
                 }
                 ptr = ptr.add(1);
-                let max: c_int = scan_number(addr_of_mut!(ptr));
+                let max: i32 = scan_number(addr_of_mut!(ptr));
                 if *ptr != b' ' as i8 {
                     let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
                     generic_error!("Bad line {expr}\n");
@@ -6229,12 +6222,12 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
     },
 ];
 
-unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
-    let mut res: c_int;
-    let mut err: c_int = 0;
+unsafe extern "C" fn launch_tests(tst: &TestDesc) -> i32 {
+    let mut res: i32;
+    let mut err: i32 = 0;
     let mut result;
     let mut error;
-    let mut mem: c_int;
+    let mut mem: i32;
 
     // let ebcdic_handler = get_encoding_handler(XmlCharEncoding::EBCDIC);
     // let euc_jp_handler = get_encoding_handler(XmlCharEncoding::EUCJP);
@@ -6313,14 +6306,14 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
     err
 }
 
-unsafe extern "C" fn runtest(i: usize) -> c_int {
-    let mut ret: c_int = 0;
+unsafe extern "C" fn runtest(i: usize) -> i32 {
+    let mut ret: i32 = 0;
 
     let old_errors = NB_ERRORS.get();
     let old_tests = NB_TESTS.get();
     let old_leaks = NB_LEAKS.get();
     println!("## {}", TEST_DESCRIPTIONS[i].desc);
-    let res: c_int = launch_tests(&TEST_DESCRIPTIONS[i]);
+    let res: i32 = launch_tests(&TEST_DESCRIPTIONS[i]);
     if res != 0 {
         ret += 1;
     }
@@ -6339,8 +6332,8 @@ unsafe extern "C" fn runtest(i: usize) -> c_int {
 
 #[test]
 fn main() {
-    let mut ret: c_int = 0;
-    let mut subset: c_int = 0;
+    let mut ret: i32 = 0;
+    let mut subset: i32 = 0;
 
     unsafe {
         initialize_libxml2();
