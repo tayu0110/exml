@@ -20,11 +20,10 @@ use crate::{
 
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
-    xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop_node_value_internal,
-    xml_is_blank_char, xml_new_doc_text_len, xml_node_set_content, xml_ns_in_scope,
-    xml_set_tree_doc, xml_text_merge, xml_tree_err_memory, XmlAttr, XmlAttrPtr,
-    XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs, XmlNsPtr,
-    XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_is_blank_char,
+    xml_new_doc_text_len, xml_node_set_content, xml_ns_in_scope, xml_set_tree_doc, xml_text_merge,
+    xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd,
+    XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -824,7 +823,7 @@ impl XmlNode {
                 ret
             }
             XmlElementType::XmlAttributeNode => {
-                xml_get_prop_node_value_internal(self as *const XmlNode as *const XmlAttr)
+                (*(self as *const XmlNode as *const XmlAttr)).get_prop_node_value_internal()
             }
             XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
                 if !self.content.is_null() {
@@ -1081,7 +1080,7 @@ impl XmlNode {
         if prop.is_null() {
             return null_mut();
         }
-        xml_get_prop_node_value_internal(prop)
+        (*prop).get_prop_node_value_internal()
     }
 
     /// Search and get the value of an attribute associated to a node.
@@ -1106,7 +1105,7 @@ impl XmlNode {
         if prop.is_null() {
             return null_mut();
         }
-        xml_get_prop_node_value_internal(prop)
+        (*prop).get_prop_node_value_internal()
     }
 
     /// Search and get the value of an attribute associated to a node
@@ -1127,7 +1126,7 @@ impl XmlNode {
         if prop.is_null() {
             return null_mut();
         }
-        xml_get_prop_node_value_internal(prop)
+        (*prop).get_prop_node_value_internal()
     }
 
     /// Search all the namespace applying to a given element.

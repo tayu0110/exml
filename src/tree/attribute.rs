@@ -11,9 +11,9 @@ use crate::{
 };
 
 use super::{
-    xml_free_prop, xml_new_prop_internal, xml_string_get_node_list, xml_tree_err_memory,
-    NodeCommon, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs,
-    XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    xml_free_prop, xml_new_prop_internal, xml_node_list_get_string, xml_string_get_node_list,
+    xml_tree_err_memory, NodeCommon, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr,
+    XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 /// An attribute on an XML node.
@@ -67,6 +67,37 @@ impl XmlAttr {
             tmp = (*tmp).next;
         }
         -1
+    }
+
+    pub(super) unsafe fn get_prop_node_value_internal(&self) -> *mut XmlChar {
+        if matches!(self.typ, XmlElementType::XmlAttributeNode) {
+            /*
+             * Note that we return at least the empty string.
+             *   TODO: Do we really always want that?
+             */
+            if !self.children.is_null() {
+                if (*self.children).next.is_null()
+                    && matches!(
+                        (*self.children).typ,
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                    )
+                {
+                    /*
+                     * Optimization for the common case: only 1 text node.
+                     */
+                    return xml_strdup((*self.children).content);
+                } else {
+                    let ret: *mut XmlChar = xml_node_list_get_string(self.doc, self.children, 1);
+                    if !ret.is_null() {
+                        return ret;
+                    }
+                }
+            }
+            return xml_strdup(c"".as_ptr() as _);
+        } else if matches!(self.typ, XmlElementType::XmlAttributeDecl) {
+            return xml_strdup((*(self as *const XmlAttr as XmlAttributePtr)).default_value);
+        }
+        null_mut()
     }
 }
 

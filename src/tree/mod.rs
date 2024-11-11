@@ -3481,40 +3481,6 @@ pub unsafe extern "C" fn xml_copy_namespace_list(mut cur: XmlNsPtr) -> XmlNsPtr 
 
 static XML_CHECK_DTD: AtomicI32 = AtomicI32::new(1);
 
-unsafe extern "C" fn xml_get_prop_node_value_internal(prop: *const XmlAttr) -> *mut XmlChar {
-    if prop.is_null() {
-        return null_mut();
-    }
-    if matches!((*prop).typ, XmlElementType::XmlAttributeNode) {
-        /*
-         * Note that we return at least the empty string.
-         *   TODO: Do we really always want that?
-         */
-        if !(*prop).children.is_null() {
-            if (*(*prop).children).next.is_null()
-                && matches!(
-                    (*(*prop).children).typ,
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-                )
-            {
-                /*
-                 * Optimization for the common case: only 1 text node.
-                 */
-                return xml_strdup((*(*prop).children).content);
-            } else {
-                let ret: *mut XmlChar = xml_node_list_get_string((*prop).doc, (*prop).children, 1);
-                if !ret.is_null() {
-                    return ret;
-                }
-            }
-        }
-        return xml_strdup(c"".as_ptr() as _);
-    } else if matches!((*prop).typ, XmlElementType::XmlAttributeDecl) {
-        return xml_strdup((*(prop as XmlAttributePtr)).default_value);
-    }
-    null_mut()
-}
-
 /**
  * xmlTreeErr:
  * @code:  the error number
