@@ -55,9 +55,8 @@ use crate::{
     },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
-        xml_new_doc_text, xml_node_list_get_string, xml_node_set_content, xml_split_qname2,
-        xml_validate_ncname, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode,
-        XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_new_doc_text, xml_node_list_get_string, xml_split_qname2, xml_validate_ncname,
+        NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -4107,7 +4106,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                             c"ns".as_ptr() as _,
                                             (*ns).href.load(Ordering::Relaxed),
                                         );
-                                        xml_node_set_content(cur, local);
+                                        (*cur).set_content(local);
                                     }
                                     xml_free(local as _);
                                     xml_free(prefix as _);

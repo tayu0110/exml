@@ -4232,71 +4232,6 @@ pub unsafe extern "C" fn xml_node_list_get_raw_string(
 }
 
 /**
- * xmlNodeSetContent:
- * @cur:  the node being modified
- * @content:  the new value of the content
- *
- * Replace the content of a node.
- * NOTE: @content is supposed to be a piece of XML CDATA, so it allows entity
- *       references, but XML special chars need to be escaped first by using
- *       xmlEncodeEntitiesReentrant() resp. xmlEncodeSpecialChars().
- */
-pub unsafe extern "C" fn xml_node_set_content(cur: XmlNodePtr, content: *const XmlChar) {
-    if cur.is_null() {
-        return;
-    }
-    match (*cur).typ {
-        XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlElementNode
-        | XmlElementType::XmlAttributeNode => {
-            if !(*cur).children.is_null() {
-                xml_free_node_list((*cur).children);
-            }
-            (*cur).children = xml_string_get_node_list((*cur).doc, content);
-            UPDATE_LAST_CHILD_AND_PARENT!(cur);
-        }
-        XmlElementType::XmlTextNode
-        | XmlElementType::XmlCDATASectionNode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPINode
-        | XmlElementType::XmlCommentNode => {
-            if !(*cur).content.is_null()
-                && ((*cur).content != addr_of_mut!((*cur).properties) as _)
-                && !(!(*cur).doc.is_null()
-                    && !(*(*cur).doc).dict.is_null()
-                    && xml_dict_owns((*(*cur).doc).dict, (*cur).content) != 0)
-            {
-                xml_free((*cur).content as _);
-            }
-            if !(*cur).children.is_null() {
-                xml_free_node_list((*cur).children);
-            }
-            (*cur).last = null_mut();
-            (*cur).children = null_mut();
-            if !content.is_null() {
-                (*cur).content = xml_strdup(content);
-            } else {
-                (*cur).content = null_mut();
-            }
-            (*cur).properties = null_mut();
-        }
-        XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlHTMLDocumentNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlXIncludeStart
-        | XmlElementType::XmlXIncludeEnd => {}
-        XmlElementType::XmlNotationNode => {}
-        XmlElementType::XmlDTDNode => {}
-        XmlElementType::XmlNamespaceDecl => {}
-        XmlElementType::XmlElementDecl => { /* TODO !!! */ }
-        XmlElementType::XmlAttributeDecl => { /* TODO !!! */ }
-        XmlElementType::XmlEntityDecl => { /* TODO !!! */ }
-        _ => unreachable!(),
-    }
-}
-
-/**
  * xmlBufGetNodeContent:
  * @buf:  a buffer xmlBufPtr
  * @cur:  the node being read
@@ -9037,35 +8972,6 @@ mod tests {
                             eprint!(" {}", n_list);
                             eprintln!(" {}", n_in_line);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_set_content() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    xml_node_set_content(cur, content);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNodeSetContent",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeSetContent()");
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_content);
                     }
                 }
             }

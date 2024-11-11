@@ -15,15 +15,15 @@ use crate::{
             xml_strncat_new, xml_strncmp, XmlChar,
         },
     },
-    tree::XmlAttributePtr,
+    tree::{xml_free_node_list, xml_string_get_node_list, XmlAttributePtr},
 };
 
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
     xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_is_blank_char,
-    xml_new_doc_text_len, xml_node_set_content, xml_ns_in_scope, xml_set_tree_doc, xml_text_merge,
-    xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd,
-    XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_new_doc_text_len, xml_ns_in_scope, xml_set_tree_doc, xml_text_merge, xml_tree_err_memory,
+    XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType,
+    XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -1611,6 +1611,75 @@ impl XmlNode {
     /// Replace the content of a node.
     ///
     /// # Note
+    /// `content` is supposed to be a piece of XML CDATA, so it allows entity references,
+    /// but XML special chars need to be escaped first by using `xmlEncodeEntitiesReentrant()`
+    /// resp. `xmlEncodeSpecialChars()`.
+    #[doc(alias = "xmlNodeSetContent")]
+    pub unsafe fn set_content(&mut self, content: *const XmlChar) {
+        match self.typ {
+            XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlElementNode
+            | XmlElementType::XmlAttributeNode => {
+                if !self.children.is_null() {
+                    xml_free_node_list(self.children);
+                }
+                self.children = xml_string_get_node_list(self.doc, content);
+                let mut ulccur: XmlNodePtr = self.children;
+                if ulccur.is_null() {
+                    self.last = null_mut();
+                } else {
+                    while !(*ulccur).next.is_null() {
+                        (*ulccur).parent = self;
+                        ulccur = (*ulccur).next;
+                    }
+                    (*ulccur).parent = self;
+                    self.last = ulccur;
+                }
+            }
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode => {
+                if !self.content.is_null()
+                    && (self.content != &raw mut self.properties as _)
+                    && !(!self.doc.is_null()
+                        && !(*self.doc).dict.is_null()
+                        && xml_dict_owns((*self.doc).dict, self.content) != 0)
+                {
+                    xml_free(self.content as _);
+                }
+                if !self.children.is_null() {
+                    xml_free_node_list(self.children);
+                }
+                self.last = null_mut();
+                self.children = null_mut();
+                if !content.is_null() {
+                    self.content = xml_strdup(content);
+                } else {
+                    self.content = null_mut();
+                }
+                self.properties = null_mut();
+            }
+            XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
+            XmlElementType::XmlNotationNode => {}
+            XmlElementType::XmlDTDNode => {}
+            XmlElementType::XmlNamespaceDecl => {}
+            XmlElementType::XmlElementDecl => { /* TODO !!! */ }
+            XmlElementType::XmlAttributeDecl => { /* TODO !!! */ }
+            XmlElementType::XmlEntityDecl => { /* TODO !!! */ }
+            _ => unreachable!(),
+        }
+    }
+
+    /// Replace the content of a node.
+    ///
+    /// # Note
     /// `content` is supposed to be a piece of XML CDATA, so it allows entity
     /// references, but XML special chars need to be escaped first by using
     /// xmlEncodeEntitiesReentrant() resp. xmlEncodeSpecialChars().
@@ -1827,12 +1896,9 @@ impl XmlNode {
         feature = "xinclude"
     ))]
     pub unsafe fn add_prev_sibling(&mut self, elem: XmlNodePtr) -> XmlNodePtr {
-        use crate::{
-            libxml::{
-                globals::xml_free,
-                xmlstring::{xml_strcat, xml_strdup},
-            },
-            tree::xml_node_set_content,
+        use crate::libxml::{
+            globals::xml_free,
+            xmlstring::{xml_strcat, xml_strdup},
         };
 
         if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
@@ -1854,7 +1920,7 @@ impl XmlNode {
 
                 tmp = xml_strdup((*elem).content);
                 tmp = xml_strcat(tmp, self.content);
-                xml_node_set_content(self, tmp);
+                self.set_content(tmp);
                 xml_free(tmp as _);
                 xml_free_node(elem);
                 return self as *mut XmlNode;
@@ -1926,7 +1992,7 @@ impl XmlNode {
 
                 tmp = xml_strdup((*elem).content);
                 tmp = xml_strcat(tmp, (*self.next).content);
-                xml_node_set_content(self.next, tmp);
+                (*self.next).set_content(tmp);
                 xml_free(tmp as _);
                 xml_free_node(elem);
                 return self.next;

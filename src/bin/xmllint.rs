@@ -94,8 +94,7 @@ use exml::{
     },
     tree::{
         set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
-        xml_node_set_content, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-        XmlEnumerationPtr, XmlNodePtr,
+        NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -2386,7 +2385,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if GENERATE != 0 {
                 doc = xml_new_doc(Some("1.0"));
                 let n = xml_new_doc_node(doc, null_mut(), c"info".as_ptr() as _, null_mut());
-                xml_node_set_content(n, c"abc".as_ptr() as _);
+                (*n).set_content(c"abc".as_ptr() as _);
                 (*doc).set_root_element(n);
             }
         }
