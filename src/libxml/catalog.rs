@@ -4425,17 +4425,13 @@ pub unsafe extern "C" fn xml_catalog_get_public(pub_id: *const XmlChar) -> *cons
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
-
     #[test]
     fn test_xml_acatalog_add() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4479,7 +4475,7 @@ mod tests {
 
     #[test]
     fn test_xml_acatalog_dump() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(all(feature = "catalog", feature = "output"))]
         unsafe {
             let mut leaks = 0;
@@ -4512,7 +4508,7 @@ mod tests {
 
     #[test]
     fn test_xml_acatalog_remove() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4546,7 +4542,7 @@ mod tests {
 
     #[test]
     fn test_xml_acatalog_resolve() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4588,7 +4584,7 @@ mod tests {
 
     #[test]
     fn test_xml_acatalog_resolve_public() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4625,7 +4621,7 @@ mod tests {
 
     #[test]
     fn test_xml_acatalog_resolve_system() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4662,7 +4658,7 @@ mod tests {
 
     #[test]
     fn test_xml_acatalog_resolve_uri() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4699,7 +4695,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_add() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4738,7 +4734,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_cleanup() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             xml_catalog_cleanup();
@@ -4749,7 +4745,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_convert() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let ret_val = xml_catalog_convert();
@@ -4761,7 +4757,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_dump() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(all(feature = "catalog", feature = "output"))]
         unsafe {
             let mut leaks = 0;
@@ -4789,7 +4785,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_get_defaults() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4816,7 +4812,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_is_empty() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4845,7 +4841,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_local_resolve() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4887,7 +4883,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_local_resolve_uri() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4924,7 +4920,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_remove() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
@@ -4941,7 +4937,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_resolve() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             for n_pub_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
@@ -4962,7 +4958,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_resolve_public() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -4994,7 +4990,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_resolve_system() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5026,7 +5022,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_resolve_uri() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5058,7 +5054,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_set_default_prefer() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5090,7 +5086,7 @@ mod tests {
 
     #[test]
     fn test_xml_catalog_set_defaults() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5121,7 +5117,7 @@ mod tests {
 
     #[test]
     fn test_xml_convert_sgmlcatalog() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5153,7 +5149,7 @@ mod tests {
 
     #[test]
     fn test_xml_initialize_catalog() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;
@@ -5179,7 +5175,7 @@ mod tests {
 
     #[test]
     fn test_xml_load_catalog() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             for n_filename in 0..GEN_NB_FILEPATH {
@@ -5196,7 +5192,7 @@ mod tests {
 
     #[test]
     fn test_xml_load_catalogs() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             for n_pathss in 0..GEN_NB_CONST_CHAR_PTR {
@@ -5212,7 +5208,7 @@ mod tests {
 
     #[test]
     fn test_xml_parse_catalog_file() {
-        let lock = TEST_LOCK.lock().unwrap();
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
         unsafe {
             let mut leaks = 0;

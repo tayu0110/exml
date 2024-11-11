@@ -2290,6 +2290,7 @@ mod tests {
 
     #[test]
     fn test_xml_no_net_external_entity_loader() {
+        let lock = TEST_CATALOG_LOCK.lock().unwrap();
         unsafe {
             let mut leaks = 0;
 
@@ -2325,6 +2326,7 @@ mod tests {
                 }
             }
         }
+        drop(lock);
     }
 
     #[test]

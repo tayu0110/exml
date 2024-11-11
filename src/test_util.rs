@@ -3,6 +3,7 @@ use std::{
     ffi::{c_char, CStr},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
+    sync::Mutex,
 };
 
 use libc::{fclose, fopen, snprintf, FILE};
@@ -59,6 +60,8 @@ use crate::{
         XmlNotationPtr, XmlNs, XmlNsPtr,
     },
 };
+
+pub(crate) static TEST_CATALOG_LOCK: Mutex<()> = Mutex::new(());
 
 thread_local! {
     static CHARTAB: RefCell<[XmlChar; 1024]> = const { RefCell::new([0; 1024]) };
