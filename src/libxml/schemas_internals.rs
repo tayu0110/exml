@@ -41,26 +41,26 @@ pub enum XmlSchemaValType {
     XmlSchemasName = 20,
     XmlSchemasQname = 21,
     XmlSchemasNcname = 22,
-    XmlSchemasId = 23,
-    XmlSchemasIdref = 24,
-    XmlSchemasIdrefs = 25,
+    XmlSchemasID = 23,
+    XmlSchemasIDREF = 24,
+    XmlSchemasIDREFS = 25,
     XmlSchemasEntity = 26,
     XmlSchemasEntities = 27,
     XmlSchemasNotation = 28,
-    XmlSchemasAnyuri = 29,
+    XmlSchemasAnyURI = 29,
     XmlSchemasInteger = 30,
-    XmlSchemasNpinteger = 31,
-    XmlSchemasNinteger = 32,
-    XmlSchemasNninteger = 33,
-    XmlSchemasPinteger = 34,
+    XmlSchemasNPInteger = 31,
+    XmlSchemasNInteger = 32,
+    XmlSchemasNNInteger = 33,
+    XmlSchemasPInteger = 34,
     XmlSchemasInt = 35,
-    XmlSchemasUint = 36,
+    XmlSchemasUInt = 36,
     XmlSchemasLong = 37,
-    XmlSchemasUlong = 38,
+    XmlSchemasULong = 38,
     XmlSchemasShort = 39,
-    XmlSchemasUshort = 40,
+    XmlSchemasUShort = 40,
     XmlSchemasByte = 41,
-    XmlSchemasUbyte = 42,
+    XmlSchemasUByte = 42,
     XmlSchemasHexbinary = 43,
     XmlSchemasBase64binary = 44,
     XmlSchemasAnytype = 45,
@@ -122,46 +122,46 @@ impl TryFrom<i32> for XmlSchemaValType {
             Ok(Self::XmlSchemasQname)
         } else if value == Self::XmlSchemasNcname as i32 {
             Ok(Self::XmlSchemasNcname)
-        } else if value == Self::XmlSchemasId as i32 {
-            Ok(Self::XmlSchemasId)
-        } else if value == Self::XmlSchemasIdref as i32 {
-            Ok(Self::XmlSchemasIdref)
-        } else if value == Self::XmlSchemasIdrefs as i32 {
-            Ok(Self::XmlSchemasIdrefs)
+        } else if value == Self::XmlSchemasID as i32 {
+            Ok(Self::XmlSchemasID)
+        } else if value == Self::XmlSchemasIDREF as i32 {
+            Ok(Self::XmlSchemasIDREF)
+        } else if value == Self::XmlSchemasIDREFS as i32 {
+            Ok(Self::XmlSchemasIDREFS)
         } else if value == Self::XmlSchemasEntity as i32 {
             Ok(Self::XmlSchemasEntity)
         } else if value == Self::XmlSchemasEntities as i32 {
             Ok(Self::XmlSchemasEntities)
         } else if value == Self::XmlSchemasNotation as i32 {
             Ok(Self::XmlSchemasNotation)
-        } else if value == Self::XmlSchemasAnyuri as i32 {
-            Ok(Self::XmlSchemasAnyuri)
+        } else if value == Self::XmlSchemasAnyURI as i32 {
+            Ok(Self::XmlSchemasAnyURI)
         } else if value == Self::XmlSchemasInteger as i32 {
             Ok(Self::XmlSchemasInteger)
-        } else if value == Self::XmlSchemasNpinteger as i32 {
-            Ok(Self::XmlSchemasNpinteger)
-        } else if value == Self::XmlSchemasNinteger as i32 {
-            Ok(Self::XmlSchemasNinteger)
-        } else if value == Self::XmlSchemasNninteger as i32 {
-            Ok(Self::XmlSchemasNninteger)
-        } else if value == Self::XmlSchemasPinteger as i32 {
-            Ok(Self::XmlSchemasPinteger)
+        } else if value == Self::XmlSchemasNPInteger as i32 {
+            Ok(Self::XmlSchemasNPInteger)
+        } else if value == Self::XmlSchemasNInteger as i32 {
+            Ok(Self::XmlSchemasNInteger)
+        } else if value == Self::XmlSchemasNNInteger as i32 {
+            Ok(Self::XmlSchemasNNInteger)
+        } else if value == Self::XmlSchemasPInteger as i32 {
+            Ok(Self::XmlSchemasPInteger)
         } else if value == Self::XmlSchemasInt as i32 {
             Ok(Self::XmlSchemasInt)
-        } else if value == Self::XmlSchemasUint as i32 {
-            Ok(Self::XmlSchemasUint)
+        } else if value == Self::XmlSchemasUInt as i32 {
+            Ok(Self::XmlSchemasUInt)
         } else if value == Self::XmlSchemasLong as i32 {
             Ok(Self::XmlSchemasLong)
-        } else if value == Self::XmlSchemasUlong as i32 {
-            Ok(Self::XmlSchemasUlong)
+        } else if value == Self::XmlSchemasULong as i32 {
+            Ok(Self::XmlSchemasULong)
         } else if value == Self::XmlSchemasShort as i32 {
             Ok(Self::XmlSchemasShort)
-        } else if value == Self::XmlSchemasUshort as i32 {
-            Ok(Self::XmlSchemasUshort)
+        } else if value == Self::XmlSchemasUShort as i32 {
+            Ok(Self::XmlSchemasUShort)
         } else if value == Self::XmlSchemasByte as i32 {
             Ok(Self::XmlSchemasByte)
-        } else if value == Self::XmlSchemasUbyte as i32 {
-            Ok(Self::XmlSchemasUbyte)
+        } else if value == Self::XmlSchemasUByte as i32 {
+            Ok(Self::XmlSchemasUByte)
         } else if value == Self::XmlSchemasHexbinary as i32 {
             Ok(Self::XmlSchemasHexbinary)
         } else if value == Self::XmlSchemasBase64binary as i32 {
@@ -206,9 +206,9 @@ pub enum XmlSchemaTypeType {
     XmlSchemaTypeList,
     XmlSchemaTypeUnion,
     XmlSchemaTypeAnyAttribute,
-    XmlSchemaTypeIdcUnique,
-    XmlSchemaTypeIdcKey,
-    XmlSchemaTypeIdcKeyref,
+    XmlSchemaTypeIDCUnique,
+    XmlSchemaTypeIDCKey,
+    XmlSchemaTypeIDCKeyref,
     XmlSchemaTypeParticle = 25,
     XmlSchemaTypeAttributeUse,
     XmlSchemaFacetMininclusive = 1000,

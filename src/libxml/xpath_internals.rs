@@ -1183,7 +1183,7 @@ unsafe extern "C" fn xml_xpath_debug_dump_node(output: *mut FILE, cur: XmlNodePt
     }
 
     if (*cur).typ == XmlElementType::XmlDocumentNode
-        || (*cur).typ == XmlElementType::XmlHtmlDocumentNode
+        || (*cur).typ == XmlElementType::XmlHTMLDocumentNode
     {
         fprintf(output, c"%s".as_ptr(), shift.as_ptr());
         fprintf(output, c" /\n".as_ptr());
@@ -3657,9 +3657,9 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                 misc = 1;
             }
             XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlPiNode => {
+            | XmlElementType::XmlPINode => {
                 misc_node1 = node1;
                 /*
                  * Find nearest element node.
@@ -3716,9 +3716,9 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                 misc = 1;
             }
             XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlPiNode => {
+            | XmlElementType::XmlPINode => {
                 misc_node2 = node2;
                 if !(*node2).prev.is_null() {
                     loop {
@@ -4415,7 +4415,7 @@ pub enum XmlXPathTypeVal {
     NodeTypeNode = 0,
     NodeTypeComment = XmlElementType::XmlCommentNode as isize,
     NodeTypeText = XmlElementType::XmlTextNode as isize,
-    NodeTypePI = XmlElementType::XmlPiNode as isize,
+    NodeTypePI = XmlElementType::XmlPINode as isize,
 }
 
 impl TryFrom<i32> for XmlXPathTypeVal {
@@ -6278,25 +6278,25 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
             XmlElementType::XmlElementNode
             | XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlHtmlDocumentNode => {
+            | XmlElementType::XmlHTMLDocumentNode => {
                 cur = (*ctxt).node;
             }
             XmlElementType::XmlAttributeNode
             | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlDTDNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
             | XmlElementType::XmlEntityDecl
             | XmlElementType::XmlNamespaceDecl
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => {}
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
             _ => unreachable!(),
         }
         limit = cur;
@@ -6350,9 +6350,9 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                     match (*cur).typ {
                         XmlElementType::XmlElementNode
                         | XmlElementType::XmlTextNode
-                        | XmlElementType::XmlCdataSectionNode
+                        | XmlElementType::XmlCDATASectionNode
                         | XmlElementType::XmlCommentNode
-                        | XmlElementType::XmlPiNode => 'to_break: {
+                        | XmlElementType::XmlPINode => 'to_break: {
                             ret = if matches!((*cur).typ, XmlElementType::XmlElementNode) {
                                 xml_stream_push(
                                     patstream,
@@ -6392,7 +6392,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                     cur = (*cur).next;
                                     if !matches!(
                                         (*cur).typ,
-                                        XmlElementType::XmlEntityDecl | XmlElementType::XmlDtdNode
+                                        XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
                                     ) {
                                         // goto next_node;
                                         continue 'next_node;
@@ -6419,7 +6419,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                         /*
                          * Skip DTDs
                          */
-                        if !matches!((*cur).typ, XmlElementType::XmlDtdNode) {
+                        if !matches!((*cur).typ, XmlElementType::XmlDTDNode) {
                             break 'to_continue_main;
                         }
                     }
@@ -6433,7 +6433,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                     cur = (*cur).next;
                     if !matches!(
                         (*cur).typ,
-                        XmlElementType::XmlEntityDecl | XmlElementType::XmlDtdNode
+                        XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
                     ) {
                         // goto next_node;
                         continue 'next_node;
@@ -6458,9 +6458,9 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                         && matches!(
                             (*cur).typ,
                             XmlElementType::XmlTextNode
-                                | XmlElementType::XmlCdataSectionNode
+                                | XmlElementType::XmlCDATASectionNode
                                 | XmlElementType::XmlCommentNode
-                                | XmlElementType::XmlPiNode
+                                | XmlElementType::XmlPINode
                         ))
                 {
                     // ret =
@@ -6796,7 +6796,7 @@ unsafe extern "C" fn xml_xpath_next_child_element(
                 }
                 return null_mut();
             }
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 return (*(cur as XmlDocPtr)).get_root_element();
             }
             _ => {
@@ -6812,10 +6812,10 @@ unsafe extern "C" fn xml_xpath_next_child_element(
         | XmlElementType::XmlTextNode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlCdataSectionNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlCDATASectionNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlXincludeEnd => {}
+        | XmlElementType::XmlXIncludeEnd => {}
         /* case XML_DTD_NODE: */ /* URGENT TODO: DTD-node as well? */
         _ => {
             return null_mut();
@@ -6882,7 +6882,7 @@ unsafe extern "C" fn xml_xpath_next_preceding_internal(
     if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
-    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDtdNode) {
+    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDTDNode) {
         cur = (*cur).prev;
     }
     while (*cur).prev.is_null() {
@@ -7552,12 +7552,12 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                     if matches!(typ, XmlXPathTypeVal::NodeTypeNode) {
                         match (*cur).typ {
                             XmlElementType::XmlDocumentNode
-                            | XmlElementType::XmlHtmlDocumentNode
+                            | XmlElementType::XmlHTMLDocumentNode
                             | XmlElementType::XmlElementNode
                             | XmlElementType::XmlAttributeNode
-                            | XmlElementType::XmlPiNode
+                            | XmlElementType::XmlPINode
                             | XmlElementType::XmlCommentNode
-                            | XmlElementType::XmlCdataSectionNode
+                            | XmlElementType::XmlCDATASectionNode
                             | XmlElementType::XmlTextNode => {
                                 xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             }
@@ -7578,13 +7578,13 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                             xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
                     } else if matches!(typ, XmlXPathTypeVal::NodeTypeText)
-                        && matches!((*cur).typ, XmlElementType::XmlCdataSectionNode)
+                        && matches!((*cur).typ, XmlElementType::XmlCDATASectionNode)
                     {
                         xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                     }
                 }
                 XmlXPathTestVal::NodeTestPI => {
-                    if matches!((*cur).typ, XmlElementType::XmlPiNode)
+                    if matches!((*cur).typ, XmlElementType::XmlPINode)
                         && (name.is_null() || xml_str_equal(name, (*cur).name))
                     {
                         xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
@@ -10364,8 +10364,8 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
 
     match (*node).typ {
         XmlElementType::XmlCommentNode
-        | XmlElementType::XmlPiNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlPINode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlTextNode => {
             string = (*node).content;
             if string.is_null() {
@@ -10398,7 +10398,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
     }
     while !tmp.is_null() {
         match (*tmp).typ {
-            XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
+            XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
                 string = (*tmp).content;
             }
             _ => {
@@ -10419,7 +10419,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
         /*
          * Skip to next node
          */
-        if (!(*tmp).children.is_null() && !matches!((*tmp).typ, XmlElementType::XmlDtdNode))
+        if (!(*tmp).children.is_null() && !matches!((*tmp).typ, XmlElementType::XmlDTDNode))
             && !matches!((*(*tmp).children).typ, XmlElementType::XmlEntityDecl)
         {
             tmp = (*tmp).children;
@@ -11792,19 +11792,19 @@ pub unsafe extern "C" fn xml_xpath_next_child(
         match (*(*(*ctxt).context).node).typ {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlDtdNode => {
+            | XmlElementType::XmlDTDNode => {
                 return (*(*(*ctxt).context).node).children;
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlHtmlDocumentNode => {
+            | XmlElementType::XmlHTMLDocumentNode => {
                 return (*((*(*ctxt).context).node as XmlDocPtr)).children;
             }
             XmlElementType::XmlElementDecl
@@ -11812,8 +11812,8 @@ pub unsafe extern "C" fn xml_xpath_next_child(
             | XmlElementType::XmlEntityDecl
             | XmlElementType::XmlAttributeNode
             | XmlElementType::XmlNamespaceDecl
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => {
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
                 return null_mut();
             }
             _ => unreachable!(),
@@ -11821,7 +11821,7 @@ pub unsafe extern "C" fn xml_xpath_next_child(
     }
     if matches!(
         (*cur).typ,
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
     ) {
         return null_mut();
     }
@@ -11875,7 +11875,7 @@ pub unsafe extern "C" fn xml_xpath_next_descendant(
             /*
              * Skip DTDs
              */
-            if !matches!((*cur).typ, XmlElementType::XmlDtdNode) {
+            if !matches!((*cur).typ, XmlElementType::XmlDTDNode) {
                 return cur;
             }
         }
@@ -11889,7 +11889,7 @@ pub unsafe extern "C" fn xml_xpath_next_descendant(
         cur = (*cur).next;
         if !matches!(
             (*cur).typ,
-            XmlElementType::XmlEntityDecl | XmlElementType::XmlDtdNode
+            XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
         ) {
             return cur;
         }
@@ -11980,17 +11980,17 @@ pub unsafe extern "C" fn xml_xpath_next_parent(
         match (*(*(*ctxt).context).node).typ {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlDTDNode
             | XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd
             | XmlElementType::XmlEntityDecl => {
                 if (*(*(*ctxt).context).node).parent.is_null() {
                     return (*(*ctxt).context).doc as XmlNodePtr;
@@ -12016,7 +12016,7 @@ pub unsafe extern "C" fn xml_xpath_next_parent(
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlHtmlDocumentNode => {
+            | XmlElementType::XmlHTMLDocumentNode => {
                 return null_mut();
             }
             XmlElementType::XmlNamespaceDecl => {
@@ -12354,7 +12354,7 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
-    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDtdNode) {
+    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDTDNode) {
         cur = (*cur).prev;
     }
     loop {
@@ -12413,18 +12413,18 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
         match (*(*(*ctxt).context).node).typ {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlDTDNode
             | XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
             | XmlElementType::XmlEntityDecl
             | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => {
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
                 if (*(*(*ctxt).context).node).parent.is_null() {
                     return (*(*ctxt).context).doc as XmlNodePtr;
                 }
@@ -12449,7 +12449,7 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlHtmlDocumentNode => {
+            | XmlElementType::XmlHTMLDocumentNode => {
                 return null_mut();
             }
             XmlElementType::XmlNamespaceDecl => {
@@ -12478,18 +12478,18 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
     match (*cur).typ {
         XmlElementType::XmlElementNode
         | XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode
         | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDtdNode
+        | XmlElementType::XmlDTDNode
         | XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {
             if (*cur).parent.is_null() {
                 return null_mut();
             }
@@ -12523,7 +12523,7 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
         XmlElementType::XmlDocumentNode
         | XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlHtmlDocumentNode => null_mut(),
+        | XmlElementType::XmlHTMLDocumentNode => null_mut(),
         _ => unreachable!(),
     }
 }
@@ -12559,7 +12559,7 @@ pub unsafe extern "C" fn xml_xpath_next_preceding_sibling(
     if cur.is_null() {
         return (*(*(*ctxt).context).node).prev;
     }
-    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDtdNode) {
+    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDTDNode) {
         cur = (*cur).prev;
         if cur.is_null() {
             return (*(*(*ctxt).context).node).prev;
@@ -12884,7 +12884,7 @@ pub unsafe extern "C" fn xml_xpath_local_name_function(
         match (*(*(*(*cur).nodesetval).node_tab.add(i as usize))).typ {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlAttributeNode
-            | XmlElementType::XmlPiNode => {
+            | XmlElementType::XmlPINode => {
                 if *(*(*(*(*cur).nodesetval).node_tab.add(i as usize)))
                     .name
                     .add(0)

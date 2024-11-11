@@ -132,23 +132,23 @@ pub enum XmlElementType {
     XmlElementNode = 1,
     XmlAttributeNode = 2,
     XmlTextNode = 3,
-    XmlCdataSectionNode = 4,
+    XmlCDATASectionNode = 4,
     XmlEntityRefNode = 5,
     XmlEntityNode = 6,
-    XmlPiNode = 7,
+    XmlPINode = 7,
     XmlCommentNode = 8,
     XmlDocumentNode = 9,
     XmlDocumentTypeNode = 10,
     XmlDocumentFragNode = 11,
     XmlNotationNode = 12,
-    XmlHtmlDocumentNode = 13,
-    XmlDtdNode = 14,
+    XmlHTMLDocumentNode = 13,
+    XmlDTDNode = 14,
     XmlElementDecl = 15,
     XmlAttributeDecl = 16,
     XmlEntityDecl = 17,
     XmlNamespaceDecl = 18,
-    XmlXincludeStart = 19,
-    XmlXincludeEnd = 20,
+    XmlXIncludeStart = 19,
+    XmlXIncludeEnd = 20,
 }
 
 impl TryFrom<i32> for XmlElementType {
@@ -160,14 +160,14 @@ impl TryFrom<i32> for XmlElementType {
             Ok(Self::XmlAttributeNode)
         } else if value == Self::XmlTextNode as i32 {
             Ok(Self::XmlTextNode)
-        } else if value == Self::XmlCdataSectionNode as i32 {
-            Ok(Self::XmlCdataSectionNode)
+        } else if value == Self::XmlCDATASectionNode as i32 {
+            Ok(Self::XmlCDATASectionNode)
         } else if value == Self::XmlEntityRefNode as i32 {
             Ok(Self::XmlEntityRefNode)
         } else if value == Self::XmlEntityNode as i32 {
             Ok(Self::XmlEntityNode)
-        } else if value == Self::XmlPiNode as i32 {
-            Ok(Self::XmlPiNode)
+        } else if value == Self::XmlPINode as i32 {
+            Ok(Self::XmlPINode)
         } else if value == Self::XmlCommentNode as i32 {
             Ok(Self::XmlCommentNode)
         } else if value == Self::XmlDocumentNode as i32 {
@@ -178,10 +178,10 @@ impl TryFrom<i32> for XmlElementType {
             Ok(Self::XmlDocumentFragNode)
         } else if value == Self::XmlNotationNode as i32 {
             Ok(Self::XmlNotationNode)
-        } else if value == Self::XmlHtmlDocumentNode as i32 {
-            Ok(Self::XmlHtmlDocumentNode)
-        } else if value == Self::XmlDtdNode as i32 {
-            Ok(Self::XmlDtdNode)
+        } else if value == Self::XmlHTMLDocumentNode as i32 {
+            Ok(Self::XmlHTMLDocumentNode)
+        } else if value == Self::XmlDTDNode as i32 {
+            Ok(Self::XmlDTDNode)
         } else if value == Self::XmlElementDecl as i32 {
             Ok(Self::XmlElementDecl)
         } else if value == Self::XmlAttributeDecl as i32 {
@@ -190,10 +190,10 @@ impl TryFrom<i32> for XmlElementType {
             Ok(Self::XmlEntityDecl)
         } else if value == Self::XmlNamespaceDecl as i32 {
             Ok(Self::XmlNamespaceDecl)
-        } else if value == Self::XmlXincludeStart as i32 {
-            Ok(Self::XmlXincludeStart)
-        } else if value == Self::XmlXincludeEnd as i32 {
-            Ok(Self::XmlXincludeEnd)
+        } else if value == Self::XmlXIncludeStart as i32 {
+            Ok(Self::XmlXIncludeStart)
+        } else if value == Self::XmlXIncludeEnd as i32 {
+            Ok(Self::XmlXIncludeEnd)
         } else {
             Err(anyhow::anyhow!(
                 "Invalid convert from value '{value}' to {}",
@@ -207,10 +207,10 @@ impl TryFrom<i32> for XmlElementType {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlAttributeType {
-    XmlAttributeCdata = 1,
-    XmlAttributeId,
-    XmlAttributeIdref,
-    XmlAttributeIdrefs,
+    XmlAttributeCDATA = 1,
+    XmlAttributeID,
+    XmlAttributeIDREF,
+    XmlAttributeIDREFS,
     XmlAttributeEntity,
     XmlAttributeEntities,
     XmlAttributeNmtoken,
@@ -222,14 +222,14 @@ pub enum XmlAttributeType {
 impl TryFrom<i32> for XmlAttributeType {
     type Error = anyhow::Error;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlAttributeCdata as i32 {
-            Ok(Self::XmlAttributeCdata)
-        } else if value == Self::XmlAttributeId as i32 {
-            Ok(Self::XmlAttributeId)
-        } else if value == Self::XmlAttributeIdref as i32 {
-            Ok(Self::XmlAttributeIdref)
-        } else if value == Self::XmlAttributeIdrefs as i32 {
-            Ok(Self::XmlAttributeIdrefs)
+        if value == Self::XmlAttributeCDATA as i32 {
+            Ok(Self::XmlAttributeCDATA)
+        } else if value == Self::XmlAttributeID as i32 {
+            Ok(Self::XmlAttributeID)
+        } else if value == Self::XmlAttributeIDREF as i32 {
+            Ok(Self::XmlAttributeIDREF)
+        } else if value == Self::XmlAttributeIDREFS as i32 {
+            Ok(Self::XmlAttributeIDREFS)
         } else if value == Self::XmlAttributeEntity as i32 {
             Ok(Self::XmlAttributeEntity)
         } else if value == Self::XmlAttributeEntities as i32 {
@@ -285,7 +285,7 @@ impl TryFrom<i32> for XmlAttributeDefault {
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum XmlElementContentType {
-    XmlElementContentPcdata = 1,
+    XmlElementContentPCDATA = 1,
     XmlElementContentElement,
     XmlElementContentSeq,
     XmlElementContentOr,
@@ -360,12 +360,12 @@ pub enum XmlDocProperties {
     XmlDocWellformed = 1 << 0, /* document is XML well formed */
     XmlDocNsvalid = 1 << 1,    /* document is Namespace valid */
     XmlDocOld10 = 1 << 2,      /* parsed with old XML-1.0 parser */
-    XmlDocDtdvalid = 1 << 3,   /* DTD validation was successful */
-    XmlDocXinclude = 1 << 4,   /* XInclude substitution was done */
+    XmlDocDTDValid = 1 << 3,   /* DTD validation was successful */
+    XmlDocXInclude = 1 << 4,   /* XInclude substitution was done */
     XmlDocUserbuilt = 1 << 5,  /* Document was built using the API
                                and not by parsing an instance */
     XmlDocInternal = 1 << 6, /* built for internal processing */
-    XmlDocHtml = 1 << 7,     /* parsed or built HTML document */
+    XmlDocHTML = 1 << 7,     /* parsed or built HTML document */
 }
 
 pub type XmlNsMapItemPtr = *mut XmlNsMapItem;
@@ -1333,7 +1333,7 @@ pub unsafe extern "C" fn xml_free_prop(cur: XmlAttrPtr) {
     }
 
     /* Check for ID removal -> leading to invalid references ! */
-    if !(*cur).doc.is_null() && matches!((*cur).atype, Some(XmlAttributeType::XmlAttributeId)) {
+    if !(*cur).doc.is_null() && matches!((*cur).atype, Some(XmlAttributeType::XmlAttributeID)) {
         xml_remove_id((*cur).doc, cur);
     }
     if !(*cur).children.is_null() {
@@ -1460,15 +1460,15 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     }
     match (*node).typ {
         XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlElementNode
         | XmlElementType::XmlDocumentFragNode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {}
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {}
         XmlElementType::XmlAttributeNode => {
             return xml_copy_prop_internal(doc, parent, node as _) as _;
         }
@@ -1476,7 +1476,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
             return xml_copy_namespace_list(node as _) as _;
         }
 
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "tree")]
             {
                 return xml_copy_doc(node as _, extended) as _;
@@ -1484,7 +1484,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         }
         XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDtdNode
+        | XmlElementType::XmlDTDNode
         | XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl => {
@@ -1522,8 +1522,8 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     if !matches!((*node).typ, XmlElementType::XmlElementNode)
         && !(*node).content.is_null()
         && !matches!((*node).typ, XmlElementType::XmlEntityRefNode)
-        && !matches!((*node).typ, XmlElementType::XmlXincludeEnd)
-        && !matches!((*node).typ, XmlElementType::XmlXincludeStart)
+        && !matches!((*node).typ, XmlElementType::XmlXIncludeEnd)
+        && !matches!((*node).typ, XmlElementType::XmlXIncludeStart)
     {
         (*ret).content = xml_strdup((*node).content);
     } else if matches!((*node).typ, XmlElementType::XmlElementNode) {
@@ -1568,7 +1568,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         return ret;
     }
     if (matches!((*node).typ, XmlElementType::XmlElementNode)
-        || matches!((*node).typ, XmlElementType::XmlXincludeStart))
+        || matches!((*node).typ, XmlElementType::XmlXIncludeStart))
         && !(*node).ns_def.is_null()
     {
         (*ret).ns_def = xml_copy_namespace_list((*node).ns_def);
@@ -1611,7 +1611,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         }
     }
     if (matches!((*node).typ, XmlElementType::XmlElementNode)
-        || matches!((*node).typ, XmlElementType::XmlXincludeStart))
+        || matches!((*node).typ, XmlElementType::XmlXIncludeStart))
         && !(*node).properties.is_null()
     {
         (*ret).properties = xml_copy_prop_list(ret, (*node).properties);
@@ -1699,7 +1699,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
     while !node.is_null() {
         #[cfg(feature = "tree")]
         {
-            if matches!((*node).typ, XmlElementType::XmlDtdNode) {
+            if matches!((*node).typ, XmlElementType::XmlDTDNode) {
                 if doc.is_null() {
                     node = (*node).next;
                     continue;
@@ -2318,7 +2318,7 @@ pub unsafe extern "C" fn xml_new_child(
             cur = xml_new_doc_node((*parent).doc, ns, name, content);
         }
     } else if (matches!((*parent).typ, XmlElementType::XmlDocumentNode)
-        || matches!((*parent).typ, XmlElementType::XmlHtmlDocumentNode))
+        || matches!((*parent).typ, XmlElementType::XmlHTMLDocumentNode))
     {
         if ns.is_null() {
             cur = xml_new_doc_node(parent as _, null_mut(), name, content);
@@ -2434,7 +2434,7 @@ pub unsafe extern "C" fn xml_new_doc_pi(
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
-    (*cur).typ = XmlElementType::XmlPiNode;
+    (*cur).typ = XmlElementType::XmlPINode;
 
     if !doc.is_null() && !(*doc).dict.is_null() {
         (*cur).name = xml_dict_lookup((*doc).dict, name, -1);
@@ -2602,7 +2602,7 @@ pub unsafe extern "C" fn xml_new_cdata_block(
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
-    (*cur).typ = XmlElementType::XmlCdataSectionNode;
+    (*cur).typ = XmlElementType::XmlCDATASectionNode;
     (*cur).doc = doc;
 
     if !content.is_null() {
@@ -2834,7 +2834,7 @@ pub unsafe extern "C" fn xml_new_text_child(
             cur = xml_new_doc_raw_node((*parent).doc, ns, name, content);
         }
     } else if (matches!((*parent).typ, XmlElementType::XmlDocumentNode)
-        || matches!((*parent).typ, XmlElementType::XmlHtmlDocumentNode))
+        || matches!((*parent).typ, XmlElementType::XmlHTMLDocumentNode))
     {
         if ns.is_null() {
             cur = xml_new_doc_raw_node(parent as _, null_mut(), name, content);
@@ -3055,9 +3055,9 @@ pub unsafe extern "C" fn xml_text_concat(
     }
 
     if !matches!((*node).typ, XmlElementType::XmlTextNode)
-        && !matches!((*node).typ, XmlElementType::XmlCdataSectionNode)
+        && !matches!((*node).typ, XmlElementType::XmlCDATASectionNode)
         && !matches!((*node).typ, XmlElementType::XmlCommentNode)
-        && !matches!((*node).typ, XmlElementType::XmlPiNode)
+        && !matches!((*node).typ, XmlElementType::XmlPINode)
     {
         return -1;
     }
@@ -3104,8 +3104,8 @@ pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
     loop {
         while !(*cur).children.is_null()
             && !matches!((*cur).typ, XmlElementType::XmlDocumentNode)
-            && !matches!((*cur).typ, XmlElementType::XmlHtmlDocumentNode)
-            && !matches!((*cur).typ, XmlElementType::XmlDtdNode)
+            && !matches!((*cur).typ, XmlElementType::XmlHTMLDocumentNode)
+            && !matches!((*cur).typ, XmlElementType::XmlDTDNode)
             && !matches!((*cur).typ, XmlElementType::XmlEntityRefNode)
         {
             cur = (*cur).children;
@@ -3115,10 +3115,10 @@ pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
         next = (*cur).next;
         parent = (*cur).parent;
         if matches!((*cur).typ, XmlElementType::XmlDocumentNode)
-            || matches!((*cur).typ, XmlElementType::XmlHtmlDocumentNode)
+            || matches!((*cur).typ, XmlElementType::XmlHTMLDocumentNode)
         {
             xml_free_doc(cur as _);
-        } else if !matches!((*cur).typ, XmlElementType::XmlDtdNode) {
+        } else if !matches!((*cur).typ, XmlElementType::XmlDTDNode) {
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
             // && xmlDeregisterNodeDefaultValue.is_some()
             {
@@ -3126,23 +3126,23 @@ pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
             }
 
             if (matches!((*cur).typ, XmlElementType::XmlElementNode)
-                || matches!((*cur).typ, XmlElementType::XmlXincludeStart)
-                || matches!((*cur).typ, XmlElementType::XmlXincludeEnd))
+                || matches!((*cur).typ, XmlElementType::XmlXIncludeStart)
+                || matches!((*cur).typ, XmlElementType::XmlXIncludeEnd))
                 && !(*cur).properties.is_null()
             {
                 xml_free_prop_list((*cur).properties);
             }
             if !matches!((*cur).typ, XmlElementType::XmlElementNode)
-                && !matches!((*cur).typ, XmlElementType::XmlXincludeStart)
-                && !matches!((*cur).typ, XmlElementType::XmlXincludeEnd)
+                && !matches!((*cur).typ, XmlElementType::XmlXIncludeStart)
+                && !matches!((*cur).typ, XmlElementType::XmlXIncludeEnd)
                 && !matches!((*cur).typ, XmlElementType::XmlEntityRefNode)
                 && ((*cur).content != addr_of_mut!((*cur).properties) as _)
             {
                 DICT_FREE!(dict, (*cur).content)
             }
             if (matches!((*cur).typ, XmlElementType::XmlElementNode)
-                || matches!((*cur).typ, XmlElementType::XmlXincludeStart)
-                || matches!((*cur).typ, XmlElementType::XmlXincludeEnd))
+                || matches!((*cur).typ, XmlElementType::XmlXIncludeStart)
+                || matches!((*cur).typ, XmlElementType::XmlXIncludeEnd))
                 && !(*cur).ns_def.is_null()
             {
                 xml_free_ns_list((*cur).ns_def);
@@ -3191,7 +3191,7 @@ pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
     }
 
     /* use xmlFreeDtd for DTD nodes */
-    if matches!((*cur).typ, XmlElementType::XmlDtdNode) {
+    if matches!((*cur).typ, XmlElementType::XmlDTDNode) {
         xml_free_dtd(cur as _);
         return;
     }
@@ -3224,8 +3224,8 @@ pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
     }
 
     if matches!((*cur).typ, XmlElementType::XmlElementNode)
-        || matches!((*cur).typ, XmlElementType::XmlXincludeStart)
-        || matches!((*cur).typ, XmlElementType::XmlXincludeEnd)
+        || matches!((*cur).typ, XmlElementType::XmlXIncludeStart)
+        || matches!((*cur).typ, XmlElementType::XmlXIncludeEnd)
     {
         if !(*cur).properties.is_null() {
             xml_free_prop_list((*cur).properties);
@@ -3303,7 +3303,7 @@ pub unsafe extern "C" fn xml_set_tree_doc(tree: XmlNodePtr, doc: XmlDocPtr) {
         if matches!((*tree).typ, XmlElementType::XmlElementNode) {
             prop = (*tree).properties;
             while !prop.is_null() {
-                if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeId)) {
+                if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
                     xml_remove_id((*tree).doc, prop);
                 }
 
@@ -3793,7 +3793,7 @@ unsafe extern "C" fn xml_get_prop_node_value_internal(prop: *const XmlAttr) -> *
             if (*(*prop).children).next.is_null()
                 && matches!(
                     (*(*prop).children).typ,
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 )
             {
                 /*
@@ -4491,7 +4491,7 @@ pub unsafe extern "C" fn xml_node_list_get_string(
 
     while !node.is_null() {
         if (matches!((*node).typ, XmlElementType::XmlTextNode)
-            || matches!((*node).typ, XmlElementType::XmlCdataSectionNode))
+            || matches!((*node).typ, XmlElementType::XmlCDATASectionNode))
         {
             if in_line != 0 {
                 ret = xml_strcat(ret, (*node).content);
@@ -4573,7 +4573,7 @@ pub unsafe extern "C" fn xml_node_list_get_raw_string(
 
     while !node.is_null() {
         if (matches!((*node).typ, XmlElementType::XmlTextNode)
-            || matches!((*node).typ, XmlElementType::XmlCdataSectionNode))
+            || matches!((*node).typ, XmlElementType::XmlCDATASectionNode))
         {
             if in_line != 0 {
                 ret = xml_strcat(ret, (*node).content);
@@ -4649,10 +4649,10 @@ pub unsafe extern "C" fn xml_node_set_content(cur: XmlNodePtr, content: *const X
             UPDATE_LAST_CHILD_AND_PARENT!(cur);
         }
         XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {
             if !(*cur).content.is_null()
                 && ((*cur).content != addr_of_mut!((*cur).properties) as _)
@@ -4675,12 +4675,12 @@ pub unsafe extern "C" fn xml_node_set_content(cur: XmlNodePtr, content: *const X
             (*cur).properties = null_mut();
         }
         XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlHtmlDocumentNode
+        | XmlElementType::XmlHTMLDocumentNode
         | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {}
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {}
         XmlElementType::XmlNotationNode => {}
-        XmlElementType::XmlDtdNode => {}
+        XmlElementType::XmlDTDNode => {}
         XmlElementType::XmlNamespaceDecl => {}
         XmlElementType::XmlElementDecl => { /* TODO !!! */ }
         XmlElementType::XmlAttributeDecl => { /* TODO !!! */ }
@@ -4720,10 +4720,10 @@ pub unsafe extern "C" fn xml_node_set_content_len(
             UPDATE_LAST_CHILD_AND_PARENT!(cur);
         }
         XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode
         | XmlElementType::XmlNotationNode => {
             if (!(*cur).content.is_null()
@@ -4747,12 +4747,12 @@ pub unsafe extern "C" fn xml_node_set_content_len(
             (*cur).properties = null_mut();
         }
         XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlDtdNode
-        | XmlElementType::XmlHtmlDocumentNode
+        | XmlElementType::XmlDTDNode
+        | XmlElementType::XmlHTMLDocumentNode
         | XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {}
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {}
         XmlElementType::XmlElementDecl => { /* TODO !!! */ }
         XmlElementType::XmlAttributeDecl => { /* TODO !!! */ }
         XmlElementType::XmlEntityDecl => { /* TODO !!! */ }
@@ -4800,10 +4800,10 @@ pub unsafe extern "C" fn xml_node_add_content_len(
         }
         XmlElementType::XmlAttributeNode => {}
         XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode
         | XmlElementType::XmlNotationNode => {
             if !content.is_null() {
@@ -4820,12 +4820,12 @@ pub unsafe extern "C" fn xml_node_add_content_len(
             }
         }
         XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlDtdNode
-        | XmlElementType::XmlHtmlDocumentNode
+        | XmlElementType::XmlDTDNode
+        | XmlElementType::XmlHTMLDocumentNode
         | XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {}
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {}
         XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl => {}
@@ -4851,7 +4851,7 @@ pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *cons
         return -1;
     }
     match (*cur).typ {
-        XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
+        XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
             xml_buf_cat(buf, (*cur).content);
         }
         XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
@@ -4859,7 +4859,7 @@ pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *cons
 
             while !tmp.is_null() {
                 match (*tmp).typ {
-                    XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
+                    XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
                         if !(*tmp).content.is_null() {
                             xml_buf_cat(buf, (*tmp).content);
                         }
@@ -4918,7 +4918,7 @@ pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *cons
                 tmp = (*tmp).next;
             }
         }
-        XmlElementType::XmlCommentNode | XmlElementType::XmlPiNode => {
+        XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
             xml_buf_cat(buf, (*cur).content);
         }
         XmlElementType::XmlEntityRefNode => {
@@ -4944,17 +4944,17 @@ pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *cons
         XmlElementType::XmlEntityNode
         | XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDtdNode
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {}
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+        | XmlElementType::XmlDTDNode
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {}
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             cur = (*cur).children;
             while !cur.is_null() {
                 if matches!(
                     (*cur).typ,
                     XmlElementType::XmlElementNode
                         | XmlElementType::XmlTextNode
-                        | XmlElementType::XmlCdataSectionNode
+                        | XmlElementType::XmlCDATASectionNode
                 ) {
                     xml_buf_get_node_content(buf, cur);
                 }
@@ -5021,23 +5021,23 @@ pub unsafe extern "C" fn xml_node_set_lang(cur: XmlNodePtr, lang: *const XmlChar
     }
     match (*cur).typ {
         XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlCommentNode
         | XmlElementType::XmlDocumentNode
         | XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlDocumentFragNode
         | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlHtmlDocumentNode
-        | XmlElementType::XmlDtdNode
+        | XmlElementType::XmlHTMLDocumentNode
+        | XmlElementType::XmlDTDNode
         | XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlEntityNode
         | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {
             return;
         }
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
@@ -5065,23 +5065,23 @@ pub unsafe extern "C" fn xml_node_set_space_preserve(cur: XmlNodePtr, val: i32) 
     }
     match (*cur).typ {
         XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlCommentNode
         | XmlElementType::XmlDocumentNode
         | XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlDocumentFragNode
         | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlHtmlDocumentNode
-        | XmlElementType::XmlDtdNode
+        | XmlElementType::XmlHTMLDocumentNode
+        | XmlElementType::XmlDTDNode
         | XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlEntityNode
         | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {
             return;
         }
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
@@ -6767,7 +6767,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                     } else {
                         'lp: while {
                             cur = (*cur).next;
-                            if matches!((*cur).typ, XmlElementType::XmlXincludeEnd)
+                            if matches!((*cur).typ, XmlElementType::XmlXIncludeEnd)
                                 || (*cur).doc == (*node).doc
                             {
                                 break 'lp;
@@ -6786,7 +6786,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                 if !leave_node {
                     (*cur).doc = dest_doc;
                     match (*cur).typ {
-                        XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd => {
+                        XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
                             /*
                              * TODO
                              */
@@ -6986,7 +6986,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                 if !source_doc.is_null()
                                     && matches!(
                                         (*(cur as XmlAttrPtr)).atype,
-                                        Some(XmlAttributeType::XmlAttributeId)
+                                        Some(XmlAttributeType::XmlAttributeID)
                                     )
                                 {
                                     xml_remove_id(source_doc, cur as _);
@@ -6995,7 +6995,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                 (*(cur as XmlAttrPtr)).psvi = null_mut();
                             }
                         }
-                        XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode => {
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                             /*
                              * This puts the content in the dest dict, only if
                              * it was previously in the source dict.
@@ -7033,7 +7033,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                             // goto leave_node;
                             leave_node = true;
                         }
-                        XmlElementType::XmlPiNode => {
+                        XmlElementType::XmlPINode => {
                             XML_TREE_ADOPT_STR!((*cur).name, adopt_str, source_doc, dest_doc);
                             XML_TREE_ADOPT_STR_2!(
                                 (*cur).content,
@@ -7068,8 +7068,8 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                     if matches!(
                         (*cur).typ,
                         XmlElementType::XmlElementNode
-                            | XmlElementType::XmlXincludeStart
-                            | XmlElementType::XmlXincludeEnd
+                            | XmlElementType::XmlXIncludeStart
+                            | XmlElementType::XmlXIncludeEnd
                     ) {
                         /*
                          * TODO: Do we expect nsDefs on xmlElementType::XML_XINCLUDE_START?
@@ -7371,7 +7371,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
     while !cur.is_null() {
         (*cur).doc = dest_doc;
         match (*cur).typ {
-            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode => {
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                 XML_TREE_ADOPT_STR_2!((*cur).content, adopt_str, source_doc, dest_doc, cur);
             }
             XmlElementType::XmlEntityRefNode => {
@@ -7481,9 +7481,9 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
         XmlElementType::XmlElementNode
         | XmlElementType::XmlAttributeNode
         | XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {}
         XmlElementType::XmlDocumentFragNode => {
             /* TODO: Support document-fragment-nodes. */
@@ -7523,7 +7523,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
             adopt_str = 0;
         }
         match (*node).typ {
-            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode => {
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                 XML_TREE_ADOPT_STR_2!((*node).content, adopt_str, source_doc, dest_doc, cur);
             }
             XmlElementType::XmlEntityRefNode => {
@@ -7546,7 +7546,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
                 }
                 XML_TREE_ADOPT_STR!((*node).name, adopt_str, source_doc, dest_doc);
             }
-            XmlElementType::XmlPiNode => {
+            XmlElementType::XmlPINode => {
                 XML_TREE_ADOPT_STR!((*node).name, adopt_str, source_doc, dest_doc);
                 XML_TREE_ADOPT_STR_2!((*node).content, adopt_str, source_doc, dest_doc, cur);
             }
@@ -7595,9 +7595,9 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
 
     match (*node).typ {
         XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {
             (*node).unlink();
             return 0;
@@ -7946,7 +7946,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                  * Create a new node.
                  */
                 match (*cur).typ {
-                    XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd => {
+                    XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
                         /*
                          * TODO: What to do with XInclude?
                          */
@@ -7954,9 +7954,9 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                     }
                     XmlElementType::XmlElementNode
                     | XmlElementType::XmlTextNode
-                    | XmlElementType::XmlCdataSectionNode
+                    | XmlElementType::XmlCDATASectionNode
                     | XmlElementType::XmlCommentNode
-                    | XmlElementType::XmlPiNode
+                    | XmlElementType::XmlPINode
                     | XmlElementType::XmlDocumentFragNode
                     | XmlElementType::XmlEntityRefNode
                     | XmlElementType::XmlEntityNode => {
@@ -8046,7 +8046,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
 
                 let mut leave_node = false;
                 match (*cur).typ {
-                    XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd => {
+                    XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
                         /*
                          * TODO
                          */
@@ -8167,7 +8167,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         /* IDs will be processed further down. */
                         /* (*cur).ns will be processed further down. */
                     }
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode => {
+                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                         /*
                          * Note that this will also cover the values of attributes.
                          */
@@ -8207,7 +8207,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         // goto leave_node;
                         leave_node = true;
                     }
-                    XmlElementType::XmlPiNode => {
+                    XmlElementType::XmlPINode => {
                         DICT_COPY!(dict, (*cur).content, (*clone).content);
                         // goto leave_node;
                         leave_node = true;
@@ -8383,8 +8383,8 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         break 'main;
                     }
                     if matches!((*cur).typ, XmlElementType::XmlElementNode)
-                        || matches!((*cur).typ, XmlElementType::XmlXincludeStart)
-                        || matches!((*cur).typ, XmlElementType::XmlXincludeEnd)
+                        || matches!((*cur).typ, XmlElementType::XmlXIncludeStart)
+                        || matches!((*cur).typ, XmlElementType::XmlXIncludeEnd)
                     {
                         /*
                          * TODO: Do we expect nsDefs on xmlElementType::XML_XINCLUDE_START?

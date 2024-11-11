@@ -1641,7 +1641,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 if matches!(
                                     (*node).typ,
                                     XmlElementType::XmlDocumentNode
-                                        | XmlElementType::XmlHtmlDocumentNode
+                                        | XmlElementType::XmlHTMLDocumentNode
                                 ) {
                                     break 'to_continue;
                                 }
@@ -1686,7 +1686,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     (*node).typ,
                                     XmlElementType::XmlElementNode
                                         | XmlElementType::XmlDocumentNode
-                                        | XmlElementType::XmlHtmlDocumentNode
+                                        | XmlElementType::XmlHTMLDocumentNode
                                 ) {
                                     break 'rollback;
                                 }
@@ -1740,7 +1740,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 if matches!(
                                     (*node).typ,
                                     XmlElementType::XmlDocumentNode
-                                        | XmlElementType::XmlHtmlDocumentNode
+                                        | XmlElementType::XmlHTMLDocumentNode
                                         | XmlElementType::XmlNamespaceDecl
                                 ) {
                                     break 'rollback;
@@ -1797,7 +1797,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 if matches!(
                                     (*node).typ,
                                     XmlElementType::XmlDocumentNode
-                                        | XmlElementType::XmlHtmlDocumentNode
+                                        | XmlElementType::XmlHTMLDocumentNode
                                         | XmlElementType::XmlNamespaceDecl
                                 ) {
                                     break 'rollback;

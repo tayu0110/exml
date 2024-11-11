@@ -826,7 +826,7 @@ unsafe extern "C" fn xml_xptr_get_arity(mut cur: XmlNodePtr) -> i32 {
             (*cur).typ,
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHtmlDocumentNode
+                | XmlElementType::XmlHTMLDocumentNode
         ) {
             i += 1;
         }
@@ -854,7 +854,7 @@ unsafe extern "C" fn xml_xptr_get_index(mut cur: XmlNodePtr) -> i32 {
             (*cur).typ,
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHtmlDocumentNode
+                | XmlElementType::XmlHTMLDocumentNode
         ) {
             i += 1;
         }
@@ -914,13 +914,13 @@ unsafe extern "C" fn xml_xptr_covering_range(
                         }
                         XmlElementType::XmlElementNode
                         | XmlElementType::XmlTextNode
-                        | XmlElementType::XmlCdataSectionNode
+                        | XmlElementType::XmlCDATASectionNode
                         | XmlElementType::XmlEntityRefNode
-                        | XmlElementType::XmlPiNode
+                        | XmlElementType::XmlPINode
                         | XmlElementType::XmlCommentNode
                         | XmlElementType::XmlDocumentNode
                         | XmlElementType::XmlNotationNode
-                        | XmlElementType::XmlHtmlDocumentNode => {
+                        | XmlElementType::XmlHTMLDocumentNode => {
                             let indx: i32 = xml_xptr_get_index(node);
 
                             node = (*node).parent;
@@ -1027,10 +1027,10 @@ unsafe extern "C" fn xml_xptr_inside_range(
         XmlXPathObjectType::XpathPoint => {
             let node: XmlNodePtr = (*loc).user as XmlNodePtr;
             match (*node).typ {
-                XmlElementType::XmlPiNode
+                XmlElementType::XmlPINode
                 | XmlElementType::XmlCommentNode
                 | XmlElementType::XmlTextNode
-                | XmlElementType::XmlCdataSectionNode => {
+                | XmlElementType::XmlCDATASectionNode => {
                     if (*node).content.is_null() {
                         return xml_xptr_new_range(node, 0, node, 0);
                     } else {
@@ -1042,7 +1042,7 @@ unsafe extern "C" fn xml_xptr_inside_range(
                 | XmlElementType::XmlEntityRefNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlNotationNode
-                | XmlElementType::XmlHtmlDocumentNode => {
+                | XmlElementType::XmlHTMLDocumentNode => {
                     return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
                 }
                 _ => {}
@@ -1055,10 +1055,10 @@ unsafe extern "C" fn xml_xptr_inside_range(
                 return xml_xptr_new_range(node, (*loc).index, (*loc).user2 as _, (*loc).index2);
             } else {
                 match (*node).typ {
-                    XmlElementType::XmlPiNode
+                    XmlElementType::XmlPINode
                     | XmlElementType::XmlCommentNode
                     | XmlElementType::XmlTextNode
-                    | XmlElementType::XmlCdataSectionNode => {
+                    | XmlElementType::XmlCDATASectionNode => {
                         if (*node).content.is_null() {
                             return xml_xptr_new_range(node, 0, node, 0);
                         } else {
@@ -1070,7 +1070,7 @@ unsafe extern "C" fn xml_xptr_inside_range(
                     | XmlElementType::XmlEntityRefNode
                     | XmlElementType::XmlDocumentNode
                     | XmlElementType::XmlNotationNode
-                    | XmlElementType::XmlHtmlDocumentNode => {
+                    | XmlElementType::XmlHTMLDocumentNode => {
                         return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
                     }
                     _ => {}
@@ -1267,7 +1267,7 @@ unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: i32) -> Xml
             (*cur).typ,
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHtmlDocumentNode
+                | XmlElementType::XmlHTMLDocumentNode
         ) {
             i += 1;
             if i == no {
@@ -1312,8 +1312,8 @@ pub(crate) unsafe extern "C" fn xml_xptr_advance_node(
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlTextNode
                     | XmlElementType::XmlDocumentNode
-                    | XmlElementType::XmlHtmlDocumentNode
-                    | XmlElementType::XmlCdataSectionNode
+                    | XmlElementType::XmlHTMLDocumentNode
+                    | XmlElementType::XmlCDATASectionNode
             ) {
                 if (*cur).typ == XmlElementType::XmlEntityRefNode {
                     /* Shouldn't happen */
@@ -1359,8 +1359,8 @@ pub(crate) unsafe extern "C" fn xml_xptr_advance_node(
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlTextNode
                     | XmlElementType::XmlDocumentNode
-                    | XmlElementType::XmlHtmlDocumentNode
-                    | XmlElementType::XmlCdataSectionNode
+                    | XmlElementType::XmlHTMLDocumentNode
+                    | XmlElementType::XmlCDATASectionNode
             ) {
                 if (*cur).typ == XmlElementType::XmlEntityRefNode {
                     /* Shouldn't happen */
@@ -1416,7 +1416,7 @@ unsafe extern "C" fn xml_xptr_advance_char(
                 (*cur).typ,
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlDocumentNode
-                    | XmlElementType::XmlHtmlDocumentNode
+                    | XmlElementType::XmlHTMLDocumentNode
             )
         {
             if pos > 0 {
@@ -1499,7 +1499,7 @@ unsafe extern "C" fn xml_xptr_get_last_char(node: *mut XmlNodePtr, indx: *mut i3
         (*cur).typ,
         XmlElementType::XmlElementNode
             | XmlElementType::XmlDocumentNode
-            | XmlElementType::XmlHtmlDocumentNode
+            | XmlElementType::XmlHTMLDocumentNode
     ) && pos > 0
     {
         cur = xml_xptr_get_nth_child(cur, pos);
@@ -2091,7 +2091,7 @@ unsafe extern "C" fn xml_xptr_nb_loc_children(mut node: XmlNodePtr) -> i32 {
         return -1;
     }
     match (*node).typ {
-        XmlElementType::XmlHtmlDocumentNode
+        XmlElementType::XmlHTMLDocumentNode
         | XmlElementType::XmlDocumentNode
         | XmlElementType::XmlElementNode => {
             node = (*node).children;
@@ -2103,10 +2103,10 @@ unsafe extern "C" fn xml_xptr_nb_loc_children(mut node: XmlNodePtr) -> i32 {
             }
         }
         XmlElementType::XmlAttributeNode => return -1,
-        XmlElementType::XmlPiNode
+        XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode
         | XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode => ret = xml_strlen((*node).content),
         _ => return -1,
     }
@@ -3066,7 +3066,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
             /* looks superfluous but ... */
             if matches!(
                 (*cur).typ,
-                XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 let mut content: *const XmlChar = (*cur).content;
 
@@ -3101,14 +3101,14 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
         } else {
             tmp = null_mut();
             match (*cur).typ {
-                XmlElementType::XmlDtdNode
+                XmlElementType::XmlDTDNode
                 | XmlElementType::XmlElementDecl
                 | XmlElementType::XmlAttributeDecl
                 | XmlElementType::XmlEntityNode => { /* Do not copy DTD information */ }
                 XmlElementType::XmlEntityDecl => {
                     // TODO /* handle crossing entities -> stack needed */
                 }
-                XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd => {
+                XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
                     /* don't consider it part of the tree content */
                 }
                 XmlElementType::XmlAttributeNode => {
@@ -3173,22 +3173,22 @@ pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr)
                 }
                 match (*(*(*set).node_tab.add(i as usize))).typ {
                     XmlElementType::XmlTextNode
-                    | XmlElementType::XmlCdataSectionNode
+                    | XmlElementType::XmlCDATASectionNode
                     | XmlElementType::XmlElementNode
                     | XmlElementType::XmlEntityRefNode
                     | XmlElementType::XmlEntityNode
-                    | XmlElementType::XmlPiNode
+                    | XmlElementType::XmlPINode
                     | XmlElementType::XmlCommentNode
                     | XmlElementType::XmlDocumentNode
-                    | XmlElementType::XmlHtmlDocumentNode
-                    | XmlElementType::XmlXincludeStart
-                    | XmlElementType::XmlXincludeEnd => {}
+                    | XmlElementType::XmlHTMLDocumentNode
+                    | XmlElementType::XmlXIncludeStart
+                    | XmlElementType::XmlXIncludeEnd => {}
                     XmlElementType::XmlAttributeNode
                     | XmlElementType::XmlNamespaceDecl
                     | XmlElementType::XmlDocumentTypeNode
                     | XmlElementType::XmlDocumentFragNode
                     | XmlElementType::XmlNotationNode
-                    | XmlElementType::XmlDtdNode
+                    | XmlElementType::XmlDTDNode
                     | XmlElementType::XmlElementDecl
                     | XmlElementType::XmlAttributeDecl
                     | XmlElementType::XmlEntityDecl => continue, /* for */

@@ -2269,7 +2269,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
         XmlElementType::XmlElementNode => {
             ret = xml_c14n_process_element_node(ctx, cur, visible);
         }
-        XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
+        XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
             /*
              * Text Nodes
              * the string value, except all ampersands are replaced
@@ -2290,7 +2290,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
                 }
             }
         }
-        XmlElementType::XmlPiNode => {
+        XmlElementType::XmlPINode => {
             /*
              * Processing Instruction (PI) Nodes-
              * The opening PI symbol (<?), the PI target name of the node,
@@ -2386,7 +2386,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
             }
         }
         #[cfg(feature = "html")]
-        XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlHTMLDocumentNode => {
             /* should be processed as document? */
             if !(*cur).children.is_null() {
                 (*ctx).pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
@@ -2426,7 +2426,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
 
         XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDtdNode
+        | XmlElementType::XmlDTDNode
         | XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl => {
@@ -2435,7 +2435,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
              */
         }
         #[cfg(feature = "xinclude")]
-        XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd => {
+        XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
             /*
              * should be ignored according to "W3C Canonical XML"
              */

@@ -263,8 +263,8 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
             | XmlElementType::XmlAttributeNode
             | XmlElementType::XmlDocumentNode
             | XmlElementType::XmlTextNode
-            | XmlElementType::XmlHtmlDocumentNode
-            | XmlElementType::XmlXincludeStart
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlXIncludeStart
     ) {
         return -2;
     }
@@ -275,12 +275,12 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlAttributeNode
                 | XmlElementType::XmlTextNode
-                | XmlElementType::XmlXincludeStart
+                | XmlElementType::XmlXIncludeStart
         )
     {
         if matches!(
             (*node).typ,
-            XmlElementType::XmlElementNode | XmlElementType::XmlXincludeStart
+            XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
         ) {
             cur = (*node).ns_def;
             while !cur.is_null() {
@@ -302,7 +302,7 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
     if !node.is_null()
         && matches!(
             (*node).typ,
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
         )
     {
         let old_ns: XmlNsPtr = (*(node as XmlDocPtr)).old_ns;
@@ -540,8 +540,8 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             | XmlElementType::XmlAttributeNode
             | XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
-            | XmlElementType::XmlDtdNode
-            | XmlElementType::XmlHtmlDocumentNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlHTMLDocumentNode
             | XmlElementType::XmlDocumentNode
     ) && !(*node).content.is_null()
     {
@@ -584,10 +584,10 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 );
             }
         }
-        XmlElementType::XmlPiNode => {
+        XmlElementType::XmlPINode => {
             xml_ctxt_check_name(ctxt, (*node).name);
         }
-        XmlElementType::XmlCdataSectionNode => {
+        XmlElementType::XmlCDATASectionNode => {
             if (*node).name.is_null() {
                 // break;
             } else {
@@ -604,15 +604,15 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         | XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlDocumentFragNode
         | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDtdNode
+        | XmlElementType::XmlDTDNode
         | XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl
         | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd
         | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlHtmlDocumentNode => {}
+        | XmlElementType::XmlHTMLDocumentNode => {}
         _ => unreachable!(),
     }
 }
@@ -627,7 +627,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
         return;
     }
 
-    if (*dtd).typ != XmlElementType::XmlDtdNode {
+    if (*dtd).typ != XmlElementType::XmlDTDNode {
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNotDTD,
@@ -805,16 +805,16 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
     }
     if (*ctxt).check == 0 {
         match (*attr).atype {
-            XmlAttributeType::XmlAttributeCdata => {
+            XmlAttributeType::XmlAttributeCDATA => {
                 fprintf((*ctxt).output, c" CDATA".as_ptr());
             }
-            XmlAttributeType::XmlAttributeId => {
+            XmlAttributeType::XmlAttributeID => {
                 fprintf((*ctxt).output, c" ID".as_ptr());
             }
-            XmlAttributeType::XmlAttributeIdref => {
+            XmlAttributeType::XmlAttributeIDREF => {
                 fprintf((*ctxt).output, c" IDREF".as_ptr());
             }
-            XmlAttributeType::XmlAttributeIdrefs => {
+            XmlAttributeType::XmlAttributeIDREFS => {
                 fprintf((*ctxt).output, c" IDREFS".as_ptr());
             }
             XmlAttributeType::XmlAttributeEntity => {
@@ -1175,7 +1175,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
                 }
             }
         }
-        XmlElementType::XmlCdataSectionNode => {
+        XmlElementType::XmlCDATASectionNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"CDATA_SECTION\n".as_ptr());
@@ -1197,7 +1197,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
                 fprintf((*ctxt).output, c"ENTITY\n".as_ptr());
             }
         }
-        XmlElementType::XmlPiNode => {
+        XmlElementType::XmlPINode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
                 fprintf(
@@ -1213,7 +1213,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
                 fprintf((*ctxt).output, c"COMMENT\n".as_ptr());
             }
         }
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
             }
@@ -1239,7 +1239,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
                 fprintf((*ctxt).output, c"NOTATION\n".as_ptr());
             }
         }
-        XmlElementType::XmlDtdNode => {
+        XmlElementType::XmlDTDNode => {
             xml_ctxt_dump_dtd_node(ctxt, node as XmlDtdPtr);
             return;
         }
@@ -1259,14 +1259,14 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             xml_ctxt_dump_namespace(ctxt, node as XmlNsPtr);
             return;
         }
-        XmlElementType::XmlXincludeStart => {
+        XmlElementType::XmlXIncludeStart => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"INCLUDE START\n".as_ptr());
             }
             return;
         }
-        XmlElementType::XmlXincludeEnd => {
+        XmlElementType::XmlXIncludeEnd => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"INCLUDE END\n".as_ptr());
@@ -1556,7 +1556,7 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
                 c"Misplaced TEXT node\n".as_ptr(),
             );
         }
-        XmlElementType::XmlCdataSectionNode => {
+        XmlElementType::XmlCDATASectionNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundCDATA,
@@ -1577,7 +1577,7 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
                 c"Misplaced ENTITY node\n".as_ptr(),
             );
         }
-        XmlElementType::XmlPiNode => {
+        XmlElementType::XmlPINode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundPI,
@@ -1596,7 +1596,7 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
                 fprintf((*ctxt).output, c"DOCUMENT\n".as_ptr());
             }
         }
-        XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlHTMLDocumentNode => {
             if (*ctxt).check == 0 {
                 fprintf((*ctxt).output, c"HTML DOCUMENT\n".as_ptr());
             }
@@ -1719,7 +1719,7 @@ unsafe extern "C" fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
     xml_ctxt_dump_document_head(ctxt, doc);
     if matches!(
         (*doc).typ,
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
     ) && !(*doc).children.is_null()
     {
         (*ctxt).depth += 1;
@@ -1973,7 +1973,7 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
         XmlElementType::XmlTextNode => {
             fprintf(output, c"t".as_ptr());
         }
-        XmlElementType::XmlCdataSectionNode => {
+        XmlElementType::XmlCDATASectionNode => {
             fprintf(output, c"C".as_ptr());
         }
         XmlElementType::XmlEntityRefNode => {
@@ -1982,7 +1982,7 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
         XmlElementType::XmlEntityNode => {
             fprintf(output, c"E".as_ptr());
         }
-        XmlElementType::XmlPiNode => {
+        XmlElementType::XmlPINode => {
             fprintf(output, c"p".as_ptr());
         }
         XmlElementType::XmlCommentNode => {
@@ -1991,7 +1991,7 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
         XmlElementType::XmlDocumentNode => {
             fprintf(output, c"d".as_ptr());
         }
-        XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlHTMLDocumentNode => {
             fprintf(output, c"h".as_ptr());
         }
         XmlElementType::XmlDocumentTypeNode => {
@@ -2049,7 +2049,7 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
                 xml_debug_dump_string(output, (*node).content);
             }
         }
-        XmlElementType::XmlCdataSectionNode => {}
+        XmlElementType::XmlCDATASectionNode => {}
         XmlElementType::XmlEntityRefNode => {
             if !(*node).name.is_null() {
                 fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
@@ -2060,14 +2060,14 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
                 fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
             }
         }
-        XmlElementType::XmlPiNode => {
+        XmlElementType::XmlPINode => {
             if !(*node).name.is_null() {
                 fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
             }
         }
         XmlElementType::XmlCommentNode => {}
         XmlElementType::XmlDocumentNode => {}
-        XmlElementType::XmlHtmlDocumentNode => {}
+        XmlElementType::XmlHTMLDocumentNode => {}
         XmlElementType::XmlDocumentTypeNode => {}
         XmlElementType::XmlDocumentFragNode => {}
         XmlElementType::XmlNotationNode => {}
@@ -2118,15 +2118,15 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
         XmlElementType::XmlElementNode => {
             list = (*node).children;
         }
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             list = (*(node as XmlDocPtr)).children;
         }
         XmlElementType::XmlAttributeNode => {
             list = (*(node as XmlAttrPtr)).children;
         }
         XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlCDATASectionNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {
             if !(*node).content.is_null() {
                 ret = xml_strlen((*node).content);
@@ -2137,13 +2137,13 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
         | XmlElementType::XmlEntityNode
         | XmlElementType::XmlDocumentFragNode
         | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDtdNode
+        | XmlElementType::XmlDTDNode
         | XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl
         | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXincludeStart
-        | XmlElementType::XmlXincludeEnd => {
+        | XmlElementType::XmlXIncludeStart
+        | XmlElementType::XmlXIncludeEnd => {
             ret = 1;
         }
         _ => unreachable!(),
@@ -2415,7 +2415,7 @@ pub unsafe extern "C" fn xml_shell_list(
         return 0;
     }
     if (*node).typ == XmlElementType::XmlDocumentNode
-        || (*node).typ == XmlElementType::XmlHtmlDocumentNode
+        || (*node).typ == XmlElementType::XmlHTMLDocumentNode
     {
         cur = (*(node as XmlDocPtr)).children;
     } else if (*node).typ == XmlElementType::XmlNamespaceDecl {
@@ -2501,7 +2501,7 @@ pub unsafe extern "C" fn xml_shell_dir(
         return 0;
     }
     if (*node).typ == XmlElementType::XmlDocumentNode
-        || (*node).typ == XmlElementType::XmlHtmlDocumentNode
+        || (*node).typ == XmlElementType::XmlHTMLDocumentNode
     {
         xml_debug_dump_document_head((*ctxt).output, node as XmlDocPtr);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
@@ -2548,7 +2548,7 @@ pub unsafe extern "C" fn xml_shell_load(
         return -1;
     }
     if !(*ctxt).doc.is_null() {
-        html = ((*(*ctxt).doc).typ == XmlElementType::XmlHtmlDocumentNode) as i32;
+        html = ((*(*ctxt).doc).typ == XmlElementType::XmlHTMLDocumentNode) as i32;
     }
 
     if html != 0 {
@@ -2628,9 +2628,9 @@ pub unsafe extern "C" fn xml_shell_cat(
         fprintf((*ctxt).output, c"NULL\n".as_ptr());
         return 0;
     }
-    if (*(*ctxt).doc).typ == XmlElementType::XmlHtmlDocumentNode {
+    if (*(*ctxt).doc).typ == XmlElementType::XmlHTMLDocumentNode {
         #[cfg(feature = "html")]
-        if (*node).typ == XmlElementType::XmlHtmlDocumentNode {
+        if (*node).typ == XmlElementType::XmlHTMLDocumentNode {
             html_doc_dump((*ctxt).output, node as HtmlDocPtr);
         } else {
             html_node_dump_file((*ctxt).output, (*ctxt).doc, node);
@@ -2690,7 +2690,7 @@ pub unsafe extern "C" fn xml_shell_write(
                 return -1;
             }
         }
-        XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "html")]
             if html_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
                 generic_error!(
@@ -2763,7 +2763,7 @@ pub unsafe extern "C" fn xml_shell_save(
                 );
             }
         }
-        XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "html")]
             if html_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
                 generic_error!(
@@ -2878,7 +2878,7 @@ pub unsafe extern "C" fn xml_shell_du(
     node = tree;
     while !node.is_null() {
         if (*node).typ == XmlElementType::XmlDocumentNode
-            || (*node).typ == XmlElementType::XmlHtmlDocumentNode
+            || (*node).typ == XmlElementType::XmlHTMLDocumentNode
         {
             fprintf((*ctxt).output, c"/\n".as_ptr());
         } else if (*node).typ == XmlElementType::XmlElementNode {
@@ -2900,7 +2900,7 @@ pub unsafe extern "C" fn xml_shell_du(
          */
 
         if (*node).typ == XmlElementType::XmlDocumentNode
-            || (*node).typ == XmlElementType::XmlHtmlDocumentNode
+            || (*node).typ == XmlElementType::XmlHTMLDocumentNode
         {
             node = (*(node as XmlDocPtr)).children;
         } else if !(*node).children.is_null() && (*node).typ != XmlElementType::XmlEntityRefNode {
@@ -3114,7 +3114,7 @@ unsafe extern "C" fn xml_shell_grep(
          */
 
         if (*node).typ == XmlElementType::XmlDocumentNode
-            || (*node).typ == XmlElementType::XmlHtmlDocumentNode
+            || (*node).typ == XmlElementType::XmlHTMLDocumentNode
         {
             node = (*(node as XmlDocPtr)).children;
         } else if !(*node).children.is_null() && (*node).typ != XmlElementType::XmlEntityRefNode {

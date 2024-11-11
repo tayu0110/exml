@@ -64,16 +64,16 @@ enum XmlTextWriterState {
     XmlTextwriterText,
     XmlTextwriterPI,
     XmlTextwriterPIText,
-    XmlTextwriterCdata,
-    XmlTextwriterDtd,
-    XmlTextwriterDtdText,
-    XmlTextwriterDtdElem,
-    XmlTextwriterDtdElemText,
-    XmlTextwriterDtdAttl,
-    XmlTextwriterDtdAttlText,
-    XmlTextwriterDtdEnty, /* entity */
-    XmlTextwriterDtdEntyText,
-    XmlTextwriterDtdPEnt, /* parameter entity */
+    XmlTextwriterCDATA,
+    XmlTextwriterDTD,
+    XmlTextwriterDTDText,
+    XmlTextwriterDTDElem,
+    XmlTextwriterDTDElemText,
+    XmlTextwriterDTDAttl,
+    XmlTextwriterDTDAttlText,
+    XmlTextwriterDTDEnty, /* entity */
+    XmlTextwriterDTDEntyText,
+    XmlTextwriterDTDPEnt, /* parameter entity */
     XmlTextwriterComment,
 }
 
@@ -1094,22 +1094,22 @@ pub unsafe extern "C" fn xml_text_writer_end_document(writer: XmlTextWriterPtr) 
                 }
                 sum += count;
             }
-            XmlTextWriterState::XmlTextwriterCdata => {
+            XmlTextWriterState::XmlTextwriterCDATA => {
                 count = xml_text_writer_end_cdata(writer);
                 if count < 0 {
                     return -1;
                 }
                 sum += count;
             }
-            XmlTextWriterState::XmlTextwriterDtd
-            | XmlTextWriterState::XmlTextwriterDtdText
-            | XmlTextWriterState::XmlTextwriterDtdElem
-            | XmlTextWriterState::XmlTextwriterDtdElemText
-            | XmlTextWriterState::XmlTextwriterDtdAttl
-            | XmlTextWriterState::XmlTextwriterDtdAttlText
-            | XmlTextWriterState::XmlTextwriterDtdEnty
-            | XmlTextWriterState::XmlTextwriterDtdEntyText
-            | XmlTextWriterState::XmlTextwriterDtdPEnt => {
+            XmlTextWriterState::XmlTextwriterDTD
+            | XmlTextWriterState::XmlTextwriterDTDText
+            | XmlTextWriterState::XmlTextwriterDTDElem
+            | XmlTextWriterState::XmlTextwriterDTDElemText
+            | XmlTextWriterState::XmlTextwriterDTDAttl
+            | XmlTextWriterState::XmlTextwriterDTDAttlText
+            | XmlTextWriterState::XmlTextwriterDTDEnty
+            | XmlTextWriterState::XmlTextwriterDTDEntyText
+            | XmlTextWriterState::XmlTextwriterDTDPEnt => {
                 count = xml_text_writer_end_dtd(writer);
                 if count < 0 {
                     return -1;
@@ -2217,23 +2217,23 @@ unsafe extern "C" fn xml_text_writer_handle_state_dependencies(
                 extra[0] = b' ' as _;
                 (*p).state = XmlTextWriterState::XmlTextwriterPIText;
             }
-            XmlTextWriterState::XmlTextwriterDtd => {
+            XmlTextWriterState::XmlTextwriterDTD => {
                 extra[0] = b' ' as _;
                 extra[1] = b'[' as _;
-                (*p).state = XmlTextWriterState::XmlTextwriterDtdText;
+                (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
             }
-            XmlTextWriterState::XmlTextwriterDtdElem => {
+            XmlTextWriterState::XmlTextwriterDTDElem => {
                 extra[0] = b' ' as _;
-                (*p).state = XmlTextWriterState::XmlTextwriterDtdElemText;
+                (*p).state = XmlTextWriterState::XmlTextwriterDTDElemText;
             }
-            XmlTextWriterState::XmlTextwriterDtdAttl => {
+            XmlTextWriterState::XmlTextwriterDTDAttl => {
                 extra[0] = b' ' as _;
-                (*p).state = XmlTextWriterState::XmlTextwriterDtdAttlText;
+                (*p).state = XmlTextWriterState::XmlTextwriterDTDAttlText;
             }
-            XmlTextWriterState::XmlTextwriterDtdEnty | XmlTextWriterState::XmlTextwriterDtdPEnt => {
+            XmlTextWriterState::XmlTextwriterDTDEnty | XmlTextWriterState::XmlTextwriterDTDPEnt => {
                 extra[0] = b' ' as _;
                 extra[1] = (*writer).qchar;
-                (*p).state = XmlTextWriterState::XmlTextwriterDtdEntyText;
+                (*p).state = XmlTextWriterState::XmlTextwriterDTDEntyText;
             }
             _ => {}
         }
@@ -3231,7 +3231,7 @@ pub unsafe extern "C" fn xml_text_writer_start_pi(
                 }
                 XmlTextWriterState::XmlTextwriterNone
                 | XmlTextWriterState::XmlTextwriterText
-                | XmlTextWriterState::XmlTextwriterDtd => {}
+                | XmlTextWriterState::XmlTextwriterDTD => {}
                 XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
                     xml_writer_err_msg(
                         writer,
@@ -3512,7 +3512,7 @@ pub unsafe extern "C" fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -
                     sum += count;
                     (*p).state = XmlTextWriterState::XmlTextwriterText;
                 }
-                XmlTextWriterState::XmlTextwriterCdata => {
+                XmlTextWriterState::XmlTextwriterCDATA => {
                     xml_writer_err_msg(
                         writer,
                         XmlParserErrors::XmlErrInternalError,
@@ -3539,7 +3539,7 @@ pub unsafe extern "C" fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -
     }
 
     (*p).name = null_mut();
-    (*p).state = XmlTextWriterState::XmlTextwriterCdata;
+    (*p).state = XmlTextWriterState::XmlTextwriterCDATA;
 
     xml_list_push_front((*writer).nodes, p as _);
 
@@ -3580,7 +3580,7 @@ pub unsafe extern "C" fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> 
 
     sum = 0;
     match (*p).state {
-        XmlTextWriterState::XmlTextwriterCdata => {
+        XmlTextWriterState::XmlTextwriterCDATA => {
             count = (*(*writer).out).write_str("]]>");
             if count < 0 {
                 return -1;
@@ -3706,7 +3706,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd(
         xml_free(p as _);
         return -1;
     }
-    (*p).state = XmlTextWriterState::XmlTextwriterDtd;
+    (*p).state = XmlTextWriterState::XmlTextwriterDTD;
 
     xml_list_push_front((*writer).nodes, p as _);
 
@@ -3847,9 +3847,9 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> i3
             break;
         }
         match (*p).state {
-            ty @ XmlTextWriterState::XmlTextwriterDtdText
-            | ty @ XmlTextWriterState::XmlTextwriterDtd => {
-                if matches!(ty, XmlTextWriterState::XmlTextwriterDtdText) {
+            ty @ XmlTextWriterState::XmlTextwriterDTDText
+            | ty @ XmlTextWriterState::XmlTextwriterDTD => {
+                if matches!(ty, XmlTextWriterState::XmlTextwriterDTDText) {
                     count = (*(*writer).out).write_str("]");
                     if count < 0 {
                         return -1;
@@ -3869,17 +3869,17 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> i3
 
                 xml_list_pop_front((*writer).nodes);
             }
-            XmlTextWriterState::XmlTextwriterDtdElem
-            | XmlTextWriterState::XmlTextwriterDtdElemText => {
+            XmlTextWriterState::XmlTextwriterDTDElem
+            | XmlTextWriterState::XmlTextwriterDTDElemText => {
                 count = xml_text_writer_end_dtdelement(writer);
             }
-            XmlTextWriterState::XmlTextwriterDtdAttl
-            | XmlTextWriterState::XmlTextwriterDtdAttlText => {
+            XmlTextWriterState::XmlTextwriterDTDAttl
+            | XmlTextWriterState::XmlTextwriterDTDAttlText => {
                 count = xml_text_writer_end_dtd_attlist(writer);
             }
-            XmlTextWriterState::XmlTextwriterDtdEnty
-            | XmlTextWriterState::XmlTextwriterDtdPEnt
-            | XmlTextWriterState::XmlTextwriterDtdEntyText => {
+            XmlTextWriterState::XmlTextwriterDTDEnty
+            | XmlTextWriterState::XmlTextwriterDTDPEnt
+            | XmlTextWriterState::XmlTextwriterDTDEntyText => {
                 count = xml_text_writer_end_dtd_entity(writer);
             }
             XmlTextWriterState::XmlTextwriterComment => {
@@ -4009,7 +4009,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdelement(
     p = xml_link_get_data(lk) as _;
     if !p.is_null() {
         match (*p).state {
-            XmlTextWriterState::XmlTextwriterDtd => {
+            XmlTextWriterState::XmlTextwriterDTD => {
                 count = (*(*writer).out).write_str(" [");
                 if count < 0 {
                     return -1;
@@ -4022,9 +4022,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdelement(
                     }
                     sum += count;
                 }
-                (*p).state = XmlTextWriterState::XmlTextwriterDtdText;
+                (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
             }
-            XmlTextWriterState::XmlTextwriterDtdText | XmlTextWriterState::XmlTextwriterNone => {}
+            XmlTextWriterState::XmlTextwriterDTDText | XmlTextWriterState::XmlTextwriterNone => {}
             _ => {
                 return -1;
             }
@@ -4051,7 +4051,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdelement(
         xml_free(p as _);
         return -1;
     }
-    (*p).state = XmlTextWriterState::XmlTextwriterDtdElem;
+    (*p).state = XmlTextWriterState::XmlTextwriterDTDElem;
 
     xml_list_push_front((*writer).nodes, p as _);
 
@@ -4105,7 +4105,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr
     }
 
     match (*p).state {
-        XmlTextWriterState::XmlTextwriterDtdElem | XmlTextWriterState::XmlTextwriterDtdElemText => {
+        XmlTextWriterState::XmlTextwriterDTDElem | XmlTextWriterState::XmlTextwriterDTDElemText => {
             count = (*(*writer).out).write_str(">");
             if count < 0 {
                 return -1;
@@ -4222,7 +4222,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdattlist(
     p = xml_link_get_data(lk) as _;
     if !p.is_null() {
         match (*p).state {
-            XmlTextWriterState::XmlTextwriterDtd => {
+            XmlTextWriterState::XmlTextwriterDTD => {
                 count = (*(*writer).out).write_str(" [");
                 if count < 0 {
                     return -1;
@@ -4235,9 +4235,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdattlist(
                     }
                     sum += count;
                 }
-                (*p).state = XmlTextWriterState::XmlTextwriterDtdText;
+                (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
             }
-            XmlTextWriterState::XmlTextwriterDtdText | XmlTextWriterState::XmlTextwriterNone => {}
+            XmlTextWriterState::XmlTextwriterDTDText | XmlTextWriterState::XmlTextwriterNone => {}
             _ => {
                 return -1;
             }
@@ -4264,7 +4264,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtdattlist(
         xml_free(p as _);
         return -1;
     }
-    (*p).state = XmlTextWriterState::XmlTextwriterDtdAttl;
+    (*p).state = XmlTextWriterState::XmlTextwriterDTDAttl;
 
     xml_list_push_front((*writer).nodes, p as _);
 
@@ -4318,7 +4318,7 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPt
     }
 
     match (*p).state {
-        XmlTextWriterState::XmlTextwriterDtdAttl | XmlTextWriterState::XmlTextwriterDtdAttlText => {
+        XmlTextWriterState::XmlTextwriterDTDAttl | XmlTextWriterState::XmlTextwriterDTDAttlText => {
             count = (*(*writer).out).write_str(">");
             if count < 0 {
                 return -1;
@@ -4433,7 +4433,7 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd_entity(
         p = xml_link_get_data(lk) as _;
         if !p.is_null() {
             match (*p).state {
-                XmlTextWriterState::XmlTextwriterDtd => {
+                XmlTextWriterState::XmlTextwriterDTD => {
                     count = (*(*writer).out).write_str(" [");
                     if count < 0 {
                         return -1;
@@ -4446,9 +4446,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd_entity(
                         }
                         sum += count;
                     }
-                    (*p).state = XmlTextWriterState::XmlTextwriterDtdText;
+                    (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
                 }
-                _ty @ XmlTextWriterState::XmlTextwriterDtdText
+                _ty @ XmlTextWriterState::XmlTextwriterDTDText
                 | _ty @ XmlTextWriterState::XmlTextwriterNone => {}
                 _ => {
                     return -1;
@@ -4479,9 +4479,9 @@ pub unsafe extern "C" fn xml_text_writer_start_dtd_entity(
     }
 
     if pe != 0 {
-        (*p).state = XmlTextWriterState::XmlTextwriterDtdPEnt;
+        (*p).state = XmlTextWriterState::XmlTextwriterDTDPEnt;
     } else {
-        (*p).state = XmlTextWriterState::XmlTextwriterDtdEnty;
+        (*p).state = XmlTextWriterState::XmlTextwriterDTDEnty;
     }
 
     xml_list_push_front((*writer).nodes, p as _);
@@ -4545,10 +4545,10 @@ pub unsafe extern "C" fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr
     }
 
     match (*p).state {
-        ty @ XmlTextWriterState::XmlTextwriterDtdEntyText
-        | ty @ XmlTextWriterState::XmlTextwriterDtdEnty
-        | ty @ XmlTextWriterState::XmlTextwriterDtdPEnt => {
-            if matches!(ty, XmlTextWriterState::XmlTextwriterDtdEntyText) {
+        ty @ XmlTextWriterState::XmlTextwriterDTDEntyText
+        | ty @ XmlTextWriterState::XmlTextwriterDTDEnty
+        | ty @ XmlTextWriterState::XmlTextwriterDTDPEnt => {
+            if matches!(ty, XmlTextWriterState::XmlTextwriterDTDEntyText) {
                 count = (*(*writer).out).write_bytes(&[(*writer).qchar as u8]);
                 if count < 0 {
                     return -1;
@@ -4739,8 +4739,8 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_external_entity_contents(
     }
 
     match (*p).state {
-        XmlTextWriterState::XmlTextwriterDtdEnty => {}
-        XmlTextWriterState::XmlTextwriterDtdPEnt => {
+        XmlTextWriterState::XmlTextwriterDTDEnty => {}
+        XmlTextWriterState::XmlTextwriterDTDPEnt => {
             if !ndataid.is_null() {
                 xml_writer_err_msg(writer, XmlParserErrors::XmlErrInternalError,
                                 c"xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!\n".as_ptr() as _);
@@ -4914,7 +4914,7 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
     let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
     if !p.is_null() {
         match (*p).state {
-            XmlTextWriterState::XmlTextwriterDtd => {
+            XmlTextWriterState::XmlTextwriterDTD => {
                 count = (*(*writer).out).write_str(" [");
                 if count < 0 {
                     return -1;
@@ -4927,9 +4927,9 @@ pub unsafe extern "C" fn xml_text_writer_write_dtd_notation(
                     }
                     sum += count;
                 }
-                (*p).state = XmlTextWriterState::XmlTextwriterDtdText;
+                (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
             }
-            XmlTextWriterState::XmlTextwriterDtdText => {}
+            XmlTextWriterState::XmlTextwriterDTDText => {}
             _ => {
                 return -1;
             }

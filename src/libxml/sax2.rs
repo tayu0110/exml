@@ -920,7 +920,7 @@ pub unsafe fn xml_sax2_attribute_decl(
     }
 
     if xml_str_equal(fullname, c"xml:id".as_ptr() as _)
-        && typ != XmlAttributeType::XmlAttributeId as i32
+        && typ != XmlAttributeType::XmlAttributeID as i32
     {
         /*
          * Raise the error but keep the validity flag
@@ -1300,7 +1300,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
                 xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
                 return;
             }
-            (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocHtml as i32;
+            (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocHTML as i32;
             (*(*ctxt).my_doc).parse_flags = (*ctxt).options;
         }
         #[cfg(not(feature = "html"))]
@@ -3673,7 +3673,7 @@ pub unsafe fn xml_sax2_cdata_block(
     } else {
         null_mut()
     };
-    xml_sax2_text(ctxt, value, len, XmlElementType::XmlCdataSectionNode);
+    xml_sax2_text(ctxt, value, len, XmlElementType::XmlCDATASectionNode);
 }
 
 static mut XML_SAX2_DEFAULT_VERSION_VALUE: i32 = 2;

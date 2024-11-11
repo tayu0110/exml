@@ -60,10 +60,10 @@ pub enum XmlSaveOption {
     XmlSaveFormat = 1 << 0,   /* format save output */
     XmlSaveNoDecl = 1 << 1,   /* drop the xml declaration */
     XmlSaveNoEmpty = 1 << 2,  /* no empty tags */
-    XmlSaveNoXhtml = 1 << 3,  /* disable XHTML1 specific rules */
-    XmlSaveXhtml = 1 << 4,    /* force XHTML1 specific rules */
-    XmlSaveAsXml = 1 << 5,    /* force XML serialization on HTML doc */
-    XmlSaveAsHtml = 1 << 6,   /* force HTML serialization on XML doc */
+    XmlSaveNoXHTML = 1 << 3,  /* disable XHTML1 specific rules */
+    XmlSaveXHTML = 1 << 4,    /* force XHTML1 specific rules */
+    XmlSaveAsXML = 1 << 5,    /* force XML serialization on HTML doc */
+    XmlSaveAsHTML = 1 << 6,   /* force HTML serialization on XML doc */
     XmlSaveWsnonsig = 1 << 7, /* format with non-significant whitespace */
 }
 
@@ -502,10 +502,10 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
     parent = (*cur).parent;
     loop {
         match (*cur).typ {
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 xml_doc_content_dump_output(ctxt, cur as _);
             }
-            XmlElementType::XmlDtdNode => {
+            XmlElementType::XmlDTDNode => {
                 xml_dtd_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlDocumentFragNode => {
@@ -610,7 +610,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                                 if matches!(
                                     (*tmp).typ,
                                     XmlElementType::XmlTextNode
-                                        | XmlElementType::XmlCdataSectionNode
+                                        | XmlElementType::XmlCDATASectionNode
                                         | XmlElementType::XmlEntityRefNode
                                 ) {
                                     (*ctxt).format = 0;
@@ -658,7 +658,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                     }
                 }
             }
-            XmlElementType::XmlPiNode => {
+            XmlElementType::XmlPINode => {
                 if cur != root && (*ctxt).format == 1 && get_indent_tree_output() != 0 {
                     let len = (*ctxt).indent_size
                         * if (*ctxt).level > (*ctxt).indent_nr as i32 {
@@ -723,7 +723,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 (*buf).write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                 (*buf).write_bytes(b";");
             }
-            XmlElementType::XmlCdataSectionNode => {
+            XmlElementType::XmlCDATASectionNode => {
                 if (*cur).content.is_null() || *(*cur).content == b'\0' {
                     (*buf).write_bytes(b"<![CDATA[]]>");
                 } else {
@@ -765,7 +765,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
             if (*ctxt).format == 1
                 && !matches!(
                     (*cur).typ,
-                    XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd
+                    XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
                 )
             {
                 (*buf).write_bytes(b"\n");
@@ -1124,13 +1124,13 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
     parent = (*cur).parent;
     loop {
         match (*cur).typ {
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 xml_doc_content_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlNamespaceDecl => {
                 xml_ns_dump_output_ctxt(ctxt, cur as _);
             }
-            XmlElementType::XmlDtdNode => {
+            XmlElementType::XmlDTDNode => {
                 xml_dtd_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlDocumentFragNode => {
@@ -1371,7 +1371,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     );
                 }
             }
-            XmlElementType::XmlPiNode => {
+            XmlElementType::XmlPINode => {
                 if !(*cur).content.is_null() {
                     (*buf).write_bytes(b"<?");
 
@@ -1411,7 +1411,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 (*buf).write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                 (*buf).write_bytes(b";");
             }
-            XmlElementType::XmlCdataSectionNode => {
+            XmlElementType::XmlCDATASectionNode => {
                 if (*cur).content.is_null() || *(*cur).content == b'\0' {
                     (*buf).write_bytes(b"<![CDATA[]]>");
                 } else {
@@ -1532,7 +1532,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
 
     if !matches!(
         (*cur).typ,
-        XmlElementType::XmlHtmlDocumentNode | XmlElementType::XmlDocumentNode
+        XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
     ) {
         return -1;
     }
@@ -1544,10 +1544,10 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         encoding = Some(enc.to_owned());
     }
 
-    if (matches!((*cur).typ, XmlElementType::XmlHtmlDocumentNode)
-        && ((*ctxt).options & XmlSaveOption::XmlSaveAsXml as i32) == 0
-        && ((*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32) == 0)
-        || (*ctxt).options & XmlSaveOption::XmlSaveAsHtml as i32 != 0
+    if (matches!((*cur).typ, XmlElementType::XmlHTMLDocumentNode)
+        && ((*ctxt).options & XmlSaveOption::XmlSaveAsXML as i32) == 0
+        && ((*ctxt).options & XmlSaveOption::XmlSaveXHTML as i32) == 0)
+        || (*ctxt).options & XmlSaveOption::XmlSaveAsHTML as i32 != 0
     {
         #[cfg(feature = "html")]
         {
@@ -1584,8 +1584,8 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
             return -1;
         }
     } else if matches!((*cur).typ, XmlElementType::XmlDocumentNode)
-        || (*ctxt).options & XmlSaveOption::XmlSaveAsXml as i32 != 0
-        || (*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32 != 0
+        || (*ctxt).options & XmlSaveOption::XmlSaveAsXML as i32 != 0
+        || (*ctxt).options & XmlSaveOption::XmlSaveXHTML as i32 != 0
     {
         let enc = if let Some(encoding) = encoding.as_deref() {
             encoding
@@ -1657,10 +1657,10 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
 
         #[cfg(feature = "html")]
         {
-            if (*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32 != 0 {
+            if (*ctxt).options & XmlSaveOption::XmlSaveXHTML as i32 != 0 {
                 is_html = true;
             }
-            if (*ctxt).options & XmlSaveOption::XmlSaveNoXhtml as i32 == 0 {
+            if (*ctxt).options & XmlSaveOption::XmlSaveNoXHTML as i32 == 0 {
                 dtd = (*cur).get_int_subset();
                 if !dtd.is_null() {
                     let system_id = (!(*dtd).system_id.is_null()).then(|| {
@@ -1696,7 +1696,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                 }
                 if !matches!(
                     (*child).typ,
-                    XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd
+                    XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
                 ) {
                     (*buf).write_bytes(b"\n");
                 }
@@ -1957,15 +1957,15 @@ pub unsafe extern "C" fn xml_save_tree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -
     }
     #[cfg(feature = "html")]
     {
-        if (*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32 != 0 {
+        if (*ctxt).options & XmlSaveOption::XmlSaveXHTML as i32 != 0 {
             xhtml_node_dump_output(ctxt, node);
             return ret;
         }
         if (!matches!((*node).typ, XmlElementType::XmlNamespaceDecl)
             && !(*node).doc.is_null()
-            && matches!((*(*node).doc).typ, XmlElementType::XmlHtmlDocumentNode)
-            && (*ctxt).options & XmlSaveOption::XmlSaveAsXml as i32 == 0)
-            || (*ctxt).options & XmlSaveOption::XmlSaveAsHtml as i32 != 0
+            && matches!((*(*node).doc).typ, XmlElementType::XmlHTMLDocumentNode)
+            && (*ctxt).options & XmlSaveOption::XmlSaveAsXML as i32 == 0)
+            || (*ctxt).options & XmlSaveOption::XmlSaveAsHTML as i32 != 0
         {
             html_node_dump_output_internal(ctxt, node);
             return ret;

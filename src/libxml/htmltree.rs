@@ -56,14 +56,14 @@ const HTML_COMMENT_NODE: XmlElementType = XmlElementType::XmlCommentNode;
  * Macro. A preserved node in a HTML document is really implemented
  * the same way as a CDATA section in an XML document.
  */
-const HTML_PRESERVE_NODE: XmlElementType = XmlElementType::XmlCdataSectionNode;
+const HTML_PRESERVE_NODE: XmlElementType = XmlElementType::XmlCDATASectionNode;
 /**
  * HTML_PI_NODE:
  *
  * Macro. A processing instruction in a HTML document is really implemented
  * the same way as a processing instruction in an XML document.
  */
-const HTML_PI_NODE: XmlElementType = XmlElementType::XmlPiNode;
+const HTML_PI_NODE: XmlElementType = XmlElementType::XmlPINode;
 
 /**
  * htmlNewDoc:
@@ -113,7 +113,7 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     memset(cur as _, 0, size_of::<XmlDoc>());
     std::ptr::write(&mut *cur, XmlDoc::default());
 
-    (*cur).typ = XmlElementType::XmlHtmlDocumentNode;
+    (*cur).typ = XmlElementType::XmlHTMLDocumentNode;
     (*cur).version = None;
     (*cur).int_subset = null_mut();
     (*cur).doc = cur;
@@ -129,7 +129,7 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     (*cur)._private = null_mut();
     (*cur).charset = XmlCharEncoding::UTF8;
     (*cur).properties =
-        XmlDocProperties::XmlDocHtml as i32 | XmlDocProperties::XmlDocUserbuilt as i32;
+        XmlDocProperties::XmlDocHTML as i32 | XmlDocProperties::XmlDocUserbuilt as i32;
     if !external_id.is_null() || !uri.is_null() {
         xml_create_int_subset(cur, c"html".as_ptr() as _, external_id, uri);
     }
@@ -1194,7 +1194,7 @@ pub unsafe fn html_node_dump_format_output(
     parent = (*cur).parent;
     'main: loop {
         match (*cur).typ {
-            XmlElementType::XmlHtmlDocumentNode | XmlElementType::XmlDocumentNode => {
+            XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
                 if !(*(cur as XmlDocPtr)).int_subset.is_null() {
                     html_dtd_dump_output(buf, cur as _, null_mut());
                 }
@@ -1400,7 +1400,7 @@ pub unsafe fn html_node_dump_format_output(
 
             if matches!(
                 (*cur).typ,
-                XmlElementType::XmlHtmlDocumentNode | XmlElementType::XmlDocumentNode
+                XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
             ) {
                 (*buf).write_str("\n");
             } else {
@@ -1487,7 +1487,7 @@ pub unsafe fn html_doc_content_dump_format_output(
     let mut typ: i32 = 0;
     if !cur.is_null() {
         typ = (*cur).typ as i32;
-        (*cur).typ = XmlElementType::XmlHtmlDocumentNode;
+        (*cur).typ = XmlElementType::XmlHTMLDocumentNode;
     }
     html_node_dump_format_output(buf, cur, cur as _, None, format);
     if !cur.is_null() {

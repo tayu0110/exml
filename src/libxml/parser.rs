@@ -416,10 +416,10 @@ pub const XML_SKIP_IDS: usize = 8;
 pub enum XmlParserMode {
     #[default]
     XmlParseUnknown = 0,
-    XmlParseDom = 1,
-    XmlParseSax = 2,
-    XmlParsePushDom = 3,
-    XmlParsePushSax = 4,
+    XmlParseDOM = 1,
+    XmlParseSAX = 2,
+    XmlParsePushDOM = 3,
+    XmlParsePushSAX = 4,
     XmlParseReader = 5,
 }
 
@@ -3502,7 +3502,7 @@ unsafe extern "C" fn xml_clean_special_attr(ctxt: XmlParserCtxtPtr) {
     };
 
     atts.remove_if(
-        |data, _, _, _| data.0 as isize == XmlAttributeType::XmlAttributeCdata as isize,
+        |data, _, _, _| data.0 as isize == XmlAttributeType::XmlAttributeCDATA as isize,
         |_, _| {},
     );
     if atts.is_empty() {
@@ -3703,7 +3703,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
     if (*ctxt).well_formed != 0 && !(*ctxt).my_doc.is_null() {
         (*(*ctxt).my_doc).properties |= XmlDocProperties::XmlDocWellformed as i32;
         if (*ctxt).valid != 0 {
-            (*(*ctxt).my_doc).properties |= XmlDocProperties::XmlDocDtdvalid as i32;
+            (*(*ctxt).my_doc).properties |= XmlDocProperties::XmlDocDTDValid as i32;
         }
         if (*ctxt).ns_well_formed != 0 {
             (*(*ctxt).my_doc).properties |= XmlDocProperties::XmlDocNsvalid as i32;
@@ -4661,12 +4661,12 @@ pub unsafe fn xml_parse_in_node_context(
         XmlElementType::XmlElementNode
         | XmlElementType::XmlAttributeNode
         | XmlElementType::XmlTextNode
-        | XmlElementType::XmlCdataSectionNode
+        | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode
         | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlHtmlDocumentNode => {}
+        | XmlElementType::XmlHTMLDocumentNode => {}
         _ => {
             return XmlParserErrors::XmlErrInternalError;
         }
@@ -4676,7 +4676,7 @@ pub unsafe fn xml_parse_in_node_context(
             (*node).typ,
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHtmlDocumentNode
+                | XmlElementType::XmlHTMLDocumentNode
         )
     {
         node = (*node).parent;
@@ -4699,7 +4699,7 @@ pub unsafe fn xml_parse_in_node_context(
      */
     if (*doc).typ == XmlElementType::XmlDocumentNode {
         ctxt = xml_create_memory_parser_ctxt(data);
-    } else if cfg!(feature = "html") && (*doc).typ == XmlElementType::XmlHtmlDocumentNode {
+    } else if cfg!(feature = "html") && (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
         #[cfg(feature = "html")]
         {
             ctxt = html_create_memory_parser_ctxt(data);
@@ -4795,7 +4795,7 @@ pub unsafe fn xml_parse_in_node_context(
 
     #[cfg(feature = "html")]
     {
-        if (*doc).typ == XmlElementType::XmlHtmlDocumentNode {
+        if (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
             __html_parse_content(ctxt as _);
         } else {
             xml_parse_content(ctxt);
@@ -13042,7 +13042,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                 }
                 break;
             }
-            if typ != XmlAttributeType::XmlAttributeCdata as i32 && !default_value.is_null() {
+            if typ != XmlAttributeType::XmlAttributeCDATA as i32 && !default_value.is_null() {
                 xml_attr_normalize_space(default_value, default_value);
             }
 

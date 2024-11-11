@@ -1777,15 +1777,15 @@ unsafe extern "C" fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> *con
         XmlSchemaTypeType::XmlSchemaTypeChoice => c"model group (choice)".as_ptr() as _,
         XmlSchemaTypeType::XmlSchemaTypeAll => c"model group (all)".as_ptr() as _,
         XmlSchemaTypeType::XmlSchemaTypeParticle => c"particle".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeIdcUnique => {
+        XmlSchemaTypeType::XmlSchemaTypeIDCUnique => {
             c"unique identity-constraint".as_ptr() as _
             /* return (c"IDC (unique)".as_ptr() as _); */
         }
-        XmlSchemaTypeType::XmlSchemaTypeIdcKey => {
+        XmlSchemaTypeType::XmlSchemaTypeIDCKey => {
             c"key identity-constraint".as_ptr() as _
             /* return (c"IDC (key)".as_ptr() as _); */
         }
-        XmlSchemaTypeType::XmlSchemaTypeIdcKeyref => {
+        XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
             c"keyref identity-constraint".as_ptr() as _
             /* return (c"IDC (keyref)".as_ptr() as _); */
         }
@@ -1846,9 +1846,9 @@ unsafe extern "C" fn xml_schema_get_component_target_ns(
         XmlSchemaTypeType::XmlSchemaTypeGroup => {
             return (*(item as XmlSchemaModelGroupDefPtr)).target_namespace;
         }
-        XmlSchemaTypeType::XmlSchemaTypeIdcKey
-        | XmlSchemaTypeType::XmlSchemaTypeIdcUnique
-        | XmlSchemaTypeType::XmlSchemaTypeIdcKeyref => {
+        XmlSchemaTypeType::XmlSchemaTypeIDCKey
+        | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
+        | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
             return (*(item as XmlSchemaIDCPtr)).target_namespace;
         }
         XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
@@ -1896,9 +1896,9 @@ unsafe extern "C" fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) 
         XmlSchemaTypeType::XmlSchemaTypeGroup => {
             return (*(item as XmlSchemaModelGroupDefPtr)).name;
         }
-        XmlSchemaTypeType::XmlSchemaTypeIdcKey
-        | XmlSchemaTypeType::XmlSchemaTypeIdcUnique
-        | XmlSchemaTypeType::XmlSchemaTypeIdcKeyref => {
+        XmlSchemaTypeType::XmlSchemaTypeIDCKey
+        | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
+        | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
             return (*(item as XmlSchemaIDCPtr)).name;
         }
         XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
@@ -2116,12 +2116,12 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
                 );
                 *buf = xml_strcat(*buf, c"'".as_ptr() as _);
             }
-            XmlSchemaTypeType::XmlSchemaTypeIdcUnique
-            | XmlSchemaTypeType::XmlSchemaTypeIdcKey
-            | XmlSchemaTypeType::XmlSchemaTypeIdcKeyref => {
-                if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeIdcUnique {
+            XmlSchemaTypeType::XmlSchemaTypeIDCUnique
+            | XmlSchemaTypeType::XmlSchemaTypeIDCKey
+            | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
+                if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeIDCUnique {
                     *buf = xml_strdup(c"unique '".as_ptr() as _);
-                } else if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKey {
+                } else if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKey {
                     *buf = xml_strdup(c"key '".as_ptr() as _);
                 } else {
                     *buf = xml_strdup(c"keyRef '".as_ptr() as _);
@@ -2576,9 +2576,9 @@ unsafe extern "C" fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) 
         XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
             (*(item as XmlSchemaAttributeGroupPtr)).node
         }
-        XmlSchemaTypeType::XmlSchemaTypeIdcUnique
-        | XmlSchemaTypeType::XmlSchemaTypeIdcKey
-        | XmlSchemaTypeType::XmlSchemaTypeIdcKeyref => (*(item as XmlSchemaIDCPtr)).node,
+        XmlSchemaTypeType::XmlSchemaTypeIDCUnique
+        | XmlSchemaTypeType::XmlSchemaTypeIDCKey
+        | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => (*(item as XmlSchemaIDCPtr)).node,
         XmlSchemaTypeType::XmlSchemaExtraQnameref => (*(item as XmlSchemaQnameRefPtr)).node,
         /* TODO: What to do with NOTATIONs?
         XmlSchemaTypeType::XML_SCHEMA_TYPE_NOTATION:
@@ -5066,7 +5066,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
                 }
             } else if !matches!(
                 (*cur).typ,
-                XmlElementType::XmlElementNode | XmlElementType::XmlCdataSectionNode
+                XmlElementType::XmlElementNode | XmlElementType::XmlCDATASectionNode
             ) {
                 delete = cur;
                 // goto skip_children;
@@ -5366,9 +5366,9 @@ unsafe extern "C" fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) 
                 | XmlSchemaTypeType::XmlSchemaTypeAnyAttribute => {
                     xml_schema_free_wildcard(item as XmlSchemaWildcardPtr);
                 }
-                XmlSchemaTypeType::XmlSchemaTypeIdcKey
-                | XmlSchemaTypeType::XmlSchemaTypeIdcUnique
-                | XmlSchemaTypeType::XmlSchemaTypeIdcKeyref => {
+                XmlSchemaTypeType::XmlSchemaTypeIDCKey
+                | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
+                | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
                     xml_schema_free_idc(item as XmlSchemaIDCPtr);
                 }
                 XmlSchemaTypeType::XmlSchemaTypeNotation => {
@@ -6371,7 +6371,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_id(
             /*
              * NOTE: the IDness might have already be declared in the DTD
              */
-            if !matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeId)) {
+            if !matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeID)) {
                 /*
                  * TODO: Use xmlSchemaStrip here; it's not exported at this
                  * moment.
@@ -6389,7 +6389,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_id(
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
                         attr as XmlNodePtr,
-                        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasId),
+                        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasID),
                         null_mut(),
                         null_mut(),
                         c"Duplicate value '%s' of simple type 'xs:ID'".as_ptr() as _,
@@ -6397,7 +6397,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_id(
                         null_mut(),
                     );
                 } else {
-                    (*attr).atype = Some(XmlAttributeType::XmlAttributeId);
+                    (*attr).atype = Some(XmlAttributeType::XmlAttributeID);
                 }
             }
         }
@@ -6408,7 +6408,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_id(
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 null_mut(),
                 attr as XmlNodePtr,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasId),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasID),
                 null_mut(),
                 null_mut(),
                 c"The value '%s' of simple type 'xs:ID' is not a valid 'xs:NCName'".as_ptr() as _,
@@ -6500,7 +6500,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_value(
     match XmlSchemaValType::try_from((*typ).built_in_type) {
         Ok(XmlSchemaValType::XmlSchemasNcname)
         | Ok(XmlSchemaValType::XmlSchemasQname)
-        | Ok(XmlSchemaValType::XmlSchemasAnyuri)
+        | Ok(XmlSchemaValType::XmlSchemasAnyURI)
         | Ok(XmlSchemaValType::XmlSchemasToken)
         | Ok(XmlSchemaValType::XmlSchemasLanguage) => {
             ret = xml_schema_val_predef_type_node(typ, value, null_mut(), attr as XmlNodePtr);
@@ -6780,7 +6780,7 @@ unsafe extern "C" fn xml_schema_parse_schema_element(
                     ctxt,
                     null_mut(),
                     attr,
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
                     null_mut(),
                 );
                 HFAILURE!(res, 'exit_failure);
@@ -7247,7 +7247,7 @@ unsafe extern "C" fn xml_schema_parse_annotation(
                 null_mut(),
                 child,
                 c"source".as_ptr() as _,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
                 null_mut(),
             );
             child = (*child).next;
@@ -7643,7 +7643,7 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
             pctxt,
             null_mut(),
             attr,
-            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
             schema_location as _,
         ) != 0
         {
@@ -8007,9 +8007,9 @@ unsafe extern "C" fn xml_schema_add_annotation(
             ADD_ANNOTATION!(item, annot);
         }
         XmlSchemaTypeType::XmlSchemaTypeParticle
-        | XmlSchemaTypeType::XmlSchemaTypeIdcKey
-        | XmlSchemaTypeType::XmlSchemaTypeIdcKeyref
-        | XmlSchemaTypeType::XmlSchemaTypeIdcUnique => {
+        | XmlSchemaTypeType::XmlSchemaTypeIDCKey
+        | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
+        | XmlSchemaTypeType::XmlSchemaTypeIDCUnique => {
             let item: XmlSchemaAnnotItemPtr = ann_item as XmlSchemaAnnotItemPtr;
             ADD_ANNOTATION!(item, annot);
         }
@@ -9824,7 +9824,7 @@ unsafe extern "C" fn xml_schema_parse_wildcard_ns(
                         null_mut(),
                         attr,
                         ns_item,
-                        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
+                        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
                     );
                     dictns_item = xml_dict_lookup((*ctxt).dict, ns_item, -1);
                 }
@@ -10868,7 +10868,7 @@ unsafe extern "C" fn xml_schema_add_idc(
     /*
      * Only keyrefs need to be fixup up.
      */
-    if category == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
+    if category == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
         WXS_ADD_PENDING!(ctxt, ret);
     }
     ret
@@ -11145,7 +11145,7 @@ unsafe extern "C" fn xml_schema_parse_idc(
         if (*attr).ns.is_null() {
             if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
                 && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                && (idc_category != XmlSchemaTypeType::XmlSchemaTypeIdcKeyref
+                && (idc_category != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
                     || !xml_str_equal((*attr).name, c"refer".as_ptr() as _))
             {
                 xml_schema_pillegal_attr_err(
@@ -11200,7 +11200,7 @@ unsafe extern "C" fn xml_schema_parse_idc(
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
-    if idc_category == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
+    if idc_category == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
         /*
          * Attribute "refer" (mandatory).
          */
@@ -11220,7 +11220,7 @@ unsafe extern "C" fn xml_schema_parse_idc(
              */
             (*item).refe = xml_schema_new_qname_ref(
                 ctxt,
-                XmlSchemaTypeType::XmlSchemaTypeIdcKey,
+                XmlSchemaTypeType::XmlSchemaTypeIDCKey,
                 null_mut(),
                 null_mut(),
             );
@@ -11814,7 +11814,7 @@ unsafe extern "C" fn xml_schema_parse_element(
                     ctxt,
                     schema,
                     child,
-                    XmlSchemaTypeType::XmlSchemaTypeIdcUnique,
+                    XmlSchemaTypeType::XmlSchemaTypeIDCUnique,
                     (*decl).target_namespace,
                 );
             } else if IS_SCHEMA!(child, c"key".as_ptr()) {
@@ -11822,7 +11822,7 @@ unsafe extern "C" fn xml_schema_parse_element(
                     ctxt,
                     schema,
                     child,
-                    XmlSchemaTypeType::XmlSchemaTypeIdcKey,
+                    XmlSchemaTypeType::XmlSchemaTypeIDCKey,
                     (*decl).target_namespace,
                 );
             } else if IS_SCHEMA!(child, c"keyref".as_ptr()) {
@@ -11830,7 +11830,7 @@ unsafe extern "C" fn xml_schema_parse_element(
                     ctxt,
                     schema,
                     child,
-                    XmlSchemaTypeType::XmlSchemaTypeIdcKeyref,
+                    XmlSchemaTypeType::XmlSchemaTypeIDCKeyref,
                     (*decl).target_namespace,
                 );
             }
@@ -14154,7 +14154,7 @@ unsafe extern "C" fn xml_schema_parse_import(
         null_mut(),
         node,
         c"namespace".as_ptr() as _,
-        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
+        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
         addr_of_mut!(namespace_name),
     ) != 0
     {
@@ -14163,7 +14163,7 @@ unsafe extern "C" fn xml_schema_parse_import(
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
             node,
-            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
             null_mut(),
             namespace_name,
             null_mut(),
@@ -14178,7 +14178,7 @@ unsafe extern "C" fn xml_schema_parse_import(
         null_mut(),
         node,
         c"schemaLocation".as_ptr() as _,
-        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
+        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
         addr_of_mut!(schema_location),
     ) != 0
     {
@@ -14187,7 +14187,7 @@ unsafe extern "C" fn xml_schema_parse_import(
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
             node,
-            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyuri),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
             null_mut(),
             schema_location,
             null_mut(),
@@ -15210,9 +15210,9 @@ unsafe extern "C" fn xml_schema_add_components(
                 name = (*(item as XmlSchemaAttributeGroupPtr)).name;
                 WXS_GET_GLOBAL_HASH!(bucket, attrgrp_decl, table);
             }
-            XmlSchemaTypeType::XmlSchemaTypeIdcKey
-            | XmlSchemaTypeType::XmlSchemaTypeIdcUnique
-            | XmlSchemaTypeType::XmlSchemaTypeIdcKeyref => {
+            XmlSchemaTypeType::XmlSchemaTypeIDCKey
+            | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
+            | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
                 name = (*(item as XmlSchemaIDCPtr)).name;
                 WXS_GET_GLOBAL_HASH!(bucket, idc_def, table);
             }
@@ -16108,7 +16108,7 @@ unsafe extern "C" fn xml_schema_resolve_idckey_references(
     idc: XmlSchemaIDCPtr,
     pctxt: XmlSchemaParserCtxtPtr,
 ) -> i32 {
-    if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
+    if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
         return 0;
     }
     if !(*(*idc).refe).name.is_null() {
@@ -16130,11 +16130,11 @@ unsafe extern "C" fn xml_schema_resolve_idckey_references(
                 c"refer".as_ptr() as _,
                 (*(*idc).refe).name,
                 (*(*idc).refe).target_namespace,
-                XmlSchemaTypeType::XmlSchemaTypeIdcKey,
+                XmlSchemaTypeType::XmlSchemaTypeIDCKey,
                 null_mut(),
             );
             return (*pctxt).err;
-        } else if (*(*(*idc).refe).item).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
+        } else if (*(*(*idc).refe).item).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
             /*
              * SPEC c-props-correct (1)
              */
@@ -18072,7 +18072,7 @@ unsafe extern "C" fn xml_schema_check_ctprops_correct(
             if !WXS_ATTRUSE_TYPEDEF!(using).is_null()
                 && xml_schema_is_derived_from_built_in_type(
                     WXS_ATTRUSE_TYPEDEF!(using),
-                    XmlSchemaValType::XmlSchemasId as i32,
+                    XmlSchemaValType::XmlSchemasID as i32,
                 ) != 0
             {
                 if has_id != 0 {
@@ -21460,7 +21460,7 @@ unsafe extern "C" fn xml_schema_check_attr_props_correct(
          */
         if xml_schema_is_derived_from_built_in_type(
             WXS_ATTR_TYPEDEF!(attr),
-            XmlSchemaValType::XmlSchemasId as i32,
+            XmlSchemaValType::XmlSchemasID as i32,
         ) != 0
         {
             xml_schema_custom_err(pctxt as XmlSchemaAbstractCtxtPtr, XmlParserErrors::XmlSchemapAPropsCorrect3, null_mut(),  attr as XmlSchemaBasicItemPtr, c"Value constraints are not allowed if the type definition is or is derived from xs:ID".as_ptr() as _, null_mut(), null_mut());
@@ -21560,7 +21560,7 @@ unsafe extern "C" fn xml_schema_check_attr_use_props_correct(
          */
         if xml_schema_is_derived_from_built_in_type(
             WXS_ATTRUSE_TYPEDEF!(using),
-            XmlSchemaValType::XmlSchemasId as i32,
+            XmlSchemaValType::XmlSchemasID as i32,
         ) != 0
         {
             xml_schema_custom_err(ctxt as XmlSchemaAbstractCtxtPtr, XmlParserErrors::XmlSchemapAuPropsCorrect, null_mut(),  using as XmlSchemaBasicItemPtr, c"Value constraints are not allowed if the type definition is or is derived from xs:ID".as_ptr() as _, null_mut(), null_mut());
@@ -21694,7 +21694,7 @@ unsafe extern "C" fn xml_schema_check_agprops_correct(
             if !WXS_ATTRUSE_TYPEDEF!(using).is_null()
                 && xml_schema_is_derived_from_built_in_type(
                     WXS_ATTRUSE_TYPEDEF!(using),
-                    XmlSchemaValType::XmlSchemasId as i32,
+                    XmlSchemaValType::XmlSchemasID as i32,
                 ) != 0
             {
                 if has_id != 0 {
@@ -22156,13 +22156,13 @@ unsafe extern "C" fn xml_schema_check_elem_props_correct(
         && ((WXS_IS_SIMPLE!(type_def)
             && xml_schema_is_derived_from_built_in_type(
                 type_def,
-                XmlSchemaValType::XmlSchemasId as i32,
+                XmlSchemaValType::XmlSchemasID as i32,
             ) != 0)
             || (WXS_IS_COMPLEX!(type_def)
                 && WXS_HAS_SIMPLE_CONTENT!(type_def)
                 && xml_schema_is_derived_from_built_in_type(
                     (*type_def).content_type_def,
-                    XmlSchemaValType::XmlSchemasId as i32,
+                    XmlSchemaValType::XmlSchemasID as i32,
                 ) != 0))
     {
         ret = XmlParserErrors::XmlSchemapEPropsCorrect5 as i32;
@@ -23387,9 +23387,9 @@ unsafe extern "C" fn xml_schema_fixup_components(
                             );
                             FIXHFAILURE!(pctxt, 'exit_failure);
                         }
-                        XmlSchemaTypeType::XmlSchemaTypeIdcKey
-                        | XmlSchemaTypeType::XmlSchemaTypeIdcUnique
-                        | XmlSchemaTypeType::XmlSchemaTypeIdcKeyref => {
+                        XmlSchemaTypeType::XmlSchemaTypeIDCKey
+                        | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
+                        | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
                             xml_schema_resolve_idckey_references(item as XmlSchemaIDCPtr, pctxt);
                             FIXHFAILURE!(pctxt, 'exit_failure);
                         }
@@ -24669,7 +24669,7 @@ unsafe extern "C" fn xml_schema_idc_release_matcher_list(
             }
         }
         if !(*matcher).targets.is_null() {
-            if (*matcher).idc_type == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref as i32 {
+            if (*matcher).idc_type == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref as i32 {
                 let mut idc_node: XmlSchemaPSVIIDCNodePtr;
                 /*
                  * Node-table items for keyrefs are not stored globally
@@ -24928,7 +24928,7 @@ extern "C" fn xml_schema_augment_idc(
         /*
          * Save if we have keyrefs at all.
          */
-        if (*vctxt).has_keyrefs == 0 && (*idc_def).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref
+        if (*vctxt).has_keyrefs == 0 && (*idc_def).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
         {
             (*vctxt).has_keyrefs = 1;
         }
@@ -26355,7 +26355,7 @@ unsafe extern "C" fn xml_schema_idc_register_matchers(
         return -1;
     }
     while {
-        if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
+        if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
             /*
              * Since IDCs bubbles are expensive we need to know the
              * depth at which the bubbles should stop; this will be
@@ -27267,7 +27267,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                 'selector_leave: {
                     'selector_key_error: {
                         if (*matcher).key_seqs.is_null() || (*matcher).size_key_seqs <= pos {
-                            if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKey {
+                            if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKey {
                                 break 'selector_key_error;
                             } else {
                                 break 'selector_leave;
@@ -27276,7 +27276,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
 
                         key_seq = (*matcher).key_seqs.add(pos as usize);
                         if (*key_seq).is_null() {
-                            if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKey {
+                            if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKey {
                                 break 'selector_key_error;
                             } else {
                                 break 'selector_leave;
@@ -27287,7 +27287,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                                 /*
                                  * Not qualified, if not all fields did resolve.
                                  */
-                                if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKey {
+                                if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKey {
                                     /*
                                      * All fields of a "key" IDC must resolve.
                                      */
@@ -27314,7 +27314,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                         //         bind = xmlSchemaIDCAcquireBinding(vctxt, matcher);
                         // #endif
                         targets = xml_schema_idc_acquire_target_list(vctxt, matcher);
-                        if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIdcKeyref
+                        if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
                             && (*targets).nb_items != 0
                         {
                             let mut ckey: XmlSchemaPSVIIDCKeyPtr;
@@ -27413,7 +27413,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                         /*
                          * Store the node-table item in a global list.
                          */
-                        if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
+                        if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
                             if xml_schema_idc_store_node_table_item(vctxt, nt_item) == -1 {
                                 xml_free(nt_item as _);
                                 xml_free(*key_seq as _);
@@ -27450,7 +27450,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                         //         if (xmlSchemaIDCAppendNodeTableItem(bind, ntItem) == -1) {
                         // #endif}
                         if xml_schema_item_list_add(targets, nt_item as _) == -1 {
-                            if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
+                            if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
                                 /*
                                  * Free the item, since keyref items won't be
                                  * put on a global list.
@@ -27460,7 +27460,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                             }
                             return -1;
                         }
-                        if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIdcKeyref {
+                        if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
                             let mut value: *mut XmlChar = null_mut();
 
                             if (*matcher).htab.is_null() {
@@ -27854,7 +27854,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                     (*iattr).type_def = WXS_ATTR_TYPEDEF!((*iattr).decl);
                     if xml_schema_is_derived_from_built_in_type(
                         (*iattr).type_def,
-                        XmlSchemaValType::XmlSchemasId as i32,
+                        XmlSchemaValType::XmlSchemasID as i32,
                     ) != 0
                     {
                         /*
@@ -27879,7 +27879,7 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                             for j in 0..(*attr_use_list).nb_items {
                                 if xml_schema_is_derived_from_built_in_type(
                                     WXS_ATTRUSE_TYPEDEF!(*(*attr_use_list).items.add(j as usize)),
-                                    XmlSchemaValType::XmlSchemasId as i32,
+                                    XmlSchemaValType::XmlSchemasID as i32,
                                 ) != 0
                                 {
                                     /* URGENT VAL TODO: implement */
@@ -28995,7 +28995,7 @@ unsafe extern "C" fn xml_schema_idc_fill_node_tables(
         /*
          * Skip keyref IDCs and empty IDC target-lists.
          */
-        if (*(*(*matcher).aidc).def).typ == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref
+        if (*(*(*matcher).aidc).def).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
             || WXS_ILIST_IS_EMPTY!((*matcher).targets)
         {
             matcher = (*matcher).next;
@@ -29258,7 +29258,7 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
      * Find a keyref.
      */
     while !matcher.is_null() {
-        if (*matcher).idc_type == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref as i32
+        if (*matcher).idc_type == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref as i32
             && !(*matcher).targets.is_null()
             && (*(*matcher).targets).nb_items != 0
         {
@@ -30416,7 +30416,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 }
             } else if matches!(
                 (*node).typ,
-                XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 /*
                  * Process character content.
@@ -30545,7 +30545,7 @@ unsafe extern "C" fn xml_schema_idc_free_matcher_list(mut matcher: XmlSchemaIDCM
             xml_free((*matcher).key_seqs as _);
         }
         if !(*matcher).targets.is_null() {
-            if (*matcher).idc_type == XmlSchemaTypeType::XmlSchemaTypeIdcKeyref as i32 {
+            if (*matcher).idc_type == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref as i32 {
                 let mut idc_node: XmlSchemaPSVIIDCNodePtr;
                 /*
                  * Node-table items for keyrefs are not stored globally
@@ -31364,7 +31364,7 @@ unsafe fn xml_schema_sax_handle_cdata_section(
     }
     if xml_schema_vpush_text(
         vctxt,
-        XmlElementType::XmlCdataSectionNode as i32,
+        XmlElementType::XmlCDATASectionNode as i32,
         ch,
         len,
         XML_SCHEMA_PUSH_TEXT_VOLATILE,

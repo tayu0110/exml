@@ -952,7 +952,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
         return null_mut();
     }
     if !doc.is_null() {
-        html = matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) as i32;
+        html = matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) as i32;
     }
 
     /*

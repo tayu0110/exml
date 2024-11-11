@@ -763,7 +763,7 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
     child = (*con).children;
     while !child.is_null() {
         if ((*child).typ == XmlElementType::XmlTextNode)
-            || ((*child).typ == XmlElementType::XmlCdataSectionNode)
+            || ((*child).typ == XmlElementType::XmlCDATASectionNode)
         /* Do Nothing */
         {
         } else if IS_SCHEMATRON!(child, c"name".as_ptr() as _) {
@@ -1736,7 +1736,7 @@ unsafe extern "C" fn xml_schematron_format_report(
     child = (*test).children;
     while !child.is_null() {
         if ((*child).typ == XmlElementType::XmlTextNode)
-            || ((*child).typ == XmlElementType::XmlCdataSectionNode)
+            || ((*child).typ == XmlElementType::XmlCDATASectionNode)
         {
             ret = xml_strcat(ret, (*child).content);
         } else if IS_SCHEMATRON!(child, c"name".as_ptr() as _) {
@@ -2087,7 +2087,7 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
             /*
              * Skip DTDs
              */
-            if (*cur).typ != XmlElementType::XmlDtdNode {
+            if (*cur).typ != XmlElementType::XmlDTDNode {
                 return cur;
             }
         }
@@ -2095,7 +2095,7 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
 
     while !(*cur).next.is_null() {
         cur = (*cur).next;
-        if (*cur).typ != XmlElementType::XmlEntityDecl && (*cur).typ != XmlElementType::XmlDtdNode {
+        if (*cur).typ != XmlElementType::XmlEntityDecl && (*cur).typ != XmlElementType::XmlDTDNode {
             return cur;
         }
     }

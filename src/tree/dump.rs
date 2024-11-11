@@ -97,7 +97,7 @@ impl XmlDoc {
         ctxt.format = (format != 0) as i32;
         ctxt.encoding = encoding;
         xml_save_ctxt_init(&mut ctxt);
-        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt, self);
         (*out_buff).flush();
         if let Some(conv) = (*out_buff).conv {
@@ -199,7 +199,7 @@ impl XmlDoc {
             ..Default::default()
         };
         xml_save_ctxt_init(&mut ctxt);
-        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
 
         let ret: i32 = xml_output_buffer_close(buf);
@@ -257,7 +257,7 @@ impl XmlDoc {
             ..Default::default()
         };
         xml_save_ctxt_init(&mut ctxt);
-        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
 
@@ -314,7 +314,7 @@ impl XmlDoc {
         }
         if !matches!(
             self.typ,
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
         ) {
             xml_output_buffer_close(buf);
             return -1;
@@ -327,7 +327,7 @@ impl XmlDoc {
             ..Default::default()
         };
         xml_save_ctxt_init(&mut ctxt);
-        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
         let ret: i32 = xml_output_buffer_close(buf);
         ret
@@ -352,7 +352,7 @@ impl XmlDoc {
             ..Default::default()
         };
         xml_save_ctxt_init(&mut ctxt);
-        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
         let ret: i32 = xml_output_buffer_close(buf);
         ret
@@ -391,7 +391,7 @@ impl XmlNode {
             ..Default::default()
         };
         xml_save_ctxt_init(&mut ctxt);
-        ctxt.options |= XmlSaveOption::XmlSaveAsXml as i32;
+        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
         #[cfg(feature = "html")]
         {
@@ -436,7 +436,7 @@ impl XmlNode {
         if outbuf.is_null() {
             return;
         }
-        if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
+        if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
             #[cfg(feature = "html")]
             {
                 html_node_dump_output(outbuf, doc, self, null_mut());

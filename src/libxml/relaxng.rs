@@ -4231,7 +4231,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
              */
             else if matches!(
                 (*cur).typ,
-                XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 if IS_BLANK_NODE!(cur) {
                     if !(*cur).parent.is_null()
@@ -5409,7 +5409,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
         (*def).value = xml_strdup(c"".as_ptr() as _);
     } else if !matches!(
         (*(*node).children).typ,
-        XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
     ) || !(*(*node).children).next.is_null()
     {
         xml_rng_perr(
@@ -9589,12 +9589,12 @@ unsafe extern "C" fn xml_relaxng_skip_ignored(
         && (matches!(
             (*node).typ,
             XmlElementType::XmlCommentNode
-                | XmlElementType::XmlPiNode
-                | XmlElementType::XmlXincludeStart
-                | XmlElementType::XmlXincludeEnd
+                | XmlElementType::XmlPINode
+                | XmlElementType::XmlXIncludeStart
+                | XmlElementType::XmlXIncludeEnd
         ) || (matches!(
             (*node).typ,
-            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
         ) && ((*ctxt).flags & FLAGS_MIXED_CONTENT != 0 || IS_BLANK_NODE!(node))))
     {
         node = (*node).next;
@@ -10392,7 +10392,7 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
     while !cur.is_null() {
         (*(*ctxt).state).seq = cur;
         match (*cur).typ {
-            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode => {
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                 if (*cur).is_blank_node() {
                     // break;
                 } else {
@@ -10807,7 +10807,7 @@ unsafe extern "C" fn xml_relaxng_node_matches_list(
             }
         } else if matches!(
             (*node).typ,
-            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
         ) && matches!(
             (*cur).typ,
             XmlRelaxNGType::Datatype
@@ -10912,7 +10912,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
 
             if matches!(
                 (*cur).typ,
-                XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 tmp = xml_hash_lookup2((*partitions).triage, c"#text".as_ptr() as _, null_mut());
             } else if (*cur).typ == XmlElementType::XmlElementNode {
@@ -11210,8 +11210,8 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     (*node).typ,
                     XmlElementType::XmlTextNode
                         | XmlElementType::XmlCommentNode
-                        | XmlElementType::XmlPiNode
-                        | XmlElementType::XmlCdataSectionNode
+                        | XmlElementType::XmlPINode
+                        | XmlElementType::XmlCDATASectionNode
                 )
             {
                 node = (*node).next;
@@ -11691,7 +11691,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                  */
                 if matches!(
                     (*node).typ,
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     list = xml_hash_lookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
                 } else if (*node).typ == XmlElementType::XmlElementNode {
@@ -11808,7 +11808,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     break;
                 } else if matches!(
                     (*child).typ,
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     content = xml_strcat(content, (*child).content);
                 }
@@ -11859,7 +11859,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     break;
                 } else if matches!(
                     (*child).typ,
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     content = xml_strcat(content, (*child).content);
                 }
@@ -11914,7 +11914,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     break;
                 } else if matches!(
                     (*child).typ,
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     content = xml_strcat(content, (*child).content);
                 }
@@ -12203,7 +12203,7 @@ unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
             (*node).typ,
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHtmlDocumentNode
+                | XmlElementType::XmlHTMLDocumentNode
         )
     {
         return;

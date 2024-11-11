@@ -450,7 +450,7 @@ unsafe extern "C" fn xml_schema_new_min_length_facet(value: i32) -> XmlSchemaFac
         return null_mut();
     }
     (*ret).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
-    (*ret).val = xml_schema_new_value(XmlSchemaValType::XmlSchemasNninteger);
+    (*ret).val = xml_schema_new_value(XmlSchemaValType::XmlSchemasNNInteger);
     if (*ret).val.is_null() {
         xml_free(ret as _);
         return null_mut();
@@ -503,7 +503,7 @@ unsafe extern "C" fn xml_schema_init_basic_type(
         | XmlSchemaValType::XmlSchemasFloat
         | XmlSchemaValType::XmlSchemasDouble
         | XmlSchemaValType::XmlSchemasBoolean
-        | XmlSchemaValType::XmlSchemasAnyuri
+        | XmlSchemaValType::XmlSchemasAnyURI
         | XmlSchemaValType::XmlSchemasHexbinary
         | XmlSchemaValType::XmlSchemasBase64binary
         | XmlSchemaValType::XmlSchemasQname
@@ -517,7 +517,7 @@ unsafe extern "C" fn xml_schema_init_basic_type(
      */
     match typ {
         XmlSchemaValType::XmlSchemasAnytype | XmlSchemaValType::XmlSchemasAnysimpletype => {}
-        XmlSchemaValType::XmlSchemasIdrefs
+        XmlSchemaValType::XmlSchemasIDREFS
         | XmlSchemaValType::XmlSchemasNmtokens
         | XmlSchemaValType::XmlSchemasEntities => {
             (*ret).flags |= XML_SCHEMAS_TYPE_VARIETY_LIST;
@@ -773,7 +773,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_ANY_URIDEF.set(xml_schema_init_basic_type(
             c"anyURI".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasAnyuri,
+            XmlSchemaValType::XmlSchemasAnyURI,
             XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_ANY_URIDEF.get().is_null() {
@@ -825,7 +825,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
             c"nonPositiveInteger".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNpinteger,
+            XmlSchemaValType::XmlSchemasNPInteger,
             XML_SCHEMA_TYPE_INTEGER_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get().is_null() {
@@ -833,7 +833,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
             c"negativeInteger".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNinteger,
+            XmlSchemaValType::XmlSchemasNInteger,
             XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get().is_null() {
@@ -873,7 +873,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
             c"nonNegativeInteger".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNninteger,
+            XmlSchemaValType::XmlSchemasNNInteger,
             XML_SCHEMA_TYPE_INTEGER_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get().is_null() {
@@ -881,7 +881,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.set(xml_schema_init_basic_type(
             c"unsignedLong".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasUlong,
+            XmlSchemaValType::XmlSchemasULong,
             XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get().is_null() {
@@ -889,7 +889,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.set(xml_schema_init_basic_type(
             c"unsignedInt".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasUint,
+            XmlSchemaValType::XmlSchemasUInt,
             XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get().is_null() {
@@ -897,7 +897,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.set(xml_schema_init_basic_type(
             c"unsignedShort".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasUshort,
+            XmlSchemaValType::XmlSchemasUShort,
             XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get().is_null() {
@@ -905,7 +905,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.set(xml_schema_init_basic_type(
             c"unsignedByte".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasUbyte,
+            XmlSchemaValType::XmlSchemasUByte,
             XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get().is_null() {
@@ -913,7 +913,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
             c"positiveInteger".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasPinteger,
+            XmlSchemaValType::XmlSchemasPInteger,
             XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get().is_null() {
@@ -969,7 +969,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_ID_DEF.set(xml_schema_init_basic_type(
             c"ID".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasId,
+            XmlSchemaValType::XmlSchemasID,
             XML_SCHEMA_TYPE_NCNAME_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_ID_DEF.get().is_null() {
@@ -977,7 +977,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         }
         XML_SCHEMA_TYPE_IDREF_DEF.set(xml_schema_init_basic_type(
             c"IDREF".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasIdref,
+            XmlSchemaValType::XmlSchemasIDREF,
             XML_SCHEMA_TYPE_NCNAME_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_IDREF_DEF.get().is_null() {
@@ -1007,7 +1007,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
         /* IDREFS */
         XML_SCHEMA_TYPE_IDREFS_DEF.set(xml_schema_init_basic_type(
             c"IDREFS".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasIdrefs,
+            XmlSchemaValType::XmlSchemasIDREFS,
             XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
         ));
         if XML_SCHEMA_TYPE_IDREFS_DEF.get().is_null() {
@@ -2966,10 +2966,10 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 break 'done;
                             }
-                            XmlSchemaValType::XmlSchemasId => {
+                            XmlSchemaValType::XmlSchemasID => {
                                 ret = xml_validate_ncname(value, 1);
                                 if ret == 0 && !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasId);
+                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasID);
                                     if !v.is_null() {
                                         (*v).value.str = xml_strdup(value);
                                         *val = v;
@@ -2988,7 +2988,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                      */
                                     if !matches!(
                                         (*attr).atype,
-                                        Some(XmlAttributeType::XmlAttributeId)
+                                        Some(XmlAttributeType::XmlAttributeID)
                                     ) {
                                         let res: XmlIDPtr;
 
@@ -3002,16 +3002,16 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         if res.is_null() {
                                             ret = 2;
                                         } else {
-                                            (*attr).atype = Some(XmlAttributeType::XmlAttributeId);
+                                            (*attr).atype = Some(XmlAttributeType::XmlAttributeID);
                                         }
                                     }
                                 }
                                 break 'done;
                             }
-                            XmlSchemaValType::XmlSchemasIdref => {
+                            XmlSchemaValType::XmlSchemasIDREF => {
                                 ret = xml_validate_ncname(value, 1);
                                 if ret == 0 && !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasIdref);
+                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasIDREF);
                                     if v.is_null() {
                                         break 'error;
                                     }
@@ -3031,11 +3031,11 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     } else {
                                         xml_add_ref(null_mut(), (*node).doc, value, attr);
                                     }
-                                    (*attr).atype = Some(XmlAttributeType::XmlAttributeIdref);
+                                    (*attr).atype = Some(XmlAttributeType::XmlAttributeIDREF);
                                 }
                                 break 'done;
                             }
-                            XmlSchemaValType::XmlSchemasIdrefs => {
+                            XmlSchemaValType::XmlSchemasIDREFS => {
                                 ret = xml_schema_val_atomic_list_node(
                                     XML_SCHEMA_TYPE_IDREF_DEF.get(),
                                     value,
@@ -3053,7 +3053,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 {
                                     let attr: XmlAttrPtr = node as XmlAttrPtr;
 
-                                    (*attr).atype = Some(XmlAttributeType::XmlAttributeIdrefs);
+                                    (*attr).atype = Some(XmlAttributeType::XmlAttributeIDREFS);
                                 }
                                 break 'done;
                             }
@@ -3182,7 +3182,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 break 'done;
                             }
-                            XmlSchemaValType::XmlSchemasAnyuri => {
+                            XmlSchemaValType::XmlSchemasAnyURI => {
                                 if *value != 0 {
                                     let mut cur: *mut XmlChar;
                                     if norm.is_null() && norm_on_the_fly != 0 {
@@ -3224,7 +3224,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
 
                                 if !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasAnyuri);
+                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasAnyURI);
                                     if v.is_null() {
                                         break 'error;
                                     }
@@ -3450,10 +3450,10 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 break 'return0;
                             }
                             XmlSchemaValType::XmlSchemasInteger
-                            | XmlSchemaValType::XmlSchemasPinteger
-                            | XmlSchemaValType::XmlSchemasNpinteger
-                            | XmlSchemaValType::XmlSchemasNinteger
-                            | XmlSchemaValType::XmlSchemasNninteger => {
+                            | XmlSchemaValType::XmlSchemasPInteger
+                            | XmlSchemaValType::XmlSchemasNPInteger
+                            | XmlSchemaValType::XmlSchemasNInteger
+                            | XmlSchemaValType::XmlSchemasNNInteger => {
                                 let mut cur: *const XmlChar = value;
                                 let mut lo: u64 = 0;
                                 let mut mi: u64 = 0;
@@ -3492,13 +3492,13 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     break 'return1;
                                 }
                                 if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasNpinteger as i32
+                                    == XmlSchemaValType::XmlSchemasNPInteger as i32
                                 {
                                     if sign == 0 && (hi != 0 || mi != 0 || lo != 0) {
                                         break 'return1;
                                     }
                                 } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasPinteger as i32
+                                    == XmlSchemaValType::XmlSchemasPInteger as i32
                                 {
                                     if sign == 1 {
                                         break 'return1;
@@ -3507,7 +3507,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         break 'return1;
                                     }
                                 } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasNinteger as i32
+                                    == XmlSchemaValType::XmlSchemasNInteger as i32
                                 {
                                     if sign == 0 {
                                         break 'return1;
@@ -3516,7 +3516,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         break 'return1;
                                     }
                                 } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasNninteger as i32
+                                    == XmlSchemaValType::XmlSchemasNNInteger as i32
                                     && (sign == 1 && (hi != 0 || mi != 0 || lo != 0))
                                 {
                                     break 'return1;
@@ -3656,10 +3656,10 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 break 'return0;
                             }
-                            XmlSchemaValType::XmlSchemasUint
-                            | XmlSchemaValType::XmlSchemasUlong
-                            | XmlSchemaValType::XmlSchemasUshort
-                            | XmlSchemaValType::XmlSchemasUbyte => {
+                            XmlSchemaValType::XmlSchemasUInt
+                            | XmlSchemaValType::XmlSchemasULong
+                            | XmlSchemaValType::XmlSchemasUShort
+                            | XmlSchemaValType::XmlSchemasUByte => {
                                 let mut cur: *const XmlChar = value;
                                 let mut lo: u64 = 0;
                                 let mut mi: u64 = 0;
@@ -3690,7 +3690,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 if *cur != 0 {
                                     break 'return1;
                                 }
-                                if (*typ).built_in_type == XmlSchemaValType::XmlSchemasUlong as i32
+                                if (*typ).built_in_type == XmlSchemaValType::XmlSchemasULong as i32
                                 {
                                     if hi >= 1844 {
                                         if hi > 1844 {
@@ -3706,7 +3706,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         }
                                     }
                                 } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasUint as i32
+                                    == XmlSchemaValType::XmlSchemasUInt as i32
                                 {
                                     if hi != 0 {
                                         break 'return1;
@@ -3720,7 +3720,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         }
                                     }
                                 } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasUshort as i32
+                                    == XmlSchemaValType::XmlSchemasUShort as i32
                                 {
                                     if mi != 0 || hi != 0 {
                                         break 'return1;
@@ -3729,7 +3729,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         break 'return1;
                                     }
                                 } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasUbyte as i32
+                                    == XmlSchemaValType::XmlSchemasUByte as i32
                                 {
                                     if mi != 0 || hi != 0 {
                                         break 'return1;
@@ -5191,18 +5191,18 @@ unsafe extern "C" fn xml_schema_compare_values_internal(
             return -2;
         }
         XmlSchemaValType::XmlSchemasInteger
-        | XmlSchemaValType::XmlSchemasNpinteger
-        | XmlSchemaValType::XmlSchemasNinteger
-        | XmlSchemaValType::XmlSchemasNninteger
-        | XmlSchemaValType::XmlSchemasPinteger
+        | XmlSchemaValType::XmlSchemasNPInteger
+        | XmlSchemaValType::XmlSchemasNInteger
+        | XmlSchemaValType::XmlSchemasNNInteger
+        | XmlSchemaValType::XmlSchemasPInteger
         | XmlSchemaValType::XmlSchemasInt
-        | XmlSchemaValType::XmlSchemasUint
+        | XmlSchemaValType::XmlSchemasUInt
         | XmlSchemaValType::XmlSchemasLong
-        | XmlSchemaValType::XmlSchemasUlong
+        | XmlSchemaValType::XmlSchemasULong
         | XmlSchemaValType::XmlSchemasShort
-        | XmlSchemaValType::XmlSchemasUshort
+        | XmlSchemaValType::XmlSchemasUShort
         | XmlSchemaValType::XmlSchemasByte
-        | XmlSchemaValType::XmlSchemasUbyte
+        | XmlSchemaValType::XmlSchemasUByte
         | XmlSchemaValType::XmlSchemasDecimal => {
             if x.is_null() || y.is_null() {
                 return -2;
@@ -5214,18 +5214,18 @@ unsafe extern "C" fn xml_schema_compare_values_internal(
                 ytype,
                 XmlSchemaValType::XmlSchemasDecimal
                     | XmlSchemaValType::XmlSchemasInteger
-                    | XmlSchemaValType::XmlSchemasNpinteger
-                    | XmlSchemaValType::XmlSchemasNinteger
-                    | XmlSchemaValType::XmlSchemasNninteger
-                    | XmlSchemaValType::XmlSchemasPinteger
+                    | XmlSchemaValType::XmlSchemasNPInteger
+                    | XmlSchemaValType::XmlSchemasNInteger
+                    | XmlSchemaValType::XmlSchemasNNInteger
+                    | XmlSchemaValType::XmlSchemasPInteger
                     | XmlSchemaValType::XmlSchemasInt
-                    | XmlSchemaValType::XmlSchemasUint
+                    | XmlSchemaValType::XmlSchemasUInt
                     | XmlSchemaValType::XmlSchemasLong
-                    | XmlSchemaValType::XmlSchemasUlong
+                    | XmlSchemaValType::XmlSchemasULong
                     | XmlSchemaValType::XmlSchemasShort
-                    | XmlSchemaValType::XmlSchemasUshort
+                    | XmlSchemaValType::XmlSchemasUShort
                     | XmlSchemaValType::XmlSchemasByte
-                    | XmlSchemaValType::XmlSchemasUbyte
+                    | XmlSchemaValType::XmlSchemasUByte
             ) {
                 return xml_schema_compare_decimals(x, y);
             }
@@ -5278,10 +5278,10 @@ unsafe extern "C" fn xml_schema_compare_values_internal(
         | XmlSchemaValType::XmlSchemasNmtoken
         | XmlSchemaValType::XmlSchemasName
         | XmlSchemaValType::XmlSchemasNcname
-        | XmlSchemaValType::XmlSchemasId
-        | XmlSchemaValType::XmlSchemasIdref
+        | XmlSchemaValType::XmlSchemasID
+        | XmlSchemaValType::XmlSchemasIDREF
         | XmlSchemaValType::XmlSchemasEntity
-        | XmlSchemaValType::XmlSchemasAnyuri => {
+        | XmlSchemaValType::XmlSchemasAnyURI => {
             let xv = if x.is_null() { xvalue } else { (*x).value.str };
             let yv = if y.is_null() { yvalue } else { (*y).value.str };
             /*
@@ -5304,10 +5304,10 @@ unsafe extern "C" fn xml_schema_compare_values_internal(
                     | XmlSchemaValType::XmlSchemasNmtoken
                     | XmlSchemaValType::XmlSchemasName
                     | XmlSchemaValType::XmlSchemasNcname
-                    | XmlSchemaValType::XmlSchemasId
-                    | XmlSchemaValType::XmlSchemasIdref
+                    | XmlSchemaValType::XmlSchemasID
+                    | XmlSchemaValType::XmlSchemasIDREF
                     | XmlSchemaValType::XmlSchemasEntity
-                    | XmlSchemaValType::XmlSchemasAnyuri
+                    | XmlSchemaValType::XmlSchemasAnyURI
             ) {
                 if xws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
                     if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
@@ -5450,7 +5450,7 @@ unsafe extern "C" fn xml_schema_compare_values_internal(
             }
             return -2;
         }
-        XmlSchemaValType::XmlSchemasIdrefs
+        XmlSchemaValType::XmlSchemasIDREFS
         | XmlSchemaValType::XmlSchemasEntities
         | XmlSchemaValType::XmlSchemasNmtokens => {
             // todo!()
@@ -5709,7 +5709,7 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
             if (*facet).val.is_null()
                 || !matches!(
                     (*(*facet).val).typ,
-                    XmlSchemaValType::XmlSchemasDecimal | XmlSchemaValType::XmlSchemasNninteger
+                    XmlSchemaValType::XmlSchemasDecimal | XmlSchemaValType::XmlSchemasNNInteger
                 )
                 || (*(*facet).val).value.decimal.frac != 0
             {
@@ -5745,14 +5745,14 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
                             }
                         }
                     }
-                    XmlSchemaValType::XmlSchemasIdref
+                    XmlSchemaValType::XmlSchemasIDREF
                     | XmlSchemaValType::XmlSchemasToken
                     | XmlSchemaValType::XmlSchemasLanguage
                     | XmlSchemaValType::XmlSchemasNmtoken
                     | XmlSchemaValType::XmlSchemasName
                     | XmlSchemaValType::XmlSchemasNcname
-                    | XmlSchemaValType::XmlSchemasId
-                    | XmlSchemaValType::XmlSchemasAnyuri => {
+                    | XmlSchemaValType::XmlSchemasID
+                    | XmlSchemaValType::XmlSchemasAnyURI => {
                         if !value.is_null() {
                             len = xml_schema_norm_len(value) as _;
                         }
@@ -5779,7 +5779,7 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
             if (*facet).val.is_null()
                 || !matches!(
                     (*(*facet).val).typ,
-                    XmlSchemaValType::XmlSchemasPinteger | XmlSchemaValType::XmlSchemasNninteger
+                    XmlSchemaValType::XmlSchemasPInteger | XmlSchemaValType::XmlSchemasNNInteger
                 )
                 || (*(*facet).val).value.decimal.frac != 0
             {
@@ -5790,18 +5790,18 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
                     (*val).typ,
                     XmlSchemaValType::XmlSchemasDecimal
                         | XmlSchemaValType::XmlSchemasInteger
-                        | XmlSchemaValType::XmlSchemasNpinteger
-                        | XmlSchemaValType::XmlSchemasNinteger
-                        | XmlSchemaValType::XmlSchemasNninteger
-                        | XmlSchemaValType::XmlSchemasPinteger
+                        | XmlSchemaValType::XmlSchemasNPInteger
+                        | XmlSchemaValType::XmlSchemasNInteger
+                        | XmlSchemaValType::XmlSchemasNNInteger
+                        | XmlSchemaValType::XmlSchemasPInteger
                         | XmlSchemaValType::XmlSchemasInt
-                        | XmlSchemaValType::XmlSchemasUint
+                        | XmlSchemaValType::XmlSchemasUInt
                         | XmlSchemaValType::XmlSchemasLong
-                        | XmlSchemaValType::XmlSchemasUlong
+                        | XmlSchemaValType::XmlSchemasULong
                         | XmlSchemaValType::XmlSchemasShort
-                        | XmlSchemaValType::XmlSchemasUshort
+                        | XmlSchemaValType::XmlSchemasUShort
                         | XmlSchemaValType::XmlSchemasByte
-                        | XmlSchemaValType::XmlSchemasUbyte
+                        | XmlSchemaValType::XmlSchemasUByte
                 )
             {
                 return -1;
@@ -5915,12 +5915,12 @@ pub unsafe extern "C" fn xml_schema_free_value(mut value: XmlSchemaValPtr) {
             | XmlSchemaValType::XmlSchemasNmtokens
             | XmlSchemaValType::XmlSchemasName
             | XmlSchemaValType::XmlSchemasNcname
-            | XmlSchemaValType::XmlSchemasId
-            | XmlSchemaValType::XmlSchemasIdref
-            | XmlSchemaValType::XmlSchemasIdrefs
+            | XmlSchemaValType::XmlSchemasID
+            | XmlSchemaValType::XmlSchemasIDREF
+            | XmlSchemaValType::XmlSchemasIDREFS
             | XmlSchemaValType::XmlSchemasEntity
             | XmlSchemaValType::XmlSchemasEntities
-            | XmlSchemaValType::XmlSchemasAnyuri
+            | XmlSchemaValType::XmlSchemasAnyURI
             | XmlSchemaValType::XmlSchemasAnysimpletype => {
                 if !(*value).value.str.is_null() {
                     xml_free((*value).value.str as _);
@@ -6201,13 +6201,13 @@ pub unsafe extern "C" fn xml_schema_check_facet(
         | XmlSchemaTypeType::XmlSchemaFacetMinlength => {
             if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
                 ret = xml_schema_validate_predefined_type(
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasPinteger),
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasPInteger),
                     (*facet).value,
                     addr_of_mut!((*facet).val),
                 );
             } else {
                 ret = xml_schema_validate_predefined_type(
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNninteger),
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNNInteger),
                     (*facet).value,
                     addr_of_mut!((*facet).val),
                 );
@@ -6360,7 +6360,7 @@ pub unsafe extern "C" fn xml_schema_get_built_in_list_simple_type_item_type(
     }
     match XmlSchemaValType::try_from((*typ).built_in_type) {
         Ok(XmlSchemaValType::XmlSchemasNmtokens) => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
-        Ok(XmlSchemaValType::XmlSchemasIdrefs) => XML_SCHEMA_TYPE_IDREF_DEF.get(),
+        Ok(XmlSchemaValType::XmlSchemasIDREFS) => XML_SCHEMA_TYPE_IDREF_DEF.get(),
         Ok(XmlSchemaValType::XmlSchemasEntities) => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
         _ => null_mut(),
     }
@@ -6460,26 +6460,26 @@ pub unsafe extern "C" fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> 
         XmlSchemaValType::XmlSchemasName => XML_SCHEMA_TYPE_NAME_DEF.get(),
         XmlSchemaValType::XmlSchemasQname => XML_SCHEMA_TYPE_QNAME_DEF.get(),
         XmlSchemaValType::XmlSchemasNcname => XML_SCHEMA_TYPE_NCNAME_DEF.get(),
-        XmlSchemaValType::XmlSchemasId => XML_SCHEMA_TYPE_ID_DEF.get(),
-        XmlSchemaValType::XmlSchemasIdref => XML_SCHEMA_TYPE_IDREF_DEF.get(),
-        XmlSchemaValType::XmlSchemasIdrefs => XML_SCHEMA_TYPE_IDREFS_DEF.get(),
+        XmlSchemaValType::XmlSchemasID => XML_SCHEMA_TYPE_ID_DEF.get(),
+        XmlSchemaValType::XmlSchemasIDREF => XML_SCHEMA_TYPE_IDREF_DEF.get(),
+        XmlSchemaValType::XmlSchemasIDREFS => XML_SCHEMA_TYPE_IDREFS_DEF.get(),
         XmlSchemaValType::XmlSchemasEntity => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
         XmlSchemaValType::XmlSchemasEntities => XML_SCHEMA_TYPE_ENTITIES_DEF.get(),
         XmlSchemaValType::XmlSchemasNotation => XML_SCHEMA_TYPE_NOTATION_DEF.get(),
-        XmlSchemaValType::XmlSchemasAnyuri => XML_SCHEMA_TYPE_ANY_URIDEF.get(),
+        XmlSchemaValType::XmlSchemasAnyURI => XML_SCHEMA_TYPE_ANY_URIDEF.get(),
         XmlSchemaValType::XmlSchemasInteger => XML_SCHEMA_TYPE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasNpinteger => XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasNinteger => XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasNninteger => XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasPinteger => XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasNPInteger => XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasNInteger => XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasNNInteger => XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
+        XmlSchemaValType::XmlSchemasPInteger => XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get(),
         XmlSchemaValType::XmlSchemasInt => XML_SCHEMA_TYPE_INT_DEF.get(),
-        XmlSchemaValType::XmlSchemasUint => XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
+        XmlSchemaValType::XmlSchemasUInt => XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
         XmlSchemaValType::XmlSchemasLong => XML_SCHEMA_TYPE_LONG_DEF.get(),
-        XmlSchemaValType::XmlSchemasUlong => XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
+        XmlSchemaValType::XmlSchemasULong => XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
         XmlSchemaValType::XmlSchemasShort => XML_SCHEMA_TYPE_SHORT_DEF.get(),
-        XmlSchemaValType::XmlSchemasUshort => XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
+        XmlSchemaValType::XmlSchemasUShort => XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
         XmlSchemaValType::XmlSchemasByte => XML_SCHEMA_TYPE_BYTE_DEF.get(),
-        XmlSchemaValType::XmlSchemasUbyte => XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get(),
+        XmlSchemaValType::XmlSchemasUByte => XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get(),
         XmlSchemaValType::XmlSchemasHexbinary => XML_SCHEMA_TYPE_HEX_BINARY_DEF.get(),
         XmlSchemaValType::XmlSchemasBase64binary => XML_SCHEMA_TYPE_BASE64_BINARY_DEF.get(),
         XmlSchemaValType::XmlSchemasAnytype => XML_SCHEMA_TYPE_ANY_TYPE_DEF.get(),
@@ -6521,7 +6521,7 @@ pub unsafe extern "C" fn xml_schema_is_built_in_type_facet(
         Ok(XmlSchemaValType::XmlSchemasString)
         | Ok(XmlSchemaValType::XmlSchemasNotation)
         | Ok(XmlSchemaValType::XmlSchemasQname)
-        | Ok(XmlSchemaValType::XmlSchemasAnyuri)
+        | Ok(XmlSchemaValType::XmlSchemasAnyURI)
         | Ok(XmlSchemaValType::XmlSchemasBase64binary)
         | Ok(XmlSchemaValType::XmlSchemasHexbinary) => {
             if facet_type == XmlSchemaTypeType::XmlSchemaFacetLength as i32
@@ -6748,7 +6748,7 @@ unsafe extern "C" fn xml_schema_validate_length_facet_internal(
     if (*facet).val.is_null()
         || !matches!(
             (*(*facet).val).typ,
-            XmlSchemaValType::XmlSchemasDecimal | XmlSchemaValType::XmlSchemasNninteger
+            XmlSchemaValType::XmlSchemasDecimal | XmlSchemaValType::XmlSchemasNNInteger
         )
         || (*(*facet).val).value.decimal.frac != 0
     {
@@ -6784,17 +6784,17 @@ unsafe extern "C" fn xml_schema_validate_length_facet_internal(
                     }
                 }
             }
-            XmlSchemaValType::XmlSchemasIdref
+            XmlSchemaValType::XmlSchemasIDREF
             | XmlSchemaValType::XmlSchemasToken
             | XmlSchemaValType::XmlSchemasLanguage
             | XmlSchemaValType::XmlSchemasNmtoken
             | XmlSchemaValType::XmlSchemasName
             | XmlSchemaValType::XmlSchemasNcname
-            | XmlSchemaValType::XmlSchemasId
+            | XmlSchemaValType::XmlSchemasID
             /*
              * FIXME: What exactly to do with anyURI?
              */
-            | XmlSchemaValType::XmlSchemasAnyuri => {
+            | XmlSchemaValType::XmlSchemasAnyURI => {
                 if !value.is_null() {
                     len = xml_schema_norm_len(value) as _;
                 }
@@ -6974,11 +6974,11 @@ pub unsafe extern "C" fn xml_schema_get_canon_value(
         | XmlSchemaValType::XmlSchemasNmtoken
         | XmlSchemaValType::XmlSchemasName
         | XmlSchemaValType::XmlSchemasNcname
-        | XmlSchemaValType::XmlSchemasId
-        | XmlSchemaValType::XmlSchemasIdref
+        | XmlSchemaValType::XmlSchemasID
+        | XmlSchemaValType::XmlSchemasIDREF
         | XmlSchemaValType::XmlSchemasEntity
         | XmlSchemaValType::XmlSchemasNotation
-        | XmlSchemaValType::XmlSchemasAnyuri => {
+        | XmlSchemaValType::XmlSchemasAnyURI => {
             if (*val).value.str.is_null() {
                 return -1;
             }
@@ -7105,18 +7105,18 @@ pub unsafe extern "C" fn xml_schema_get_canon_value(
             }
         }
         XmlSchemaValType::XmlSchemasInteger
-        | XmlSchemaValType::XmlSchemasPinteger
-        | XmlSchemaValType::XmlSchemasNpinteger
-        | XmlSchemaValType::XmlSchemasNinteger
-        | XmlSchemaValType::XmlSchemasNninteger
+        | XmlSchemaValType::XmlSchemasPInteger
+        | XmlSchemaValType::XmlSchemasNPInteger
+        | XmlSchemaValType::XmlSchemasNInteger
+        | XmlSchemaValType::XmlSchemasNNInteger
         | XmlSchemaValType::XmlSchemasLong
         | XmlSchemaValType::XmlSchemasByte
         | XmlSchemaValType::XmlSchemasShort
         | XmlSchemaValType::XmlSchemasInt
-        | XmlSchemaValType::XmlSchemasUint
-        | XmlSchemaValType::XmlSchemasUlong
-        | XmlSchemaValType::XmlSchemasUshort
-        | XmlSchemaValType::XmlSchemasUbyte => {
+        | XmlSchemaValType::XmlSchemasUInt
+        | XmlSchemaValType::XmlSchemasULong
+        | XmlSchemaValType::XmlSchemasUShort
+        | XmlSchemaValType::XmlSchemasUByte => {
             if (*val).value.decimal.total == 1 && (*val).value.decimal.lo == 0 {
                 *ret_value = xml_strdup(c"0".as_ptr() as _);
             } else {
@@ -7593,10 +7593,10 @@ pub unsafe extern "C" fn xml_schema_value_get_as_string(val: XmlSchemaValPtr) ->
         | XmlSchemaValType::XmlSchemasNmtoken
         | XmlSchemaValType::XmlSchemasName
         | XmlSchemaValType::XmlSchemasNcname
-        | XmlSchemaValType::XmlSchemasId
-        | XmlSchemaValType::XmlSchemasIdref
+        | XmlSchemaValType::XmlSchemasID
+        | XmlSchemaValType::XmlSchemasIDREF
         | XmlSchemaValType::XmlSchemasEntity
-        | XmlSchemaValType::XmlSchemasAnyuri => {
+        | XmlSchemaValType::XmlSchemasAnyURI => {
             return (*val).value.str;
         }
         _ => {}
@@ -7742,7 +7742,7 @@ pub unsafe extern "C" fn xml_schema_copy_value(mut val: XmlSchemaValPtr) -> XmlS
     while !val.is_null() {
         match (*val).typ {
             XmlSchemaValType::XmlSchemasAnytype
-            | XmlSchemaValType::XmlSchemasIdrefs
+            | XmlSchemaValType::XmlSchemasIDREFS
             | XmlSchemaValType::XmlSchemasEntities
             | XmlSchemaValType::XmlSchemasNmtokens => {
                 xml_schema_free_value(ret);
@@ -7755,11 +7755,11 @@ pub unsafe extern "C" fn xml_schema_copy_value(mut val: XmlSchemaValPtr) -> XmlS
             | XmlSchemaValType::XmlSchemasLanguage
             | XmlSchemaValType::XmlSchemasName
             | XmlSchemaValType::XmlSchemasNcname
-            | XmlSchemaValType::XmlSchemasId
-            | XmlSchemaValType::XmlSchemasIdref
+            | XmlSchemaValType::XmlSchemasID
+            | XmlSchemaValType::XmlSchemasIDREF
             | XmlSchemaValType::XmlSchemasEntity
             | XmlSchemaValType::XmlSchemasNmtoken
-            | XmlSchemaValType::XmlSchemasAnyuri => {
+            | XmlSchemaValType::XmlSchemasAnyURI => {
                 cur = xml_schema_dup_val(val);
                 if !(*val).value.str.is_null() {
                     (*cur).value.str = xml_strdup((*val).value.str);

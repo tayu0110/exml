@@ -3107,16 +3107,16 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
 ) -> i32 {
     if (*ctxt).content_bytes().starts_with(b"CDATA") {
         (*ctxt).advance(5);
-        return XmlAttributeType::XmlAttributeCdata as i32;
+        return XmlAttributeType::XmlAttributeCDATA as i32;
     } else if (*ctxt).content_bytes().starts_with(b"IDREFS") {
         (*ctxt).advance(6);
-        return XmlAttributeType::XmlAttributeIdrefs as i32;
+        return XmlAttributeType::XmlAttributeIDREFS as i32;
     } else if (*ctxt).content_bytes().starts_with(b"IDREF") {
         (*ctxt).advance(5);
-        return XmlAttributeType::XmlAttributeIdref as i32;
+        return XmlAttributeType::XmlAttributeIDREF as i32;
     } else if (*ctxt).current_byte() == b'I' && NXT!(ctxt, 1) == b'D' {
         (*ctxt).advance(2);
-        return XmlAttributeType::XmlAttributeId as i32;
+        return XmlAttributeType::XmlAttributeID as i32;
     } else if (*ctxt).content_bytes().starts_with(b"ENTITY") {
         (*ctxt).advance(6);
         return XmlAttributeType::XmlAttributeEntity as i32;
@@ -3351,7 +3351,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
             ret = xml_new_doc_element_content(
                 (*ctxt).my_doc,
                 null(),
-                XmlElementContentType::XmlElementContentPcdata,
+                XmlElementContentType::XmlElementContentPCDATA,
             );
             if ret.is_null() {
                 return null_mut();
@@ -3366,7 +3366,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
             ret = xml_new_doc_element_content(
                 (*ctxt).my_doc,
                 null(),
-                XmlElementContentType::XmlElementContentPcdata,
+                XmlElementContentType::XmlElementContentPCDATA,
             );
             cur = ret;
             if ret.is_null() {

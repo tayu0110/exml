@@ -65,7 +65,7 @@ impl XmlDoc {
 
         cur = self.children;
         while !cur.is_null() {
-            if matches!((*cur).typ, XmlElementType::XmlDtdNode) {
+            if matches!((*cur).typ, XmlElementType::XmlDTDNode) {
                 return cur as _;
             }
             cur = (*cur).next;

@@ -1577,7 +1577,7 @@ macro_rules! __xml_raise_error {
                                     prev = (*prev).parent;
                                 } else {
                                     prev = (*prev).prev;
-                                    if matches!((*prev).typ, XmlElementType::XmlXincludeStart) {
+                                    if matches!((*prev).typ, XmlElementType::XmlXIncludeStart) {
                                         if inclcount > 0 {
                                             inclcount -= 1;
                                         } else {
@@ -1586,7 +1586,7 @@ macro_rules! __xml_raise_error {
                                                 break;
                                             }
                                         }
-                                    } else if matches!((*prev).typ, XmlElementType::XmlXincludeEnd) {
+                                    } else if matches!((*prev).typ, XmlElementType::XmlXIncludeEnd) {
                                         inclcount += 1;
                                     }
                                 }

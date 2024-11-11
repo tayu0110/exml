@@ -226,7 +226,7 @@ unsafe extern "C" fn xmlconf_test_invalid(
         );
     } else {
         /* invalidity should be reported both in the context and in the document */
-        if (*ctxt).valid != 0 || (*doc).properties & XmlDocProperties::XmlDocDtdvalid as i32 != 0 {
+        if (*ctxt).valid != 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
             test_log!(
                 logfile,
                 "test {} : {} failed to detect invalid document\n",
@@ -272,7 +272,7 @@ unsafe extern "C" fn xmlconf_test_valid(
         ret = 0;
     } else {
         /* validity should be reported both in the context and in the document */
-        if (*ctxt).valid == 0 || (*doc).properties & XmlDocProperties::XmlDocDtdvalid as i32 == 0 {
+        if (*ctxt).valid == 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
             test_log!(
                 logfile,
                 "test {} : {} failed to validate a valid document\n",

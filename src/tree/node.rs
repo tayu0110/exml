@@ -177,7 +177,7 @@ pub trait NodeCommon {
             return;
         }
 
-        if matches!(self.element_type(), XmlElementType::XmlDtdNode) {
+        if matches!(self.element_type(), XmlElementType::XmlDTDNode) {
             let doc = self.document();
             if !doc.is_null() {
                 if (*doc).int_subset == self as *mut Self as *mut XmlDtd {
@@ -296,7 +296,7 @@ impl XmlNode {
     pub unsafe fn is_blank_node(&self) -> bool {
         if !matches!(
             self.typ,
-            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
         ) {
             return false;
         }
@@ -331,7 +331,7 @@ impl XmlNode {
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlTextNode
                 | XmlElementType::XmlCommentNode
-                | XmlElementType::XmlPiNode
+                | XmlElementType::XmlPINode
         ) {
             if self.line == 65535 {
                 if matches!(self.typ, XmlElementType::XmlTextNode) && !self.psvi.is_null() {
@@ -355,7 +355,7 @@ impl XmlNode {
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlTextNode
                     | XmlElementType::XmlCommentNode
-                    | XmlElementType::XmlPiNode
+                    | XmlElementType::XmlPINode
             )
         {
             result = (*self.prev).get_line_no_internal(depth + 1);
@@ -434,7 +434,7 @@ impl XmlNode {
             occur = 0;
             if matches!(
                 (*cur).typ,
-                XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
             ) {
                 if *buffer.add(0) == b'/' {
                     break;
@@ -543,7 +543,7 @@ impl XmlNode {
                 }
             } else if matches!(
                 (*cur).typ,
-                XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 sep = c"/".as_ptr() as _;
                 name = c"text()".as_ptr() as _;
@@ -556,7 +556,7 @@ impl XmlNode {
                 while !tmp.is_null() {
                     if matches!(
                         (*tmp).typ,
-                        XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     ) {
                         occur += 1;
                     }
@@ -571,7 +571,7 @@ impl XmlNode {
                     while !tmp.is_null() {
                         if matches!(
                             (*tmp).typ,
-                            XmlElementType::XmlTextNode | XmlElementType::XmlCdataSectionNode
+                            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                         ) {
                             occur = 1;
                             break;
@@ -581,7 +581,7 @@ impl XmlNode {
                 } else {
                     occur += 1;
                 }
-            } else if matches!((*cur).typ, XmlElementType::XmlPiNode) {
+            } else if matches!((*cur).typ, XmlElementType::XmlPINode) {
                 sep = c"/".as_ptr() as _;
                 snprintf(
                     nametemp.as_mut_ptr() as _,
@@ -599,7 +599,7 @@ impl XmlNode {
                  */
                 tmp = (*cur).prev;
                 while !tmp.is_null() {
-                    if matches!((*tmp).typ, XmlElementType::XmlPiNode)
+                    if matches!((*tmp).typ, XmlElementType::XmlPINode)
                         && xml_str_equal((*cur).name, (*tmp).name)
                     {
                         occur += 1;
@@ -609,7 +609,7 @@ impl XmlNode {
                 if occur == 0 {
                     tmp = (*cur).next;
                     while !tmp.is_null() && occur == 0 {
-                        if matches!((*tmp).typ, XmlElementType::XmlPiNode)
+                        if matches!((*tmp).typ, XmlElementType::XmlPINode)
                             && xml_str_equal((*cur).name, (*tmp).name)
                         {
                             occur += 1;
@@ -732,7 +732,7 @@ impl XmlNode {
             doc = self.doc;
         }
         let mut cur = self as *const XmlNode;
-        if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
+        if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
             cur = (*doc).children;
             while !cur.is_null() && !(*cur).name.is_null() {
                 if !matches!((*cur).typ, XmlElementType::XmlElementNode) {
@@ -826,7 +826,7 @@ impl XmlNode {
             XmlElementType::XmlAttributeNode => {
                 xml_get_prop_node_value_internal(self as *const XmlNode as *const XmlAttr)
             }
-            XmlElementType::XmlCommentNode | XmlElementType::XmlPiNode => {
+            XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
                 if !self.content.is_null() {
                     return xml_strdup(self.content);
                 }
@@ -857,10 +857,10 @@ impl XmlNode {
             XmlElementType::XmlEntityNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlDtdNode
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => null_mut(),
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => null_mut(),
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 let buf = xml_buf_create();
                 if buf.is_null() {
                     return null_mut();
@@ -896,7 +896,7 @@ impl XmlNode {
                 /* TODO !!! */
                 null_mut()
             }
-            XmlElementType::XmlCdataSectionNode | XmlElementType::XmlTextNode => {
+            XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
                 if !self.content.is_null() {
                     return xml_strdup(self.content);
                 }
@@ -1054,23 +1054,23 @@ impl XmlNode {
         }
         match self.typ {
             XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlHtmlDocumentNode
+            | XmlElementType::XmlHTMLDocumentNode
             | XmlElementType::XmlNamespaceDecl
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => {
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
                 return;
             }
             XmlElementType::XmlElementNode
             | XmlElementType::XmlAttributeNode
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlDTDNode
             | XmlElementType::XmlDocumentNode
             | XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
@@ -1180,9 +1180,9 @@ impl XmlNode {
             /*
             	* Modify the attribute's value.
             	*/
-            if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeId)) {
+            if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
                 xml_remove_id(self.doc, prop);
-                (*prop).atype = Some(XmlAttributeType::XmlAttributeId);
+                (*prop).atype = Some(XmlAttributeType::XmlAttributeID);
             }
             if !(*prop).children.is_null() {
                 xml_free_node_list((*prop).children);
@@ -1204,7 +1204,7 @@ impl XmlNode {
                     tmp = (*tmp).next;
                 }
             }
-            if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeId)) {
+            if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
                 xml_add_id(null_mut(), self.doc, value, prop);
             }
             return prop;
@@ -1225,25 +1225,25 @@ impl XmlNode {
 
         match self.typ {
             XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlDTDNode
             | XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
             | XmlElementType::XmlEntityDecl
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode
             | XmlElementType::XmlNamespaceDecl
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => {
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
                 return;
             }
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHtmlDocumentNode => {
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 let doc = self as *mut XmlNode as XmlDocPtr;
 
                 if uri.is_null() {
@@ -1626,7 +1626,7 @@ impl XmlNode {
             | XmlElementType::XmlEntityNode
             | XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlHtmlDocumentNode => self.children,
+            | XmlElementType::XmlHTMLDocumentNode => self.children,
             _ => {
                 return 0;
             }
@@ -1653,14 +1653,14 @@ impl XmlNode {
         let mut cur = match self.typ {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlDtdNode
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => self.next,
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => self.next,
             _ => {
                 return null_mut();
             }
@@ -1689,7 +1689,7 @@ impl XmlNode {
             | XmlElementType::XmlEntityNode
             | XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlHtmlDocumentNode => self.children,
+            | XmlElementType::XmlHTMLDocumentNode => self.children,
             _ => {
                 return null_mut();
             }
@@ -1718,7 +1718,7 @@ impl XmlNode {
             | XmlElementType::XmlEntityNode
             | XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlHtmlDocumentNode => self.last,
+            | XmlElementType::XmlHTMLDocumentNode => self.last,
             _ => {
                 return null_mut();
             }
@@ -1745,13 +1745,13 @@ impl XmlNode {
         let mut node = match self.typ {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode
+            | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => self.prev,
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => self.prev,
             _ => {
                 return null_mut();
             }

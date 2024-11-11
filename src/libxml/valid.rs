@@ -691,7 +691,7 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
                 );
             }
         }
-        XmlElementContentType::XmlElementContentPcdata
+        XmlElementContentType::XmlElementContentPCDATA
         | XmlElementContentType::XmlElementContentSeq
         | XmlElementContentType::XmlElementContentOr => {
             if !name.is_null() {
@@ -871,7 +871,7 @@ pub unsafe extern "C" fn xml_free_doc_element_content(
         }
 
         match (*cur).typ {
-            XmlElementContentType::XmlElementContentPcdata
+            XmlElementContentType::XmlElementContentPCDATA
             | XmlElementContentType::XmlElementContentElement
             | XmlElementContentType::XmlElementContentSeq
             | XmlElementContentType::XmlElementContentOr => {} // _ => {
@@ -952,7 +952,7 @@ pub unsafe extern "C" fn xml_snprintf_element_content(
         strcat(buf, c"(".as_ptr() as _);
     }
     match (*content).typ {
-        XmlElementContentType::XmlElementContentPcdata => {
+        XmlElementContentType::XmlElementContentPCDATA => {
             strcat(buf, c"#PCDATA".as_ptr() as _);
         }
         XmlElementContentType::XmlElementContentElement => {
@@ -1606,7 +1606,7 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElemen
             }
 
             match (*cur).typ {
-                XmlElementContentType::XmlElementContentPcdata => {
+                XmlElementContentType::XmlElementContentPCDATA => {
                     xml_buf_ccat(buf, c"#PCDATA".as_ptr() as _);
                 }
                 XmlElementContentType::XmlElementContentElement => {
@@ -2137,12 +2137,12 @@ unsafe extern "C" fn xml_validate_attribute_value_internal(
     value: *const XmlChar,
 ) -> i32 {
     match typ {
-        XmlAttributeType::XmlAttributeEntities | XmlAttributeType::XmlAttributeIdrefs => {
+        XmlAttributeType::XmlAttributeEntities | XmlAttributeType::XmlAttributeIDREFS => {
             return xml_validate_names_value_internal(doc, value);
         }
         XmlAttributeType::XmlAttributeEntity
-        | XmlAttributeType::XmlAttributeIdref
-        | XmlAttributeType::XmlAttributeId
+        | XmlAttributeType::XmlAttributeIDREF
+        | XmlAttributeType::XmlAttributeID
         | XmlAttributeType::XmlAttributeNotation => {
             return xml_validate_name_value_internal(doc, value);
         }
@@ -2152,7 +2152,7 @@ unsafe extern "C" fn xml_validate_attribute_value_internal(
         XmlAttributeType::XmlAttributeNmtoken => {
             return xml_validate_nmtoken_value_internal(doc, value);
         }
-        XmlAttributeType::XmlAttributeCdata => {} // _ => {}
+        XmlAttributeType::XmlAttributeCDATA => {} // _ => {}
     }
     1
 }
@@ -2397,7 +2397,7 @@ unsafe extern "C" fn xml_scan_id_attribute_decl(
     }
     cur = (*elem).attributes;
     while !cur.is_null() {
-        if matches!((*cur).atype, XmlAttributeType::XmlAttributeId) {
+        if matches!((*cur).atype, XmlAttributeType::XmlAttributeID) {
             ret += 1;
             if ret > 1 && err != 0 {
                 xml_err_valid_node(
@@ -2471,10 +2471,10 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
          * Check the type and possibly the default value.
          */
         match typ {
-            XmlAttributeType::XmlAttributeCdata => {}
-            XmlAttributeType::XmlAttributeId => {}
-            XmlAttributeType::XmlAttributeIdref => {}
-            XmlAttributeType::XmlAttributeIdrefs => {}
+            XmlAttributeType::XmlAttributeCDATA => {}
+            XmlAttributeType::XmlAttributeID => {}
+            XmlAttributeType::XmlAttributeIDREF => {}
+            XmlAttributeType::XmlAttributeIDREFS => {}
             XmlAttributeType::XmlAttributeEntity => {}
             XmlAttributeType::XmlAttributeEntities => {}
             XmlAttributeType::XmlAttributeNmtoken => {}
@@ -2613,7 +2613,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
     if !elem_def.is_null() {
         #[cfg(feature = "valid")]
         {
-            if matches!(typ, XmlAttributeType::XmlAttributeId)
+            if matches!(typ, XmlAttributeType::XmlAttributeID)
                 && xml_scan_id_attribute_decl(null_mut(), elem_def, 1) != 0
             {
                 xml_err_valid_node(
@@ -2829,16 +2829,16 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttrib
     }
     xml_buf_cat(buf, (*attr).name);
     match (*attr).atype {
-        XmlAttributeType::XmlAttributeCdata => {
+        XmlAttributeType::XmlAttributeCDATA => {
             xml_buf_ccat(buf, c" CDATA".as_ptr() as _);
         }
-        XmlAttributeType::XmlAttributeId => {
+        XmlAttributeType::XmlAttributeID => {
             xml_buf_ccat(buf, c" ID".as_ptr() as _);
         }
-        XmlAttributeType::XmlAttributeIdref => {
+        XmlAttributeType::XmlAttributeIDREF => {
             xml_buf_ccat(buf, c" IDREF".as_ptr() as _);
         }
-        XmlAttributeType::XmlAttributeIdrefs => {
+        XmlAttributeType::XmlAttributeIDREFS => {
             xml_buf_ccat(buf, c" IDREFS".as_ptr() as _);
         }
         XmlAttributeType::XmlAttributeEntity => {
@@ -3049,7 +3049,7 @@ pub unsafe extern "C" fn xml_add_id(
         return null_mut();
     }
     if !attr.is_null() {
-        (*attr).atype = Some(XmlAttributeType::XmlAttributeId);
+        (*attr).atype = Some(XmlAttributeType::XmlAttributeID);
     }
     ret
 }
@@ -3139,10 +3139,10 @@ pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAt
     }
     if (*doc).int_subset.is_null()
         && (*doc).ext_subset.is_null()
-        && !matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode)
+        && !matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode)
     {
         return 0;
-    } else if matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
+    } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
         if xml_str_equal(c"id".as_ptr() as _, (*attr).name)
             || (xml_str_equal(c"name".as_ptr() as _, (*attr).name)
                 && (elem.is_null() || xml_str_equal((*elem).name, c"a".as_ptr() as _)))
@@ -3196,7 +3196,7 @@ pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAt
             xml_free(fullelemname as _);
         }
 
-        if !attr_decl.is_null() && matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeId) {
+        if !attr_decl.is_null() && matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeID) {
             return 1;
         }
     }
@@ -3497,7 +3497,7 @@ pub(crate) unsafe extern "C" fn xml_is_ref(
 
     if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
         return 0;
-    } else if matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
+    } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
         /* TODO @@@ */
         return 0;
     } else {
@@ -3514,7 +3514,7 @@ pub(crate) unsafe extern "C" fn xml_is_ref(
         if !attr_decl.is_null()
             && matches!(
                 (*attr_decl).atype,
-                XmlAttributeType::XmlAttributeIdref | XmlAttributeType::XmlAttributeIdrefs
+                XmlAttributeType::XmlAttributeIDREF | XmlAttributeType::XmlAttributeIDREFS
             )
         {
             return 1;
@@ -4024,7 +4024,7 @@ pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
     if attr_decl.is_null() {
         return null_mut();
     }
-    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeCdata) {
+    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeCDATA) {
         return null_mut();
     }
 
@@ -4119,7 +4119,7 @@ pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
     if attr_decl.is_null() {
         return null_mut();
     }
-    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeCdata) {
+    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeCDATA) {
         return null_mut();
     }
 
@@ -4145,7 +4145,7 @@ extern "C" fn xml_validate_attribute_id_callback(
     let attr: XmlAttributePtr = payload as XmlAttributePtr;
     let count: *mut i32 = data as *mut i32;
     unsafe {
-        if matches!((*attr).atype, XmlAttributeType::XmlAttributeId) {
+        if matches!((*attr).atype, XmlAttributeType::XmlAttributeID) {
             (*count) += 1;
         }
     }
@@ -4272,7 +4272,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
     }
 
     /* ID Attribute Default */
-    if matches!((*attr).atype, XmlAttributeType::XmlAttributeId)
+    if matches!((*attr).atype, XmlAttributeType::XmlAttributeID)
         && !matches!(
             (*attr).def,
             XmlAttributeDefault::XmlAttributeImplied | XmlAttributeDefault::XmlAttributeRequired
@@ -4291,7 +4291,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
     }
 
     /* One ID per Element Type */
-    if matches!((*attr).atype, XmlAttributeType::XmlAttributeId) {
+    if matches!((*attr).atype, XmlAttributeType::XmlAttributeID) {
         let mut nb_id: i32;
 
         /* the trick is that we parse DtD as their own internal subset */
@@ -4529,13 +4529,13 @@ unsafe extern "C" fn xml_validate_attribute_value2(
 ) -> i32 {
     let mut ret: i32 = 1;
     match typ {
-        XmlAttributeType::XmlAttributeIdrefs
-        | XmlAttributeType::XmlAttributeIdref
-        | XmlAttributeType::XmlAttributeId
+        XmlAttributeType::XmlAttributeIDREFS
+        | XmlAttributeType::XmlAttributeIDREF
+        | XmlAttributeType::XmlAttributeID
         | XmlAttributeType::XmlAttributeNmtokens
         | XmlAttributeType::XmlAttributeEnumeration
         | XmlAttributeType::XmlAttributeNmtoken
-        | XmlAttributeType::XmlAttributeCdata => {}
+        | XmlAttributeType::XmlAttributeCDATA => {}
         XmlAttributeType::XmlAttributeEntity => {
             let mut ent: XmlEntityPtr;
 
@@ -4669,10 +4669,10 @@ extern "C" fn xml_validate_attribute_callback(
     }
     unsafe {
         match (*cur).atype {
-            XmlAttributeType::XmlAttributeCdata
-            | XmlAttributeType::XmlAttributeId
-            | XmlAttributeType::XmlAttributeIdref
-            | XmlAttributeType::XmlAttributeIdrefs
+            XmlAttributeType::XmlAttributeCDATA
+            | XmlAttributeType::XmlAttributeID
+            | XmlAttributeType::XmlAttributeIDREF
+            | XmlAttributeType::XmlAttributeIDREFS
             | XmlAttributeType::XmlAttributeNmtoken
             | XmlAttributeType::XmlAttributeNmtokens
             | XmlAttributeType::XmlAttributeEnumeration => {}
@@ -4729,7 +4729,7 @@ extern "C" fn xml_validate_attribute_callback(
             }
             if elem.is_null()
                 && !(*cur).parent.is_null()
-                && matches!((*(*cur).parent).typ, XmlElementType::XmlDtdNode)
+                && matches!((*(*cur).parent).typ, XmlElementType::XmlDTDNode)
             {
                 elem = xml_get_dtd_element_desc((*cur).parent as XmlDtdPtr, (*cur).elem);
             }
@@ -5198,9 +5198,9 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
                 }
             }
             XmlElementType::XmlCommentNode
-            | XmlElementType::XmlPiNode
+            | XmlElementType::XmlPINode
             | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCdataSectionNode => {}
+            | XmlElementType::XmlCDATASectionNode => {}
             _ => {
                 ret = 0;
                 // goto done;
@@ -5299,7 +5299,7 @@ unsafe extern "C" fn xml_snprintf_elements(
                 }
             }
             ty @ XmlElementType::XmlTextNode
-            | ty @ XmlElementType::XmlCdataSectionNode
+            | ty @ XmlElementType::XmlCDATASectionNode
             | ty @ XmlElementType::XmlEntityRefNode => 'to_break: {
                 if matches!(ty, XmlElementType::XmlTextNode) && (*cur).is_blank_node() {
                     break 'to_break;
@@ -5311,7 +5311,7 @@ unsafe extern "C" fn xml_snprintf_elements(
             }
             XmlElementType::XmlAttributeNode
             | XmlElementType::XmlDocumentNode
-            | XmlElementType::XmlHtmlDocumentNode
+            | XmlElementType::XmlHTMLDocumentNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlNotationNode
@@ -5322,14 +5322,14 @@ unsafe extern "C" fn xml_snprintf_elements(
                 }
             }
             XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPiNode
-            | XmlElementType::XmlDtdNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlDTDNode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
             | XmlElementType::XmlEntityDecl
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => {}
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
             _ => unreachable!(),
         }
         cur = (*cur).next;
@@ -5436,7 +5436,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
              * Check first if the content matches
              */
             match (*(*(*ctxt).vstate).cont).typ {
-                XmlElementContentType::XmlElementContentPcdata => {
+                XmlElementContentType::XmlElementContentPCDATA => {
                     if (*(*ctxt).vstate).node.is_null() {
                         DEBUG_VALID_MSG!(c"pcdata failed no node".as_ptr());
                         ret = 0;
@@ -5470,7 +5470,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                                         XmlElementType::XmlTextNode
                                     ) && !matches!(
                                         (*(*(*ctxt).vstate).node).typ,
-                                        XmlElementType::XmlCdataSectionNode
+                                        XmlElementType::XmlCDATASectionNode
                                     )))
                                 {
                                     break;
@@ -5546,7 +5546,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                                         XmlElementType::XmlTextNode
                                     ) && !matches!(
                                         (*(*(*ctxt).vstate).node).typ,
-                                        XmlElementType::XmlCdataSectionNode
+                                        XmlElementType::XmlCDATASectionNode
                                     )))
                                 {
                                     break;
@@ -5795,7 +5795,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
             }
 
             match (*(*(*(*ctxt).vstate).cont).parent).typ {
-                XmlElementContentType::XmlElementContentPcdata => {
+                XmlElementContentType::XmlElementContentPCDATA => {
                     DEBUG_VALID_MSG!(c"Error: parent pcdata".as_ptr());
                     return -1;
                 }
@@ -5943,7 +5943,7 @@ unsafe extern "C" fn xml_validate_element_content(
                                     break 'fail;
                                 }
                             }
-                            XmlElementType::XmlCdataSectionNode => {
+                            XmlElementType::XmlCDATASectionNode => {
                                 /* TODO */
                                 ret = 0;
                                 break 'fail;
@@ -6065,7 +6065,7 @@ unsafe extern "C" fn xml_validate_element_content(
                             }
                         }
                         ty @ XmlElementType::XmlTextNode
-                        | ty @ XmlElementType::XmlCdataSectionNode
+                        | ty @ XmlElementType::XmlCDATASectionNode
                         | ty @ XmlElementType::XmlElementNode => {
                             if matches!(ty, XmlElementType::XmlTextNode)
                                 && xml_is_blank_node(cur) != 0
@@ -6095,7 +6095,7 @@ unsafe extern "C" fn xml_validate_element_content(
                                     (*last).next = tmp;
                                     last = tmp;
                                 }
-                                if matches!((*cur).typ, XmlElementType::XmlCdataSectionNode) {
+                                if matches!((*cur).typ, XmlElementType::XmlCDATASectionNode) {
                                     /*
                                      * E59 spaces in CDATA does not match the
                                      * nonterminal S
@@ -6319,12 +6319,12 @@ pub unsafe extern "C" fn xml_validate_one_element(
             }
             return 1;
         }
-        XmlElementType::XmlXincludeStart | XmlElementType::XmlXincludeEnd => {
+        XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
             return 1;
         }
-        XmlElementType::XmlCdataSectionNode
+        XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlPiNode
+        | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {
             return 1;
         }
@@ -6366,7 +6366,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
             );
             return 0;
         }
-        XmlElementType::XmlHtmlDocumentNode => {
+        XmlElementType::XmlHTMLDocumentNode => {
             xml_err_valid_node(
                 ctxt,
                 elem,
@@ -6441,7 +6441,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
             XmlElementTypeVal::XmlElementTypeMixed => {
                 /* simple case of declared as #PCDATA */
                 if !(*elem_decl).content.is_null()
-                    && (*(*elem_decl).content).typ == XmlElementContentType::XmlElementContentPcdata
+                    && (*(*elem_decl).content).typ == XmlElementContentType::XmlElementContentPCDATA
                 {
                     ret = xml_validate_one_cdata_element(ctxt, doc, elem);
                     if ret == 0 {
@@ -6502,7 +6502,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                         ) || (*cont).c1.is_null()
                                             || !matches!(
                                                 (*(*cont).c1).typ,
-                                                XmlElementContentType::XmlElementContentPcdata
+                                                XmlElementContentType::XmlElementContentPCDATA
                                             )
                                         {
                                             xml_err_valid(
@@ -6552,7 +6552,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                     ) || (*cont).c1.is_null()
                                         || !matches!(
                                             (*(*cont).c1).typ,
-                                            XmlElementContentType::XmlElementContentPcdata
+                                            XmlElementContentType::XmlElementContentPCDATA
                                         )
                                     {
                                         xml_err_valid(
@@ -6939,7 +6939,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
     }
 
     /* Validity Constraint: ID uniqueness */
-    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeId)
+    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeID)
         && xml_add_id(ctxt, doc, value, attr).is_null()
     {
         ret = 0;
@@ -6947,7 +6947,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
 
     if matches!(
         (*attr_decl).atype,
-        XmlAttributeType::XmlAttributeIdref | XmlAttributeType::XmlAttributeIdrefs
+        XmlAttributeType::XmlAttributeIDREF | XmlAttributeType::XmlAttributeIDREFS
     ) && xml_add_ref(ctxt, doc, value, attr).is_null()
     {
         ret = 0;
@@ -7466,7 +7466,7 @@ unsafe extern "C" fn xml_validate_ref(
             }
         }
         xml_free(dup as _);
-    } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIdref)) {
+    } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIDREF)) {
         id = xml_get_id((*ctxt).doc, name);
         if id.is_null() {
             xml_err_valid_node(
@@ -7480,7 +7480,7 @@ unsafe extern "C" fn xml_validate_ref(
             );
             (*ctxt).valid = 0;
         }
-    } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIdrefs)) {
+    } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIDREFS)) {
         let mut str: *mut XmlChar;
         let mut cur: *mut XmlChar;
         let mut save: XmlChar;
@@ -7894,7 +7894,7 @@ pub unsafe extern "C" fn xml_valid_get_potential_children(
     }
 
     match (*ctree).typ {
-        XmlElementContentType::XmlElementContentPcdata => {
+        XmlElementContentType::XmlElementContentPCDATA => {
             for i in 0..*len {
                 if xml_str_equal(c"#PCDATA".as_ptr() as _, *names.add(i as usize)) {
                     return *len;
@@ -8183,7 +8183,7 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
         return 0;
     }
     match (*content).typ {
-        XmlElementContentType::XmlElementContentPcdata => {
+        XmlElementContentType::XmlElementContentPCDATA => {
             xml_err_valid_node(
                 ctxt,
                 null_mut(),
@@ -8472,7 +8472,7 @@ unsafe extern "C" fn xml_validate_check_mixed(
                 || (*cont).c1.is_null()
                 || !matches!(
                     (*(*cont).c1).typ,
-                    XmlElementContentType::XmlElementContentPcdata
+                    XmlElementContentType::XmlElementContentPCDATA
                 )
             {
                 xml_err_valid(
@@ -8511,7 +8511,7 @@ unsafe extern "C" fn xml_validate_check_mixed(
                 || (*cont).c1.is_null()
                 || !matches!(
                     (*(*cont).c1).typ,
-                    XmlElementContentType::XmlElementContentPcdata
+                    XmlElementContentType::XmlElementContentPCDATA
                 )
             {
                 xml_err_valid(
@@ -8711,7 +8711,7 @@ pub unsafe extern "C" fn xml_validate_push_element(
                     /* simple case of declared as #PCDATA */
                     if !(*elem_decl).content.is_null()
                         && (*(*elem_decl).content).typ
-                            == XmlElementContentType::XmlElementContentPcdata
+                            == XmlElementContentType::XmlElementContentPCDATA
                     {
                         xml_err_valid_node(
                             ctxt,
@@ -8975,10 +8975,10 @@ unsafe extern "C" fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodeP
     while !child.is_null() {
         match (*child).typ {
             /* These things are ignored (skipped) during validation.  */
-            XmlElementType::XmlPiNode
+            XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlXincludeStart
-            | XmlElementType::XmlXincludeEnd => {
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
                 child = (*child).next;
             }
             XmlElementType::XmlTextNode => {

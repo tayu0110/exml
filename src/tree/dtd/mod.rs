@@ -148,7 +148,7 @@ pub unsafe fn xml_create_int_subset(
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDtd>());
-    (*cur).typ = XmlElementType::XmlDtdNode;
+    (*cur).typ = XmlElementType::XmlDTDNode;
 
     if !name.is_null() {
         (*cur).name = xml_strdup(name);
@@ -190,7 +190,7 @@ pub unsafe fn xml_create_int_subset(
         if (*doc).children.is_null() {
             (*doc).children = cur as _;
             (*doc).last = cur as _;
-        } else if matches!((*doc).typ, XmlElementType::XmlHtmlDocumentNode) {
+        } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
             let prev = (*doc).children;
             (*prev).prev = cur as _;
             (*cur).next = prev;
@@ -250,7 +250,7 @@ pub unsafe fn xml_new_dtd(
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDtd>());
-    (*cur).typ = XmlElementType::XmlDtdNode;
+    (*cur).typ = XmlElementType::XmlDTDNode;
 
     if !name.is_null() {
         (*cur).name = xml_strdup(name);

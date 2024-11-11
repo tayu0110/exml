@@ -405,7 +405,7 @@ pub(crate) fn gen_xml_schema_val_type(no: i32, _nr: i32) -> XmlSchemaValType {
         return XmlSchemaValType::XmlSchemasAnytype;
     }
     if no == 3 {
-        return XmlSchemaValType::XmlSchemasAnyuri;
+        return XmlSchemaValType::XmlSchemasAnyURI;
     }
     if no == 4 {
         return XmlSchemaValType::XmlSchemasBase64binary;
@@ -630,12 +630,12 @@ pub(crate) fn gen_xml_element_content_type(no: i32, _nr: i32) -> XmlElementConte
         return XmlElementContentType::XmlElementContentOr;
     }
     if no == 3 {
-        return XmlElementContentType::XmlElementContentPcdata;
+        return XmlElementContentType::XmlElementContentPCDATA;
     }
     if no == 4 {
         return XmlElementContentType::XmlElementContentSeq;
     }
-    XmlElementContentType::XmlElementContentPcdata
+    XmlElementContentType::XmlElementContentPCDATA
 }
 
 pub(crate) fn des_xml_element_content_type(_no: i32, _val: XmlElementContentType, _nr: i32) {}
@@ -678,7 +678,7 @@ pub(crate) fn des_xml_attribute_default(_no: i32, _val: XmlAttributeDefault, _nr
 
 pub(crate) fn gen_xml_attribute_type(no: i32, _nr: i32) -> XmlAttributeType {
     if no == 1 {
-        return XmlAttributeType::XmlAttributeCdata;
+        return XmlAttributeType::XmlAttributeCDATA;
     }
     if no == 2 {
         return XmlAttributeType::XmlAttributeEntities;
@@ -689,7 +689,7 @@ pub(crate) fn gen_xml_attribute_type(no: i32, _nr: i32) -> XmlAttributeType {
     if no == 4 {
         return XmlAttributeType::XmlAttributeEnumeration;
     }
-    XmlAttributeType::XmlAttributeCdata
+    XmlAttributeType::XmlAttributeCDATA
 }
 
 pub(crate) fn des_xml_attribute_type(_no: i32, _val: XmlAttributeType, _nr: i32) {}
@@ -785,11 +785,11 @@ pub(crate) unsafe extern "C" fn des_xml_ns_ptr(no: i32, _val: XmlNsPtr, _nr: i32
 }
 
 unsafe extern "C" fn get_api_dtd() -> XmlDtdPtr {
-    if API_DTD.get().is_null() || (*API_DTD.get()).typ != XmlElementType::XmlDtdNode {
+    if API_DTD.get().is_null() || (*API_DTD.get()).typ != XmlElementType::XmlDTDNode {
         get_api_doc();
         if !API_DOC.get().is_null()
             && !(*API_DOC.get()).children.is_null()
-            && (*(*API_DOC.get()).children).typ == XmlElementType::XmlDtdNode
+            && (*(*API_DOC.get()).children).typ == XmlElementType::XmlDTDNode
         {
             API_DTD.set((*API_DOC.get()).children as XmlDtdPtr);
         }

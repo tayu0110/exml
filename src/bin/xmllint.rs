@@ -3013,7 +3013,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
                 #[cfg(any(feature = "html", feature = "valid"))]
                 if XMLOUT != 0 {
-                    save_opts |= XmlSaveOption::XmlSaveAsXml as i32;
+                    save_opts |= XmlSaveOption::XmlSaveAsXML as i32;
                 }
 
                 if let Some(o) = OUTPUT.lock().unwrap().as_ref() {

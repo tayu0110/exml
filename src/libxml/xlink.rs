@@ -247,7 +247,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
     if doc.is_null() {
         doc = (*node).doc;
     }
-    if !doc.is_null() && (*doc).typ == XmlElementType::XmlHtmlDocumentNode {
+    if !doc.is_null() && (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
         /*
          * This is an HTML document.
          */
