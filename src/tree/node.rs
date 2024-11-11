@@ -1608,6 +1608,79 @@ impl XmlNode {
         }
     }
 
+    /// Replace the content of a node.
+    ///
+    /// # Note
+    /// `content` is supposed to be a piece of XML CDATA, so it allows entity
+    /// references, but XML special chars need to be escaped first by using
+    /// xmlEncodeEntitiesReentrant() resp. xmlEncodeSpecialChars().
+    #[doc(alias = "xmlNodeSetContentLen")]
+    #[cfg(feature = "tree")]
+    pub unsafe fn set_content_len(&mut self, content: *const XmlChar, len: i32) {
+        use crate::{libxml::xmlstring::xml_strndup, tree::xml_string_len_get_node_list};
+
+        use super::xml_free_node_list;
+
+        match self.typ {
+            XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlElementNode
+            | XmlElementType::XmlAttributeNode => {
+                if !self.children.is_null() {
+                    xml_free_node_list(self.children);
+                }
+                self.children = xml_string_len_get_node_list(self.doc, content, len);
+                let mut ulccur: XmlNodePtr = self.children;
+                if ulccur.is_null() {
+                    self.last = null_mut();
+                } else {
+                    while !(*ulccur).next.is_null() {
+                        (*ulccur).parent = self;
+                        ulccur = (*ulccur).next;
+                    }
+                    (*ulccur).parent = self;
+                    self.last = ulccur;
+                }
+            }
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlNotationNode => {
+                if (!self.content.is_null() && self.content != &raw mut self.properties as _)
+                    && (!(!self.doc.is_null()
+                        && !(*self.doc).dict.is_null()
+                        && xml_dict_owns((*self.doc).dict, self.content) != 0))
+                {
+                    xml_free(self.content as _);
+                }
+                if !self.children.is_null() {
+                    xml_free_node_list(self.children);
+                }
+                self.children = null_mut();
+                self.last = null_mut();
+                if !content.is_null() {
+                    self.content = xml_strndup(content, len);
+                } else {
+                    self.content = null_mut();
+                }
+                self.properties = null_mut();
+            }
+            XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
+            XmlElementType::XmlElementDecl => { /* TODO !!! */ }
+            XmlElementType::XmlAttributeDecl => { /* TODO !!! */ }
+            XmlElementType::XmlEntityDecl => { /* TODO !!! */ }
+            _ => unreachable!(),
+        }
+    }
+
     /// Search an attribute associated to a node.  
     ///
     /// This function also looks in DTD attribute declaration for #FIXED or
