@@ -42,7 +42,7 @@ use crate::{
     },
     private::{buf::xml_buf_set_allocation_scheme, save::xml_buf_attr_serialize_txt_content},
     tree::{
-        xml_is_xhtml, XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr,
+        is_xhtml, XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr,
         XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
@@ -1520,7 +1520,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     #[cfg(feature = "html")]
     let dtd: XmlDtdPtr;
     #[cfg(feature = "html")]
-    let mut is_xhtml: i32 = 0;
+    let mut is_html = false;
     let oldenc = (*cur).encoding.clone();
     let oldctxtenc = (*ctxt).encoding.clone();
     let oldescape = (*ctxt).escape;
@@ -1658,15 +1658,22 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         #[cfg(feature = "html")]
         {
             if (*ctxt).options & XmlSaveOption::XmlSaveXhtml as i32 != 0 {
-                is_xhtml = 1;
+                is_html = true;
             }
             if (*ctxt).options & XmlSaveOption::XmlSaveNoXhtml as i32 == 0 {
                 dtd = (*cur).get_int_subset();
                 if !dtd.is_null() {
-                    is_xhtml = xml_is_xhtml((*dtd).system_id, (*dtd).external_id);
-                    if is_xhtml < 0 {
-                        is_xhtml = 0;
-                    }
+                    let system_id = (!(*dtd).system_id.is_null()).then(|| {
+                        CStr::from_ptr((*dtd).system_id as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                    });
+                    let external_id = (!(*dtd).external_id.is_null()).then(|| {
+                        CStr::from_ptr((*dtd).external_id as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                    });
+                    is_html = is_xhtml(system_id.as_deref(), external_id.as_deref());
                 }
             }
         }
@@ -1677,7 +1684,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                 (*ctxt).level = 0;
                 #[cfg(feature = "html")]
                 {
-                    if is_xhtml != 0 {
+                    if is_html {
                         xhtml_node_dump_output(ctxt, child);
                     } else {
                         xml_node_dump_output_internal(ctxt, child);

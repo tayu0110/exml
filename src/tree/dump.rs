@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    ffi::CString,
+    ffi::{CStr, CString},
     ptr::{null, null_mut},
     rc::Rc,
 };
@@ -25,7 +25,7 @@ use crate::{
         },
         xmlstring::{xml_strndup, XmlChar},
     },
-    tree::{xml_buf_set_allocation_scheme, xml_buf_use, xml_is_xhtml, XmlBufferAllocationScheme},
+    tree::{is_xhtml, xml_buf_set_allocation_scheme, xml_buf_use, XmlBufferAllocationScheme},
 };
 
 use super::{
@@ -395,20 +395,27 @@ impl XmlNode {
 
         #[cfg(feature = "html")]
         {
-            let mut is_xhtml: i32 = 0;
+            let mut is_html = false;
             let dtd = if doc.is_null() {
                 null_mut()
             } else {
                 (*doc).get_int_subset()
             };
             if !dtd.is_null() {
-                is_xhtml = xml_is_xhtml((*dtd).system_id, (*dtd).external_id);
-                if is_xhtml < 0 {
-                    is_xhtml = 0;
-                }
+                let system_id = (!(*dtd).system_id.is_null()).then(|| {
+                    CStr::from_ptr((*dtd).system_id as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                });
+                let external_id = (!(*dtd).external_id.is_null()).then(|| {
+                    CStr::from_ptr((*dtd).external_id as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                });
+                is_html = is_xhtml(system_id.as_deref(), external_id.as_deref());
             }
 
-            if is_xhtml != 0 {
+            if is_html {
                 xhtml_node_dump_output(&raw mut ctxt as _, self);
             } else {
                 xml_node_dump_output_internal(&raw mut ctxt as _, self);

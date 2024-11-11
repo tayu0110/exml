@@ -5420,49 +5420,21 @@ pub unsafe extern "C" fn xml_reconciliate_ns(doc: XmlDocPtr, tree: XmlNodePtr) -
 /*
  * XHTML
  */
-const XHTML_STRICT_PUBLIC_ID: &CStr = c"-//W3C//DTD XHTML 1.0 Strict//EN";
-const XHTML_STRICT_SYSTEM_ID: &CStr = c"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd";
-const XHTML_FRAME_PUBLIC_ID: &CStr = c"-//W3C//DTD XHTML 1.0 Frameset//EN";
-const XHTML_FRAME_SYSTEM_ID: &CStr = c"http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd";
-const XHTML_TRANS_PUBLIC_ID: &CStr = c"-//W3C//DTD XHTML 1.0 Transitional//EN";
-const XHTML_TRANS_SYSTEM_ID: &CStr = c"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd";
+const XHTML_STRICT_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Strict//EN";
+const XHTML_STRICT_SYSTEM_ID: &str = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd";
+const XHTML_FRAME_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Frameset//EN";
+const XHTML_FRAME_SYSTEM_ID: &str = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd";
+const XHTML_TRANS_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Transitional//EN";
+const XHTML_TRANS_SYSTEM_ID: &str = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd";
 
-/**
- * xmlIsXHTML:
- * @systemID:  the system identifier
- * @publicID:  the public identifier
- *
- * Try to find if the document correspond to an XHTML DTD
- *
- * Returns 1 if true, 0 if not and -1 in case of error
- */
-pub unsafe extern "C" fn xml_is_xhtml(system_id: *const XmlChar, public_id: *const XmlChar) -> i32 {
-    if system_id.is_null() && public_id.is_null() {
-        return -1;
-    }
-    if !public_id.is_null() {
-        if xml_str_equal(public_id, XHTML_STRICT_PUBLIC_ID.as_ptr() as _) {
-            return 1;
-        }
-        if xml_str_equal(public_id, XHTML_FRAME_PUBLIC_ID.as_ptr() as _) {
-            return 1;
-        }
-        if xml_str_equal(public_id, XHTML_TRANS_PUBLIC_ID.as_ptr() as _) {
-            return 1;
-        }
-    }
-    if !system_id.is_null() {
-        if xml_str_equal(system_id, XHTML_STRICT_SYSTEM_ID.as_ptr() as _) {
-            return 1;
-        }
-        if xml_str_equal(system_id, XHTML_FRAME_SYSTEM_ID.as_ptr() as _) {
-            return 1;
-        }
-        if xml_str_equal(system_id, XHTML_TRANS_SYSTEM_ID.as_ptr() as _) {
-            return 1;
-        }
-    }
-    0
+/// Try to find if the document correspond to an XHTML DTD.
+#[doc(alias = "xmlIsXHTML")]
+pub fn is_xhtml(system_id: Option<&str>, public_id: Option<&str>) -> bool {
+    public_id.map_or(false, |s| {
+        s == XHTML_STRICT_PUBLIC_ID || s == XHTML_FRAME_PUBLIC_ID || s == XHTML_TRANS_PUBLIC_ID
+    }) || system_id.map_or(false, |s| {
+        s == XHTML_STRICT_SYSTEM_ID || s == XHTML_FRAME_SYSTEM_ID || s == XHTML_TRANS_SYSTEM_ID
+    })
 }
 
 static XML_COMPRESS_MODE: AtomicI32 = AtomicI32::new(0);
@@ -9155,36 +9127,6 @@ mod tests {
                             eprint!(" {}", n_name);
                             eprintln!(" {}", n_name_space);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_is_xhtml() {
-        unsafe {
-            let mut leaks = 0;
-            for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_public_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let system_id = gen_const_xml_char_ptr(n_system_id, 0);
-                    let public_id = gen_const_xml_char_ptr(n_public_id, 1);
-
-                    let ret_val = xml_is_xhtml(system_id as *const XmlChar, public_id);
-                    desret_int(ret_val);
-                    des_const_xml_char_ptr(n_system_id, system_id, 0);
-                    des_const_xml_char_ptr(n_public_id, public_id, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlIsXHTML",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlIsXHTML()");
-                        eprint!(" {}", n_system_id);
-                        eprintln!(" {}", n_public_id);
                     }
                 }
             }
