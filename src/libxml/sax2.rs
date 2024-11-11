@@ -32,7 +32,7 @@ use crate::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
         xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns,
-        xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_search_ns, xml_set_ns,
+        xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_set_ns,
         xml_string_get_node_list, xml_string_len_get_node_list, xml_text_concat,
         xml_validate_ncname, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
@@ -1839,7 +1839,7 @@ unsafe fn xml_sax2_attribute_internal(
     }
 
     if !ns.is_null() {
-        namespace = xml_search_ns((*ctxt).my_doc, (*ctxt).node, ns);
+        namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, ns);
 
         if namespace.is_null() {
             xml_ns_err_msg(
@@ -2397,9 +2397,9 @@ pub unsafe fn xml_sax2_start_element(
          * Search the namespace, note that since the attributes have been
          * processed, the local namespaces are available.
          */
-        ns = xml_search_ns((*ctxt).my_doc, ret, prefix);
+        ns = (*ret).search_ns((*ctxt).my_doc, prefix);
         if ns.is_null() && !parent.is_null() {
-            ns = xml_search_ns((*ctxt).my_doc, parent, prefix);
+            ns = (*parent).search_ns((*ctxt).my_doc, prefix);
         }
         if !prefix.is_null() && ns.is_null() {
             ns = xml_new_ns(ret, null_mut(), prefix);
@@ -2749,9 +2749,13 @@ pub unsafe fn xml_sax2_start_element_ns(
      * Note that, if prefix is NULL, this searches for the default Ns
      */
     if !orig_uri.is_null() && (*ret).ns.is_null() {
-        (*ret).ns = xml_search_ns((*ctxt).my_doc, parent, prefix);
+        (*ret).ns = if !parent.is_null() {
+            (*parent).search_ns((*ctxt).my_doc, prefix)
+        } else {
+            null_mut()
+        };
         if (*ret).ns.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) {
-            (*ret).ns = xml_search_ns((*ctxt).my_doc, ret, prefix);
+            (*ret).ns = (*ret).search_ns((*ctxt).my_doc, prefix);
         }
         if (*ret).ns.is_null() {
             ns = xml_new_ns(ret, null_mut(), prefix);
@@ -3024,7 +3028,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
      * Note: if prefix.is_null(), the attribute is not in the default namespace
      */
     if !prefix.is_null() {
-        namespace = xml_search_ns((*ctxt).my_doc, (*ctxt).node, prefix);
+        namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, prefix);
     }
 
     /*

@@ -122,10 +122,10 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
-        xml_node_list_get_string, xml_search_ns, xml_split_qname2, xml_split_qname3,
-        xml_validate_ncname, xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType,
-        XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr,
-        XmlNsPtr, XML_XML_NAMESPACE,
+        xml_node_list_get_string, xml_split_qname2, xml_split_qname3, xml_validate_ncname,
+        xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType, XmlDocPtr,
+        XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr,
+        XML_XML_NAMESPACE,
     },
 };
 
@@ -2645,11 +2645,8 @@ unsafe extern "C" fn xml_schema_lookup_namespace(
             );
             return null_mut();
         }
-        let ns: XmlNsPtr = xml_search_ns(
-            (*(*(*vctxt).inode).node).doc,
-            (*(*vctxt).inode).node,
-            prefix,
-        );
+        let ns: XmlNsPtr =
+            (*(*(*vctxt).inode).node).search_ns((*(*(*vctxt).inode).node).doc, prefix);
         if !ns.is_null() {
             return (*ns).href.load(Ordering::Relaxed);
         }
@@ -2735,7 +2732,7 @@ unsafe extern "C" fn xml_schema_validate_notation(
             if !vctxt.is_null() {
                 ns_name = xml_schema_lookup_namespace(vctxt, prefix);
             } else if !node.is_null() {
-                let ns: XmlNsPtr = xml_search_ns((*node).doc, node, prefix);
+                let ns: XmlNsPtr = (*node).search_ns((*node).doc, prefix);
                 if !ns.is_null() {
                     ns_name = (*ns).href.load(Ordering::Relaxed);
                 }
@@ -7867,7 +7864,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     }
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
-        ns = xml_search_ns((*attr).doc, (*attr).parent, null_mut());
+        ns = (*(*attr).parent).search_ns((*attr).doc, null_mut());
         if !ns.is_null()
             && !(*ns).href.load(Ordering::Relaxed).is_null()
             && *(*ns).href.load(Ordering::Relaxed).add(0) != 0
@@ -7891,7 +7888,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     *local = xml_split_qname3(value, addr_of_mut!(len));
     *local = xml_dict_lookup((*ctxt).dict, *local, -1);
     let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
-    ns = xml_search_ns((*attr).doc, (*attr).parent, pref);
+    ns = (*(*attr).parent).search_ns((*attr).doc, pref);
     if ns.is_null() {
         xml_schema_psimple_type_err(ctxt, XmlParserErrors::XmlSchemapS4sAttrInvalidValue, owner_item, attr as XmlNodePtr, xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname), null_mut(), value, c"The value '%s' of simple type 'xs:QName' has no corresponding namespace declaration in scope".as_ptr() as _, value, null_mut());
         return (*ctxt).err;
@@ -28053,11 +28050,8 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                                         counter,
                                     );
                                     counter += 1;
-                                    ns = xml_search_ns(
-                                        (*def_attr_owner_elem).doc,
-                                        def_attr_owner_elem,
-                                        prefix.as_ptr(),
-                                    );
+                                    ns = (*def_attr_owner_elem)
+                                        .search_ns((*def_attr_owner_elem).doc, prefix.as_ptr());
                                     if counter > 1000 {
                                         VERROR_INT!(
                                             vctxt,

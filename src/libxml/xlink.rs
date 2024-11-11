@@ -12,7 +12,7 @@ use std::{
 
 use libc::snprintf;
 
-use crate::tree::{xml_search_ns, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr};
+use crate::tree::{XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr};
 
 use super::{
     globals::xml_free,
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
         } else if xml_str_equal(typ, c"extended".as_ptr() as _) {
             role = (*node).get_ns_prop(c"role".as_ptr() as _, XLINK_NAMESPACE.as_ptr() as _);
             if !role.is_null() {
-                let xlink: XmlNsPtr = xml_search_ns(doc, node, XLINK_NAMESPACE.as_ptr() as _);
+                let xlink: XmlNsPtr = (*node).search_ns(doc, XLINK_NAMESPACE.as_ptr() as _);
                 if xlink.is_null() {
                     /* Humm, fallback method */
                     if xml_str_equal(role, c"xlink:external-linkset".as_ptr() as _) {

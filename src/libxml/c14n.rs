@@ -23,8 +23,8 @@ use crate::{
     },
     private::buf::xml_buf_write_quoted_string,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, xml_node_list_get_string, xml_search_ns, XmlAttrPtr,
-        XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_new_ns_prop, xml_node_list_get_string, XmlAttrPtr, XmlDocPtr,
+        XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -1034,7 +1034,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
     while !n.is_null() {
         ns = (*n).ns_def;
         while !ns.is_null() {
-            tmp = xml_search_ns((*cur).doc, cur, (*ns).prefix.load(Ordering::Relaxed));
+            tmp = (*cur).search_ns((*cur).doc, (*ns).prefix.load(Ordering::Relaxed));
 
             if tmp == ns && !xml_c14n_is_xml_ns(ns) && xml_c14n_is_visible!(ctx, ns, cur) != 0 {
                 already_rendered = xml_c14n_visible_ns_stack_find((*ctx).ns_rendered, ns) as i32;
@@ -1220,7 +1220,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
                 has_empty_ns_in_inclusive_list = 1;
             }
 
-            ns = xml_search_ns((*cur).doc, cur, prefix);
+            ns = (*cur).search_ns((*cur).doc, prefix);
             if !ns.is_null() && !xml_c14n_is_xml_ns(ns) && xml_c14n_is_visible!(ctx, ns, cur) != 0 {
                 already_rendered = xml_c14n_visible_ns_stack_find((*ctx).ns_rendered, ns) as i32;
                 if visible != 0 {
@@ -1240,7 +1240,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
     if !(*cur).ns.is_null() {
         ns = (*cur).ns;
     } else {
-        ns = xml_search_ns((*cur).doc, cur, null_mut());
+        ns = (*cur).search_ns((*cur).doc, null_mut());
         has_visibly_utilized_empty_ns = 1;
     }
     if !ns.is_null() && !xml_c14n_is_xml_ns(ns) {

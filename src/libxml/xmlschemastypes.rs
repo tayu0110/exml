@@ -48,9 +48,9 @@ use crate::{
         xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
     },
     tree::{
-        xml_search_ns, xml_split_qname2, xml_validate_name, xml_validate_ncname,
-        xml_validate_nmtoken, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlElementType,
-        XmlIDPtr, XmlNodePtr, XmlNsPtr,
+        xml_split_qname2, xml_validate_name, xml_validate_ncname, xml_validate_nmtoken,
+        xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlElementType, XmlIDPtr, XmlNodePtr,
+        XmlNsPtr,
     },
 };
 
@@ -2916,7 +2916,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     let mut prefix: *mut XmlChar = null_mut();
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                    let ns: XmlNsPtr = xml_search_ns((*node).doc, node, prefix);
+                                    let ns: XmlNsPtr = (*node).search_ns((*node).doc, prefix);
                                     if ns.is_null() && !prefix.is_null() {
                                         xml_free(prefix as _);
                                         if !local.is_null() {
@@ -3132,7 +3132,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
                                     if !prefix.is_null() {
-                                        let ns: XmlNsPtr = xml_search_ns((*node).doc, node, prefix);
+                                        let ns: XmlNsPtr = (*node).search_ns((*node).doc, prefix);
                                         if ns.is_null() {
                                             ret = 1;
                                         } else if !val.is_null() {

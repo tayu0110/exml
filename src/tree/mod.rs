@@ -1398,7 +1398,7 @@ unsafe extern "C" fn xml_new_reconciled_ns(
         );
     }
 
-    def = xml_search_ns(doc, tree, prefix.as_ptr() as _);
+    def = (*tree).search_ns(doc, prefix.as_ptr() as _);
     while !def.is_null() {
         if counter > 1000 {
             return null_mut();
@@ -1421,7 +1421,7 @@ unsafe extern "C" fn xml_new_reconciled_ns(
             );
             counter += 1;
         }
-        def = xml_search_ns(doc, tree, prefix.as_ptr() as _);
+        def = (*tree).search_ns(doc, prefix.as_ptr() as _);
     }
 
     /*
@@ -1567,9 +1567,10 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
 
         return ret;
     }
-    if (matches!((*node).typ, XmlElementType::XmlElementNode)
-        || matches!((*node).typ, XmlElementType::XmlXIncludeStart))
-        && !(*node).ns_def.is_null()
+    if matches!(
+        (*node).typ,
+        XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
+    ) && !(*node).ns_def.is_null()
     {
         (*ret).ns_def = xml_copy_namespace_list((*node).ns_def);
     }
@@ -1577,18 +1578,14 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     if !(*node).ns.is_null() {
         let mut ns: XmlNsPtr;
 
-        ns = xml_search_ns(doc, ret, (*(*node).ns).prefix.load(Ordering::Relaxed));
+        ns = (*ret).search_ns(doc, (*(*node).ns).prefix.load(Ordering::Relaxed));
         if ns.is_null() {
             /*
              * Humm, we are copying an element whose namespace is defined
              * out of the new tree scope. Search it in the original tree
              * and add it at the top of the new tree
              */
-            ns = xml_search_ns(
-                (*node).doc,
-                node,
-                (*(*node).ns).prefix.load(Ordering::Relaxed),
-            );
+            ns = (*node).search_ns((*node).doc, (*(*node).ns).prefix.load(Ordering::Relaxed));
             if !ns.is_null() {
                 let mut root: XmlNodePtr = ret;
 
@@ -1782,22 +1779,15 @@ unsafe extern "C" fn xml_copy_prop_internal(
     if !(*cur).ns.is_null() && !target.is_null() {
         let mut ns: XmlNsPtr;
 
-        ns = xml_search_ns(
-            (*target).doc,
-            target,
-            (*(*cur).ns).prefix.load(Ordering::Relaxed),
-        );
+        ns = (*target).search_ns((*target).doc, (*(*cur).ns).prefix.load(Ordering::Relaxed));
         if ns.is_null() {
             /*
              * Humm, we are copying an element whose namespace is defined
              * out of the new tree scope. Search it in the original tree
              * and add it at the top of the new tree
              */
-            ns = xml_search_ns(
-                (*cur).doc,
-                (*cur).parent,
-                (*(*cur).ns).prefix.load(Ordering::Relaxed),
-            );
+            ns =
+                (*(*cur).parent).search_ns((*cur).doc, (*(*cur).ns).prefix.load(Ordering::Relaxed));
             if !ns.is_null() {
                 let mut root: XmlNodePtr = target;
                 let mut pred: XmlNodePtr = null_mut();
@@ -3379,122 +3369,6 @@ pub unsafe extern "C" fn xml_set_list_doc(list: XmlNodePtr, doc: XmlDocPtr) {
 /*
  * Namespaces.
  */
-/**
- * xmlSearchNs:
- * @doc:  the document
- * @node:  the current node
- * @nameSpace:  the namespace prefix
- *
- * Search a Ns registered under a given name space for a document.
- * recurse on the parents until it finds the defined namespace
- * or return null_mut() otherwise.
- * @nameSpace can be null_mut(), this is a search for the default namespace.
- * We don't allow to cross entities boundaries. If you don't declare
- * the namespace within those you will be in troubles !!! A warning
- * is generated to cover this case.
- *
- * Returns the namespace pointer or null_mut().
- */
-pub unsafe extern "C" fn xml_search_ns(
-    mut doc: XmlDocPtr,
-    mut node: XmlNodePtr,
-    name_space: *const XmlChar,
-) -> XmlNsPtr {
-    let mut cur: XmlNsPtr;
-    let orig: *const XmlNode = node;
-
-    if node.is_null() || matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    if !name_space.is_null() && xml_str_equal(name_space, c"xml".as_ptr() as _) {
-        if doc.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
-            /*
-             * The XML-1.0 namespace is normally held on the root
-             * element. In this case exceptionally create it on the
-             * node element.
-             */
-            cur = xml_malloc(size_of::<XmlNs>()) as _;
-            if cur.is_null() {
-                xml_tree_err_memory(c"searching namespace".as_ptr() as _);
-                return null_mut();
-            }
-            memset(cur as _, 0, size_of::<XmlNs>());
-            (*cur).typ = Some(XML_LOCAL_NAMESPACE);
-            (*cur).href.store(
-                xml_strdup(XML_XML_NAMESPACE.as_ptr() as _) as _,
-                Ordering::Relaxed,
-            );
-            (*cur)
-                .prefix
-                .store(xml_strdup(c"xml".as_ptr() as _) as _, Ordering::Relaxed);
-            (*cur).next.store((*node).ns_def as _, Ordering::Relaxed);
-            (*node).ns_def = cur;
-            return cur;
-        }
-        if doc.is_null() {
-            doc = (*node).doc;
-            if doc.is_null() {
-                return null_mut();
-            }
-        }
-        /*
-        	* Return the XML namespace declaration held by the doc.
-        	*/
-        if (*doc).old_ns.is_null() {
-            return (*doc).ensure_xmldecl() as _;
-        } else {
-            return (*doc).old_ns;
-        }
-    }
-    while !node.is_null() {
-        if (matches!((*node).typ, XmlElementType::XmlEntityRefNode)
-            || matches!((*node).typ, XmlElementType::XmlEntityNode)
-            || matches!((*node).typ, XmlElementType::XmlEntityDecl))
-        {
-            return null_mut();
-        }
-        if matches!((*node).typ, XmlElementType::XmlElementNode) {
-            cur = (*node).ns_def;
-            while !cur.is_null() {
-                if (*cur).prefix.load(Ordering::Relaxed).is_null()
-                    && name_space.is_null()
-                    && !(*cur).href.load(Ordering::Relaxed).is_null()
-                {
-                    return cur;
-                }
-                if !(*cur).prefix.load(Ordering::Relaxed).is_null()
-                    && !name_space.is_null()
-                    && !(*cur).href.load(Ordering::Relaxed).is_null()
-                    && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), name_space)
-                {
-                    return cur;
-                }
-                cur = (*cur).next.load(Ordering::Relaxed);
-            }
-            if orig != node {
-                cur = (*node).ns;
-                if !cur.is_null() {
-                    if (*cur).prefix.load(Ordering::Relaxed).is_null()
-                        && name_space.is_null()
-                        && !(*cur).href.load(Ordering::Relaxed).is_null()
-                    {
-                        return cur;
-                    }
-                    if !(*cur).prefix.load(Ordering::Relaxed).is_null()
-                        && !name_space.is_null()
-                        && !(*cur).href.load(Ordering::Relaxed).is_null()
-                        && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), name_space)
-                    {
-                        return cur;
-                    }
-                }
-            }
-        }
-        node = (*node).parent;
-    }
-    null_mut()
-}
-
 /**
  * xmlNsInScope:
  * @doc:  the document
@@ -9721,41 +9595,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlReconciliateNs()");
                         eprint!(" {}", n_doc);
                         eprintln!(" {}", n_tree);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_search_ns() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    for n_name_space in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let node = gen_xml_node_ptr(n_node, 1);
-                        let name_space = gen_const_xml_char_ptr(n_name_space, 2);
-
-                        let ret_val = xml_search_ns(doc, node, name_space);
-                        desret_xml_ns_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_xml_node_ptr(n_node, node, 1);
-                        des_const_xml_char_ptr(n_name_space, name_space, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSearchNs",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlSearchNs()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_node);
-                            eprintln!(" {}", n_name_space);
-                        }
                     }
                 }
             }

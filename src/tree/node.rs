@@ -1315,7 +1315,7 @@ impl XmlNode {
         feature = "html"
     ))]
     pub unsafe fn set_prop(&mut self, name: *const XmlChar, value: *const XmlChar) -> XmlAttrPtr {
-        use crate::{libxml::xmlstring::xml_strndup, tree::xml_search_ns};
+        use crate::libxml::xmlstring::xml_strndup;
 
         use super::xml_split_qname3;
 
@@ -1329,7 +1329,7 @@ impl XmlNode {
         let nqname: *const XmlChar = xml_split_qname3(name, &raw mut len);
         if !nqname.is_null() {
             let prefix: *mut XmlChar = xml_strndup(name, len);
-            let ns: XmlNsPtr = xml_search_ns(self.doc, self, prefix);
+            let ns: XmlNsPtr = self.search_ns(self.doc, prefix);
             if !prefix.is_null() {
                 xml_free(prefix as _);
             }
@@ -2097,6 +2097,115 @@ impl XmlNode {
                 return node;
             }
             node = (*node).prev;
+        }
+        null_mut()
+    }
+
+    /// Search a Ns registered under a given name space for a document.  
+    /// recurse on the parents until it finds the defined namespace or return NULL otherwise.  
+    /// `namespace` can be NULL, this is a search for the default namespace.
+    ///
+    /// We don't allow to cross entities boundaries.  
+    /// If you don't declare the namespace within those you will be in troubles !!!  
+    /// A warning is generated to cover this case.
+    ///
+    /// Returns the namespace pointer or NULL.
+    #[doc(alias = "xmlSearchNs")]
+    pub unsafe fn search_ns(&mut self, mut doc: XmlDocPtr, namespace: *const XmlChar) -> XmlNsPtr {
+        let mut cur: XmlNsPtr;
+        let orig: *const XmlNode = self;
+
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        if !namespace.is_null() && xml_str_equal(namespace, c"xml".as_ptr() as _) {
+            if doc.is_null() && matches!(self.typ, XmlElementType::XmlElementNode) {
+                /*
+                 * The XML-1.0 namespace is normally held on the root
+                 * element. In this case exceptionally create it on the
+                 * node element.
+                 */
+                cur = xml_malloc(size_of::<XmlNs>()) as _;
+                if cur.is_null() {
+                    xml_tree_err_memory(c"searching namespace".as_ptr() as _);
+                    return null_mut();
+                }
+                memset(cur as _, 0, size_of::<XmlNs>());
+                (*cur).typ = Some(XML_LOCAL_NAMESPACE);
+                (*cur).href.store(
+                    xml_strdup(XML_XML_NAMESPACE.as_ptr() as _) as _,
+                    Ordering::Relaxed,
+                );
+                (*cur)
+                    .prefix
+                    .store(xml_strdup(c"xml".as_ptr() as _) as _, Ordering::Relaxed);
+                (*cur).next.store(self.ns_def as _, Ordering::Relaxed);
+                self.ns_def = cur;
+                return cur;
+            }
+            if doc.is_null() {
+                doc = self.doc;
+                if doc.is_null() {
+                    return null_mut();
+                }
+            }
+            /*
+            	* Return the XML namespace declaration held by the doc.
+            	*/
+            if (*doc).old_ns.is_null() {
+                return (*doc).ensure_xmldecl() as _;
+            } else {
+                return (*doc).old_ns;
+            }
+        }
+        let mut node = self as *mut XmlNode;
+        while !node.is_null() {
+            if matches!(
+                (*node).typ,
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
+                return null_mut();
+            }
+            if matches!((*node).typ, XmlElementType::XmlElementNode) {
+                cur = (*node).ns_def;
+                while !cur.is_null() {
+                    if (*cur).prefix.load(Ordering::Relaxed).is_null()
+                        && namespace.is_null()
+                        && !(*cur).href.load(Ordering::Relaxed).is_null()
+                    {
+                        return cur;
+                    }
+                    if !(*cur).prefix.load(Ordering::Relaxed).is_null()
+                        && !namespace.is_null()
+                        && !(*cur).href.load(Ordering::Relaxed).is_null()
+                        && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), namespace)
+                    {
+                        return cur;
+                    }
+                    cur = (*cur).next.load(Ordering::Relaxed);
+                }
+                if orig != node {
+                    cur = (*node).ns;
+                    if !cur.is_null() {
+                        if (*cur).prefix.load(Ordering::Relaxed).is_null()
+                            && namespace.is_null()
+                            && !(*cur).href.load(Ordering::Relaxed).is_null()
+                        {
+                            return cur;
+                        }
+                        if !(*cur).prefix.load(Ordering::Relaxed).is_null()
+                            && !namespace.is_null()
+                            && !(*cur).href.load(Ordering::Relaxed).is_null()
+                            && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), namespace)
+                        {
+                            return cur;
+                        }
+                    }
+                }
+            }
+            node = (*node).parent;
         }
         null_mut()
     }
