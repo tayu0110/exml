@@ -44,9 +44,8 @@ use crate::{
     },
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
-        xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len, xml_static_copy_node,
-        xml_static_copy_node_list, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
-        XML_XML_NAMESPACE,
+        xml_new_doc_node, xml_new_doc_text, xml_static_copy_node, xml_static_copy_node_list,
+        NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -2296,7 +2295,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         i += l;
     }
 
-    xml_node_add_content_len(node, content, len);
+    (*node).add_content_len(content, len);
 
     if (*ctxt).txt_nr >= (*ctxt).txt_max {
         let new_size: usize = if (*ctxt).txt_max != 0 {

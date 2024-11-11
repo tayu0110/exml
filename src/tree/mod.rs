@@ -4402,79 +4402,6 @@ pub unsafe extern "C" fn xml_node_set_content_len(
 }
 
 /**
- * xmlNodeAddContentLen:
- * @cur:  the node being modified
- * @content:  extra content
- * @len:  the size of @content
- *
- * Append the extra substring to the node content.
- * NOTE: In contrast to xmlNodeSetContentLen(), @content is supposed to be
- *       raw text, so unescaped XML special chars are allowed, entity
- *       references are not supported.
- */
-pub unsafe extern "C" fn xml_node_add_content_len(
-    cur: XmlNodePtr,
-    content: *const XmlChar,
-    len: i32,
-) {
-    if cur.is_null() {
-        return;
-    }
-    if len <= 0 {
-        return;
-    }
-    match (*cur).typ {
-        XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
-            let tmp: XmlNodePtr;
-
-            let last: XmlNodePtr = (*cur).last;
-            let new_node: XmlNodePtr = xml_new_doc_text_len((*cur).doc, content, len);
-            if !new_node.is_null() {
-                tmp = (*cur).add_child(new_node);
-                if tmp != new_node {
-                    return;
-                }
-                if !last.is_null() && (*last).next == new_node {
-                    xml_text_merge(last, new_node);
-                }
-            }
-        }
-        XmlElementType::XmlAttributeNode => {}
-        XmlElementType::XmlTextNode
-        | XmlElementType::XmlCDATASectionNode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPINode
-        | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlNotationNode => {
-            if !content.is_null() {
-                if ((*cur).content == addr_of_mut!((*cur).properties) as _)
-                    || (!(*cur).doc.is_null()
-                        && !(*(*cur).doc).dict.is_null()
-                        && xml_dict_owns((*(*cur).doc).dict, (*cur).content) != 0)
-                {
-                    (*cur).content = xml_strncat_new((*cur).content, content, len);
-                    (*cur).properties = null_mut();
-                } else {
-                    (*cur).content = xml_strncat((*cur).content, content, len);
-                }
-            }
-        }
-        XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlDTDNode
-        | XmlElementType::XmlHTMLDocumentNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXIncludeStart
-        | XmlElementType::XmlXIncludeEnd => {}
-        XmlElementType::XmlElementDecl
-        | XmlElementType::XmlAttributeDecl
-        | XmlElementType::XmlEntityDecl => {}
-        _ => unreachable!(),
-    }
-}
-
-/**
  * xmlBufGetNodeContent:
  * @buf:  a buffer xmlBufPtr
  * @cur:  the node being read
@@ -9137,46 +9064,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlNewTextLen()");
                         eprint!(" {}", n_content);
                         eprintln!(" {}", n_len);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_add_content_len() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let cur = gen_xml_node_ptr(n_cur, 0);
-                        let content = gen_const_xml_char_ptr(n_content, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !content.is_null() && len > xml_strlen(content) {
-                            len = 0;
-                        }
-
-                        xml_node_add_content_len(cur, content, len);
-                        des_xml_node_ptr(n_cur, cur, 0);
-                        des_const_xml_char_ptr(n_content, content, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNodeAddContentLen",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlNodeAddContentLen()"
-                            );
-                            eprint!(" {}", n_cur);
-                            eprint!(" {}", n_content);
-                            eprintln!(" {}", n_len);
-                        }
                     }
                 }
             }

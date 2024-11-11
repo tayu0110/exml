@@ -3,6 +3,7 @@ use std::{ffi::CString, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 use libc::memset;
 
 use crate::{
+    dict::xml_dict_owns,
     hash::{xml_hash_lookup, xml_hash_remove_entry},
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
@@ -10,7 +11,8 @@ use crate::{
         uri::xml_build_uri,
         valid::{xml_get_dtd_attr_desc, xml_get_dtd_qattr_desc},
         xmlstring::{
-            xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, XmlChar,
+            xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
+            xml_strncat_new, xml_strncmp, XmlChar,
         },
     },
     tree::XmlAttributePtr,
@@ -19,10 +21,10 @@ use crate::{
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
     xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop_node_value_internal,
-    xml_is_blank_char, xml_node_add_content_len, xml_node_set_content, xml_ns_in_scope,
-    xml_set_tree_doc, xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc,
-    XmlDocPtr, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE,
-    XML_XML_NAMESPACE,
+    xml_is_blank_char, xml_new_doc_text_len, xml_node_set_content, xml_ns_in_scope,
+    xml_set_tree_doc, xml_text_merge, xml_tree_err_memory, XmlAttr, XmlAttrPtr,
+    XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs, XmlNsPtr,
+    XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -1953,7 +1955,68 @@ impl XmlNode {
             return;
         }
         let len: i32 = xml_strlen(content);
-        xml_node_add_content_len(self, content, len);
+        self.add_content_len(content, len);
+    }
+
+    /// Append the extra substring to the node content.
+    ///
+    /// # Note
+    /// In contrast to xmlNodeSetContentLen(), `content` is supposed to be raw text,
+    /// so unescaped XML special chars are allowed, entity references are not supported.
+    #[doc(alias = "xmlNodeAddContentLen")]
+    pub unsafe fn add_content_len(&mut self, content: *const XmlChar, len: i32) {
+        if len <= 0 {
+            return;
+        }
+        match self.typ {
+            XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
+                let tmp: XmlNodePtr;
+
+                let last: XmlNodePtr = self.last;
+                let new_node: XmlNodePtr = xml_new_doc_text_len(self.doc, content, len);
+                if !new_node.is_null() {
+                    tmp = self.add_child(new_node);
+                    if tmp != new_node {
+                        return;
+                    }
+                    if !last.is_null() && (*last).next == new_node {
+                        xml_text_merge(last, new_node);
+                    }
+                }
+            }
+            XmlElementType::XmlAttributeNode => {}
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlNotationNode => {
+                if !content.is_null() {
+                    if self.content == &raw mut self.properties as _
+                        || (!self.doc.is_null()
+                            && !(*self.doc).dict.is_null()
+                            && xml_dict_owns((*self.doc).dict, self.content) != 0)
+                    {
+                        self.content = xml_strncat_new(self.content, content, len);
+                        self.properties = null_mut();
+                    } else {
+                        self.content = xml_strncat(self.content, content, len);
+                    }
+                }
+            }
+            XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
+            XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl => {}
+            _ => unreachable!(),
+        }
     }
 
     /// Finds the current number of child nodes of that element which are element nodes.
@@ -2359,9 +2422,9 @@ impl XmlNode {
             return -1;
         }
         while !node.is_null() {
-            // * Reconciliate the node namespace
+            // Reconciliate the node namespace
             if !(*node).ns.is_null() {
-                // * initialize the cache if needed
+                // initialize the cache if needed
                 if size_cache == 0 {
                     size_cache = 10;
                     old_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
@@ -2385,11 +2448,11 @@ impl XmlNode {
                     }
                 }
                 if !f {
-                    // * OK we need to recreate a new namespace definition
+                    // OK we need to recreate a new namespace definition
                     n = xml_new_reconciled_ns(doc, self, (*node).ns);
                     if !n.is_null() {
                         // :-( what if else ???
-                        // * check if we need to grow the cache buffers.
+                        // check if we need to grow the cache buffers.
                         if size_cache <= nb_cache {
                             size_cache *= 2;
                             old_ns = xml_realloc(
@@ -2418,12 +2481,12 @@ impl XmlNode {
                     }
                 }
             }
-            // * now check for namespace held by attributes on the node.
+            // now check for namespace held by attributes on the node.
             if matches!((*node).typ, XmlElementType::XmlElementNode) {
                 attr = (*node).properties;
                 while !attr.is_null() {
                     if !(*attr).ns.is_null() {
-                        // * initialize the cache if needed
+                        // initialize the cache if needed
                         if size_cache == 0 {
                             size_cache = 10;
                             old_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
@@ -2447,11 +2510,11 @@ impl XmlNode {
                             }
                         }
                         if !f {
-                            // * OK we need to recreate a new namespace definition
+                            // OK we need to recreate a new namespace definition
                             n = xml_new_reconciled_ns(doc, self, (*attr).ns);
                             if !n.is_null() {
                                 // :-( what if else ???
-                                // * check if we need to grow the cache buffers.
+                                // check if we need to grow the cache buffers.
                                 if size_cache <= nb_cache {
                                     size_cache *= 2;
                                     old_ns = xml_realloc(
