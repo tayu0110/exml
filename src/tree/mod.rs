@@ -4972,58 +4972,6 @@ pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *cons
     0
 }
 
-/**
- * xmlNodeSetSpacePreserve:
- * @cur:  the node being changed
- * @val:  the xml:space value ("0": default, 1: "preserve")
- *
- * Set (or reset) the space preserving behaviour of a node, i.e. the
- * value of the xml:space attribute.
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_node_set_space_preserve(cur: XmlNodePtr, val: i32) {
-    if cur.is_null() {
-        return;
-    }
-    match (*cur).typ {
-        XmlElementType::XmlTextNode
-        | XmlElementType::XmlCDATASectionNode
-        | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlHTMLDocumentNode
-        | XmlElementType::XmlDTDNode
-        | XmlElementType::XmlElementDecl
-        | XmlElementType::XmlAttributeDecl
-        | XmlElementType::XmlEntityDecl
-        | XmlElementType::XmlPINode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXIncludeStart
-        | XmlElementType::XmlXIncludeEnd => {
-            return;
-        }
-        XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
-        _ => unreachable!(),
-    }
-    let ns: XmlNsPtr = (*cur).search_ns_by_href((*cur).doc, XML_XML_NAMESPACE.as_ptr() as _);
-    if ns.is_null() {
-        return;
-    }
-    match val {
-        0 => {
-            (*cur).set_ns_prop(ns, c"space".as_ptr() as _, c"default".as_ptr() as _);
-        }
-        1 => {
-            (*cur).set_ns_prop(ns, c"space".as_ptr() as _, c"preserve".as_ptr() as _);
-        }
-        _ => {}
-    }
-}
-
 /*
  * Removing content.
  */
@@ -10117,40 +10065,6 @@ mod tests {
                             eprint!(" {}", n_content);
                             eprintln!(" {}", n_len);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_set_space_preserve() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_val in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let val = gen_int(n_val, 1);
-
-                    xml_node_set_space_preserve(cur, val);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_int(n_val, val, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNodeSetSpacePreserve",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNodeSetSpacePreserve()"
-                        );
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_val);
                     }
                 }
             }

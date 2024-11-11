@@ -1345,6 +1345,50 @@ impl XmlNode {
         self.set_ns_prop(ns, c"lang".as_ptr() as _, lang);
     }
 
+    /// Set (or reset) the space preserving behaviour of a node,   
+    /// i.e. the value of the xml:space attribute.
+    #[doc(alias = "xmlNodeSetSpacePreserve")]
+    #[cfg(feature = "tree")]
+    pub unsafe fn set_space_preserve(&mut self, val: i32) {
+        match self.typ {
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
+                return;
+            }
+            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
+            _ => unreachable!(),
+        }
+        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.as_ptr() as _);
+        if ns.is_null() {
+            return;
+        }
+        match val {
+            0 => {
+                self.set_ns_prop(ns, c"space".as_ptr() as _, c"default".as_ptr() as _);
+            }
+            1 => {
+                self.set_ns_prop(ns, c"space".as_ptr() as _, c"preserve".as_ptr() as _);
+            }
+            _ => {}
+        }
+    }
+
     /// Search an attribute associated to a node.  
     ///
     /// This function also looks in DTD attribute declaration for #FIXED or
