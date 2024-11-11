@@ -23,9 +23,8 @@ use crate::{
     },
     private::buf::xml_buf_write_quoted_string,
     tree::{
-        xml_free_prop_list, xml_has_ns_prop, xml_new_ns_prop, xml_node_list_get_string,
-        xml_search_ns, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_new_ns_prop, xml_node_list_get_string, xml_search_ns, XmlAttrPtr,
+        XmlDocPtr, XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -1418,7 +1417,7 @@ unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
 ) -> XmlAttrPtr {
     let mut res: XmlAttrPtr;
     while !cur.is_null() && xml_c14n_is_visible!(ctx, cur, (*cur).parent) == 0 {
-        res = xml_has_ns_prop(cur, name, ns);
+        res = (*cur).has_ns_prop(name, ns);
         if !res.is_null() {
             return res;
         }
@@ -1463,7 +1462,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     /* go up the stack until we find a node that we rendered already */
     cur = (*(*xml_base_attr).parent).parent;
     while !cur.is_null() && xml_c14n_is_visible!(ctx, cur, (*cur).parent) == 0 {
-        attr = xml_has_ns_prop(cur, c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+        attr = (*cur).has_ns_prop(c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
         if !attr.is_null() {
             /* get attr value */
             tmp_str = xml_node_list_get_string((*ctx).doc, (*attr).children, 1);

@@ -3815,35 +3815,6 @@ unsafe extern "C" fn xml_get_prop_node_value_internal(prop: *const XmlAttr) -> *
 }
 
 /**
- * xmlHasNsProp:
- * @node:  the node
- * @name:  the attribute name
- * @nameSpace:  the URI of the namespace
- *
- * Search for an attribute associated to a node
- * This attribute has to be anchored in the namespace specified.
- * This does the entity substitution.
- * This function looks in DTD attribute declaration for #FIXED or
- * default declaration values unless DTD use has been turned off.
- * Note that a namespace of null_mut() indicates to use the default namespace.
- *
- * Returns the attribute or the attribute declaration or null_mut()
- *     if neither was found.
- */
-pub unsafe extern "C" fn xml_has_ns_prop(
-    node: *const XmlNode,
-    name: *const XmlChar,
-    name_space: *const XmlChar,
-) -> XmlAttrPtr {
-    xml_get_prop_node_internal(
-        node,
-        name,
-        name_space,
-        XML_CHECK_DTD.load(Ordering::Relaxed),
-    )
-}
-
-/**
  * xmlTreeErr:
  * @code:  the error number
  * @extra:  extra information
@@ -8804,41 +8775,6 @@ mod tests {
                     leaks == 0,
                     "{leaks} Leaks are found in xmlGetCompressMode()"
                 );
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_has_ns_prop() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_name_space in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let node = gen_const_xml_node_ptr(n_node, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let name_space = gen_const_xml_char_ptr(n_name_space, 2);
-
-                        let ret_val = xml_has_ns_prop(node, name, name_space);
-                        desret_xml_attr_ptr(ret_val);
-                        des_const_xml_node_ptr(n_node, node, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_name_space, name_space, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlHasNsProp",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlHasNsProp()");
-                            eprint!(" {}", n_node);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_name_space);
-                        }
-                    }
-                }
             }
         }
     }

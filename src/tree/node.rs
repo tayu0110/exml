@@ -18,7 +18,7 @@ use crate::{
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
     xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop_node_internal,
-    xml_get_prop_node_value_internal, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content_len,
+    xml_get_prop_node_value_internal, xml_is_blank_char, xml_node_add_content_len,
     xml_node_set_content, xml_ns_in_scope, xml_set_tree_doc, xml_tree_err_memory, XmlAttr,
     XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs,
     XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
@@ -123,13 +123,10 @@ pub trait NodeCommon {
                 /* check if an attribute with the same name exists */
 
                 let lastattr = if (*cur).ns.is_null() {
-                    xml_has_ns_prop(self as *mut Self as *mut XmlNode, (*cur).name, null_mut())
+                    (*(self as *mut Self as *mut XmlNode)).has_ns_prop((*cur).name, null_mut())
                 } else {
-                    xml_has_ns_prop(
-                        self as *mut Self as *mut XmlNode,
-                        (*cur).name,
-                        (*(*cur).ns).href.load(Ordering::Relaxed),
-                    )
+                    (*(self as *mut Self as *mut XmlNode))
+                        .has_ns_prop((*cur).name, (*(*cur).ns).href.load(Ordering::Relaxed))
                 };
                 if !lastattr.is_null()
                     && lastattr != cur as _
@@ -1498,6 +1495,25 @@ impl XmlNode {
         null_mut()
     }
 
+    /// Search for an attribute associated to a node.
+    ///
+    /// This attribute has to be anchored in the namespace specified.  
+    /// This does the entity substitution.  
+    /// This function looks in DTD attribute declaration for #FIXED or
+    /// default declaration values unless DTD use has been turned off.  
+    ///
+    /// Note that a namespace of NULL indicates to use the default namespace.
+    ///
+    /// Returns the attribute or the attribute declaration or NULL if neither was found.
+    #[doc(alias = "xmlHasNsProp")]
+    pub unsafe fn has_ns_prop(
+        &self,
+        name: *const XmlChar,
+        namespace: *const XmlChar,
+    ) -> XmlAttrPtr {
+        xml_get_prop_node_internal(self, name, namespace, XML_CHECK_DTD.load(Ordering::Relaxed))
+    }
+
     /// Add a new element `elem` to the list of siblings of `self`
     /// merging adjacent TEXT nodes (`elem` may be freed)  
     /// If the new element was already inserted in a document
@@ -2107,13 +2123,9 @@ unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) 
 
     /* check if an attribute with the same name exists */
     let attr = if (*prop).ns.is_null() {
-        xml_has_ns_prop((*cur).parent, (*prop).name, null_mut())
+        (*(*cur).parent).has_ns_prop((*prop).name, null_mut())
     } else {
-        xml_has_ns_prop(
-            (*cur).parent,
-            (*prop).name,
-            (*(*prop).ns).href.load(Ordering::Relaxed),
-        )
+        (*(*cur).parent).has_ns_prop((*prop).name, (*(*prop).ns).href.load(Ordering::Relaxed))
     };
 
     if (*prop).doc != (*cur).doc {
