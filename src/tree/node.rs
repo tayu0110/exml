@@ -2323,6 +2323,207 @@ impl XmlNode {
         }
         null_mut()
     }
+
+    /// This function checks that all the namespaces declared within the given tree are properly declared.
+    /// This is needed for example after Copy or Cut and then paste operations.
+    ///
+    /// The subtree may still hold pointers to namespace declarations outside the subtree or invalid/masked.
+    ///
+    /// As much as possible the function try to reuse the existing namespaces found in the new environment.
+    /// If not possible the new namespaces are redeclared on `tree` at the top of the given subtree.
+    ///
+    /// Returns the number of namespace declarations created or -1 in case of error.
+    #[doc(alias = "xmlReconciliateNs")]
+    #[cfg(feature = "tree")]
+    pub unsafe fn reconciliate_ns(&mut self, doc: XmlDocPtr) -> i32 {
+        use crate::libxml::globals::xml_realloc;
+
+        use super::xml_new_reconciled_ns;
+
+        let mut old_ns: *mut XmlNsPtr = null_mut();
+        let mut new_ns: *mut XmlNsPtr = null_mut();
+        let mut size_cache: i32 = 0;
+        let mut nb_cache: i32 = 0;
+        let mut n: XmlNsPtr;
+        let mut node: XmlNodePtr = self;
+        let mut attr: XmlAttrPtr;
+        let ret: i32 = 0;
+
+        if !matches!((*node).typ, XmlElementType::XmlElementNode) {
+            return -1;
+        }
+        if doc.is_null() || !matches!((*doc).typ, XmlElementType::XmlDocumentNode) {
+            return -1;
+        }
+        if (*node).doc != doc {
+            return -1;
+        }
+        while !node.is_null() {
+            // * Reconciliate the node namespace
+            if !(*node).ns.is_null() {
+                // * initialize the cache if needed
+                if size_cache == 0 {
+                    size_cache = 10;
+                    old_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
+                    if old_ns.is_null() {
+                        xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                        return -1;
+                    }
+                    new_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
+                    if new_ns.is_null() {
+                        xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                        xml_free(old_ns as _);
+                        return -1;
+                    }
+                }
+                let mut f = false;
+                for i in 0..nb_cache {
+                    if *old_ns.add(i as usize) == (*node).ns {
+                        (*node).ns = *new_ns.add(i as usize);
+                        f = true;
+                        break;
+                    }
+                }
+                if !f {
+                    // * OK we need to recreate a new namespace definition
+                    n = xml_new_reconciled_ns(doc, self, (*node).ns);
+                    if !n.is_null() {
+                        // :-( what if else ???
+                        // * check if we need to grow the cache buffers.
+                        if size_cache <= nb_cache {
+                            size_cache *= 2;
+                            old_ns = xml_realloc(
+                                old_ns as _,
+                                size_cache as usize * size_of::<XmlNsPtr>(),
+                            ) as _;
+                            if old_ns.is_null() {
+                                xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                xml_free(new_ns as _);
+                                return -1;
+                            }
+                            new_ns = xml_realloc(
+                                new_ns as _,
+                                size_cache as usize * size_of::<XmlNsPtr>(),
+                            ) as _;
+                            if new_ns.is_null() {
+                                xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                xml_free(old_ns as _);
+                                return -1;
+                            }
+                        }
+                        *new_ns.add(nb_cache as usize) = n;
+                        *old_ns.add(nb_cache as usize) = (*node).ns;
+                        nb_cache += 1;
+                        (*node).ns = n;
+                    }
+                }
+            }
+            // * now check for namespace held by attributes on the node.
+            if matches!((*node).typ, XmlElementType::XmlElementNode) {
+                attr = (*node).properties;
+                while !attr.is_null() {
+                    if !(*attr).ns.is_null() {
+                        // * initialize the cache if needed
+                        if size_cache == 0 {
+                            size_cache = 10;
+                            old_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
+                            if old_ns.is_null() {
+                                xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                return -1;
+                            }
+                            new_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
+                            if new_ns.is_null() {
+                                xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                xml_free(old_ns as _);
+                                return -1;
+                            }
+                        }
+                        let mut f = false;
+                        for i in 0..nb_cache {
+                            if *old_ns.add(i as usize) == (*attr).ns {
+                                (*attr).ns = *new_ns.add(i as usize);
+                                f = true;
+                                break;
+                            }
+                        }
+                        if !f {
+                            // * OK we need to recreate a new namespace definition
+                            n = xml_new_reconciled_ns(doc, self, (*attr).ns);
+                            if !n.is_null() {
+                                // :-( what if else ???
+                                // * check if we need to grow the cache buffers.
+                                if size_cache <= nb_cache {
+                                    size_cache *= 2;
+                                    old_ns = xml_realloc(
+                                        old_ns as _,
+                                        size_cache as usize * size_of::<XmlNsPtr>(),
+                                    ) as _;
+                                    if old_ns.is_null() {
+                                        xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                        xml_free(new_ns as _);
+                                        return -1;
+                                    }
+                                    new_ns = xml_realloc(
+                                        new_ns as _,
+                                        size_cache as usize * size_of::<XmlNsPtr>(),
+                                    ) as _;
+                                    if new_ns.is_null() {
+                                        xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                        xml_free(old_ns as _);
+                                        return -1;
+                                    }
+                                }
+                                *new_ns.add(nb_cache as usize) = n;
+                                *old_ns.add(nb_cache as usize) = (*attr).ns;
+                                nb_cache += 1;
+                                (*attr).ns = n;
+                            }
+                        }
+                    }
+                    attr = (*attr).next;
+                }
+            }
+
+            // Browse the full subtree, deep first
+            if !(*node).children.is_null()
+                && !matches!((*node).typ, XmlElementType::XmlEntityRefNode)
+            {
+                // deep first
+                node = (*node).children;
+            } else if node != self && !(*node).next.is_null() {
+                // then siblings
+                node = (*node).next;
+            } else if node != self {
+                // go up to parents->next if needed
+                while node != self {
+                    if !(*node).parent.is_null() {
+                        node = (*node).parent;
+                    }
+                    if node != self && !(*node).next.is_null() {
+                        node = (*node).next;
+                        break;
+                    }
+                    if (*node).parent.is_null() {
+                        node = null_mut();
+                        break;
+                    }
+                }
+                // exit condition
+                if node == self {
+                    node = null_mut();
+                }
+            } else {
+                break;
+            }
+        }
+        if !old_ns.is_null() {
+            xml_free(old_ns as _);
+        }
+        if !new_ns.is_null() {
+            xml_free(new_ns as _);
+        }
+        ret
+    }
 }
 
 impl NodeCommon for XmlNode {
