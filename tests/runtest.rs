@@ -2869,18 +2869,18 @@ unsafe fn stream_mem_parse_test(
     ret
 }
 
-#[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-static XPATH_OUTPUT: Mutex<Option<File>> = Mutex::new(None);
-#[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-static XPATH_DOCUMENT: AtomicPtr<XmlDoc> = AtomicPtr::new(null_mut());
+thread_local! {
+    #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
+    static XPATH_OUTPUT: RefCell<Option<File>> = const { RefCell::new(None) };
+    #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
+    static XPATH_DOCUMENT: Cell<*mut XmlDoc> = const { Cell::new(null_mut()) };
+}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
-    use std::sync::atomic::Ordering;
-
     use exml::libxml::{
         xpath::{
             xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_eval_expression,
@@ -2901,15 +2901,11 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     if cfg!(feature = "libxml_xptr") && xptr != 0 {
         #[cfg(feature = "libxml_xptr")]
         {
-            ctxt = xml_xptr_new_context(
-                XPATH_DOCUMENT.load(Ordering::Relaxed),
-                null_mut(),
-                null_mut(),
-            );
+            ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), null_mut(), null_mut());
             res = xml_xptr_eval(str as _, ctxt);
         }
     } else {
-        let xpath_document = XPATH_DOCUMENT.load(Ordering::Relaxed);
+        let xpath_document = XPATH_DOCUMENT.get();
         ctxt = xml_xpath_new_context(xpath_document);
         (*ctxt).node = if xpath_document.is_null() {
             null_mut()
@@ -2931,7 +2927,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
         }
     }
     let fd = fdopen(
-        XPATH_OUTPUT.lock().unwrap().as_ref().unwrap().as_raw_fd(),
+        XPATH_OUTPUT.with_borrow_mut(|f| f.as_ref().unwrap().as_raw_fd()),
         c"wb".as_ptr(),
     );
     assert!(!fd.is_null());
@@ -2977,7 +2973,7 @@ unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, e
         eprintln!("failed to open output file {temp}",);
         return -1;
     };
-    *XPATH_OUTPUT.lock().unwrap() = Some(out);
+    XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
 
     let mut input = match File::open(filename) {
         Ok(file) => BufReader::new(file),
@@ -3004,12 +3000,14 @@ unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, e
         }
         if !expression.is_empty() {
             expression.push(0);
-            writeln!(
-                XPATH_OUTPUT.lock().unwrap().as_mut().unwrap(),
-                "\n========================\nExpression: {}",
-                CStr::from_ptr(expression.as_ptr() as _).to_string_lossy(),
-            )
-            .ok();
+            XPATH_OUTPUT.with_borrow_mut(|f| {
+                writeln!(
+                    f.as_mut().unwrap(),
+                    "\n========================\nExpression: {}",
+                    CStr::from_ptr(expression.as_ptr() as _).to_string_lossy(),
+                )
+                .ok()
+            });
             test_xpath(expression.as_ptr() as _, xptr, expr);
         }
         expression.clear();
@@ -3064,7 +3062,7 @@ unsafe fn xpath_doc_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::{mem::zeroed, sync::atomic::Ordering};
+    use std::mem::zeroed;
 
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
@@ -3084,7 +3082,7 @@ unsafe fn xpath_doc_test(
         eprintln!("Failed to load {filename}",);
         return -1;
     } else {
-        XPATH_DOCUMENT.store(xpath_document, Ordering::Relaxed);
+        XPATH_DOCUMENT.set(xpath_document);
     }
 
     let cbase = CString::new(base_filename(filename)).unwrap();
@@ -3124,7 +3122,7 @@ unsafe fn xpath_doc_test(
     }
     globfree(addr_of_mut!(globbuf));
 
-    xml_free_doc(XPATH_DOCUMENT.load(Ordering::Relaxed));
+    xml_free_doc(XPATH_DOCUMENT.get());
     ret
 }
 
@@ -3146,7 +3144,7 @@ unsafe fn xptr_doc_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::{mem::zeroed, sync::atomic::Ordering};
+    use std::mem::zeroed;
 
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
@@ -3171,7 +3169,7 @@ unsafe fn xptr_doc_test(
         eprintln!("Failed to load {filename}",);
         return -1;
     } else {
-        XPATH_DOCUMENT.store(xpath_document, Ordering::Relaxed)
+        XPATH_DOCUMENT.set(xpath_document)
     }
 
     let cbase = CString::new(base_filename(filename)).unwrap();
@@ -3213,7 +3211,7 @@ unsafe fn xptr_doc_test(
     }
     globfree(addr_of_mut!(globbuf));
 
-    xml_free_doc(XPATH_DOCUMENT.load(Ordering::Relaxed));
+    xml_free_doc(XPATH_DOCUMENT.get());
     ret
 }
 
@@ -3235,8 +3233,6 @@ unsafe fn xmlid_doc_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::sync::atomic::Ordering;
-
     let mut res: i32 = 0;
     let mut ret: i32;
     let cfilename = CString::new(filename).unwrap();
@@ -3250,7 +3246,7 @@ unsafe fn xmlid_doc_test(
         eprintln!("Failed to load {filename}",);
         return -1;
     } else {
-        XPATH_DOCUMENT.store(xpath_document, Ordering::Relaxed)
+        XPATH_DOCUMENT.set(xpath_document)
     }
 
     let temp = result_filename(
@@ -3266,10 +3262,10 @@ unsafe fn xmlid_doc_test(
         .open(temp.as_str())
     else {
         eprintln!("failed to open output file {temp}",);
-        xml_free_doc(XPATH_DOCUMENT.load(Ordering::Relaxed));
+        xml_free_doc(XPATH_DOCUMENT.get());
         return -1;
     };
-    *XPATH_OUTPUT.lock().unwrap() = Some(out);
+    XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
 
     test_xpath(c"id('bar')".as_ptr() as _, 0, 0);
 
@@ -3282,7 +3278,7 @@ unsafe fn xmlid_doc_test(
     }
 
     remove_file(temp).ok();
-    xml_free_doc(XPATH_DOCUMENT.load(Ordering::Relaxed));
+    xml_free_doc(XPATH_DOCUMENT.get());
 
     if let Some(err) = err {
         ret = TEST_ERRORS
@@ -6060,88 +6056,10 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: None,
         options: 0,
     },
-    #[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "valid"))]
-    TestDesc {
-        desc: "xml:id regression tests",
-        func: xmlid_doc_test,
-        input: Some("./test/xmlid/*"),
-        out: Some("./result/xmlid/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: 0,
-    },
-    TestDesc {
-        desc: "URI parsing tests",
-        func: uri_parse_test,
-        input: Some("./test/URI/*.uri"),
-        out: Some("./result/URI/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
-    TestDesc {
-        desc: "URI base composition tests",
-        func: uri_base_test,
-        input: Some("./test/URI/*.data"),
-        out: Some("./result/URI/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
     TestDesc {
         desc: "Path URI conversion tests",
         func: uri_path_test,
         input: None,
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "schema")]
-    TestDesc {
-        desc: "Schemas regression tests",
-        func: schemas_test,
-        input: Some("./test/schemas/*_*.xsd"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "schema")]
-    TestDesc {
-        desc: "Relax-NG regression tests",
-        func: rng_test,
-        input: Some("./test/relaxng/*.rng"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
-    },
-    #[cfg(all(feature = "schema", feature = "libxml_reader"))]
-    TestDesc {
-        desc: "Relax-NG streaming regression tests",
-        func: rng_stream_test,
-        input: Some("./test/relaxng/*.rng"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
-    },
-    #[cfg(all(feature = "libxml_pattern", feature = "libxml_reader"))]
-    TestDesc {
-        desc: "Pattern regression tests",
-        func: pattern_test,
-        input: Some("./test/pattern/*.pat"),
-        out: Some("./result/pattern/"),
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "libxml_c14n")]
-    TestDesc {
-        desc: "C14N with comments regression tests",
-        func: c14n_with_comment_test,
-        input: Some("./test/c14n/with-comments/*.xml"),
         out: None,
         suffix: None,
         err: None,
@@ -6326,6 +6244,116 @@ fn test_common(desc: &TestDesc) {
         NB_LEAKS.get() - old_leaks,
     );
     test_cleanup();
+}
+
+#[test]
+#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "valid"))]
+fn xml_id_regression_test() {
+    test_common(&TestDesc {
+        desc: "xml:id regression tests",
+        func: xmlid_doc_test,
+        input: Some("./test/xmlid/*"),
+        out: Some("./result/xmlid/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: 0,
+    });
+}
+
+#[test]
+fn uri_parsing_test() {
+    test_common(&TestDesc {
+        desc: "URI parsing tests",
+        func: uri_parse_test,
+        input: Some("./test/URI/*.uri"),
+        out: Some("./result/URI/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+fn uri_base_composition_test() {
+    test_common(&TestDesc {
+        desc: "URI base composition tests",
+        func: uri_base_test,
+        input: Some("./test/URI/*.data"),
+        out: Some("./result/URI/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(feature = "schema")]
+fn schemas_regression_test() {
+    test_common(&TestDesc {
+        desc: "Schemas regression tests",
+        func: schemas_test,
+        input: Some("./test/schemas/*_*.xsd"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(feature = "schema")]
+fn relaxng_regression_test() {
+    test_common(&TestDesc {
+        desc: "Relax-NG regression tests",
+        func: rng_test,
+        input: Some("./test/relaxng/*.rng"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "schema", feature = "libxml_reader"))]
+fn relaxng_streaming_regression_test() {
+    test_common(&TestDesc {
+        desc: "Relax-NG streaming regression tests",
+        func: rng_stream_test,
+        input: Some("./test/relaxng/*.rng"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "libxml_pattern", feature = "libxml_reader"))]
+fn pattern_regression_test() {
+    test_common(&TestDesc {
+        desc: "Pattern regression tests",
+        func: pattern_test,
+        input: Some("./test/pattern/*.pat"),
+        out: Some("./result/pattern/"),
+        suffix: None,
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(feature = "libxml_c14n")]
+fn c14n_with_comments_regression_test() {
+    test_common(&TestDesc {
+        desc: "C14N with comments regression tests",
+        func: c14n_with_comment_test,
+        input: Some("./test/c14n/with-comments/*.xml"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
 }
 
 #[test]
