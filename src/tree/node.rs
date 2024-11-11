@@ -19,9 +19,9 @@ use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
     xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop_node_internal,
     xml_get_prop_node_value_internal, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content_len,
-    xml_node_set_content, xml_ns_in_scope, xml_remove_prop, xml_set_tree_doc, xml_tree_err_memory,
-    XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType,
-    XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_node_set_content, xml_ns_in_scope, xml_set_tree_doc, xml_tree_err_memory, XmlAttr,
+    XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs,
+    XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -2111,7 +2111,7 @@ unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) 
     }
     if !attr.is_null() && ((*attr).typ != XmlElementType::XmlAttributeDecl) {
         /* different instance, destroy it (attributes must be unique) */
-        xml_remove_prop(attr);
+        (*attr).remove_prop();
     }
     prop
 }

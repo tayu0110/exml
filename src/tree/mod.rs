@@ -4973,49 +4973,6 @@ pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *cons
 }
 
 /*
- * Removing content.
- */
-/**
- * xmlRemoveProp:
- * @cur:  an attribute
- *
- * Unlink and free one attribute, all the content is freed too
- * Note this doesn't work for namespace definition attributes
- *
- * Returns 0 if success and -1 in case of error.
- */
-pub unsafe extern "C" fn xml_remove_prop(cur: XmlAttrPtr) -> i32 {
-    let mut tmp: XmlAttrPtr;
-    if cur.is_null() {
-        return -1;
-    }
-    if (*cur).parent.is_null() {
-        return -1;
-    }
-    tmp = (*(*cur).parent).properties;
-    if tmp == cur {
-        (*(*cur).parent).properties = (*cur).next;
-        if !(*cur).next.is_null() {
-            (*(*cur).next).prev = null_mut();
-        }
-        xml_free_prop(cur);
-        return 0;
-    }
-    while !tmp.is_null() {
-        if (*tmp).next == cur {
-            (*tmp).next = (*cur).next;
-            if !(*tmp).next.is_null() {
-                (*(*tmp).next).prev = tmp;
-            }
-            xml_free_prop(cur);
-            return 0;
-        }
-        tmp = (*tmp).next;
-    }
-    -1
-}
-
-/*
  * Namespace handling.
  */
 /**
@@ -10045,32 +10002,6 @@ mod tests {
                         eprint!(" {}", n_doc);
                         eprintln!(" {}", n_tree);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_remove_prop() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_XML_ATTR_PTR {
-                let mem_base = xml_mem_blocks();
-                let mut cur = gen_xml_attr_ptr(n_cur, 0);
-
-                let ret_val = xml_remove_prop(cur);
-                cur = null_mut();
-                desret_int(ret_val);
-                des_xml_attr_ptr(n_cur, cur, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlRemoveProp",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlRemoveProp()");
-                    eprintln!(" {}", n_cur);
                 }
             }
         }

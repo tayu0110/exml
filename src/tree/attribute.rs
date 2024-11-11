@@ -11,9 +11,9 @@ use crate::{
 };
 
 use super::{
-    xml_new_prop_internal, xml_string_get_node_list, xml_tree_err_memory, NodeCommon,
-    XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
-    __XML_REGISTER_CALLBACKS,
+    xml_free_prop, xml_new_prop_internal, xml_string_get_node_list, xml_tree_err_memory,
+    NodeCommon, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs,
+    XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 /// An attribute on an XML node.
@@ -32,6 +32,42 @@ pub struct XmlAttr {
     pub(crate) ns: *mut XmlNs,                  /* pointer to the associated namespace */
     pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
     pub(crate) psvi: *mut c_void,               /* for type/PSVI information */
+}
+
+impl XmlAttr {
+    /// Unlink and free one attribute, all the content is freed too.
+    ///
+    /// Note this doesn't work for namespace definition attributes.
+    ///
+    /// Returns 0 if success and -1 in case of error.
+    #[doc(alias = "xmlRemoveProp")]
+    pub unsafe fn remove_prop(&mut self) -> i32 {
+        let mut tmp: XmlAttrPtr;
+        if self.parent.is_null() {
+            return -1;
+        }
+        tmp = (*self.parent).properties;
+        if tmp == self {
+            (*self.parent).properties = self.next;
+            if !self.next.is_null() {
+                (*self.next).prev = null_mut();
+            }
+            xml_free_prop(self);
+            return 0;
+        }
+        while !tmp.is_null() {
+            if (*tmp).next == self {
+                (*tmp).next = self.next;
+                if !(*tmp).next.is_null() {
+                    (*(*tmp).next).prev = tmp;
+                }
+                xml_free_prop(self);
+                return 0;
+            }
+            tmp = (*tmp).next;
+        }
+        -1
+    }
 }
 
 impl NodeCommon for XmlAttr {
