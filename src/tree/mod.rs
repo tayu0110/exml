@@ -5465,64 +5465,21 @@ pub unsafe extern "C" fn xml_is_xhtml(system_id: *const XmlChar, public_id: *con
     0
 }
 
-/*
- * Compression.
- */
-/**
- * xmlGetDocCompressMode:
- * @doc:  the document
- *
- * get the compression ratio for a document, ZLIB based
- * Returns 0 (uncompressed) to 9 (max compression)
- */
-pub unsafe extern "C" fn xml_get_doc_compress_mode(doc: *const XmlDoc) -> i32 {
-    if doc.is_null() {
-        return -1;
-    }
-    (*doc).compression
-}
-
-/**
- * xmlSetDocCompressMode:
- * @doc:  the document
- * @mode:  the compression ratio
- *
- * set the compression ratio for a document, ZLIB based
- * Correct values: 0 (uncompressed) to 9 (max compression)
- */
-pub unsafe extern "C" fn xml_set_doc_compress_mode(doc: XmlDocPtr, mode: i32) {
-    if doc.is_null() {
-        return;
-    }
-    if mode < 0 {
-        (*doc).compression = 0;
-    } else if mode > 9 {
-        (*doc).compression = 9;
-    } else {
-        (*doc).compression = mode;
-    }
-}
-
-/**
- * xmlGetCompressMode:
- *
- * get the default compression mode used, ZLIB based.
- * Returns 0 (uncompressed) to 9 (max compression)
- */
 static XML_COMPRESS_MODE: AtomicI32 = AtomicI32::new(0);
 
-pub unsafe extern "C" fn xml_get_compress_mode() -> i32 {
+/// Get the default compression mode used, ZLIB based.
+///
+/// Returns 0 (uncompressed) to 9 (max compression)
+#[doc(alias = "xmlGetCompressMode")]
+pub fn get_compress_mode() -> i32 {
     XML_COMPRESS_MODE.load(Ordering::Acquire)
 }
 
-/**
- * xmlSetCompressMode:
- * @mode:  the compression ratio
- *
- * set the default compression mode used, ZLIB based
- * Correct values: 0 (uncompressed) to 9 (max compression)
- */
-pub unsafe extern "C" fn xml_set_compress_mode(mode: i32) {
+/// Set the default compression mode used, ZLIB based.
+///
+/// Correct values: 0 (uncompressed) to 9 (max compression)
+#[doc(alias = "xmlSetCompressMode")]
+pub fn set_compress_mode(mode: i32) {
     if mode < 0 {
         XML_COMPRESS_MODE.store(0, Ordering::Release);
     } else if mode > 9 {
@@ -9122,7 +9079,7 @@ mod tests {
             let mut leaks = 0;
             let mem_base = xml_mem_blocks();
 
-            let ret_val = xml_get_compress_mode();
+            let ret_val = get_compress_mode();
             desret_int(ret_val);
             reset_last_error();
             if mem_base != xml_mem_blocks() {
@@ -9135,34 +9092,6 @@ mod tests {
                     leaks == 0,
                     "{leaks} Leaks are found in xmlGetCompressMode()"
                 );
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_doc_compress_mode() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_const_xml_doc_ptr(n_doc, 0);
-
-                let ret_val = xml_get_doc_compress_mode(doc);
-                desret_int(ret_val);
-                des_const_xml_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlGetDocCompressMode",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlGetDocCompressMode()"
-                    );
-                    eprintln!(" {}", n_doc);
-                }
             }
         }
     }
@@ -10528,7 +10457,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let mode = gen_int(n_mode, 0);
 
-                xml_set_compress_mode(mode);
+                set_compress_mode(mode);
                 des_int(n_mode, mode, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
@@ -10542,39 +10471,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlSetCompressMode()"
                     );
                     eprintln!(" {}", n_mode);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_set_doc_compress_mode() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_mode in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let mode = gen_int(n_mode, 1);
-
-                    xml_set_doc_compress_mode(doc, mode);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_int(n_mode, mode, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSetDocCompressMode",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlSetDocCompressMode()"
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_mode);
-                    }
                 }
             }
         }

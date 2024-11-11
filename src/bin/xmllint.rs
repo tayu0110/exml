@@ -93,9 +93,9 @@ use exml::{
         xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     },
     tree::{
-        xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
-        xml_node_set_content, xml_set_compress_mode, NodeCommon, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
+        set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
+        xml_node_set_content, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+        XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -3888,7 +3888,7 @@ fn main() {
                 && (arg == "-compress" || arg == "--compress")
             {
                 COMPRESS += 1;
-                xml_set_compress_mode(9);
+                set_compress_mode(9);
             } else if arg == "-nowarning" || arg == "--nowarning" {
                 OPTIONS |= XmlParserOption::XmlParseNowarning as i32;
                 OPTIONS &= !(XmlParserOption::XmlParsePedantic as i32);

@@ -89,6 +89,14 @@ impl XmlDoc {
         ret
     }
 
+    /// Get the compression ratio for a document, ZLIB based.
+    ///
+    /// Returns 0 (uncompressed) to 9 (max compression)
+    #[doc(alias = "xmlGetDocCompressMode")]
+    pub fn get_compress_mode(&self) -> i32 {
+        self.compression
+    }
+
     /// Set the root element of the document.
     /// (self.children is a list containing possibly comments, PIs, etc ...).
     ///
@@ -122,6 +130,20 @@ impl XmlDoc {
             xml_replace_node(old, root);
         }
         old
+    }
+
+    /// Set the compression ratio for a document, ZLIB based.
+    ///
+    /// Correct values: 0 (uncompressed) to 9 (max compression)
+    #[doc(alias = "xmlSetDocCompressMode")]
+    pub unsafe extern "C" fn set_compress_mode(&mut self, mode: i32) {
+        if mode < 0 {
+            self.compression = 0;
+        } else if mode > 9 {
+            self.compression = 9;
+        } else {
+            self.compression = mode;
+        }
     }
 
     /// Ensures that there is an XML namespace declaration on the doc.

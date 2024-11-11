@@ -49,7 +49,7 @@ use crate::{
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
     private::save::xml_buf_attr_serialize_txt_content,
-    tree::{xml_free_doc, xml_new_doc, xml_set_doc_compress_mode, XmlDocPtr, XmlNodePtr},
+    tree::{xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
 };
 
 /*
@@ -763,7 +763,7 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
         return null_mut();
     }
 
-    xml_set_doc_compress_mode((*ctxt).my_doc, compression);
+    (*(*ctxt).my_doc).set_compress_mode(compression);
 
     if !doc.is_null() {
         *doc = (*ctxt).my_doc;
@@ -841,7 +841,7 @@ pub unsafe extern "C" fn xml_new_text_writer_tree(
     (*ctxt).node = node;
     (*ret).no_doc_free = 1;
 
-    xml_set_doc_compress_mode(doc, compression);
+    (*doc).set_compress_mode(compression);
 
     ret
 }
