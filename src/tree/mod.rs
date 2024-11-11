@@ -5048,26 +5048,6 @@ pub unsafe extern "C" fn xml_unset_ns_prop(
     0
 }
 
-/**
- * xmlUnsetProp:
- * @node:  the node
- * @name:  the attribute name
- *
- * Remove an attribute carried by a node.
- * This handles only attributes in no namespace.
- * Returns 0 if successful, -1 if not found
- */
-#[cfg(any(feature = "tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_unset_prop(node: XmlNodePtr, name: *const XmlChar) -> i32 {
-    let prop: XmlAttrPtr = xml_get_prop_node_internal(node, name, null_mut(), 0);
-    if prop.is_null() {
-        return -1;
-    }
-    (*prop).unlink();
-    xml_free_prop(prop);
-    0
-}
-
 /*
  * Namespace handling.
  */
@@ -10426,38 +10406,6 @@ mod tests {
                             eprint!(" {}", n_ns);
                             eprintln!(" {}", n_name);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_unset_prop() {
-        #[cfg(any(feature = "tree", feature = "schema"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let node = gen_xml_node_ptr(n_node, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_unset_prop(node, name);
-                    desret_int(ret_val);
-                    des_xml_node_ptr(n_node, node, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlUnsetProp",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlUnsetProp()");
-                        eprint!(" {}", n_node);
-                        eprintln!(" {}", n_name);
                     }
                 }
             }

@@ -45,8 +45,8 @@ use crate::{
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_new_doc_node, xml_new_doc_text, xml_node_add_content_len, xml_static_copy_node,
-        xml_static_copy_node_list, xml_unset_prop, NodeCommon, XmlDocPtr, XmlDtdPtr,
-        XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_static_copy_node_list, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
+        XML_XML_NAMESPACE,
     },
 };
 
@@ -2716,7 +2716,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
          * XInclude end one
          */
         if (*refe).fallback != 0 {
-            xml_unset_prop(cur, c"href".as_ptr() as _);
+            (*cur).unset_prop(c"href".as_ptr() as _);
         }
         (*cur).typ = XmlElementType::XmlXIncludeStart;
         /* Remove fallback children */

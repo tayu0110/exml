@@ -1169,6 +1169,22 @@ impl XmlNode {
         self.set_ns_prop(null_mut(), name, value)
     }
 
+    /// Remove an attribute carried by a node.  
+    /// This handles only attributes in no namespace.
+    ///
+    /// Returns 0 if successful, -1 if not found
+    #[doc(alias = "xmlUnsetProp")]
+    #[cfg(any(feature = "tree", feature = "schema"))]
+    pub unsafe fn unset_prop(&mut self, name: *const XmlChar) -> i32 {
+        let prop: XmlAttrPtr = xml_get_prop_node_internal(self, name, null_mut(), 0);
+        if prop.is_null() {
+            return -1;
+        }
+        (*prop).unlink();
+        xml_free_prop(prop);
+        0
+    }
+
     /// Set (or reset) an attribute carried by a node.  
     /// The ns structure must be in scope, this is not checked.
     ///

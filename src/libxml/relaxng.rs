@@ -56,8 +56,8 @@ use crate::{
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
         xml_new_doc_text, xml_node_list_get_string, xml_node_set_content, xml_search_ns,
-        xml_split_qname2, xml_unset_prop, xml_validate_ncname, NodeCommon, XmlAttrPtr, XmlDocPtr,
-        XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_split_qname2, xml_validate_ncname, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType,
+        XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -4039,7 +4039,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                     null_mut(),
                                 );
                             }
-                            xml_unset_prop(cur, c"name".as_ptr() as _);
+                            (*cur).unset_prop(c"name".as_ptr() as _);
                             xml_free(name as _);
                             ns = (*cur).get_prop(c"ns".as_ptr() as _);
                             if !ns.is_null() {
@@ -5720,7 +5720,7 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
              * the externalRef may be reused in a different ns context
              */
             if new_ns == 1 {
-                xml_unset_prop(root, c"ns".as_ptr() as _);
+                (*root).unset_prop(c"ns".as_ptr() as _);
             }
         }
         (*def).content = (*docu).content;
