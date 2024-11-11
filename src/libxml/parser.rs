@@ -103,11 +103,11 @@ use crate::{
     },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
-        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, xml_search_ns_by_href,
-        xml_set_tree_doc, NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType,
-        XmlBufferAllocationScheme, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur,
-        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
-        XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, xml_set_tree_doc, NodeCommon,
+        XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme,
+        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
+        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
+        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -4970,7 +4970,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*ctxt).my_doc = new_doc;
         (*(*new_doc).children).doc = doc;
         /* Ensure that doc has XML spec namespace */
-        xml_search_ns_by_href(doc, doc as _, XML_XML_NAMESPACE.as_ptr() as _);
+        (*(doc as *mut XmlNode)).search_ns_by_href(doc, XML_XML_NAMESPACE.as_ptr() as _);
         (*new_doc).old_ns = (*doc).old_ns;
     }
     (*ctxt).instate = XmlParserInputState::XmlParserContent;

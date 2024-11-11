@@ -1374,7 +1374,7 @@ unsafe extern "C" fn xml_new_reconciled_ns(
     /*
      * Search an existing namespace definition inherited.
      */
-    def = xml_search_ns_by_href(doc, tree, (*ns).href.load(Ordering::Relaxed));
+    def = (*tree).search_ns_by_href(doc, (*ns).href.load(Ordering::Relaxed));
     if !def.is_null() {
         return def;
     }
@@ -3516,10 +3516,12 @@ unsafe extern "C" fn xml_ns_in_scope(
     let mut tst: XmlNsPtr;
 
     while !node.is_null() && node != ancestor {
-        if matches!((*node).typ, XmlElementType::XmlEntityRefNode)
-            || matches!((*node).typ, XmlElementType::XmlEntityNode)
-            || matches!((*node).typ, XmlElementType::XmlEntityDecl)
-        {
+        if matches!(
+            (*node).typ,
+            XmlElementType::XmlEntityRefNode
+                | XmlElementType::XmlEntityNode
+                | XmlElementType::XmlEntityDecl
+        ) {
             return -1;
         }
         if matches!((*node).typ, XmlElementType::XmlElementNode) {
@@ -3543,109 +3545,6 @@ unsafe extern "C" fn xml_ns_in_scope(
         return -1;
     }
     1
-}
-
-/**
- * xmlSearchNsByHref:
- * @doc:  the document
- * @node:  the current node
- * @href:  the namespace value
- *
- * Search a Ns aliasing a given URI. Recurse on the parents until it finds
- * the defined namespace or return null_mut() otherwise.
- * Returns the namespace pointer or null_mut().
- */
-pub unsafe extern "C" fn xml_search_ns_by_href(
-    mut doc: XmlDocPtr,
-    mut node: XmlNodePtr,
-    href: *const XmlChar,
-) -> XmlNsPtr {
-    let mut cur: XmlNsPtr;
-    let orig: XmlNodePtr = node;
-
-    if node.is_null() || matches!((*node).typ, XmlElementType::XmlNamespaceDecl) || href.is_null() {
-        return null_mut();
-    }
-    if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
-        /*
-         * Only the document can hold the XML spec namespace.
-         */
-        if doc.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
-            /*
-             * The XML-1.0 namespace is normally held on the root
-             * element. In this case exceptionally create it on the
-             * node element.
-             */
-            cur = xml_malloc(size_of::<XmlNs>()) as _;
-            if cur.is_null() {
-                xml_tree_err_memory(c"searching namespace".as_ptr() as _);
-                return null_mut();
-            }
-            memset(cur as _, 0, size_of::<XmlNs>());
-            (*cur).typ = Some(XML_LOCAL_NAMESPACE);
-            (*cur).href.store(
-                xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
-                Ordering::Relaxed,
-            );
-            (*cur)
-                .prefix
-                .store(xml_strdup(c"xml".as_ptr() as _), Ordering::Relaxed);
-            (*cur).next.store((*node).ns_def, Ordering::Relaxed);
-            (*node).ns_def = cur;
-            return cur;
-        }
-        if doc.is_null() {
-            doc = (*node).doc;
-            if doc.is_null() {
-                return null_mut();
-            }
-        }
-        /*
-        	* Return the XML namespace declaration held by the doc.
-        	*/
-        if (*doc).old_ns.is_null() {
-            return (*doc).ensure_xmldecl();
-        } else {
-            return (*doc).old_ns;
-        }
-    }
-    let is_attr: i32 = matches!((*node).typ, XmlElementType::XmlAttributeNode) as i32;
-    while !node.is_null() {
-        if matches!((*node).typ, XmlElementType::XmlEntityRefNode)
-            || matches!((*node).typ, XmlElementType::XmlEntityNode)
-            || matches!((*node).typ, XmlElementType::XmlEntityDecl)
-        {
-            return null_mut();
-        }
-        if matches!((*node).typ, XmlElementType::XmlElementNode) {
-            cur = (*node).ns_def;
-            while !cur.is_null() {
-                if !(*cur).href.load(Ordering::Relaxed).is_null()
-                    && !href.is_null()
-                    && xml_str_equal((*cur).href.load(Ordering::Relaxed), href)
-                    && (is_attr == 0 || !(*cur).prefix.load(Ordering::Relaxed).is_null())
-                    && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed)) == 1
-                {
-                    return cur;
-                }
-                cur = (*cur).next.load(Ordering::Relaxed);
-            }
-            if orig != node {
-                cur = (*node).ns;
-                if !cur.is_null()
-                    && !(*cur).href.load(Ordering::Relaxed).is_null()
-                    && !href.is_null()
-                    && xml_str_equal((*cur).href.load(Ordering::Relaxed), href)
-                    && (is_attr == 0 || !(*cur).prefix.load(Ordering::Relaxed).is_null())
-                    && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed)) == 1
-                {
-                    return cur;
-                }
-            }
-        }
-        node = (*node).parent;
-    }
-    null_mut()
 }
 
 /**
@@ -5144,7 +5043,7 @@ pub unsafe extern "C" fn xml_node_set_lang(cur: XmlNodePtr, lang: *const XmlChar
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
         _ => unreachable!(),
     }
-    let ns: XmlNsPtr = xml_search_ns_by_href((*cur).doc, cur, XML_XML_NAMESPACE.as_ptr() as _);
+    let ns: XmlNsPtr = (*cur).search_ns_by_href((*cur).doc, XML_XML_NAMESPACE.as_ptr() as _);
     if ns.is_null() {
         return;
     }
@@ -5188,7 +5087,7 @@ pub unsafe extern "C" fn xml_node_set_space_preserve(cur: XmlNodePtr, val: i32) 
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
         _ => unreachable!(),
     }
-    let ns: XmlNsPtr = xml_search_ns_by_href((*cur).doc, cur, XML_XML_NAMESPACE.as_ptr() as _);
+    let ns: XmlNsPtr = (*cur).search_ns_by_href((*cur).doc, XML_XML_NAMESPACE.as_ptr() as _);
     if ns.is_null() {
         return;
     }
@@ -10613,41 +10512,6 @@ mod tests {
                             eprint!(" {}", n_doc);
                             eprint!(" {}", n_node);
                             eprintln!(" {}", n_name_space);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_search_ns_by_href() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    for n_href in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let node = gen_xml_node_ptr(n_node, 1);
-                        let href = gen_const_xml_char_ptr(n_href, 2);
-
-                        let ret_val = xml_search_ns_by_href(doc, node, href);
-                        desret_xml_ns_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_xml_node_ptr(n_node, node, 1);
-                        des_const_xml_char_ptr(n_href, href, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSearchNsByHref",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlSearchNsByHref()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_node);
-                            eprintln!(" {}", n_href);
                         }
                     }
                 }

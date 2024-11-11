@@ -1,10 +1,12 @@
 use std::{ffi::CString, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
+use libc::memset;
+
 use crate::{
     hash::{xml_hash_lookup, xml_hash_remove_entry},
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
-        globals::xml_free,
+        globals::{xml_free, xml_malloc},
         uri::xml_build_uri,
         valid::xml_get_dtd_attr_desc,
         xmlstring::{
@@ -17,9 +19,9 @@ use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
     xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop_node_internal,
     xml_get_prop_node_value_internal, xml_has_ns_prop, xml_is_blank_char, xml_node_add_content_len,
-    xml_node_set_content, xml_remove_prop, xml_set_tree_doc, XmlAttr, XmlAttrPtr,
-    XmlBufferAllocationScheme, XmlDoc, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD,
-    XML_XML_NAMESPACE,
+    xml_node_set_content, xml_ns_in_scope, xml_remove_prop, xml_set_tree_doc, xml_tree_err_memory,
+    XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType,
+    XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -1219,10 +1221,7 @@ impl XmlNode {
     pub unsafe fn set_base(&mut self, uri: *const XmlChar) {
         use std::ffi::CStr;
 
-        use crate::{
-            libxml::uri::xml_path_to_uri,
-            tree::{xml_search_ns_by_href, XmlDocPtr},
-        };
+        use crate::{libxml::uri::xml_path_to_uri, tree::XmlDocPtr};
 
         match self.typ {
             XmlElementType::XmlTextNode
@@ -1267,7 +1266,7 @@ impl XmlNode {
             _ => unreachable!(),
         }
 
-        let ns: XmlNsPtr = xml_search_ns_by_href(self.doc, self, XML_XML_NAMESPACE.as_ptr() as _);
+        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.as_ptr() as _);
         if ns.is_null() {
             return;
         }
@@ -1762,6 +1761,109 @@ impl XmlNode {
                 return node;
             }
             node = (*node).prev;
+        }
+        null_mut()
+    }
+
+    /// Search a Ns aliasing a given URI.
+    /// Recurse on the parents until it finds the defined namespace or return NULL otherwise.
+    ///
+    /// Returns the namespace pointer or NULL.
+    #[doc(alias = "xmlSearchNsByHref")]
+    pub unsafe fn search_ns_by_href(
+        &mut self,
+        mut doc: XmlDocPtr,
+        href: *const XmlChar,
+    ) -> XmlNsPtr {
+        let mut cur: XmlNsPtr;
+        let orig: XmlNodePtr = self;
+
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) || href.is_null() {
+            return null_mut();
+        }
+        if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
+            /*
+             * Only the document can hold the XML spec namespace.
+             */
+            if doc.is_null() && matches!(self.typ, XmlElementType::XmlElementNode) {
+                /*
+                 * The XML-1.0 namespace is normally held on the root
+                 * element. In this case exceptionally create it on the
+                 * node element.
+                 */
+                cur = xml_malloc(size_of::<XmlNs>()) as _;
+                if cur.is_null() {
+                    xml_tree_err_memory(c"searching namespace".as_ptr() as _);
+                    return null_mut();
+                }
+                memset(cur as _, 0, size_of::<XmlNs>());
+                (*cur).typ = Some(XML_LOCAL_NAMESPACE);
+                (*cur).href.store(
+                    xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
+                    Ordering::Relaxed,
+                );
+                (*cur)
+                    .prefix
+                    .store(xml_strdup(c"xml".as_ptr() as _), Ordering::Relaxed);
+                (*cur).next.store(self.ns_def, Ordering::Relaxed);
+                self.ns_def = cur;
+                return cur;
+            }
+            if doc.is_null() {
+                doc = self.doc;
+                if doc.is_null() {
+                    return null_mut();
+                }
+            }
+            /*
+            	* Return the XML namespace declaration held by the doc.
+            	*/
+            if (*doc).old_ns.is_null() {
+                return (*doc).ensure_xmldecl();
+            } else {
+                return (*doc).old_ns;
+            }
+        }
+        let is_attr = matches!(self.typ, XmlElementType::XmlAttributeNode);
+        let mut node = self as *mut XmlNode;
+        while !node.is_null() {
+            if matches!(
+                (*node).typ,
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
+                return null_mut();
+            }
+            if matches!((*node).typ, XmlElementType::XmlElementNode) {
+                cur = (*node).ns_def;
+                while !cur.is_null() {
+                    if !(*cur).href.load(Ordering::Relaxed).is_null()
+                        && !href.is_null()
+                        && xml_str_equal((*cur).href.load(Ordering::Relaxed), href)
+                        && (!is_attr || !(*cur).prefix.load(Ordering::Relaxed).is_null())
+                        && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed))
+                            == 1
+                    {
+                        return cur;
+                    }
+                    cur = (*cur).next.load(Ordering::Relaxed);
+                }
+                if orig != node {
+                    cur = (*node).ns;
+                    if !cur.is_null()
+                        && !(*cur).href.load(Ordering::Relaxed).is_null()
+                        && !href.is_null()
+                        && xml_str_equal((*cur).href.load(Ordering::Relaxed), href)
+                        && (!is_attr || !(*cur).prefix.load(Ordering::Relaxed).is_null())
+                        && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed))
+                            == 1
+                    {
+                        return cur;
+                    }
+                }
+            }
+            node = (*node).parent;
         }
         null_mut()
     }
