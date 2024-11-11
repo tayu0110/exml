@@ -121,11 +121,11 @@ use crate::{
         },
     },
     tree::{
-        xml_free_doc, xml_free_node, xml_get_no_ns_prop, xml_new_doc_text, xml_new_ns,
-        xml_new_ns_prop, xml_new_prop, xml_node_list_get_string, xml_search_ns, xml_split_qname2,
-        xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon, XmlAttrPtr,
-        XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
-        XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
+        xml_node_list_get_string, xml_search_ns, xml_split_qname2, xml_split_qname3,
+        xml_validate_ncname, xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType,
+        XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr,
+        XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -5433,7 +5433,7 @@ unsafe extern "C" fn xml_schema_get_prop(
     node: XmlNodePtr,
     name: *const c_char,
 ) -> *const XmlChar {
-    let val: *mut XmlChar = xml_get_no_ns_prop(node, name as _);
+    let val: *mut XmlChar = (*node).get_no_ns_prop(name as _);
     if val.is_null() {
         return null_mut();
     }

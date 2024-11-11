@@ -3815,37 +3815,6 @@ unsafe extern "C" fn xml_get_prop_node_value_internal(prop: *const XmlAttr) -> *
 }
 
 /**
- * xmlGetNoNsProp:
- * @node:  the node
- * @name:  the attribute name
- *
- * Search and get the value of an attribute associated to a node
- * This does the entity substitution.
- * This function looks in DTD attribute declaration for #FIXED or
- * default declaration values unless DTD use has been turned off.
- * This function is similar to xmlGetProp except it will accept only
- * an attribute in no namespace.
- *
- * Returns the attribute value or null_mut() if not found.
- *     It's up to the caller to free the memory with xml_free().
- */
-pub unsafe extern "C" fn xml_get_no_ns_prop(
-    node: *const XmlNode,
-    name: *const XmlChar,
-) -> *mut XmlChar {
-    let prop: XmlAttrPtr = xml_get_prop_node_internal(
-        node,
-        name,
-        null_mut(),
-        XML_CHECK_DTD.load(Ordering::Relaxed),
-    );
-    if prop.is_null() {
-        return null_mut();
-    }
-    xml_get_prop_node_value_internal(prop)
-}
-
-/**
  * xmlHasNsProp:
  * @node:  the node
  * @name:  the attribute name
@@ -8835,36 +8804,6 @@ mod tests {
                     leaks == 0,
                     "{leaks} Leaks are found in xmlGetCompressMode()"
                 );
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_no_ns_prop() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let node = gen_const_xml_node_ptr(n_node, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_get_no_ns_prop(node, name);
-                    desret_xml_char_ptr(ret_val);
-                    des_const_xml_node_ptr(n_node, node, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlGetNoNsProp",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlGetNoNsProp()");
-                        eprint!(" {}", n_node);
-                        eprintln!(" {}", n_name);
-                    }
-                }
             }
         }
     }

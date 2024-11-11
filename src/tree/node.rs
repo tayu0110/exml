@@ -957,6 +957,31 @@ impl XmlNode {
         xml_get_prop_node_value_internal(prop)
     }
 
+    /// Search and get the value of an attribute associated to a node
+    /// This does the entity substitution.
+    ///
+    /// This function looks in DTD attribute declaration for #FIXED or
+    /// default declaration values unless DTD use has been turned off.  
+    ///
+    /// This function is similar to xmlGetProp except it will accept only
+    /// an attribute in no namespace.
+    ///
+    /// Returns the attribute value or NULL if not found.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlGetNoNsProp")]
+    pub unsafe fn get_no_ns_prop(&self, name: *const XmlChar) -> *mut XmlChar {
+        let prop: XmlAttrPtr = xml_get_prop_node_internal(
+            self,
+            name,
+            null_mut(),
+            XML_CHECK_DTD.load(Ordering::Relaxed),
+        );
+        if prop.is_null() {
+            return null_mut();
+        }
+        xml_get_prop_node_value_internal(prop)
+    }
+
     /// Search all the namespace applying to a given element.
     ///
     /// Returns an NULL terminated array of all the `xmlNsPtr` found

@@ -68,9 +68,9 @@ use crate::{
     tree::{
         xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd,
         xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_get_no_ns_prop, xml_new_doc_text, xml_node_list_get_string,
-        xml_search_ns, xml_split_qname2, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr,
-        XmlDtdPtr, XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_free_ns_list, xml_new_doc_text, xml_node_list_get_string, xml_search_ns,
+        xml_split_qname2, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr,
+        XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -3870,7 +3870,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
             }
             return null_mut();
         }
-        return xml_get_no_ns_prop(reader.node, name);
+        return (*reader.node).get_no_ns_prop(name);
     }
 
     /*
