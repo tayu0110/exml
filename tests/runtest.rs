@@ -5850,116 +5850,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: None,
         options: XmlParserOption::XmlParseNoent as i32,
     },
-    #[cfg(feature = "push")]
-    TestDesc {
-        desc: "XML push regression tests",
-        func: push_parse_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "push")]
-    TestDesc {
-        desc: "XML push boundary tests",
-        func: push_boundary_test,
-        input: Some("./test/*"),
-        out: Some("./result/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
-    #[cfg(feature = "html")]
-    TestDesc {
-        desc: "HTML regression tests",
-        func: err_parse_test,
-        input: Some("./test/HTML/*"),
-        out: Some("./result/HTML/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XML_PARSE_HTML,
-    },
-    #[cfg(all(feature = "html", feature = "push"))]
-    TestDesc {
-        desc: "Push HTML regression tests",
-        func: push_parse_test,
-        input: Some("./test/HTML/*"),
-        out: Some("./result/HTML/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XML_PARSE_HTML,
-    },
-    #[cfg(all(feature = "html", feature = "push"))]
-    TestDesc {
-        desc: "Push HTML boundary tests",
-        func: push_boundary_test,
-        input: Some("./test/HTML/*"),
-        out: Some("./result/HTML/"),
-        suffix: Some(""),
-        err: None,
-        options: XML_PARSE_HTML,
-    },
-    #[cfg(feature = "html")]
-    TestDesc {
-        desc: "HTML SAX regression tests",
-        func: sax_parse_test,
-        input: Some("./test/HTML/*"),
-        out: Some("./result/HTML/"),
-        suffix: Some(".sax"),
-        err: None,
-        options: XML_PARSE_HTML,
-    },
-    #[cfg(feature = "valid")]
-    TestDesc {
-        desc: "Valid documents regression tests",
-        func: err_parse_test,
-        input: Some("./test/VCM/*"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: XmlParserOption::XmlParseDtdvalid as i32,
-    },
-    #[cfg(feature = "valid")]
-    TestDesc {
-        desc: "Validity checking regression tests",
-        func: err_parse_test,
-        input: Some("./test/VC/*"),
-        out: Some("./result/VC/"),
-        suffix: None,
-        err: Some(""),
-        options: XmlParserOption::XmlParseDtdvalid as i32,
-    },
-    #[cfg(all(feature = "valid", feature = "libxml_reader"))]
-    TestDesc {
-        desc: "Streaming validity checking regression tests",
-        func: stream_parse_test,
-        input: Some("./test/valid/*.xml"),
-        out: Some("./result/valid/"),
-        suffix: None,
-        err: Some(".err.rdr"),
-        options: XmlParserOption::XmlParseDtdvalid as i32,
-    },
-    #[cfg(all(feature = "valid", feature = "libxml_reader"))]
-    TestDesc {
-        desc: "Streaming validity error checking regression tests",
-        func: stream_parse_test,
-        input: Some("./test/VC/*"),
-        out: Some("./result/VC/"),
-        suffix: None,
-        err: Some(".rdr"),
-        options: XmlParserOption::XmlParseDtdvalid as i32,
-    },
-    #[cfg(feature = "valid")]
-    TestDesc {
-        desc: "General documents valid regression tests",
-        func: err_parse_test,
-        input: Some("./test/valid/*"),
-        out: Some("./result/valid/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XmlParserOption::XmlParseDtdvalid as i32,
-    },
     #[cfg(feature = "xinclude")]
     TestDesc {
         desc: "XInclude regression tests",
@@ -6011,36 +5901,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         suffix: Some(""),
         err: Some(".err"),
         options: XmlParserOption::XmlParseXinclude as i32,
-    },
-    #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-    TestDesc {
-        desc: "XPath expressions regression tests",
-        func: xpath_expr_test,
-        input: Some("./test/XPath/expr/*"),
-        out: Some("./result/XPath/expr/"),
-        suffix: Some(""),
-        err: None,
-        options: 0,
-    },
-    #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-    TestDesc {
-        desc: "XPath document queries regression tests",
-        func: xpath_doc_test,
-        input: Some("./test/XPath/docs/*"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: 0,
-    },
-    #[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "libxml_xptr"))]
-    TestDesc {
-        desc: "XPointer document queries regression tests",
-        func: xptr_doc_test,
-        input: Some("./test/XPath/docs/*"),
-        out: None,
-        suffix: None,
-        err: None,
-        options: -1,
     },
     #[cfg(all(
         feature = "xpath",
@@ -6244,6 +6104,202 @@ fn test_common(desc: &TestDesc) {
         NB_LEAKS.get() - old_leaks,
     );
     test_cleanup();
+}
+
+#[test]
+#[cfg(feature = "push")]
+fn xml_push_regression_test() {
+    test_common(&TestDesc {
+        desc: "XML push regression tests",
+        func: push_parse_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(feature = "push")]
+fn xml_push_boundary_test() {
+    test_common(&TestDesc {
+        desc: "XML push boundary tests",
+        func: push_boundary_test,
+        input: Some("./test/*"),
+        out: Some("./result/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(feature = "html")]
+fn html_regression_test() {
+    test_common(&TestDesc {
+        desc: "HTML regression tests",
+        func: err_parse_test,
+        input: Some("./test/HTML/*"),
+        out: Some("./result/HTML/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: XML_PARSE_HTML,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "html", feature = "push"))]
+fn push_html_regression_test() {
+    test_common(&TestDesc {
+        desc: "Push HTML regression tests",
+        func: push_parse_test,
+        input: Some("./test/HTML/*"),
+        out: Some("./result/HTML/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: XML_PARSE_HTML,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "html", feature = "push"))]
+fn push_html_boundary_test() {
+    test_common(&TestDesc {
+        desc: "Push HTML boundary tests",
+        func: push_boundary_test,
+        input: Some("./test/HTML/*"),
+        out: Some("./result/HTML/"),
+        suffix: Some(""),
+        err: None,
+        options: XML_PARSE_HTML,
+    });
+}
+
+#[test]
+#[cfg(feature = "html")]
+fn html_sax_regression_test() {
+    test_common(&TestDesc {
+        desc: "HTML SAX regression tests",
+        func: sax_parse_test,
+        input: Some("./test/HTML/*"),
+        out: Some("./result/HTML/"),
+        suffix: Some(".sax"),
+        err: None,
+        options: XML_PARSE_HTML,
+    });
+}
+
+#[test]
+#[cfg(feature = "valid")]
+fn valid_documents_regression_test() {
+    test_common(&TestDesc {
+        desc: "Valid documents regression tests",
+        func: err_parse_test,
+        input: Some("./test/VCM/*"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: XmlParserOption::XmlParseDtdvalid as i32,
+    });
+}
+
+#[test]
+#[cfg(feature = "valid")]
+fn validity_checking_regression_test() {
+    test_common(&TestDesc {
+        desc: "Validity checking regression tests",
+        func: err_parse_test,
+        input: Some("./test/VC/*"),
+        out: Some("./result/VC/"),
+        suffix: None,
+        err: Some(""),
+        options: XmlParserOption::XmlParseDtdvalid as i32,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "valid", feature = "libxml_reader"))]
+fn streaming_validity_checking_regression_test() {
+    test_common(&TestDesc {
+        desc: "Streaming validity checking regression tests",
+        func: stream_parse_test,
+        input: Some("./test/valid/*.xml"),
+        out: Some("./result/valid/"),
+        suffix: None,
+        err: Some(".err.rdr"),
+        options: XmlParserOption::XmlParseDtdvalid as i32,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "valid", feature = "libxml_reader"))]
+fn streaming_validity_error_checking_regression_test() {
+    test_common(&TestDesc {
+        desc: "Streaming validity error checking regression tests",
+        func: stream_parse_test,
+        input: Some("./test/VC/*"),
+        out: Some("./result/VC/"),
+        suffix: None,
+        err: Some(".rdr"),
+        options: XmlParserOption::XmlParseDtdvalid as i32,
+    });
+}
+
+#[test]
+#[cfg(feature = "valid")]
+fn general_documents_valid_regression_test() {
+    test_common(&TestDesc {
+        desc: "General documents valid regression tests",
+        func: err_parse_test,
+        input: Some("./test/valid/*"),
+        out: Some("./result/valid/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: XmlParserOption::XmlParseDtdvalid as i32,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "xpath", feature = "libxml_debug"))]
+fn xpath_expression_regression_test() {
+    test_common(&TestDesc {
+        desc: "XPath expressions regression tests",
+        func: xpath_expr_test,
+        input: Some("./test/XPath/expr/*"),
+        out: Some("./result/XPath/expr/"),
+        suffix: Some(""),
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "xpath", feature = "libxml_debug"))]
+fn xpath_document_queries_regression_test() {
+    test_common(&TestDesc {
+        desc: "XPath document queries regression tests",
+        func: xpath_doc_test,
+        input: Some("./test/XPath/docs/*"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: 0,
+    });
+}
+
+#[test]
+#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "libxml_xptr"))]
+fn xpointer_document_queries_regression_test() {
+    test_common(&TestDesc {
+        desc: "XPointer document queries regression tests",
+        func: xptr_doc_test,
+        input: Some("./test/XPath/docs/*"),
+        out: None,
+        suffix: None,
+        err: None,
+        options: -1,
+    });
 }
 
 #[test]
