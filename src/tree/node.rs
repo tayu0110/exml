@@ -8,20 +8,21 @@ use crate::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         globals::{xml_free, xml_malloc},
         uri::xml_build_uri,
-        valid::xml_get_dtd_attr_desc,
+        valid::{xml_get_dtd_attr_desc, xml_get_dtd_qattr_desc},
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, XmlChar,
         },
     },
+    tree::XmlAttributePtr,
 };
 
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
-    xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop_node_internal,
-    xml_get_prop_node_value_internal, xml_is_blank_char, xml_node_add_content_len,
-    xml_node_set_content, xml_ns_in_scope, xml_set_tree_doc, xml_tree_err_memory, XmlAttr,
-    XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs,
-    XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_get_prop_node_value_internal,
+    xml_is_blank_char, xml_node_add_content_len, xml_node_set_content, xml_ns_in_scope,
+    xml_set_tree_doc, xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc,
+    XmlDocPtr, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE,
+    XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -903,6 +904,162 @@ impl XmlNode {
         }
     }
 
+    unsafe fn get_prop_node_internal(
+        &self,
+        name: *const XmlChar,
+        ns_name: *const XmlChar,
+        use_dtd: i32,
+    ) -> XmlAttrPtr {
+        let mut prop: XmlAttrPtr;
+
+        if !matches!(self.typ, XmlElementType::XmlElementNode) || name.is_null() {
+            return null_mut();
+        }
+
+        if !self.properties.is_null() {
+            prop = self.properties;
+            if ns_name.is_null() {
+                /*
+                 * We want the attr to be in no namespace.
+                 */
+                while {
+                    if (*prop).ns.is_null() && xml_str_equal((*prop).name, name) {
+                        return prop;
+                    }
+                    prop = (*prop).next;
+                    !prop.is_null()
+                } {}
+            } else {
+                /*
+                 * We want the attr to be in the specified namespace.
+                 */
+                while {
+                    if !(*prop).ns.is_null()
+                        && xml_str_equal((*prop).name, name)
+                        && ((*(*prop).ns).href.load(Ordering::Relaxed) == ns_name as _
+                            || xml_str_equal((*(*prop).ns).href.load(Ordering::Relaxed), ns_name))
+                    {
+                        return prop;
+                    }
+                    prop = (*prop).next;
+                    !prop.is_null()
+                } {}
+            }
+        }
+
+        #[cfg(feature = "tree")]
+        {
+            if use_dtd == 0 {
+                return null_mut();
+            }
+            /*
+             * Check if there is a default/fixed attribute declaration in
+             * the internal or external subset.
+             */
+            if !self.doc.is_null() && !(*self.doc).int_subset.is_null() {
+                let doc: XmlDocPtr = self.doc;
+                let mut attr_decl: XmlAttributePtr = null_mut();
+                let elem_qname: *mut XmlChar;
+                let mut tmpstr: *mut XmlChar = null_mut();
+
+                /*
+                 * We need the QName of the element for the DTD-lookup.
+                 */
+                if !self.ns.is_null() && !(*self.ns).prefix.load(Ordering::Relaxed).is_null() {
+                    tmpstr = xml_strdup((*self.ns).prefix.load(Ordering::Relaxed));
+                    tmpstr = xml_strcat(tmpstr, c":".as_ptr() as _);
+                    tmpstr = xml_strcat(tmpstr, self.name);
+                    if tmpstr.is_null() {
+                        return null_mut();
+                    }
+                    elem_qname = tmpstr;
+                } else {
+                    elem_qname = self.name as _;
+                }
+                if ns_name.is_null() {
+                    /*
+                     * The common and nice case: Attr in no namespace.
+                     */
+                    attr_decl =
+                        xml_get_dtd_qattr_desc((*doc).int_subset, elem_qname, name, null_mut());
+                    if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
+                        attr_decl =
+                            xml_get_dtd_qattr_desc((*doc).ext_subset, elem_qname, name, null_mut());
+                    }
+                } else if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
+                    /*
+                     * The XML namespace must be bound to prefix 'xml'.
+                     */
+                    attr_decl = xml_get_dtd_qattr_desc(
+                        (*doc).int_subset,
+                        elem_qname,
+                        name,
+                        c"xml".as_ptr() as _,
+                    );
+                    if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
+                        attr_decl = xml_get_dtd_qattr_desc(
+                            (*doc).ext_subset,
+                            elem_qname,
+                            name,
+                            c"xml".as_ptr() as _,
+                        );
+                    }
+                } else {
+                    let mut cur: *mut XmlNsPtr;
+
+                    /*
+                     * The ugly case: Search using the prefixes of in-scope
+                     * ns-decls corresponding to @nsName.
+                     */
+                    let ns_list: *mut XmlNsPtr = self.get_ns_list(self.doc);
+                    if ns_list.is_null() {
+                        if !tmpstr.is_null() {
+                            xml_free(tmpstr as _);
+                        }
+                        return null_mut();
+                    }
+                    cur = ns_list;
+                    while !(*cur).is_null() {
+                        if xml_str_equal((*(*cur)).href.load(Ordering::Relaxed), ns_name) {
+                            attr_decl = xml_get_dtd_qattr_desc(
+                                (*doc).int_subset,
+                                elem_qname,
+                                name,
+                                (*(*cur)).prefix.load(Ordering::Relaxed),
+                            );
+                            if !attr_decl.is_null() {
+                                break;
+                            }
+                            if !(*doc).ext_subset.is_null() {
+                                attr_decl = xml_get_dtd_qattr_desc(
+                                    (*doc).ext_subset,
+                                    elem_qname,
+                                    name,
+                                    (*(*cur)).prefix.load(Ordering::Relaxed),
+                                );
+                                if !attr_decl.is_null() {
+                                    break;
+                                }
+                            }
+                        }
+                        cur = cur.add(1);
+                    }
+                    xml_free(ns_list as _);
+                }
+                if !tmpstr.is_null() {
+                    xml_free(tmpstr as _);
+                }
+                /*
+                 * Only default/fixed attrs are relevant.
+                 */
+                if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
+                    return attr_decl as _;
+                }
+            }
+        }
+        null_mut()
+    }
+
     /// Search and get the value of an attribute associated to a node.  
     ///
     /// This does the entity substitution.
@@ -942,12 +1099,8 @@ impl XmlNode {
         name: *const XmlChar,
         name_space: *const XmlChar,
     ) -> *mut XmlChar {
-        let prop: XmlAttrPtr = xml_get_prop_node_internal(
-            self,
-            name,
-            name_space,
-            XML_CHECK_DTD.load(Ordering::Relaxed),
-        );
+        let prop =
+            self.get_prop_node_internal(name, name_space, XML_CHECK_DTD.load(Ordering::Relaxed));
         if prop.is_null() {
             return null_mut();
         }
@@ -967,12 +1120,8 @@ impl XmlNode {
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetNoNsProp")]
     pub unsafe fn get_no_ns_prop(&self, name: *const XmlChar) -> *mut XmlChar {
-        let prop: XmlAttrPtr = xml_get_prop_node_internal(
-            self,
-            name,
-            null_mut(),
-            XML_CHECK_DTD.load(Ordering::Relaxed),
-        );
+        let prop =
+            self.get_prop_node_internal(name, null_mut(), XML_CHECK_DTD.load(Ordering::Relaxed));
         if prop.is_null() {
             return null_mut();
         }
@@ -1198,7 +1347,7 @@ impl XmlNode {
     #[doc(alias = "xmlUnsetProp")]
     #[cfg(any(feature = "tree", feature = "schema"))]
     pub unsafe fn unset_prop(&mut self, name: *const XmlChar) -> i32 {
-        let prop: XmlAttrPtr = xml_get_prop_node_internal(self, name, null_mut(), 0);
+        let prop: XmlAttrPtr = self.get_prop_node_internal(name, null_mut(), 0);
         if prop.is_null() {
             return -1;
         }
@@ -1229,13 +1378,10 @@ impl XmlNode {
             tree::{xml_free_node_list, xml_new_doc_text, xml_new_prop_internal, XmlAttributeType},
         };
 
-        use super::xml_get_prop_node_internal;
-
         if !ns.is_null() && (*ns).href.load(Ordering::Relaxed).is_null() {
             return null_mut();
         }
-        let prop = xml_get_prop_node_internal(
-            self,
+        let prop = self.get_prop_node_internal(
             name,
             if !ns.is_null() {
                 (*ns).href.load(Ordering::Relaxed)
@@ -1289,8 +1435,7 @@ impl XmlNode {
     #[doc(alias = "xmlUnsetNsProp")]
     #[cfg(any(feature = "tree", feature = "schema"))]
     pub unsafe fn unset_ns_prop(&mut self, ns: XmlNsPtr, name: *const XmlChar) -> i32 {
-        let prop: XmlAttrPtr = xml_get_prop_node_internal(
-            self,
+        let prop: XmlAttrPtr = self.get_prop_node_internal(
             name,
             if !ns.is_null() {
                 (*ns).href.load(Ordering::Relaxed)
@@ -1511,7 +1656,7 @@ impl XmlNode {
         name: *const XmlChar,
         namespace: *const XmlChar,
     ) -> XmlAttrPtr {
-        xml_get_prop_node_internal(self, name, namespace, XML_CHECK_DTD.load(Ordering::Relaxed))
+        self.get_prop_node_internal(name, namespace, XML_CHECK_DTD.load(Ordering::Relaxed))
     }
 
     /// Add a new element `elem` to the list of siblings of `self`
