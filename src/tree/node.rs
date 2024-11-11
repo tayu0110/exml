@@ -1261,6 +1261,30 @@ impl XmlNode {
         xml_new_prop_internal(self, ns, name, value, 0)
     }
 
+    /// Remove an attribute carried by a node.
+    ///
+    /// Returns 0 if successful, -1 if not found
+    #[doc(alias = "xmlUnsetNsProp")]
+    #[cfg(any(feature = "tree", feature = "schema"))]
+    pub unsafe fn unset_ns_prop(&mut self, ns: XmlNsPtr, name: *const XmlChar) -> i32 {
+        let prop: XmlAttrPtr = xml_get_prop_node_internal(
+            self,
+            name,
+            if !ns.is_null() {
+                (*ns).href.load(Ordering::Relaxed)
+            } else {
+                null_mut()
+            },
+            0,
+        );
+        if prop.is_null() {
+            return -1;
+        }
+        (*prop).unlink();
+        xml_free_prop(prop);
+        0
+    }
+
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "tree", feature = "xinclude"))]
