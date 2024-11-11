@@ -5007,50 +5007,6 @@ pub unsafe extern "C" fn xml_node_get_space_preserve(mut cur: *const XmlNode) ->
 }
 
 /**
- * xmlNodeSetLang:
- * @cur:  the node being changed
- * @lang:  the language description
- *
- * Set the language of a node, i.e. the values of the xml:lang
- * attribute.
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_node_set_lang(cur: XmlNodePtr, lang: *const XmlChar) {
-    if cur.is_null() {
-        return;
-    }
-    match (*cur).typ {
-        XmlElementType::XmlTextNode
-        | XmlElementType::XmlCDATASectionNode
-        | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlHTMLDocumentNode
-        | XmlElementType::XmlDTDNode
-        | XmlElementType::XmlElementDecl
-        | XmlElementType::XmlAttributeDecl
-        | XmlElementType::XmlEntityDecl
-        | XmlElementType::XmlPINode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXIncludeStart
-        | XmlElementType::XmlXIncludeEnd => {
-            return;
-        }
-        XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
-        _ => unreachable!(),
-    }
-    let ns: XmlNsPtr = (*cur).search_ns_by_href((*cur).doc, XML_XML_NAMESPACE.as_ptr() as _);
-    if ns.is_null() {
-        return;
-    }
-    (*cur).set_ns_prop(ns, c"lang".as_ptr() as _, lang);
-}
-
-/**
  * xmlNodeSetSpacePreserve:
  * @cur:  the node being changed
  * @val:  the xml:space value ("0": default, 1: "preserve")
@@ -10226,37 +10182,6 @@ mod tests {
                             eprint!(" {}", n_content);
                             eprintln!(" {}", n_len);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_set_lang() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                for n_lang in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_ptr(n_cur, 0);
-                    let lang = gen_const_xml_char_ptr(n_lang, 1);
-
-                    xml_node_set_lang(cur, lang);
-                    des_xml_node_ptr(n_cur, cur, 0);
-                    des_const_xml_char_ptr(n_lang, lang, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNodeSetLang",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNodeSetLang()");
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_lang);
                     }
                 }
             }

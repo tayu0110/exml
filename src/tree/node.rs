@@ -1279,6 +1279,42 @@ impl XmlNode {
         }
     }
 
+    /// Set the language of a node, i.e. the values of the xml:lang
+    /// attribute.
+    #[doc(alias = "xmlNodeSetLang")]
+    #[cfg(feature = "tree")]
+    pub unsafe fn set_lang(&mut self, lang: *const XmlChar) {
+        match self.typ {
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
+                return;
+            }
+            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
+            _ => unreachable!(),
+        }
+        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.as_ptr() as _);
+        if ns.is_null() {
+            return;
+        }
+        self.set_ns_prop(ns, c"lang".as_ptr() as _, lang);
+    }
+
     /// Search an attribute associated to a node.  
     ///
     /// This function also looks in DTD attribute declaration for #FIXED or
