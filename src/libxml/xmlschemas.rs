@@ -122,10 +122,10 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_get_no_ns_prop, xml_new_doc_text, xml_new_ns,
-        xml_new_ns_prop, xml_new_prop, xml_node_get_space_preserve, xml_node_list_get_string,
-        xml_search_ns, xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname,
-        NodeCommon, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-        XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_new_ns_prop, xml_new_prop, xml_node_list_get_string, xml_search_ns, xml_split_qname2,
+        xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon, XmlAttrPtr,
+        XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
+        XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -5061,7 +5061,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
         }
         'skip_children: {
             if (*cur).typ == XmlElementType::XmlTextNode {
-                if IS_BLANK_NODE!(cur) && xml_node_get_space_preserve(cur) != 1 {
+                if IS_BLANK_NODE!(cur) && (*cur).get_space_preserve() != 1 {
                     delete = cur;
                 }
             } else if !matches!(

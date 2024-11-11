@@ -4973,40 +4973,6 @@ pub unsafe extern "C" fn xml_buf_get_node_content(buf: XmlBufPtr, mut cur: *cons
 }
 
 /**
- * xmlNodeGetSpacePreserve:
- * @cur:  the node being checked
- *
- * Searches the space preserving behaviour of a node, i.e. the values
- * of the xml:space attribute or the one carried by the nearest
- * ancestor.
- *
- * Returns -1 if xml:space is not inherited, 0 if "default".as_ptr() as _, 1 if "preserve"
- */
-pub unsafe extern "C" fn xml_node_get_space_preserve(mut cur: *const XmlNode) -> i32 {
-    let mut space: *mut XmlChar;
-
-    if cur.is_null() || !matches!((*cur).typ, XmlElementType::XmlElementNode) {
-        return -1;
-    }
-    while !cur.is_null() {
-        space = (*cur).get_ns_prop(c"space".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
-        if !space.is_null() {
-            if xml_str_equal(space, c"preserve".as_ptr() as _) {
-                xml_free(space as _);
-                return 1;
-            }
-            if xml_str_equal(space, c"default".as_ptr() as _) {
-                xml_free(space as _);
-                return 0;
-            }
-            xml_free(space as _);
-        }
-        cur = (*cur).parent;
-    }
-    -1
-}
-
-/**
  * xmlNodeSetSpacePreserve:
  * @cur:  the node being changed
  * @val:  the xml:space value ("0": default, 1: "preserve")
@@ -5373,9 +5339,6 @@ pub unsafe extern "C" fn xml_reconciliate_ns(doc: XmlDocPtr, tree: XmlNodePtr) -
     ret
 }
 
-/*
- * XHTML
- */
 const XHTML_STRICT_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Strict//EN";
 const XHTML_STRICT_SYSTEM_ID: &str = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd";
 const XHTML_FRAME_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Frameset//EN";
@@ -10006,34 +9969,6 @@ mod tests {
                             eprintln!(" {}", n_len);
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_get_space_preserve() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_CONST_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let cur = gen_const_xml_node_ptr(n_cur, 0);
-
-                let ret_val = xml_node_get_space_preserve(cur);
-                desret_int(ret_val);
-                des_const_xml_node_ptr(n_cur, cur, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNodeGetSpacePreserve",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlNodeGetSpacePreserve()"
-                    );
-                    eprintln!(" {}", n_cur);
                 }
             }
         }

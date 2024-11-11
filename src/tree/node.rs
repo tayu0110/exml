@@ -1038,6 +1038,36 @@ impl XmlNode {
         null_mut()
     }
 
+    /// Searches the space preserving behaviour of a node, i.e. the values
+    /// of the xml:space attribute or the one carried by the nearest ancestor.
+    ///
+    /// Returns -1 if xml:space is not inherited, 0 if "default", 1 if "preserve"
+    #[doc(alias = "xmlNodeGetSpacePreserve")]
+    pub unsafe fn get_space_preserve(&self) -> i32 {
+        let mut space: *mut XmlChar;
+
+        if !matches!(self.typ, XmlElementType::XmlElementNode) {
+            return -1;
+        }
+        let mut cur = self as *const XmlNode;
+        while !cur.is_null() {
+            space = (*cur).get_ns_prop(c"space".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+            if !space.is_null() {
+                if xml_str_equal(space, c"preserve".as_ptr() as _) {
+                    xml_free(space as _);
+                    return 1;
+                }
+                if xml_str_equal(space, c"default".as_ptr() as _) {
+                    xml_free(space as _);
+                    return 0;
+                }
+                xml_free(space as _);
+            }
+            cur = (*cur).parent;
+        }
+        -1
+    }
+
     /// Set (or reset) the name of a node.
     #[doc(alias = "xmlNodeSetName")]
     #[cfg(feature = "tree")]
