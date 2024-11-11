@@ -1452,6 +1452,17 @@ impl XmlNode {
         0
     }
 
+    /// Associate a namespace to a node, a posteriori.
+    #[doc(alias = "xmlSetNs")]
+    pub fn set_ns(&mut self, ns: XmlNsPtr) {
+        if matches!(
+            self.typ,
+            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
+        ) {
+            self.ns = ns;
+        }
+    }
+
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "tree", feature = "xinclude"))]

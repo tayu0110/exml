@@ -3422,24 +3422,6 @@ unsafe extern "C" fn xml_ns_in_scope(
 }
 
 /**
- * xmlSetNs:
- * @node:  a node in the document
- * @ns:  a namespace pointer
- *
- * Associate a namespace to a node, a posteriori.
- */
-pub unsafe extern "C" fn xml_set_ns(node: XmlNodePtr, ns: XmlNsPtr) {
-    if node.is_null() {
-        return;
-    }
-    if (matches!((*node).typ, XmlElementType::XmlElementNode)
-        || matches!((*node).typ, XmlElementType::XmlAttributeNode))
-    {
-        (*node).ns = ns;
-    }
-}
-
-/**
  * xmlCopyNamespace:
  * @cur:  the namespace
  *
@@ -9624,35 +9606,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlSetCompressMode()"
                     );
                     eprintln!(" {}", n_mode);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_set_ns() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_ns in 0..GEN_NB_XML_NS_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let node = gen_xml_node_ptr(n_node, 0);
-                    let ns = gen_xml_ns_ptr(n_ns, 1);
-
-                    xml_set_ns(node, ns);
-                    des_xml_node_ptr(n_node, node, 0);
-                    des_xml_ns_ptr(n_ns, ns, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSetNs",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlSetNs()");
-                        eprint!(" {}", n_node);
-                        eprintln!(" {}", n_ns);
-                    }
                 }
             }
         }
