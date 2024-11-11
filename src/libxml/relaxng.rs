@@ -5,12 +5,13 @@
 
 use std::{
     any::type_name,
+    cell::Cell,
     ffi::{c_char, CStr},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     slice::from_raw_parts,
-    sync::atomic::{AtomicBool, AtomicPtr, Ordering},
+    sync::atomic::Ordering,
 };
 
 use libc::{fprintf, memcpy, memset, ptrdiff_t, snprintf, FILE};
@@ -617,9 +618,11 @@ pub struct XmlRelaxNGTypeLibrary {
     freef: Option<XmlRelaxNGTypeFree>,   /* the freeing function */
 }
 
-static XML_RELAXNG_TYPE_INITIALIZED: AtomicBool = AtomicBool::new(false);
-static XML_RELAXNG_REGISTERED_TYPES: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
-    AtomicPtr::new(null_mut());
+thread_local! {
+    static XML_RELAXNG_TYPE_INITIALIZED: Cell<bool> = const { Cell::new(false) };
+    static XML_RELAXNG_REGISTERED_TYPES: Cell<*mut XmlHashTable<'static, CVoidWrapper>> =
+        const { Cell::new(null_mut()) };
+}
 
 macro_rules! VALID_ERR {
     ($ctxt:expr, $a:expr) => {
@@ -1291,7 +1294,7 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     facet: Option<XmlRelaxNGFacetCheck>,
     freef: Option<XmlRelaxNGTypeFree>,
 ) -> i32 {
-    let registered_types = XML_RELAXNG_REGISTERED_TYPES.load(Ordering::Acquire);
+    let registered_types = XML_RELAXNG_REGISTERED_TYPES.get();
     if registered_types.is_null() || namespace.is_null() || check.is_none() || comp.is_none() {
         return -1;
     }
@@ -1743,7 +1746,7 @@ unsafe extern "C" fn xml_relaxng_default_type_compare(
  * Returns 0 in case of success and -1 in case of error.
  */
 pub unsafe extern "C" fn xml_relaxng_init_types() -> i32 {
-    if XML_RELAXNG_TYPE_INITIALIZED.load(Ordering::Acquire) {
+    if XML_RELAXNG_TYPE_INITIALIZED.get() {
         return 0;
     }
 
@@ -1753,7 +1756,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> i32 {
         return -1;
     }
 
-    XML_RELAXNG_REGISTERED_TYPES.store(registered_types, Ordering::Release);
+    XML_RELAXNG_REGISTERED_TYPES.set(registered_types);
     xml_relaxng_register_type_library(
         c"http://www.w3.org/2001/XMLSchema-datatypes".as_ptr() as _,
         null_mut(),
@@ -1772,7 +1775,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> i32 {
         None,
         None,
     );
-    XML_RELAXNG_TYPE_INITIALIZED.store(true, Ordering::Release);
+    XML_RELAXNG_TYPE_INITIALIZED.set(true);
     0
 }
 
@@ -1808,14 +1811,14 @@ extern "C" fn xml_relaxng_free_type_library(payload: *mut c_void, _namespace: *c
  */
 pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
     xml_schema_cleanup_types();
-    if !XML_RELAXNG_TYPE_INITIALIZED.load(Ordering::Acquire) {
+    if !XML_RELAXNG_TYPE_INITIALIZED.get() {
         return;
     }
     xml_hash_free(
-        XML_RELAXNG_REGISTERED_TYPES.load(Ordering::Relaxed),
+        XML_RELAXNG_REGISTERED_TYPES.get(),
         Some(xml_relaxng_free_type_library),
     );
-    XML_RELAXNG_TYPE_INITIALIZED.store(false, Ordering::Release);
+    XML_RELAXNG_TYPE_INITIALIZED.set(false);
 }
 
 /**
@@ -5063,10 +5066,8 @@ unsafe extern "C" fn xml_relaxng_parse_data(
     (*def).name = typ;
     (*def).ns = library;
 
-    let lib: XmlRelaxNGTypeLibraryPtr = xml_hash_lookup(
-        XML_RELAXNG_REGISTERED_TYPES.load(Ordering::Relaxed),
-        library,
-    ) as _;
+    let lib: XmlRelaxNGTypeLibraryPtr =
+        xml_hash_lookup(XML_RELAXNG_REGISTERED_TYPES.get(), library) as _;
     if lib.is_null() {
         xml_rng_perr(
             ctxt,
@@ -5367,10 +5368,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
         (*def).name = typ;
         (*def).ns = library;
 
-        lib = xml_hash_lookup(
-            XML_RELAXNG_REGISTERED_TYPES.load(Ordering::Relaxed),
-            library,
-        ) as _;
+        lib = xml_hash_lookup(XML_RELAXNG_REGISTERED_TYPES.get(), library) as _;
         if lib.is_null() {
             xml_rng_perr(
                 ctxt,

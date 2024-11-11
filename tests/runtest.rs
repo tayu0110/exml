@@ -14,7 +14,7 @@ use std::{
     slice::from_raw_parts,
     sync::{
         atomic::{AtomicPtr, AtomicUsize, Ordering},
-        Mutex, OnceLock,
+        Condvar, Mutex, OnceLock,
     },
 };
 
@@ -315,14 +315,7 @@ unsafe extern "C" fn initialize_libxml2() {
         Some(xml_mem_realloc),
         Some(xml_memory_strdup),
     );
-    xml_pedantic_parser_default(0);
     xml_set_external_entity_loader(test_external_entity_loader);
-    set_structured_error(Some(test_structured_error_handler), None);
-    #[cfg(feature = "schema")]
-    {
-        xml_schema_init_types();
-        xml_relaxng_init_types();
-    }
 }
 
 fn base_filename(filename: impl AsRef<Path>) -> String {
@@ -6264,33 +6257,58 @@ unsafe extern "C" fn runtest(i: usize) -> i32 {
     ret
 }
 
-static TEST_INITIALIZED: AtomicUsize = AtomicUsize::new(0);
+static NUM_STARTED_TESTS: AtomicUsize = AtomicUsize::new(0);
+static TEST_INITIALIZED: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
 fn test_initialize() {
-    while TEST_INITIALIZED
-        .fetch_update(Ordering::Release, Ordering::Acquire, |old| {
-            if old == 0 {
+    let mut lock = TEST_INITIALIZED.0.lock().unwrap();
+    loop {
+        if let Ok(prev) =
+            NUM_STARTED_TESTS
+                .fetch_update(Ordering::Release, Ordering::Acquire, |old| Some(old + 1))
+        {
+            if prev == 0 {
                 unsafe {
                     initialize_libxml2();
                 }
+                *lock = true;
+                TEST_INITIALIZED.1.notify_all();
+            } else {
+                while !*lock {
+                    lock = TEST_INITIALIZED.1.wait(lock).unwrap();
+                }
             }
-            Some(old + 1)
-        })
-        .is_err()
-    {}
+            break;
+        }
+    }
+    xml_pedantic_parser_default(0);
+    set_structured_error(Some(test_structured_error_handler), None);
+    #[cfg(feature = "schema")]
+    {
+        unsafe {
+            xml_schema_init_types();
+            xml_relaxng_init_types();
+        }
+    }
 }
 fn test_cleanup() {
-    while TEST_INITIALIZED
-        .fetch_update(Ordering::Release, Ordering::Acquire, |old| {
-            if old == 1 {
+    let mut lock = TEST_INITIALIZED.0.lock().unwrap();
+    loop {
+        if let Ok(prev) =
+            NUM_STARTED_TESTS.fetch_update(Ordering::Release, Ordering::Acquire, |old| {
+                old.checked_sub(1)
+            })
+        {
+            if prev == 1 {
                 unsafe {
                     xml_cleanup_parser();
                     xml_memory_dump();
                 }
+
+                *lock = false;
             }
-            old.checked_sub(1)
-        })
-        .is_err()
-    {}
+            break;
+        }
+    }
 }
 
 fn test_common(desc: &TestDesc) {
