@@ -11,9 +11,9 @@ use crate::{
 };
 
 use super::{
-    xml_free_prop, xml_new_prop_internal, xml_node_list_get_string, xml_string_get_node_list,
-    xml_tree_err_memory, NodeCommon, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr,
-    XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    xml_free_prop, xml_new_prop_internal, xml_node_list_get_string, xml_tree_err_memory,
+    NodeCommon, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
+    XmlNodePtr, XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 /// An attribute on an XML node.
@@ -178,7 +178,11 @@ pub unsafe extern "C" fn xml_new_doc_prop(
     }
     (*cur).doc = doc;
     if !value.is_null() {
-        (*cur).children = xml_string_get_node_list(doc, value);
+        (*cur).children = if doc.is_null() {
+            null_mut()
+        } else {
+            (*doc).get_node_list(value)
+        };
         (*cur).last = null_mut();
 
         let mut tmp = (*cur).children;

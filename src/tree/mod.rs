@@ -2135,7 +2135,11 @@ pub unsafe extern "C" fn xml_new_doc_node(
     if !cur.is_null() {
         (*cur).doc = doc;
         if !content.is_null() {
-            (*cur).children = xml_string_get_node_list(doc, content);
+            (*cur).children = if doc.is_null() {
+                null_mut()
+            } else {
+                (*doc).get_node_list(content)
+            };
             UPDATE_LAST_CHILD_AND_PARENT!(cur)
         }
     }
@@ -2169,7 +2173,11 @@ pub unsafe extern "C" fn xml_new_doc_node_eat_name(
     if !cur.is_null() {
         (*cur).doc = doc;
         if !content.is_null() {
-            (*cur).children = xml_string_get_node_list(doc, content);
+            (*cur).children = if doc.is_null() {
+                null_mut()
+            } else {
+                (*doc).get_node_list(content)
+            };
             UPDATE_LAST_CHILD_AND_PARENT!(cur)
         }
     } else {
@@ -3504,293 +3512,6 @@ unsafe extern "C" fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra
 }
 
 /**
- * xmlStringGetNodeList:
- * @doc:  the document
- * @value:  the value of the attribute
- *
- * Parse the value string and build the node list associated. Should
- * produce a flat tree with only TEXTs and ENTITY_REFs.
- * Returns a pointer to the first child
- */
-pub unsafe extern "C" fn xml_string_get_node_list(
-    doc: *const XmlDoc,
-    value: *const XmlChar,
-) -> XmlNodePtr {
-    let mut ret: XmlNodePtr = null_mut();
-    let mut head: XmlNodePtr = null_mut();
-    let mut last: XmlNodePtr = null_mut();
-    let mut node: XmlNodePtr;
-    let mut val: *mut XmlChar = null_mut();
-    let mut cur: *const XmlChar = value;
-    let mut q: *const XmlChar;
-    let mut ent: XmlEntityPtr;
-
-    if value.is_null() {
-        return null_mut();
-    }
-
-    let buf: XmlBufPtr = xml_buf_create_size(0);
-    if buf.is_null() {
-        return null_mut();
-    }
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-
-    q = cur;
-    while *cur != 0 {
-        if *cur.add(0) == b'&' {
-            let mut charval: i32 = 0;
-            let mut tmp: XmlChar;
-
-            /*
-             * Save the current text.
-             */
-            if cur != q && xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
-                // goto out;
-                xml_buf_free(buf);
-                if !val.is_null() {
-                    xml_free(val as _);
-                }
-                if !head.is_null() {
-                    xml_free_node_list(head);
-                }
-                return ret;
-            }
-            // q = cur;
-            if *cur.add(1) == b'#' && *cur.add(2) == b'x' {
-                cur = cur.add(3);
-                tmp = *cur;
-                while tmp != b';' {
-                    /* Non input consuming loop */
-                    /* Don't check for integer overflow, see above. */
-                    if tmp.is_ascii_digit() {
-                        charval = charval * 16 + (tmp - b'0') as i32;
-                    } else if (b'a'..=b'f').contains(&tmp) {
-                        charval = charval * 16 + (tmp - b'a') as i32 + 10;
-                    } else if (b'A'..=b'F').contains(&tmp) {
-                        charval = charval * 16 + (tmp - b'A') as i32 + 10;
-                    } else {
-                        xml_tree_err(XmlParserErrors::XmlTreeInvalidHex, doc as _, null_mut());
-                        charval = 0;
-                        break;
-                    }
-                    cur = cur.add(1);
-                    tmp = *cur;
-                }
-                if tmp == b';' {
-                    cur = cur.add(1);
-                }
-                q = cur;
-            } else if *cur.add(1) == b'#' {
-                cur = cur.add(2);
-                tmp = *cur;
-                while tmp != b';' {
-                    /* Non input consuming loops */
-                    /* Don't check for integer overflow, see above. */
-                    if tmp.is_ascii_digit() {
-                        charval = charval * 10 + (tmp - b'0') as i32;
-                    } else {
-                        xml_tree_err(XmlParserErrors::XmlTreeInvalidDec, doc as _, null_mut());
-                        charval = 0;
-                        break;
-                    }
-                    cur = cur.add(1);
-                    tmp = *cur;
-                }
-                if tmp == b';' {
-                    cur = cur.add(1);
-                }
-                q = cur;
-            } else {
-                /*
-                 * Read the entity string
-                 */
-                cur = cur.add(1);
-                q = cur;
-                while *cur != 0 && *cur != b';' {
-                    cur = cur.add(1);
-                }
-                if *cur == 0 {
-                    xml_tree_err(XmlParserErrors::XmlTreeUnterminatedEntity, doc as _, q as _);
-                    // goto out;
-                    xml_buf_free(buf);
-                    if !val.is_null() {
-                        xml_free(val as _);
-                    }
-                    if !head.is_null() {
-                        xml_free_node_list(head);
-                    }
-                    return ret;
-                }
-                if cur != q {
-                    /*
-                     * Predefined entities don't generate nodes
-                     */
-                    val = xml_strndup(q, cur.offset_from(q) as _);
-                    ent = xml_get_doc_entity(doc, val);
-                    if ent.is_null()
-                        && matches!(
-                            (*ent).etype,
-                            Some(XmlEntityType::XmlInternalPredefinedEntity)
-                        )
-                    {
-                        if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
-                            // goto out;
-                            xml_buf_free(buf);
-                            if !val.is_null() {
-                                xml_free(val as _);
-                            }
-                            if !head.is_null() {
-                                xml_free_node_list(head);
-                            }
-                            return ret;
-                        }
-                    } else {
-                        /*
-                         * Flush buffer so far
-                         */
-                        if xml_buf_is_empty(buf) == 0 {
-                            node = xml_new_doc_text(doc, null_mut());
-                            if node.is_null() {
-                                // goto out;
-                                xml_buf_free(buf);
-                                if !val.is_null() {
-                                    xml_free(val as _);
-                                }
-                                if !head.is_null() {
-                                    xml_free_node_list(head);
-                                }
-                                return ret;
-                            }
-                            (*node).content = xml_buf_detach(buf);
-
-                            if last.is_null() {
-                                last = node;
-                                head = node;
-                            } else {
-                                last = (*last).add_next_sibling(node);
-                            }
-                        }
-
-                        /*
-                         * Create a new REFERENCE_REF node
-                         */
-                        node = xml_new_reference(doc, val);
-                        if node.is_null() {
-                            // goto out;
-                            xml_buf_free(buf);
-                            if !val.is_null() {
-                                xml_free(val as _);
-                            }
-                            if !head.is_null() {
-                                xml_free_node_list(head);
-                            }
-                            return ret;
-                        }
-                        if !ent.is_null()
-                            && (((*ent).flags & XML_ENT_PARSED as i32) == 0)
-                            && (((*ent).flags & XML_ENT_EXPANDING as i32) == 0)
-                        {
-                            let mut temp: XmlNodePtr;
-
-                            /*
-                             * The entity should have been checked already,
-                             * but set the flag anyway to avoid recursion.
-                             */
-                            (*ent).flags |= XML_ENT_EXPANDING as i32;
-                            (*ent).children.store(
-                                xml_string_get_node_list(doc, (*node).content),
-                                Ordering::Relaxed,
-                            );
-                            (*ent).owner = 1;
-                            (*ent).flags &= !XML_ENT_EXPANDING as i32;
-                            (*ent).flags |= XML_ENT_PARSED as i32;
-                            temp = (*ent).children.load(Ordering::Relaxed);
-                            while !temp.is_null() {
-                                (*temp).parent = ent as _;
-                                (*ent).last.store(temp, Ordering::Relaxed);
-                                temp = (*temp).next;
-                            }
-                        }
-                        if last.is_null() {
-                            last = node;
-                            head = node
-                        } else {
-                            last = (*last).add_next_sibling(node);
-                        }
-                    }
-                    xml_free(val as _);
-                    val = null_mut();
-                }
-                cur = cur.add(1);
-                q = cur;
-            }
-            if charval != 0 {
-                let mut buffer: [XmlChar; 10] = [0; 10];
-
-                let len: i32 = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
-                buffer[len as usize] = 0;
-
-                if xml_buf_cat(buf, buffer.as_ptr() as _) != 0 {
-                    // goto out;
-                    xml_buf_free(buf);
-                    if !val.is_null() {
-                        xml_free(val as _);
-                    }
-                    if !head.is_null() {
-                        xml_free_node_list(head);
-                    }
-                    return ret;
-                }
-                // charval = 0;
-            }
-        } else {
-            cur = cur.add(1);
-        }
-    }
-    if cur != q || head.is_null() {
-        /*
-         * Handle the last piece of text.
-         */
-        xml_buf_add(buf, q, cur.offset_from(q) as _);
-    }
-
-    if xml_buf_is_empty(buf) == 0 {
-        node = xml_new_doc_text(doc, null_mut());
-        if node.is_null() {
-            // goto out;
-            xml_buf_free(buf);
-            if !val.is_null() {
-                xml_free(val as _);
-            }
-            if !head.is_null() {
-                xml_free_node_list(head);
-            }
-            return ret;
-        }
-        (*node).content = xml_buf_detach(buf);
-
-        if last.is_null() {
-            head = node;
-        } else {
-            (*last).add_next_sibling(node);
-        }
-    }
-
-    ret = head;
-    head = null_mut();
-
-    // out:
-    xml_buf_free(buf);
-    if !val.is_null() {
-        xml_free(val as _);
-    }
-    if !head.is_null() {
-        xml_free_node_list(head);
-    }
-    ret
-}
-
-/**
  * xmlStringLenGetNodeList:
  * @doc:  the document
  * @value:  the value of the text
@@ -3977,8 +3698,8 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
                             xml_buf_free(buf);
                             return ret;
                         } else if !ent.is_null()
-                            && (((*ent).flags & XML_ENT_PARSED as i32) == 0)
-                            && (((*ent).flags & XML_ENT_EXPANDING as i32) == 0)
+                            && (*ent).flags & XML_ENT_PARSED as i32 == 0
+                            && (*ent).flags & XML_ENT_EXPANDING as i32 == 0
                         {
                             let mut temp: XmlNodePtr;
 
@@ -3988,7 +3709,7 @@ pub unsafe extern "C" fn xml_string_len_get_node_list(
                              */
                             (*ent).flags |= XML_ENT_EXPANDING as i32;
                             (*ent).children.store(
-                                xml_string_get_node_list(doc, (*node).content as _),
+                                (*doc).get_node_list((*node).content as _),
                                 Ordering::Relaxed,
                             );
                             (*ent).owner = 1;
@@ -9062,39 +8783,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlSplitQName3()");
                         eprint!(" {}", n_name);
                         eprintln!(" {}", n_len);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_string_get_node_list() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_const_xml_doc_ptr(n_doc, 0);
-                    let value = gen_const_xml_char_ptr(n_value, 1);
-
-                    let ret_val = xml_string_get_node_list(doc, value);
-                    desret_xml_node_ptr(ret_val);
-                    des_const_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_value, value, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlStringGetNodeList",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlStringGetNodeList()"
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_value);
                     }
                 }
             }

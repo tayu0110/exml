@@ -15,7 +15,7 @@ use crate::{
             xml_strncat_new, xml_strncmp, XmlChar,
         },
     },
-    tree::{xml_free_node_list, xml_string_get_node_list, XmlAttributePtr},
+    tree::{xml_free_node_list, XmlAttributePtr},
 };
 
 use super::{
@@ -1623,7 +1623,11 @@ impl XmlNode {
                 if !self.children.is_null() {
                     xml_free_node_list(self.children);
                 }
-                self.children = xml_string_get_node_list(self.doc, content);
+                self.children = if self.doc.is_null() {
+                    null_mut()
+                } else {
+                    (*self.doc).get_node_list(content)
+                };
                 let mut ulccur: XmlNodePtr = self.children;
                 if ulccur.is_null() {
                     self.last = null_mut();
