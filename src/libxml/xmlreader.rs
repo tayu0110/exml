@@ -3904,11 +3904,14 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
     } else {
         ns = (*reader.node).search_ns((*reader.node).doc, prefix);
         if !ns.is_null() {
+            let href = (*ns).href.load(Ordering::Relaxed);
             ret = (*reader.node).get_ns_prop(
                 CStr::from_ptr(localname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*ns).href.load(Ordering::Relaxed),
+                (!href.is_null())
+                    .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+                    .as_deref(),
             );
         }
     }
@@ -3981,7 +3984,9 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
         CStr::from_ptr(local_name as *const i8)
             .to_string_lossy()
             .as_ref(),
-        namespace_uri,
+        (!namespace_uri.is_null())
+            .then(|| CStr::from_ptr(namespace_uri as *const i8).to_string_lossy())
+            .as_deref(),
     )
 }
 

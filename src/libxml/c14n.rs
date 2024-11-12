@@ -1419,7 +1419,9 @@ unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
     while !cur.is_null() && xml_c14n_is_visible!(ctx, cur, (*cur).parent) == 0 {
         res = (*cur).has_ns_prop(
             CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-            ns,
+            (!ns.is_null())
+                .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
+                .as_deref(),
         );
         if !res.is_null() {
             return res;
@@ -1469,7 +1471,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     /* go up the stack until we find a node that we rendered already */
     cur = (*(*xml_base_attr).parent).parent;
     while !cur.is_null() && xml_c14n_is_visible!(ctx, cur, (*cur).parent) == 0 {
-        attr = (*cur).has_ns_prop("base", XML_XML_NAMESPACE.as_ptr() as _);
+        attr = (*cur).has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
         if !attr.is_null() {
             /* get attr value */
             tmp_str = if (*attr).children.is_null() {

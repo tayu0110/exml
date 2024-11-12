@@ -135,14 +135,17 @@ pub trait NodeCommon {
                         CStr::from_ptr((*cur).name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                        null_mut(),
+                        None,
                     )
                 } else {
+                    let href = (*(*cur).ns).href.load(Ordering::Relaxed);
                     (*(self as *mut Self as *mut XmlNode)).has_ns_prop(
                         CStr::from_ptr((*cur).name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                        (*(*cur).ns).href.load(Ordering::Relaxed),
+                        (!href.is_null())
+                            .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+                            .as_deref(),
                     )
                 };
                 if !lastattr.is_null()
@@ -774,7 +777,7 @@ impl XmlNode {
                 return xml_strdup((*ent).uri.load(Ordering::Relaxed));
             }
             if matches!((*cur).typ, XmlElementType::XmlElementNode) {
-                base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.as_ptr() as _);
+                base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
                 if !base.is_null() {
                     if !oldbase.is_null() {
                         newbase = xml_build_uri(oldbase, base);
@@ -1062,7 +1065,7 @@ impl XmlNode {
     unsafe fn get_prop_node_internal(
         &self,
         name: &str,
-        ns_name: *const XmlChar,
+        ns_name: Option<&str>,
         use_dtd: i32,
     ) -> XmlAttrPtr {
         let mut prop: XmlAttrPtr;
@@ -1074,13 +1077,17 @@ impl XmlNode {
         let name = CString::new(name).unwrap();
         if !self.properties.is_null() {
             prop = self.properties;
-            if ns_name.is_null() {
-                /*
-                 * We want the attr to be in no namespace.
-                 */
+            if let Some(ns_name) = ns_name {
+                // We want the attr to be in the specified namespace.
+                let ns_name = CString::new(ns_name).unwrap();
                 while {
-                    if (*prop).ns.is_null()
+                    if !(*prop).ns.is_null()
                         && xml_str_equal((*prop).name, name.as_ptr() as *const u8)
+                        && ((*(*prop).ns).href.load(Ordering::Relaxed) == ns_name.as_ptr() as _
+                            || xml_str_equal(
+                                (*(*prop).ns).href.load(Ordering::Relaxed),
+                                ns_name.as_ptr() as *const u8,
+                            ))
                     {
                         return prop;
                     }
@@ -1088,14 +1095,10 @@ impl XmlNode {
                     !prop.is_null()
                 } {}
             } else {
-                /*
-                 * We want the attr to be in the specified namespace.
-                 */
+                // We want the attr to be in no namespace.
                 while {
-                    if !(*prop).ns.is_null()
+                    if (*prop).ns.is_null()
                         && xml_str_equal((*prop).name, name.as_ptr() as *const u8)
-                        && ((*(*prop).ns).href.load(Ordering::Relaxed) == ns_name as _
-                            || xml_str_equal((*(*prop).ns).href.load(Ordering::Relaxed), ns_name))
                     {
                         return prop;
                     }
@@ -1134,7 +1137,70 @@ impl XmlNode {
                 } else {
                     elem_qname = self.name as _;
                 }
-                if ns_name.is_null() {
+                if let Some(ns_name) = ns_name {
+                    if ns_name == XML_XML_NAMESPACE.to_string_lossy() {
+                        /*
+                         * The XML namespace must be bound to prefix 'xml'.
+                         */
+                        attr_decl = xml_get_dtd_qattr_desc(
+                            (*doc).int_subset,
+                            elem_qname,
+                            name.as_ptr() as *const u8,
+                            c"xml".as_ptr() as _,
+                        );
+                        if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
+                            attr_decl = xml_get_dtd_qattr_desc(
+                                (*doc).ext_subset,
+                                elem_qname,
+                                name.as_ptr() as *const u8,
+                                c"xml".as_ptr() as _,
+                            );
+                        }
+                    } else {
+                        /*
+                         * The ugly case: Search using the prefixes of in-scope
+                         * ns-decls corresponding to @nsName.
+                         */
+                        let ns_list: *mut XmlNsPtr = self.get_ns_list(self.doc);
+                        if ns_list.is_null() {
+                            if !tmpstr.is_null() {
+                                xml_free(tmpstr as _);
+                            }
+                            return null_mut();
+                        }
+                        let mut cur = ns_list;
+                        let ns_name = CString::new(ns_name).unwrap();
+                        while !(*cur).is_null() {
+                            if xml_str_equal(
+                                (*(*cur)).href.load(Ordering::Relaxed),
+                                ns_name.as_ptr() as *const u8,
+                            ) {
+                                attr_decl = xml_get_dtd_qattr_desc(
+                                    (*doc).int_subset,
+                                    elem_qname,
+                                    name.as_ptr() as *const u8,
+                                    (*(*cur)).prefix.load(Ordering::Relaxed),
+                                );
+                                if !attr_decl.is_null() {
+                                    break;
+                                }
+                                if !(*doc).ext_subset.is_null() {
+                                    attr_decl = xml_get_dtd_qattr_desc(
+                                        (*doc).ext_subset,
+                                        elem_qname,
+                                        name.as_ptr() as *const u8,
+                                        (*(*cur)).prefix.load(Ordering::Relaxed),
+                                    );
+                                    if !attr_decl.is_null() {
+                                        break;
+                                    }
+                                }
+                            }
+                            cur = cur.add(1);
+                        }
+                        xml_free(ns_list as _);
+                    }
+                } else {
                     /*
                      * The common and nice case: Attr in no namespace.
                      */
@@ -1152,65 +1218,6 @@ impl XmlNode {
                             null_mut(),
                         );
                     }
-                } else if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
-                    /*
-                     * The XML namespace must be bound to prefix 'xml'.
-                     */
-                    attr_decl = xml_get_dtd_qattr_desc(
-                        (*doc).int_subset,
-                        elem_qname,
-                        name.as_ptr() as *const u8,
-                        c"xml".as_ptr() as _,
-                    );
-                    if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                        attr_decl = xml_get_dtd_qattr_desc(
-                            (*doc).ext_subset,
-                            elem_qname,
-                            name.as_ptr() as *const u8,
-                            c"xml".as_ptr() as _,
-                        );
-                    }
-                } else {
-                    let mut cur: *mut XmlNsPtr;
-
-                    /*
-                     * The ugly case: Search using the prefixes of in-scope
-                     * ns-decls corresponding to @nsName.
-                     */
-                    let ns_list: *mut XmlNsPtr = self.get_ns_list(self.doc);
-                    if ns_list.is_null() {
-                        if !tmpstr.is_null() {
-                            xml_free(tmpstr as _);
-                        }
-                        return null_mut();
-                    }
-                    cur = ns_list;
-                    while !(*cur).is_null() {
-                        if xml_str_equal((*(*cur)).href.load(Ordering::Relaxed), ns_name) {
-                            attr_decl = xml_get_dtd_qattr_desc(
-                                (*doc).int_subset,
-                                elem_qname,
-                                name.as_ptr() as *const u8,
-                                (*(*cur)).prefix.load(Ordering::Relaxed),
-                            );
-                            if !attr_decl.is_null() {
-                                break;
-                            }
-                            if !(*doc).ext_subset.is_null() {
-                                attr_decl = xml_get_dtd_qattr_desc(
-                                    (*doc).ext_subset,
-                                    elem_qname,
-                                    name.as_ptr() as *const u8,
-                                    (*(*cur)).prefix.load(Ordering::Relaxed),
-                                );
-                                if !attr_decl.is_null() {
-                                    break;
-                                }
-                            }
-                        }
-                        cur = cur.add(1);
-                    }
-                    xml_free(ns_list as _);
                 }
                 if !tmpstr.is_null() {
                     xml_free(tmpstr as _);
@@ -1260,7 +1267,7 @@ impl XmlNode {
     /// Returns the attribute value or NULL if not found.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetNsProp")]
-    pub unsafe fn get_ns_prop(&self, name: &str, name_space: *const XmlChar) -> *mut XmlChar {
+    pub unsafe fn get_ns_prop(&self, name: &str, name_space: Option<&str>) -> *mut XmlChar {
         let prop =
             self.get_prop_node_internal(name, name_space, XML_CHECK_DTD.load(Ordering::Relaxed));
         if prop.is_null() {
@@ -1282,8 +1289,7 @@ impl XmlNode {
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetNoNsProp")]
     pub unsafe fn get_no_ns_prop(&self, name: &str) -> *mut XmlChar {
-        let prop =
-            self.get_prop_node_internal(name, null_mut(), XML_CHECK_DTD.load(Ordering::Relaxed));
+        let prop = self.get_prop_node_internal(name, None, XML_CHECK_DTD.load(Ordering::Relaxed));
         if prop.is_null() {
             return null_mut();
         }
@@ -1362,7 +1368,7 @@ impl XmlNode {
         }
         let mut cur = self as *const XmlNode;
         while !cur.is_null() {
-            let lang = (*cur).get_ns_prop("lang", XML_XML_NAMESPACE.as_ptr() as _);
+            let lang = (*cur).get_ns_prop("lang", XML_XML_NAMESPACE.to_str().ok());
             if !lang.is_null() {
                 return lang;
             }
@@ -1384,7 +1390,7 @@ impl XmlNode {
         }
         let mut cur = self as *const XmlNode;
         while !cur.is_null() {
-            space = (*cur).get_ns_prop("space", XML_XML_NAMESPACE.as_ptr() as _);
+            space = (*cur).get_ns_prop("space", XML_XML_NAMESPACE.to_str().ok());
             if !space.is_null() {
                 if xml_str_equal(space, c"preserve".as_ptr() as _) {
                     xml_free(space as _);
@@ -1657,7 +1663,7 @@ impl XmlNode {
     #[doc(alias = "xmlUnsetProp")]
     #[cfg(any(feature = "tree", feature = "schema"))]
     pub unsafe fn unset_prop(&mut self, name: &str) -> i32 {
-        let prop: XmlAttrPtr = self.get_prop_node_internal(name, null_mut(), 0);
+        let prop: XmlAttrPtr = self.get_prop_node_internal(name, None, 0);
         if prop.is_null() {
             return -1;
         }
@@ -1691,13 +1697,16 @@ impl XmlNode {
         if !ns.is_null() && (*ns).href.load(Ordering::Relaxed).is_null() {
             return null_mut();
         }
+        let href = if !ns.is_null() {
+            (*ns).href.load(Ordering::Relaxed) as *const i8
+        } else {
+            null_mut()
+        };
         let prop = self.get_prop_node_internal(
             name,
-            if !ns.is_null() {
-                (*ns).href.load(Ordering::Relaxed)
-            } else {
-                null_mut()
-            },
+            (!href.is_null())
+                .then(|| CStr::from_ptr(href).to_string_lossy())
+                .as_deref(),
             0,
         );
         if !prop.is_null() {
@@ -1746,13 +1755,16 @@ impl XmlNode {
     #[doc(alias = "xmlUnsetNsProp")]
     #[cfg(any(feature = "tree", feature = "schema"))]
     pub unsafe fn unset_ns_prop(&mut self, ns: XmlNsPtr, name: &str) -> i32 {
+        let href = if !ns.is_null() {
+            (*ns).href.load(Ordering::Relaxed) as *const i8
+        } else {
+            null_mut()
+        };
         let prop: XmlAttrPtr = self.get_prop_node_internal(
             name,
-            if !ns.is_null() {
-                (*ns).href.load(Ordering::Relaxed)
-            } else {
-                null_mut()
-            },
+            (!href.is_null())
+                .then(|| CStr::from_ptr(href).to_string_lossy())
+                .as_deref(),
             0,
         );
         if prop.is_null() {
@@ -2214,7 +2226,7 @@ impl XmlNode {
     ///
     /// Returns the attribute or the attribute declaration or NULL if neither was found.
     #[doc(alias = "xmlHasNsProp")]
-    pub unsafe fn has_ns_prop(&self, name: &str, namespace: *const XmlChar) -> XmlAttrPtr {
+    pub unsafe fn has_ns_prop(&self, name: &str, namespace: Option<&str>) -> XmlAttrPtr {
         self.get_prop_node_internal(name, namespace, XML_CHECK_DTD.load(Ordering::Relaxed))
     }
 
@@ -3199,14 +3211,17 @@ unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) 
             CStr::from_ptr((*prop).name as *const i8)
                 .to_string_lossy()
                 .as_ref(),
-            null_mut(),
+            None,
         )
     } else {
+        let href = (*(*prop).ns).href.load(Ordering::Relaxed);
         (*(*cur).parent).has_ns_prop(
             CStr::from_ptr((*prop).name as *const i8)
                 .to_string_lossy()
                 .as_ref(),
-            (*(*prop).ns).href.load(Ordering::Relaxed),
+            (!href.is_null())
+                .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+                .as_deref(),
         )
     };
 

@@ -400,14 +400,13 @@ unsafe extern "C" fn xml_xinclude_get_prop(
     cur: XmlNodePtr,
     name: *const XmlChar,
 ) -> *mut XmlChar {
-    let mut ret: *mut XmlChar;
-
-    ret = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), name);
+    let cname = (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy());
+    let mut ret = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), cname.as_deref());
     if !ret.is_null() {
         return ret;
     }
     if (*ctxt).legacy != 0 {
-        ret = (*cur).get_ns_prop(XINCLUDE_OLD_NS.to_string_lossy().as_ref(), name);
+        ret = (*cur).get_ns_prop(XINCLUDE_OLD_NS.to_string_lossy().as_ref(), cname.as_deref());
         if !ret.is_null() {
             return ret;
         }
@@ -1959,7 +1958,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
              * The base is only adjusted if "necessary", i.e. if the xinclude node
              * has a base specified, or the URL is relative
              */
-            base = (*(*refe).elem).get_ns_prop("base", XML_XML_NAMESPACE.as_ptr() as _);
+            base = (*(*refe).elem).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
             if base.is_null() {
                 /*
                  * No xml:base on the xinclude node, so we check whether the
@@ -2015,7 +2014,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                  */
 
                                 let xml_base: *mut XmlChar =
-                                    (*node).get_ns_prop("base", XML_XML_NAMESPACE.as_ptr() as _);
+                                    (*node).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
                                 if !xml_base.is_null() {
                                     let rel_base: *mut XmlChar = xml_build_uri(xml_base, base);
                                     if rel_base.is_null() {

@@ -1427,7 +1427,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             pref = prefer;
         }
         prop = (*cur).get_prop(c"id".as_ptr() as _);
-        base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.as_ptr() as _);
+        base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
         entry = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataGroup,
             prop,
