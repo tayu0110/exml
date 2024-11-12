@@ -22178,9 +22178,9 @@ unsafe extern "C" fn xml_schema_check_elem_props_correct(
         }
         if !(*elem_decl).node.is_null() {
             if (*elem_decl).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
-                node = (*(*elem_decl).node).has_prop(c"fixed".as_ptr() as _) as XmlNodePtr;
+                node = (*(*elem_decl).node).has_prop("fixed") as XmlNodePtr;
             } else {
-                node = (*(*elem_decl).node).has_prop(c"default".as_ptr() as _) as XmlNodePtr;
+                node = (*(*elem_decl).node).has_prop("default") as XmlNodePtr;
             }
         }
         let vcret: i32 = xml_schema_parse_check_cos_valid_default(

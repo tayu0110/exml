@@ -765,7 +765,7 @@ impl XmlNode {
                     continue;
                 }
                 if xml_strcasecmp((*cur).name, c"base".as_ptr() as _) == 0 {
-                    return (*cur).get_prop(c"href".as_ptr() as _);
+                    return (*cur).get_prop("href");
                 }
                 cur = (*cur).next;
             }
@@ -1247,7 +1247,7 @@ impl XmlNode {
     /// Returns the attribute value or NULL if not found.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetProp")]
-    pub unsafe fn get_prop(&self, name: *const XmlChar) -> *mut XmlChar {
+    pub unsafe fn get_prop(&self, name: &str) -> *mut XmlChar {
         let prop: XmlAttrPtr = self.has_prop(name);
         if prop.is_null() {
             return null_mut();
@@ -2178,16 +2178,15 @@ impl XmlNode {
     ///
     /// Returns the attribute or the attribute declaration or NULL if neither was found.
     #[doc(alias = "xmlHasProp")]
-    pub unsafe fn has_prop(&self, name: *const XmlChar) -> XmlAttrPtr {
-        if !matches!(self.typ, XmlElementType::XmlElementNode) || name.is_null() {
+    pub unsafe fn has_prop(&self, name: &str) -> XmlAttrPtr {
+        if !matches!(self.typ, XmlElementType::XmlElementNode) {
             return null_mut();
         }
-        /*
-         * Check on the properties attached to the node
-         */
+        // Check on the properties attached to the node
+        let name = CString::new(name).unwrap();
         let mut prop = self.properties;
         while !prop.is_null() {
-            if xml_str_equal((*prop).name, name) {
+            if xml_str_equal((*prop).name, name.as_ptr() as *const u8) {
                 return prop;
             }
             prop = (*prop).next;
@@ -2196,15 +2195,14 @@ impl XmlNode {
             return null_mut();
         }
 
-        /*
-         * Check if there is a default declaration in the internal
-         * or external subsets
-         */
+        // Check if there is a default declaration in the internal or external subsets
         let doc = self.doc;
         if !doc.is_null() && !(*doc).int_subset.is_null() {
-            let mut attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, self.name, name);
+            let mut attr_decl =
+                xml_get_dtd_attr_desc((*doc).int_subset, self.name, name.as_ptr() as *const u8);
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, self.name, name);
+                attr_decl =
+                    xml_get_dtd_attr_desc((*doc).ext_subset, self.name, name.as_ptr() as *const u8);
             }
             if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
                 // return attribute declaration only if a default value is given

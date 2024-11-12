@@ -1218,8 +1218,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     tmp = (*cur).children;
                     while !tmp.is_null() {
                         if xml_str_equal((*tmp).name, c"meta".as_ptr() as _) {
-                            let httpequiv: *mut XmlChar =
-                                (*tmp).get_prop(c"http-equiv".as_ptr() as _);
+                            let httpequiv: *mut XmlChar = (*tmp).get_prop("http-equiv");
                             if !httpequiv.is_null() {
                                 if xml_strcasecmp(httpequiv, c"Content-Type".as_ptr() as _) == 0 {
                                     xml_free(httpequiv as _);

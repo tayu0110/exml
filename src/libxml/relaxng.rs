@@ -3348,7 +3348,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
      */
     if !ns.is_null() {
         root = (*doc).get_root_element();
-        if !root.is_null() && (*root).has_prop(c"ns".as_ptr() as _).is_null() {
+        if !root.is_null() && (*root).has_prop("ns").is_null() {
             (*root).set_prop("ns", ns);
         }
     }
@@ -3528,7 +3528,7 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
             (*tmp).unlink();
             xml_free_node(tmp);
         } else if !name.is_null() && IS_RELAXNG!(tmp, c"define".as_ptr() as _) {
-            name2 = (*tmp).get_prop(c"name".as_ptr() as _);
+            name2 = (*tmp).get_prop("name");
             xml_relaxng_norm_ext_space(name2);
             if !name2.is_null() {
                 if xml_str_equal(name, name2) {
@@ -3638,7 +3638,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
      */
     if !ns.is_null() {
         root = (*doc).get_root_element();
-        if !root.is_null() && (*root).has_prop(c"ns".as_ptr() as _).is_null() {
+        if !root.is_null() && (*root).has_prop("ns").is_null() {
             (*root).set_prop("ns", ns);
         }
     }
@@ -3710,7 +3710,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
                 );
             }
         } else if IS_RELAXNG!(cur, c"define".as_ptr() as _) {
-            let name: *mut XmlChar = (*cur).get_prop(c"name".as_ptr() as _);
+            let name: *mut XmlChar = (*cur).get_prop("name");
             if name.is_null() {
                 xml_rng_perr(
                     ctxt,
@@ -3811,18 +3811,18 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         let mut ns: *mut XmlChar;
                         let mut tmp: XmlNodePtr;
 
-                        ns = (*cur).get_prop(c"ns".as_ptr() as _);
+                        ns = (*cur).get_prop("ns");
                         if ns.is_null() {
                             tmp = (*cur).parent;
                             while !tmp.is_null() && (*tmp).typ == XmlElementType::XmlElementNode {
-                                ns = (*tmp).get_prop(c"ns".as_ptr() as _);
+                                ns = (*tmp).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
                                 }
                                 tmp = (*tmp).parent;
                             }
                         }
-                        let href: *mut XmlChar = (*cur).get_prop(c"href".as_ptr() as _);
+                        let href: *mut XmlChar = (*cur).get_prop("href");
                         if href.is_null() {
                             xml_rng_perr(
                                 ctxt,
@@ -3934,7 +3934,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         let mut ns: *mut XmlChar;
                         let mut tmp: XmlNodePtr;
 
-                        let href: *mut XmlChar = (*cur).get_prop(c"href".as_ptr() as _);
+                        let href: *mut XmlChar = (*cur).get_prop("href");
                         if href.is_null() {
                             xml_rng_perr(
                                 ctxt,
@@ -3973,11 +3973,11 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         if !base.is_null() {
                             xml_free(base as _);
                         }
-                        ns = (*cur).get_prop(c"ns".as_ptr() as _);
+                        ns = (*cur).get_prop("ns");
                         if ns.is_null() {
                             tmp = (*cur).parent;
                             while !tmp.is_null() && (*tmp).typ == XmlElementType::XmlElementNode {
-                                ns = (*tmp).get_prop(c"ns".as_ptr() as _);
+                                ns = (*tmp).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
                                 }
@@ -4014,7 +4014,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                          * Simplification 4.8. name attribute of element
                          * and attribute elements
                          */
-                        let name: *mut XmlChar = (*cur).get_prop(c"name".as_ptr() as _);
+                        let name: *mut XmlChar = (*cur).get_prop("name");
                         if !name.is_null() {
                             if (*cur).children.is_null() {
                                 text = xml_new_child(cur, (*cur).ns, c"name".as_ptr() as _, name);
@@ -4044,7 +4044,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             }
                             (*cur).unset_prop("name");
                             xml_free(name as _);
-                            ns = (*cur).get_prop(c"ns".as_ptr() as *const u8);
+                            ns = (*cur).get_prop("ns");
                             if !ns.is_null() {
                                 if !text.is_null() {
                                     (*text).set_prop("ns", ns);
@@ -4063,13 +4063,13 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                          * Simplification 4.8. name attribute of element
                          * and attribute elements
                          */
-                        if (*cur).has_prop(c"ns".as_ptr() as _).is_null() {
+                        if (*cur).has_prop("ns").is_null() {
                             let mut node: XmlNodePtr;
                             let mut ns: *mut XmlChar = null_mut();
 
                             node = (*cur).parent;
                             while !node.is_null() && (*node).typ == XmlElementType::XmlElementNode {
-                                ns = (*node).get_prop(c"ns".as_ptr() as _);
+                                ns = (*node).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
                                 }
@@ -4189,12 +4189,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                          * implements rule 4.11
                          */
 
-                        let ns: *mut XmlChar = (*cur).get_prop(c"ns".as_ptr() as _);
+                        let ns: *mut XmlChar = (*cur).get_prop("ns");
 
                         child = (*cur).children;
                         ins = cur;
                         while !child.is_null() {
-                            if !ns.is_null() && (*child).has_prop(c"ns".as_ptr() as _).is_null() {
+                            if !ns.is_null() && (*child).has_prop("ns").is_null() {
                                 (*child).set_prop("ns", ns);
                             }
                             tmp = (*child).next;
@@ -4432,7 +4432,7 @@ extern "C" fn xml_relaxng_check_combine(
         }
         cur = define;
         while !cur.is_null() {
-            combine = (*(*cur).node).get_prop(c"combine".as_ptr() as _);
+            combine = (*(*cur).node).get_prop("combine");
             if !combine.is_null() {
                 if xml_str_equal(combine, c"choice".as_ptr() as _) {
                     if choice_or_interleave == -1 {
@@ -4813,7 +4813,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
             }
         }
         (*ret).name = val;
-        val = (*node).get_prop(c"ns".as_ptr() as _);
+        val = (*node).get_prop("ns");
         (*ret).ns = val;
         if (*ctxt).flags & XML_RELAXNG_IN_ATTRIBUTE != 0
             && !val.is_null()
@@ -4854,7 +4854,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
         }
     } else if IS_RELAXNG!(node, c"nsName".as_ptr() as _) {
         (*ret).name = null_mut();
-        (*ret).ns = (*node).get_prop(c"ns".as_ptr() as _);
+        (*ret).ns = (*node).get_prop("ns");
         if (*ret).ns.is_null() {
             xml_rng_perr(
                 ctxt,
@@ -4974,7 +4974,7 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
     }
 
     if IS_RELAXNG!(node, c"data".as_ptr() as _) || IS_RELAXNG!(node, c"value".as_ptr() as _) {
-        ret = (*node).get_prop(c"datatypeLibrary".as_ptr() as _);
+        ret = (*node).get_prop("datatypeLibrary");
         if !ret.is_null() {
             if *ret.add(0) == 0 {
                 xml_free(ret as _);
@@ -4990,7 +4990,7 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
     }
     node = (*node).parent;
     while !node.is_null() && (*node).typ == XmlElementType::XmlElementNode {
-        ret = (*node).get_prop(c"datatypeLibrary".as_ptr() as _);
+        ret = (*node).get_prop("datatypeLibrary");
         if !ret.is_null() {
             if *ret.add(0) == 0 {
                 xml_free(ret as _);
@@ -5028,7 +5028,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
     let mut content: XmlNodePtr;
     let tmp: i32;
 
-    let typ: *mut XmlChar = (*node).get_prop(c"type".as_ptr() as _);
+    let typ: *mut XmlChar = (*node).get_prop("type");
     if typ.is_null() {
         xml_rng_perr(
             ctxt,
@@ -5139,7 +5139,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
             param = xml_relaxng_new_define(ctxt, node);
             if !param.is_null() {
                 (*param).typ = XmlRelaxNGType::Param;
-                (*param).name = (*content).get_prop(c"name".as_ptr() as _);
+                (*param).name = (*content).get_prop("name");
                 if (*param).name.is_null() {
                     xml_rng_perr(
                         ctxt,
@@ -5347,7 +5347,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
     }
     (*def).typ = XmlRelaxNGType::Value;
 
-    let typ: *mut XmlChar = (*node).get_prop(c"type".as_ptr() as _);
+    let typ: *mut XmlChar = (*node).get_prop("type");
     if !typ.is_null() {
         xml_relaxng_norm_ext_space(typ);
         if xml_validate_ncname(typ, 0) != 0 {
@@ -5683,11 +5683,11 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
             /*
              * ns transmission rules
              */
-            ns = (*root).get_prop(c"ns".as_ptr() as _);
+            ns = (*root).get_prop("ns");
             if ns.is_null() {
                 tmp = node;
                 while !tmp.is_null() && (*tmp).typ == XmlElementType::XmlElementNode {
-                    ns = (*tmp).get_prop(c"ns".as_ptr() as _);
+                    ns = (*tmp).get_prop("ns");
                     if !ns.is_null() {
                         break;
                     }
@@ -5881,7 +5881,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Ref;
-        (*def).name = (*node).get_prop(c"name".as_ptr() as _);
+        (*def).name = (*node).get_prop("name");
         if (*def).name.is_null() {
             xml_rng_perr(
                 ctxt,
@@ -6032,7 +6032,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Parentref;
-        (*def).name = (*node).get_prop(c"name".as_ptr() as _);
+        (*def).name = (*node).get_prop("name");
         if (*def).name.is_null() {
             xml_rng_perr(
                 ctxt,
@@ -6456,7 +6456,7 @@ unsafe extern "C" fn xml_relaxng_parse_define(
     let def: XmlRelaxNGDefinePtr;
     let olddefine: *const XmlChar;
 
-    let name: *mut XmlChar = (*node).get_prop(c"name".as_ptr() as _);
+    let name: *mut XmlChar = (*node).get_prop("name");
     if name.is_null() {
         xml_rng_perr(
             ctxt,
@@ -6722,7 +6722,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                 null_mut(),
             );
         } else {
-            combine = (*(*(*cur).node).parent).get_prop(c"combine".as_ptr() as _);
+            combine = (*(*(*cur).node).parent).get_prop("combine");
         }
 
         if !combine.is_null() {

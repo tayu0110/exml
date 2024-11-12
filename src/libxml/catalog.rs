@@ -1296,7 +1296,11 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
     let mut ret: XmlCatalogEntryPtr = null_mut();
 
     if !attr_name.is_null() {
-        name_value = (*cur).get_prop(attr_name);
+        name_value = (*cur).get_prop(
+            CStr::from_ptr(attr_name as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        );
         if name_value.is_null() {
             xml_catalog_err(
                 ret,
@@ -1310,7 +1314,11 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             ok = 0;
         }
     }
-    let uri_value: *mut XmlChar = (*cur).get_prop(uri_attr_name);
+    let uri_value: *mut XmlChar = (*cur).get_prop(
+        CStr::from_ptr(uri_attr_name as *const i8)
+            .to_string_lossy()
+            .as_ref(),
+    );
     if uri_value.is_null() {
         xml_catalog_err(
             ret,
@@ -1406,7 +1414,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
         let mut prop: *mut XmlChar;
         let mut pref: XmlCatalogPrefer = XmlCatalogPrefer::None;
 
-        prop = (*cur).get_prop(c"prefer".as_ptr() as _);
+        prop = (*cur).get_prop("prefer");
         if !prop.is_null() {
             if xml_str_equal(prop, c"system".as_ptr() as _) {
                 prefer = XmlCatalogPrefer::System;
@@ -1426,7 +1434,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             xml_free(prop as _);
             pref = prefer;
         }
-        prop = (*cur).get_prop(c"id".as_ptr() as _);
+        prop = (*cur).get_prop("id");
         base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
         entry = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataGroup,
@@ -1652,7 +1660,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
             return null_mut();
         }
 
-        prop = (*cur).get_prop(c"prefer".as_ptr() as _);
+        prop = (*cur).get_prop("prefer");
         if !prop.is_null() {
             if xml_str_equal(prop, c"system".as_ptr() as _) {
                 prefer = XmlCatalogPrefer::System;

@@ -1581,7 +1581,7 @@ macro_rules! __xml_raise_error {
                                         if inclcount > 0 {
                                             inclcount -= 1;
                                         } else {
-                                            href = (*prev).get_prop(c"href".as_ptr() as _) as *mut c_char;
+                                            href = (*prev).get_prop("href") as *mut c_char;
                                             if !href.is_null() {
                                                 break;
                                             }

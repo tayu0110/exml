@@ -308,11 +308,6 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
             XINCLUDE_OLD_NS.as_ptr() as _,
         ) && (*ctxt).legacy == 0
         {
-            // #if 0 /* wait for the XML Core Working Group to get something stable ! */
-            //         xmlXIncludeWarn(ctxt, node, XML_XINCLUDE_DEPRECATED_NS,
-            //                    c"Deprecated XInclude namespace found, use %s",
-            //                         XINCLUDE_NS);
-            // #endif
             (*ctxt).legacy = 1;
         }
         if xml_str_equal((*node).name, XINCLUDE_NODE.as_ptr() as _) {
@@ -395,18 +390,17 @@ const XINCLUDE_MAX_DEPTH: i32 = 40;
  *
  * Returns the value (to be freed) or NULL if not found
  */
-unsafe extern "C" fn xml_xinclude_get_prop(
+unsafe fn xml_xinclude_get_prop(
     ctxt: XmlXincludeCtxtPtr,
     cur: XmlNodePtr,
-    name: *const XmlChar,
+    name: &str,
 ) -> *mut XmlChar {
-    let cname = (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy());
-    let mut ret = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), cname.as_deref());
+    let mut ret = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), Some(name));
     if !ret.is_null() {
         return ret;
     }
     if (*ctxt).legacy != 0 {
-        ret = (*cur).get_ns_prop(XINCLUDE_OLD_NS.to_string_lossy().as_ref(), cname.as_deref());
+        ret = (*cur).get_ns_prop(XINCLUDE_OLD_NS.to_string_lossy().as_ref(), Some(name));
         if !ret.is_null() {
             return ret;
         }
@@ -557,14 +551,14 @@ unsafe extern "C" fn xml_xinclude_add_node(
     /*
      * read the attributes
      */
-    href = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.as_ptr() as _);
+    href = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.to_str().unwrap());
     if href.is_null() {
         href = xml_strdup(c"".as_ptr() as _); /* @@@@ href is now optional */
         if href.is_null() {
             return null_mut();
         }
     }
-    let parse: *mut XmlChar = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.as_ptr() as _);
+    let parse: *mut XmlChar = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.to_str().unwrap());
     if !parse.is_null() {
         if xml_str_equal(parse, XINCLUDE_PARSE_XML.as_ptr() as _) {
             xml = 1;
@@ -634,7 +628,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
         );
         return null_mut();
     }
-    fragment = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE_XPOINTER.as_ptr() as _);
+    fragment = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE_XPOINTER.to_str().unwrap());
 
     /*
      * Check the URL and remove any fragment identifier
@@ -2184,7 +2178,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
      * Try to get the encoding if available
      */
     if !(*refe).elem.is_null() {
-        encoding = (*(*refe).elem).get_prop(XINCLUDE_PARSE_ENCODING.as_ptr() as _);
+        encoding = (*(*refe).elem).get_prop(XINCLUDE_PARSE_ENCODING.to_str().unwrap());
     }
     if !encoding.is_null() {
         /*
@@ -2421,14 +2415,14 @@ unsafe extern "C" fn xml_xinclude_load_node(
     /*
      * read the attributes
      */
-    href = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.as_ptr() as _);
+    href = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.to_str().unwrap());
     if href.is_null() {
         href = xml_strdup(c"".as_ptr() as _); /* @@@@ href is now optional */
         if href.is_null() {
             return -1;
         }
     }
-    let parse: *mut XmlChar = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.as_ptr() as _);
+    let parse: *mut XmlChar = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.to_str().unwrap());
     if !parse.is_null() {
         if xml_str_equal(parse, XINCLUDE_PARSE_XML.as_ptr() as _) {
             xml = 1;

@@ -375,7 +375,7 @@ unsafe extern "C" fn xmlconf_test_item(
     TEST_ERRORS[0] = 0;
     NB_ERROR = 0;
     NB_FATAL = 0;
-    let id: *mut XmlChar = (*cur).get_prop(c"ID".as_ptr() as _);
+    let id: *mut XmlChar = (*cur).get_prop("ID");
     if id.is_null() {
         test_log!(logfile, "test missing ID, line {}\n", (*cur).get_line_no());
     // goto error;
@@ -420,7 +420,7 @@ unsafe extern "C" fn xmlconf_test_item(
                 return ret;
             }
         }
-        typ = (*cur).get_prop(c"TYPE".as_ptr() as _);
+        typ = (*cur).get_prop("TYPE");
         if typ.is_null() {
             test_log!(
                 logfile,
@@ -429,7 +429,7 @@ unsafe extern "C" fn xmlconf_test_item(
             );
             // goto error;
         } else {
-            uri = (*cur).get_prop(c"URI".as_ptr() as _);
+            uri = (*cur).get_prop("URI");
             if uri.is_null() {
                 test_log!(
                     logfile,
@@ -459,14 +459,14 @@ unsafe extern "C" fn xmlconf_test_item(
                     );
                     // goto error;
                 } else {
-                    version = (*cur).get_prop(c"VERSION".as_ptr() as _);
+                    version = (*cur).get_prop("VERSION");
 
-                    entities = (*cur).get_prop(c"ENTITIES".as_ptr() as _);
+                    entities = (*cur).get_prop("ENTITIES");
                     if !xml_str_equal(entities, "none".as_ptr()) {
                         options |= XmlParserOption::XmlParseDtdload as i32;
                         options |= XmlParserOption::XmlParseNoent as i32;
                     }
-                    rec = (*cur).get_prop(c"RECOMMENDATION".as_ptr() as _);
+                    rec = (*cur).get_prop("RECOMMENDATION");
                     if rec.is_null()
                         || xml_str_equal(rec, c"XML1.0".as_ptr() as _)
                         || xml_str_equal(rec, c"XML1.0-errata2e".as_ptr() as _)
@@ -557,7 +557,7 @@ unsafe extern "C" fn xmlconf_test_item(
                         }
                         return ret;
                     }
-                    edition = (*cur).get_prop(c"EDITION".as_ptr() as _);
+                    edition = (*cur).get_prop("EDITION");
                     if !edition.is_null() && xml_strchr(edition, b'5').is_null() {
                         /* test limited to all versions before 5th */
                         options |= XmlParserOption::XmlParseOld10 as i32;
@@ -747,7 +747,7 @@ unsafe extern "C" fn xmlconf_test_cases(
     let mut output: c_int = 0;
 
     if level == 1 {
-        profile = (*cur).get_prop(c"PROFILE".as_ptr() as _);
+        profile = (*cur).get_prop("PROFILE");
         if !profile.is_null() {
             output = 1;
             level += 1;
@@ -791,7 +791,7 @@ unsafe extern "C" fn xmlconf_test_suite(
 ) -> c_int {
     let mut ret: c_int = 0;
 
-    let profile: *mut XmlChar = (*cur).get_prop(c"PROFILE".as_ptr() as _);
+    let profile: *mut XmlChar = (*cur).get_prop("PROFILE");
     if !profile.is_null() {
         println!(
             "Test suite: {}",
