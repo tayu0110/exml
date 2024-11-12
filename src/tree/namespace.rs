@@ -25,11 +25,24 @@ pub type XmlNsPtr = *mut XmlNs;
 #[repr(C)]
 pub struct XmlNs {
     pub next: AtomicPtr<XmlNs>,             /* next Ns link for this node  */
-    pub(crate) typ: Option<XmlNsType>,      /* global or local */
+    pub(crate) typ: XmlNsType,              /* global or local */
     pub href: AtomicPtr<XmlChar>,           /* URL for the namespace */
     pub prefix: AtomicPtr<XmlChar>,         /* prefix for the namespace */
     pub(crate) _private: AtomicPtr<c_void>, /* application data */
     pub(crate) context: AtomicPtr<XmlDoc>,  /* normally an xmlDoc */
+}
+
+impl Default for XmlNs {
+    fn default() -> Self {
+        Self {
+            next: AtomicPtr::new(null_mut()),
+            typ: XmlNsType::XmlInvalidNode,
+            href: AtomicPtr::new(null_mut()),
+            prefix: AtomicPtr::new(null_mut()),
+            _private: AtomicPtr::new(null_mut()),
+            context: AtomicPtr::new(null_mut()),
+        }
+    }
 }
 
 /// Creation of a new Namespace. This function will refuse to create
@@ -73,7 +86,7 @@ pub unsafe fn xml_new_ns(
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNs>());
-    (*cur).typ = Some(XML_LOCAL_NAMESPACE);
+    (*cur).typ = XML_LOCAL_NAMESPACE;
 
     if !href.is_null() {
         (*cur).href = AtomicPtr::new(xml_strdup(href));

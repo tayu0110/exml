@@ -306,9 +306,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
     if cur.is_null() || buf.is_null() {
         return;
     }
-    if matches!((*cur).typ, Some(XML_LOCAL_NAMESPACE))
-        && !(*cur).href.load(Ordering::Relaxed).is_null()
-    {
+    if matches!((*cur).typ, XML_LOCAL_NAMESPACE) && !(*cur).href.load(Ordering::Relaxed).is_null() {
         if xml_str_equal((*cur).prefix.load(Ordering::Relaxed), c"xml".as_ptr() as _) {
             return;
         }

@@ -2776,7 +2776,7 @@ impl XmlNode {
                     return null_mut();
                 }
                 memset(cur as _, 0, size_of::<XmlNs>());
-                (*cur).typ = Some(XML_LOCAL_NAMESPACE);
+                (*cur).typ = XML_LOCAL_NAMESPACE;
                 (*cur).href.store(
                     xml_strdup(XML_XML_NAMESPACE.as_ptr() as _) as _,
                     Ordering::Relaxed,
@@ -2895,7 +2895,7 @@ impl XmlNode {
                     return null_mut();
                 }
                 memset(cur as _, 0, size_of::<XmlNs>());
-                (*cur).typ = Some(XML_LOCAL_NAMESPACE);
+                (*cur).typ = XML_LOCAL_NAMESPACE;
                 (*cur).href.store(
                     xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
                     Ordering::Relaxed,

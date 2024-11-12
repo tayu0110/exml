@@ -3336,7 +3336,7 @@ pub const XML_NODESET_DEFAULT: usize = 10;
  * Returns the newly created object.
  */
 pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPtr) -> XmlNodePtr {
-    if ns.is_null() || !matches!((*ns).typ, Some(XmlElementType::XmlNamespaceDecl)) {
+    if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
     if node.is_null() || matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
@@ -3352,7 +3352,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPt
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNs>());
-    (*cur).typ = Some(XmlElementType::XmlNamespaceDecl);
+    (*cur).typ = XmlElementType::XmlNamespaceDecl;
     if !(*ns).href.load(Ordering::Relaxed).is_null() {
         (*cur).href.store(
             xml_strdup((*ns).href.load(Ordering::Relaxed)),
@@ -3525,7 +3525,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_ns(
     if cur.is_null()
         || ns.is_null()
         || node.is_null()
-        || !matches!((*ns).typ, Some(XmlElementType::XmlNamespaceDecl))
+        || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl)
         || !matches!((*node).typ, XmlElementType::XmlElementNode)
     {
         return -1;
@@ -6870,7 +6870,7 @@ unsafe extern "C" fn xml_xpath_next_preceding_internal(
             if (*ns).next.load(Ordering::Relaxed).is_null()
                 || matches!(
                     (*(*ns).next.load(Ordering::Relaxed)).typ,
-                    Some(XmlElementType::XmlNamespaceDecl)
+                    XmlElementType::XmlNamespaceDecl
                 )
             {
                 return null_mut();
@@ -12025,7 +12025,7 @@ pub unsafe extern "C" fn xml_xpath_next_parent(
                 if !(*ns).next.load(Ordering::Relaxed).is_null()
                     && !matches!(
                         (*(*ns).next.load(Ordering::Relaxed)).typ,
-                        Some(XmlElementType::XmlNamespaceDecl)
+                        XmlElementType::XmlNamespaceDecl
                     )
                 {
                     return (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
@@ -12137,7 +12137,7 @@ pub unsafe extern "C" fn xml_xpath_next_following(
             if (*ns).next.load(Ordering::Relaxed).is_null()
                 || matches!(
                     (*(*ns).next.load(Ordering::Relaxed)).typ,
-                    Some(XmlElementType::XmlNamespaceDecl)
+                    XmlElementType::XmlNamespaceDecl
                 )
             {
                 return null_mut();
@@ -12171,7 +12171,7 @@ pub unsafe extern "C" fn xml_xpath_next_following(
 
 static mut XML_XPATH_XMLNAMESPACE_STRUCT: XmlNs = XmlNs {
     next: AtomicPtr::new(null_mut()),
-    typ: Some(XmlElementType::XmlNamespaceDecl),
+    typ: XmlElementType::XmlNamespaceDecl,
     href: AtomicPtr::new(XML_XML_NAMESPACE.as_ptr() as *mut u8),
     prefix: AtomicPtr::new(c"xml".as_ptr() as *mut u8),
     _private: AtomicPtr::new(null_mut()),
@@ -12343,7 +12343,7 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
             if (*ns).next.load(Ordering::Relaxed).is_null()
                 || matches!(
                     (*(*ns).next.load(Ordering::Relaxed)).typ,
-                    Some(XmlElementType::XmlNamespaceDecl)
+                    XmlElementType::XmlNamespaceDecl
                 )
             {
                 return null_mut();
@@ -12458,7 +12458,7 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
                 if !(*ns).next.load(Ordering::Relaxed).is_null()
                     && !matches!(
                         (*(*ns).next.load(Ordering::Relaxed)).typ,
-                        Some(XmlElementType::XmlNamespaceDecl)
+                        XmlElementType::XmlNamespaceDecl
                     )
                 {
                     return (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
@@ -12512,7 +12512,7 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
             if !(*ns).next.load(Ordering::Relaxed).is_null()
                 && !matches!(
                     (*(*ns).next.load(Ordering::Relaxed)).typ,
-                    Some(XmlElementType::XmlNamespaceDecl)
+                    XmlElementType::XmlNamespaceDecl
                 )
             {
                 return (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
@@ -13909,14 +13909,14 @@ pub unsafe extern "C" fn xml_xpath_boolean_function(ctxt: XmlXPathParserContextP
  */
 #[cfg(feature = "xpath")]
 pub(crate) unsafe extern "C" fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
-    if ns.is_null() || !matches!((*ns).typ, Some(XmlElementType::XmlNamespaceDecl)) {
+    if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return;
     }
 
     if !(*ns).next.load(Ordering::Relaxed).is_null()
         && !matches!(
             (*(*ns).next.load(Ordering::Relaxed)).typ,
-            Some(XmlElementType::XmlNamespaceDecl)
+            XmlElementType::XmlNamespaceDecl
         )
     {
         if !(*ns).href.load(Ordering::Relaxed).is_null() {

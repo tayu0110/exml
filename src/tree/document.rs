@@ -736,7 +736,7 @@ impl XmlDoc {
                 return null_mut();
             }
             memset(ns as _, 0, size_of::<XmlNs>());
-            (*ns).typ = Some(XML_LOCAL_NAMESPACE);
+            (*ns).typ = XML_LOCAL_NAMESPACE;
             (*ns).href.store(
                 xml_strdup(XML_XML_NAMESPACE.as_ptr() as _) as _,
                 Ordering::Relaxed,

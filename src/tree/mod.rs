@@ -1363,7 +1363,7 @@ unsafe extern "C" fn xml_new_reconciled_ns(
     if tree.is_null() || !matches!((*tree).typ, XmlElementType::XmlElementNode) {
         return null_mut();
     }
-    if ns.is_null() || !matches!((*ns).typ, Some(XmlElementType::XmlNamespaceDecl)) {
+    if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
     /*
@@ -3333,7 +3333,7 @@ pub unsafe extern "C" fn xml_copy_namespace(cur: XmlNsPtr) -> XmlNsPtr {
     }
 
     match (*cur).typ {
-        Some(XML_LOCAL_NAMESPACE) => xml_new_ns(
+        XML_LOCAL_NAMESPACE => xml_new_ns(
             null_mut(),
             (*cur).href.load(Ordering::Relaxed),
             (*cur).prefix.load(Ordering::Relaxed),
@@ -6073,7 +6073,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                     return -1;
                                 }
                                 memset(clone_ns as _, 0, size_of::<XmlNs>());
-                                (*clone_ns).typ = Some(XML_LOCAL_NAMESPACE);
+                                (*clone_ns).typ = XML_LOCAL_NAMESPACE;
 
                                 if !(*ns).href.load(Ordering::Relaxed).is_null() {
                                     (*clone_ns).href.store(

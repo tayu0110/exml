@@ -981,7 +981,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
         }
         return;
     }
-    if (*ns).typ != Some(XmlElementType::XmlNamespaceDecl) {
+    if (*ns).typ != XmlElementType::XmlNamespaceDecl {
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNotNsDecl,
