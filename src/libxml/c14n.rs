@@ -23,8 +23,8 @@ use crate::{
     },
     private::buf::xml_buf_write_quoted_string,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, xml_node_list_get_string, XmlAttrPtr, XmlDocPtr,
-        XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_new_ns_prop, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
+        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -1451,7 +1451,11 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     }
 
     /* start from current value */
-    let mut res: *mut XmlChar = xml_node_list_get_string((*ctx).doc, (*xml_base_attr).children, 1);
+    let mut res: *mut XmlChar = if (*xml_base_attr).children.is_null() {
+        null_mut()
+    } else {
+        (*(*xml_base_attr).children).get_string((*ctx).doc, 1)
+    };
     if res.is_null() {
         xml_c14n_err_internal(
             c"processing xml:base attribute - can't get attr value".as_ptr() as _,
@@ -1465,7 +1469,11 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
         attr = (*cur).has_ns_prop(c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
         if !attr.is_null() {
             /* get attr value */
-            tmp_str = xml_node_list_get_string((*ctx).doc, (*attr).children, 1);
+            tmp_str = if (*attr).children.is_null() {
+                null_mut()
+            } else {
+                (*(*attr).children).get_string((*ctx).doc, 1)
+            };
             if tmp_str.is_null() {
                 xml_free(res as _);
 
@@ -1743,7 +1751,11 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
         (*(*ctx).buf).write_str(CStr::from_ptr((*attr).name as _).to_string_lossy().as_ref());
         (*(*ctx).buf).write_str("=\"");
 
-        let value: *mut XmlChar = xml_node_list_get_string((*ctx).doc, (*attr).children, 1);
+        let value: *mut XmlChar = if (*attr).children.is_null() {
+            null_mut()
+        } else {
+            (*(*attr).children).get_string((*ctx).doc, 1)
+        };
         /* todo: should we log an error if value==NULL ? */
         if !value.is_null() {
             buffer = xml_c11n_normalize_attr(value);

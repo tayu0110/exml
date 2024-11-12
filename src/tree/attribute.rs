@@ -11,9 +11,9 @@ use crate::{
 };
 
 use super::{
-    xml_free_prop, xml_new_prop_internal, xml_node_list_get_string, xml_tree_err_memory,
-    NodeCommon, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
-    XmlNodePtr, XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    xml_free_prop, xml_new_prop_internal, xml_tree_err_memory, NodeCommon, XmlAttributePtr,
+    XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+    __XML_REGISTER_CALLBACKS,
 };
 
 /// An attribute on an XML node.
@@ -87,7 +87,7 @@ impl XmlAttr {
                      */
                     return xml_strdup((*self.children).content);
                 } else {
-                    let ret: *mut XmlChar = xml_node_list_get_string(self.doc, self.children, 1);
+                    let ret: *mut XmlChar = (*self.children).get_string(self.doc, 1);
                     if !ret.is_null() {
                         return ret;
                     }

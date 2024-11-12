@@ -55,8 +55,8 @@ use crate::{
     },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
-        xml_new_doc_text, xml_node_list_get_string, xml_split_qname2, xml_validate_ncname,
-        NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_new_doc_text, xml_split_qname2, xml_validate_ncname, NodeCommon, XmlAttrPtr, XmlDocPtr,
+        XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -3144,7 +3144,11 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
             } else if xml_str_equal((*cur).name, c"datatypeLibrary".as_ptr() as _) {
                 let uri: XmlURIPtr;
 
-                let val: *mut XmlChar = xml_node_list_get_string((*node).doc, (*cur).children, 1);
+                let val: *mut XmlChar = if (*cur).children.is_null() {
+                    null_mut()
+                } else {
+                    (*(*cur).children).get_string((*node).doc, 1)
+                };
                 if !val.is_null() {
                     if *val.add(0) != 0 {
                         uri = xml_parse_uri(val as _);
@@ -10191,7 +10195,11 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             }
         }
         if !prop.is_null() {
-            value = xml_node_list_get_string((*prop).doc, (*prop).children, 1);
+            value = if (*prop).children.is_null() {
+                null_mut()
+            } else {
+                (*(*prop).children).get_string((*prop).doc, 1)
+            };
             oldvalue = (*(*ctxt).state).value;
             oldseq = (*(*ctxt).state).seq;
             (*(*ctxt).state).seq = prop as _;
@@ -10227,7 +10235,11 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             }
         }
         if !prop.is_null() {
-            value = xml_node_list_get_string((*prop).doc, (*prop).children, 1);
+            value = if (*prop).children.is_null() {
+                null_mut()
+            } else {
+                (*(*prop).children).get_string((*prop).doc, 1)
+            };
             oldvalue = (*(*ctxt).state).value;
             oldseq = (*(*ctxt).state).seq;
             (*(*ctxt).state).seq = prop as _;

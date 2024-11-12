@@ -1071,10 +1071,7 @@ unsafe extern "C" fn html_attr_dump_output(
 ) {
     use std::ffi::CStr;
 
-    use crate::{
-        libxml::{chvalid::xml_is_blank_char, globals::xml_free, uri::xml_uri_escape_str},
-        tree::xml_node_list_get_string,
-    };
+    use crate::libxml::{chvalid::xml_is_blank_char, globals::xml_free, uri::xml_uri_escape_str};
 
     let value: *mut XmlChar;
 
@@ -1100,7 +1097,7 @@ unsafe extern "C" fn html_attr_dump_output(
 
     (*buf).write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
     if !(*cur).children.is_null() && html_is_boolean_attr((*cur).name as _) == 0 {
-        value = xml_node_list_get_string(doc, (*cur).children, 0);
+        value = (*(*cur).children).get_string(doc, 0);
         if !value.is_null() {
             (*buf).write_str("=");
             if (*cur).ns.is_null()

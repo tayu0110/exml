@@ -56,13 +56,12 @@ use crate::{
     },
     private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
-        xml_build_qname, xml_free_node, xml_new_doc_node, xml_node_list_get_string,
-        xml_split_qname2, xml_split_qname3, NodeCommon, XmlAttrPtr, XmlAttribute,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
-        XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
-        XmlElementContentType, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration,
-        XmlEnumerationPtr, XmlID, XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr,
-        XmlNsPtr, XmlRef, XmlRefPtr,
+        xml_build_qname, xml_free_node, xml_new_doc_node, xml_split_qname2, xml_split_qname3,
+        NodeCommon, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr,
+        XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
     },
 };
 
@@ -3262,7 +3261,11 @@ pub unsafe extern "C" fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 
         return -1;
     }
 
-    let id: *mut XmlChar = xml_node_list_get_string(doc, (*attr).children, 1);
+    let id: *mut XmlChar = if (*attr).children.is_null() {
+        null_mut()
+    } else {
+        (*(*attr).children).get_string(doc, 1)
+    };
     if id.is_null() {
         return -1;
     }
@@ -3578,7 +3581,11 @@ pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr)
         return -1;
     }
 
-    let id: *mut XmlChar = xml_node_list_get_string(doc, (*attr).children, 1);
+    let id: *mut XmlChar = if (*attr).children.is_null() {
+        null_mut()
+    } else {
+        (*(*attr).children).get_string(doc, 1)
+    };
     if id.is_null() {
         return -1;
     }
@@ -4981,7 +4988,11 @@ pub unsafe extern "C" fn xml_validate_element(
         if matches!((*elem).typ, XmlElementType::XmlElementNode) {
             attr = (*elem).properties;
             while !attr.is_null() {
-                value = xml_node_list_get_string(doc, (*attr).children, 0);
+                value = if (*attr).children.is_null() {
+                    null_mut()
+                } else {
+                    (*(*attr).children).get_string(doc, 0)
+                };
                 ret &= xml_validate_one_attribute(ctxt, doc, elem, attr, value);
                 if !value.is_null() {
                     xml_free(value as _);

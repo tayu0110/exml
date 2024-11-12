@@ -68,7 +68,7 @@ use crate::{
     tree::{
         xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd,
         xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_new_doc_text, xml_node_list_get_string, xml_split_qname2, XmlAttrPtr,
+        xml_free_ns_list, xml_new_doc_text, xml_split_qname2, XmlAttrPtr,
         XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
         __XML_REGISTER_CALLBACKS,
     },
@@ -3619,9 +3619,17 @@ pub unsafe extern "C" fn xml_text_reader_value(reader: &mut XmlTextReader) -> *m
             let attr: XmlAttrPtr = node as XmlAttrPtr;
 
             if !(*attr).parent.is_null() {
-                return xml_node_list_get_string((*(*attr).parent).doc, (*attr).children, 1);
+                return if (*attr).children.is_null() {
+                    null_mut()
+                } else {
+                    (*(*attr).children).get_string((*(*attr).parent).doc, 1)
+                };
             } else {
-                return xml_node_list_get_string(null_mut(), (*attr).children, 1);
+                return if (*attr).children.is_null() {
+                    null_mut()
+                } else {
+                    (*(*attr).children).get_string(null_mut(), 1)
+                };
             }
         }
         XmlElementType::XmlTextNode
@@ -3814,7 +3822,11 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_no(
     }
     /* TODO walk the DTD if present */
 
-    let ret: *mut XmlChar = xml_node_list_get_string((*reader.node).doc, (*cur).children, 1);
+    let ret: *mut XmlChar = if (*cur).children.is_null() {
+        null_mut()
+    } else {
+        (*(*cur).children).get_string((*reader.node).doc, 1)
+    };
     if ret.is_null() {
         return xml_strdup(c"".as_ptr() as _);
     }

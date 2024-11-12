@@ -122,10 +122,9 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
-        xml_node_list_get_string, xml_split_qname2, xml_split_qname3, xml_validate_ncname,
-        xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
+        XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType,
+        XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -30369,7 +30368,11 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             (*attr).name,
                             ns_name,
                             0,
-                            xml_node_list_get_string((*attr).doc, (*attr).children, 1),
+                            if (*attr).children.is_null() {
+                                null_mut()
+                            } else {
+                                (*(*attr).children).get_string((*attr).doc, 1)
+                            },
                             1,
                         );
                         if ret == -1 {

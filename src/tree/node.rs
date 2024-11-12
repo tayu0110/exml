@@ -6,7 +6,7 @@ use crate::{
     dict::xml_dict_owns,
     hash::{xml_hash_lookup, xml_hash_remove_entry},
     libxml::{
-        entities::{xml_get_doc_entity, XmlEntityPtr},
+        entities::{xml_encode_entities_reentrant, xml_get_doc_entity, XmlEntityPtr},
         globals::{xml_free, xml_malloc},
         uri::xml_build_uri,
         valid::{xml_get_dtd_attr_desc, xml_get_dtd_qattr_desc},
@@ -20,10 +20,10 @@ use crate::{
 
 use super::{
     xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
-    xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop, xml_is_blank_char,
-    xml_new_doc_text_len, xml_ns_in_scope, xml_set_tree_doc, xml_text_merge, xml_tree_err_memory,
-    XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType,
-    XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_buf_set_allocation_scheme, xml_encode_attribute_entities, xml_free_node, xml_free_prop,
+    xml_is_blank_char, xml_new_doc_text_len, xml_ns_in_scope, xml_set_tree_doc, xml_text_merge,
+    xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd,
+    XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -1238,6 +1238,78 @@ impl XmlNode {
             cur = (*cur).parent;
         }
         -1
+    }
+
+    /// Build the string equivalent to the text contained in the Node list
+    /// made of TEXTs and ENTITY_REFs.
+    ///
+    /// Returns a pointer to the string copy, the caller must free it with `xml_free()`.
+    #[doc(alias = "xmlNodeListGetString")]
+    pub unsafe fn get_string(&self, doc: XmlDocPtr, in_line: i32) -> *mut XmlChar {
+        let mut node: *const XmlNode = self;
+        let mut ret: *mut XmlChar = null_mut();
+        let mut ent: XmlEntityPtr;
+
+        let attr = !self.parent.is_null()
+            && matches!((*self.parent).typ, XmlElementType::XmlAttributeNode);
+
+        while !node.is_null() {
+            if matches!(
+                (*node).typ,
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+            ) {
+                if in_line != 0 {
+                    ret = xml_strcat(ret, (*node).content);
+                } else {
+                    let buffer = if attr {
+                        xml_encode_attribute_entities(doc, (*node).content)
+                    } else {
+                        xml_encode_entities_reentrant(doc, (*node).content)
+                    };
+                    if !buffer.is_null() {
+                        ret = xml_strcat(ret, buffer);
+                        xml_free(buffer as _);
+                    }
+                }
+            } else if matches!((*node).typ, XmlElementType::XmlEntityRefNode) {
+                if in_line != 0 {
+                    ent = xml_get_doc_entity(doc, (*node).name);
+                    if !ent.is_null() {
+                        // an entity content can be any "well balanced chunk",
+                        // i.e. the result of the content [43] production:
+                        // http://www.w3.org/TR/REC-xml#NT-content.
+                        // So it can contain text, CDATA section or nested
+                        // entity reference nodes (among others).
+                        // -> we recursive  call xmlNodeListGetString()
+                        // which handles these types
+                        let children = (*ent).children.load(Ordering::Relaxed);
+                        let buffer: *mut XmlChar = if children.is_null() {
+                            null_mut()
+                        } else {
+                            (*children).get_string(doc, 1)
+                        };
+                        if !buffer.is_null() {
+                            ret = xml_strcat(ret, buffer);
+                            xml_free(buffer as _);
+                        }
+                    } else {
+                        ret = xml_strcat(ret, (*node).content);
+                    }
+                } else {
+                    let mut buf: [XmlChar; 2] = [0; 2];
+
+                    buf[0] = b'&';
+                    buf[1] = 0;
+                    ret = xml_strncat(ret, buf.as_ptr() as _, 1);
+                    ret = xml_strcat(ret, (*node).name);
+                    buf[0] = b';';
+                    buf[1] = 0;
+                    ret = xml_strncat(ret, buf.as_ptr() as _, 1);
+                }
+            }
+            node = (*node).next;
+        }
+        ret
     }
 
     /// Set (or reset) the name of a node.
