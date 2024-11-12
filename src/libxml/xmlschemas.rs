@@ -2644,8 +2644,12 @@ unsafe extern "C" fn xml_schema_lookup_namespace(
             );
             return null_mut();
         }
-        let ns: XmlNsPtr =
-            (*(*(*vctxt).inode).node).search_ns((*(*(*vctxt).inode).node).doc, prefix);
+        let ns: XmlNsPtr = (*(*(*vctxt).inode).node).search_ns(
+            (*(*(*vctxt).inode).node).doc,
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        );
         if !ns.is_null() {
             return (*ns).href.load(Ordering::Relaxed);
         }
@@ -2723,7 +2727,6 @@ unsafe extern "C" fn xml_schema_validate_notation(
     }
     {
         let mut prefix: *mut XmlChar = null_mut();
-
         let local_name: *mut XmlChar = xml_split_qname2(value, addr_of_mut!(prefix));
         if !prefix.is_null() {
             let mut ns_name: *const XmlChar = null();
@@ -2731,7 +2734,12 @@ unsafe extern "C" fn xml_schema_validate_notation(
             if !vctxt.is_null() {
                 ns_name = xml_schema_lookup_namespace(vctxt, prefix);
             } else if !node.is_null() {
-                let ns: XmlNsPtr = (*node).search_ns((*node).doc, prefix);
+                let ns: XmlNsPtr = (*node).search_ns(
+                    (*node).doc,
+                    (!prefix.is_null())
+                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                        .as_deref(),
+                );
                 if !ns.is_null() {
                     ns_name = (*ns).href.load(Ordering::Relaxed);
                 }
@@ -7863,7 +7871,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     }
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
-        ns = (*(*attr).parent).search_ns((*attr).doc, null_mut());
+        ns = (*(*attr).parent).search_ns((*attr).doc, None);
         if !ns.is_null()
             && !(*ns).href.load(Ordering::Relaxed).is_null()
             && *(*ns).href.load(Ordering::Relaxed).add(0) != 0
@@ -7887,7 +7895,10 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     *local = xml_split_qname3(value, addr_of_mut!(len));
     *local = xml_dict_lookup((*ctxt).dict, *local, -1);
     let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
-    ns = (*(*attr).parent).search_ns((*attr).doc, pref);
+    ns = (*(*attr).parent).search_ns(
+        (*attr).doc,
+        Some(CStr::from_ptr(pref as *const i8).to_string_lossy()).as_deref(),
+    );
     if ns.is_null() {
         xml_schema_psimple_type_err(ctxt, XmlParserErrors::XmlSchemapS4sAttrInvalidValue, owner_item, attr as XmlNodePtr, xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname), null_mut(), value, c"The value '%s' of simple type 'xs:QName' has no corresponding namespace declaration in scope".as_ptr() as _, value, null_mut());
         return (*ctxt).err;
@@ -28038,8 +28049,8 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                                     .as_ref(),
                             );
                             if ns.is_null() {
-                                let mut prefix: [XmlChar; 12] = [0; 12];
                                 let mut counter: i32 = 0;
+                                let mut prefix = String::new();
 
                                 /*
                                  * Create a namespace declaration on the validation
@@ -28052,9 +28063,12 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                                         c"p%d".as_ptr() as _,
                                         counter,
                                     );
+                                    prefix = format!("p{counter}");
                                     counter += 1;
-                                    ns = (*def_attr_owner_elem)
-                                        .search_ns((*def_attr_owner_elem).doc, prefix.as_ptr());
+                                    ns = (*def_attr_owner_elem).search_ns(
+                                        (*def_attr_owner_elem).doc,
+                                        Some(prefix.as_str()),
+                                    );
                                     if counter > 1000 {
                                         VERROR_INT!(
                                             vctxt,
@@ -28070,10 +28084,11 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
 
                                     !ns.is_null()
                                 } {}
+                                let prefix = CString::new(prefix).unwrap();
                                 ns = xml_new_ns(
                                     (*vctxt).validation_root,
                                     (*iattr).ns_name,
-                                    prefix.as_ptr(),
+                                    prefix.as_ptr() as *const u8,
                                 );
                             }
                             /*

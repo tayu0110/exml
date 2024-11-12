@@ -1034,7 +1034,10 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
     while !n.is_null() {
         ns = (*n).ns_def;
         while !ns.is_null() {
-            tmp = (*cur).search_ns((*cur).doc, (*ns).prefix.load(Ordering::Relaxed));
+            let prefix = (*ns).prefix.load(Ordering::Relaxed);
+            let prefix =
+                (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
+            tmp = (*cur).search_ns((*cur).doc, prefix.as_deref());
 
             if tmp == ns && !xml_c14n_is_xml_ns(ns) && xml_c14n_is_visible!(ctx, ns, cur) != 0 {
                 already_rendered = xml_c14n_visible_ns_stack_find((*ctx).ns_rendered, ns) as i32;
@@ -1220,7 +1223,12 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
                 has_empty_ns_in_inclusive_list = 1;
             }
 
-            ns = (*cur).search_ns((*cur).doc, prefix);
+            ns = (*cur).search_ns(
+                (*cur).doc,
+                (!prefix.is_null())
+                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    .as_deref(),
+            );
             if !ns.is_null() && !xml_c14n_is_xml_ns(ns) && xml_c14n_is_visible!(ctx, ns, cur) != 0 {
                 already_rendered = xml_c14n_visible_ns_stack_find((*ctx).ns_rendered, ns) as i32;
                 if visible != 0 {
@@ -1240,7 +1248,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
     if !(*cur).ns.is_null() {
         ns = (*cur).ns;
     } else {
-        ns = (*cur).search_ns((*cur).doc, null_mut());
+        ns = (*cur).search_ns((*cur).doc, None);
         has_visibly_utilized_empty_ns = 1;
     }
     if !ns.is_null() && !xml_c14n_is_xml_ns(ns) {

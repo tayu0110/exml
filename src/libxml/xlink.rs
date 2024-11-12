@@ -278,7 +278,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
         } else if xml_str_equal(typ, c"extended".as_ptr() as _) {
             role = (*node).get_ns_prop("role", XLINK_NAMESPACE.to_str().ok());
             if !role.is_null() {
-                let xlink: XmlNsPtr = (*node).search_ns(doc, XLINK_NAMESPACE.as_ptr() as _);
+                let xlink: XmlNsPtr = (*node).search_ns(doc, XLINK_NAMESPACE.to_str().ok());
                 if xlink.is_null() {
                     /* Humm, fallback method */
                     if xml_str_equal(role, c"xlink:external-linkset".as_ptr() as _) {

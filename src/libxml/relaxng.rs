@@ -4093,7 +4093,14 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             if !name.is_null() {
                                 local = xml_split_qname2(name, addr_of_mut!(prefix));
                                 if !local.is_null() {
-                                    let ns: XmlNsPtr = (*cur).search_ns((*cur).doc, prefix);
+                                    let ns: XmlNsPtr = (*cur).search_ns(
+                                        (*cur).doc,
+                                        Some(
+                                            CStr::from_ptr(prefix as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
+                                        ),
+                                    );
                                     if ns.is_null() {
                                         xml_rng_perr(
                                             ctxt,

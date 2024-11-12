@@ -15,6 +15,7 @@ mod node;
 
 use std::{
     any::type_name,
+    borrow::Cow,
     ffi::{c_char, CStr},
     mem::size_of,
     ptr::{addr_of_mut, null, null_mut},
@@ -1357,7 +1358,6 @@ unsafe extern "C" fn xml_new_reconciled_ns(
     ns: XmlNsPtr,
 ) -> XmlNsPtr {
     let mut def: XmlNsPtr;
-    let mut prefix: [XmlChar; 50] = [0; 50];
     let mut counter: i32 = 1;
 
     if tree.is_null() || !matches!((*tree).typ, XmlElementType::XmlElementNode) {
@@ -1383,45 +1383,30 @@ unsafe extern "C" fn xml_new_reconciled_ns(
      * Find a close prefix which is not already in use.
      * Let's strip namespace prefixes longer than 20 chars !
      */
-    if (*ns).prefix.load(Ordering::Relaxed).is_null() {
-        snprintf(
-            prefix.as_mut_ptr() as _,
-            prefix.len(),
-            c"default".as_ptr() as _,
-        );
+    let prefix = if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+        Cow::Borrowed("default")
     } else {
-        snprintf(
-            prefix.as_mut_ptr() as _,
-            prefix.len(),
-            c"%.20s".as_ptr() as _,
-            (*ns).prefix.load(Ordering::Relaxed) as *const c_char,
-        );
-    }
+        Cow::Owned(format!(
+            "{}",
+            CStr::from_ptr((*ns).prefix.load(Ordering::Relaxed) as *const c_char).to_string_lossy()
+        ))
+    };
 
-    def = (*tree).search_ns(doc, prefix.as_ptr() as _);
+    def = (*tree).search_ns(doc, Some(&prefix));
     while !def.is_null() {
         if counter > 1000 {
             return null_mut();
         }
-        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
-            snprintf(
-                prefix.as_mut_ptr() as _,
-                prefix.len(),
-                c"default%d".as_ptr() as _,
-                counter,
-            );
-            counter += 1;
+        let prefix = if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+            format!("default{counter}")
         } else {
-            snprintf(
-                prefix.as_mut_ptr() as _,
-                prefix.len(),
-                c"%.20s%d".as_ptr() as _,
-                (*ns).prefix.load(Ordering::Relaxed) as *const c_char,
-                counter,
-            );
-            counter += 1;
-        }
-        def = (*tree).search_ns(doc, prefix.as_ptr() as _);
+            format!(
+                "{}{counter}",
+                CStr::from_ptr((*ns).prefix.load(Ordering::Relaxed) as *const i8).to_string_lossy()
+            )
+        };
+        counter += 1;
+        def = (*tree).search_ns(doc, Some(&prefix));
     }
 
     /*
@@ -1576,16 +1561,17 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     }
 
     if !(*node).ns.is_null() {
-        let mut ns: XmlNsPtr;
-
-        ns = (*ret).search_ns(doc, (*(*node).ns).prefix.load(Ordering::Relaxed));
+        let prefix = (*(*node).ns).prefix.load(Ordering::Relaxed);
+        let prefix =
+            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
+        let mut ns = (*ret).search_ns(doc, prefix.as_deref());
         if ns.is_null() {
             /*
              * Humm, we are copying an element whose namespace is defined
              * out of the new tree scope. Search it in the original tree
              * and add it at the top of the new tree
              */
-            ns = (*node).search_ns((*node).doc, (*(*node).ns).prefix.load(Ordering::Relaxed));
+            ns = (*node).search_ns((*node).doc, prefix.as_deref());
             if !ns.is_null() {
                 let mut root: XmlNodePtr = ret;
 
@@ -1777,17 +1763,17 @@ unsafe extern "C" fn xml_copy_prop_internal(
     (*ret).parent = target;
 
     if !(*cur).ns.is_null() && !target.is_null() {
-        let mut ns: XmlNsPtr;
-
-        ns = (*target).search_ns((*target).doc, (*(*cur).ns).prefix.load(Ordering::Relaxed));
+        let prefix = (*(*cur).ns).prefix.load(Ordering::Relaxed);
+        let prefix =
+            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
+        let mut ns = (*target).search_ns((*target).doc, prefix.as_deref());
         if ns.is_null() {
             /*
              * Humm, we are copying an element whose namespace is defined
              * out of the new tree scope. Search it in the original tree
              * and add it at the top of the new tree
              */
-            ns =
-                (*(*cur).parent).search_ns((*cur).doc, (*(*cur).ns).prefix.load(Ordering::Relaxed));
+            ns = (*(*cur).parent).search_ns((*cur).doc, prefix.as_deref());
             if !ns.is_null() {
                 let mut root: XmlNodePtr = target;
                 let mut pred: XmlNodePtr = null_mut();

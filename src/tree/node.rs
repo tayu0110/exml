@@ -1628,18 +1628,17 @@ impl XmlNode {
 
         use super::xml_split_qname3;
 
-        let mut len: i32 = 0;
-
         if !matches!(self.typ, XmlElementType::XmlElementNode) {
             return null_mut();
         }
 
         // handle QNames
+        let mut len: i32 = 0;
         let cname = CString::new(name).unwrap();
         let nqname: *const XmlChar = xml_split_qname3(cname.as_ptr() as *const u8, &raw mut len);
         if !nqname.is_null() {
             let prefix: *mut XmlChar = xml_strndup(cname.as_ptr() as *const u8, len);
-            let ns: XmlNsPtr = self.search_ns(self.doc, prefix);
+            let ns: XmlNsPtr = self.search_ns(self.doc, Some(&name[..len as usize]));
             if !prefix.is_null() {
                 xml_free(prefix as _);
             }
@@ -2738,14 +2737,14 @@ impl XmlNode {
     ///
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNs")]
-    pub unsafe fn search_ns(&mut self, mut doc: XmlDocPtr, namespace: *const XmlChar) -> XmlNsPtr {
+    pub unsafe fn search_ns(&mut self, mut doc: XmlDocPtr, namespace: Option<&str>) -> XmlNsPtr {
         let mut cur: XmlNsPtr;
         let orig: *const XmlNode = self;
 
         if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
-        if !namespace.is_null() && xml_str_equal(namespace, c"xml".as_ptr() as _) {
+        if namespace.filter(|&n| n == "xml").is_some() {
             if doc.is_null() && matches!(self.typ, XmlElementType::XmlElementNode) {
                 /*
                  * The XML-1.0 namespace is normally held on the root
@@ -2799,15 +2798,21 @@ impl XmlNode {
                 cur = (*node).ns_def;
                 while !cur.is_null() {
                     if (*cur).prefix.load(Ordering::Relaxed).is_null()
-                        && namespace.is_null()
+                        && namespace.is_none()
                         && !(*cur).href.load(Ordering::Relaxed).is_null()
                     {
                         return cur;
                     }
                     if !(*cur).prefix.load(Ordering::Relaxed).is_null()
-                        && !namespace.is_null()
                         && !(*cur).href.load(Ordering::Relaxed).is_null()
-                        && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), namespace)
+                        && namespace
+                            .filter(|&n| {
+                                n == CStr::from_ptr(
+                                    (*cur).prefix.load(Ordering::Relaxed) as *const i8
+                                )
+                                .to_string_lossy()
+                            })
+                            .is_some()
                     {
                         return cur;
                     }
@@ -2817,15 +2822,21 @@ impl XmlNode {
                     cur = (*node).ns;
                     if !cur.is_null() {
                         if (*cur).prefix.load(Ordering::Relaxed).is_null()
-                            && namespace.is_null()
+                            && namespace.is_none()
                             && !(*cur).href.load(Ordering::Relaxed).is_null()
                         {
                             return cur;
                         }
                         if !(*cur).prefix.load(Ordering::Relaxed).is_null()
-                            && !namespace.is_null()
                             && !(*cur).href.load(Ordering::Relaxed).is_null()
-                            && xml_str_equal((*cur).prefix.load(Ordering::Relaxed), namespace)
+                            && namespace
+                                .filter(|&n| {
+                                    n == CStr::from_ptr(
+                                        (*cur).prefix.load(Ordering::Relaxed) as *const i8
+                                    )
+                                    .to_string_lossy()
+                                })
+                                .is_some()
                         {
                             return cur;
                         }

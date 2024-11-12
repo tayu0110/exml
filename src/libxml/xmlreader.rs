@@ -3902,7 +3902,12 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
             ns = (*ns).next.load(Ordering::Relaxed);
         }
     } else {
-        ns = (*reader.node).search_ns((*reader.node).doc, prefix);
+        ns = (*reader.node).search_ns(
+            (*reader.node).doc,
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        );
         if !ns.is_null() {
             let href = (*ns).href.load(Ordering::Relaxed);
             ret = (*reader.node).get_ns_prop(
@@ -4056,11 +4061,18 @@ pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
     reader: &mut XmlTextReader,
     prefix: *const XmlChar,
 ) -> *mut XmlChar {
+    use std::ffi::CStr;
+
     if reader.node.is_null() {
         return null_mut();
     }
 
-    let ns: XmlNsPtr = (*reader.node).search_ns((*reader.node).doc, prefix);
+    let ns: XmlNsPtr = (*reader.node).search_ns(
+        (*reader.node).doc,
+        (!prefix.is_null())
+            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+            .as_deref(),
+    );
     if ns.is_null() {
         return null_mut();
     }

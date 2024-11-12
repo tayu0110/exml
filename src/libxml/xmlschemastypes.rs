@@ -2916,7 +2916,15 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     let mut prefix: *mut XmlChar = null_mut();
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                    let ns: XmlNsPtr = (*node).search_ns((*node).doc, prefix);
+                                    let ns: XmlNsPtr = (*node).search_ns(
+                                        (*node).doc,
+                                        (!prefix.is_null())
+                                            .then(|| {
+                                                CStr::from_ptr(prefix as *const i8)
+                                                    .to_string_lossy()
+                                            })
+                                            .as_deref(),
+                                    );
                                     if ns.is_null() && !prefix.is_null() {
                                         xml_free(prefix as _);
                                         if !local.is_null() {
@@ -3132,7 +3140,14 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
                                     if !prefix.is_null() {
-                                        let ns: XmlNsPtr = (*node).search_ns((*node).doc, prefix);
+                                        let ns: XmlNsPtr = (*node).search_ns(
+                                            (*node).doc,
+                                            Some(
+                                                CStr::from_ptr(prefix as *const i8)
+                                                    .to_string_lossy()
+                                                    .as_ref(),
+                                            ),
+                                        );
                                         if ns.is_null() {
                                             ret = 1;
                                         } else if !val.is_null() {

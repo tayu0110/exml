@@ -1838,7 +1838,10 @@ unsafe fn xml_sax2_attribute_internal(
     }
 
     if !ns.is_null() {
-        namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, ns);
+        namespace = (*(*ctxt).node).search_ns(
+            (*ctxt).my_doc,
+            Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()),
+        );
 
         if namespace.is_null() {
             xml_ns_err_msg(
@@ -2400,9 +2403,11 @@ pub unsafe fn xml_sax2_start_element(
          * Search the namespace, note that since the attributes have been
          * processed, the local namespaces are available.
          */
-        ns = (*ret).search_ns((*ctxt).my_doc, prefix);
+        let pre =
+            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
+        ns = (*ret).search_ns((*ctxt).my_doc, pre.as_deref());
         if ns.is_null() && !parent.is_null() {
-            ns = (*parent).search_ns((*ctxt).my_doc, prefix);
+            ns = (*parent).search_ns((*ctxt).my_doc, pre.as_deref());
         }
         if !prefix.is_null() && ns.is_null() {
             ns = xml_new_ns(ret, null_mut(), prefix);
@@ -2752,13 +2757,15 @@ pub unsafe fn xml_sax2_start_element_ns(
      * Note that, if prefix is NULL, this searches for the default Ns
      */
     if !orig_uri.is_null() && (*ret).ns.is_null() {
+        let pre =
+            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
         (*ret).ns = if !parent.is_null() {
-            (*parent).search_ns((*ctxt).my_doc, prefix)
+            (*parent).search_ns((*ctxt).my_doc, pre.as_deref())
         } else {
             null_mut()
         };
         if (*ret).ns.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) {
-            (*ret).ns = (*ret).search_ns((*ctxt).my_doc, prefix);
+            (*ret).ns = (*ret).search_ns((*ctxt).my_doc, pre.as_deref());
         }
         if (*ret).ns.is_null() {
             ns = xml_new_ns(ret, null_mut(), prefix);
@@ -3031,7 +3038,14 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
      * Note: if prefix.is_null(), the attribute is not in the default namespace
      */
     if !prefix.is_null() {
-        namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, prefix);
+        namespace = (*(*ctxt).node).search_ns(
+            (*ctxt).my_doc,
+            Some(
+                CStr::from_ptr(prefix as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ),
+        );
     }
 
     /*
