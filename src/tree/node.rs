@@ -22,9 +22,9 @@ use super::{
     copy_string_for_new_dict_if_needed, xml_buf_cat, xml_buf_create, xml_buf_create_size,
     xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme, xml_encode_attribute_entities,
     xml_free_node, xml_free_prop, xml_is_blank_char, xml_new_doc_text_len, xml_ns_in_scope,
-    xml_set_list_doc, xml_text_merge, xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlAttributeType,
-    XmlBufPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs,
-    XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_text_merge, xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlBufPtr,
+    XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs, XmlNsPtr,
+    XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -2079,7 +2079,9 @@ impl XmlNode {
                         );
                         (*prop).doc = doc;
                     }
-                    xml_set_list_doc((*prop).children, doc);
+                    if !(*prop).children.is_null() {
+                        (*(*prop).children).set_doc_all_sibling(doc);
+                    }
 
                     // TODO: ID attributes should be also added to the new
                     //       document, but this breaks things like xmlReplaceNode.
@@ -2101,7 +2103,7 @@ impl XmlNode {
                  */
                 self.children = null_mut();
             } else if !self.children.is_null() {
-                xml_set_list_doc(self.children, doc);
+                (*self.children).set_doc_all_sibling(doc);
             }
 
             self.name = copy_string_for_new_dict_if_needed(old_tree_dict, new_dict, self.name);
@@ -2109,6 +2111,21 @@ impl XmlNode {
                 copy_string_for_new_dict_if_needed(old_tree_dict, null_mut(), self.content) as _;
             /* FIXME: self.ns should be updated as in xmlStaticCopyNode(). */
             self.doc = doc;
+        }
+    }
+
+    /// update all nodes in the list to point to the right document
+    #[doc(alias = "xmlSetListDoc")]
+    pub unsafe fn set_doc_all_sibling(&mut self, doc: XmlDocPtr) {
+        if self.typ == XmlElementType::XmlNamespaceDecl {
+            return;
+        }
+        let mut cur = self as *mut XmlNode;
+        while !cur.is_null() {
+            if (*cur).doc != doc {
+                (*cur).set_doc(doc);
+            }
+            cur = (*cur).next;
         }
     }
 

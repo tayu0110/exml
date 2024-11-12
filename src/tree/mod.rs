@@ -3273,28 +3273,6 @@ unsafe extern "C" fn copy_string_for_new_dict_if_needed(
     new_value
 }
 
-/**
- * xmlSetListDoc:
- * @list:  the first element
- * @doc:  the document
- *
- * update all nodes in the list to point to the right document
- */
-pub unsafe extern "C" fn xml_set_list_doc(list: XmlNodePtr, doc: XmlDocPtr) {
-    let mut cur: XmlNodePtr;
-
-    if list.is_null() || ((*list).typ == XmlElementType::XmlNamespaceDecl) {
-        return;
-    }
-    cur = list;
-    while !cur.is_null() {
-        if (*cur).doc != doc {
-            (*cur).set_doc(doc);
-        }
-        cur = (*cur).next;
-    }
-}
-
 /*
  * Namespaces.
  */
