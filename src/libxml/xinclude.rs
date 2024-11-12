@@ -296,18 +296,10 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
     if (*node).ns.is_null() {
         return 0;
     }
-    if xml_str_equal(
-        (*(*node).ns).href.load(Ordering::Relaxed),
-        XINCLUDE_NS.as_ptr() as _,
-    ) || xml_str_equal(
-        (*(*node).ns).href.load(Ordering::Relaxed),
-        XINCLUDE_OLD_NS.as_ptr() as _,
-    ) {
-        if xml_str_equal(
-            (*(*node).ns).href.load(Ordering::Relaxed),
-            XINCLUDE_OLD_NS.as_ptr() as _,
-        ) && (*ctxt).legacy == 0
-        {
+    if xml_str_equal((*(*node).ns).href, XINCLUDE_NS.as_ptr() as _)
+        || xml_str_equal((*(*node).ns).href, XINCLUDE_OLD_NS.as_ptr() as _)
+    {
+        if xml_str_equal((*(*node).ns).href, XINCLUDE_OLD_NS.as_ptr() as _) && (*ctxt).legacy == 0 {
             (*ctxt).legacy = 1;
         }
         if xml_str_equal((*node).name, XINCLUDE_NODE.as_ptr() as _) {
@@ -317,13 +309,8 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
             while !child.is_null() {
                 if (*child).typ == XmlElementType::XmlElementNode
                     && !(*child).ns.is_null()
-                    && (xml_str_equal(
-                        (*(*child).ns).href.load(Ordering::Relaxed),
-                        XINCLUDE_NS.as_ptr() as _,
-                    ) || xml_str_equal(
-                        (*(*child).ns).href.load(Ordering::Relaxed),
-                        XINCLUDE_OLD_NS.as_ptr() as _,
-                    ))
+                    && (xml_str_equal((*(*child).ns).href, XINCLUDE_NS.as_ptr() as _)
+                        || xml_str_equal((*(*child).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
                 {
                     if xml_str_equal((*child).name, XINCLUDE_NODE.as_ptr() as _) {
                         xml_xinclude_err(
@@ -357,13 +344,8 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
             && ((*node).parent.is_null()
                 || (*(*node).parent).typ != XmlElementType::XmlElementNode
                 || (*(*node).parent).ns.is_null()
-                || (!xml_str_equal(
-                    (*(*(*node).parent).ns).href.load(Ordering::Relaxed),
-                    XINCLUDE_NS.as_ptr() as _,
-                ) && !xml_str_equal(
-                    (*(*(*node).parent).ns).href.load(Ordering::Relaxed),
-                    XINCLUDE_OLD_NS.as_ptr() as _,
-                ))
+                || (!xml_str_equal((*(*(*node).parent).ns).href, XINCLUDE_NS.as_ptr() as _)
+                    && !xml_str_equal((*(*(*node).parent).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
                 || !xml_str_equal((*(*node).parent).name, XINCLUDE_NODE.as_ptr() as _))
         {
             xml_xinclude_err(
@@ -1107,13 +1089,8 @@ unsafe extern "C" fn xml_xinclude_copy_node(
         } else if (*cur).typ == XmlElementType::XmlElementNode
             && !(*cur).ns.is_null()
             && xml_str_equal((*cur).name, XINCLUDE_NODE.as_ptr() as _)
-            && (xml_str_equal(
-                (*(*cur).ns).href.load(Ordering::Relaxed),
-                XINCLUDE_NS.as_ptr() as _,
-            ) || xml_str_equal(
-                (*(*cur).ns).href.load(Ordering::Relaxed),
-                XINCLUDE_OLD_NS.as_ptr() as _,
-            ))
+            && (xml_str_equal((*(*cur).ns).href, XINCLUDE_NS.as_ptr() as _)
+                || xml_str_equal((*(*cur).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
         {
             let refe: XmlXincludeRefPtr = xml_xinclude_expand_node(ctxt, cur);
 
@@ -2522,13 +2499,8 @@ unsafe extern "C" fn xml_xinclude_load_node(
             if (*children).typ == XmlElementType::XmlElementNode
                 && !(*children).ns.is_null()
                 && xml_str_equal((*children).name, XINCLUDE_FALLBACK.as_ptr() as _)
-                && (xml_str_equal(
-                    (*(*children).ns).href.load(Ordering::Relaxed),
-                    XINCLUDE_NS.as_ptr() as _,
-                ) || xml_str_equal(
-                    (*(*children).ns).href.load(Ordering::Relaxed),
-                    XINCLUDE_OLD_NS.as_ptr() as _,
-                ))
+                && (xml_str_equal((*(*children).ns).href, XINCLUDE_NS.as_ptr() as _)
+                    || xml_str_equal((*(*children).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
             {
                 ret = xml_xinclude_load_fallback(ctxt, children, refe);
                 break;

@@ -1583,11 +1583,8 @@ unsafe extern "C" fn xml_parse_xml_catalog_node_list(
 ) {
     while !cur.is_null() {
         if !(*cur).ns.is_null()
-            && !(*(*cur).ns).href.load(Ordering::Relaxed).is_null()
-            && xml_str_equal(
-                (*(*cur).ns).href.load(Ordering::Relaxed) as _,
-                XML_CATALOGS_NAMESPACE.as_ptr() as _,
-            )
+            && !(*(*cur).ns).href.is_null()
+            && xml_str_equal((*(*cur).ns).href, XML_CATALOGS_NAMESPACE.as_ptr() as _)
         {
             xml_parse_xml_catalog_node(cur, prefer, parent, cgroup);
         }
@@ -1641,11 +1638,8 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
     if !cur.is_null()
         && xml_str_equal((*cur).name, c"catalog".as_ptr() as _)
         && !(*cur).ns.is_null()
-        && !(*(*cur).ns).href.load(Ordering::Relaxed).is_null()
-        && xml_str_equal(
-            (*(*cur).ns).href.load(Ordering::Relaxed),
-            XML_CATALOGS_NAMESPACE.as_ptr() as _,
-        )
+        && !(*(*cur).ns).href.is_null()
+        && xml_str_equal((*(*cur).ns).href, XML_CATALOGS_NAMESPACE.as_ptr() as _)
     {
         parent = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,

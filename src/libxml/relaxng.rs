@@ -1566,10 +1566,7 @@ macro_rules! IS_RELAXNG {
             && !(*$node).ns.is_null()
             && (*$node).typ == XmlElementType::XmlElementNode
             && xml_str_equal((*$node).name, $typ)
-            && xml_str_equal(
-                (*(*$node).ns).href.load(Ordering::Relaxed),
-                XML_RELAXNG_NS.as_ptr() as _,
-            )
+            && xml_str_equal((*(*$node).ns).href, XML_RELAXNG_NS.as_ptr() as _)
     };
 }
 
@@ -2502,7 +2499,7 @@ unsafe extern "C" fn xml_relaxng_element_match(
                 (*elem).name
             );
             return 0;
-        } else if !xml_str_equal((*(*elem).ns).href.load(Ordering::Relaxed), (*define).ns) {
+        } else if !xml_str_equal((*(*elem).ns).href, (*define).ns) {
             VALID_ERR3!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrElemwrongns,
@@ -2649,7 +2646,7 @@ unsafe extern "C" fn xml_relaxng_compare_name_classes(
                 node.ns = null_mut();
             } else {
                 node.ns = addr_of_mut!(ns);
-                ns.href.store((*def1).ns, Ordering::Relaxed);
+                ns.href = (*def1).ns;
             }
         } else {
             node.ns = null_mut();
@@ -2696,10 +2693,10 @@ unsafe extern "C" fn xml_relaxng_compare_name_classes(
             if *(*def2).ns.add(0) == 0 {
                 node.ns = null_mut();
             } else {
-                ns.href.store((*def2).ns, Ordering::Relaxed);
+                ns.href = (*def2).ns;
             }
         } else {
-            ns.href.store(INVALID_NAME.as_ptr() as _, Ordering::Relaxed);
+            ns.href = INVALID_NAME.as_ptr() as *const u8;
         }
         if xml_relaxng_element_match(addr_of_mut!(ctxt), def1, addr_of_mut!(node)) != 0 {
             if !(*def2).name_class.is_null() {
@@ -3079,12 +3076,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
     cur = (*node).properties;
     while !cur.is_null() {
         next = (*cur).next;
-        if (*cur).ns.is_null()
-            || xml_str_equal(
-                (*(*cur).ns).href.load(Ordering::Relaxed),
-                XML_RELAXNG_NS.as_ptr() as _,
-            )
-        {
+        if (*cur).ns.is_null() || xml_str_equal((*(*cur).ns).href, XML_RELAXNG_NS.as_ptr() as _) {
             if xml_str_equal((*cur).name, c"name".as_ptr() as _) {
                 if !xml_str_equal((*node).name, c"element".as_ptr() as _)
                     && !xml_str_equal((*node).name, c"attribute".as_ptr() as _)
@@ -3789,10 +3781,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                  * Simplification 4.1. Annotations
                  */
                 if (*cur).ns.is_null()
-                    || !xml_str_equal(
-                        (*(*cur).ns).href.load(Ordering::Relaxed),
-                        XML_RELAXNG_NS.as_ptr() as _,
-                    )
+                    || !xml_str_equal((*(*cur).ns).href, XML_RELAXNG_NS.as_ptr() as _)
                 {
                     if !(*cur).parent.is_null()
                         && (*(*cur).parent).typ == XmlElementType::XmlElementNode
@@ -4131,7 +4120,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                             null_mut(),
                                         );
                                     } else {
-                                        let href = (*ns).href.load(Ordering::Relaxed);
+                                        let href = (*ns).href;
                                         (*cur).set_prop(
                                             "ns",
                                             (!href.is_null())
@@ -10150,9 +10139,7 @@ unsafe extern "C" fn xml_relaxng_attribute_match(
             if !(*prop).ns.is_null() {
                 return 0;
             }
-        } else if (*prop).ns.is_null()
-            || !xml_str_equal((*define).ns, (*(*prop).ns).href.load(Ordering::Relaxed))
-        {
+        } else if (*prop).ns.is_null() || !xml_str_equal((*define).ns, (*(*prop).ns).href) {
             return 0;
         }
     }
@@ -10225,8 +10212,7 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             if !tmp.is_null()
                 && xml_str_equal((*define).name, (*tmp).name)
                 && ((((*define).ns.is_null() || *(*define).ns.add(0) == 0) && (*tmp).ns.is_null())
-                    || (!(*tmp).ns.is_null()
-                        && xml_str_equal((*define).ns, (*(*tmp).ns).href.load(Ordering::Relaxed))))
+                    || (!(*tmp).ns.is_null() && xml_str_equal((*define).ns, (*(*tmp).ns).href)))
             {
                 prop = tmp;
                 j = i;
@@ -10458,12 +10444,8 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
             }
             XmlElementType::XmlElementNode => {
                 if !(*cur).ns.is_null() {
-                    ret = xml_reg_exec_push_string2(
-                        exec,
-                        (*cur).name,
-                        (*(*cur).ns).href.load(Ordering::Relaxed),
-                        ctxt as _,
-                    );
+                    ret =
+                        xml_reg_exec_push_string2(exec, (*cur).name, (*(*cur).ns).href, ctxt as _);
                 } else {
                     ret = xml_reg_exec_push_string(exec, (*cur).name, ctxt as _);
                 }
@@ -10967,16 +10949,12 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                 tmp = xml_hash_lookup2((*partitions).triage, c"#text".as_ptr() as _, null_mut());
             } else if (*cur).typ == XmlElementType::XmlElementNode {
                 if !(*cur).ns.is_null() {
-                    tmp = xml_hash_lookup2(
-                        (*partitions).triage,
-                        (*cur).name,
-                        (*(*cur).ns).href.load(Ordering::Relaxed),
-                    );
+                    tmp = xml_hash_lookup2((*partitions).triage, (*cur).name, (*(*cur).ns).href);
                     if tmp.is_null() {
                         tmp = xml_hash_lookup2(
                             (*partitions).triage,
                             c"#any".as_ptr() as _,
-                            (*(*cur).ns).href.load(Ordering::Relaxed),
+                            (*(*cur).ns).href,
                         );
                     }
                 } else {
@@ -11746,17 +11724,11 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     list = xml_hash_lookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
                 } else if (*node).typ == XmlElementType::XmlElementNode {
                     if !(*node).ns.is_null() {
-                        list = xml_hash_lookup2(
-                            triage,
-                            (*node).name,
-                            (*(*node).ns).href.load(Ordering::Relaxed),
-                        ) as _;
+                        list = xml_hash_lookup2(triage, (*node).name, (*(*node).ns).href) as _;
                         if list.is_null() {
-                            list = xml_hash_lookup2(
-                                triage,
-                                c"#any".as_ptr() as _,
-                                (*(*node).ns).href.load(Ordering::Relaxed),
-                            ) as _;
+                            list =
+                                xml_hash_lookup2(triage, c"#any".as_ptr() as _, (*(*node).ns).href)
+                                    as _;
                         }
                     } else {
                         list = xml_hash_lookup2(triage, (*node).name, null_mut()) as _;
@@ -12575,12 +12547,7 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_element(
     (*ctxt).pnode = elem;
     (*ctxt).pstate = 0;
     if !(*elem).ns.is_null() {
-        ret = xml_reg_exec_push_string2(
-            (*ctxt).elem,
-            (*elem).name,
-            (*(*elem).ns).href.load(Ordering::Relaxed),
-            ctxt as _,
-        );
+        ret = xml_reg_exec_push_string2((*ctxt).elem, (*elem).name, (*(*elem).ns).href, ctxt as _);
     } else {
         ret = xml_reg_exec_push_string((*ctxt).elem, (*elem).name, ctxt as _);
     }

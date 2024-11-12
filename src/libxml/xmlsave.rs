@@ -306,7 +306,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
     if cur.is_null() || buf.is_null() {
         return;
     }
-    if matches!((*cur).typ, XML_LOCAL_NAMESPACE) && !(*cur).href.load(Ordering::Relaxed).is_null() {
+    if matches!((*cur).typ, XML_LOCAL_NAMESPACE) && !(*cur).href.is_null() {
         if xml_str_equal((*cur).prefix.load(Ordering::Relaxed), c"xml".as_ptr() as _) {
             return;
         }
@@ -330,9 +330,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
         }
         (*buf).write_bytes(b"=");
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_cstr(CStr::from_ptr(
-                (*cur).href.load(Ordering::Relaxed) as *const i8
-            ));
+            buf.push_quoted_cstr(CStr::from_ptr((*cur).href as *const i8));
         }
     }
 }
@@ -1005,12 +1003,7 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
     }
     {
         let str2 = CString::new(XHTML_NS_NAME).unwrap();
-        if !(*node).ns.is_null()
-            && !xml_str_equal(
-                (*(*node).ns).href.load(Ordering::Relaxed),
-                str2.as_ptr() as _,
-            )
-        {
+        if !(*node).ns.is_null() && !xml_str_equal((*(*node).ns).href, str2.as_ptr() as _) {
             return 0;
         }
     }

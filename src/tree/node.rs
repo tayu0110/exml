@@ -138,7 +138,7 @@ pub trait NodeCommon {
                         None,
                     )
                 } else {
-                    let href = (*(*cur).ns).href.load(Ordering::Relaxed);
+                    let href = (*(*cur).ns).href;
                     (*(self as *mut Self as *mut XmlNode)).has_ns_prop(
                         CStr::from_ptr((*cur).name as *const i8)
                             .to_string_lossy()
@@ -894,11 +894,8 @@ impl XmlNode {
                 ret
             }
             XmlElementType::XmlNamespaceDecl => {
-                let tmp: *mut XmlChar = xml_strdup(
-                    (*(self as *const XmlNode as *const XmlNs))
-                        .href
-                        .load(Ordering::Relaxed),
-                );
+                let tmp: *mut XmlChar =
+                    xml_strdup((*(self as *const XmlNode as *const XmlNs)).href);
                 tmp
             }
             XmlElementType::XmlElementDecl => {
@@ -1047,12 +1044,7 @@ impl XmlNode {
                 }
             }
             XmlElementType::XmlNamespaceDecl => {
-                xml_buf_cat(
-                    buf,
-                    (*(self as *const XmlNode as XmlNsPtr))
-                        .href
-                        .load(Ordering::Relaxed),
-                );
+                xml_buf_cat(buf, (*(self as *const XmlNode as XmlNsPtr)).href);
             }
             XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
@@ -1083,11 +1075,8 @@ impl XmlNode {
                 while {
                     if !(*prop).ns.is_null()
                         && xml_str_equal((*prop).name, name.as_ptr() as *const u8)
-                        && ((*(*prop).ns).href.load(Ordering::Relaxed) == ns_name.as_ptr() as _
-                            || xml_str_equal(
-                                (*(*prop).ns).href.load(Ordering::Relaxed),
-                                ns_name.as_ptr() as *const u8,
-                            ))
+                        && ((*(*prop).ns).href == ns_name.as_ptr() as _
+                            || xml_str_equal((*(*prop).ns).href, ns_name.as_ptr() as *const u8))
                     {
                         return prop;
                     }
@@ -1171,10 +1160,7 @@ impl XmlNode {
                         let mut cur = ns_list;
                         let ns_name = CString::new(ns_name).unwrap();
                         while !(*cur).is_null() {
-                            if xml_str_equal(
-                                (*(*cur)).href.load(Ordering::Relaxed),
-                                ns_name.as_ptr() as *const u8,
-                            ) {
+                            if xml_str_equal((*(*cur)).href, ns_name.as_ptr() as *const u8) {
                                 attr_decl = xml_get_dtd_qattr_desc(
                                     (*doc).int_subset,
                                     elem_qname,
@@ -1692,11 +1678,11 @@ impl XmlNode {
             tree::{xml_free_node_list, xml_new_doc_text, xml_new_prop_internal, XmlAttributeType},
         };
 
-        if !ns.is_null() && (*ns).href.load(Ordering::Relaxed).is_null() {
+        if !ns.is_null() && (*ns).href.is_null() {
             return null_mut();
         }
         let href = if !ns.is_null() {
-            (*ns).href.load(Ordering::Relaxed) as *const i8
+            (*ns).href as *const i8
         } else {
             null_mut()
         };
@@ -1766,7 +1752,7 @@ impl XmlNode {
     #[cfg(any(feature = "tree", feature = "schema"))]
     pub unsafe fn unset_ns_prop(&mut self, ns: XmlNsPtr, name: &str) -> i32 {
         let href = if !ns.is_null() {
-            (*ns).href.load(Ordering::Relaxed) as *const i8
+            (*ns).href as *const i8
         } else {
             null_mut()
         };
@@ -2777,10 +2763,7 @@ impl XmlNode {
                 }
                 memset(cur as _, 0, size_of::<XmlNs>());
                 (*cur).typ = XML_LOCAL_NAMESPACE;
-                (*cur).href.store(
-                    xml_strdup(XML_XML_NAMESPACE.as_ptr() as _) as _,
-                    Ordering::Relaxed,
-                );
+                (*cur).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
                 (*cur)
                     .prefix
                     .store(xml_strdup(c"xml".as_ptr() as _) as _, Ordering::Relaxed);
@@ -2818,12 +2801,12 @@ impl XmlNode {
                 while !cur.is_null() {
                     if (*cur).prefix.load(Ordering::Relaxed).is_null()
                         && namespace.is_none()
-                        && !(*cur).href.load(Ordering::Relaxed).is_null()
+                        && !(*cur).href.is_null()
                     {
                         return cur;
                     }
                     if !(*cur).prefix.load(Ordering::Relaxed).is_null()
-                        && !(*cur).href.load(Ordering::Relaxed).is_null()
+                        && !(*cur).href.is_null()
                         && namespace
                             .filter(|&n| {
                                 n == CStr::from_ptr(
@@ -2842,12 +2825,12 @@ impl XmlNode {
                     if !cur.is_null() {
                         if (*cur).prefix.load(Ordering::Relaxed).is_null()
                             && namespace.is_none()
-                            && !(*cur).href.load(Ordering::Relaxed).is_null()
+                            && !(*cur).href.is_null()
                         {
                             return cur;
                         }
                         if !(*cur).prefix.load(Ordering::Relaxed).is_null()
-                            && !(*cur).href.load(Ordering::Relaxed).is_null()
+                            && !(*cur).href.is_null()
                             && namespace
                                 .filter(|&n| {
                                     n == CStr::from_ptr(
@@ -2896,10 +2879,7 @@ impl XmlNode {
                 }
                 memset(cur as _, 0, size_of::<XmlNs>());
                 (*cur).typ = XML_LOCAL_NAMESPACE;
-                (*cur).href.store(
-                    xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
-                    Ordering::Relaxed,
-                );
+                (*cur).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
                 (*cur)
                     .prefix
                     .store(xml_strdup(c"xml".as_ptr() as _), Ordering::Relaxed);
@@ -2937,11 +2917,8 @@ impl XmlNode {
                 let href = CString::new(href).unwrap();
                 cur = (*node).ns_def;
                 while !cur.is_null() {
-                    if !(*cur).href.load(Ordering::Relaxed).is_null()
-                        && xml_str_equal(
-                            (*cur).href.load(Ordering::Relaxed),
-                            href.as_ptr() as *const u8,
-                        )
+                    if !(*cur).href.is_null()
+                        && xml_str_equal((*cur).href, href.as_ptr() as *const u8)
                         && (!is_attr || !(*cur).prefix.load(Ordering::Relaxed).is_null())
                         && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed))
                             == 1
@@ -2953,11 +2930,8 @@ impl XmlNode {
                 if orig != node {
                     cur = (*node).ns;
                     if !cur.is_null()
-                        && !(*cur).href.load(Ordering::Relaxed).is_null()
-                        && xml_str_equal(
-                            (*cur).href.load(Ordering::Relaxed),
-                            href.as_ptr() as *const u8,
-                        )
+                        && !(*cur).href.is_null()
+                        && xml_str_equal((*cur).href, href.as_ptr() as *const u8)
                         && (!is_attr || !(*cur).prefix.load(Ordering::Relaxed).is_null())
                         && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed))
                             == 1
@@ -3243,7 +3217,7 @@ unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) 
             None,
         )
     } else {
-        let href = (*(*prop).ns).href.load(Ordering::Relaxed);
+        let href = (*(*prop).ns).href;
         (*(*cur).parent).has_ns_prop(
             CStr::from_ptr((*prop).name as *const i8)
                 .to_string_lossy()

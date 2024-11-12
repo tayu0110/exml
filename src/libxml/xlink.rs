@@ -252,10 +252,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
          * This is an HTML document.
          */
     } else if !(*node).ns.is_null()
-        && xml_str_equal(
-            (*(*node).ns).href.load(Ordering::Relaxed),
-            XHTML_NAMESPACE.as_ptr() as _,
-        )
+        && xml_str_equal((*(*node).ns).href, XHTML_NAMESPACE.as_ptr() as _)
     {
         /*
          * !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@

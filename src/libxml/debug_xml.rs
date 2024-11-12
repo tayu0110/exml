@@ -989,7 +989,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
         );
         return;
     }
-    if (*ns).href.load(Ordering::Relaxed).is_null() {
+    if (*ns).href.is_null() {
         if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
             xml_debug_err3(
                 ctxt,
@@ -1015,7 +1015,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
             fprintf((*ctxt).output, c"default namespace href=".as_ptr());
         }
 
-        xml_ctxt_dump_string(ctxt, (*ns).href.load(Ordering::Relaxed));
+        xml_ctxt_dump_string(ctxt, (*ns).href);
         fprintf((*ctxt).output, c"\n".as_ptr());
     }
 }
@@ -2075,17 +2075,13 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
             let ns: XmlNsPtr = node as XmlNsPtr;
 
             if (*ns).prefix.load(Ordering::Relaxed).is_null() {
-                fprintf(
-                    output,
-                    c"default -> %s".as_ptr(),
-                    (*ns).href.load(Ordering::Relaxed) as *mut c_char,
-                );
+                fprintf(output, c"default -> %s".as_ptr(), (*ns).href as *mut c_char);
             } else {
                 fprintf(
                     output,
                     c"%s -> %s".as_ptr(),
                     (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
-                    (*ns).href.load(Ordering::Relaxed) as *mut c_char,
+                    (*ns).href as *mut c_char,
                 );
             }
         }
@@ -3301,16 +3297,12 @@ unsafe extern "C" fn xml_shell_register_root_namespaces(
     ns = (*root).ns_def;
     while !ns.is_null() {
         if (*ns).prefix.load(Ordering::Relaxed).is_null() {
-            xml_xpath_register_ns(
-                (*ctxt).pctxt,
-                c"defaultns".as_ptr() as _,
-                (*ns).href.load(Ordering::Relaxed),
-            );
+            xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, (*ns).href);
         } else {
             xml_xpath_register_ns(
                 (*ctxt).pctxt,
                 (*ns).prefix.load(Ordering::Relaxed),
-                (*ns).href.load(Ordering::Relaxed),
+                (*ns).href,
             );
         }
         ns = (*ns).next.load(Ordering::Relaxed);

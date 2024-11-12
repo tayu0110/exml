@@ -9,7 +9,6 @@ use std::{
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
-    sync::atomic::Ordering,
 };
 
 use libc::{memcpy, memmove, memset, snprintf, sscanf};
@@ -2933,7 +2932,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         break 'return1;
                                     }
                                     if !ns.is_null() {
-                                        uri = (*ns).href.load(Ordering::Relaxed);
+                                        uri = (*ns).href;
                                     }
                                     if !prefix.is_null() {
                                         xml_free(prefix as _);
@@ -3151,7 +3150,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                         if ns.is_null() {
                                             ret = 1;
                                         } else if !val.is_null() {
-                                            uri = xml_strdup((*ns).href.load(Ordering::Relaxed));
+                                            uri = xml_strdup((*ns).href);
                                         }
                                     }
                                     if !local.is_null() && (val.is_null() || ret != 0) {

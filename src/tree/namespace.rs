@@ -26,7 +26,7 @@ pub type XmlNsPtr = *mut XmlNs;
 pub struct XmlNs {
     pub next: AtomicPtr<XmlNs>,             /* next Ns link for this node  */
     pub(crate) typ: XmlNsType,              /* global or local */
-    pub href: AtomicPtr<XmlChar>,           /* URL for the namespace */
+    pub href: *const XmlChar,               /* URL for the namespace */
     pub prefix: AtomicPtr<XmlChar>,         /* prefix for the namespace */
     pub(crate) _private: AtomicPtr<c_void>, /* application data */
     pub(crate) context: *mut XmlDoc,        /* normally an xmlDoc */
@@ -37,7 +37,7 @@ impl Default for XmlNs {
         Self {
             next: AtomicPtr::new(null_mut()),
             typ: XmlNsType::XmlInvalidNode,
-            href: AtomicPtr::new(null_mut()),
+            href: null_mut(),
             prefix: AtomicPtr::new(null_mut()),
             _private: AtomicPtr::new(null_mut()),
             context: null_mut(),
@@ -89,7 +89,7 @@ pub unsafe fn xml_new_ns(
     (*cur).typ = XML_LOCAL_NAMESPACE;
 
     if !href.is_null() {
-        (*cur).href = AtomicPtr::new(xml_strdup(href));
+        (*cur).href = xml_strdup(href);
     }
     if !prefix.is_null() {
         (*cur).prefix = AtomicPtr::new(xml_strdup(prefix));
@@ -140,8 +140,8 @@ pub unsafe extern "C" fn xml_free_ns(cur: XmlNsPtr) {
     if cur.is_null() {
         return;
     }
-    if !(*cur).href.load(Ordering::Relaxed).is_null() {
-        xml_free((*cur).href.load(Ordering::Relaxed) as _);
+    if !(*cur).href.is_null() {
+        xml_free((*cur).href as _);
     }
     if !(*cur).prefix.load(Ordering::Relaxed).is_null() {
         xml_free((*cur).prefix.load(Ordering::Relaxed) as _);

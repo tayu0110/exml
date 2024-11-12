@@ -4770,10 +4770,10 @@ pub unsafe fn xml_parse_in_node_context(
                 if !(*ctxt).dict.is_null() {
                     iprefix =
                         xml_dict_lookup((*ctxt).dict, (*ns).prefix.load(Ordering::Relaxed), -1);
-                    ihref = xml_dict_lookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
+                    ihref = xml_dict_lookup((*ctxt).dict, (*ns).href, -1);
                 } else {
                     iprefix = (*ns).prefix.load(Ordering::Relaxed) as _;
-                    ihref = (*ns).href.load(Ordering::Relaxed) as _;
+                    ihref = (*ns).href as _;
                 }
 
                 if xml_get_namespace(ctxt, iprefix).is_null() {

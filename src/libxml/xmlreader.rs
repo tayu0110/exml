@@ -2312,13 +2312,8 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                 && !reader.node.is_null()
                 && (*reader.node).typ == XmlElementType::XmlElementNode
                 && !(*reader.node).ns.is_null()
-                && (xml_str_equal(
-                    (*(*reader.node).ns).href.load(Ordering::Relaxed),
-                    XINCLUDE_NS.as_ptr() as _,
-                ) || xml_str_equal(
-                    (*(*reader.node).ns).href.load(Ordering::Relaxed),
-                    XINCLUDE_OLD_NS.as_ptr() as _,
-                ))
+                && (xml_str_equal((*(*reader.node).ns).href, XINCLUDE_NS.as_ptr() as _)
+                    || xml_str_equal((*(*reader.node).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
             {
                 if reader.xincctxt.is_null() {
                     reader.xincctxt = xml_xinclude_new_context((*reader.ctxt).my_doc);
@@ -2721,15 +2716,14 @@ pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: &mut XmlTe
         let ns: XmlNsPtr = reader.curnode as XmlNsPtr;
 
         if reader.faketext.is_null() {
-            reader.faketext =
-                xml_new_doc_text((*reader.node).doc, (*ns).href.load(Ordering::Relaxed));
+            reader.faketext = xml_new_doc_text((*reader.node).doc, (*ns).href);
         } else {
             if !(*reader.faketext).content.is_null()
                 && (*reader.faketext).content != addr_of_mut!((*reader.faketext).properties) as _
             {
                 xml_free((*reader.faketext).content as _);
             }
-            (*reader.faketext).content = xml_strdup((*ns).href.load(Ordering::Relaxed));
+            (*reader.faketext).content = xml_strdup((*ns).href);
         }
         reader.curnode = reader.faketext;
     } else {
@@ -3214,7 +3208,7 @@ pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
         return null_mut();
     }
     if !(*node).ns.is_null() {
-        return CONSTSTR!(reader, (*(*node).ns).href.load(Ordering::Relaxed));
+        return CONSTSTR!(reader, (*(*node).ns).href);
     }
     null_mut()
 }
@@ -3325,9 +3319,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
     };
 
     match (*node).typ {
-        XmlElementType::XmlNamespaceDecl => {
-            return (*(node as XmlNsPtr)).href.load(Ordering::Relaxed)
-        }
+        XmlElementType::XmlNamespaceDecl => return (*(node as XmlNsPtr)).href,
         XmlElementType::XmlAttributeNode => {
             let attr: XmlAttrPtr = node as XmlAttrPtr;
             let mut ret: *const XmlChar;
@@ -3530,7 +3522,7 @@ pub unsafe extern "C" fn xml_text_reader_namespace_uri(reader: &mut XmlTextReade
         return null_mut();
     }
     if !(*node).ns.is_null() {
-        return xml_strdup((*(*node).ns).href.load(Ordering::Relaxed));
+        return xml_strdup((*(*node).ns).href);
     }
     null_mut()
 }
@@ -3611,9 +3603,7 @@ pub unsafe extern "C" fn xml_text_reader_value(reader: &mut XmlTextReader) -> *m
     };
 
     match (*node).typ {
-        XmlElementType::XmlNamespaceDecl => {
-            return xml_strdup((*(node as XmlNsPtr)).href.load(Ordering::Relaxed))
-        }
+        XmlElementType::XmlNamespaceDecl => return xml_strdup((*(node as XmlNsPtr)).href),
         XmlElementType::XmlAttributeNode => {
             let attr: XmlAttrPtr = node as XmlAttrPtr;
 
@@ -3806,7 +3796,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_no(
     }
 
     if !ns.is_null() {
-        return xml_strdup((*ns).href.load(Ordering::Relaxed));
+        return xml_strdup((*ns).href);
     }
     cur = (*reader.node).properties;
     if cur.is_null() {
@@ -3877,7 +3867,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
             ns = (*reader.node).ns_def;
             while !ns.is_null() {
                 if (*ns).prefix.load(Ordering::Relaxed).is_null() {
-                    return xml_strdup((*ns).href.load(Ordering::Relaxed));
+                    return xml_strdup((*ns).href);
                 }
                 ns = (*ns).next.load(Ordering::Relaxed);
             }
@@ -3896,7 +3886,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
             if !(*ns).prefix.load(Ordering::Relaxed).is_null()
                 && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), localname)
             {
-                ret = xml_strdup((*ns).href.load(Ordering::Relaxed));
+                ret = xml_strdup((*ns).href);
                 break;
             }
             ns = (*ns).next.load(Ordering::Relaxed);
@@ -3909,7 +3899,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
                 .as_deref(),
         );
         if !ns.is_null() {
-            let href = (*ns).href.load(Ordering::Relaxed);
+            let href = (*ns).href;
             ret = (*reader.node).get_ns_prop(
                 CStr::from_ptr(localname as *const i8)
                     .to_string_lossy()
@@ -3978,7 +3968,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
                 || (!(*ns).prefix.load(Ordering::Relaxed).is_null()
                     && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), local_name))
             {
-                return xml_strdup((*ns).href.load(Ordering::Relaxed));
+                return xml_strdup((*ns).href);
             }
             ns = (*ns).next.load(Ordering::Relaxed);
         }
@@ -4076,7 +4066,7 @@ pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
     if ns.is_null() {
         return null_mut();
     }
-    xml_strdup((*ns).href.load(Ordering::Relaxed))
+    xml_strdup((*ns).href)
 }
 
 /**
@@ -4321,8 +4311,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
          *   - and the attribute carrying that namespace
          */
         if xml_str_equal((*prop).name, local_name)
-            && (!(*prop).ns.is_null()
-                && xml_str_equal((*(*prop).ns).href.load(Ordering::Relaxed), namespace_uri))
+            && (!(*prop).ns.is_null() && xml_str_equal((*(*prop).ns).href, namespace_uri))
         {
             reader.curnode = prop as XmlNodePtr;
             return 1;

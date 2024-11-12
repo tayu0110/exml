@@ -1859,17 +1859,14 @@ unsafe fn xml_sax2_attribute_internal(
                 if !(*prop).ns.is_null()
                     && (xml_str_equal(name, (*prop).name)
                         && (namespace == (*prop).ns
-                            || xml_str_equal(
-                                (*namespace).href.load(Ordering::Relaxed) as _,
-                                (*(*prop).ns).href.load(Ordering::Relaxed) as _,
-                            )))
+                            || xml_str_equal((*namespace).href as _, (*(*prop).ns).href as _)))
                 {
                     xml_ns_err_msg(
                         ctxt,
                         XmlParserErrors::XmlErrAttributeRedefined,
                         c"Attribute %s in %s redefined\n".as_ptr() as _,
                         name,
-                        (*namespace).href.load(Ordering::Relaxed) as _,
+                        (*namespace).href as _,
                     );
                     (*ctxt).well_formed = 0;
                     if (*ctxt).recovery == 0 {
@@ -2425,9 +2422,8 @@ pub unsafe fn xml_sax2_start_element(
          * is unbound on a parent we simply keep it NULL
          */
         if !ns.is_null()
-            && !(*ns).href.load(Ordering::Relaxed).is_null()
-            && (*(*ns).href.load(Ordering::Relaxed).add(0) != 0
-                || !(*ns).prefix.load(Ordering::Relaxed).is_null())
+            && !(*ns).href.is_null()
+            && (*(*ns).href.add(0) != 0 || !(*ns).prefix.load(Ordering::Relaxed).is_null())
         {
             (*ret).set_ns(ns);
         }

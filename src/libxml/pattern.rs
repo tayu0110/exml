@@ -7,7 +7,6 @@ use std::{
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
-    sync::atomic::Ordering,
 };
 
 use libc::memset;
@@ -1666,14 +1665,11 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     if !(*step).value2.is_null() {
                                         break 'rollback;
                                     }
-                                } else if !(*(*node).ns).href.load(Ordering::Relaxed).is_null() {
+                                } else if !(*(*node).ns).href.is_null() {
                                     if (*step).value2.is_null() {
                                         break 'rollback;
                                     }
-                                    if !xml_str_equal(
-                                        (*step).value2,
-                                        (*(*node).ns).href.load(Ordering::Relaxed),
-                                    ) {
+                                    if !xml_str_equal((*step).value2, (*(*node).ns).href) {
                                         break 'rollback;
                                     }
                                 }
@@ -1727,10 +1723,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                         break 'rollback;
                                     }
                                 } else if !(*step).value2.is_null()
-                                    && !xml_str_equal(
-                                        (*step).value2,
-                                        (*(*node).ns).href.load(Ordering::Relaxed),
-                                    )
+                                    && !xml_str_equal((*step).value2, (*(*node).ns).href)
                                 {
                                     break 'rollback;
                                 }
@@ -1763,14 +1756,11 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     if !(*step).value2.is_null() {
                                         break 'rollback;
                                     }
-                                } else if !(*(*node).ns).href.load(Ordering::Relaxed).is_null() {
+                                } else if !(*(*node).ns).href.is_null() {
                                     if (*step).value2.is_null() {
                                         break 'rollback;
                                     }
-                                    if !xml_str_equal(
-                                        (*step).value2,
-                                        (*(*node).ns).href.load(Ordering::Relaxed),
-                                    ) {
+                                    if !xml_str_equal((*step).value2, (*(*node).ns).href) {
                                         break 'rollback;
                                     }
                                 }
@@ -1813,14 +1803,11 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                             if (*step).value2.is_null() {
                                                 break;
                                             }
-                                        } else if !(*(*node).ns)
-                                            .href
-                                            .load(Ordering::Relaxed)
-                                            .is_null()
+                                        } else if !(*(*node).ns).href.is_null()
                                             && (!(*step).value2.is_null()
                                                 && xml_str_equal(
                                                     (*step).value2,
-                                                    (*(*node).ns).href.load(Ordering::Relaxed),
+                                                    (*(*node).ns).href,
                                                 ))
                                         {
                                             break;
@@ -1850,14 +1837,11 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     if !(*step).value.is_null() {
                                         break 'rollback;
                                     }
-                                } else if !(*(*node).ns).href.load(Ordering::Relaxed).is_null() {
+                                } else if !(*(*node).ns).href.is_null() {
                                     if (*step).value.is_null() {
                                         break 'rollback;
                                     }
-                                    if !xml_str_equal(
-                                        (*step).value,
-                                        (*(*node).ns).href.load(Ordering::Relaxed),
-                                    ) {
+                                    if !xml_str_equal((*step).value, (*(*node).ns).href) {
                                         break 'rollback;
                                     }
                                 }

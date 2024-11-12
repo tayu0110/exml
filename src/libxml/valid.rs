@@ -5003,14 +5003,7 @@ pub unsafe extern "C" fn xml_validate_element(
             ns = (*elem).ns_def;
             while !ns.is_null() {
                 if (*elem).ns.is_null() {
-                    ret &= xml_validate_one_namespace(
-                        ctxt,
-                        doc,
-                        elem,
-                        null_mut(),
-                        ns,
-                        (*ns).href.load(Ordering::Relaxed),
-                    );
+                    ret &= xml_validate_one_namespace(ctxt, doc, elem, null_mut(), ns, (*ns).href);
                 } else {
                     ret &= xml_validate_one_namespace(
                         ctxt,
@@ -5018,7 +5011,7 @@ pub unsafe extern "C" fn xml_validate_element(
                         elem,
                         (*(*elem).ns).prefix.load(Ordering::Relaxed),
                         ns,
-                        (*ns).href.load(Ordering::Relaxed),
+                        (*ns).href,
                     );
                 }
                 ns = (*ns).next.load(Ordering::Relaxed);
@@ -6751,10 +6744,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
                         if (*ns).prefix.load(Ordering::Relaxed).is_null() {
-                            if !xml_str_equal(
-                                (*attr).default_value,
-                                (*ns).href.load(Ordering::Relaxed),
-                            ) {
+                            if !xml_str_equal((*attr).default_value, (*ns).href) {
                                 xml_err_valid_node(ctxt, elem,
                                     XmlParserErrors::XmlDTDElemDefaultNamespace,
                                 c"Element %s namespace name for default namespace does not match the DTD\n".as_ptr() as _,
@@ -6771,10 +6761,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
                         if xml_str_equal((*attr).name, (*ns).prefix.load(Ordering::Relaxed)) {
-                            if !xml_str_equal(
-                                (*attr).default_value,
-                                (*ns).href.load(Ordering::Relaxed),
-                            ) {
+                            if !xml_str_equal((*attr).default_value, (*ns).href) {
                                 xml_err_valid_node(
                                     ctxt,
                                     elem,
@@ -7101,7 +7088,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
     if elem.is_null() || (*elem).name.is_null() {
         return 0;
     }
-    if ns.is_null() || (*ns).href.load(Ordering::Relaxed).is_null() {
+    if ns.is_null() || (*ns).href.is_null() {
         return 0;
     }
 

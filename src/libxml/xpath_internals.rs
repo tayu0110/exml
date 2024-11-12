@@ -2318,9 +2318,7 @@ pub unsafe extern "C" fn xml_xpath_ns_lookup(
                     prefix,
                 )
             {
-                return (*(*(*ctxt).namespaces.add(i as usize)))
-                    .href
-                    .load(Ordering::Relaxed) as _;
+                return (*(*(*ctxt).namespaces.add(i as usize))).href;
             }
         }
     }
@@ -3353,11 +3351,8 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPt
     }
     memset(cur as _, 0, size_of::<XmlNs>());
     (*cur).typ = XmlElementType::XmlNamespaceDecl;
-    if !(*ns).href.load(Ordering::Relaxed).is_null() {
-        (*cur).href.store(
-            xml_strdup((*ns).href.load(Ordering::Relaxed)),
-            Ordering::Relaxed,
-        );
+    if !(*ns).href.is_null() {
+        (*cur).href = xml_strdup((*ns).href);
     }
     if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
         (*cur).prefix.store(
@@ -4115,7 +4110,7 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
                 i = 0;
                 for j in 0..(*ctxt).ns_nr {
                     ns = *(*ctxt).namespaces.add(j as usize);
-                    *namespaces.add(i as usize) = (*ns).href.load(Ordering::Relaxed);
+                    *namespaces.add(i as usize) = (*ns).href;
                     i += 1;
                     *namespaces.add(i as usize) = (*ns).prefix.load(Ordering::Relaxed);
                     i += 1;
@@ -6358,7 +6353,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                     patstream,
                                     (*cur).name,
                                     if !(*cur).ns.is_null() {
-                                        (*(*cur).ns).href.load(Ordering::Relaxed)
+                                        (*(*cur).ns).href
                                     } else {
                                         null_mut()
                                     },
@@ -7594,11 +7589,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                     if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
                         if matches!((*cur).typ, XmlElementType::XmlAttributeNode)
                             && (prefix.is_null()
-                                || (!(*cur).ns.is_null()
-                                    && xml_str_equal(
-                                        uri,
-                                        (*(*cur).ns).href.load(Ordering::Relaxed),
-                                    )))
+                                || (!(*cur).ns.is_null() && xml_str_equal(uri, (*(*cur).ns).href)))
                         {
                             xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
@@ -7608,8 +7599,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                         }
                     } else if matches!((*cur).typ, XmlElementType::XmlElementNode)
                         && (prefix.is_null()
-                            || (!(*cur).ns.is_null()
-                                && xml_str_equal(uri, (*(*cur).ns).href.load(Ordering::Relaxed))))
+                            || (!(*cur).ns.is_null() && xml_str_equal(uri, (*(*cur).ns).href)))
                     {
                         xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                     }
@@ -7637,7 +7627,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                                         xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
                                 } else if !(*cur).ns.is_null()
-                                    && xml_str_equal(uri, (*(*cur).ns).href.load(Ordering::Relaxed))
+                                    && xml_str_equal(uri, (*(*cur).ns).href)
                                 {
                                     xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
@@ -7654,10 +7644,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                                         xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
                                 } else if !(*attr).ns.is_null()
-                                    && xml_str_equal(
-                                        uri,
-                                        (*(*attr).ns).href.load(Ordering::Relaxed),
-                                    )
+                                    && xml_str_equal(uri, (*(*attr).ns).href)
                                 {
                                     xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
@@ -10377,7 +10364,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
             return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
         }
         XmlElementType::XmlNamespaceDecl => {
-            string = (*(node as XmlNsPtr)).href.load(Ordering::Relaxed);
+            string = (*(node as XmlNsPtr)).href;
             if string.is_null() {
                 return 0;
             }
@@ -12173,7 +12160,7 @@ thread_local! {
     static XML_XPATH_XMLNAMESPACE_STRUCT: XmlNs = const { XmlNs {
         next: AtomicPtr::new(null_mut()),
         typ: XmlElementType::XmlNamespaceDecl,
-        href: AtomicPtr::new(XML_XML_NAMESPACE.as_ptr() as *mut u8),
+        href: XML_XML_NAMESPACE.as_ptr() as *const u8,
         prefix: AtomicPtr::new(c"xml".as_ptr() as *mut u8),
         _private: AtomicPtr::new(null_mut()),
         context: null_mut(),
@@ -12990,9 +12977,7 @@ pub unsafe extern "C" fn xml_xpath_namespace_uri_function(
                         ctxt,
                         xml_xpath_cache_new_string(
                             (*ctxt).context,
-                            (*(*(*(*(*cur).nodesetval).node_tab.add(i as usize))).ns)
-                                .href
-                                .load(Ordering::Relaxed),
+                            (*(*(*(*(*cur).nodesetval).node_tab.add(i as usize))).ns).href,
                         ),
                     );
                 }
@@ -13921,8 +13906,8 @@ pub(crate) unsafe extern "C" fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
             XmlElementType::XmlNamespaceDecl
         )
     {
-        if !(*ns).href.load(Ordering::Relaxed).is_null() {
-            xml_free((*ns).href.load(Ordering::Relaxed) as _);
+        if !(*ns).href.is_null() {
+            xml_free((*ns).href as _);
         }
         if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
             xml_free((*ns).prefix.load(Ordering::Relaxed) as _);

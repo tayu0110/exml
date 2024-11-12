@@ -2171,7 +2171,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
         let mut i = 0;
         let mut ns = (*root).ns_def;
         while !ns.is_null() && i < 20 {
-            namespaces[i] = (*ns).href.load(Ordering::Relaxed);
+            namespaces[i] = (*ns).href;
             i += 1;
             namespaces[i] = (*ns).prefix.load(Ordering::Relaxed);
             i += 1;

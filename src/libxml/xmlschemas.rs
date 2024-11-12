@@ -642,10 +642,7 @@ macro_rules! IS_SCHEMA {
         !$node.is_null()
             && !(*$node).ns.is_null()
             && xml_str_equal((*$node).name, $type as _)
-            && xml_str_equal(
-                (*(*$node).ns).href.load(Ordering::Relaxed),
-                XML_SCHEMA_NS.as_ptr() as _,
-            )
+            && xml_str_equal((*(*$node).ns).href, XML_SCHEMA_NS.as_ptr() as _)
     };
 }
 
@@ -2195,11 +2192,7 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
         if !(*elem).ns.is_null() {
             *buf = xml_strcat(
                 *buf,
-                xml_schema_format_qname(
-                    addr_of_mut!(str),
-                    (*(*elem).ns).href.load(Ordering::Relaxed),
-                    (*elem).name,
-                ),
+                xml_schema_format_qname(addr_of_mut!(str), (*(*elem).ns).href, (*elem).name),
             );
             FREE_AND_NULL!(str);
         } else {
@@ -2214,7 +2207,7 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
                 *buf,
                 xml_schema_format_qname(
                     addr_of_mut!(str),
-                    (*(*item_node).ns).href.load(Ordering::Relaxed),
+                    (*(*item_node).ns).href,
                     (*item_node).name,
                 ),
             );
@@ -2262,11 +2255,7 @@ unsafe extern "C" fn xml_schema_format_node_for_error(
             if !(*elem).ns.is_null() {
                 *msg = xml_strcat(
                     *msg,
-                    xml_schema_format_qname(
-                        addr_of_mut!(str),
-                        (*(*elem).ns).href.load(Ordering::Relaxed),
-                        (*elem).name,
-                    ),
+                    xml_schema_format_qname(addr_of_mut!(str), (*(*elem).ns).href, (*elem).name),
                 );
             } else {
                 *msg = xml_strcat(
@@ -2283,11 +2272,7 @@ unsafe extern "C" fn xml_schema_format_node_for_error(
         if !(*node).ns.is_null() {
             *msg = xml_strcat(
                 *msg,
-                xml_schema_format_qname(
-                    addr_of_mut!(str),
-                    (*(*node).ns).href.load(Ordering::Relaxed),
-                    (*node).name,
-                ),
+                xml_schema_format_qname(addr_of_mut!(str), (*(*node).ns).href, (*node).name),
             );
         } else {
             *msg = xml_strcat(
@@ -2651,7 +2636,7 @@ unsafe extern "C" fn xml_schema_lookup_namespace(
                 .as_deref(),
         );
         if !ns.is_null() {
-            return (*ns).href.load(Ordering::Relaxed);
+            return (*ns).href;
         }
         return null_mut();
     }
@@ -2741,7 +2726,7 @@ unsafe extern "C" fn xml_schema_validate_notation(
                         .as_deref(),
                 );
                 if !ns.is_null() {
-                    ns_name = (*ns).href.load(Ordering::Relaxed);
+                    ns_name = (*ns).href;
                 }
             } else {
                 xml_free(prefix as _);
@@ -6940,7 +6925,7 @@ unsafe extern "C" fn xml_schema_format_qname_ns(
     local_name: *const XmlChar,
 ) -> *const XmlChar {
     if !ns.is_null() {
-        xml_schema_format_qname(buf, (*ns).href.load(Ordering::Relaxed), local_name)
+        xml_schema_format_qname(buf, (*ns).href, local_name)
     } else {
         xml_schema_format_qname(buf, null_mut(), local_name)
     }
@@ -7065,7 +7050,7 @@ unsafe extern "C" fn xml_schema_get_prop_node_ns(
     while !prop.is_null() {
         if !(*prop).ns.is_null()
             && xml_str_equal((*prop).name, name as _)
-            && xml_str_equal((*(*prop).ns).href.load(Ordering::Relaxed), uri as _)
+            && xml_str_equal((*(*prop).ns).href, uri as _)
         {
             return prop;
         }
@@ -7201,10 +7186,7 @@ unsafe extern "C" fn xml_schema_parse_annotation(
     while !attr.is_null() {
         if ((*attr).ns.is_null() && !xml_str_equal((*attr).name, c"id".as_ptr() as _))
             || (!(*attr).ns.is_null()
-                && xml_str_equal(
-                    (*(*attr).ns).href.load(Ordering::Relaxed),
-                    XML_SCHEMA_NS.as_ptr() as _,
-                ))
+                && xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _))
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
@@ -7232,10 +7214,7 @@ unsafe extern "C" fn xml_schema_parse_annotation(
             while !attr.is_null() {
                 if ((*attr).ns.is_null() && !xml_str_equal((*attr).name, c"source".as_ptr() as _))
                     || (!(*attr).ns.is_null()
-                        && xml_str_equal(
-                            (*(*attr).ns).href.load(Ordering::Relaxed),
-                            XML_SCHEMA_NS.as_ptr() as _,
-                        ))
+                        && xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _))
                 {
                     xml_schema_pillegal_attr_err(
                         ctxt,
@@ -7273,14 +7252,9 @@ unsafe extern "C" fn xml_schema_parse_annotation(
                             attr,
                         );
                     }
-                } else if xml_str_equal(
-                    (*(*attr).ns).href.load(Ordering::Relaxed),
-                    XML_SCHEMA_NS.as_ptr() as _,
-                ) || (xml_str_equal((*attr).name, c"lang".as_ptr() as _)
-                    && !xml_str_equal(
-                        (*(*attr).ns).href.load(Ordering::Relaxed),
-                        XML_XML_NAMESPACE.as_ptr() as _,
-                    ))
+                } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _)
+                    || (xml_str_equal((*attr).name, c"lang".as_ptr() as _)
+                        && !xml_str_equal((*(*attr).ns).href, XML_XML_NAMESPACE.as_ptr() as _))
                 {
                     xml_schema_pillegal_attr_err(
                         ctxt,
@@ -7618,10 +7592,7 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -7872,11 +7843,8 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
         ns = (*(*attr).parent).search_ns((*attr).doc, None);
-        if !ns.is_null()
-            && !(*ns).href.load(Ordering::Relaxed).is_null()
-            && *(*ns).href.load(Ordering::Relaxed).add(0) != 0
-        {
-            *uri = xml_dict_lookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
+        if !ns.is_null() && !(*ns).href.is_null() && *(*ns).href.add(0) != 0 {
+            *uri = xml_dict_lookup((*ctxt).dict, (*ns).href, -1);
         } else if (*schema).flags & XML_SCHEMAS_INCLUDING_CONVERT_NS != 0 {
             /* TODO: move XML_SCHEMAS_INCLUDING_CONVERT_NS to the
              * parser context. */
@@ -7903,7 +7871,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
         xml_schema_psimple_type_err(ctxt, XmlParserErrors::XmlSchemapS4sAttrInvalidValue, owner_item, attr as XmlNodePtr, xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname), null_mut(), value, c"The value '%s' of simple type 'xs:QName' has no corresponding namespace declaration in scope".as_ptr() as _, value, null_mut());
         return (*ctxt).err;
     } else {
-        *uri = xml_dict_lookup((*ctxt).dict, (*ns).href.load(Ordering::Relaxed), -1);
+        *uri = xml_dict_lookup((*ctxt).dict, (*ns).href, -1);
     }
     0
 }
@@ -8771,10 +8739,7 @@ unsafe extern "C" fn xml_schema_parse_model_group_def_ref(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9109,10 +9074,7 @@ unsafe extern "C" fn xml_schema_parse_local_attribute(
                     }
                     break 'attr_next;
                 }
-            } else if !xml_str_equal(
-                (*(*attr).ns).href.load(Ordering::Relaxed),
-                XML_SCHEMA_NS.as_ptr() as _,
-            ) {
+            } else if !xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
                 break 'attr_next;
             }
 
@@ -9511,10 +9473,7 @@ unsafe extern "C" fn xml_schema_parse_attribute_group_ref(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9921,10 +9880,7 @@ unsafe extern "C" fn xml_schema_parse_any_attribute(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10008,10 +9964,7 @@ unsafe extern "C" fn xml_schema_parse_extension(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10193,10 +10146,7 @@ unsafe extern "C" fn xml_schema_parse_simple_content(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10324,10 +10274,7 @@ unsafe extern "C" fn xml_schema_parse_complex_content(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10630,10 +10577,7 @@ unsafe extern "C" fn xml_schema_parse_complex_type(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10961,7 +10905,7 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
                 return -1;
             }
             for i in 0..count {
-                *ns_array.add(2 * i) = (*(*ns_list.add(i))).href.load(Ordering::Relaxed);
+                *ns_array.add(2 * i) = (*(*ns_list.add(i))).href;
                 *ns_array.add(2 * i + 1) = (*(*ns_list.add(i))).prefix.load(Ordering::Relaxed);
             }
             *ns_array.add(count * 2) = null_mut();
@@ -11041,10 +10985,7 @@ unsafe extern "C" fn xml_schema_parse_idcselector_and_field(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11162,10 +11103,7 @@ unsafe extern "C" fn xml_schema_parse_idc(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11466,10 +11404,7 @@ unsafe extern "C" fn xml_schema_parse_element(
                             xml_schema_pcustom_attr_err(ctxt, XmlParserErrors::XmlSchemapSrcElement2_2, null_mut(), null_mut(), attr, c"Only the attributes 'minOccurs', 'maxOccurs' and 'id' are allowed in addition to 'ref'".as_ptr() as _);
                             break;
                         }
-                    } else if xml_str_equal(
-                        (*(*attr).ns).href.load(Ordering::Relaxed),
-                        XML_SCHEMA_NS.as_ptr() as _,
-                    ) {
+                    } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
                         xml_schema_pillegal_attr_err(
                             ctxt,
                             XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11611,10 +11546,7 @@ unsafe extern "C" fn xml_schema_parse_element(
                         );
                     }
                 }
-            } else if xml_str_equal(
-                (*(*attr).ns).href.load(Ordering::Relaxed),
-                XML_SCHEMA_NS.as_ptr() as _,
-            ) {
+            } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11942,10 +11874,7 @@ unsafe extern "C" fn xml_schema_parse_any(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12110,10 +12039,7 @@ unsafe extern "C" fn xml_schema_parse_model_group(
                         attr,
                     );
                 }
-            } else if xml_str_equal(
-                (*(*attr).ns).href.load(Ordering::Relaxed) as _,
-                XML_SCHEMA_NS.as_ptr() as _,
-            ) {
+            } else if xml_str_equal((*(*attr).ns).href as _, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12138,10 +12064,7 @@ unsafe extern "C" fn xml_schema_parse_model_group(
                         attr,
                     );
                 }
-            } else if xml_str_equal(
-                (*(*attr).ns).href.load(Ordering::Relaxed) as _,
-                XML_SCHEMA_NS.as_ptr() as _,
-            ) {
+            } else if xml_str_equal((*(*attr).ns).href as _, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12501,10 +12424,7 @@ unsafe extern "C" fn xml_schema_parse_restriction(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12861,10 +12781,7 @@ unsafe extern "C" fn xml_schema_parse_list(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -13014,10 +12931,7 @@ unsafe extern "C" fn xml_schema_parse_union(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -13317,10 +13231,7 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
                         attr,
                     );
                 }
-            } else if xml_str_equal(
-                (*(*attr).ns).href.load(Ordering::Relaxed),
-                XML_SCHEMA_NS.as_ptr() as _,
-            ) {
+            } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -13368,10 +13279,7 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
                         attr,
                     );
                 }
-            } else if xml_str_equal(
-                (*(*attr).ns).href.load(Ordering::Relaxed),
-                XML_SCHEMA_NS.as_ptr() as _,
-            ) {
+            } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -13611,10 +13519,7 @@ unsafe extern "C" fn xml_schema_parse_model_group_definition(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -13808,10 +13713,7 @@ unsafe extern "C" fn xml_schema_parse_attribute_group_definition(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -14140,10 +14042,7 @@ unsafe extern "C" fn xml_schema_parse_import(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -14450,10 +14349,7 @@ unsafe extern "C" fn xml_schema_parse_global_attribute(
                     attr,
                 );
             }
-        } else if xml_str_equal(
-            (*(*attr).ns).href.load(Ordering::Relaxed),
-            XML_SCHEMA_NS.as_ptr() as _,
-        ) {
+        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -27594,11 +27490,7 @@ unsafe extern "C" fn xml_schema_format_error_node_qname(
 ) -> *const XmlChar {
     if !node.is_null() {
         if !(*node).ns.is_null() {
-            return xml_schema_format_qname(
-                str,
-                (*(*node).ns).href.load(Ordering::Relaxed),
-                (*node).name,
-            );
+            return xml_schema_format_qname(str, (*(*node).ns).href, (*node).name);
         } else {
             return xml_schema_format_qname(str, null_mut(), (*node).name);
         }
@@ -30359,7 +30251,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 (*ielem).node_line = (*node).line as _;
                 (*ielem).local_name = (*node).name;
                 if !(*node).ns.is_null() {
-                    (*ielem).ns_name = (*(*node).ns).href.load(Ordering::Relaxed);
+                    (*ielem).ns_name = (*(*node).ns).href;
                 }
                 (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;
                 /*
@@ -30372,7 +30264,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     attr = (*node).properties;
                     while {
                         if !(*attr).ns.is_null() {
-                            ns_name = (*(*attr).ns).href.load(Ordering::Relaxed);
+                            ns_name = (*(*attr).ns).href;
                         } else {
                             ns_name = null_mut();
                         }

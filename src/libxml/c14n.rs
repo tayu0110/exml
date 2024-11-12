@@ -694,8 +694,8 @@ unsafe extern "C" fn xml_c14n_check_for_relative_namespaces(
 
     ns = (*cur).ns_def;
     while !ns.is_null() {
-        if xml_strlen((*ns).href.load(Ordering::Relaxed) as _) > 0 {
-            let uri: XmlURIPtr = xml_parse_uri((*ns).href.load(Ordering::Relaxed) as _);
+        if xml_strlen((*ns).href as _) > 0 {
+            let uri: XmlURIPtr = xml_parse_uri((*ns).href as _);
             if uri.is_null() {
                 xml_c14n_err_internal(c"parsing namespace uri".as_ptr() as _);
                 return -1;
@@ -767,10 +767,7 @@ unsafe extern "C" fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
             (*ns).prefix.load(Ordering::Relaxed) as _,
             c"xml".as_ptr() as _,
         )
-        && xml_str_equal(
-            (*ns).href.load(Ordering::Relaxed) as _,
-            XML_XML_NAMESPACE.as_ptr() as _,
-        )
+        && xml_str_equal((*ns).href as _, XML_XML_NAMESPACE.as_ptr() as _)
 }
 
 unsafe extern "C" fn xml_c14n_str_equal(
@@ -822,14 +819,12 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_find(
     } else {
         c"".as_ptr() as _
     };
-    let href: *const XmlChar = if let Some(href) = ns
-        .filter(|ns| !ns.href.load(Ordering::Relaxed).is_null())
-        .map(|ns| ns.href.load(Ordering::Relaxed))
-    {
-        href
-    } else {
-        c"".as_ptr() as _
-    };
+    let href: *const XmlChar =
+        if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
+            href
+        } else {
+            c"".as_ptr() as _
+        };
 
     let has_empty_ns =
         xml_c14n_str_equal(prefix, null_mut()) && xml_c14n_str_equal(href, null_mut());
@@ -854,7 +849,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_find(
                 return xml_c14n_str_equal(
                     href,
                     if !ns1.is_null() {
-                        (*ns1).href.load(Ordering::Relaxed)
+                        (*ns1).href
                     } else {
                         null_mut()
                     },
@@ -957,10 +952,10 @@ unsafe extern "C" fn xml_c14n_print_namespaces(ns: &XmlNs, ctx: XmlC14NCtxPtr) -
     } else {
         (*(*ctx).buf).write_str(" xmlns=");
     }
-    if !ns.href.load(Ordering::Relaxed).is_null() {
+    if !ns.href.is_null() {
         xml_buf_write_quoted_string(
             (*(*ctx).buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
-            ns.href.load(Ordering::Relaxed),
+            ns.href,
         );
     } else {
         (*(*ctx).buf).write_str("\"\"");
@@ -1112,14 +1107,12 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
     } else {
         c"".as_ptr() as _
     };
-    let href: *const XmlChar = if let Some(href) = ns
-        .filter(|ns| !ns.href.load(Ordering::Relaxed).is_null())
-        .map(|ns| ns.href.load(Ordering::Relaxed))
-    {
-        href
-    } else {
-        c"".as_ptr() as _
-    };
+    let href: *const XmlChar =
+        if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
+            href
+        } else {
+            c"".as_ptr() as _
+        };
     let has_empty_ns: i32 =
         (xml_c14n_str_equal(prefix, null_mut()) && xml_c14n_str_equal(href, null_mut())) as _;
 
@@ -1139,7 +1132,7 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
                 if xml_c14n_str_equal(
                     href,
                     if !ns1.is_null() {
-                        (*ns1).href.load(Ordering::Relaxed)
+                        (*ns1).href
                     } else {
                         null_mut()
                     },
@@ -1301,7 +1294,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
             }
         } else if !(*attr).ns.is_null()
             && xml_strlen((*(*attr).ns).prefix.load(Ordering::Relaxed)) == 0
-            && xml_strlen((*(*attr).ns).href.load(Ordering::Relaxed)) == 0
+            && xml_strlen((*(*attr).ns).href) == 0
         {
             has_visibly_utilized_empty_ns = 1;
         }
@@ -1399,10 +1392,7 @@ extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void)
             return 1;
         }
 
-        let mut ret: i32 = xml_strcmp(
-            (*(*attr1).ns).href.load(Ordering::Relaxed),
-            (*(*attr2).ns).href.load(Ordering::Relaxed),
-        );
+        let mut ret: i32 = xml_strcmp((*(*attr1).ns).href, (*(*attr2).ns).href);
         if ret == 0 {
             ret = xml_strcmp((*attr1).name, (*attr2).name);
         }
