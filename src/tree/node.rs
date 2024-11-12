@@ -1312,6 +1312,75 @@ impl XmlNode {
         ret
     }
 
+    /// Builds the string equivalent to the text contained in the Node list
+    /// made of TEXTs and ENTITY_REFs, contrary to `xmlNodeListGetString()`
+    /// this function doesn't do any character encoding handling.
+    ///
+    /// Returns a pointer to the string copy, the caller must free it with `xml_free()`.
+    #[doc(alias = "xmlNodeListGetRawString")]
+    #[cfg(feature = "tree")]
+    pub unsafe fn get_raw_string(&self, doc: *const XmlDoc, in_line: i32) -> *mut XmlChar {
+        use crate::libxml::entities::xml_encode_special_chars;
+
+        let mut node: *const XmlNode = self;
+        let mut ret: *mut XmlChar = null_mut();
+        let mut ent: XmlEntityPtr;
+
+        while !node.is_null() {
+            if matches!(
+                (*node).typ,
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+            ) {
+                if in_line != 0 {
+                    ret = xml_strcat(ret, (*node).content);
+                } else {
+                    let buffer: *mut XmlChar = xml_encode_special_chars(doc, (*node).content);
+                    if !buffer.is_null() {
+                        ret = xml_strcat(ret, buffer);
+                        xml_free(buffer as _);
+                    }
+                }
+            } else if matches!((*node).typ, XmlElementType::XmlEntityRefNode) {
+                if in_line != 0 {
+                    ent = xml_get_doc_entity(doc, (*node).name);
+                    if !ent.is_null() {
+                        // an entity content can be any "well balanced chunk",
+                        // i.e. the result of the content [43] production:
+                        // http://www.w3.org/TR/REC-xml#NT-content.
+                        // So it can contain text, CDATA section or nested
+                        // entity reference nodes (among others).
+                        // -> we recursive  call xmlNodeListGetRawString()
+                        // which handles these types
+                        let children = (*ent).children.load(Ordering::Relaxed);
+                        let buffer: *mut XmlChar = if children.is_null() {
+                            null_mut()
+                        } else {
+                            (*children).get_raw_string(doc, 1)
+                        };
+                        if !buffer.is_null() {
+                            ret = xml_strcat(ret, buffer);
+                            xml_free(buffer as _);
+                        }
+                    } else {
+                        ret = xml_strcat(ret, (*node).content);
+                    }
+                } else {
+                    let mut buf: [XmlChar; 2] = [0; 2];
+
+                    buf[0] = b'&';
+                    buf[1] = 0;
+                    ret = xml_strncat(ret, buf.as_ptr(), 1);
+                    ret = xml_strcat(ret, (*node).name);
+                    buf[0] = b';';
+                    buf[1] = 0;
+                    ret = xml_strncat(ret, buf.as_ptr(), 1);
+                }
+            }
+            node = (*node).next;
+        }
+        ret
+    }
+
     /// Set (or reset) the name of a node.
     #[doc(alias = "xmlNodeSetName")]
     #[cfg(feature = "tree")]

@@ -41,8 +41,8 @@ use crate::{
         },
         valid::{xml_free_id_table, xml_free_ref_table, xml_remove_id},
         xmlstring::{
-            xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new,
-            xml_strndup, XmlChar,
+            xml_str_equal, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new, xml_strndup,
+            XmlChar,
         },
     },
     private::{
@@ -3509,87 +3509,6 @@ unsafe extern "C" fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra
         _ => c"unexpected error number\n".as_ptr() as _,
     };
     __xml_simple_error(XmlErrorDomain::XmlFromTree, code, node, msg, extra);
-}
-
-/**
- * xmlNodeListGetRawString:
- * @doc:  the document
- * @list:  a Node list
- * @inLine:  should we replace entity contents or show their external form
- *
- * Builds the string equivalent to the text contained in the Node list
- * made of TEXTs and ENTITY_REFs, contrary to xmlNodeListGetString()
- * this function doesn't do any character encoding handling.
- *
- * Returns a pointer to the string copy, the caller must free it with xml_free( as _).
- */
-#[cfg(feature = "tree")]
-pub unsafe extern "C" fn xml_node_list_get_raw_string(
-    doc: *const XmlDoc,
-    list: *const XmlNode,
-    in_line: i32,
-) -> *mut XmlChar {
-    use crate::libxml::entities::xml_encode_special_chars;
-
-    let mut node: *const XmlNode = list;
-    let mut ret: *mut XmlChar = null_mut();
-    let mut ent: XmlEntityPtr;
-
-    if list.is_null() {
-        return null_mut();
-    }
-
-    while !node.is_null() {
-        if (matches!((*node).typ, XmlElementType::XmlTextNode)
-            || matches!((*node).typ, XmlElementType::XmlCDATASectionNode))
-        {
-            if in_line != 0 {
-                ret = xml_strcat(ret, (*node).content);
-            } else {
-                let buffer: *mut XmlChar = xml_encode_special_chars(doc, (*node).content);
-                if !buffer.is_null() {
-                    ret = xml_strcat(ret, buffer);
-                    xml_free(buffer as _);
-                }
-            }
-        } else if matches!((*node).typ, XmlElementType::XmlEntityRefNode) {
-            if in_line != 0 {
-                ent = xml_get_doc_entity(doc, (*node).name);
-                if !ent.is_null() {
-                    /* an entity content can be any "well balanced chunk",
-                     * i.e. the result of the content [43] production:
-                     * http://www.w3.org/TR/REC-xml#NT-content.
-                     * So it can contain text, CDATA section or nested
-                     * entity reference nodes (among others).
-                     * -> we recursive  call xmlNodeListGetRawString()
-                     * which handles these types */
-                    let buffer: *mut XmlChar = xml_node_list_get_raw_string(
-                        doc,
-                        (*ent).children.load(Ordering::Relaxed),
-                        1,
-                    );
-                    if !buffer.is_null() {
-                        ret = xml_strcat(ret, buffer);
-                        xml_free(buffer as _);
-                    }
-                } else {
-                    ret = xml_strcat(ret, (*node).content);
-                }
-            } else {
-                let mut buf: [XmlChar; 2] = [0; 2];
-
-                buf[0] = b'&';
-                buf[1] = 0;
-                ret = xml_strncat(ret, buf.as_ptr(), 1);
-                ret = xml_strcat(ret, (*node).name);
-                buf[0] = b';';
-                buf[1] = 0;
-                ret = xml_strncat(ret, buf.as_ptr(), 1);
-            }
-        }
-        node = (*node).next;
-    }
-    ret
 }
 
 /**
@@ -8259,46 +8178,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlNewTextLen()");
                         eprint!(" {}", n_content);
                         eprintln!(" {}", n_len);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_node_list_get_raw_string() {
-        #[cfg(feature = "tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                for n_list in 0..GEN_NB_CONST_XML_NODE_PTR {
-                    for n_in_line in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_const_xml_doc_ptr(n_doc, 0);
-                        let list = gen_const_xml_node_ptr(n_list, 1);
-                        let in_line = gen_int(n_in_line, 2);
-
-                        let ret_val = xml_node_list_get_raw_string(doc, list, in_line);
-                        desret_xml_char_ptr(ret_val);
-                        des_const_xml_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_node_ptr(n_list, list, 1);
-                        des_int(n_in_line, in_line, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNodeListGetRawString",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlNodeListGetRawString()"
-                            );
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_list);
-                            eprintln!(" {}", n_in_line);
-                        }
                     }
                 }
             }
