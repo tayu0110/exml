@@ -3847,6 +3847,8 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
     reader: &mut XmlTextReader,
     name: *const XmlChar,
 ) -> *mut XmlChar {
+    use std::ffi::CStr;
+
     let mut prefix: *mut XmlChar = null_mut();
     let mut ns: XmlNsPtr;
     let mut ret: *mut XmlChar = null_mut();
@@ -3881,7 +3883,8 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
             }
             return null_mut();
         }
-        return (*reader.node).get_no_ns_prop(name);
+        return (*reader.node)
+            .get_no_ns_prop(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref());
     }
 
     /*
@@ -3901,7 +3904,12 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
     } else {
         ns = (*reader.node).search_ns((*reader.node).doc, prefix);
         if !ns.is_null() {
-            ret = (*reader.node).get_ns_prop(localname, (*ns).href.load(Ordering::Relaxed));
+            ret = (*reader.node).get_ns_prop(
+                CStr::from_ptr(localname as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*ns).href.load(Ordering::Relaxed),
+            );
         }
     }
 
@@ -3929,6 +3937,8 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
     local_name: *const XmlChar,
     namespace_uri: *const XmlChar,
 ) -> *mut XmlChar {
+    use std::ffi::CStr;
+
     let mut prefix: *mut XmlChar = null_mut();
     let mut ns: XmlNsPtr;
 
@@ -3967,7 +3977,12 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
         return null_mut();
     }
 
-    (*reader.node).get_ns_prop(local_name, namespace_uri)
+    (*reader.node).get_ns_prop(
+        CStr::from_ptr(local_name as *const i8)
+            .to_string_lossy()
+            .as_ref(),
+        namespace_uri,
+    )
 }
 
 /**

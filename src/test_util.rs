@@ -856,7 +856,8 @@ unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
     {
         snprintf(name.as_mut_ptr() as _, 20, c"foo%d".as_ptr() as _, NR);
         NR += 1;
-        API_ATTR.set((*API_ROOT.get()).set_prop(name.as_ptr() as _, c"bar".as_ptr() as _));
+        let name = CStr::from_ptr(name.as_ptr() as *const i8).to_string_lossy();
+        API_ATTR.set((*API_ROOT.get()).set_prop(name.as_ref(), c"bar".as_ptr() as _));
     }
     API_ATTR.get()
 }

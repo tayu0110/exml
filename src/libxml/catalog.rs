@@ -1427,7 +1427,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             pref = prefer;
         }
         prop = (*cur).get_prop(c"id".as_ptr() as _);
-        base = (*cur).get_ns_prop(c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+        base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.as_ptr() as _);
         entry = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataGroup,
             prop,
@@ -3223,27 +3223,27 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataNextCatalog => {
                     node = xml_new_doc_node(doc, ns, c"nextCatalog".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"catalog".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("catalog", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::XmlCataNone => {}
                 XmlCatalogEntryType::XmlCataGroup => {
                     node = xml_new_doc_node(doc, ns, c"group".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"id".as_ptr() as _, (*cur).name);
+                    (*node).set_prop("id", (*cur).name);
                     if !(*cur).value.is_null() {
                         let xns: XmlNsPtr =
                             (*node).search_ns_by_href(doc, XML_XML_NAMESPACE.as_ptr() as _);
                         if !xns.is_null() {
-                            (*node).set_ns_prop(xns, c"base".as_ptr() as _, (*cur).value);
+                            (*node).set_ns_prop(xns, "base", (*cur).value);
                         }
                     }
                     match (*cur).prefer {
                         XmlCatalogPrefer::None => {}
                         XmlCatalogPrefer::Public => {
-                            (*node).set_prop(c"prefer".as_ptr() as _, c"public".as_ptr() as _);
+                            (*node).set_prop("prefer", c"public".as_ptr() as _);
                         }
                         XmlCatalogPrefer::System => {
-                            (*node).set_prop(c"prefer".as_ptr() as _, c"system".as_ptr() as _);
+                            (*node).set_prop("prefer", c"system".as_ptr() as _);
                         }
                     }
                     xml_dump_xml_catalog_node((*cur).next, node, doc, ns, cur);
@@ -3251,50 +3251,50 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataPublic => {
                     node = xml_new_doc_node(doc, ns, c"public".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"publicId".as_ptr() as _, (*cur).name);
-                    (*node).set_prop(c"uri".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("publicId", (*cur).name);
+                    (*node).set_prop("uri", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::XmlCataSystem => {
                     node = xml_new_doc_node(doc, ns, c"system".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"systemId".as_ptr() as _, (*cur).name);
-                    (*node).set_prop(c"uri".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("systemId", (*cur).name);
+                    (*node).set_prop("uri", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::XmlCataRewriteSystem => {
                     node = xml_new_doc_node(doc, ns, c"rewriteSystem".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"systemIdStartString".as_ptr() as _, (*cur).name);
-                    (*node).set_prop(c"rewritePrefix".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("systemIdStartString", (*cur).name);
+                    (*node).set_prop("rewritePrefix", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::XmlCataDelegatePublic => {
                     node = xml_new_doc_node(doc, ns, c"delegatePublic".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"publicIdStartString".as_ptr() as _, (*cur).name);
-                    (*node).set_prop(c"catalog".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("publicIdStartString", (*cur).name);
+                    (*node).set_prop("catalog", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::XmlCataDelegateSystem => {
                     node = xml_new_doc_node(doc, ns, c"delegateSystem".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"systemIdStartString".as_ptr() as _, (*cur).name);
-                    (*node).set_prop(c"catalog".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("systemIdStartString", (*cur).name);
+                    (*node).set_prop("catalog", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::XmlCataURI => {
                     node = xml_new_doc_node(doc, ns, c"uri".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"name".as_ptr() as _, (*cur).name);
-                    (*node).set_prop(c"uri".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("name", (*cur).name);
+                    (*node).set_prop("uri", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::XmlCataRewriteURI => {
                     node = xml_new_doc_node(doc, ns, c"rewriteURI".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"uriStartString".as_ptr() as _, (*cur).name);
-                    (*node).set_prop(c"rewritePrefix".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("uriStartString", (*cur).name);
+                    (*node).set_prop("rewritePrefix", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::XmlCataDelegateURI => {
                     node = xml_new_doc_node(doc, ns, c"delegateURI".as_ptr() as _, null_mut());
-                    (*node).set_prop(c"uriStartString".as_ptr() as _, (*cur).name);
-                    (*node).set_prop(c"catalog".as_ptr() as _, (*cur).value);
+                    (*node).set_prop("uriStartString", (*cur).name);
+                    (*node).set_prop("catalog", (*cur).value);
                     (*catalog).add_child(node);
                 }
                 XmlCatalogEntryType::SgmlCataSystem

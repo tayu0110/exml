@@ -398,7 +398,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                     .contains(&encoding.unwrap().to_ascii_lowercase())
             }) {
                 let newcontent = CString::new(newcontent).unwrap();
-                (*meta).set_prop(c"content".as_ptr() as _, newcontent.as_ptr() as _);
+                (*meta).set_prop("content", newcontent.as_ptr() as _);
             }
         }
 

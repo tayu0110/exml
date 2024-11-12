@@ -5429,7 +5429,7 @@ unsafe extern "C" fn xml_schema_get_prop(
     node: XmlNodePtr,
     name: *const c_char,
 ) -> *const XmlChar {
-    let val: *mut XmlChar = (*node).get_no_ns_prop(name as _);
+    let val: *mut XmlChar = (*node).get_no_ns_prop(CStr::from_ptr(name).to_string_lossy().as_ref());
     if val.is_null() {
         return null_mut();
     }

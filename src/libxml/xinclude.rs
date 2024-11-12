@@ -402,12 +402,12 @@ unsafe extern "C" fn xml_xinclude_get_prop(
 ) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
 
-    ret = (*cur).get_ns_prop(XINCLUDE_NS.as_ptr() as _, name);
+    ret = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), name);
     if !ret.is_null() {
         return ret;
     }
     if (*ctxt).legacy != 0 {
-        ret = (*cur).get_ns_prop(XINCLUDE_OLD_NS.as_ptr() as _, name);
+        ret = (*cur).get_ns_prop(XINCLUDE_OLD_NS.to_string_lossy().as_ref(), name);
         if !ret.is_null() {
             return ret;
         }
@@ -1959,8 +1959,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
              * The base is only adjusted if "necessary", i.e. if the xinclude node
              * has a base specified, or the URL is relative
              */
-            base =
-                (*(*refe).elem).get_ns_prop(c"base".as_ptr() as _, XML_XML_NAMESPACE.as_ptr() as _);
+            base = (*(*refe).elem).get_ns_prop("base", XML_XML_NAMESPACE.as_ptr() as _);
             if base.is_null() {
                 /*
                  * No xml:base on the xinclude node, so we check whether the
@@ -2015,10 +2014,8 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                  * set, then relativise it if necessary
                                  */
 
-                                let xml_base: *mut XmlChar = (*node).get_ns_prop(
-                                    c"base".as_ptr() as _,
-                                    XML_XML_NAMESPACE.as_ptr() as _,
-                                );
+                                let xml_base: *mut XmlChar =
+                                    (*node).get_ns_prop("base", XML_XML_NAMESPACE.as_ptr() as _);
                                 if !xml_base.is_null() {
                                     let rel_base: *mut XmlChar = xml_build_uri(xml_base, base);
                                     if rel_base.is_null() {
@@ -2723,7 +2720,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
          * XInclude end one
          */
         if (*refe).fallback != 0 {
-            (*cur).unset_prop(c"href".as_ptr() as _);
+            (*cur).unset_prop("href");
         }
         (*cur).typ = XmlElementType::XmlXIncludeStart;
         /* Remove fallback children */

@@ -769,7 +769,7 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
         } else if IS_SCHEMATRON!(child, c"name".as_ptr() as _) {
             /* Do Nothing */
         } else if IS_SCHEMATRON!(child, c"value-of".as_ptr() as _) {
-            let select: *mut XmlChar = (*child).get_no_ns_prop(c"select".as_ptr() as _);
+            let select: *mut XmlChar = (*child).get_no_ns_prop("select");
 
             if select.is_null() {
                 xml_schematron_perr(
@@ -897,7 +897,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
         return;
     }
 
-    let context: *mut XmlChar = (*rule).get_no_ns_prop(c"context".as_ptr() as _);
+    let context: *mut XmlChar = (*rule).get_no_ns_prop("context");
     if context.is_null() {
         xml_schematron_perr(
             ctxt,
@@ -931,7 +931,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
     NEXT_SCHEMATRON!(cur);
     while !cur.is_null() {
         if IS_SCHEMATRON!(cur, c"let".as_ptr() as _) {
-            name = (*cur).get_no_ns_prop(c"name".as_ptr() as _);
+            name = (*cur).get_no_ns_prop("name");
             if name.is_null() {
                 xml_schematron_perr(
                     ctxt,
@@ -954,7 +954,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 xml_free(name as _);
                 return;
             }
-            value = (*cur).get_no_ns_prop(c"value".as_ptr() as _);
+            value = (*cur).get_no_ns_prop("value");
             if value.is_null() {
                 xml_schematron_perr(
                     ctxt,
@@ -1006,7 +1006,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
             xml_free(value as _);
         } else if IS_SCHEMATRON!(cur, c"assert".as_ptr() as _) {
             nb_checks += 1;
-            test = (*cur).get_no_ns_prop(c"test".as_ptr() as _);
+            test = (*cur).get_no_ns_prop("test");
             if test.is_null() {
                 xml_schematron_perr(
                     ctxt,
@@ -1044,7 +1044,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
             }
         } else if IS_SCHEMATRON!(cur, c"report".as_ptr() as _) {
             nb_checks += 1;
-            test = (*cur).get_no_ns_prop(c"test".as_ptr() as _);
+            test = (*cur).get_no_ns_prop("test");
             if test.is_null() {
                 xml_schematron_perr(
                     ctxt,
@@ -1125,9 +1125,9 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
         return;
     }
 
-    id = (*pat).get_no_ns_prop(c"id".as_ptr() as _);
+    id = (*pat).get_no_ns_prop("id");
     if id.is_null() {
-        id = (*pat).get_no_ns_prop(c"name".as_ptr() as _);
+        id = (*pat).get_no_ns_prop("name");
     }
     let pattern: XmlSchematronPatternPtr =
         xml_schematron_add_pattern(ctxt, (*ctxt).schema, pat, id);
@@ -1297,8 +1297,8 @@ pub unsafe extern "C" fn xml_schematron_parse(
                 NEXT_SCHEMATRON!(cur);
             }
             while IS_SCHEMATRON!(cur, c"ns".as_ptr() as _) {
-                let prefix: *mut XmlChar = (*cur).get_no_ns_prop(c"prefix".as_ptr() as _);
-                let uri: *mut XmlChar = (*cur).get_no_ns_prop(c"uri".as_ptr() as _);
+                let prefix: *mut XmlChar = (*cur).get_no_ns_prop("prefix");
+                let uri: *mut XmlChar = (*cur).get_no_ns_prop("uri");
                 if uri.is_null() || *uri.add(0) == 0 {
                     xml_schematron_perr(
                         ctxt,
@@ -1740,7 +1740,7 @@ unsafe extern "C" fn xml_schematron_format_report(
         {
             ret = xml_strcat(ret, (*child).content);
         } else if IS_SCHEMATRON!(child, c"name".as_ptr() as _) {
-            let path: *mut XmlChar = (*child).get_no_ns_prop(c"path".as_ptr() as _);
+            let path: *mut XmlChar = (*child).get_no_ns_prop("path");
 
             node = cur;
             if !path.is_null() {
@@ -1759,7 +1759,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                 ret = xml_strcat(ret, (*node).name);
             }
         } else if IS_SCHEMATRON!(child, c"value-of".as_ptr() as _) {
-            let select: *mut XmlChar = (*child).get_no_ns_prop(c"select".as_ptr() as _);
+            let select: *mut XmlChar = (*child).get_no_ns_prop("select");
             comp = xml_xpath_ctxt_compile((*ctxt).xctxt, select);
             let eval: XmlXPathObjectPtr = xml_xpath_compiled_eval(comp, (*ctxt).xctxt);
 
