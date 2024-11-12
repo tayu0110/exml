@@ -1066,7 +1066,7 @@ impl XmlNode {
         &self,
         name: &str,
         ns_name: Option<&str>,
-        use_dtd: i32,
+        use_dtd: bool,
     ) -> XmlAttrPtr {
         let mut prop: XmlAttrPtr;
 
@@ -1110,7 +1110,7 @@ impl XmlNode {
 
         #[cfg(feature = "tree")]
         {
-            if use_dtd == 0 {
+            if !use_dtd {
                 return null_mut();
             }
             /*
@@ -1663,7 +1663,7 @@ impl XmlNode {
     #[doc(alias = "xmlUnsetProp")]
     #[cfg(any(feature = "tree", feature = "schema"))]
     pub unsafe fn unset_prop(&mut self, name: &str) -> i32 {
-        let prop: XmlAttrPtr = self.get_prop_node_internal(name, None, 0);
+        let prop: XmlAttrPtr = self.get_prop_node_internal(name, None, false);
         if prop.is_null() {
             return -1;
         }
@@ -1707,7 +1707,7 @@ impl XmlNode {
             (!href.is_null())
                 .then(|| CStr::from_ptr(href).to_string_lossy())
                 .as_deref(),
-            0,
+            false,
         );
         if !prop.is_null() {
             /*
@@ -1765,7 +1765,7 @@ impl XmlNode {
             (!href.is_null())
                 .then(|| CStr::from_ptr(href).to_string_lossy())
                 .as_deref(),
-            0,
+            false,
         );
         if prop.is_null() {
             return -1;
@@ -2192,7 +2192,7 @@ impl XmlNode {
             }
             prop = (*prop).next;
         }
-        if XML_CHECK_DTD.load(Ordering::Relaxed) == 0 {
+        if !XML_CHECK_DTD.load(Ordering::Relaxed) {
             return null_mut();
         }
 

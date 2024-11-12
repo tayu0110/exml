@@ -18,7 +18,7 @@ use std::{
     ffi::{c_char, CStr},
     mem::size_of,
     ptr::{addr_of_mut, null, null_mut},
-    sync::atomic::{AtomicI32, Ordering},
+    sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
 use libc::{memcpy, memset, snprintf, strlen};
@@ -3386,7 +3386,7 @@ pub unsafe extern "C" fn xml_copy_namespace_list(mut cur: XmlNsPtr) -> XmlNsPtr 
  * Changing the content.
  */
 
-static XML_CHECK_DTD: AtomicI32 = AtomicI32::new(1);
+static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
 
 /**
  * xmlTreeErr:
