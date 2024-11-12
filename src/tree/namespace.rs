@@ -27,7 +27,7 @@ pub struct XmlNs {
     pub next: AtomicPtr<XmlNs>,             /* next Ns link for this node  */
     pub(crate) typ: XmlNsType,              /* global or local */
     pub href: *const XmlChar,               /* URL for the namespace */
-    pub prefix: AtomicPtr<XmlChar>,         /* prefix for the namespace */
+    pub prefix: *const XmlChar,             /* prefix for the namespace */
     pub(crate) _private: AtomicPtr<c_void>, /* application data */
     pub(crate) context: *mut XmlDoc,        /* normally an xmlDoc */
 }
@@ -38,7 +38,7 @@ impl Default for XmlNs {
             next: AtomicPtr::new(null_mut()),
             typ: XmlNsType::XmlInvalidNode,
             href: null_mut(),
-            prefix: AtomicPtr::new(null_mut()),
+            prefix: null_mut(),
             _private: AtomicPtr::new(null_mut()),
             context: null_mut(),
         }
@@ -92,7 +92,7 @@ pub unsafe fn xml_new_ns(
         (*cur).href = xml_strdup(href);
     }
     if !prefix.is_null() {
-        (*cur).prefix = AtomicPtr::new(xml_strdup(prefix));
+        (*cur).prefix = xml_strdup(prefix);
     }
 
     /*
@@ -105,24 +105,16 @@ pub unsafe fn xml_new_ns(
         } else {
             let mut prev: XmlNsPtr = (*node).ns_def;
 
-            if ((*prev).prefix.load(Ordering::Relaxed).is_null()
-                && (*cur).prefix.load(Ordering::Relaxed).is_null())
-                || xml_str_equal(
-                    (*prev).prefix.load(Ordering::Relaxed),
-                    (*cur).prefix.load(Ordering::Relaxed),
-                )
+            if ((*prev).prefix.is_null() && (*cur).prefix.is_null())
+                || xml_str_equal((*prev).prefix, (*cur).prefix)
             {
                 xml_free_ns(cur);
                 return null_mut();
             }
             while !(*prev).next.load(Ordering::Relaxed).is_null() {
                 prev = (*prev).next.load(Ordering::Relaxed);
-                if ((*prev).prefix.load(Ordering::Relaxed).is_null()
-                    && (*cur).prefix.load(Ordering::Relaxed).is_null())
-                    || xml_str_equal(
-                        (*prev).prefix.load(Ordering::Relaxed),
-                        (*cur).prefix.load(Ordering::Relaxed),
-                    )
+                if ((*prev).prefix.is_null() && (*cur).prefix.is_null())
+                    || xml_str_equal((*prev).prefix, (*cur).prefix)
                 {
                     xml_free_ns(cur);
                     return null_mut();
@@ -143,8 +135,8 @@ pub unsafe extern "C" fn xml_free_ns(cur: XmlNsPtr) {
     if !(*cur).href.is_null() {
         xml_free((*cur).href as _);
     }
-    if !(*cur).prefix.load(Ordering::Relaxed).is_null() {
-        xml_free((*cur).prefix.load(Ordering::Relaxed) as _);
+    if !(*cur).prefix.is_null() {
+        xml_free((*cur).prefix as _);
     }
     xml_free(cur as _);
 }

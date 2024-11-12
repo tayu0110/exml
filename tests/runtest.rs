@@ -4546,7 +4546,7 @@ unsafe fn pattern_test(
                     while j < 20 && !ns.is_null() {
                         namespaces[j] = (*ns).href;
                         j += 1;
-                        namespaces[j] = (*ns).prefix.load(Ordering::Relaxed);
+                        namespaces[j] = (*ns).prefix;
                         j += 1;
                         ns = (*ns).next.load(Ordering::Relaxed);
                     }
@@ -4705,10 +4705,10 @@ unsafe extern "C" fn load_xpath_expr(
      */
     ns = (*node).ns_def;
     while !ns.is_null() {
-        if xml_xpath_register_ns(ctx, (*ns).prefix.load(Ordering::Relaxed), (*ns).href) != 0 {
+        if xml_xpath_register_ns(ctx, (*ns).prefix, (*ns).href) != 0 {
             eprintln!(
                 "Error: unable to register NS with prefix=\"{}\" and href=\"{}\"",
-                CStr::from_ptr((*ns).prefix.load(Ordering::Relaxed) as _).to_string_lossy(),
+                CStr::from_ptr((*ns).prefix as _).to_string_lossy(),
                 CStr::from_ptr((*ns).href as _).to_string_lossy(),
             );
             xml_free(expr as _);

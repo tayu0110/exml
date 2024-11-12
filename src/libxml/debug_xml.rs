@@ -287,10 +287,7 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
                 if cur == ns {
                     return 1;
                 }
-                if xml_str_equal(
-                    (*cur).prefix.load(Ordering::Relaxed),
-                    (*ns).prefix.load(Ordering::Relaxed),
-                ) {
+                if xml_str_equal((*cur).prefix, (*ns).prefix) {
                     return -2;
                 }
                 cur = (*cur).next.load(Ordering::Relaxed);
@@ -328,7 +325,7 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
 ) {
     let ret: i32 = xml_ns_check_scope(node, ns);
     if ret == -2 {
-        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*ns).prefix.is_null() {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckNsScope,
@@ -339,12 +336,12 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
                 ctxt,
                 XmlParserErrors::XmlCheckNsScope,
                 c"Reference to namespace '%s' not in scope\n".as_ptr(),
-                (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
+                (*ns).prefix as *mut c_char,
             );
         }
     }
     if ret == -3 {
-        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*ns).prefix.is_null() {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckNsAncestor,
@@ -355,7 +352,7 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
                 ctxt,
                 XmlParserErrors::XmlCheckNsAncestor,
                 c"Reference to namespace '%s' not on ancestor\n".as_ptr(),
-                (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
+                (*ns).prefix as *mut c_char,
             );
         }
     }
@@ -990,12 +987,12 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
         return;
     }
     if (*ns).href.is_null() {
-        if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if !(*ns).prefix.is_null() {
             xml_debug_err3(
                 ctxt,
                 XmlParserErrors::XmlCheckNoHref,
                 c"Incomplete namespace %s href=NULL\n".as_ptr(),
-                (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
+                (*ns).prefix as *mut c_char,
             );
         } else {
             xml_debug_err(
@@ -1005,11 +1002,11 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
             );
         }
     } else if (*ctxt).check == 0 {
-        if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if !(*ns).prefix.is_null() {
             fprintf(
                 (*ctxt).output,
                 c"namespace %s href=".as_ptr(),
-                (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
+                (*ns).prefix as *mut c_char,
             );
         } else {
             fprintf((*ctxt).output, c"default namespace href=".as_ptr());
@@ -1137,9 +1134,8 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
                 fprintf((*ctxt).output, c"ELEMENT ".as_ptr());
-                if !(*node).ns.is_null() && !(*(*node).ns).prefix.load(Ordering::Relaxed).is_null()
-                {
-                    xml_ctxt_dump_string(ctxt, (*(*node).ns).prefix.load(Ordering::Relaxed));
+                if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
+                    xml_ctxt_dump_string(ctxt, (*(*node).ns).prefix);
                     fprintf((*ctxt).output, c":".as_ptr());
                 }
                 xml_ctxt_dump_string(ctxt, (*node).name);
@@ -2028,13 +2024,8 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
     match (*node).typ {
         XmlElementType::XmlElementNode => {
             if !(*node).name.is_null() {
-                if !(*node).ns.is_null() && !(*(*node).ns).prefix.load(Ordering::Relaxed).is_null()
-                {
-                    fprintf(
-                        output,
-                        c"%s:".as_ptr(),
-                        (*(*node).ns).prefix.load(Ordering::Relaxed),
-                    );
+                if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
+                    fprintf(output, c"%s:".as_ptr(), (*(*node).ns).prefix);
                 }
                 fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
             }
@@ -2074,13 +2065,13 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
         XmlElementType::XmlNamespaceDecl => {
             let ns: XmlNsPtr = node as XmlNsPtr;
 
-            if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+            if (*ns).prefix.is_null() {
                 fprintf(output, c"default -> %s".as_ptr(), (*ns).href as *mut c_char);
             } else {
                 fprintf(
                     output,
                     c"%s -> %s".as_ptr(),
-                    (*ns).prefix.load(Ordering::Relaxed) as *mut c_char,
+                    (*ns).prefix as *mut c_char,
                     (*ns).href as *mut c_char,
                 );
             }
@@ -2881,12 +2872,8 @@ pub unsafe extern "C" fn xml_shell_du(
             for _ in 0..indent {
                 fprintf((*ctxt).output, c"  ".as_ptr());
             }
-            if !(*node).ns.is_null() && !(*(*node).ns).prefix.load(Ordering::Relaxed).is_null() {
-                fprintf(
-                    (*ctxt).output,
-                    c"%s:".as_ptr(),
-                    (*(*node).ns).prefix.load(Ordering::Relaxed),
-                );
+            if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
+                fprintf((*ctxt).output, c"%s:".as_ptr(), (*(*node).ns).prefix);
             }
             fprintf((*ctxt).output, c"%s\n".as_ptr(), (*node).name);
         }
@@ -3296,14 +3283,10 @@ unsafe extern "C" fn xml_shell_register_root_namespaces(
     }
     ns = (*root).ns_def;
     while !ns.is_null() {
-        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*ns).prefix.is_null() {
             xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, (*ns).href);
         } else {
-            xml_xpath_register_ns(
-                (*ctxt).pctxt,
-                (*ns).prefix.load(Ordering::Relaxed),
-                (*ns).href,
-            );
+            xml_xpath_register_ns((*ctxt).pctxt, (*ns).prefix, (*ns).href);
         }
         ns = (*ns).next.load(Ordering::Relaxed);
     }
@@ -3437,16 +3420,13 @@ pub unsafe extern "C" fn xml_shell(
         } else if !(*ctxt).node.is_null()
             && !(*(*ctxt).node).name.is_null()
             && !(*(*ctxt).node).ns.is_null()
-            && !(*(*(*ctxt).node).ns)
-                .prefix
-                .load(Ordering::Relaxed)
-                .is_null()
+            && !(*(*(*ctxt).node).ns).prefix.is_null()
         {
             snprintf(
                 prompt.as_mut_ptr() as _,
                 prompt.len(),
                 c"%s:%s > ".as_ptr(),
-                (*(*(*ctxt).node).ns).prefix.load(Ordering::Relaxed),
+                (*(*(*ctxt).node).ns).prefix,
                 (*(*ctxt).node).name,
             );
         } else if !(*ctxt).node.is_null() && !(*(*ctxt).node).name.is_null() {

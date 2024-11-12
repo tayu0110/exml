@@ -9,7 +9,6 @@ use std::{
     os::raw::c_void,
     ptr::{addr_of, null, null_mut},
     slice::from_raw_parts,
-    sync::atomic::Ordering,
 };
 
 use libc::{malloc, memset, snprintf, sprintf, FILE};
@@ -1741,10 +1740,10 @@ unsafe extern "C" fn xml_schematron_format_report(
                 xml_free(path as _);
             }
 
-            if (*node).ns.is_null() || (*(*node).ns).prefix.load(Ordering::Relaxed).is_null() {
+            if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
                 ret = xml_strcat(ret, (*node).name);
             } else {
-                ret = xml_strcat(ret, (*(*node).ns).prefix.load(Ordering::Relaxed));
+                ret = xml_strcat(ret, (*(*node).ns).prefix);
                 ret = xml_strcat(ret, c":".as_ptr() as _);
                 ret = xml_strcat(ret, (*node).name);
             }

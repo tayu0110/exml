@@ -2423,7 +2423,7 @@ pub unsafe fn xml_sax2_start_element(
          */
         if !ns.is_null()
             && !(*ns).href.is_null()
-            && (*(*ns).href.add(0) != 0 || !(*ns).prefix.load(Ordering::Relaxed).is_null())
+            && (*(*ns).href.add(0) != 0 || !(*ns).prefix.is_null())
         {
             (*ret).set_ns(ns);
         }

@@ -287,7 +287,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
                         buf.as_mut_ptr() as _,
                         buf.len(),
                         c"%s:external-linkset".as_ptr() as _,
-                        (*xlink).prefix.load(Ordering::Relaxed) as *const c_char,
+                        (*xlink).prefix as *const c_char,
                     );
                     buf[buf.len() - 1] = 0;
                     if xml_str_equal(role, buf.as_ptr() as _) {

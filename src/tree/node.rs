@@ -402,7 +402,7 @@ impl XmlNode {
     #[doc(alias = "xmlGetNodePath")]
     #[cfg(feature = "tree")]
     pub unsafe fn get_node_path(&self) -> *mut XmlChar {
-        use std::{ptr::null_mut, sync::atomic::Ordering};
+        use std::ptr::null_mut;
 
         use libc::snprintf;
 
@@ -463,12 +463,12 @@ impl XmlNode {
                 sep = c"/".as_ptr() as _;
                 name = (*cur).name as _;
                 if !(*cur).ns.is_null() {
-                    if !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
+                    if !(*(*cur).ns).prefix.is_null() {
                         snprintf(
                             nametemp.as_mut_ptr() as _,
                             nametemp.len() - 1,
                             c"%s:%s".as_ptr() as _,
-                            (*(*cur).ns).prefix.load(Ordering::Relaxed) as *const i8,
+                            (*(*cur).ns).prefix as *const i8,
                             (*cur).name,
                         );
                         *nametemp.last_mut().unwrap() = 0;
@@ -497,8 +497,8 @@ impl XmlNode {
                                     || (!(*tmp).ns.is_null()
                                         && !(*cur).ns.is_null()
                                         && xml_str_equal(
-                                            (*(*cur).ns).prefix.load(Ordering::Relaxed),
-                                            (*(*tmp).ns).prefix.load(Ordering::Relaxed),
+                                            (*(*cur).ns).prefix,
+                                            (*(*tmp).ns).prefix,
                                         )))))
                     {
                         occur += 1;
@@ -515,8 +515,8 @@ impl XmlNode {
                                         || (!(*tmp).ns.is_null()
                                             && !(*cur).ns.is_null()
                                             && (xml_str_equal(
-                                                (*(*cur).ns).prefix.load(Ordering::Relaxed),
-                                                (*(*tmp).ns).prefix.load(Ordering::Relaxed),
+                                                (*(*cur).ns).prefix,
+                                                (*(*tmp).ns).prefix,
                                             ))))))
                         {
                             occur += 1;
@@ -643,12 +643,12 @@ impl XmlNode {
                 sep = c"/@".as_ptr() as _;
                 name = (*(cur as XmlAttrPtr)).name as _;
                 if !(*cur).ns.is_null() {
-                    if !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
+                    if !(*(*cur).ns).prefix.is_null() {
                         snprintf(
                             nametemp.as_mut_ptr() as _,
                             nametemp.len() - 1,
                             c"%s:%s".as_ptr() as _,
-                            (*(*cur).ns).prefix.load(Ordering::Relaxed) as *const i8,
+                            (*(*cur).ns).prefix as *const i8,
                             (*cur).name,
                         );
                     } else {
@@ -1115,8 +1115,8 @@ impl XmlNode {
                 /*
                  * We need the QName of the element for the DTD-lookup.
                  */
-                if !self.ns.is_null() && !(*self.ns).prefix.load(Ordering::Relaxed).is_null() {
-                    tmpstr = xml_strdup((*self.ns).prefix.load(Ordering::Relaxed));
+                if !self.ns.is_null() && !(*self.ns).prefix.is_null() {
+                    tmpstr = xml_strdup((*self.ns).prefix);
                     tmpstr = xml_strcat(tmpstr, c":".as_ptr() as _);
                     tmpstr = xml_strcat(tmpstr, self.name);
                     if tmpstr.is_null() {
@@ -1165,7 +1165,7 @@ impl XmlNode {
                                     (*doc).int_subset,
                                     elem_qname,
                                     name.as_ptr() as *const u8,
-                                    (*(*cur)).prefix.load(Ordering::Relaxed),
+                                    (*(*cur)).prefix,
                                 );
                                 if !attr_decl.is_null() {
                                     break;
@@ -1175,7 +1175,7 @@ impl XmlNode {
                                         (*doc).ext_subset,
                                         elem_qname,
                                         name.as_ptr() as *const u8,
-                                        (*(*cur)).prefix.load(Ordering::Relaxed),
+                                        (*(*cur)).prefix,
                                     );
                                     if !attr_decl.is_null() {
                                         break;
@@ -1309,12 +1309,8 @@ impl XmlNode {
                 cur = (*node).ns_def;
                 'b: while !cur.is_null() {
                     for i in 0..nbns {
-                        if ((*cur).prefix.load(Ordering::Relaxed)
-                            == (*(*ret.add(i as usize))).prefix.load(Ordering::Relaxed))
-                            || xml_str_equal(
-                                (*cur).prefix.load(Ordering::Relaxed),
-                                (*(*ret.add(i as usize))).prefix.load(Ordering::Relaxed),
-                            )
+                        if ((*cur).prefix == (*(*ret.add(i as usize))).prefix)
+                            || xml_str_equal((*cur).prefix, (*(*ret.add(i as usize))).prefix)
                         {
                             cur = (*cur).next.load(Ordering::Relaxed);
                             continue 'b;
@@ -2764,9 +2760,7 @@ impl XmlNode {
                 memset(cur as _, 0, size_of::<XmlNs>());
                 (*cur).typ = XML_LOCAL_NAMESPACE;
                 (*cur).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
-                (*cur)
-                    .prefix
-                    .store(xml_strdup(c"xml".as_ptr() as _) as _, Ordering::Relaxed);
+                (*cur).prefix = xml_strdup(c"xml".as_ptr() as _);
                 (*cur).next.store(self.ns_def as _, Ordering::Relaxed);
                 self.ns_def = cur;
                 return cur;
@@ -2799,20 +2793,14 @@ impl XmlNode {
             if matches!((*node).typ, XmlElementType::XmlElementNode) {
                 cur = (*node).ns_def;
                 while !cur.is_null() {
-                    if (*cur).prefix.load(Ordering::Relaxed).is_null()
-                        && namespace.is_none()
-                        && !(*cur).href.is_null()
-                    {
+                    if (*cur).prefix.is_null() && namespace.is_none() && !(*cur).href.is_null() {
                         return cur;
                     }
-                    if !(*cur).prefix.load(Ordering::Relaxed).is_null()
+                    if !(*cur).prefix.is_null()
                         && !(*cur).href.is_null()
                         && namespace
                             .filter(|&n| {
-                                n == CStr::from_ptr(
-                                    (*cur).prefix.load(Ordering::Relaxed) as *const i8
-                                )
-                                .to_string_lossy()
+                                n == CStr::from_ptr((*cur).prefix as *const i8).to_string_lossy()
                             })
                             .is_some()
                     {
@@ -2823,20 +2811,16 @@ impl XmlNode {
                 if orig != node {
                     cur = (*node).ns;
                     if !cur.is_null() {
-                        if (*cur).prefix.load(Ordering::Relaxed).is_null()
-                            && namespace.is_none()
-                            && !(*cur).href.is_null()
+                        if (*cur).prefix.is_null() && namespace.is_none() && !(*cur).href.is_null()
                         {
                             return cur;
                         }
-                        if !(*cur).prefix.load(Ordering::Relaxed).is_null()
+                        if !(*cur).prefix.is_null()
                             && !(*cur).href.is_null()
                             && namespace
                                 .filter(|&n| {
-                                    n == CStr::from_ptr(
-                                        (*cur).prefix.load(Ordering::Relaxed) as *const i8
-                                    )
-                                    .to_string_lossy()
+                                    n == CStr::from_ptr((*cur).prefix as *const i8)
+                                        .to_string_lossy()
                                 })
                                 .is_some()
                         {
@@ -2880,9 +2864,7 @@ impl XmlNode {
                 memset(cur as _, 0, size_of::<XmlNs>());
                 (*cur).typ = XML_LOCAL_NAMESPACE;
                 (*cur).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
-                (*cur)
-                    .prefix
-                    .store(xml_strdup(c"xml".as_ptr() as _), Ordering::Relaxed);
+                (*cur).prefix = xml_strdup(c"xml".as_ptr() as _);
                 (*cur).next.store(self.ns_def, Ordering::Relaxed);
                 self.ns_def = cur;
                 return cur;
@@ -2919,9 +2901,8 @@ impl XmlNode {
                 while !cur.is_null() {
                     if !(*cur).href.is_null()
                         && xml_str_equal((*cur).href, href.as_ptr() as *const u8)
-                        && (!is_attr || !(*cur).prefix.load(Ordering::Relaxed).is_null())
-                        && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed))
-                            == 1
+                        && (!is_attr || !(*cur).prefix.is_null())
+                        && xml_ns_in_scope(doc, orig, node, (*cur).prefix) == 1
                     {
                         return cur;
                     }
@@ -2932,9 +2913,8 @@ impl XmlNode {
                     if !cur.is_null()
                         && !(*cur).href.is_null()
                         && xml_str_equal((*cur).href, href.as_ptr() as *const u8)
-                        && (!is_attr || !(*cur).prefix.load(Ordering::Relaxed).is_null())
-                        && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed))
-                            == 1
+                        && (!is_attr || !(*cur).prefix.is_null())
+                        && xml_ns_in_scope(doc, orig, node, (*cur).prefix) == 1
                     {
                         return cur;
                     }

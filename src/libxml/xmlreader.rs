@@ -1381,7 +1381,7 @@ unsafe extern "C" fn xml_text_reader_validate_pop(reader: &mut XmlTextReader) {
         && !reader.ctxt.is_null()
         && (*reader.ctxt).validate == 1
     {
-        if (*node).ns.is_null() || (*(*node).ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
             (*reader.ctxt).valid &= xml_validate_pop_element(
                 addr_of_mut!((*reader.ctxt).vctxt),
                 (*reader.ctxt).my_doc,
@@ -1392,7 +1392,7 @@ unsafe extern "C" fn xml_text_reader_validate_pop(reader: &mut XmlTextReader) {
             /* TODO use the BuildQName interface */
             let mut qname: *mut XmlChar;
 
-            qname = xml_strdup((*(*node).ns).prefix.load(Ordering::Relaxed));
+            qname = xml_strdup((*(*node).ns).prefix);
             qname = xml_strcat(qname, c":".as_ptr() as _);
             qname = xml_strcat(qname, (*node).name);
             (*reader.ctxt).valid &= xml_validate_pop_element(
@@ -1781,7 +1781,7 @@ unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
         && !reader.ctxt.is_null()
         && (*reader.ctxt).validate == 1
     {
-        if (*node).ns.is_null() || (*(*node).ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
             (*reader.ctxt).valid &= xml_validate_push_element(
                 addr_of_mut!((*reader.ctxt).vctxt),
                 (*reader.ctxt).my_doc,
@@ -1792,7 +1792,7 @@ unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
             /* TODO use the BuildQName interface */
             let mut qname: *mut XmlChar;
 
-            qname = xml_strdup((*(*node).ns).prefix.load(Ordering::Relaxed));
+            qname = xml_strdup((*(*node).ns).prefix);
             qname = xml_strcat(qname, c":".as_ptr() as _);
             qname = xml_strcat(qname, (*node).name);
             (*reader.ctxt).valid &= xml_validate_push_element(
@@ -3090,10 +3090,10 @@ pub unsafe extern "C" fn xml_text_reader_const_local_name(
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
-        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*ns).prefix.is_null() {
             return CONSTSTR!(reader, c"xmlns".as_ptr() as _);
         } else {
-            return (*ns).prefix.load(Ordering::Relaxed);
+            return (*ns).prefix;
         }
     }
     if !matches!(
@@ -3126,14 +3126,10 @@ pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) 
     };
     match (*node).typ {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            if (*node).ns.is_null() || (*(*node).ns).prefix.load(Ordering::Relaxed).is_null() {
+            if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
                 return (*node).name;
             }
-            CONSTQSTR!(
-                reader,
-                (*(*node).ns).prefix.load(Ordering::Relaxed),
-                (*node).name
-            )
+            CONSTQSTR!(reader, (*(*node).ns).prefix, (*node).name)
         }
         XmlElementType::XmlTextNode => CONSTSTR!(reader, c"#text".as_ptr() as _),
         XmlElementType::XmlCDATASectionNode => {
@@ -3157,14 +3153,10 @@ pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) 
         XmlElementType::XmlNamespaceDecl => {
             let ns: XmlNsPtr = node as XmlNsPtr;
 
-            if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+            if (*ns).prefix.is_null() {
                 return CONSTSTR!(reader, c"xmlns".as_ptr() as _);
             }
-            CONSTQSTR!(
-                reader,
-                c"xmlns".as_ptr() as _,
-                (*ns).prefix.load(Ordering::Relaxed)
-            )
+            CONSTQSTR!(reader, c"xmlns".as_ptr() as _, (*ns).prefix)
         }
 
         XmlElementType::XmlElementDecl
@@ -3236,7 +3228,7 @@ pub unsafe extern "C" fn xml_text_reader_const_prefix(
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
-        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*ns).prefix.is_null() {
             return null_mut();
         }
         return CONSTSTR!(reader, c"xmlns".as_ptr() as _);
@@ -3247,8 +3239,8 @@ pub unsafe extern "C" fn xml_text_reader_const_prefix(
     ) {
         return null_mut();
     }
-    if !(*node).ns.is_null() && !(*(*node).ns).prefix.load(Ordering::Relaxed).is_null() {
-        return CONSTSTR!(reader, (*(*node).ns).prefix.load(Ordering::Relaxed));
+    if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
+        return CONSTSTR!(reader, (*(*node).ns).prefix);
     }
     null_mut()
 }
@@ -3409,10 +3401,10 @@ pub unsafe extern "C" fn xml_text_reader_local_name(reader: &mut XmlTextReader) 
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
-        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*ns).prefix.is_null() {
             return xml_strdup(c"xmlns".as_ptr() as _);
         } else {
-            return xml_strdup((*ns).prefix.load(Ordering::Relaxed));
+            return xml_strdup((*ns).prefix);
         }
     }
     if !matches!(
@@ -3447,11 +3439,11 @@ pub unsafe extern "C" fn xml_text_reader_name(reader: &mut XmlTextReader) -> *mu
     };
     match (*node).typ {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            if (*node).ns.is_null() || (*(*node).ns).prefix.load(Ordering::Relaxed).is_null() {
+            if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
                 return xml_strdup((*node).name);
             }
 
-            ret = xml_strdup((*(*node).ns).prefix.load(Ordering::Relaxed));
+            ret = xml_strdup((*(*node).ns).prefix);
             ret = xml_strcat(ret, c":".as_ptr() as _);
             ret = xml_strcat(ret, (*node).name);
             ret
@@ -3475,11 +3467,11 @@ pub unsafe extern "C" fn xml_text_reader_name(reader: &mut XmlTextReader) -> *mu
             let ns: XmlNsPtr = node as XmlNsPtr;
 
             ret = xml_strdup(c"xmlns".as_ptr() as _);
-            if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+            if (*ns).prefix.is_null() {
                 return ret;
             }
             ret = xml_strcat(ret, c":".as_ptr() as _);
-            ret = xml_strcat(ret, (*ns).prefix.load(Ordering::Relaxed));
+            ret = xml_strcat(ret, (*ns).prefix);
             ret
         }
 
@@ -3548,7 +3540,7 @@ pub unsafe extern "C" fn xml_text_reader_prefix(reader: &mut XmlTextReader) -> *
     };
     if (*node).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
-        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*ns).prefix.is_null() {
             return null_mut();
         }
         return xml_strdup(c"xmlns".as_ptr() as _);
@@ -3559,8 +3551,8 @@ pub unsafe extern "C" fn xml_text_reader_prefix(reader: &mut XmlTextReader) -> *
     ) {
         return null_mut();
     }
-    if !(*node).ns.is_null() && !(*(*node).ns).prefix.load(Ordering::Relaxed).is_null() {
-        return xml_strdup((*(*node).ns).prefix.load(Ordering::Relaxed));
+    if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
+        return xml_strdup((*(*node).ns).prefix);
     }
     null_mut()
 }
@@ -3866,7 +3858,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
         if xml_str_equal(name, c"xmlns".as_ptr() as _) {
             ns = (*reader.node).ns_def;
             while !ns.is_null() {
-                if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+                if (*ns).prefix.is_null() {
                     return xml_strdup((*ns).href);
                 }
                 ns = (*ns).next.load(Ordering::Relaxed);
@@ -3883,9 +3875,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
     if xml_str_equal(prefix, c"xmlns".as_ptr() as _) {
         ns = (*reader.node).ns_def;
         while !ns.is_null() {
-            if !(*ns).prefix.load(Ordering::Relaxed).is_null()
-                && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), localname)
-            {
+            if !(*ns).prefix.is_null() && xml_str_equal((*ns).prefix, localname) {
                 ret = xml_strdup((*ns).href);
                 break;
             }
@@ -3964,9 +3954,8 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
         }
         ns = (*reader.node).ns_def;
         while !ns.is_null() {
-            if (prefix.is_null() && (*ns).prefix.load(Ordering::Relaxed).is_null())
-                || (!(*ns).prefix.load(Ordering::Relaxed).is_null()
-                    && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), local_name))
+            if (prefix.is_null() && (*ns).prefix.is_null())
+                || (!(*ns).prefix.is_null() && xml_str_equal((*ns).prefix, local_name))
             {
                 return xml_strdup((*ns).href);
             }
@@ -4166,7 +4155,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
         if xml_str_equal(name, c"xmlns".as_ptr() as _) {
             ns = (*reader.node).ns_def;
             while !ns.is_null() {
-                if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+                if (*ns).prefix.is_null() {
                     reader.curnode = ns as XmlNodePtr;
                     return 1;
                 }
@@ -4183,7 +4172,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
              *   - and the attribute carrying that namespace
              */
             if xml_str_equal((*prop).name, name)
-                && ((*prop).ns.is_null() || (*(*prop).ns).prefix.load(Ordering::Relaxed).is_null())
+                && ((*prop).ns.is_null() || (*(*prop).ns).prefix.is_null())
             {
                 reader.curnode = prop as XmlNodePtr;
                 return 1;
@@ -4199,9 +4188,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
     if xml_str_equal(prefix, c"xmlns".as_ptr() as _) {
         ns = (*reader.node).ns_def;
         while !ns.is_null() {
-            if !(*ns).prefix.load(Ordering::Relaxed).is_null()
-                && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), localname)
-            {
+            if !(*ns).prefix.is_null() && xml_str_equal((*ns).prefix, localname) {
                 reader.curnode = ns as XmlNodePtr;
                 // goto found;
                 if !localname.is_null() {
@@ -4225,7 +4212,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
              */
             if xml_str_equal((*prop).name, localname)
                 && !(*prop).ns.is_null()
-                && xml_str_equal((*(*prop).ns).prefix.load(Ordering::Relaxed), prefix)
+                && xml_str_equal((*(*prop).ns).prefix, prefix)
             {
                 reader.curnode = prop as XmlNodePtr;
                 // goto found;
@@ -4291,9 +4278,8 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
         }
         ns = (*reader.node).ns_def;
         while !ns.is_null() {
-            if (prefix.is_null() && (*ns).prefix.load(Ordering::Relaxed).is_null())
-                || (!(*ns).prefix.load(Ordering::Relaxed).is_null()
-                    && xml_str_equal((*ns).prefix.load(Ordering::Relaxed), local_name))
+            if (prefix.is_null() && (*ns).prefix.is_null())
+                || (!(*ns).prefix.is_null() && xml_str_equal((*ns).prefix, local_name))
             {
                 reader.curnode = ns as XmlNodePtr;
                 return 1;

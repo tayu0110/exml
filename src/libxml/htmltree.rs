@@ -1086,9 +1086,9 @@ unsafe extern "C" fn html_attr_dump_output(
         return;
     }
     (*buf).write_str(" ");
-    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
+    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
         (*buf).write_str(
-            CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+            CStr::from_ptr((*(*cur).ns).prefix as _)
                 .to_string_lossy()
                 .as_ref(),
         );
@@ -1228,9 +1228,9 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 (*buf).write_str("<");
-                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
+                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
                     (*buf).write_str(
-                        CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                        CStr::from_ptr((*(*cur).ns).prefix as _)
                             .to_string_lossy()
                             .as_ref(),
                     );
@@ -1258,11 +1258,9 @@ pub unsafe fn html_node_dump_format_output(
                         (*buf).write_str(">");
                     } else {
                         (*buf).write_str("></");
-                        if !(*cur).ns.is_null()
-                            && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null()
-                        {
+                        if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
                             (*buf).write_str(
-                                CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                                CStr::from_ptr((*(*cur).ns).prefix as _)
                                     .to_string_lossy()
                                     .as_ref(),
                             );
@@ -1420,9 +1418,9 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 (*buf).write_str("</");
-                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
+                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
                     (*buf).write_str(
-                        CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                        CStr::from_ptr((*(*cur).ns).prefix as _)
                             .to_string_lossy()
                             .as_ref(),
                     );

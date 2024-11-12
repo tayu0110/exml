@@ -11,7 +11,6 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
-    sync::atomic::Ordering,
 };
 
 use libc::{fprintf, memcpy, memset, snprintf, strchr, FILE};
@@ -10906,7 +10905,7 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
             }
             for i in 0..count {
                 *ns_array.add(2 * i) = (*(*ns_list.add(i))).href;
-                *ns_array.add(2 * i + 1) = (*(*ns_list.add(i))).prefix.load(Ordering::Relaxed);
+                *ns_array.add(2 * i + 1) = (*(*ns_list.add(i))).prefix;
             }
             *ns_array.add(count * 2) = null_mut();
             xml_free(ns_list as _);

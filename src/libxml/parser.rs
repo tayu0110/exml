@@ -4768,12 +4768,11 @@ pub unsafe fn xml_parse_in_node_context(
 
             while !ns.is_null() {
                 if !(*ctxt).dict.is_null() {
-                    iprefix =
-                        xml_dict_lookup((*ctxt).dict, (*ns).prefix.load(Ordering::Relaxed), -1);
+                    iprefix = xml_dict_lookup((*ctxt).dict, (*ns).prefix, -1);
                     ihref = xml_dict_lookup((*ctxt).dict, (*ns).href, -1);
                 } else {
-                    iprefix = (*ns).prefix.load(Ordering::Relaxed) as _;
-                    ihref = (*ns).href as _;
+                    iprefix = (*ns).prefix;
+                    ihref = (*ns).href;
                 }
 
                 if xml_get_namespace(ctxt, iprefix).is_null() {

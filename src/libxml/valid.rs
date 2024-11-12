@@ -3124,12 +3124,9 @@ pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAt
         return 0;
     }
     if !(*attr).ns.is_null()
-        && !(*(*attr).ns).prefix.load(Ordering::Relaxed).is_null()
+        && !(*(*attr).ns).prefix.is_null()
         && strcmp((*attr).name as _, c"id".as_ptr() as _) == 0
-        && strcmp(
-            (*(*attr).ns).prefix.load(Ordering::Acquire) as _,
-            c"xml".as_ptr() as _,
-        ) == 0
+        && strcmp((*(*attr).ns).prefix as *const i8, c"xml".as_ptr() as _) == 0
     {
         return 1;
     }
@@ -3157,29 +3154,19 @@ pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAt
         let felem: [XmlChar; 50] = [0; 50];
         let fattr: [XmlChar; 50] = [0; 50];
 
-        let fullelemname: *mut XmlChar =
-            if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.load(Ordering::Relaxed).is_null() {
-                xml_build_qname(
-                    (*elem).name,
-                    (*(*elem).ns).prefix.load(Ordering::Relaxed),
-                    felem.as_ptr() as _,
-                    50,
-                )
-            } else {
-                (*elem).name as *mut XmlChar
-            };
+        let fullelemname: *mut XmlChar = if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.is_null()
+        {
+            xml_build_qname((*elem).name, (*(*elem).ns).prefix, felem.as_ptr() as _, 50)
+        } else {
+            (*elem).name as *mut XmlChar
+        };
 
-        let fullattrname: *mut XmlChar =
-            if !(*attr).ns.is_null() && !(*(*attr).ns).prefix.load(Ordering::Relaxed).is_null() {
-                xml_build_qname(
-                    (*attr).name,
-                    (*(*attr).ns).prefix.load(Ordering::Relaxed),
-                    fattr.as_ptr() as _,
-                    50,
-                )
-            } else {
-                (*attr).name as *mut XmlChar
-            };
+        let fullattrname: *mut XmlChar = if !(*attr).ns.is_null() && !(*(*attr).ns).prefix.is_null()
+        {
+            xml_build_qname((*attr).name, (*(*attr).ns).prefix, fattr.as_ptr() as _, 50)
+        } else {
+            (*attr).name as *mut XmlChar
+        };
 
         if !fullelemname.is_null() && !fullattrname.is_null() {
             attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, fullelemname, fullattrname);
@@ -3737,12 +3724,12 @@ pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr
          * Check first the document root against the NQName
          */
         if !xml_str_equal((*(*doc).int_subset).name, (*root).name) {
-            if !(*root).ns.is_null() && !(*(*root).ns).prefix.load(Ordering::Relaxed).is_null() {
+            if !(*root).ns.is_null() && !(*(*root).ns).prefix.is_null() {
                 let mut fname: [XmlChar; 50] = [0; 50];
 
                 let fullname: *mut XmlChar = xml_build_qname(
                     (*root).name,
-                    (*(*root).ns).prefix.load(Ordering::Relaxed) as _,
+                    (*(*root).ns).prefix as _,
                     fname.as_mut_ptr(),
                     50,
                 );
@@ -4007,12 +3994,12 @@ pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
         return null_mut();
     }
 
-    if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.load(Ordering::Relaxed).is_null() {
+    if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.is_null() {
         let mut fname: [XmlChar; 50] = [0; 50];
 
         let fullname: *mut XmlChar = xml_build_qname(
             (*elem).name,
-            (*(*elem).ns).prefix.load(Ordering::Relaxed) as _,
+            (*(*elem).ns).prefix as _,
             fname.as_mut_ptr(),
             50,
         );
@@ -4090,12 +4077,12 @@ pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
         return null_mut();
     }
 
-    if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.load(Ordering::Relaxed).is_null() {
+    if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.is_null() {
         let mut fname: [XmlChar; 50] = [0; 50];
 
         let fullname: *mut XmlChar = xml_build_qname(
             (*elem).name,
-            (*(*elem).ns).prefix.load(Ordering::Relaxed) as _,
+            (*(*elem).ns).prefix as _,
             fname.as_mut_ptr(),
             50,
         );
@@ -5009,7 +4996,7 @@ pub unsafe extern "C" fn xml_validate_element(
                         ctxt,
                         doc,
                         elem,
-                        (*(*elem).ns).prefix.load(Ordering::Relaxed),
+                        (*(*elem).ns).prefix,
                         ns,
                         (*ns).href,
                     );
@@ -5071,8 +5058,8 @@ unsafe extern "C" fn xml_valid_get_elem_decl(
     /*
      * Fetch the declaration for the qualified name
      */
-    if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.load(Ordering::Relaxed).is_null() {
-        prefix = (*(*elem).ns).prefix.load(Ordering::Relaxed);
+    if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.is_null() {
+        prefix = (*(*elem).ns).prefix;
     }
 
     if !prefix.is_null() {
@@ -5276,19 +5263,14 @@ unsafe extern "C" fn xml_snprintf_elements(
         }
         match (*cur).typ {
             XmlElementType::XmlElementNode => {
-                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null() {
-                    if size - len
-                        < xml_strlen((*(*cur).ns).prefix.load(Ordering::Relaxed) as _) + 10
-                    {
+                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
+                    if size - len < xml_strlen((*(*cur).ns).prefix as _) + 10 {
                         if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
                             strcat(buf, c" ...".as_ptr() as _);
                         }
                         return;
                     }
-                    strcat(
-                        buf,
-                        (*(*cur).ns).prefix.load(Ordering::Relaxed) as *mut c_char,
-                    );
+                    strcat(buf, (*(*cur).ns).prefix as *mut c_char);
                     strcat(buf, c":".as_ptr() as _);
                 }
                 if size - len < xml_strlen((*cur).name) + 10 {
@@ -5953,14 +5935,12 @@ unsafe extern "C" fn xml_validate_element_content(
                                 break 'fail;
                             }
                             XmlElementType::XmlElementNode => {
-                                if !(*cur).ns.is_null()
-                                    && !(*(*cur).ns).prefix.load(Ordering::Relaxed).is_null()
-                                {
+                                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
                                     let mut fname: [XmlChar; 50] = [0; 50];
 
                                     let fullname: *mut XmlChar = xml_build_qname(
                                         (*cur).name,
-                                        (*(*cur).ns).prefix.load(Ordering::Relaxed) as _,
+                                        (*(*cur).ns).prefix as _,
                                         fname.as_mut_ptr(),
                                         50,
                                     );
@@ -6467,14 +6447,12 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         'child_ok: {
                             if matches!((*child).typ, XmlElementType::XmlElementNode) {
                                 name = (*child).name;
-                                if !(*child).ns.is_null()
-                                    && !(*(*child).ns).prefix.load(Ordering::Relaxed).is_null()
-                                {
+                                if !(*child).ns.is_null() && !(*(*child).ns).prefix.is_null() {
                                     let mut fname: [XmlChar; 50] = [0; 50];
 
                                     let fullname: *mut XmlChar = xml_build_qname(
                                         (*child).name,
-                                        (*(*child).ns).prefix.load(Ordering::Relaxed),
+                                        (*(*child).ns).prefix,
                                         fname.as_mut_ptr() as _,
                                         50,
                                     );
@@ -6628,7 +6606,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
 
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
-                        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+                        if (*ns).prefix.is_null() {
                             break 'found;
                         }
                         ns = (*ns).next.load(Ordering::Relaxed);
@@ -6638,7 +6616,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
 
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
-                        if xml_str_equal((*attr).name, (*ns).prefix.load(Ordering::Relaxed)) {
+                        if xml_str_equal((*attr).name, (*ns).prefix) {
                             break 'found;
                         }
                         ns = (*ns).next.load(Ordering::Relaxed);
@@ -6664,10 +6642,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                     if qualified < 0 {
                                         qualified = 0;
                                     }
-                                } else if !xml_str_equal(
-                                    (*name_space).prefix.load(Ordering::Relaxed),
-                                    (*attr).prefix,
-                                ) {
+                                } else if !xml_str_equal((*name_space).prefix, (*attr).prefix) {
                                     if qualified < 1 {
                                         qualified = 1;
                                     }
@@ -6743,7 +6718,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
 
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
-                        if (*ns).prefix.load(Ordering::Relaxed).is_null() {
+                        if (*ns).prefix.is_null() {
                             if !xml_str_equal((*attr).default_value, (*ns).href) {
                                 xml_err_valid_node(ctxt, elem,
                                     XmlParserErrors::XmlDTDElemDefaultNamespace,
@@ -6760,7 +6735,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
 
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
-                        if xml_str_equal((*attr).name, (*ns).prefix.load(Ordering::Relaxed)) {
+                        if xml_str_equal((*attr).name, (*ns).prefix) {
                             if !xml_str_equal((*attr).default_value, (*ns).href) {
                                 xml_err_valid_node(
                                     ctxt,
@@ -6769,7 +6744,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                     c"Element %s namespace name for %s does not match the DTD\n"
                                         .as_ptr() as _,
                                     (*elem).name,
-                                    (*ns).prefix.load(Ordering::Relaxed) as _,
+                                    (*ns).prefix as _,
                                     null_mut(),
                                 );
                                 ret = 0;
@@ -6830,12 +6805,12 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         return 0;
     }
 
-    if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.load(Ordering::Relaxed).is_null() {
+    if !(*elem).ns.is_null() && !(*(*elem).ns).prefix.is_null() {
         let mut fname: [XmlChar; 50] = [0; 50];
 
         let fullname: *mut XmlChar = xml_build_qname(
             (*elem).name,
-            (*(*elem).ns).prefix.load(Ordering::Relaxed) as _,
+            (*(*elem).ns).prefix as _,
             fname.as_mut_ptr(),
             50,
         );
@@ -6847,14 +6822,14 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
                 (*doc).int_subset,
                 fullname,
                 (*attr).name,
-                (*(*attr).ns).prefix.load(Ordering::Relaxed) as _,
+                (*(*attr).ns).prefix as _,
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
                 attr_decl = xml_get_dtd_qattr_desc(
                     (*doc).ext_subset,
                     fullname,
                     (*attr).name,
-                    (*(*attr).ns).prefix.load(Ordering::Relaxed) as _,
+                    (*(*attr).ns).prefix as _,
                 );
             }
         } else {
@@ -6873,14 +6848,14 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
                 (*doc).int_subset,
                 (*elem).name,
                 (*attr).name,
-                (*(*attr).ns).prefix.load(Ordering::Relaxed),
+                (*(*attr).ns).prefix,
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
                 attr_decl = xml_get_dtd_qattr_desc(
                     (*doc).ext_subset,
                     (*elem).name,
                     (*attr).name,
-                    (*(*attr).ns).prefix.load(Ordering::Relaxed),
+                    (*(*attr).ns).prefix,
                 );
             }
         } else {
@@ -7100,18 +7075,18 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             xml_verr_memory(ctxt, c"Validating namespace".as_ptr() as _);
             return 0;
         }
-        if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if !(*ns).prefix.is_null() {
             attr_decl = xml_get_dtd_qattr_desc(
                 (*doc).int_subset,
                 fullname,
-                (*ns).prefix.load(Ordering::Relaxed) as _,
+                (*ns).prefix as _,
                 c"xmlns".as_ptr() as _,
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
                 attr_decl = xml_get_dtd_qattr_desc(
                     (*doc).ext_subset,
                     fullname,
-                    (*ns).prefix.load(Ordering::Relaxed) as _,
+                    (*ns).prefix as _,
                     c"xmlns".as_ptr() as _,
                 );
             }
@@ -7127,18 +7102,18 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
         }
     }
     if attr_decl.is_null() {
-        if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if !(*ns).prefix.is_null() {
             attr_decl = xml_get_dtd_qattr_desc(
                 (*doc).int_subset,
                 (*elem).name,
-                (*ns).prefix.load(Ordering::Relaxed) as _,
+                (*ns).prefix as _,
                 c"xmlns".as_ptr() as _,
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
                 attr_decl = xml_get_dtd_qattr_desc(
                     (*doc).ext_subset,
                     (*elem).name,
-                    (*ns).prefix.load(Ordering::Relaxed) as _,
+                    (*ns).prefix as _,
                     c"xmlns".as_ptr() as _,
                 );
             }
@@ -7154,13 +7129,13 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
 
     /* Validity Constraint: Attribute Value Type */
     if attr_decl.is_null() {
-        if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if !(*ns).prefix.is_null() {
             xml_err_valid_node(
                 ctxt,
                 elem,
                 XmlParserErrors::XmlDTDUnknownAttribute,
                 c"No declaration for attribute xmlns:%s of element %s\n".as_ptr() as _,
-                (*ns).prefix.load(Ordering::Relaxed) as _,
+                (*ns).prefix as _,
                 (*elem).name,
                 null_mut(),
             );
@@ -7180,13 +7155,13 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
 
     let val: i32 = xml_validate_attribute_value_internal(doc, (*attr_decl).atype, value);
     if val == 0 {
-        if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if !(*ns).prefix.is_null() {
             xml_err_valid_node(
                 ctxt,
                 elem,
                 XmlParserErrors::XmlDTDInvalidDefault,
                 c"Syntax of value for attribute xmlns:%s of %s is not valid\n".as_ptr() as _,
-                (*ns).prefix.load(Ordering::Relaxed) as _,
+                (*ns).prefix as _,
                 (*elem).name,
                 null_mut(),
             );
@@ -7208,14 +7183,14 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
     if matches!((*attr_decl).def, XmlAttributeDefault::XmlAttributeFixed)
         && !xml_str_equal(value, (*attr_decl).default_value)
     {
-        if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if !(*ns).prefix.is_null() {
             xml_err_valid_node(
                 ctxt,
                 elem,
                 XmlParserErrors::XmlDTDAttributeDefault,
                 c"Value for attribute xmlns:%s of %s is different from default \"%s\"\n".as_ptr()
                     as _,
-                (*ns).prefix.load(Ordering::Relaxed) as _,
+                (*ns).prefix as _,
                 (*elem).name,
                 (*attr_decl).default_value,
             );
@@ -7264,7 +7239,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
         }
 
         if nota.is_null() {
-            if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+            if !(*ns).prefix.is_null() {
                 xml_err_valid_node(
                     ctxt,
                     elem,
@@ -7272,7 +7247,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                     c"Value \"%s\" for attribute xmlns:%s of %s is not a declared Notation\n"
                         .as_ptr() as _,
                     value,
-                    (*ns).prefix.load(Ordering::Relaxed) as _,
+                    (*ns).prefix as _,
                     (*elem).name,
                 );
             } else {
@@ -7298,8 +7273,8 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             tree = (*tree).next;
         }
         if tree.is_null() {
-            if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
-                xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDNotationValue, c"Value \"%s\" for attribute xmlns:%s of %s is not among the enumerated notations\n".as_ptr() as _, value, (*ns).prefix.load(Ordering::Relaxed) as _, (*elem).name);
+            if !(*ns).prefix.is_null() {
+                xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDNotationValue, c"Value \"%s\" for attribute xmlns:%s of %s is not among the enumerated notations\n".as_ptr() as _, value, (*ns).prefix as _, (*elem).name);
             } else {
                 xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDNotationValue, c"Value \"%s\" for attribute xmlns of %s is not among the enumerated notations\n".as_ptr() as _, value, (*elem).name, null_mut());
             }
@@ -7320,7 +7295,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             tree = (*tree).next;
         }
         if tree.is_null() {
-            if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+            if !(*ns).prefix.is_null() {
                 xml_err_valid_node(
                     ctxt,
                     elem,
@@ -7328,7 +7303,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                     c"Value \"%s\" for attribute xmlns:%s of %s is not among the enumerated set\n"
                         .as_ptr() as _,
                     value,
-                    (*ns).prefix.load(Ordering::Relaxed) as _,
+                    (*ns).prefix as _,
                     (*elem).name,
                 );
             } else {
@@ -7351,13 +7326,13 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
     if matches!((*attr_decl).def, XmlAttributeDefault::XmlAttributeFixed)
         && !xml_str_equal((*attr_decl).default_value, value)
     {
-        if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
+        if !(*ns).prefix.is_null() {
             xml_err_valid_node(
                 ctxt,
                 elem,
                 XmlParserErrors::XmlDTDElemNamespace,
                 c"Value for attribute xmlns:%s of %s must be \"%s\"\n".as_ptr() as _,
-                (*ns).prefix.load(Ordering::Relaxed) as _,
+                (*ns).prefix as _,
                 (*elem).name,
                 (*attr_decl).default_value,
             );
@@ -7376,14 +7351,9 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
     }
 
     /* Extra check for the attribute value */
-    if !(*ns).prefix.load(Ordering::Relaxed).is_null() {
-        ret &= xml_validate_attribute_value2(
-            ctxt,
-            doc,
-            (*ns).prefix.load(Ordering::Relaxed) as _,
-            (*attr_decl).atype,
-            value,
-        );
+    if !(*ns).prefix.is_null() {
+        ret &=
+            xml_validate_attribute_value2(ctxt, doc, (*ns).prefix as _, (*attr_decl).atype, value);
     } else {
         ret &= xml_validate_attribute_value2(
             ctxt,

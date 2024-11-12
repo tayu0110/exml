@@ -748,12 +748,7 @@ extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) ->
         return 1;
     }
 
-    unsafe {
-        xml_strcmp(
-            (*ns1).prefix.load(Ordering::Relaxed),
-            (*ns2).prefix.load(Ordering::Relaxed),
-        )
-    }
+    unsafe { xml_strcmp((*ns1).prefix, (*ns2).prefix) }
 }
 
 /// Check whether `ns` is a default 'xml:' namespace with href="http://www.w3.org/XML/1998/namespace".  
@@ -763,10 +758,7 @@ extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) ->
 /* todo: make it a define? */
 unsafe extern "C" fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
     !ns.is_null()
-        && xml_str_equal(
-            (*ns).prefix.load(Ordering::Relaxed) as _,
-            c"xml".as_ptr() as _,
-        )
+        && xml_str_equal((*ns).prefix as _, c"xml".as_ptr() as _)
         && xml_str_equal((*ns).href as _, XML_XML_NAMESPACE.as_ptr() as _)
 }
 
@@ -811,14 +803,12 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_find(
      * if the default namespace xmlns="" is not defined yet then
      * we do not want to print it out
      */
-    let prefix: *const XmlChar = if let Some(prefix) = ns
-        .filter(|ns| !ns.prefix.load(Ordering::Relaxed).is_null())
-        .map(|ns| ns.prefix.load(Ordering::Relaxed))
-    {
-        prefix
-    } else {
-        c"".as_ptr() as _
-    };
+    let prefix: *const XmlChar =
+        if let Some(prefix) = ns.filter(|ns| !ns.prefix.is_null()).map(|ns| ns.prefix) {
+            prefix
+        } else {
+            c"".as_ptr() as _
+        };
     let href: *const XmlChar =
         if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
             href
@@ -841,7 +831,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_find(
             if xml_c14n_str_equal(
                 prefix,
                 if !ns1.is_null() {
-                    (*ns1).prefix.load(Ordering::Relaxed)
+                    (*ns1).prefix
                 } else {
                     null_mut()
                 },
@@ -940,14 +930,10 @@ unsafe extern "C" fn xml_c14n_print_namespaces(ns: &XmlNs, ctx: XmlC14NCtxPtr) -
         return 0;
     }
 
-    if !ns.prefix.load(Ordering::Relaxed).is_null() {
+    if !ns.prefix.is_null() {
         (*(*ctx).buf).write_str(" xmlns:");
 
-        (*(*ctx).buf).write_str(
-            CStr::from_ptr(ns.prefix.load(Ordering::Relaxed) as _)
-                .to_string_lossy()
-                .as_ref(),
-        );
+        (*(*ctx).buf).write_str(CStr::from_ptr(ns.prefix as _).to_string_lossy().as_ref());
         (*(*ctx).buf).write_str("=");
     } else {
         (*(*ctx).buf).write_str(" xmlns=");
@@ -1036,7 +1022,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
     while !n.is_null() {
         ns = (*n).ns_def;
         while !ns.is_null() {
-            let prefix = (*ns).prefix.load(Ordering::Relaxed);
+            let prefix = (*ns).prefix;
             let prefix =
                 (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
             tmp = (*cur).search_ns((*cur).doc, prefix.as_deref());
@@ -1050,7 +1036,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
                 if already_rendered == 0 {
                     xml_list_insert(list, ns as _);
                 }
-                if xml_strlen((*ns).prefix.load(Ordering::Relaxed)) == 0 {
+                if xml_strlen((*ns).prefix) == 0 {
                     has_empty_ns = 1;
                 }
             }
@@ -1099,14 +1085,12 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
      * if the default namespace xmlns="" is not defined yet then
      * we do not want to print it out
      */
-    let prefix: *const XmlChar = if let Some(prefix) = ns
-        .filter(|ns| !ns.prefix.load(Ordering::Relaxed).is_null())
-        .map(|ns| ns.prefix.load(Ordering::Relaxed))
-    {
-        prefix
-    } else {
-        c"".as_ptr() as _
-    };
+    let prefix: *const XmlChar =
+        if let Some(prefix) = ns.filter(|ns| !ns.prefix.is_null()).map(|ns| ns.prefix) {
+            prefix
+        } else {
+            c"".as_ptr() as _
+        };
     let href: *const XmlChar =
         if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
             href
@@ -1124,7 +1108,7 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
             if xml_c14n_str_equal(
                 prefix,
                 if !ns1.is_null() {
-                    (*ns1).prefix.load(Ordering::Relaxed)
+                    (*ns1).prefix
                 } else {
                     null_mut()
                 },
@@ -1243,7 +1227,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
                 if already_rendered == 0 {
                     xml_list_insert(list, ns as _);
                 }
-                if xml_strlen((*ns).prefix.load(Ordering::Relaxed)) == 0 {
+                if xml_strlen((*ns).prefix) == 0 {
                     has_empty_ns = 1;
                 }
             }
@@ -1266,7 +1250,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
         if visible != 0 {
             xml_c14n_visible_ns_stack_add((*ctx).ns_rendered, ns, cur);
         }
-        if xml_strlen((*ns).prefix.load(Ordering::Relaxed)) == 0 {
+        if xml_strlen((*ns).prefix) == 0 {
             has_empty_ns = 1;
         }
     }
@@ -1289,11 +1273,11 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
             if already_rendered == 0 && visible != 0 {
                 xml_list_insert(list, (*attr).ns as _);
             }
-            if xml_strlen((*(*attr).ns).prefix.load(Ordering::Relaxed)) == 0 {
+            if xml_strlen((*(*attr).ns).prefix) == 0 {
                 has_empty_ns = 1;
             }
         } else if !(*attr).ns.is_null()
-            && xml_strlen((*(*attr).ns).prefix.load(Ordering::Relaxed)) == 0
+            && xml_strlen((*(*attr).ns).prefix) == 0
             && xml_strlen((*(*attr).ns).href) == 0
         {
             has_visibly_utilized_empty_ns = 1;
@@ -1385,10 +1369,10 @@ extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void)
         if (*attr2).ns.is_null() {
             return 1;
         }
-        if (*(*attr1).ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*(*attr1).ns).prefix.is_null() {
             return -1;
         }
-        if (*(*attr2).ns).prefix.load(Ordering::Relaxed).is_null() {
+        if (*(*attr2).ns).prefix.is_null() {
             return 1;
         }
 
@@ -1751,9 +1735,9 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
         }
 
         (*(*ctx).buf).write_str(" ");
-        if !(*attr).ns.is_null() && xml_strlen((*(*attr).ns).prefix.load(Ordering::Relaxed)) > 0 {
+        if !(*attr).ns.is_null() && xml_strlen((*(*attr).ns).prefix) > 0 {
             (*(*ctx).buf).write_str(
-                CStr::from_ptr((*(*attr).ns).prefix.load(Ordering::Relaxed) as _)
+                CStr::from_ptr((*(*attr).ns).prefix as _)
                     .to_string_lossy()
                     .as_ref(),
             );
@@ -2130,10 +2114,9 @@ unsafe extern "C" fn xml_c14n_process_element_node(
         }
         (*(*ctx).buf).write_str("<");
 
-        if !(*cur).ns.is_null() && xml_strlen((*(*cur).ns).prefix.load(Ordering::Relaxed) as _) > 0
-        {
+        if !(*cur).ns.is_null() && xml_strlen((*(*cur).ns).prefix as _) > 0 {
             (*(*ctx).buf).write_str(
-                CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                CStr::from_ptr((*(*cur).ns).prefix as _)
                     .to_string_lossy()
                     .as_ref(),
             );
@@ -2175,9 +2158,9 @@ unsafe extern "C" fn xml_c14n_process_element_node(
     }
     if visible != 0 {
         (*(*ctx).buf).write_str("</");
-        if !(*cur).ns.is_null() && xml_strlen((*(*cur).ns).prefix.load(Ordering::Relaxed)) > 0 {
+        if !(*cur).ns.is_null() && xml_strlen((*(*cur).ns).prefix) > 0 {
             (*(*ctx).buf).write_str(
-                CStr::from_ptr((*(*cur).ns).prefix.load(Ordering::Relaxed) as _)
+                CStr::from_ptr((*(*cur).ns).prefix as _)
                     .to_string_lossy()
                     .as_ref(),
             );
