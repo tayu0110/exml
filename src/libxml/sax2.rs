@@ -32,11 +32,11 @@ use crate::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
         xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns,
-        xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_string_len_get_node_list,
-        xml_text_concat, xml_validate_ncname, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeDefault,
-        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
-        XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_text_concat,
+        xml_validate_ncname, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
+        XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -3101,11 +3101,11 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                 (*tmp).parent = ret as XmlNodePtr;
             }
         } else {
-            (*ret).children = xml_string_len_get_node_list(
-                (*ctxt).my_doc,
-                value,
-                valueend.offset_from(value) as _,
-            );
+            (*ret).children = if (*ctxt).my_doc.is_null() {
+                null_mut()
+            } else {
+                (*(*ctxt).my_doc).get_node_list_with_strlen(value, valueend.offset_from(value) as _)
+            };
             tmp = (*ret).children;
             while !tmp.is_null() {
                 (*tmp).doc = (*ret).doc;

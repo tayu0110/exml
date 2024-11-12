@@ -1690,7 +1690,7 @@ impl XmlNode {
     #[doc(alias = "xmlNodeSetContentLen")]
     #[cfg(feature = "tree")]
     pub unsafe fn set_content_len(&mut self, content: *const XmlChar, len: i32) {
-        use crate::{libxml::xmlstring::xml_strndup, tree::xml_string_len_get_node_list};
+        use crate::libxml::xmlstring::xml_strndup;
 
         use super::xml_free_node_list;
 
@@ -1701,7 +1701,11 @@ impl XmlNode {
                 if !self.children.is_null() {
                     xml_free_node_list(self.children);
                 }
-                self.children = xml_string_len_get_node_list(self.doc, content, len);
+                self.children = if self.doc.is_null() {
+                    null_mut()
+                } else {
+                    (*self.doc).get_node_list_with_strlen(content, len)
+                };
                 let mut ulccur: XmlNodePtr = self.children;
                 if ulccur.is_null() {
                     self.last = null_mut();

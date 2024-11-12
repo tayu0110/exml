@@ -103,9 +103,10 @@ impl XmlDoc {
         self.compression
     }
 
-    /// Parse the value string and build the node list associated.
+    /// Parse the value string and build the node list associated.  
     /// Should produce a flat tree with only TEXTs and ENTITY_REFs.
-    /// Returns a pointer to the first child
+    ///
+    /// Returns a pointer to the first child.
     #[doc(alias = "xmlStringGetNodeList")]
     pub unsafe fn get_node_list(&self, value: *const XmlChar) -> XmlNodePtr {
         let mut ret: XmlNodePtr = null_mut();
@@ -390,6 +391,284 @@ impl XmlDoc {
         if !head.is_null() {
             xml_free_node_list(head);
         }
+        ret
+    }
+
+    /// Parse the value string and build the node list associated.  
+    /// Should produce a flat tree with only TEXTs and ENTITY_REFs.
+    ///
+    /// Returns a pointer to the first child.
+    #[doc(alias = "xmlStringLenGetNodeList")]
+    pub unsafe fn get_node_list_with_strlen(&self, value: *const XmlChar, len: i32) -> XmlNodePtr {
+        let mut ret: XmlNodePtr = null_mut();
+        let mut last: XmlNodePtr = null_mut();
+        let mut node: XmlNodePtr;
+        let mut val: *mut XmlChar;
+        let mut cur: *const XmlChar;
+        let mut q: *const XmlChar;
+        let mut ent: XmlEntityPtr;
+
+        if value.is_null() {
+            return null_mut();
+        }
+        cur = value;
+        let end: *const XmlChar = cur.add(len as usize);
+
+        let buf = xml_buf_create_size(0);
+        if buf.is_null() {
+            return null_mut();
+        }
+        xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+
+        q = cur;
+        while cur < end && *cur != 0 {
+            if *cur.add(0) == b'&' {
+                let mut charval: i32 = 0;
+                let mut tmp: XmlChar;
+
+                /*
+                 * Save the current text.
+                 */
+                if cur != q && xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
+                    // goto out;
+                    xml_buf_free(buf);
+                    return ret;
+                }
+                // q = cur;
+                if cur.add(2) < end && *cur.add(1) == b'#' && *cur.add(2) == b'x' {
+                    cur = cur.add(3);
+                    if cur < end {
+                        tmp = *cur;
+                    } else {
+                        tmp = 0;
+                    }
+                    while tmp != b';' {
+                        /* Non input consuming loop */
+                        /*
+                         * If you find an integer overflow here when fuzzing,
+                         * the bug is probably elsewhere. This function should
+                         * only receive entities that were already validated by
+                         * the parser, typically by xmlParseAttValueComplex
+                         * calling xmlStringDecodeEntities.
+                         *
+                         * So it's better *not* to check for overflow to
+                         * potentially discover new bugs.
+                         */
+                        if tmp.is_ascii_digit() {
+                            charval = charval * 16 + (tmp - b'0') as i32;
+                        } else if (b'a'..=b'f').contains(&tmp) {
+                            charval = charval * 16 + (tmp - b'a') as i32 + 10;
+                        } else if (b'A'..=b'F').contains(&tmp) {
+                            charval = charval * 16 + (tmp - b'A') as i32 + 10;
+                        } else {
+                            xml_tree_err(
+                                XmlParserErrors::XmlTreeInvalidHex,
+                                self as *const XmlDoc as _,
+                                null_mut(),
+                            );
+                            charval = 0;
+                            break;
+                        }
+                        cur = cur.add(1);
+                        if cur < end {
+                            tmp = *cur;
+                        } else {
+                            tmp = 0;
+                        }
+                    }
+                    if tmp == b';' {
+                        cur = cur.add(1);
+                    }
+                    q = cur;
+                } else if (cur.add(1) < end) && *cur.add(1) == b'#' {
+                    cur = cur.add(2);
+                    if cur < end {
+                        tmp = *cur;
+                    } else {
+                        tmp = 0;
+                    }
+                    while tmp != b';' {
+                        /* Non input consuming loops */
+                        /* Don't check for integer overflow, see above. */
+                        if tmp.is_ascii_digit() {
+                            charval = charval * 10 + (tmp - b'0') as i32;
+                        } else {
+                            xml_tree_err(
+                                XmlParserErrors::XmlTreeInvalidDec,
+                                self as *const XmlDoc as _,
+                                null_mut(),
+                            );
+                            charval = 0;
+                            break;
+                        }
+                        cur = cur.add(1);
+                        if cur < end {
+                            tmp = *cur;
+                        } else {
+                            tmp = 0;
+                        }
+                    }
+                    if tmp == b';' {
+                        cur = cur.add(1);
+                    }
+                    q = cur;
+                } else {
+                    /*
+                     * Read the entity string
+                     */
+                    cur = cur.add(1);
+                    q = cur;
+                    while cur < end && *cur != 0 && *cur != b';' {
+                        cur = cur.add(1);
+                    }
+                    if cur >= end || *cur == 0 {
+                        xml_tree_err(
+                            XmlParserErrors::XmlTreeUnterminatedEntity,
+                            self as *const XmlDoc as _,
+                            q as _,
+                        );
+                        // goto out;
+                        xml_buf_free(buf);
+                        return ret;
+                    }
+                    if cur != q {
+                        /*
+                         * Predefined entities don't generate nodes
+                         */
+                        val = xml_strndup(q, cur.offset_from(q) as _);
+                        ent = xml_get_doc_entity(self, val);
+                        if !ent.is_null()
+                            && matches!(
+                                (*ent).etype,
+                                Some(XmlEntityType::XmlInternalPredefinedEntity)
+                            )
+                        {
+                            if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
+                                // goto out;
+                                xml_buf_free(buf);
+                                return ret;
+                            }
+                        } else {
+                            /*
+                             * Flush buffer so far
+                             */
+                            if xml_buf_is_empty(buf) == 0 {
+                                node = xml_new_doc_text(self, null_mut());
+                                if node.is_null() {
+                                    if !val.is_null() {
+                                        xml_free(val as _);
+                                    }
+                                    // goto out;
+                                    xml_buf_free(buf);
+                                    return ret;
+                                }
+                                (*node).content = xml_buf_detach(buf);
+
+                                if last.is_null() {
+                                    last = node;
+                                    ret = node;
+                                } else {
+                                    last = (*last).add_next_sibling(node);
+                                }
+                            }
+
+                            /*
+                             * Create a new REFERENCE_REF node
+                             */
+                            node = xml_new_reference(self, val);
+                            if node.is_null() {
+                                if !val.is_null() {
+                                    xml_free(val as _);
+                                }
+                                // goto out;
+                                xml_buf_free(buf);
+                                return ret;
+                            } else if !ent.is_null()
+                                && (*ent).flags & XML_ENT_PARSED as i32 == 0
+                                && (*ent).flags & XML_ENT_EXPANDING as i32 == 0
+                            {
+                                let mut temp: XmlNodePtr;
+
+                                /*
+                                 * The entity should have been checked already,
+                                 * but set the flag anyway to avoid recursion.
+                                 */
+                                (*ent).flags |= XML_ENT_EXPANDING as i32;
+                                (*ent).children.store(
+                                    self.get_node_list((*node).content as _),
+                                    Ordering::Relaxed,
+                                );
+                                (*ent).owner = 1;
+                                (*ent).flags &= !XML_ENT_EXPANDING as i32;
+                                (*ent).flags |= XML_ENT_PARSED as i32;
+                                temp = (*ent).children.load(Ordering::Relaxed);
+                                while !temp.is_null() {
+                                    (*temp).parent = ent as _;
+                                    (*ent).last.store(temp, Ordering::Relaxed);
+                                    temp = (*temp).next;
+                                }
+                            }
+                            if last.is_null() {
+                                last = node;
+                                ret = node;
+                            } else {
+                                last = (*last).add_next_sibling(node);
+                            }
+                        }
+                        xml_free(val as _);
+                    }
+                    cur = cur.add(1);
+                    q = cur;
+                }
+                if charval != 0 {
+                    let mut buffer: [XmlChar; 10] = [0; 10];
+
+                    let l: i32 = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
+                    buffer[l as usize] = 0;
+
+                    if xml_buf_cat(buf, buffer.as_ptr() as _) != 0 {
+                        // goto out;
+                        xml_buf_free(buf);
+                        return ret;
+                    }
+                    // charval = 0;
+                }
+            } else {
+                cur = cur.add(1);
+            }
+        }
+
+        if cur != q {
+            /*
+             * Handle the last piece of text.
+             */
+            if xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
+                // goto out;
+                xml_buf_free(buf);
+                return ret;
+            }
+        }
+
+        if xml_buf_is_empty(buf) == 0 {
+            node = xml_new_doc_text(self, null_mut());
+            if node.is_null() {
+                // goto out;
+                xml_buf_free(buf);
+                return ret;
+            }
+            (*node).content = xml_buf_detach(buf);
+
+            if last.is_null() {
+                ret = node;
+            } else {
+                (*last).add_next_sibling(node);
+            }
+        } else if ret.is_null() {
+            ret = xml_new_doc_text(self, c"".as_ptr() as _);
+        }
+
+        // out:
+        xml_buf_free(buf);
         ret
     }
 
