@@ -3349,7 +3349,10 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
     if !ns.is_null() {
         root = (*doc).get_root_element();
         if !root.is_null() && (*root).has_prop("ns").is_null() {
-            (*root).set_prop("ns", ns);
+            (*root).set_prop(
+                "ns",
+                Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()),
+            );
         }
     }
 
@@ -3639,7 +3642,10 @@ unsafe extern "C" fn xml_relaxng_load_include(
     if !ns.is_null() {
         root = (*doc).get_root_element();
         if !root.is_null() && (*root).has_prop("ns").is_null() {
-            (*root).set_prop("ns", ns);
+            (*root).set_prop(
+                "ns",
+                Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()),
+            );
         }
     }
 
@@ -4047,12 +4053,19 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             ns = (*cur).get_prop("ns");
                             if !ns.is_null() {
                                 if !text.is_null() {
-                                    (*text).set_prop("ns", ns);
+                                    (*text).set_prop(
+                                        "ns",
+                                        Some(
+                                            CStr::from_ptr(ns as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
+                                        ),
+                                    );
                                     /* xmlUnsetProp(cur, c"ns".as_ptr() as _); */
                                 }
                                 xml_free(ns as _);
                             } else if xml_str_equal((*cur).name, c"attribute".as_ptr() as _) {
-                                (*text).set_prop("ns", c"".as_ptr() as _);
+                                (*text).set_prop("ns", Some(""));
                             }
                         }
                     } else if xml_str_equal((*cur).name, c"name".as_ptr() as _)
@@ -4076,9 +4089,14 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 node = (*node).parent;
                             }
                             if ns.is_null() {
-                                (*cur).set_prop("ns", c"".as_ptr() as _);
+                                (*cur).set_prop("ns", Some(""));
                             } else {
-                                (*cur).set_prop("ns", ns);
+                                (*cur).set_prop(
+                                    "ns",
+                                    Some(
+                                        CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref(),
+                                    ),
+                                );
                                 xml_free(ns as _);
                             }
                         }
@@ -4113,7 +4131,16 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                             null_mut(),
                                         );
                                     } else {
-                                        (*cur).set_prop("ns", (*ns).href.load(Ordering::Relaxed));
+                                        let href = (*ns).href.load(Ordering::Relaxed);
+                                        (*cur).set_prop(
+                                            "ns",
+                                            (!href.is_null())
+                                                .then(|| {
+                                                    CStr::from_ptr(href as *const i8)
+                                                        .to_string_lossy()
+                                                })
+                                                .as_deref(),
+                                        );
                                         (*cur).set_content(local);
                                     }
                                     xml_free(local as _);
@@ -4202,7 +4229,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         ins = cur;
                         while !child.is_null() {
                             if !ns.is_null() && (*child).has_prop("ns").is_null() {
-                                (*child).set_prop("ns", ns);
+                                (*child).set_prop(
+                                    "ns",
+                                    Some(
+                                        CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref(),
+                                    ),
+                                );
                             }
                             tmp = (*child).next;
                             (*child).unlink();
@@ -5701,7 +5733,10 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
                     tmp = (*tmp).parent;
                 }
                 if !ns.is_null() {
-                    (*root).set_prop("ns", ns);
+                    (*root).set_prop(
+                        "ns",
+                        Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()),
+                    );
                     new_ns = 1;
                     xml_free(ns as _);
                 }

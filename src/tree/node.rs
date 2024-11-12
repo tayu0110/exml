@@ -1623,7 +1623,7 @@ impl XmlNode {
         feature = "schema",
         feature = "html"
     ))]
-    pub unsafe fn set_prop(&mut self, name: &str, value: *const XmlChar) -> XmlAttrPtr {
+    pub unsafe fn set_prop(&mut self, name: &str, value: Option<&str>) -> XmlAttrPtr {
         use crate::libxml::xmlstring::xml_strndup;
 
         use super::xml_split_qname3;
@@ -1686,8 +1686,10 @@ impl XmlNode {
         &mut self,
         ns: XmlNsPtr,
         name: &str,
-        value: *const XmlChar,
+        value: Option<&str>,
     ) -> XmlAttrPtr {
+        use std::ptr::null;
+
         use crate::{
             libxml::valid::{xml_add_id, xml_remove_id},
             tree::{xml_free_node_list, xml_new_doc_text, xml_new_prop_internal, XmlAttributeType},
@@ -1722,12 +1724,11 @@ impl XmlNode {
             (*prop).children = null_mut();
             (*prop).last = null_mut();
             (*prop).ns = ns;
-            if !value.is_null() {
-                let mut tmp: XmlNodePtr;
-
-                (*prop).children = xml_new_doc_text(self.doc, value);
+            if let Some(value) = value {
+                let value = CString::new(value).unwrap();
+                (*prop).children = xml_new_doc_text(self.doc, value.as_ptr() as *const u8);
                 (*prop).last = null_mut();
-                tmp = (*prop).children;
+                let mut tmp = (*prop).children;
                 while !tmp.is_null() {
                     (*tmp).parent = prop as _;
                     if (*tmp).next.is_null() {
@@ -1737,7 +1738,13 @@ impl XmlNode {
                 }
             }
             if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
-                xml_add_id(null_mut(), self.doc, value, prop);
+                let value = value.map(|v| CString::new(v).unwrap());
+                xml_add_id(
+                    null_mut(),
+                    self.doc,
+                    value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
+                    prop,
+                );
             }
             return prop;
         }
@@ -1745,7 +1752,14 @@ impl XmlNode {
          * No equal attr found; create a new one.
          */
         let name = CString::new(name).unwrap();
-        xml_new_prop_internal(self, ns, name.as_ptr() as *const u8, value, 0)
+        let value = value.map(|v| CString::new(v).unwrap());
+        xml_new_prop_internal(
+            self,
+            ns,
+            name.as_ptr() as *const u8,
+            value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
+            0,
+        )
     }
 
     /// Remove an attribute carried by a node.
@@ -1789,7 +1803,7 @@ impl XmlNode {
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "tree", feature = "xinclude"))]
     pub unsafe fn set_base(&mut self, uri: Option<&str>) {
-        use std::{ffi::CStr, ptr::null};
+        use std::ffi::CStr;
 
         use crate::{libxml::uri::xml_path_to_uri, tree::XmlDocPtr};
 
@@ -1837,16 +1851,24 @@ impl XmlNode {
             return;
         }
         if let Some(uri) = uri {
-            let uri = CString::new(uri).unwrap();
-            let fixed: *mut XmlChar = xml_path_to_uri(uri.as_ptr() as *const u8);
+            let curi = CString::new(uri).unwrap();
+            let fixed: *mut XmlChar = xml_path_to_uri(curi.as_ptr() as *const u8);
             if !fixed.is_null() {
-                self.set_ns_prop(ns, "base", fixed);
+                self.set_ns_prop(
+                    ns,
+                    "base",
+                    Some(
+                        CStr::from_ptr(fixed as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                );
                 xml_free(fixed as _);
             } else {
-                self.set_ns_prop(ns, "base", uri.as_ptr() as *const u8);
+                self.set_ns_prop(ns, "base", Some(uri));
             }
         } else {
-            self.set_ns_prop(ns, "base", null());
+            self.set_ns_prop(ns, "base", None);
         }
     }
 
@@ -1854,7 +1876,7 @@ impl XmlNode {
     /// attribute.
     #[doc(alias = "xmlNodeSetLang")]
     #[cfg(feature = "tree")]
-    pub unsafe fn set_lang(&mut self, lang: *const XmlChar) {
+    pub unsafe fn set_lang(&mut self, lang: Option<&str>) {
         match self.typ {
             XmlElementType::XmlTextNode
             | XmlElementType::XmlCDATASectionNode
@@ -1921,10 +1943,10 @@ impl XmlNode {
         }
         match val {
             0 => {
-                self.set_ns_prop(ns, "space", c"default".as_ptr() as _);
+                self.set_ns_prop(ns, "space", Some("default"));
             }
             1 => {
-                self.set_ns_prop(ns, "space", c"preserve".as_ptr() as _);
+                self.set_ns_prop(ns, "space", Some("preserve"));
             }
             _ => {}
         }

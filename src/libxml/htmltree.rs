@@ -384,6 +384,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                     c"http-equiv".as_ptr() as _,
                     c"Content-Type".as_ptr() as _,
                 );
+                let newcontent = CString::new(newcontent).unwrap();
                 xml_new_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
             }
         } else {
@@ -397,8 +398,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                 !c.to_ascii_lowercase()
                     .contains(&encoding.unwrap().to_ascii_lowercase())
             }) {
-                let newcontent = CString::new(newcontent).unwrap();
-                (*meta).set_prop("content", newcontent.as_ptr() as _);
+                (*meta).set_prop("content", Some(newcontent));
             }
         }
 
