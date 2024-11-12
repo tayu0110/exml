@@ -8,7 +8,10 @@ use std::{
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null, null_mut, NonNull},
-    sync::atomic::{AtomicPtr, Ordering},
+    sync::{
+        atomic::{AtomicPtr, Ordering},
+        LazyLock,
+    },
 };
 
 #[cfg(feature = "libxml_debug")]
@@ -12169,14 +12172,14 @@ pub unsafe extern "C" fn xml_xpath_next_following(
     cur
 }
 
-static mut XML_XPATH_XMLNAMESPACE_STRUCT: XmlNs = XmlNs {
+static XML_XPATH_XMLNAMESPACE_STRUCT: LazyLock<XmlNs> = LazyLock::new(|| XmlNs {
     next: AtomicPtr::new(null_mut()),
     typ: XmlElementType::XmlNamespaceDecl,
     href: AtomicPtr::new(XML_XML_NAMESPACE.as_ptr() as *mut u8),
     prefix: AtomicPtr::new(c"xml".as_ptr() as *mut u8),
     _private: AtomicPtr::new(null_mut()),
     context: AtomicPtr::new(null_mut()),
-};
+});
 // static xmlXPathXMLNamespace: AtomicPtr<xmlNs> =
 //     AtomicPtr::new(addr_of_mut!(xmlXPathXMLNamespaceStruct));
 
@@ -12223,7 +12226,9 @@ pub unsafe extern "C" fn xml_xpath_next_namespace(
                 (*(*ctxt).context).tmp_ns_nr += 1;
             }
         }
-        return addr_of_mut!(XML_XPATH_XMLNAMESPACE_STRUCT) as XmlNodePtr;
+        // Does it work ???
+        let reference = &raw const *XML_XPATH_XMLNAMESPACE_STRUCT;
+        return reference as XmlNodePtr;
     }
     if (*(*ctxt).context).tmp_ns_nr > 0 {
         (*(*ctxt).context).tmp_ns_nr -= 1;
