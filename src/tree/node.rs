@@ -19,11 +19,12 @@ use crate::{
 };
 
 use super::{
-    xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_get_node_content,
+    xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free,
     xml_buf_set_allocation_scheme, xml_encode_attribute_entities, xml_free_node, xml_free_prop,
     xml_is_blank_char, xml_new_doc_text_len, xml_ns_in_scope, xml_set_tree_doc, xml_text_merge,
-    xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd,
-    XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDoc,
+    XmlDocPtr, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE,
+    XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -817,7 +818,7 @@ impl XmlNode {
                     buf,
                     XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
                 );
-                xml_buf_get_node_content(buf, self);
+                self.get_content_to(buf);
                 let ret: *mut XmlChar = xml_buf_detach(buf);
                 xml_buf_free(buf);
                 ret
@@ -847,7 +848,7 @@ impl XmlNode {
                     XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
                 );
 
-                xml_buf_get_node_content(buf, self);
+                self.get_content_to(buf);
 
                 let ret: *mut XmlChar = xml_buf_detach(buf);
                 xml_buf_free(buf);
@@ -869,7 +870,7 @@ impl XmlNode {
                     XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
                 );
 
-                xml_buf_get_node_content(buf, self);
+                self.get_content_to(buf);
 
                 let ret: *mut XmlChar = xml_buf_detach(buf);
                 xml_buf_free(buf);
@@ -903,6 +904,145 @@ impl XmlNode {
             }
             _ => unreachable!(),
         }
+    }
+
+    /// Read the value of a node `cur`, this can be either the text carried
+    /// directly by this node if it's a TEXT node or the aggregate string
+    /// of the values carried by this node child's (TEXT and ENTITY_REF).
+    ///
+    /// Entity references are substituted. Fills up the buffer `buf` with this value.
+    ///
+    /// Returns 0 in case of success and -1 in case of error.
+    #[doc(alias = "xmlBufGetNodeContent")]
+    pub unsafe fn get_content_to(&self, buf: XmlBufPtr) -> i32 {
+        if buf.is_null() {
+            return -1;
+        }
+        match self.typ {
+            XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
+                xml_buf_cat(buf, self.content);
+            }
+            XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
+                let mut tmp: *const XmlNode = self;
+
+                while !tmp.is_null() {
+                    match (*tmp).typ {
+                        XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
+                            if !(*tmp).content.is_null() {
+                                xml_buf_cat(buf, (*tmp).content);
+                            }
+                        }
+                        XmlElementType::XmlEntityRefNode => {
+                            (*tmp).get_content_to(buf);
+                        }
+                        _ => {}
+                    }
+                    /*
+                     * Skip to next node
+                     */
+                    if !(*tmp).children.is_null()
+                        && !matches!((*(*tmp).children).typ, XmlElementType::XmlEntityDecl)
+                    {
+                        tmp = (*tmp).children;
+                        continue;
+                    }
+                    if tmp == self {
+                        break;
+                    } else {
+                        if !(*tmp).next.is_null() {
+                            tmp = (*tmp).next;
+                            continue;
+                        }
+
+                        'lp: while {
+                            tmp = (*tmp).parent;
+                            if tmp.is_null() {
+                                break 'lp;
+                            }
+                            if tmp == self {
+                                tmp = null_mut();
+                                break 'lp;
+                            }
+                            if !(*tmp).next.is_null() {
+                                tmp = (*tmp).next;
+                                break 'lp;
+                            }
+
+                            !tmp.is_null()
+                        } {}
+                    }
+                }
+            }
+            XmlElementType::XmlAttributeNode => {
+                let attr: XmlAttrPtr = self as *const XmlNode as _;
+                let mut tmp: XmlNodePtr = (*attr).children;
+
+                while !tmp.is_null() {
+                    if matches!((*tmp).typ, XmlElementType::XmlTextNode) {
+                        xml_buf_cat(buf, (*tmp).content);
+                    } else {
+                        (*tmp).get_content_to(buf);
+                    }
+                    tmp = (*tmp).next;
+                }
+            }
+            XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
+                xml_buf_cat(buf, self.content);
+            }
+            XmlElementType::XmlEntityRefNode => {
+                let mut tmp: XmlNodePtr;
+
+                /* lookup entity declaration */
+                let ent: XmlEntityPtr = xml_get_doc_entity(self.doc, self.name);
+                if ent.is_null() {
+                    return -1;
+                }
+
+                /* an entity content can be any "well balanced chunk",
+                 * i.e. the result of the content [43] production:
+                 * http://www.w3.org/TR/REC-xml#NT-content
+                 * -> we iterate through child nodes and recursive call
+                 * xmlNodeGetContent() which handles all possible node types */
+                tmp = (*ent).children.load(Ordering::Relaxed);
+                while !tmp.is_null() {
+                    (*tmp).get_content_to(buf);
+                    tmp = (*tmp).next;
+                }
+            }
+            XmlElementType::XmlEntityNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                let mut cur = self.children;
+                while !cur.is_null() {
+                    if matches!(
+                        (*cur).typ,
+                        XmlElementType::XmlElementNode
+                            | XmlElementType::XmlTextNode
+                            | XmlElementType::XmlCDATASectionNode
+                    ) {
+                        (*cur).get_content_to(buf);
+                    }
+                    cur = (*cur).next;
+                }
+            }
+            XmlElementType::XmlNamespaceDecl => {
+                xml_buf_cat(
+                    buf,
+                    (*(self as *const XmlNode as XmlNsPtr))
+                        .href
+                        .load(Ordering::Relaxed),
+                );
+            }
+            XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl => {}
+            _ => unreachable!(),
+        }
+        0
     }
 
     unsafe fn get_prop_node_internal(

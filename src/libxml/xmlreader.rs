@@ -66,11 +66,10 @@ use crate::{
     },
     private::buf::{xml_buf_create_size, xml_buf_empty, xml_buf_set_allocation_scheme},
     tree::{
-        xml_buf_content, xml_buf_get_node_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd,
-        xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_new_doc_text, xml_split_qname2, XmlAttrPtr,
-        XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
-        __XML_REGISTER_CALLBACKS,
+        xml_buf_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd, xml_doc_copy_node,
+        xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns, xml_free_ns_list, xml_new_doc_text,
+        xml_split_qname2, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr,
+        XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -3352,7 +3351,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
                 } else {
                     xml_buf_empty(reader.buffer);
                 }
-                xml_buf_get_node_content(reader.buffer, node);
+                (*node).get_content_to(reader.buffer);
                 ret = xml_buf_content(reader.buffer);
                 if ret.is_null() {
                     /* error on the buffer best to reallocate */
