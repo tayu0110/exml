@@ -217,7 +217,7 @@ pub unsafe extern "C" fn xlink_set_default_handler(handler: XlinkHandlerPtr) {
     XLINK_DEFAULT_HANDLER.store(handler, Ordering::Release);
 }
 
-const XLINK_NAMESPACE: &CStr = c"http://www.w3.org/1999/xlink/namespace/";
+const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink/namespace/";
 const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
 
 /*
@@ -271,14 +271,14 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
      * We don't prevent a-priori having XML Linking constructs on
      * XHTML elements
      */
-    let typ: *mut XmlChar = (*node).get_ns_prop("type", XLINK_NAMESPACE.to_str().ok());
+    let typ: *mut XmlChar = (*node).get_ns_prop("type", Some(XLINK_NAMESPACE));
     if !typ.is_null() {
         if xml_str_equal(typ, c"simple".as_ptr() as _) {
             ret = XlinkType::XlinkTypeSimple;
         } else if xml_str_equal(typ, c"extended".as_ptr() as _) {
-            role = (*node).get_ns_prop("role", XLINK_NAMESPACE.to_str().ok());
+            role = (*node).get_ns_prop("role", Some(XLINK_NAMESPACE));
             if !role.is_null() {
-                let xlink: XmlNsPtr = (*node).search_ns(doc, XLINK_NAMESPACE.to_str().ok());
+                let xlink: XmlNsPtr = (*node).search_ns(doc, Some(XLINK_NAMESPACE));
                 if xlink.is_null() {
                     /* Humm, fallback method */
                     if xml_str_equal(role, c"xlink:external-linkset".as_ptr() as _) {
