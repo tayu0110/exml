@@ -29,7 +29,7 @@ pub struct XmlNs {
     pub href: AtomicPtr<XmlChar>,           /* URL for the namespace */
     pub prefix: AtomicPtr<XmlChar>,         /* prefix for the namespace */
     pub(crate) _private: AtomicPtr<c_void>, /* application data */
-    pub(crate) context: AtomicPtr<XmlDoc>,  /* normally an xmlDoc */
+    pub(crate) context: *mut XmlDoc,        /* normally an xmlDoc */
 }
 
 impl Default for XmlNs {
@@ -40,7 +40,7 @@ impl Default for XmlNs {
             href: AtomicPtr::new(null_mut()),
             prefix: AtomicPtr::new(null_mut()),
             _private: AtomicPtr::new(null_mut()),
-            context: AtomicPtr::new(null_mut()),
+            context: null_mut(),
         }
     }
 }
