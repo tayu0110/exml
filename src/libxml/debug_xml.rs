@@ -3340,7 +3340,13 @@ unsafe extern "C" fn xml_shell_set_base(
     if node.is_null() {
         return 0;
     }
-    (*node).set_base(arg as *mut XmlChar);
+    if arg.is_null() {
+        (*node).set_base(None);
+    } else {
+        (*node).set_base(Some(
+            CStr::from_ptr(arg as *const i8).to_string_lossy().as_ref(),
+        ));
+    }
     0
 }
 

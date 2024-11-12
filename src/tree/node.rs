@@ -1748,8 +1748,8 @@ impl XmlNode {
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "tree", feature = "xinclude"))]
-    pub unsafe fn set_base(&mut self, uri: *const XmlChar) {
-        use std::ffi::CStr;
+    pub unsafe fn set_base(&mut self, uri: Option<&str>) {
+        use std::{ffi::CStr, ptr::null};
 
         use crate::{libxml::uri::xml_path_to_uri, tree::XmlDocPtr};
 
@@ -1776,21 +1776,17 @@ impl XmlNode {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 let doc = self as *mut XmlNode as XmlDocPtr;
 
-                if uri.is_null() {
-                    (*doc).url = None;
-                } else {
-                    let uri = xml_path_to_uri(uri);
-                    if !uri.is_null() {
-                        (*doc).url = Some(
-                            CStr::from_ptr(uri as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
+                (*doc).url = uri.and_then(|uri| {
+                    let uri = CString::new(uri).unwrap();
+                    let uri = xml_path_to_uri(uri.as_ptr() as *const u8);
+                    (!uri.is_null()).then(|| {
+                        let url = CStr::from_ptr(uri as *const i8)
+                            .to_string_lossy()
+                            .into_owned();
                         xml_free(uri as _);
-                    } else {
-                        (*doc).url = None;
-                    }
-                }
+                        url
+                    })
+                });
                 return;
             }
             _ => unreachable!(),
@@ -1800,12 +1796,17 @@ impl XmlNode {
         if ns.is_null() {
             return;
         }
-        let fixed: *mut XmlChar = xml_path_to_uri(uri);
-        if !fixed.is_null() {
-            self.set_ns_prop(ns, c"base".as_ptr() as _, fixed);
-            xml_free(fixed as _);
+        if let Some(uri) = uri {
+            let uri = CString::new(uri).unwrap();
+            let fixed: *mut XmlChar = xml_path_to_uri(uri.as_ptr() as *const u8);
+            if !fixed.is_null() {
+                self.set_ns_prop(ns, c"base".as_ptr() as _, fixed);
+                xml_free(fixed as _);
+            } else {
+                self.set_ns_prop(ns, c"base".as_ptr() as _, uri.as_ptr() as *const u8);
+            }
         } else {
-            self.set_ns_prop(ns, c"base".as_ptr() as _, uri);
+            self.set_ns_prop(ns, c"base".as_ptr() as _, null());
         }
     }
 

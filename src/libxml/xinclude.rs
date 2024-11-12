@@ -1994,7 +1994,9 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         cur_base = (*node).get_base((*node).doc);
                         /* If no current base, set it */
                         if cur_base.is_null() {
-                            (*node).set_base(base);
+                            (*node).set_base(Some(
+                                CStr::from_ptr(base as *const i8).to_string_lossy().as_ref(),
+                            ));
                         } else {
                             /*
                              * If the current base is the same as the
@@ -2004,7 +2006,9 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                             if (*(*node).doc).url.as_deref()
                                 == CStr::from_ptr(cur_base as *const i8).to_str().ok()
                             {
-                                (*node).set_base(base);
+                                (*node).set_base(Some(
+                                    CStr::from_ptr(base as *const i8).to_string_lossy().as_ref(),
+                                ));
                             } else {
                                 /*
                                  * If the element already has an xml:base
@@ -2027,7 +2031,11 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                             xml_base,
                                         );
                                     } else {
-                                        (*node).set_base(rel_base);
+                                        (*node).set_base(Some(
+                                            CStr::from_ptr(rel_base as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
+                                        ));
                                         xml_free(rel_base as _);
                                     }
                                     xml_free(xml_base as _);
