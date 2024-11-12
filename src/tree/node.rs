@@ -1833,7 +1833,7 @@ impl XmlNode {
             _ => unreachable!(),
         }
 
-        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.as_ptr() as _);
+        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
         if ns.is_null() {
             return;
         }
@@ -1880,7 +1880,7 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             _ => unreachable!(),
         }
-        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.as_ptr() as _);
+        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
         if ns.is_null() {
             return;
         }
@@ -1916,7 +1916,7 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             _ => unreachable!(),
         }
-        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.as_ptr() as _);
+        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
         if ns.is_null() {
             return;
         }
@@ -2842,18 +2842,14 @@ impl XmlNode {
     ///
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNsByHref")]
-    pub unsafe fn search_ns_by_href(
-        &mut self,
-        mut doc: XmlDocPtr,
-        href: *const XmlChar,
-    ) -> XmlNsPtr {
+    pub unsafe fn search_ns_by_href(&mut self, mut doc: XmlDocPtr, href: &str) -> XmlNsPtr {
         let mut cur: XmlNsPtr;
         let orig: XmlNodePtr = self;
 
-        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) || href.is_null() {
+        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
-        if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
+        if href == XML_XML_NAMESPACE.to_str().unwrap() {
             /*
              * Only the document can hold the XML spec namespace.
              */
@@ -2908,11 +2904,14 @@ impl XmlNode {
                 return null_mut();
             }
             if matches!((*node).typ, XmlElementType::XmlElementNode) {
+                let href = CString::new(href).unwrap();
                 cur = (*node).ns_def;
                 while !cur.is_null() {
                     if !(*cur).href.load(Ordering::Relaxed).is_null()
-                        && !href.is_null()
-                        && xml_str_equal((*cur).href.load(Ordering::Relaxed), href)
+                        && xml_str_equal(
+                            (*cur).href.load(Ordering::Relaxed),
+                            href.as_ptr() as *const u8,
+                        )
                         && (!is_attr || !(*cur).prefix.load(Ordering::Relaxed).is_null())
                         && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed))
                             == 1
@@ -2925,8 +2924,10 @@ impl XmlNode {
                     cur = (*node).ns;
                     if !cur.is_null()
                         && !(*cur).href.load(Ordering::Relaxed).is_null()
-                        && !href.is_null()
-                        && xml_str_equal((*cur).href.load(Ordering::Relaxed), href)
+                        && xml_str_equal(
+                            (*cur).href.load(Ordering::Relaxed),
+                            href.as_ptr() as *const u8,
+                        )
                         && (!is_attr || !(*cur).prefix.load(Ordering::Relaxed).is_null())
                         && xml_ns_in_scope(doc, orig, node, (*cur).prefix.load(Ordering::Relaxed))
                             == 1

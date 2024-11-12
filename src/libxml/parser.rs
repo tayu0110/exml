@@ -4970,7 +4970,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*ctxt).my_doc = new_doc;
         (*(*new_doc).children).doc = doc;
         /* Ensure that doc has XML spec namespace */
-        (*(doc as *mut XmlNode)).search_ns_by_href(doc, XML_XML_NAMESPACE.as_ptr() as _);
+        (*(doc as *mut XmlNode)).search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap());
         (*new_doc).old_ns = (*doc).old_ns;
     }
     (*ctxt).instate = XmlParserInputState::XmlParserContent;

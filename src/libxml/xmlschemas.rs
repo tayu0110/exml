@@ -28031,8 +28031,12 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                         } else {
                             let mut ns: XmlNsPtr;
 
-                            ns = (*def_attr_owner_elem)
-                                .search_ns_by_href((*def_attr_owner_elem).doc, (*iattr).ns_name);
+                            ns = (*def_attr_owner_elem).search_ns_by_href(
+                                (*def_attr_owner_elem).doc,
+                                CStr::from_ptr((*iattr).ns_name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            );
                             if ns.is_null() {
                                 let mut prefix: [XmlChar; 12] = [0; 12];
                                 let mut counter: i32 = 0;

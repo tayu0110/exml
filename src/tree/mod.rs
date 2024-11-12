@@ -1369,7 +1369,12 @@ unsafe extern "C" fn xml_new_reconciled_ns(
     /*
      * Search an existing namespace definition inherited.
      */
-    def = (*tree).search_ns_by_href(doc, (*ns).href.load(Ordering::Relaxed));
+    def = (*tree).search_ns_by_href(
+        doc,
+        CStr::from_ptr((*ns).href.load(Ordering::Relaxed) as *const i8)
+            .to_string_lossy()
+            .as_ref(),
+    );
     if !def.is_null() {
         return def;
     }

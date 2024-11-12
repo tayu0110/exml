@@ -3240,7 +3240,7 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
                     (*node).set_prop("id", (*cur).name);
                     if !(*cur).value.is_null() {
                         let xns: XmlNsPtr =
-                            (*node).search_ns_by_href(doc, XML_XML_NAMESPACE.as_ptr() as _);
+                            (*node).search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap());
                         if !xns.is_null() {
                             (*node).set_ns_prop(xns, "base", (*cur).value);
                         }
