@@ -9,7 +9,7 @@ use crate::{
         entities::{xml_encode_entities_reentrant, xml_get_doc_entity, XmlEntityPtr},
         globals::{xml_free, xml_malloc},
         uri::xml_build_uri,
-        valid::{xml_get_dtd_attr_desc, xml_get_dtd_qattr_desc},
+        valid::{xml_get_dtd_attr_desc, xml_get_dtd_qattr_desc, xml_remove_id},
         xmlstring::{
             xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
             xml_strncat_new, xml_strncmp, XmlChar,
@@ -19,12 +19,12 @@ use crate::{
 };
 
 use super::{
-    xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free,
-    xml_buf_set_allocation_scheme, xml_encode_attribute_entities, xml_free_node, xml_free_prop,
-    xml_is_blank_char, xml_new_doc_text_len, xml_ns_in_scope, xml_set_tree_doc, xml_text_merge,
-    xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDoc,
-    XmlDocPtr, XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE,
-    XML_XML_NAMESPACE,
+    copy_string_for_new_dict_if_needed, xml_buf_cat, xml_buf_create, xml_buf_create_size,
+    xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme, xml_encode_attribute_entities,
+    xml_free_node, xml_free_prop, xml_is_blank_char, xml_new_doc_text_len, xml_ns_in_scope,
+    xml_set_list_doc, xml_text_merge, xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlAttributeType,
+    XmlBufPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs,
+    XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -98,7 +98,7 @@ pub trait NodeCommon {
         prev = (*cur).parent;
         (*cur).parent = self as *mut Self as *mut XmlNode;
         if (*cur).doc != self.document() {
-            xml_set_tree_doc(cur, self.document());
+            (*cur).set_doc(self.document());
         }
         /* this check prevents a loop on tree-traversions if a developer
          * tries to add a node to its parent multiple times
@@ -2039,6 +2039,79 @@ impl XmlNode {
         }
     }
 
+    /// update all nodes under the tree to point to the right document
+    #[doc(alias = "xmlSetTreeDoc")]
+    pub unsafe fn set_doc(&mut self, doc: XmlDocPtr) {
+        let mut prop: XmlAttrPtr;
+
+        if self.typ == XmlElementType::XmlNamespaceDecl {
+            return;
+        }
+        if self.doc != doc {
+            let old_tree_dict = if !self.doc.is_null() {
+                (*self.doc).dict
+            } else {
+                null_mut()
+            };
+            let new_dict = if !doc.is_null() {
+                (*doc).dict
+            } else {
+                null_mut()
+            };
+
+            if matches!(self.typ, XmlElementType::XmlElementNode) {
+                prop = self.properties;
+                while !prop.is_null() {
+                    if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
+                        xml_remove_id(self.doc, prop);
+                    }
+
+                    if (*prop).doc != doc {
+                        let old_prop_dict = if !(*prop).doc.is_null() {
+                            (*(*prop).doc).dict
+                        } else {
+                            null_mut()
+                        };
+                        (*prop).name = copy_string_for_new_dict_if_needed(
+                            old_prop_dict,
+                            new_dict,
+                            (*prop).name,
+                        );
+                        (*prop).doc = doc;
+                    }
+                    xml_set_list_doc((*prop).children, doc);
+
+                    // TODO: ID attributes should be also added to the new
+                    //       document, but this breaks things like xmlReplaceNode.
+                    //       The underlying problem is that xmlRemoveID is only called
+                    //       if a node is destroyed, not if it's unlinked.
+                    // if (xmlIsID(doc, tree, prop)) {
+                    //     XmlChar *idVal = xmlNodeListGetString(doc, (*prop).children,
+                    //                                           1);
+                    //     xmlAddID(null_mut(), doc, idVal, prop);
+                    // }
+
+                    prop = (*prop).next;
+                }
+            }
+            if matches!(self.typ, XmlElementType::XmlEntityRefNode) {
+                /*
+                 * Clear 'children' which points to the entity declaration
+                 * from the original document.
+                 */
+                self.children = null_mut();
+            } else if !self.children.is_null() {
+                xml_set_list_doc(self.children, doc);
+            }
+
+            self.name = copy_string_for_new_dict_if_needed(old_tree_dict, new_dict, self.name);
+            self.content =
+                copy_string_for_new_dict_if_needed(old_tree_dict, null_mut(), self.content) as _;
+            /* FIXME: self.ns should be updated as in xmlStaticCopyNode(). */
+            self.doc = doc;
+        }
+    }
+
     /// Search an attribute associated to a node.  
     ///
     /// This function also looks in DTD attribute declaration for #FIXED or
@@ -2153,7 +2226,7 @@ impl XmlNode {
         }
 
         if (*elem).doc != (*cur).doc {
-            xml_set_tree_doc(elem, (*cur).doc);
+            (*elem).set_doc((*cur).doc);
         }
         let parent: XmlNodePtr = (*cur).parent;
         (*elem).prev = cur;
@@ -2227,7 +2300,7 @@ impl XmlNode {
         }
 
         if (*elem).doc != self.doc {
-            xml_set_tree_doc(elem, self.doc);
+            (*elem).set_doc(self.doc);
         }
         (*elem).parent = self.parent;
         (*elem).next = self as *mut XmlNode;
@@ -2291,7 +2364,7 @@ impl XmlNode {
         }
 
         if (*elem).doc != self.doc {
-            xml_set_tree_doc(elem, self.doc);
+            (*elem).set_doc(self.doc);
         }
         (*elem).parent = self.parent;
         (*elem).prev = self as *mut XmlNode;
@@ -2357,14 +2430,14 @@ impl XmlNode {
         while !(*cur).next.is_null() {
             (*cur).parent = self;
             if (*cur).doc != self.doc {
-                xml_set_tree_doc(cur, self.doc);
+                (*cur).set_doc(self.doc);
             }
             cur = (*cur).next;
         }
         (*cur).parent = self;
         /* the parent may not be linked to a doc ! */
         if (*cur).doc != self.doc {
-            xml_set_tree_doc(cur, self.doc);
+            (*cur).set_doc(self.doc);
         }
         self.last = cur;
 
@@ -3085,7 +3158,7 @@ unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) 
     };
 
     if (*prop).doc != (*cur).doc {
-        xml_set_tree_doc(prop, (*cur).doc);
+        (*prop).set_doc((*cur).doc);
     }
     (*prop).parent = (*cur).parent;
     (*prop).prev = prev;

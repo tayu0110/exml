@@ -78,10 +78,10 @@ use crate::{
     },
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
-        xml_new_doc, xml_new_doc_node, xml_set_tree_doc, xml_split_qname3, XmlAttributeDefault,
-        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlElementContentOccur,
-        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
-        XmlEnumerationPtr, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_new_doc, xml_new_doc_node, xml_split_qname3, XmlAttributeDefault, XmlAttributeType,
+        XmlDocProperties, XmlDocPtr, XmlElementContentOccur, XmlElementContentPtr,
+        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
+        XML_XML_NAMESPACE,
     },
 };
 
@@ -4256,7 +4256,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 while !list.is_null() {
                     (*list).parent = ent as XmlNodePtr;
                     if (*list).doc != (*ent).doc.load(Ordering::Relaxed) as _ {
-                        xml_set_tree_doc(list, (*ent).doc.load(Ordering::Relaxed));
+                        (*list).set_doc((*ent).doc.load(Ordering::Relaxed));
                     }
                     if (*list).next.is_null() {
                         (*ent).last.store(list, Ordering::Relaxed);

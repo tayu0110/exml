@@ -2061,7 +2061,7 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
                 xml_free_doc(ret);
                 return null_mut();
             }
-            xml_set_tree_doc((*ret).int_subset as _, ret);
+            (*((*ret).int_subset as *mut XmlNode)).set_doc(ret);
             (*(*ret).int_subset).parent = ret;
         }
     }
@@ -2973,7 +2973,7 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
         return old;
     }
     (*cur).unlink();
-    xml_set_tree_doc(cur, (*old).doc);
+    (*cur).set_doc((*old).doc);
     (*cur).parent = (*old).parent;
     (*cur).next = (*old).next;
     if !(*cur).next.is_null() {
@@ -3253,7 +3253,7 @@ pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
     xml_free(cur as _);
 }
 
-unsafe extern "C" fn _copy_string_for_new_dict_if_needed(
+unsafe extern "C" fn copy_string_for_new_dict_if_needed(
     old_dict: XmlDictPtr,
     new_dict: XmlDictPtr,
     old_value: *const XmlChar,
@@ -3274,85 +3274,6 @@ unsafe extern "C" fn _copy_string_for_new_dict_if_needed(
 }
 
 /**
- * xmlSetTreeDoc:
- * @tree:  the top element
- * @doc:  the document
- *
- * update all nodes under the tree to point to the right document
- */
-pub unsafe extern "C" fn xml_set_tree_doc(tree: XmlNodePtr, doc: XmlDocPtr) {
-    let mut prop: XmlAttrPtr;
-
-    if tree.is_null() || ((*tree).typ == XmlElementType::XmlNamespaceDecl) {
-        return;
-    }
-    if (*tree).doc != doc {
-        let old_tree_dict: XmlDictPtr = if !(*tree).doc.is_null() {
-            (*(*tree).doc).dict
-        } else {
-            null_mut()
-        };
-        let new_dict: XmlDictPtr = if !doc.is_null() {
-            (*doc).dict
-        } else {
-            null_mut()
-        };
-
-        if matches!((*tree).typ, XmlElementType::XmlElementNode) {
-            prop = (*tree).properties;
-            while !prop.is_null() {
-                if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
-                    xml_remove_id((*tree).doc, prop);
-                }
-
-                if (*prop).doc != doc {
-                    let old_prop_dict: XmlDictPtr = if !(*prop).doc.is_null() {
-                        (*(*prop).doc).dict
-                    } else {
-                        null_mut()
-                    };
-                    (*prop).name =
-                        _copy_string_for_new_dict_if_needed(old_prop_dict, new_dict, (*prop).name);
-                    (*prop).doc = doc;
-                }
-                xml_set_list_doc((*prop).children, doc);
-
-                /*
-                 * TODO: ID attributes should be also added to the new
-                 * document, but this breaks things like xmlReplaceNode.
-                 * The underlying problem is that xmlRemoveID is only called
-                 * if a node is destroyed, not if it's unlinked.
-                 */
-                // #if 0
-                //                 if (xmlIsID(doc, tree, prop)) {
-                //                     XmlChar *idVal = xmlNodeListGetString(doc, (*prop).children,
-                //                                                           1);
-                //                     xmlAddID(null_mut(), doc, idVal, prop);
-                //                 }
-                // #endif
-
-                prop = (*prop).next;
-            }
-        }
-        if matches!((*tree).typ, XmlElementType::XmlEntityRefNode) {
-            /*
-             * Clear 'children' which points to the entity declaration
-             * from the original document.
-             */
-            (*tree).children = null_mut();
-        } else if !(*tree).children.is_null() {
-            xml_set_list_doc((*tree).children, doc);
-        }
-
-        (*tree).name = _copy_string_for_new_dict_if_needed(old_tree_dict, new_dict, (*tree).name);
-        (*tree).content =
-            _copy_string_for_new_dict_if_needed(old_tree_dict, null_mut(), (*tree).content) as _;
-        /* FIXME: (*tree).ns should be updated as in xmlStaticCopyNode(). */
-        (*tree).doc = doc;
-    }
-}
-
-/**
  * xmlSetListDoc:
  * @list:  the first element
  * @doc:  the document
@@ -3368,7 +3289,7 @@ pub unsafe extern "C" fn xml_set_list_doc(list: XmlNodePtr, doc: XmlDocPtr) {
     cur = list;
     while !cur.is_null() {
         if (*cur).doc != doc {
-            xml_set_tree_doc(cur, doc);
+            (*cur).set_doc(doc);
         }
         cur = (*cur).next;
     }

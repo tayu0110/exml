@@ -679,13 +679,13 @@ impl XmlDoc {
     #[doc(alias = "xmlDocSetRootElement")]
     #[cfg(any(feature = "tree", feature = "writer"))]
     pub unsafe fn set_root_element(&mut self, root: XmlNodePtr) -> XmlNodePtr {
-        use crate::tree::{xml_replace_node, xml_set_tree_doc, NodeCommon};
+        use crate::tree::{xml_replace_node, NodeCommon};
 
         if root.is_null() || matches!((*root).typ, XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
         (*root).unlink();
-        xml_set_tree_doc(root, self);
+        (*root).set_doc(self);
         (*root).parent = self as *mut XmlDoc as *mut XmlNode;
         let mut old = self.children;
         while !old.is_null() {

@@ -103,11 +103,11 @@ use crate::{
     },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
-        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, xml_set_tree_doc, NodeCommon,
-        XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme,
-        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
-        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
-        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, XmlAttrPtr,
+        XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties,
+        XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
+        XML_XML_NAMESPACE,
     },
 };
 
@@ -5021,7 +5021,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         cur = (*(*new_doc).children).children;
         *lst = cur;
         while !cur.is_null() {
-            xml_set_tree_doc(cur, doc);
+            (*cur).set_doc(doc);
             (*cur).parent = null_mut();
             cur = (*cur).next;
         }
