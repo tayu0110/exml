@@ -1,4 +1,4 @@
-use std::{os::raw::c_void, ptr::null_mut, sync::atomic::AtomicPtr};
+use std::{os::raw::c_void, ptr::null_mut};
 
 use libc::memset;
 
@@ -20,12 +20,12 @@ use super::{
 pub type XmlNsPtr = *mut XmlNs;
 #[repr(C)]
 pub struct XmlNs {
-    pub next: *mut XmlNs,                   /* next Ns link for this node  */
-    pub(crate) typ: XmlNsType,              /* global or local */
-    pub href: *const XmlChar,               /* URL for the namespace */
-    pub prefix: *const XmlChar,             /* prefix for the namespace */
-    pub(crate) _private: AtomicPtr<c_void>, /* application data */
-    pub(crate) context: *mut XmlDoc,        /* normally an xmlDoc */
+    pub next: *mut XmlNs,             /* next Ns link for this node  */
+    pub(crate) typ: XmlNsType,        /* global or local */
+    pub href: *const XmlChar,         /* URL for the namespace */
+    pub prefix: *const XmlChar,       /* prefix for the namespace */
+    pub(crate) _private: *mut c_void, /* application data */
+    pub(crate) context: *mut XmlDoc,  /* normally an xmlDoc */
 }
 
 impl Default for XmlNs {
@@ -35,7 +35,7 @@ impl Default for XmlNs {
             typ: XmlNsType::XmlInvalidNode,
             href: null_mut(),
             prefix: null_mut(),
-            _private: AtomicPtr::new(null_mut()),
+            _private: null_mut(),
             context: null_mut(),
         }
     }

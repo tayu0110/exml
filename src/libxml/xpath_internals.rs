@@ -8,7 +8,6 @@ use std::{
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null, null_mut, NonNull},
-    sync::atomic::AtomicPtr,
 };
 
 #[cfg(feature = "libxml_debug")]
@@ -12125,7 +12124,7 @@ thread_local! {
         typ: XmlElementType::XmlNamespaceDecl,
         href: XML_XML_NAMESPACE.as_ptr() as *const u8,
         prefix: c"xml".as_ptr() as *const u8,
-        _private: AtomicPtr::new(null_mut()),
+        _private: null_mut(),
         context: null_mut(),
     } };
 }
