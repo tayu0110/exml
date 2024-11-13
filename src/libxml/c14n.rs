@@ -9,7 +9,6 @@ use std::{
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
-    sync::atomic::Ordering,
 };
 
 use libc::{memcpy, memset};
@@ -138,10 +137,9 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
 
             /* this is a libxml hack! check xpath.c for details */
             if !parent.is_null() && matches!((*parent).typ, XmlElementType::XmlAttributeNode) {
-                ns.next
-                    .store((*parent).parent as XmlNsPtr, Ordering::Relaxed);
+                ns.next = (*parent).parent as XmlNsPtr;
             } else {
-                ns.next.store(parent as XmlNsPtr, Ordering::Relaxed);
+                ns.next = parent as XmlNsPtr;
             }
 
             /*
@@ -707,7 +705,7 @@ unsafe extern "C" fn xml_c14n_check_for_relative_namespaces(
             }
             xml_free_uri(uri);
         }
-        ns = (*ns).next.load(Ordering::Relaxed) as _;
+        ns = (*ns).next as _;
     }
     0
 }
@@ -1040,7 +1038,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
                     has_empty_ns = 1;
                 }
             }
-            ns = (*ns).next.load(Ordering::Relaxed);
+            ns = (*ns).next;
         }
         n = (*n).parent;
     }

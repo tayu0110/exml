@@ -2780,7 +2780,7 @@ pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextRea
     ns = (*node).ns_def;
     while !ns.is_null() {
         ret += 1;
-        ns = (*ns).next.load(Ordering::Relaxed);
+        ns = (*ns).next;
     }
     ret
 }
@@ -3783,7 +3783,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_no(
     ns = (*reader.node).ns_def;
     let mut i = 0;
     while i < no && !ns.is_null() {
-        ns = (*ns).next.load(Ordering::Relaxed);
+        ns = (*ns).next;
         i += 1;
     }
 
@@ -3861,7 +3861,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
                 if (*ns).prefix.is_null() {
                     return xml_strdup((*ns).href);
                 }
-                ns = (*ns).next.load(Ordering::Relaxed);
+                ns = (*ns).next;
             }
             return null_mut();
         }
@@ -3879,7 +3879,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
                 ret = xml_strdup((*ns).href);
                 break;
             }
-            ns = (*ns).next.load(Ordering::Relaxed);
+            ns = (*ns).next;
         }
     } else {
         ns = (*reader.node).search_ns(
@@ -3959,7 +3959,7 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
             {
                 return xml_strdup((*ns).href);
             }
-            ns = (*ns).next.load(Ordering::Relaxed);
+            ns = (*ns).next;
         }
         return null_mut();
     }
@@ -4090,7 +4090,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_no(
     ns = (*reader.node).ns_def;
     let mut i = 0;
     while i < no && !ns.is_null() {
-        ns = (*ns).next.load(Ordering::Relaxed);
+        ns = (*ns).next;
         i += 1;
     }
 
@@ -4159,7 +4159,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
                     reader.curnode = ns as XmlNodePtr;
                     return 1;
                 }
-                ns = (*ns).next.load(Ordering::Relaxed);
+                ns = (*ns).next;
             }
             return 0;
         }
@@ -4199,7 +4199,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
                 }
                 return 1;
             }
-            ns = (*ns).next.load(Ordering::Relaxed);
+            ns = (*ns).next;
         }
     // goto not_found;
     } else {
@@ -4284,7 +4284,7 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
                 reader.curnode = ns as XmlNodePtr;
                 return 1;
             }
-            ns = (*ns).next.load(Ordering::Relaxed);
+            ns = (*ns).next;
         }
         return 0;
     }
@@ -4361,8 +4361,8 @@ pub unsafe extern "C" fn xml_text_reader_move_to_next_attribute(reader: &mut Xml
 
     if (*reader.curnode).typ == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = reader.curnode as XmlNsPtr;
-        if !(*ns).next.load(Ordering::Relaxed).is_null() {
-            reader.curnode = (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
+        if !(*ns).next.is_null() {
+            reader.curnode = (*ns).next as XmlNodePtr;
             return 1;
         }
         if !(*reader.node).properties.is_null() {

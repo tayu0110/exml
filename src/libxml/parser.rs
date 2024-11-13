@@ -4779,7 +4779,7 @@ pub unsafe fn xml_parse_in_node_context(
                     (*ctxt).ns_push(iprefix, ihref);
                     nsnr += 1;
                 }
-                ns = (*ns).next.load(Ordering::Relaxed) as _;
+                ns = (*ns).next as _;
             }
             cur = (*cur).parent;
         }

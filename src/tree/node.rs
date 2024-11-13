@@ -1312,7 +1312,7 @@ impl XmlNode {
                         if ((*cur).prefix == (*(*ret.add(i as usize))).prefix)
                             || xml_str_equal((*cur).prefix, (*(*ret.add(i as usize))).prefix)
                         {
-                            cur = (*cur).next.load(Ordering::Relaxed);
+                            cur = (*cur).next;
                             continue 'b;
                         }
                     }
@@ -2761,7 +2761,7 @@ impl XmlNode {
                 (*cur).typ = XML_LOCAL_NAMESPACE;
                 (*cur).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
                 (*cur).prefix = xml_strdup(c"xml".as_ptr() as _);
-                (*cur).next.store(self.ns_def as _, Ordering::Relaxed);
+                (*cur).next = self.ns_def;
                 self.ns_def = cur;
                 return cur;
             }
@@ -2806,7 +2806,7 @@ impl XmlNode {
                     {
                         return cur;
                     }
-                    cur = (*cur).next.load(Ordering::Relaxed);
+                    cur = (*cur).next;
                 }
                 if orig != node {
                     cur = (*node).ns;
@@ -2865,7 +2865,7 @@ impl XmlNode {
                 (*cur).typ = XML_LOCAL_NAMESPACE;
                 (*cur).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
                 (*cur).prefix = xml_strdup(c"xml".as_ptr() as _);
-                (*cur).next.store(self.ns_def, Ordering::Relaxed);
+                (*cur).next = self.ns_def;
                 self.ns_def = cur;
                 return cur;
             }
@@ -2906,7 +2906,7 @@ impl XmlNode {
                     {
                         return cur;
                     }
-                    cur = (*cur).next.load(Ordering::Relaxed);
+                    cur = (*cur).next;
                 }
                 if orig != node {
                     cur = (*node).ns;

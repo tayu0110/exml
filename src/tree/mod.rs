@@ -3297,7 +3297,7 @@ unsafe extern "C" fn xml_ns_in_scope(
                 {
                     return 0;
                 }
-                tst = (*tst).next.load(Ordering::Relaxed);
+                tst = (*tst).next;
             }
         }
         node = (*node).parent;
@@ -3350,10 +3350,10 @@ pub unsafe extern "C" fn xml_copy_namespace_list(mut cur: XmlNsPtr) -> XmlNsPtr 
             ret = q;
             p = ret;
         } else {
-            (*p).next.store(q, Ordering::Relaxed);
+            (*p).next = q;
             p = q;
         }
-        cur = (*cur).next.load(Ordering::Relaxed);
+        cur = (*cur).next;
     }
     ret
 }
@@ -3733,7 +3733,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
                 if shadowed != 0 {
                     (*mi).shadow_depth = 0;
                 }
-                ns = (*ns).next.load(Ordering::Relaxed);
+                ns = (*ns).next;
 
                 if ns.is_null() {
                     break;
@@ -3817,27 +3817,25 @@ unsafe extern "C" fn xml_dom_wrap_store_ns(
     if ns.is_null() {
         return null_mut();
     }
-    if !(*ns).next.load(Ordering::Relaxed).is_null() {
+    if !(*ns).next.is_null() {
         /* Reuse. */
-        ns = (*ns).next.load(Ordering::Relaxed);
+        ns = (*ns).next;
         while !ns.is_null() {
             if (((*ns).prefix == prefix as _) || xml_str_equal((*ns).prefix, prefix))
                 && xml_str_equal((*ns).href, ns_name)
             {
                 return ns;
             }
-            if (*ns).next.load(Ordering::Relaxed).is_null() {
+            if (*ns).next.is_null() {
                 break;
             }
-            ns = (*ns).next.load(Ordering::Relaxed);
+            ns = (*ns).next;
         }
     }
     /* Create. */
     if !ns.is_null() {
-        (*ns)
-            .next
-            .store(xml_new_ns(null_mut(), ns_name, prefix), Ordering::Relaxed);
-        return (*ns).next.load(Ordering::Relaxed);
+        (*ns).next = xml_new_ns(null_mut(), ns_name, prefix);
+        return (*ns).next;
     }
     null_mut()
 }
@@ -3866,7 +3864,7 @@ unsafe extern "C" fn xml_tree_nslist_lookup_by_prefix(
             if prefix == (*ns).prefix || xml_str_equal(prefix, (*ns).prefix) {
                 return ns;
             }
-            ns = (*ns).next.load(Ordering::Relaxed);
+            ns = (*ns).next;
 
             if ns.is_null() {
                 break;
@@ -3932,7 +3930,7 @@ unsafe extern "C" fn xml_search_ns_by_prefix_strict(
                         }
                         return 1;
                     }
-                    ns = (*ns).next.load(Ordering::Relaxed);
+                    ns = (*ns).next;
 
                     if ns.is_null() {
                         break;
@@ -4014,10 +4012,10 @@ unsafe extern "C" fn xml_dom_wrap_nsnorm_declare_ns_forced(
                     (*elem).ns_def = ret;
                 } else {
                     let mut ns2: XmlNsPtr = (*elem).ns_def;
-                    while !(*ns2).next.load(Ordering::Relaxed).is_null() {
-                        ns2 = (*ns2).next.load(Ordering::Relaxed);
+                    while !(*ns2).next.is_null() {
+                        ns2 = (*ns2).next;
                     }
-                    (*ns2).next.store(ret, Ordering::Relaxed);
+                    (*ns2).next = ret;
                 }
                 return ret;
             }
@@ -4306,16 +4304,12 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                                  * Remove the ns-decl from the element-node.
                                                  */
                                                 if !prevns.is_null() {
-                                                    (*prevns).next.store(
-                                                        (*ns).next.load(Ordering::Relaxed),
-                                                        Ordering::Relaxed,
-                                                    );
+                                                    (*prevns).next = (*ns).next;
                                                 } else {
-                                                    (*cur).ns_def =
-                                                        (*ns).next.load(Ordering::Relaxed);
+                                                    (*cur).ns_def = (*ns).next;
                                                 }
                                                 // goto next_ns_decl;
-                                                ns = (*ns).next.load(Ordering::Relaxed);
+                                                ns = (*ns).next;
                                                 continue 'b;
                                             }
                                         });
@@ -4362,7 +4356,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
 
                                     prevns = ns;
                                     // next_ns_decl:
-                                    ns = (*ns).next.load(Ordering::Relaxed);
+                                    ns = (*ns).next;
                                 }
                             }
                             if adoptns == 0 {
@@ -4791,7 +4785,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                         {
                                             break 'internal_error;
                                         }
-                                        ns = (*ns).next.load(Ordering::Relaxed);
+                                        ns = (*ns).next;
                                     }
                                 }
                             }
@@ -5111,7 +5105,7 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
                 ns = (*cur).ns_def;
                 while !ns.is_null() {
                     if prefixed != 0 && (*ns).prefix.is_null() {
-                        ns = (*ns).next.load(Ordering::Relaxed);
+                        ns = (*ns).next;
                         continue;
                     }
                     if !prev.is_null() {
@@ -5131,14 +5125,14 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
                                  */
                                 break;
                             }
-                            prevns = (*prevns).next.load(Ordering::Relaxed);
+                            prevns = (*prevns).next;
 
                             if prevns.is_null() {
                                 break;
                             }
                         }
                         if !prevns.is_null() {
-                            ns = (*ns).next.load(Ordering::Relaxed);
+                            ns = (*ns).next;
                             continue;
                         }
                     }
@@ -5164,7 +5158,7 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
                              * prefix.
                              */
                             if ret == 0 {
-                                ns = (*ns).next.load(Ordering::Relaxed);
+                                ns = (*ns).next;
                                 continue;
                             }
                         }
@@ -5544,7 +5538,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
                             }
                             return -1;
                         }
-                        ns = (*ns).next.load(Ordering::Relaxed);
+                        ns = (*ns).next;
                         !ns.is_null()
                     } {}
                 }
@@ -6009,7 +6003,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                 }
 
                                 *clone_ns_def_slot = clone_ns;
-                                let mut p = (*clone_ns).next.load(Ordering::Relaxed);
+                                let mut p = (*clone_ns).next;
                                 clone_ns_def_slot = addr_of_mut!(p);
 
                                 /*
@@ -6054,7 +6048,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                         break 'internal_error;
                                     }
                                 }
-                                ns = (*ns).next.load(Ordering::Relaxed);
+                                ns = (*ns).next;
                             }
                         }
                         /* (*cur).ns will be processed further down. */

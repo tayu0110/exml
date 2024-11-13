@@ -11,7 +11,6 @@ use std::{
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     slice::from_raw_parts,
-    sync::atomic::Ordering,
 };
 
 use libc::{fprintf, memcpy, memset, ptrdiff_t, snprintf, FILE};
@@ -4243,10 +4242,10 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         if !(*cur).ns_def.is_null() && !(*cur).parent.is_null() {
                             let mut par_def: XmlNsPtr =
                                 addr_of_mut!((*(*cur).parent).ns_def) as XmlNsPtr;
-                            while !(*par_def).next.load(Ordering::Relaxed).is_null() {
-                                par_def = (*par_def).next.load(Ordering::Relaxed);
+                            while !(*par_def).next.is_null() {
+                                par_def = (*par_def).next;
                             }
-                            (*par_def).next.store((*cur).ns_def, Ordering::Relaxed);
+                            (*par_def).next = (*cur).ns_def;
                             (*cur).ns_def = null_mut();
                         }
                         delete = cur;

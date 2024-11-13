@@ -3,7 +3,7 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-use std::{ffi::c_int, ptr::null_mut, sync::atomic::Ordering};
+use std::{ffi::c_int, ptr::null_mut};
 
 use crate::{
     error::XmlParserErrors,
@@ -174,6 +174,6 @@ pub(crate) unsafe extern "C" fn xml_ns_list_dump_output(
 ) {
     while !cur.is_null() {
         xml_ns_dump_output(buf, cur, null_mut());
-        cur = (*cur).next.load(Ordering::Relaxed);
+        cur = (*cur).next;
     }
 }

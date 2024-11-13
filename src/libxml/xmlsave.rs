@@ -12,7 +12,6 @@ use std::{
     rc::Rc,
     slice::from_raw_parts,
     str::from_utf8_unchecked,
-    sync::atomic::Ordering,
 };
 
 use libc::memset;
@@ -396,7 +395,7 @@ unsafe extern "C" fn xml_buf_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
 unsafe extern "C" fn xml_ns_list_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, mut cur: XmlNsPtr) {
     while !cur.is_null() {
         xml_ns_dump_output((*ctxt).buf, cur, ctxt);
-        cur = (*cur).next.load(Ordering::Relaxed);
+        cur = (*cur).next;
     }
 }
 

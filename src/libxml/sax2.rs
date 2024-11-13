@@ -2686,7 +2686,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                 (*ret).ns_def = ns;
                 last = ns;
             } else {
-                (*last).next.store(ns, Ordering::Relaxed);
+                (*last).next = ns;
                 last = ns;
             }
             if !orig_uri.is_null() && prefix == pref {

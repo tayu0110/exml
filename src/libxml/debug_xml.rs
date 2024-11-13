@@ -290,7 +290,7 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
                 if xml_str_equal((*cur).prefix, (*ns).prefix) {
                     return -2;
                 }
-                cur = (*cur).next.load(Ordering::Relaxed);
+                cur = (*cur).next;
             }
         }
         node = (*node).parent;
@@ -522,7 +522,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         ns = (*node).ns_def;
         while !ns.is_null() {
             xml_ctxt_ns_check_scope(ctxt, node, ns);
-            ns = (*ns).next.load(Ordering::Relaxed);
+            ns = (*ns).next;
         }
         if !(*node).ns.is_null() {
             xml_ctxt_ns_check_scope(ctxt, node, (*node).ns);
@@ -1020,7 +1020,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
 unsafe extern "C" fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) {
     while !ns.is_null() {
         xml_ctxt_dump_namespace(ctxt, ns);
-        ns = (*ns).next.load(Ordering::Relaxed);
+        ns = (*ns).next;
     }
 }
 
@@ -3288,7 +3288,7 @@ unsafe extern "C" fn xml_shell_register_root_namespaces(
         } else {
             xml_xpath_register_ns((*ctxt).pctxt, (*ns).prefix, (*ns).href);
         }
-        ns = (*ns).next.load(Ordering::Relaxed);
+        ns = (*ns).next;
     }
     0
 }

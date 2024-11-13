@@ -1,8 +1,4 @@
-use std::{
-    os::raw::c_void,
-    ptr::null_mut,
-    sync::atomic::{AtomicPtr, Ordering},
-};
+use std::{os::raw::c_void, ptr::null_mut, sync::atomic::AtomicPtr};
 
 use libc::memset;
 
@@ -24,7 +20,7 @@ use super::{
 pub type XmlNsPtr = *mut XmlNs;
 #[repr(C)]
 pub struct XmlNs {
-    pub next: AtomicPtr<XmlNs>,             /* next Ns link for this node  */
+    pub next: *mut XmlNs,                   /* next Ns link for this node  */
     pub(crate) typ: XmlNsType,              /* global or local */
     pub href: *const XmlChar,               /* URL for the namespace */
     pub prefix: *const XmlChar,             /* prefix for the namespace */
@@ -35,7 +31,7 @@ pub struct XmlNs {
 impl Default for XmlNs {
     fn default() -> Self {
         Self {
-            next: AtomicPtr::new(null_mut()),
+            next: null_mut(),
             typ: XmlNsType::XmlInvalidNode,
             href: null_mut(),
             prefix: null_mut(),
@@ -111,8 +107,8 @@ pub unsafe fn xml_new_ns(
                 xml_free_ns(cur);
                 return null_mut();
             }
-            while !(*prev).next.load(Ordering::Relaxed).is_null() {
-                prev = (*prev).next.load(Ordering::Relaxed);
+            while !(*prev).next.is_null() {
+                prev = (*prev).next;
                 if ((*prev).prefix.is_null() && (*cur).prefix.is_null())
                     || xml_str_equal((*prev).prefix, (*cur).prefix)
                 {
@@ -120,7 +116,7 @@ pub unsafe fn xml_new_ns(
                     return null_mut();
                 }
             }
-            (*prev).next = AtomicPtr::new(cur);
+            (*prev).next = cur;
         }
     }
     cur
@@ -149,7 +145,7 @@ pub unsafe fn xml_free_ns_list(mut cur: XmlNsPtr) {
         return;
     }
     while !cur.is_null() {
-        next = (*cur).next.load(Ordering::Relaxed);
+        next = (*cur).next;
         xml_free_ns(cur);
         cur = next;
     }

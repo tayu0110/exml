@@ -4439,8 +4439,6 @@ unsafe fn pattern_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::sync::atomic::Ordering;
-
     use exml::{
         libxml::{
             pattern::{
@@ -4548,7 +4546,7 @@ unsafe fn pattern_test(
                         j += 1;
                         namespaces[j] = (*ns).prefix;
                         j += 1;
-                        ns = (*ns).next.load(Ordering::Relaxed);
+                        ns = (*ns).next;
                     }
                     namespaces[j] = null();
                     j += 1;
@@ -4615,8 +4613,6 @@ unsafe extern "C" fn load_xpath_expr(
     parent_doc: XmlDocPtr,
     filename: *const c_char,
 ) -> XmlXPathObjectPtr {
-    use std::sync::atomic::Ordering;
-
     use exml::{
         globals::set_load_ext_dtd_default_value,
         libxml::{
@@ -4716,7 +4712,7 @@ unsafe extern "C" fn load_xpath_expr(
             xml_free_doc(doc);
             return null_mut();
         }
-        ns = (*ns).next.load(Ordering::Relaxed);
+        ns = (*ns).next;
     }
 
     /*

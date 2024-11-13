@@ -9,7 +9,6 @@ use std::{
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
-    sync::atomic::Ordering,
 };
 
 use libc::{memcpy, memmove, memset, snprintf, strlen, INT_MAX, INT_MIN};
@@ -746,8 +745,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSe
         (*ret).node_max = XML_NODESET_DEFAULT as _;
         if matches!((*val).typ, XmlElementType::XmlNamespaceDecl) {
             let ns: XmlNsPtr = val as XmlNsPtr;
-            let ns_node: XmlNodePtr =
-                xml_xpath_node_set_dup_ns((*ns).next.load(Ordering::Relaxed) as XmlNodePtr, ns);
+            let ns_node: XmlNodePtr = xml_xpath_node_set_dup_ns((*ns).next as XmlNodePtr, ns);
 
             if ns_node.is_null() {
                 xml_xpath_free_node_set(ret);

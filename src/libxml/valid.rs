@@ -5001,7 +5001,7 @@ pub unsafe extern "C" fn xml_validate_element(
                         (*ns).href,
                     );
                 }
-                ns = (*ns).next.load(Ordering::Relaxed);
+                ns = (*ns).next;
             }
 
             if !(*elem).children.is_null() {
@@ -6609,7 +6609,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         if (*ns).prefix.is_null() {
                             break 'found;
                         }
-                        ns = (*ns).next.load(Ordering::Relaxed);
+                        ns = (*ns).next;
                     }
                 } else if xml_str_equal((*attr).prefix, c"xmlns".as_ptr() as _) {
                     let mut ns: XmlNsPtr;
@@ -6619,7 +6619,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         if xml_str_equal((*attr).name, (*ns).prefix) {
                             break 'found;
                         }
-                        ns = (*ns).next.load(Ordering::Relaxed);
+                        ns = (*ns).next;
                     }
                 } else {
                     let mut attrib: XmlAttrPtr;
@@ -6728,7 +6728,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                             }
                             break 'found;
                         }
-                        ns = (*ns).next.load(Ordering::Relaxed);
+                        ns = (*ns).next;
                     }
                 } else if xml_str_equal((*attr).prefix, c"xmlns".as_ptr() as _) {
                     let mut ns: XmlNsPtr;
@@ -6751,7 +6751,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                             }
                             break 'found;
                         }
-                        ns = (*ns).next.load(Ordering::Relaxed);
+                        ns = (*ns).next;
                     }
                 }
             }

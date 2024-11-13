@@ -8,7 +8,7 @@ use std::{
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null, null_mut, NonNull},
-    sync::atomic::{AtomicPtr, Ordering},
+    sync::atomic::AtomicPtr,
 };
 
 #[cfg(feature = "libxml_debug")]
@@ -1780,8 +1780,8 @@ pub unsafe extern "C" fn xml_xpath_node_set_contains(cur: XmlNodeSetPtr, val: Xm
                 if ns1 == ns2 {
                     return 1;
                 }
-                if !(*ns1).next.load(Ordering::Relaxed).is_null()
-                    && (*ns2).next.load(Ordering::Relaxed) == (*ns1).next.load(Ordering::Relaxed)
+                if !(*ns1).next.is_null()
+                    && (*ns2).next == (*ns1).next
                     && xml_str_equal((*ns1).prefix as _, (*ns2).prefix as _)
                 {
                     return 1;
@@ -3349,7 +3349,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPt
     if !(*ns).prefix.is_null() {
         (*cur).prefix = xml_strdup((*ns).prefix);
     }
-    (*cur).next.store(node as XmlNsPtr, Ordering::Relaxed);
+    (*cur).next = node as XmlNsPtr;
     cur as XmlNodePtr
 }
 
@@ -3411,8 +3411,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add(cur: XmlNodeSetPtr, val: XmlNode
     }
     if matches!((*val).typ, XmlElementType::XmlNamespaceDecl) {
         let ns: XmlNsPtr = val as XmlNsPtr;
-        let ns_node: XmlNodePtr =
-            xml_xpath_node_set_dup_ns((*ns).next.load(Ordering::Relaxed) as XmlNodePtr, ns);
+        let ns_node: XmlNodePtr = xml_xpath_node_set_dup_ns((*ns).next as XmlNodePtr, ns);
 
         if ns_node.is_null() {
             return -1;
@@ -3476,8 +3475,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_unique(cur: XmlNodeSetPtr, val: 
     }
     if matches!((*val).typ, XmlElementType::XmlNamespaceDecl) {
         let ns: XmlNsPtr = val as XmlNsPtr;
-        let ns_node: XmlNodePtr =
-            xml_xpath_node_set_dup_ns((*ns).next.load(Ordering::Relaxed) as XmlNodePtr, ns);
+        let ns_node: XmlNodePtr = xml_xpath_node_set_dup_ns((*ns).next as XmlNodePtr, ns);
 
         if ns_node.is_null() {
             return -1;
@@ -6592,8 +6590,7 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear(
                 continue 'b;
             } else if matches!((*n1).typ, XmlElementType::XmlNamespaceDecl)
                 && matches!((*n2).typ, XmlElementType::XmlNamespaceDecl)
-                && (*(n1 as XmlNsPtr)).next.load(Ordering::Relaxed)
-                    == (*(n2 as XmlNsPtr)).next.load(Ordering::Relaxed)
+                && (*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
                 && xml_str_equal((*(n1 as XmlNsPtr)).prefix, (*(n2 as XmlNsPtr)).prefix)
             {
                 /*
@@ -6846,15 +6843,11 @@ unsafe extern "C" fn xml_xpath_next_preceding_internal(
         } else if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
             let ns: XmlNsPtr = cur as XmlNsPtr;
 
-            if (*ns).next.load(Ordering::Relaxed).is_null()
-                || matches!(
-                    (*(*ns).next.load(Ordering::Relaxed)).typ,
-                    XmlElementType::XmlNamespaceDecl
-                )
+            if (*ns).next.is_null() || matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
             {
                 return null_mut();
             }
-            cur = (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
+            cur = (*ns).next as XmlNodePtr;
         }
         (*ctxt).ancestor = (*cur).parent;
     }
@@ -10064,8 +10057,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_merge(
             if n1 == n2
                 || ((matches!((*n1).typ, XmlElementType::XmlNamespaceDecl)
                     && matches!((*n2).typ, XmlElementType::XmlNamespaceDecl))
-                    && ((*(n1 as XmlNsPtr)).next.load(Ordering::Relaxed)
-                        == (*(n2 as XmlNsPtr)).next.load(Ordering::Relaxed)
+                    && ((*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
                         && xml_str_equal(
                             (*(n1 as XmlNsPtr)).prefix as _,
                             (*(n2 as XmlNsPtr)).prefix as _,
@@ -10119,8 +10111,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_merge(
         }
         if matches!((*n2).typ, XmlElementType::XmlNamespaceDecl) {
             let ns: XmlNsPtr = n2 as XmlNsPtr;
-            let ns_node: XmlNodePtr =
-                xml_xpath_node_set_dup_ns((*ns).next.load(Ordering::Relaxed) as XmlNodePtr, ns);
+            let ns_node: XmlNodePtr = xml_xpath_node_set_dup_ns((*ns).next as XmlNodePtr, ns);
 
             if ns_node.is_null() {
                 // goto error;
@@ -11988,13 +11979,10 @@ pub unsafe extern "C" fn xml_xpath_next_parent(
             XmlElementType::XmlNamespaceDecl => {
                 let ns: XmlNsPtr = (*(*ctxt).context).node as XmlNsPtr;
 
-                if !(*ns).next.load(Ordering::Relaxed).is_null()
-                    && !matches!(
-                        (*(*ns).next.load(Ordering::Relaxed)).typ,
-                        XmlElementType::XmlNamespaceDecl
-                    )
+                if !(*ns).next.is_null()
+                    && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
                 {
-                    return (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
+                    return (*ns).next as XmlNodePtr;
                 }
                 return null_mut();
             }
@@ -12100,15 +12088,11 @@ pub unsafe extern "C" fn xml_xpath_next_following(
         } else if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
             let ns: XmlNsPtr = cur as XmlNsPtr;
 
-            if (*ns).next.load(Ordering::Relaxed).is_null()
-                || matches!(
-                    (*(*ns).next.load(Ordering::Relaxed)).typ,
-                    XmlElementType::XmlNamespaceDecl
-                )
+            if (*ns).next.is_null() || matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
             {
                 return null_mut();
             }
-            cur = (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
+            cur = (*ns).next as XmlNodePtr;
         }
     }
     if cur.is_null() {
@@ -12137,7 +12121,7 @@ pub unsafe extern "C" fn xml_xpath_next_following(
 
 thread_local! {
     static XML_XPATH_XMLNAMESPACE_STRUCT: XmlNs = const { XmlNs {
-        next: AtomicPtr::new(null_mut()),
+        next: null_mut(),
         typ: XmlElementType::XmlNamespaceDecl,
         href: XML_XML_NAMESPACE.as_ptr() as *const u8,
         prefix: c"xml".as_ptr() as *const u8,
@@ -12308,15 +12292,11 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
         } else if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
             let ns: XmlNsPtr = cur as XmlNsPtr;
 
-            if (*ns).next.load(Ordering::Relaxed).is_null()
-                || matches!(
-                    (*(*ns).next.load(Ordering::Relaxed)).typ,
-                    XmlElementType::XmlNamespaceDecl
-                )
+            if (*ns).next.is_null() || matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
             {
                 return null_mut();
             }
-            cur = (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
+            cur = (*ns).next as XmlNodePtr;
         }
     }
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
@@ -12423,13 +12403,10 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
             XmlElementType::XmlNamespaceDecl => {
                 let ns: XmlNsPtr = (*(*ctxt).context).node as XmlNsPtr;
 
-                if !(*ns).next.load(Ordering::Relaxed).is_null()
-                    && !matches!(
-                        (*(*ns).next.load(Ordering::Relaxed)).typ,
-                        XmlElementType::XmlNamespaceDecl
-                    )
+                if !(*ns).next.is_null()
+                    && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
                 {
-                    return (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
+                    return (*ns).next as XmlNodePtr;
                 }
                 /* Bad, how did that namespace end up here ? */
                 return null_mut();
@@ -12477,13 +12454,10 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
         XmlElementType::XmlNamespaceDecl => {
             let ns: XmlNsPtr = cur as XmlNsPtr;
 
-            if !(*ns).next.load(Ordering::Relaxed).is_null()
-                && !matches!(
-                    (*(*ns).next.load(Ordering::Relaxed)).typ,
-                    XmlElementType::XmlNamespaceDecl
-                )
+            if !(*ns).next.is_null()
+                && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
             {
-                return (*ns).next.load(Ordering::Relaxed) as XmlNodePtr;
+                return (*ns).next as XmlNodePtr;
             }
             /* Bad, how did that namespace end up here ? */
             null_mut()
@@ -13877,12 +13851,7 @@ pub(crate) unsafe extern "C" fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
         return;
     }
 
-    if !(*ns).next.load(Ordering::Relaxed).is_null()
-        && !matches!(
-            (*(*ns).next.load(Ordering::Relaxed)).typ,
-            XmlElementType::XmlNamespaceDecl
-        )
-    {
+    if !(*ns).next.is_null() && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl) {
         if !(*ns).href.is_null() {
             xml_free((*ns).href as _);
         }
