@@ -2147,8 +2147,8 @@ unsafe extern "C" fn xml_c14n_process_element_node(
     if visible != 0 {
         (*(*ctx).buf).write_str(">");
     }
-    if !(*cur).children.is_null() {
-        ret = xml_c14n_process_node_list(ctx, (*cur).children);
+    if let Some(children) = (*cur).children {
+        ret = xml_c14n_process_node_list(ctx, children.as_ptr());
         if ret < 0 {
             xml_c14n_err_internal(c"processing childrens list".as_ptr() as _);
             return -1;
@@ -2383,19 +2383,19 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
         }
         XmlElementType::XmlDocumentNode | XmlElementType::XmlDocumentFragNode => {
             /* should be processed as document? */
-            if !(*cur).children.is_null() {
+            if let Some(children) = (*cur).children {
                 (*ctx).pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
                 (*ctx).parent_is_doc = 1;
-                ret = xml_c14n_process_node_list(ctx, (*cur).children);
+                ret = xml_c14n_process_node_list(ctx, children.as_ptr());
             }
         }
         #[cfg(feature = "html")]
         XmlElementType::XmlHTMLDocumentNode => {
             /* should be processed as document? */
-            if !(*cur).children.is_null() {
+            if let Some(children) = (*cur).children {
                 (*ctx).pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
                 (*ctx).parent_is_doc = 1;
-                ret = xml_c14n_process_node_list(ctx, (*cur).children);
+                ret = xml_c14n_process_node_list(ctx, children.as_ptr());
             }
         }
 

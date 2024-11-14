@@ -1282,7 +1282,13 @@ unsafe extern "C" fn xml_xpath_debug_dump_value_tree(
 
     fprintf(output, c"%s".as_ptr(), shift.as_ptr());
     fprintf(output, c"%d".as_ptr(), depth.clamp(0, 25) + 1);
-    xml_xpath_debug_dump_node_list(output, (*(*(*cur).node_tab.add(0))).children, depth + 1);
+    xml_xpath_debug_dump_node_list(
+        output,
+        (*(*(*cur).node_tab.add(0)))
+            .children
+            .map_or(null_mut(), |c| c.as_ptr()),
+        depth + 1,
+    );
 }
 
 #[cfg(feature = "libxml_xptr_locs")]
@@ -6364,7 +6370,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                     (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
                                 }
                             }
-                            if (*cur).children.is_null() || depth >= max_depth {
+                            if (*cur).children.is_none() || depth >= max_depth {
                                 // ret =
                                 xml_stream_pop(patstream);
                                 while !(*cur).next.is_null() {
@@ -6388,12 +6394,12 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                 if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
                     break 'main;
                 }
-                if !(*cur).children.is_null() && depth < max_depth {
+                if let Some(children) = (*cur).children.filter(|_| depth < max_depth) {
                     /*
                      * Do not descend on entities declarations
                      */
-                    if !matches!((*(*cur).children).typ, XmlElementType::XmlEntityDecl) {
-                        cur = (*cur).children;
+                    if !matches!(children.typ, XmlElementType::XmlEntityDecl) {
+                        cur = children.as_ptr();
                         depth += 1;
                         /*
                          * Skip DTDs
@@ -6758,7 +6764,7 @@ unsafe extern "C" fn xml_xpath_next_child_element(
             /* URGENT TODO: entify-refs as well? */
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode => {
-                cur = (*cur).children;
+                cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
                 if !cur.is_null() {
                     if matches!((*cur).typ, XmlElementType::XmlElementNode) {
                         return cur;
@@ -10308,7 +10314,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
     if matches!((*node).typ, XmlElementType::XmlDocumentNode) {
         tmp = (*(node as XmlDocPtr)).get_root_element();
         if tmp.is_null() {
-            node = (*node).children;
+            node = (*node).children.map_or(null_mut(), |c| c.as_ptr());
         } else {
             node = tmp;
         }
@@ -10346,7 +10352,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
             tmp = (*(node as XmlAttrPtr)).children;
         }
         XmlElementType::XmlElementNode => {
-            tmp = (*node).children;
+            tmp = (*node).children.map_or(null_mut(), |c| c.as_ptr());
         }
         _ => {
             return 0;
@@ -10372,13 +10378,12 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
                 return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
             }
         }
-        /*
-         * Skip to next node
-         */
-        if (!(*tmp).children.is_null() && !matches!((*tmp).typ, XmlElementType::XmlDTDNode))
-            && !matches!((*(*tmp).children).typ, XmlElementType::XmlEntityDecl)
-        {
-            tmp = (*tmp).children;
+        // Skip to next node
+        if let Some(children) = (*tmp).children.filter(|children| {
+            !matches!((*tmp).typ, XmlElementType::XmlDTDNode)
+                && !matches!(children.typ, XmlElementType::XmlEntityDecl)
+        }) {
+            tmp = children.as_ptr();
             continue;
         }
         if tmp == node {
@@ -11755,7 +11760,9 @@ pub unsafe extern "C" fn xml_xpath_next_child(
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlNotationNode
             | XmlElementType::XmlDTDNode => {
-                return (*(*(*ctxt).context).node).children;
+                return (*(*(*ctxt).context).node)
+                    .children
+                    .map_or(null_mut(), |c| c.as_ptr());
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
@@ -11816,21 +11823,19 @@ pub unsafe extern "C" fn xml_xpath_next_descendant(
         if (*(*ctxt).context).node == (*(*ctxt).context).doc as XmlNodePtr {
             return (*(*(*ctxt).context).doc).children;
         }
-        return (*(*(*ctxt).context).node).children;
+        return (*(*(*ctxt).context).node)
+            .children
+            .map_or(null_mut(), |c| c.as_ptr());
     }
 
     if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
-    if !(*cur).children.is_null() {
-        /*
-         * Do not descend on entities declarations
-         */
-        if !matches!((*(*cur).children).typ, XmlElementType::XmlEntityDecl) {
-            cur = (*cur).children;
-            /*
-             * Skip DTDs
-             */
+    if let Some(children) = (*cur).children {
+        // Do not descend on entities declarations
+        if !matches!(children.typ, XmlElementType::XmlEntityDecl) {
+            cur = children.as_ptr();
+            // Skip DTDs
             if !matches!((*cur).typ, XmlElementType::XmlDTDNode) {
                 return cur;
             }
@@ -12075,9 +12080,9 @@ pub unsafe extern "C" fn xml_xpath_next_following(
             (*cur).typ,
             XmlElementType::XmlAttributeNode | XmlElementType::XmlNamespaceDecl
         )
-        && !(*cur).children.is_null()
+        && (*cur).children.is_some()
     {
-        return (*cur).children;
+        return (*cur).children.unwrap().as_ptr();
     }
 
     if cur.is_null() {

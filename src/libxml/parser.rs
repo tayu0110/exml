@@ -5011,20 +5011,20 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     }
 
     if !lst.is_null() && (ret == 0 || recover == 1) {
-        let mut cur: XmlNodePtr;
-
         /*
          * Return the newly created nodeset after unlinking it from
          * they pseudo parent.
          */
-        cur = (*(*new_doc).children).children;
+        let mut cur = (*(*new_doc).children)
+            .children
+            .map_or(null_mut(), |c| c.as_ptr());
         *lst = cur;
         while !cur.is_null() {
             (*cur).set_doc(doc);
             (*cur).parent = null_mut();
             cur = (*cur).next;
         }
-        (*(*new_doc).children).children = null_mut();
+        (*(*new_doc).children).children = None;
     }
 
     if !sax.is_null() {
@@ -5239,19 +5239,16 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         }
     } else {
         if !list.is_null() {
-            let mut cur: XmlNodePtr;
-
-            /*
-             * Return the newly created nodeset after unlinking it from
-             * they pseudo parent.
-             */
-            cur = (*(*new_doc).children).children;
+            // Return the newly created nodeset after unlinking it from they pseudo parent.
+            let mut cur = (*(*new_doc).children)
+                .children
+                .map_or(null_mut(), |c| c.as_ptr());
             *list = cur;
             while !cur.is_null() {
                 (*cur).parent = null_mut();
                 cur = (*cur).next;
             }
-            (*(*new_doc).children).children = null_mut();
+            (*(*new_doc).children).children = None;
         }
         ret = XmlParserErrors::XmlErrOK;
     }
@@ -9534,7 +9531,7 @@ unsafe extern "C" fn are_blanks(
     if (*ctxt).current_byte() != b'<' && (*ctxt).current_byte() != 0xD {
         return 0;
     }
-    if (*(*ctxt).node).children.is_null()
+    if (*(*ctxt).node).children.is_none()
         && (*ctxt).current_byte() == b'<'
         && (*ctxt).nth_byte(1) == b'/'
     // index out of bound may occur at this `nth_byte` ??? It may be necessary to fix.
@@ -9550,7 +9547,10 @@ unsafe extern "C" fn are_blanks(
             return 0;
         }
     } else if (*last_child).is_text_node()
-        || (!(*(*ctxt).node).children.is_null() && (*(*(*ctxt).node).children).is_text_node())
+        || (*(*ctxt).node)
+            .children
+            .filter(|c| c.is_text_node())
+            .is_some()
     {
         return 0;
     }

@@ -33,10 +33,10 @@ use crate::{
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
         xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns,
         xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_text_concat,
-        xml_validate_ncname, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
-        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
-        XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeDefault,
+        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr,
+        XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
+        XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -3425,7 +3425,7 @@ unsafe extern "C" fn xml_sax2_text(
             last_child = xml_new_cdata_block((*ctxt).my_doc, ch, len);
         }
         if !last_child.is_null() {
-            (*(*ctxt).node).children = last_child;
+            (*(*ctxt).node).children = NodePtr::from_ptr(last_child);
             (*(*ctxt).node).last = last_child;
             (*last_child).parent = (*ctxt).node;
             (*last_child).doc = (*(*ctxt).node).doc;
@@ -3505,7 +3505,7 @@ unsafe extern "C" fn xml_sax2_text(
             if xml_text_concat(last_child, ch, len) != 0 {
                 xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
             }
-            if !(*(*ctxt).node).children.is_null() {
+            if (*(*ctxt).node).children.is_some() {
                 (*ctxt).nodelen = xml_strlen((*last_child).content);
                 (*ctxt).nodemem = (*ctxt).nodelen + 1;
             }
@@ -3521,7 +3521,7 @@ unsafe extern "C" fn xml_sax2_text(
             }
             if !last_child.is_null() {
                 (*(*ctxt).node).add_child(last_child);
-                if !(*(*ctxt).node).children.is_null() {
+                if (*(*ctxt).node).children.is_some() {
                     (*ctxt).nodelen = len;
                     (*ctxt).nodemem = len + 1;
                 }

@@ -505,9 +505,9 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
             }
             XmlElementType::XmlDocumentFragNode => {
                 /* Always validate (*cur).parent when descending. */
-                if (*cur).parent == parent && !(*cur).children.is_null() {
+                if let Some(children) = (*cur).children.filter(|_| (*cur).parent == parent) {
                     parent = cur;
-                    cur = (*cur).children;
+                    cur = children.as_ptr();
                     continue;
                 }
             }
@@ -545,7 +545,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                  * tree structure. Fall back to a recursive call to handle this
                  * case.
                  */
-                if (*cur).parent != parent && !(*cur).children.is_null() {
+                if (*cur).parent != parent && (*cur).children.is_some() {
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     (*buf).write_bytes(b"<");
@@ -568,37 +568,9 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                         attr = (*attr).next;
                     }
 
-                    if (*cur).children.is_null() {
-                        if (*ctxt).options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0 {
-                            if (*ctxt).format == 2 {
-                                xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
-                            }
-                            (*buf).write_bytes(b"/>");
-                        } else {
-                            if (*ctxt).format == 2 {
-                                xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
-                            }
-                            (*buf).write_bytes(b"></");
-                            if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                                (*buf).write_str(
-                                    CStr::from_ptr((*(*cur).ns).prefix as _)
-                                        .to_string_lossy()
-                                        .as_ref(),
-                                );
-                                (*buf).write_bytes(b":");
-                            }
-
-                            (*buf).write_str(
-                                CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref(),
-                            );
-                            if (*ctxt).format == 2 {
-                                xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
-                            }
-                            (*buf).write_bytes(b">");
-                        }
-                    } else {
+                    if let Some(children) = (*cur).children {
                         if (*ctxt).format == 1 {
-                            tmp = (*cur).children;
+                            tmp = children.as_ptr();
                             while !tmp.is_null() {
                                 if matches!(
                                     (*tmp).typ,
@@ -624,8 +596,33 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                             (*ctxt).level += 1;
                         }
                         parent = cur;
-                        cur = (*cur).children;
+                        cur = children.as_ptr();
                         continue;
+                    } else if (*ctxt).options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0 {
+                        if (*ctxt).format == 2 {
+                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
+                        }
+                        (*buf).write_bytes(b"/>");
+                    } else {
+                        if (*ctxt).format == 2 {
+                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
+                        }
+                        (*buf).write_bytes(b"></");
+                        if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
+                            (*buf).write_str(
+                                CStr::from_ptr((*(*cur).ns).prefix as _)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            );
+                            (*buf).write_bytes(b":");
+                        }
+
+                        (*buf)
+                            .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                        if (*ctxt).format == 2 {
+                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
+                        }
+                        (*buf).write_bytes(b">");
                     }
                 }
             }
@@ -1001,7 +998,7 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
             return 0;
         }
     }
-    if !(*node).children.is_null() {
+    if (*node).children.is_some() {
         return 0;
     }
     match *(*node).name.add(0) {
@@ -1094,7 +1091,6 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
     let format: i32 = (*ctxt).format;
     let mut addmeta: i32;
     let mut tmp: XmlNodePtr;
-
     let mut unformatted_node: XmlNodePtr = null_mut();
     let mut parent: XmlNodePtr;
     let mut start: *mut XmlChar;
@@ -1120,9 +1116,9 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
             }
             XmlElementType::XmlDocumentFragNode => {
                 /* Always validate (*cur).parent when descending. */
-                if (*cur).parent == parent && !(*cur).children.is_null() {
+                if let Some(children) = (*cur).children.filter(|_| (*cur).parent == parent) {
                     parent = cur;
-                    cur = (*cur).children;
+                    cur = children.as_ptr();
                     continue;
                 }
             }
@@ -1162,7 +1158,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                  * tree structure. Fall back to a recursive call to handle this
                  * case.
                  */
-                if (*cur).parent != parent && !(*cur).children.is_null() {
+                if (*cur).parent != parent && (*cur).children.is_some() {
                     xhtml_node_dump_output(ctxt, cur);
                     break;
                 }
@@ -1200,7 +1196,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     && xml_str_equal((*cur).name, c"head".as_ptr() as _)
                     && xml_str_equal((*parent).name, c"html".as_ptr() as _)
                 {
-                    tmp = (*cur).children;
+                    tmp = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
                     while !tmp.is_null() {
                         if xml_str_equal((*tmp).name, c"meta".as_ptr() as _) {
                             let httpequiv: *mut XmlChar = (*tmp).get_prop("http-equiv");
@@ -1219,63 +1215,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     }
                 }
 
-                if (*cur).children.is_null() {
-                    if ((*cur).ns.is_null() || (*(*cur).ns).prefix.is_null())
-                        && (xhtml_is_empty(cur) == 1 && addmeta == 0)
-                    {
-                        /*
-                         * C.2. Empty Elements
-                         */
-                        (*buf).write_bytes(b" />");
-                    } else {
-                        if addmeta == 1 {
-                            (*buf).write_bytes(b">");
-                            if (*ctxt).format == 1 {
-                                (*buf).write_bytes(b"\n");
-                                if get_indent_tree_output() != 0 {
-                                    let len = (*ctxt).indent_size
-                                        * if (*ctxt).level + 1 > (*ctxt).indent_nr as i32 {
-                                            (*ctxt).indent_nr
-                                        } else {
-                                            ((*ctxt).level + 1) as usize
-                                        };
-                                    (*buf).write_bytes(&(*ctxt).indent[..len]);
-                                }
-                            }
-
-                            (*buf).write_str(
-                                "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=",
-                            );
-                            if let Some(encoding) = (*ctxt).encoding.as_deref() {
-                                (*buf).write_str(encoding);
-                            } else {
-                                (*buf).write_bytes(b"UTF-8");
-                            }
-                            (*buf).write_bytes(b"\" />");
-                            if (*ctxt).format == 1 {
-                                (*buf).write_bytes(b"\n");
-                            }
-                        } else {
-                            (*buf).write_bytes(b">");
-                        }
-                        /*
-                         * C.3. Element Minimization and Empty Element Content
-                         */
-                        (*buf).write_bytes(b"</");
-                        if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                            (*buf).write_str(
-                                CStr::from_ptr((*(*cur).ns).prefix as _)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                            );
-                            (*buf).write_bytes(b":");
-                        }
-
-                        (*buf)
-                            .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                        (*buf).write_bytes(b">");
-                    }
-                } else {
+                if let Some(children) = (*cur).children {
                     (*buf).write_bytes(b">");
                     if addmeta == 1 {
                         if (*ctxt).format == 1 {
@@ -1303,7 +1243,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     }
 
                     if (*ctxt).format == 1 {
-                        tmp = (*cur).children;
+                        tmp = children.as_ptr();
                         while !tmp.is_null() {
                             if (matches!((*tmp).typ, XmlElementType::XmlTextNode)
                                 || matches!((*tmp).typ, XmlElementType::XmlEntityRefNode))
@@ -1323,8 +1263,61 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         (*ctxt).level += 1;
                     }
                     parent = cur;
-                    cur = (*cur).children;
+                    cur = children.as_ptr();
                     continue;
+                } else if ((*cur).ns.is_null() || (*(*cur).ns).prefix.is_null())
+                    && (xhtml_is_empty(cur) == 1 && addmeta == 0)
+                {
+                    /*
+                     * C.2. Empty Elements
+                     */
+                    (*buf).write_bytes(b" />");
+                } else {
+                    if addmeta == 1 {
+                        (*buf).write_bytes(b">");
+                        if (*ctxt).format == 1 {
+                            (*buf).write_bytes(b"\n");
+                            if get_indent_tree_output() != 0 {
+                                let len = (*ctxt).indent_size
+                                    * if (*ctxt).level + 1 > (*ctxt).indent_nr as i32 {
+                                        (*ctxt).indent_nr
+                                    } else {
+                                        ((*ctxt).level + 1) as usize
+                                    };
+                                (*buf).write_bytes(&(*ctxt).indent[..len]);
+                            }
+                        }
+
+                        (*buf).write_str(
+                            "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=",
+                        );
+                        if let Some(encoding) = (*ctxt).encoding.as_deref() {
+                            (*buf).write_str(encoding);
+                        } else {
+                            (*buf).write_bytes(b"UTF-8");
+                        }
+                        (*buf).write_bytes(b"\" />");
+                        if (*ctxt).format == 1 {
+                            (*buf).write_bytes(b"\n");
+                        }
+                    } else {
+                        (*buf).write_bytes(b">");
+                    }
+                    /*
+                     * C.3. Element Minimization and Empty Element Content
+                     */
+                    (*buf).write_bytes(b"</");
+                    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
+                        (*buf).write_str(
+                            CStr::from_ptr((*(*cur).ns).prefix as _)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
+                        (*buf).write_bytes(b":");
+                    }
+
+                    (*buf).write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                    (*buf).write_bytes(b">");
                 }
             }
             XmlElementType::XmlTextNode => {

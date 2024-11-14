@@ -5004,8 +5004,8 @@ pub unsafe extern "C" fn xml_validate_element(
                 ns = (*ns).next;
             }
 
-            if !(*elem).children.is_null() {
-                elem = (*elem).children;
+            if let Some(children) = (*elem).children {
+                elem = children.as_ptr();
                 continue;
             }
         }
@@ -5172,7 +5172,7 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
         return 0;
     }
 
-    let child: XmlNodePtr = (*elem).children;
+    let child: XmlNodePtr = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
 
     cur = child;
     'done: while !cur.is_null() {
@@ -5182,9 +5182,12 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
                  * Push the current node to be able to roll back
                  * and process within the entity
                  */
-                if !(*cur).children.is_null() && !(*(*cur).children).children.is_null() {
+                if let Some(children) = (*cur)
+                    .children
+                    .filter(|children| children.children.is_some())
+                {
                     node_vpush(ctxt, cur);
-                    cur = (*(*cur).children).children;
+                    cur = children.children.map_or(null_mut(), |c| c.as_ptr());
                     continue;
                 }
             }
@@ -5913,11 +5916,12 @@ unsafe extern "C" fn xml_validate_element_content(
                                  * Push the current node to be able to roll back
                                  * and process within the entity
                                  */
-                                if !(*cur).children.is_null()
-                                    && !(*(*cur).children).children.is_null()
+                                if let Some(children) = (*cur)
+                                    .children
+                                    .filter(|children| children.children.is_some())
                                 {
                                     node_vpush(ctxt, cur);
-                                    cur = (*(*cur).children).children;
+                                    cur = children.children.map_or(null_mut(), |c| c.as_ptr());
                                     continue;
                                 }
                             }
@@ -6265,7 +6269,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
             return 0;
         }
         XmlElementType::XmlTextNode => {
-            if !(*elem).children.is_null() {
+            if (*elem).children.is_some() {
                 xml_err_valid_node(
                     ctxt,
                     elem,
@@ -6406,7 +6410,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                 return 0;
             }
             XmlElementTypeVal::XmlElementTypeEmpty => {
-                if !(*elem).children.is_null() {
+                if (*elem).children.is_some() {
                     xml_err_valid_node(
                         ctxt,
                         elem,
@@ -6441,7 +6445,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         );
                     }
                 } else {
-                    child = (*elem).children;
+                    child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
                     /* Hum, this start to get messy */
                     while !child.is_null() {
                         'child_ok: {
@@ -6567,7 +6571,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                      *     - element types with element content, if white space
                      *       occurs directly within any instance of those types.
                      */
-                    child = (*elem).children;
+                    child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
                     while !child.is_null() {
                         if matches!((*child).typ, XmlElementType::XmlTextNode) {
                             let mut content: *const XmlChar = (*child).content;
@@ -6584,7 +6588,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         child = (*child).next;
                     }
                 }
-                child = (*elem).children;
+                child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
                 // cont = (*elem_decl).content;
                 tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem);
                 if tmp <= 0 {
@@ -7929,6 +7933,8 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     names: *mut *const XmlChar,
     max: i32,
 ) -> i32 {
+    use crate::tree::NodePtr;
+
     let mut vctxt: XmlValidCtxt = unsafe { zeroed() };
     let mut nb_valid_elements: i32;
     let mut elements: [*const XmlChar; 256] = [null(); 256];
@@ -7977,7 +7983,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     } else {
         null_mut()
     };
-    let parent_childs: *mut XmlNode = (*parent).children;
+    let parent_childs: *mut XmlNode = (*parent).children.map_or(null_mut(), |c| c.as_ptr());
     let parent_last: *mut XmlNode = (*parent).last;
 
     /*
@@ -8001,7 +8007,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     if !prev.is_null() {
         (*prev).next = test_node;
     } else {
-        (*parent).children = test_node;
+        (*parent).children = NodePtr::from_ptr(test_node);
     }
 
     if !next.is_null() {
@@ -8037,21 +8043,17 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         }
     }
 
-    /*
-     * Restore the tree structure
-     */
+    // Restore the tree structure
     if !prev.is_null() {
         (*prev).next = prev_next;
     }
     if !next.is_null() {
         (*next).prev = next_prev;
     }
-    (*parent).children = parent_childs;
+    (*parent).children = NodePtr::from_ptr(parent_childs);
     (*parent).last = parent_last;
 
-    /*
-     * Free up the dummy node
-     */
+    // Free up the dummy node
     (*test_node).name = name;
     xml_free_node(test_node);
 

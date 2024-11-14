@@ -4421,12 +4421,10 @@ pub unsafe extern "C" fn html_entity_value_lookup(value: u32) -> *const HtmlEnti
  * Returns 1 if autoclosed, 0 otherwise
  */
 pub unsafe extern "C" fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
-    let mut child: HtmlNodePtr;
-
     if elem.is_null() {
         return 1;
     }
-    child = (*elem).children;
+    let mut child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
         if html_auto_close_tag(doc, (*elem).name, child) != 0 {
             return 1;
@@ -5500,8 +5498,6 @@ pub unsafe extern "C" fn html_auto_close_tag(
     name: *const XmlChar,
     elem: HtmlNodePtr,
 ) -> i32 {
-    let mut child: HtmlNodePtr;
-
     if elem.is_null() {
         return 1;
     }
@@ -5511,7 +5507,7 @@ pub unsafe extern "C" fn html_auto_close_tag(
     if html_check_auto_close((*elem).name, name) != 0 {
         return 1;
     }
-    child = (*elem).children;
+    let mut child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
         if html_auto_close_tag(_doc, name, child) != 0 {
             return 1;

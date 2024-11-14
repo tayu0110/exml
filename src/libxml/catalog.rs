@@ -1556,7 +1556,12 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
              * Recurse to propagate prefer to the subtree
              * (xml:base handling is automated)
              */
-            xml_parse_xml_catalog_node_list((*cur).children, prefer, parent, entry);
+            xml_parse_xml_catalog_node_list(
+                (*cur).children.map_or(null_mut(), |c| c.as_ptr()),
+                prefer,
+                parent,
+                entry,
+            );
         }
     }
     if !base.is_null() {
@@ -1673,7 +1678,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
             }
             xml_free(prop as _);
         }
-        cur = (*cur).children;
+        cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
         xml_parse_xml_catalog_node_list(cur, prefer, parent, null_mut());
     } else {
         xml_catalog_err(

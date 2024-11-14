@@ -746,10 +746,9 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
     ctxt: XmlSchematronParserCtxtPtr,
     con: XmlNodePtr,
 ) {
-    let mut child: XmlNodePtr;
     let mut comp: XmlXPathCompExprPtr;
 
-    child = (*con).children;
+    let mut child = (*con).children.map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
         if ((*child).typ == XmlElementType::XmlTextNode)
             || ((*child).typ == XmlElementType::XmlCDATASectionNode)
@@ -872,10 +871,8 @@ unsafe extern "C" fn xml_schematron_parse_rule(
     pattern: XmlSchematronPatternPtr,
     rule: XmlNodePtr,
 ) {
-    let mut cur: XmlNodePtr;
     let mut nb_checks: i32 = 0;
     let mut test: *mut XmlChar;
-
     let mut report: *mut XmlChar;
     let mut name: *mut XmlChar;
     let mut value: *mut XmlChar;
@@ -916,7 +913,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
         }
     }
 
-    cur = (*rule).children;
+    let mut cur = (*rule).children.map_or(null_mut(), |c| c.as_ptr());
     NEXT_SCHEMATRON!(cur);
     while !cur.is_null() {
         if IS_SCHEMATRON!(cur, c"let".as_ptr() as _) {
@@ -1105,8 +1102,6 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
     ctxt: XmlSchematronParserCtxtPtr,
     pat: XmlNodePtr,
 ) {
-    let mut cur: XmlNodePtr;
-
     let mut nb_rules: i32 = 0;
     let mut id: *mut XmlChar;
 
@@ -1126,7 +1121,7 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
         }
         return;
     }
-    cur = (*pat).children;
+    let mut cur = (*pat).children.map_or(null_mut(), |c| c.as_ptr());
     NEXT_SCHEMATRON!(cur);
     while !cur.is_null() {
         if IS_SCHEMATRON!(cur, c"rule".as_ptr() as _) {
@@ -1274,7 +1269,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
             /*
              * scan the schema elements
              */
-            cur = (*root).children;
+            cur = (*root).children.map_or(null_mut(), |c| c.as_ptr());
             NEXT_SCHEMATRON!(cur);
             if IS_SCHEMATRON!(cur, c"title".as_ptr() as _) {
                 let title: *mut XmlChar = (*cur).get_content();
@@ -1714,7 +1709,6 @@ unsafe extern "C" fn xml_schematron_format_report(
     cur: XmlNodePtr,
 ) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
-    let mut child: XmlNodePtr;
     let mut node: XmlNodePtr;
     let mut comp: XmlXPathCompExprPtr;
 
@@ -1722,7 +1716,7 @@ unsafe extern "C" fn xml_schematron_format_report(
         return ret;
     }
 
-    child = (*test).children;
+    let mut child = (*test).children.map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
         if ((*child).typ == XmlElementType::XmlTextNode)
             || ((*child).typ == XmlElementType::XmlCDATASectionNode)
@@ -2067,12 +2061,12 @@ unsafe extern "C" fn xml_schematron_unregister_variables(
 }
 
 unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr {
-    if !(*cur).children.is_null() {
+    if let Some(children) = (*cur).children {
         /*
          * Do not descend on entities declarations
          */
-        if (*(*cur).children).typ != XmlElementType::XmlEntityDecl {
-            cur = (*cur).children;
+        if children.typ != XmlElementType::XmlEntityDecl {
+            cur = children.as_ptr();
             /*
              * Skip DTDs
              */

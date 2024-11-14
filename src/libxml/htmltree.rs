@@ -181,7 +181,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             if cur.is_null() {
                 return None;
             }
-            cur = (*cur).children;
+            cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
             /*
              * Search the head
              */
@@ -201,7 +201,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             }
         }
         // found_head:
-        cur = (*cur).children;
+        cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
     }
 
     /*
@@ -339,7 +339,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         if cur.is_null() {
             return -1;
         }
-        cur = (*cur).children;
+        cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
 
         /*
          * Search the head
@@ -374,10 +374,10 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                  */
 
                 meta = xml_new_doc_node(doc, null_mut(), c"meta".as_ptr() as _, null_mut());
-                if (*head).children.is_null() {
-                    (*head).add_child(meta);
+                if let Some(mut children) = (*head).children {
+                    children.add_prev_sibling(meta);
                 } else {
-                    (*(*head).children).add_prev_sibling(meta);
+                    (*head).add_child(meta);
                 }
                 xml_new_prop(
                     meta,
@@ -410,11 +410,11 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
     if !found_meta {
         head = cur;
         assert!(!cur.is_null());
-        if (*cur).children.is_null() {
+        let Some(children) = (*cur).children else {
             // goto create;
             return create(meta, encoding, head, &newcontent, None);
-        }
-        cur = (*cur).children;
+        };
+        cur = children.as_ptr();
     }
 
     // found_meta:
@@ -1173,6 +1173,7 @@ pub unsafe fn html_node_dump_format_output(
             xmlstring::xml_strcmp,
         },
         private::save::xml_ns_list_dump_output,
+        tree::NodePtr,
     };
 
     use super::htmlparser::HtmlElemDesc;
@@ -1195,11 +1196,11 @@ pub unsafe fn html_node_dump_format_output(
                 if !(*(cur as XmlDocPtr)).int_subset.is_null() {
                     html_dtd_dump_output(buf, cur as _, null_mut());
                 }
-                if !(*cur).children.is_null() {
+                if let Some(children) = (*cur).children {
                     /* Always validate (*cur).parent when descending. */
                     if (*cur).parent == parent {
                         parent = cur;
-                        cur = (*cur).children;
+                        cur = children.as_ptr();
                         continue;
                     }
                 } else {
@@ -1213,7 +1214,7 @@ pub unsafe fn html_node_dump_format_output(
                  * tree structure. Fall back to a recursive call to handle this
                  * case.
                  */
-                if (*cur).parent != parent && !(*cur).children.is_null() {
+                if (*cur).parent != parent && (*cur).children.is_some() {
                     html_node_dump_format_output(buf, doc, cur, _encoding, format);
                     break 'to_break;
                 }
@@ -1249,38 +1250,13 @@ pub unsafe fn html_node_dump_format_output(
 
                 if !info.is_null() && (*info).empty != 0 {
                     (*buf).write_str(">");
-                } else if (*cur).children.is_null() {
-                    if !info.is_null()
-                        && (*info).save_end_tag != 0
-                        && xml_strcmp((*info).name as _, c"html".as_ptr() as _) != 0
-                        && xml_strcmp((*info).name as _, c"body".as_ptr() as _) != 0
-                    {
-                        (*buf).write_str(">");
-                    } else {
-                        (*buf).write_str("></");
-                        if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                            (*buf).write_str(
-                                CStr::from_ptr((*(*cur).ns).prefix as _)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                            );
-                            (*buf).write_str(":");
-                        }
-
-                        (*buf)
-                            .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                        (*buf).write_str(">");
-                    }
-                } else {
+                } else if let Some(children) = (*cur).children {
                     (*buf).write_str(">");
                     if format != 0
                         && !info.is_null()
                         && (*info).isinline == 0
-                        && !matches!(
-                            (*(*cur).children).typ,
-                            HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
-                        )
-                        && (*cur).children != (*cur).last
+                        && !matches!(children.typ, HTML_TEXT_NODE | HTML_ENTITY_REF_NODE)
+                        && (*cur).children != NodePtr::from_ptr((*cur).last)
                         && !(*cur).name.is_null()
                         && *(*cur).name.add(0) != b'p'
                     /* p, pre, param */
@@ -1288,8 +1264,27 @@ pub unsafe fn html_node_dump_format_output(
                         (*buf).write_str("\n");
                     }
                     parent = cur;
-                    cur = (*cur).children;
+                    cur = children.as_ptr();
                     continue 'main;
+                } else if !info.is_null()
+                    && (*info).save_end_tag != 0
+                    && xml_strcmp((*info).name as _, c"html".as_ptr() as _) != 0
+                    && xml_strcmp((*info).name as _, c"body".as_ptr() as _) != 0
+                {
+                    (*buf).write_str(">");
+                } else {
+                    (*buf).write_str("></");
+                    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
+                        (*buf).write_str(
+                            CStr::from_ptr((*(*cur).ns).prefix as _)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
+                        (*buf).write_str(":");
+                    }
+
+                    (*buf).write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                    (*buf).write_str(">");
                 }
 
                 if (format != 0
@@ -1409,7 +1404,7 @@ pub unsafe fn html_node_dump_format_output(
                     && !info.is_null()
                     && (*info).isinline == 0
                     && !matches!((*(*cur).last).typ, HTML_TEXT_NODE | HTML_ENTITY_REF_NODE)
-                    && (*cur).children != (*cur).last
+                    && (*cur).children != NodePtr::from_ptr((*cur).last)
                     && !(*cur).name.is_null()
                     && *(*cur).name.add(0) != b'p'
                 /* p, pre, param */

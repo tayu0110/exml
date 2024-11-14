@@ -1862,8 +1862,8 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
         if matches!((*cur).typ, XmlElementType::XmlElementNode) {
             count += 1;
             (*cur).content = (-count) as _;
-            if !(*cur).children.is_null() {
-                cur = (*cur).children;
+            if let Some(children) = (*cur).children {
+                cur = children.as_ptr();
                 continue;
             }
         }

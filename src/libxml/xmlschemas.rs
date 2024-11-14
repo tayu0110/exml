@@ -5061,18 +5061,16 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
                 break 'skip_children;
             }
 
-            /*
-             * Skip to next node
-             */
-            if !(*cur).children.is_null()
-                && !matches!(
-                    (*(*cur).children).typ,
+            // Skip to next node
+            if let Some(children) = (*cur).children.filter(|children| {
+                !matches!(
+                    children.typ,
                     XmlElementType::XmlEntityDecl
                         | XmlElementType::XmlEntityRefNode
                         | XmlElementType::XmlEntityNode
                 )
-            {
-                cur = (*cur).children;
+            }) {
+                cur = children.as_ptr();
                 continue 'main;
             }
         }
@@ -7200,7 +7198,7 @@ unsafe extern "C" fn xml_schema_parse_annotation(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
         if IS_SCHEMA!(child, c"appinfo".as_ptr()) {
             /* TODO: make available the content of "appinfo". */
@@ -8764,7 +8762,7 @@ unsafe extern "C" fn xml_schema_parse_model_group_def_ref(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     /* TODO: Is annotation even allowed for a model group reference? */
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
@@ -9243,7 +9241,7 @@ unsafe extern "C" fn xml_schema_parse_local_attribute(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if occurs == XML_SCHEMAS_ATTR_USE_PROHIBITED {
         if IS_SCHEMA!(child, c"annotation".as_ptr()) {
             xml_schema_parse_annotation(pctxt, child, 0);
@@ -9488,7 +9486,7 @@ unsafe extern "C" fn xml_schema_parse_attribute_group_ref(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
          * TODO: We do not have a place to store the annotation, do we?
@@ -9899,7 +9897,7 @@ unsafe extern "C" fn xml_schema_parse_any_attribute(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*ret).annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -10002,7 +10000,7 @@ unsafe extern "C" fn xml_schema_parse_extension(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
         	* Add the annotation to the type ancestor.
@@ -10161,7 +10159,7 @@ unsafe extern "C" fn xml_schema_parse_simple_content(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
         	* Add the annotation to the complex type ancestor.
@@ -10294,7 +10292,7 @@ unsafe extern "C" fn xml_schema_parse_complex_content(
     {
         (*typ).flags |= XML_SCHEMAS_TYPE_MIXED;
     }
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
          * Add the annotation to the complex type ancestor.
@@ -10611,7 +10609,7 @@ unsafe extern "C" fn xml_schema_parse_complex_type(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*typ).annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -11035,7 +11033,7 @@ unsafe extern "C" fn xml_schema_parse_idcselector_and_field(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
         	* Add the annotation to the parent IDC.
@@ -11185,7 +11183,7 @@ unsafe extern "C" fn xml_schema_parse_idc(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*item).annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -11318,7 +11316,7 @@ unsafe extern "C" fn xml_schema_parse_element(
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -11909,7 +11907,7 @@ unsafe extern "C" fn xml_schema_parse_any(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -12082,7 +12080,7 @@ unsafe extern "C" fn xml_schema_parse_model_group(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*item).annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -12360,7 +12358,7 @@ unsafe extern "C" fn xml_schema_parse_facet(
             (*facet).fixed = 1;
         }
     }
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
 
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*facet).annot = xml_schema_parse_annotation(ctxt, child, 1);
@@ -12502,7 +12500,7 @@ unsafe extern "C" fn xml_schema_parse_restriction(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
          * Add the annotation to the simple type ancestor.
@@ -12812,7 +12810,7 @@ unsafe extern "C" fn xml_schema_parse_list(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         xml_schema_add_annotation(
             typ as XmlSchemaAnnotItemPtr,
@@ -13041,7 +13039,7 @@ unsafe extern "C" fn xml_schema_parse_union(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
          * Add the annotation to the simple type ancestor.
@@ -13339,7 +13337,7 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
 
     (*ctxt).ctxt_type = typ;
 
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*typ).annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -13532,7 +13530,7 @@ unsafe extern "C" fn xml_schema_parse_model_group_definition(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*item).annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -13727,7 +13725,7 @@ unsafe extern "C" fn xml_schema_parse_attribute_group_definition(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*ret).annot = xml_schema_parse_annotation(pctxt, child, 1);
         child = (*child).next;
@@ -13923,7 +13921,7 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if typ == XML_SCHEMA_SCHEMA_REDEFINE {
         /*
         	* Parse (simpleType | complexType | group | attributeGroup))*
@@ -14104,7 +14102,7 @@ unsafe extern "C" fn xml_schema_parse_import(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         /*
          * the annotation here is simply discarded ...
@@ -14401,7 +14399,7 @@ unsafe extern "C" fn xml_schema_parse_global_attribute(
     /*
      * And now for the children...
      */
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*ret).annot = xml_schema_parse_annotation(pctxt, child, 1);
         child = (*child).next;
@@ -14521,7 +14519,7 @@ unsafe extern "C" fn xml_schema_parse_notation(
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
 
-    child = (*node).children;
+    child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
         (*ret).annot = xml_schema_parse_annotation(ctxt, child, 1);
         child = (*child).next;
@@ -14718,11 +14716,9 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
         // goto exit;
     } else {
         /* An empty schema; just get out. */
-        if (*node).children.is_null() {
-            // goto exit;
-        } else {
+        if let Some(children) = (*node).children {
             old_errs = (*pctxt).nberrors;
-            ret = xml_schema_parse_schema_top_level(pctxt, schema, (*node).children);
+            ret = xml_schema_parse_schema_top_level(pctxt, schema, children.as_ptr());
             if ret != 0 {
                 // goto exit;
             } else {
@@ -14736,6 +14732,8 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
                     // goto exit;
                 }
             }
+        } else {
+            // goto exit;
         }
     }
 
@@ -30371,8 +30369,8 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
             /*
              * Walk the doc.
              */
-            if !(*node).children.is_null() {
-                node = (*node).children;
+            if let Some(children) = (*node).children {
+                node = children.as_ptr();
                 continue 'main;
             }
         }

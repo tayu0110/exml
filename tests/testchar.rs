@@ -762,7 +762,7 @@ unsafe extern "C" fn test_user_encoding() -> c_int {
         panic!("failed to parse document");
     }
 
-    let text: *mut XmlChar = (*(*(*doc).children).children).content;
+    let text: *mut XmlChar = (*(*doc).children).children.unwrap().content;
     eprintln!(
         "text: {}",
         std::str::from_utf8_unchecked(std::slice::from_raw_parts(text, text_size as usize))

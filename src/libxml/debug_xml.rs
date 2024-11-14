@@ -19,9 +19,9 @@ use crate::{
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{
-        xml_free_node_list, xml_validate_name, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
-        XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal,
-        XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
+        xml_free_node_list, xml_validate_name, NodePtr, XmlAttrPtr, XmlAttributeDefault,
+        XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
+        XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
     },
 };
 
@@ -474,7 +474,8 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                     c"Attr has no prev and not first of attr list\n".as_ptr(),
                 );
             }
-        } else if !(*node).parent.is_null() && (*(*node).parent).children != node {
+        } else if !(*node).parent.is_null() && (*(*node).parent).children != NodePtr::from_ptr(node)
+        {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckNoPrev,
@@ -1335,12 +1336,12 @@ unsafe extern "C" fn xml_ctxt_dump_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
         return;
     }
     xml_ctxt_dump_one_node(ctxt, node);
-    if (*node).typ != XmlElementType::XmlNamespaceDecl
-        && !(*node).children.is_null()
-        && (*node).typ != XmlElementType::XmlEntityRefNode
-    {
+    if let Some(children) = (*node).children.filter(|_| {
+        (*node).typ != XmlElementType::XmlNamespaceDecl
+            && (*node).typ != XmlElementType::XmlEntityRefNode
+    }) {
         (*ctxt).depth += 1;
-        xml_ctxt_dump_node_list(ctxt, (*node).children);
+        xml_ctxt_dump_node_list(ctxt, children.as_ptr());
         (*ctxt).depth -= 1;
     }
 }
@@ -2103,7 +2104,7 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
 
     match (*node).typ {
         XmlElementType::XmlElementNode => {
-            list = (*node).children;
+            list = (*node).children.map_or(null_mut(), |c| c.as_ptr());
         }
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             list = (*(node as XmlDocPtr)).children;
@@ -2408,8 +2409,8 @@ pub unsafe extern "C" fn xml_shell_list(
     } else if (*node).typ == XmlElementType::XmlNamespaceDecl {
         xml_ls_one_node((*ctxt).output, node);
         return 0;
-    } else if !(*node).children.is_null() {
-        cur = (*node).children;
+    } else if let Some(children) = (*node).children {
+        cur = children.as_ptr();
     } else {
         xml_ls_one_node((*ctxt).output, node);
         return 0;
@@ -2878,23 +2879,23 @@ pub unsafe extern "C" fn xml_shell_du(
             fprintf((*ctxt).output, c"%s\n".as_ptr(), (*node).name);
         }
 
-        /*
-         * Browse the full subtree, deep first
-         */
-
+        // Browse the full subtree, deep first
         if (*node).typ == XmlElementType::XmlDocumentNode
             || (*node).typ == XmlElementType::XmlHTMLDocumentNode
         {
             node = (*(node as XmlDocPtr)).children;
-        } else if !(*node).children.is_null() && (*node).typ != XmlElementType::XmlEntityRefNode {
-            /* deep first */
-            node = (*node).children;
+        } else if let Some(children) = (*node)
+            .children
+            .filter(|_| (*node).typ != XmlElementType::XmlEntityRefNode)
+        {
+            // deep first
+            node = children.as_ptr();
             indent += 1;
         } else if node != tree && !(*node).next.is_null() {
-            /* then siblings */
+            // then siblings
             node = (*node).next;
         } else if node != tree {
-            /* go up to parents->next if needed */
+            // go up to parents->next if needed
             while node != tree {
                 if !(*node).parent.is_null() {
                     node = (*node).parent;
@@ -3092,22 +3093,22 @@ unsafe extern "C" fn xml_shell_grep(
             xml_shell_list(ctxt, null_mut(), (*node).parent, null_mut());
         }
 
-        /*
-         * Browse the full subtree, deep first
-         */
-
+        // Browse the full subtree, deep first
         if (*node).typ == XmlElementType::XmlDocumentNode
             || (*node).typ == XmlElementType::XmlHTMLDocumentNode
         {
             node = (*(node as XmlDocPtr)).children;
-        } else if !(*node).children.is_null() && (*node).typ != XmlElementType::XmlEntityRefNode {
-            /* deep first */
-            node = (*node).children;
+        } else if let Some(children) = (*node)
+            .children
+            .filter(|_| (*node).typ != XmlElementType::XmlEntityRefNode)
+        {
+            // deep first
+            node = children.as_ptr();
         } else if !(*node).next.is_null() {
-            /* then siblings */
+            // then siblings
             node = (*node).next;
         } else {
-            /* go up to parents->next if needed */
+            // go up to parents->next if needed
             while !node.is_null() {
                 if !(*node).parent.is_null() {
                     node = (*node).parent;
@@ -3165,9 +3166,9 @@ unsafe extern "C" fn xml_shell_set_content(
         addr_of_mut!(results),
     );
     if ret == XmlParserErrors::XmlErrOK {
-        if !(*node).children.is_null() {
-            xml_free_node_list((*node).children);
-            (*node).children = null_mut();
+        if let Some(children) = (*node).children {
+            xml_free_node_list(children.as_ptr());
+            (*node).children = None;
             (*node).last = null_mut();
         }
         (*node).add_child_list(results);
