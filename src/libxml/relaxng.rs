@@ -54,8 +54,8 @@ use crate::{
     },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
-        xml_new_doc_text, xml_split_qname2, xml_validate_ncname, NodeCommon, XmlAttrPtr, XmlDocPtr,
-        XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_new_doc_text, xml_split_qname2, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr,
+        XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -3516,7 +3516,7 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
 
     tmp = target;
     while !tmp.is_null() {
-        tmp2 = (*tmp).next;
+        tmp2 = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
         if name.is_null() && IS_RELAXNG!(tmp, c"start".as_ptr() as _) {
             found = 1;
             (*tmp).unlink();
@@ -3757,14 +3757,14 @@ unsafe extern "C" fn xml_relaxng_load_include(
             .filter(|_| IS_RELAXNG!(cur, c"div".as_ptr() as _))
         {
             cur = children.as_ptr();
-        } else if !(*cur).next.is_null() {
-            cur = (*cur).next;
+        } else if let Some(next) = (*cur).next {
+            cur = next.as_ptr();
         } else {
-            while (*cur).parent != node && (*(*cur).parent).next.is_null() {
+            while (*cur).parent != node && (*(*cur).parent).next.is_none() {
                 cur = (*cur).parent;
             }
             cur = if (*cur).parent != node {
-                (*(*cur).parent).next
+                (*(*cur).parent).next.map_or(null_mut(), |n| n.as_ptr())
             } else {
                 null_mut()
             };
@@ -4243,7 +4243,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                     ),
                                 );
                             }
-                            tmp = (*child).next;
+                            tmp = (*child).next.map_or(null_mut(), |n| n.as_ptr());
                             (*child).unlink();
                             ins = (*ins).add_next_sibling(child);
                             child = tmp;
@@ -4314,8 +4314,8 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
             }
         }
         // skip_children:
-        if !(*cur).next.is_null() {
-            cur = (*cur).next;
+        if let Some(next) = (*cur).next {
+            cur = next.as_ptr();
             continue;
         }
 
@@ -4328,8 +4328,8 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                 cur = null_mut();
                 break;
             }
-            if !(*cur).next.is_null() {
-                cur = (*cur).next;
+            if let Some(next) = (*cur).next {
+                cur = next.as_ptr();
                 break;
             }
 
@@ -4741,7 +4741,7 @@ unsafe extern "C" fn xml_relaxng_parse_except_name_class(
         );
         return null_mut();
     }
-    if !(*node).next.is_null() {
+    if (*node).next.is_some() {
         xml_rng_perr(
             ctxt,
             node,
@@ -4788,7 +4788,7 @@ unsafe extern "C" fn xml_relaxng_parse_except_name_class(
             }
             last = cur;
         }
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
     ret
@@ -4931,7 +4931,6 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
             );
         }
     } else if IS_RELAXNG!(node, c"choice".as_ptr() as _) {
-        let mut child: XmlNodePtr;
         let mut last: XmlRelaxNGDefinePtr = null_mut();
 
         if (*def).typ == XmlRelaxNGType::Choice {
@@ -4945,10 +4944,10 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
             (*ret).typ = XmlRelaxNGType::Choice;
         }
 
-        if let Some(children) = (*node).children {
-            child = children.as_ptr();
-            while !child.is_null() {
-                tmp = xml_relaxng_parse_name_class(ctxt, child, ret);
+        if (*node).children.is_some() {
+            let mut child = (*node).children;
+            while let Some(now) = child {
+                tmp = xml_relaxng_parse_name_class(ctxt, now.as_ptr(), ret);
                 if !tmp.is_null() {
                     if last.is_null() {
                         last = tmp;
@@ -4957,7 +4956,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
                         last = tmp;
                     }
                 }
-                child = (*child).next;
+                child = now.next;
             }
         } else {
             xml_rng_perr(
@@ -5176,9 +5175,9 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                 library,
                 null_mut(),
             );
-            content = (*content).next;
+            content = (*content).next.map_or(null_mut(), |n| n.as_ptr());
             while !content.is_null() && xml_str_equal((*content).name, c"param".as_ptr() as _) {
-                content = (*content).next;
+                content = (*content).next.map_or(null_mut(), |n| n.as_ptr());
             }
         } else {
             param = xml_relaxng_new_define(ctxt, node);
@@ -5205,7 +5204,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                 }
                 if !lib.is_null() {}
             }
-            content = (*content).next;
+            content = (*content).next.map_or(null_mut(), |n| n.as_ptr());
         }
     }
     /*
@@ -5243,9 +5242,9 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                     last = tmp2;
                 }
             }
-            child = (*child).next;
+            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        content = (*content).next;
+        content = (*content).next.map_or(null_mut(), |n| n.as_ptr());
     }
     /*
      * Check there is no unhandled data
@@ -5301,7 +5300,7 @@ unsafe extern "C" fn xml_relaxng_parse_attribute(
     (*ctxt).flags |= XML_RELAXNG_IN_ATTRIBUTE;
     cur = xml_relaxng_parse_name_class(ctxt, child, ret);
     if !cur.is_null() {
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
     if !child.is_null() {
@@ -5351,7 +5350,7 @@ unsafe extern "C" fn xml_relaxng_parse_attribute(
                 }
             }
         }
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
     if !child.is_null() {
         xml_rng_perr(
@@ -5454,7 +5453,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
             !matches!(
                 children.typ,
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-            ) || !children.next.is_null()
+            ) || children.next.is_some()
         })
         .is_some()
     {
@@ -5582,7 +5581,7 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
                 last = cur;
             }
         }
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
     def
@@ -6234,7 +6233,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
     };
     cur = xml_relaxng_parse_name_class(ctxt, child, ret);
     if !cur.is_null() {
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
     if child.is_null() {
@@ -6336,7 +6335,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
                 }
             }
         }
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
     (*ctxt).define = olddefine;
     ret
@@ -6396,7 +6395,7 @@ unsafe extern "C" fn xml_relaxng_parse_patterns(
                 }
             }
         }
-        nodes = (*nodes).next;
+        nodes = (*nodes).next.map_or(null_mut(), |n| n.as_ptr());
     }
     def
 }
@@ -6473,7 +6472,7 @@ unsafe extern "C" fn xml_relaxng_parse_start(
     } else {
         (*(*ctxt).grammar).start = def;
     }
-    nodes = (*nodes).next;
+    nodes = (*nodes).next.map_or(null_mut(), |n| n.as_ptr());
     if !nodes.is_null() {
         xml_rng_perr(
             ctxt,
@@ -6728,7 +6727,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar_content(
             );
             ret = -1;
         }
-        nodes = (*nodes).next;
+        nodes = (*nodes).next.map_or(null_mut(), |n| n.as_ptr());
     }
     ret
 }
@@ -9646,7 +9645,7 @@ unsafe extern "C" fn xml_relaxng_skip_ignored(
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
         ) && ((*ctxt).flags & FLAGS_MIXED_CONTENT != 0 || IS_BLANK_NODE!(node))))
     {
-        node = (*node).next;
+        node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
     }
     node
 }
@@ -10480,10 +10479,8 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
         if ret < 0 {
             break;
         }
-        /*
-         * Switch to next element
-         */
-        cur = (*cur).next;
+        // Switch to next element
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
     if ret == 1 {
@@ -11016,18 +11013,18 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
             break;
         }
         if !(*lasts.add(i as usize)).is_null() {
-            (*(*lasts.add(i as usize))).next = cur;
+            (*(*lasts.add(i as usize))).next = NodePtr::from_ptr(cur);
             *lasts.add(i as usize) = cur;
         } else {
             *list.add(i as usize) = cur;
             *lasts.add(i as usize) = cur;
         }
-        if !(*cur).next.is_null() {
-            lastchg = (*cur).next;
+        if let Some(next) = (*cur).next {
+            lastchg = next.as_ptr();
         } else {
             lastchg = cur;
         }
-        cur = xml_relaxng_skip_ignored(ctxt, (*cur).next);
+        cur = xml_relaxng_skip_ignored(ctxt, (*cur).next.map_or(null_mut(), |n| n.as_ptr()));
     }
     'done: {
         if ret != 0 {
@@ -11046,8 +11043,10 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
             }
             group = *(*partitions).groups.add(i as usize);
             if !(*lasts.add(i as usize)).is_null() {
-                last = (*(*lasts.add(i as usize))).next;
-                (*(*lasts.add(i as usize))).next = null_mut();
+                last = (*(*lasts.add(i as usize)))
+                    .next
+                    .take()
+                    .map_or(null_mut(), |n| n.as_ptr());
             }
             (*(*ctxt).state).seq = *list.add(i as usize);
             ret = xml_relaxng_validate_definition(ctxt, (*group).rule);
@@ -11173,7 +11172,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                 break;
             }
             if !(*lasts.add(i as usize)).is_null() {
-                (*(*lasts.add(i as usize))).next = last;
+                (*(*lasts.add(i as usize))).next = NodePtr::from_ptr(last);
             }
         }
         if !(*ctxt).state.is_null() {
@@ -11198,7 +11197,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
         if cur == start || (*cur).prev.is_null() {
             break;
         }
-        (*(*cur).prev).next = cur;
+        (*(*cur).prev).next = NodePtr::from_ptr(cur);
         cur = (*cur).prev;
     }
     if ret == 0 && (*ctxt).err_nr > err_nr {
@@ -11260,7 +11259,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                         | XmlElementType::XmlCDATASectionNode
                 )
             {
-                node = (*node).next;
+                node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
             }
             (*(*ctxt).state).seq = node;
         }
@@ -11292,7 +11291,8 @@ unsafe extern "C" fn xml_relaxng_validate_state(
              * this definition.
              */
             if (*node).psvi == define as _ {
-                (*(*ctxt).state).seq = xml_relaxng_skip_ignored(ctxt, (*node).next);
+                (*(*ctxt).state).seq =
+                    xml_relaxng_skip_ignored(ctxt, (*node).next.map_or(null_mut(), |n| n.as_ptr()));
                 if (*ctxt).err_nr > err_nr {
                     xml_relaxng_pop_errors(ctxt, err_nr);
                 }
@@ -11493,16 +11493,13 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             (*ctxt).flags = oldflags;
             (*ctxt).state = oldstate;
             if !oldstate.is_null() {
-                (*oldstate).seq = xml_relaxng_skip_ignored(ctxt, (*node).next);
+                (*oldstate).seq =
+                    xml_relaxng_skip_ignored(ctxt, (*node).next.map_or(null_mut(), |n| n.as_ptr()));
             }
             if ret != 0 {
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
                     xml_relaxng_dump_valid_error(ctxt);
                     ret = 0;
-                    // #if 0
-                    //                 } else {
-                    //                     ret = -2;
-                    // #endif
                 }
             } else if (*ctxt).err_nr > err_nr {
                 xml_relaxng_pop_errors(ctxt, err_nr);
@@ -11852,8 +11849,8 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 ) {
                     content = xml_strcat(content, (*child).content);
                 }
-                /* TODO: handle entities ... */
-                child = (*child).next;
+                // TODO: handle entities ...
+                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if ret == -1 {
                 if !content.is_null() {
@@ -11903,8 +11900,8 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 ) {
                     content = xml_strcat(content, (*child).content);
                 }
-                /* TODO: handle entities ... */
-                child = (*child).next;
+                // TODO: handle entities ...
+                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if ret == -1 {
                 if !content.is_null() {
@@ -11958,8 +11955,8 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 ) {
                     content = xml_strcat(content, (*child).content);
                 }
-                /* TODO: handle entities ... */
-                child = (*child).next;
+                // TODO: handle entities ...
+                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if ret == -1 {
                 if !content.is_null() {
@@ -11986,7 +11983,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             if ret == -1 {
                 VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrList);
             } else if ret == 0 && !node.is_null() {
-                (*(*ctxt).state).seq = (*node).next;
+                (*(*ctxt).state).seq = (*node).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if !content.is_null() {
                 xml_free(content as _);
@@ -12261,8 +12258,8 @@ unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
                 continue;
             }
         }
-        if !(*cur).next.is_null() {
-            cur = (*cur).next;
+        if let Some(next) = (*cur).next {
+            cur = next.as_ptr();
             continue;
         }
         loop {
@@ -12274,8 +12271,8 @@ unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
                 cur = null_mut();
                 break;
             }
-            if !(*cur).next.is_null() {
-                cur = (*cur).next;
+            if let Some(next) = (*cur).next {
+                cur = next.as_ptr();
                 break;
             }
 

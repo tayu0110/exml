@@ -1306,10 +1306,10 @@ unsafe extern "C" fn get_api_root() -> XmlNodePtr {
         get_api_doc();
         if !API_DOC.get().is_null()
             && !(*API_DOC.get()).children.is_null()
-            && !(*(*API_DOC.get()).children).next.is_null()
-            && (*(*(*API_DOC.get()).children).next).typ == XmlElementType::XmlElementNode
+            && (*(*API_DOC.get()).children).next.is_some()
+            && (*(*API_DOC.get()).children).next.unwrap().typ == XmlElementType::XmlElementNode
         {
-            API_ROOT.set((*(*API_DOC.get()).children).next);
+            API_ROOT.set((*(*API_DOC.get()).children).next.unwrap().as_ptr());
         }
     }
     API_ROOT.get()

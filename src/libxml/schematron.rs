@@ -472,7 +472,7 @@ macro_rules! NEXT_SCHEMATRON {
             {
                 break;
             }
-            $node = (*$node).next;
+            $node = (*$node).next.map_or(null_mut(), |n| n.as_ptr());
         }
     };
 }
@@ -787,7 +787,7 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
             }
             xml_free(select as _);
         }
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
         continue;
     }
 }
@@ -1076,7 +1076,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 null_mut(),
             );
         }
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         NEXT_SCHEMATRON!(cur);
     }
     if nb_checks == 0 {
@@ -1137,7 +1137,7 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
                 null_mut(),
             );
         }
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         NEXT_SCHEMATRON!(cur);
     }
     if nb_rules == 0 {
@@ -1277,7 +1277,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                     (*ret).title = xml_dict_lookup((*ret).dict, title, -1);
                     xml_free(title as _);
                 }
-                cur = (*cur).next;
+                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                 NEXT_SCHEMATRON!(cur);
             }
             while IS_SCHEMATRON!(cur, c"ns".as_ptr() as _) {
@@ -1314,7 +1314,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                 if !prefix.is_null() {
                     xml_free(prefix as _);
                 }
-                cur = (*cur).next;
+                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                 NEXT_SCHEMATRON!(cur);
             }
             while !cur.is_null() {
@@ -1331,7 +1331,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                         null_mut(),
                     );
                 }
-                cur = (*cur).next;
+                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                 NEXT_SCHEMATRON!(cur);
             }
             if (*ret).nb_pattern == 0 {
@@ -1791,7 +1791,7 @@ unsafe extern "C" fn xml_schematron_format_report(
             xml_xpath_free_comp_expr(comp);
             xml_free(select as _);
         } else {
-            child = (*child).next;
+            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
             continue;
         }
 
@@ -1818,7 +1818,7 @@ unsafe extern "C" fn xml_schematron_format_report(
             }
         }
 
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
     ret
 }
@@ -2076,8 +2076,8 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
         }
     }
 
-    while !(*cur).next.is_null() {
-        cur = (*cur).next;
+    while let Some(next) = (*cur).next {
+        cur = next.as_ptr();
         if (*cur).typ != XmlElementType::XmlEntityDecl && (*cur).typ != XmlElementType::XmlDTDNode {
             return cur;
         }
@@ -2091,8 +2091,8 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
         if (*cur).typ == XmlElementType::XmlDocumentNode {
             return null_mut();
         }
-        if !(*cur).next.is_null() {
-            cur = (*cur).next;
+        if let Some(next) = (*cur).next {
+            cur = next.as_ptr();
             return cur;
         }
 

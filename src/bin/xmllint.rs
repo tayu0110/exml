@@ -2736,7 +2736,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if !(*doc).children.is_null() {
                 let mut node = (*doc).children;
                 while !node.is_null() && (*node).last.is_null() {
-                    node = (*node).next;
+                    node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
                 }
                 if !node.is_null() {
                     let nb = xml_valid_get_valid_elements(

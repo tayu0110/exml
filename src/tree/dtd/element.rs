@@ -1,10 +1,10 @@
-use std::os::raw::c_void;
+use std::{os::raw::c_void, ptr::null_mut};
 
 use crate::{
     libxml::{xmlregexp::XmlRegexpPtr, xmlstring::XmlChar},
     tree::{
-        NodeCommon, XmlDoc, XmlDtd, XmlElementContentPtr, XmlElementType, XmlElementTypeVal,
-        XmlNode,
+        NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementContentPtr, XmlElementType,
+        XmlElementTypeVal, XmlNode,
     },
 };
 
@@ -56,11 +56,11 @@ impl NodeCommon for XmlElement {
     fn set_last(&mut self, last: *mut XmlNode) {
         self.last = last;
     }
-    fn next(&self) -> *mut XmlNode {
-        self.next
+    fn next(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.next)
     }
-    fn set_next(&mut self, next: *mut XmlNode) {
-        self.next = next;
+    fn set_next(&mut self, next: Option<NodePtr>) {
+        self.next = next.map_or(null_mut(), |n| n.as_ptr());
     }
     fn prev(&self) -> *mut XmlNode {
         self.prev

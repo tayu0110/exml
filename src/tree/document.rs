@@ -17,9 +17,10 @@ use crate::{
 use super::{
     xml_buf_add, xml_buf_cat, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_is_empty,
     xml_buf_set_allocation_scheme, xml_free_node_list, xml_new_doc_text, xml_new_reference,
-    xml_tree_err, xml_tree_err_memory, NodeCommon, XmlBufferAllocationScheme, XmlDocProperties,
-    XmlDtd, XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_ENT_EXPANDING,
-    XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
+    xml_tree_err, xml_tree_err_memory, NodeCommon, NodePtr, XmlBufferAllocationScheme,
+    XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+    XML_ENT_EXPANDING, XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    __XML_REGISTER_CALLBACKS,
 };
 
 /// An XML document.
@@ -74,7 +75,7 @@ impl XmlDoc {
             if matches!((*cur).typ, XmlElementType::XmlDTDNode) {
                 return cur as _;
             }
-            cur = (*cur).next;
+            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
         self.int_subset
     }
@@ -90,7 +91,7 @@ impl XmlDoc {
             if matches!((*ret).typ, XmlElementType::XmlElementNode) {
                 return ret;
             }
-            ret = (*ret).next;
+            ret = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
         }
         ret
     }
@@ -312,7 +313,7 @@ impl XmlDoc {
                                 while !temp.is_null() {
                                     (*temp).parent = ent as _;
                                     (*ent).last.store(temp, Ordering::Relaxed);
-                                    temp = (*temp).next;
+                                    temp = (*temp).next.map_or(null_mut(), |n| n.as_ptr());
                                 }
                             }
                             if last.is_null() {
@@ -605,7 +606,7 @@ impl XmlDoc {
                                 while !temp.is_null() {
                                     (*temp).parent = ent as _;
                                     (*ent).last.store(temp, Ordering::Relaxed);
-                                    temp = (*temp).next;
+                                    temp = (*temp).next.map_or(null_mut(), |n| n.as_ptr());
                                 }
                             }
                             if last.is_null() {
@@ -692,7 +693,7 @@ impl XmlDoc {
             if matches!((*old).typ, XmlElementType::XmlElementNode) {
                 break;
             }
-            old = (*old).next;
+            old = (*old).next.map_or(null_mut(), |n| n.as_ptr());
         }
         if old.is_null() {
             if self.children.is_null() {
@@ -767,11 +768,11 @@ impl NodeCommon for XmlDoc {
     fn set_last(&mut self, last: *mut XmlNode) {
         self.last = last;
     }
-    fn next(&self) -> *mut XmlNode {
-        self.next
+    fn next(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.next)
     }
-    fn set_next(&mut self, next: *mut XmlNode) {
-        self.next = next;
+    fn set_next(&mut self, next: Option<NodePtr>) {
+        self.next = next.map_or(null_mut(), |n| n.as_ptr());
     }
     fn prev(&self) -> *mut XmlNode {
         self.prev

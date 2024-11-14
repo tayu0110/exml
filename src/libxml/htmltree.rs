@@ -176,7 +176,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
                         break 'goto_found_meta;
                     }
                 }
-                cur = (*cur).next;
+                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if cur.is_null() {
                 return None;
@@ -194,7 +194,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
                         break 'goto_found_meta;
                     }
                 }
-                cur = (*cur).next;
+                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if cur.is_null() {
                 return None;
@@ -222,7 +222,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             while !attr.is_null() {
                 if !(*attr).children.is_null()
                     && matches!((*(*attr).children).typ, XmlElementType::XmlTextNode)
-                    && (*(*attr).children).next.is_null()
+                    && (*(*attr).children).next.is_none()
                 {
                     value = (*(*attr).children).content;
                     if xml_strcasecmp((*attr).name, c"http-equiv".as_ptr() as _) == 0
@@ -272,7 +272,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
                 attr = (*attr).next;
             }
         }
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     None
 }
@@ -332,7 +332,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
             }
         }
 
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
     if !found_head && !found_meta {
@@ -355,7 +355,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                     found_meta = true;
                 }
             }
-            cur = (*cur).next;
+            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
         if cur.is_null() {
             return -1;
@@ -436,7 +436,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
             while !attr.is_null() {
                 if !(*attr).children.is_null()
                     && matches!((*(*attr).children).typ, XmlElementType::XmlTextNode)
-                    && (*(*attr).children).next.is_null()
+                    && (*(*attr).children).next.is_none()
                 {
                     value = (*(*attr).children).content;
                     if xml_strcasecmp((*attr).name, c"http-equiv".as_ptr() as _) == 0
@@ -463,7 +463,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                 break;
             }
         }
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     // create:
     create(meta, encoding, head, &newcontent, content.as_deref())
@@ -1288,11 +1288,13 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 if (format != 0
-                    && !(*cur).next.is_null()
+                    && (*cur).next.is_some()
                     && !info.is_null()
                     && (*info).isinline == 0)
-                    && (!matches!((*(*cur).next).typ, HTML_TEXT_NODE | HTML_ENTITY_REF_NODE)
-                        && !parent.is_null()
+                    && (!matches!(
+                        (*cur).next.unwrap().typ,
+                        HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
+                    ) && !parent.is_null()
                         && !(*parent).name.is_null()
                         && *(*parent).name.add(0) != b'p')
                 {
@@ -1379,8 +1381,8 @@ pub unsafe fn html_node_dump_format_output(
             if cur == root {
                 return;
             }
-            if !(*cur).next.is_null() {
-                cur = (*cur).next;
+            if let Some(next) = (*cur).next {
+                cur = next.as_ptr();
                 break;
             }
 
@@ -1428,9 +1430,11 @@ pub unsafe fn html_node_dump_format_output(
                 if (format != 0
                     && !info.is_null()
                     && (*info).isinline == 0
-                    && !(*cur).next.is_null())
-                    && (!matches!((*(*cur).next).typ, HTML_TEXT_NODE | HTML_ENTITY_REF_NODE)
-                        && !parent.is_null()
+                    && (*cur).next.is_some())
+                    && (!matches!(
+                        (*cur).next.unwrap().typ,
+                        HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
+                    ) && !parent.is_null()
                         && !(*parent).name.is_null()
                         && *(*parent).name.add(0) != b'p')
                 {

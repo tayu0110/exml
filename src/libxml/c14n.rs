@@ -2473,7 +2473,7 @@ unsafe extern "C" fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: Xml
     ret = 0;
     while !cur.is_null() && ret >= 0 {
         ret = xml_c14n_process_node(ctx, cur);
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     ret
 }

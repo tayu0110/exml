@@ -18,7 +18,7 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_tree_err_memory, NodeCommon, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
+    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
     __XML_REGISTER_CALLBACKS,
 };
 
@@ -106,11 +106,11 @@ impl NodeCommon for XmlDtd {
     fn set_last(&mut self, last: *mut XmlNode) {
         self.last = last;
     }
-    fn next(&self) -> *mut XmlNode {
-        self.next
+    fn next(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.next)
     }
-    fn set_next(&mut self, next: *mut XmlNode) {
-        self.next = next;
+    fn set_next(&mut self, next: Option<NodePtr>) {
+        self.next = next.map_or(null_mut(), |n| n.as_ptr());
     }
     fn prev(&self) -> *mut XmlNode {
         self.prev
@@ -198,11 +198,11 @@ pub unsafe fn xml_create_int_subset(
         } else {
             let mut next = (*doc).children;
             while !next.is_null() && !matches!((*next).typ, XmlElementType::XmlElementNode) {
-                next = (*next).next;
+                next = (*next).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if next.is_null() {
                 (*cur).prev = (*doc).last;
-                (*(*cur).prev).next = cur as _;
+                (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
                 (*cur).next = null_mut();
                 (*doc).last = cur as _;
             } else {
@@ -211,7 +211,7 @@ pub unsafe fn xml_create_int_subset(
                 if (*cur).prev.is_null() {
                     (*doc).children = cur as _;
                 } else {
-                    (*(*cur).prev).next = cur as _;
+                    (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
                 }
                 (*next).prev = cur as _;
             }

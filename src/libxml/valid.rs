@@ -57,7 +57,7 @@ use crate::{
     private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
         xml_build_qname, xml_free_node, xml_new_doc_node, xml_split_qname2, xml_split_qname3,
-        NodeCommon, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
+        NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementPtr,
         XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr,
@@ -1442,7 +1442,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
         (*dtd).children = ret as XmlNodePtr;
         (*dtd).last = (*dtd).children;
     } else {
-        (*(*dtd).last).next = ret as XmlNodePtr;
+        (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
         (*ret).prev = (*dtd).last;
         (*dtd).last = ret as XmlNodePtr;
     }
@@ -2670,7 +2670,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
         (*dtd).children = ret as XmlNodePtr;
         (*dtd).last = ret as XmlNodePtr;
     } else {
-        (*(*dtd).last).next = ret as XmlNodePtr;
+        (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
         (*ret).prev = (*dtd).last;
         (*dtd).last = ret as XmlNodePtr;
     }
@@ -5015,12 +5015,12 @@ pub unsafe extern "C" fn xml_validate_element(
                 // goto done;
                 return ret;
             }
-            if !(*elem).next.is_null() {
+            if (*elem).next.is_some() {
                 break;
             }
             elem = (*elem).parent;
         }
-        elem = (*elem).next;
+        elem = (*elem).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
     // done:
@@ -5162,7 +5162,6 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
     elem: XmlNodePtr,
 ) -> i32 {
     let mut ret: i32 = 1;
-    let mut cur: XmlNodePtr;
 
     if ctxt.is_null()
         || doc.is_null()
@@ -5172,22 +5171,20 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
         return 0;
     }
 
-    let child: XmlNodePtr = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
+    let child = (*elem).children;
 
-    cur = child;
-    'done: while !cur.is_null() {
-        match (*cur).typ {
+    let mut cur = child;
+    'done: while let Some(now) = cur {
+        match now.typ {
             XmlElementType::XmlEntityRefNode => {
                 /*
                  * Push the current node to be able to roll back
                  * and process within the entity
                  */
-                if let Some(children) = (*cur)
-                    .children
-                    .filter(|children| children.children.is_some())
+                if let Some(children) = now.children.filter(|children| children.children.is_some())
                 {
-                    node_vpush(ctxt, cur);
-                    cur = children.children.map_or(null_mut(), |c| c.as_ptr());
+                    node_vpush(ctxt, now.as_ptr());
+                    cur = children.children;
                     continue;
                 }
             }
@@ -5204,13 +5201,13 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
         /*
          * Switch to next element
          */
-        cur = (*cur).next;
-        while cur.is_null() {
-            cur = node_vpop(ctxt);
-            if cur.is_null() {
+        cur = now.next;
+        while cur.is_none() {
+            cur = NodePtr::from_ptr(node_vpop(ctxt));
+            let Some(now) = cur else {
                 break;
-            }
-            cur = (*cur).next;
+            };
+            cur = now.next;
         }
     }
     // done:
@@ -5283,7 +5280,7 @@ unsafe extern "C" fn xml_snprintf_elements(
                     return;
                 }
                 strcat(buf, (*cur).name as *mut c_char);
-                if !(*cur).next.is_null() {
+                if (*cur).next.is_some() {
                     strcat(buf, c" ".as_ptr() as _);
                 }
             }
@@ -5294,7 +5291,7 @@ unsafe extern "C" fn xml_snprintf_elements(
                     break 'to_break;
                 }
                 strcat(buf, c"CDATA".as_ptr() as _);
-                if !(*cur).next.is_null() {
+                if (*cur).next.is_some() {
                     strcat(buf, c" ".as_ptr() as _);
                 }
             }
@@ -5306,7 +5303,7 @@ unsafe extern "C" fn xml_snprintf_elements(
             | XmlElementType::XmlNotationNode
             | XmlElementType::XmlNamespaceDecl => {
                 strcat(buf, c"???".as_ptr() as _);
-                if !(*cur).next.is_null() {
+                if (*cur).next.is_some() {
                     strcat(buf, c" ".as_ptr() as _);
                 }
             }
@@ -5321,7 +5318,7 @@ unsafe extern "C" fn xml_snprintf_elements(
             | XmlElementType::XmlXIncludeEnd => {}
             _ => unreachable!(),
         }
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     if glob != 0 {
         strcat(buf, c")".as_ptr() as _);
@@ -5969,13 +5966,13 @@ unsafe extern "C" fn xml_validate_element_content(
                         /*
                          * Switch to next element
                          */
-                        cur = (*cur).next;
+                        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                         while cur.is_null() {
                             cur = node_vpop(ctxt);
                             if cur.is_null() {
                                 break;
                             }
-                            cur = (*cur).next;
+                            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                         }
                     }
 
@@ -6560,7 +6557,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                             }
                         }
                         // child_ok:
-                        child = (*child).next;
+                        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
                     }
                 }
             }
@@ -6585,7 +6582,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                 break;
                             }
                         }
-                        child = (*child).next;
+                        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
                     }
                 }
                 child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
@@ -7974,7 +7971,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
      * Do a backup of the current tree structure
      */
     let prev_next: *mut XmlNode = if !prev.is_null() {
-        (*prev).next
+        (*prev).next.map_or(null_mut(), |n| n.as_ptr())
     } else {
         null_mut()
     };
@@ -8001,11 +7998,11 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
 
     (*test_node).parent = parent;
     (*test_node).prev = prev;
-    (*test_node).next = next;
+    (*test_node).next = NodePtr::from_ptr(next);
     let name: *const XmlChar = (*test_node).name;
 
     if !prev.is_null() {
-        (*prev).next = test_node;
+        (*prev).next = NodePtr::from_ptr(test_node);
     } else {
         (*parent).children = NodePtr::from_ptr(test_node);
     }
@@ -8045,7 +8042,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
 
     // Restore the tree structure
     if !prev.is_null() {
-        (*prev).next = prev_next;
+        (*prev).next = NodePtr::from_ptr(prev_next);
     }
     if !next.is_null() {
         (*next).prev = next_prev;

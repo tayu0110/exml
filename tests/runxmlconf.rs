@@ -776,7 +776,7 @@ unsafe extern "C" fn xmlconf_test_cases(
                 );
             }
         }
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     if (output == 1) && (tests > 0) {
         println!("Test cases: {} tests", tests);
@@ -814,7 +814,7 @@ unsafe extern "C" fn xmlconf_test_suite(
                 );
             }
         }
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     ret
 }

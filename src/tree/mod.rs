@@ -1074,7 +1074,6 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
     }
 
     if !(*cur).children.is_null() {
-        let mut next: XmlNodePtr;
         let mut c: XmlNodePtr = (*cur).children;
 
         /*
@@ -1082,7 +1081,7 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
          * of notations, elements, attributes and entities.
          */
         while !c.is_null() {
-            next = (*c).next;
+            let next = (*c).next;
             if !matches!(
                 (*c).typ,
                 XmlElementType::XmlNotationNode
@@ -1093,7 +1092,7 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
                 (*c).unlink();
                 xml_free_node(c);
             }
-            c = next;
+            c = next.map_or(null_mut(), |c| c.as_ptr());
         }
     }
     DICT_FREE!(dict, (*cur).name);
@@ -1245,17 +1244,15 @@ unsafe fn xml_new_prop_internal(
     }
 
     if !value.is_null() {
-        let mut tmp: XmlNodePtr;
-
         (*cur).children = xml_new_doc_text(doc, value);
         (*cur).last = null_mut();
-        tmp = (*cur).children;
+        let mut tmp = (*cur).children;
         while !tmp.is_null() {
             (*tmp).parent = cur as _;
-            if (*tmp).next.is_null() {
+            if (*tmp).next.is_none() {
                 (*cur).last = tmp;
             }
-            tmp = (*tmp).next;
+            tmp = (*tmp).next.map_or(null_mut(), |c| c.as_ptr());
         }
     }
 
@@ -1625,7 +1622,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
                     (*insert).children = NodePtr::from_ptr(copy);
                 } else {
                     (*copy).prev = (*insert).last;
-                    (*(*insert).last).next = copy;
+                    (*(*insert).last).next = NodePtr::from_ptr(copy);
                 }
                 (*insert).last = copy;
             }
@@ -1640,8 +1637,8 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
             }
 
             loop {
-                if !(*cur).next.is_null() {
-                    cur = (*cur).next;
+                if let Some(next) = (*cur).next {
+                    cur = next.as_ptr();
                     break;
                 }
 
@@ -1680,7 +1677,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
         {
             if matches!((*node).typ, XmlElementType::XmlDTDNode) {
                 if doc.is_null() {
-                    node = (*node).next;
+                    node = (*node).next.map_or(null_mut(), |c| c.as_ptr());
                     continue;
                 }
                 if (*doc).int_subset.is_null() {
@@ -1717,11 +1714,11 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
             p = q;
         } else if p != q {
             /* the test is required if xmlStaticCopyNode coalesced 2 text nodes */
-            (*p).next = q;
+            (*p).next = NodePtr::from_ptr(q);
             (*q).prev = p;
             p = q;
         }
-        node = (*node).next;
+        node = (*node).next.map_or(null_mut(), |c| c.as_ptr());
     }
     ret
     // error:
@@ -1813,10 +1810,10 @@ unsafe extern "C" fn xml_copy_prop_internal(
         tmp = (*ret).children;
         while !tmp.is_null() {
             /* (*tmp).parent = ret; */
-            if (*tmp).next.is_null() {
+            if (*tmp).next.is_none() {
                 (*ret).last = tmp;
             }
-            tmp = (*tmp).next;
+            tmp = (*tmp).next.map_or(null_mut(), |c| c.as_ptr());
         }
     }
     /*
@@ -1974,22 +1971,22 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         }
 
         if q.is_null() {
-            cur = (*cur).next;
+            cur = (*cur).next.map_or(null_mut(), |c| c.as_ptr());
             continue;
         }
 
         if p.is_null() {
             (*ret).children = q;
         } else {
-            (*p).next = q;
+            (*p).next = NodePtr::from_ptr(q);
         }
 
         (*q).prev = p;
         (*q).parent = ret as _;
-        (*q).next = null_mut();
+        (*q).next = None;
         (*ret).last = q;
         p = q;
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |c| c.as_ptr());
     }
 
     ret
@@ -2055,10 +2052,10 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
         (*ret).last = null_mut();
         tmp = (*ret).children;
         while !tmp.is_null() {
-            if (*tmp).next.is_null() {
+            if (*tmp).next.is_none() {
                 (*ret).last = tmp;
             }
-            tmp = (*tmp).next;
+            tmp = (*tmp).next.map_or(null_mut(), |c| c.as_ptr());
         }
     }
     ret
@@ -2067,16 +2064,15 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
 macro_rules! UPDATE_LAST_CHILD_AND_PARENT {
     ($n:expr) => {
         if !$n.is_null() {
-            let mut ulccur: XmlNodePtr = (*$n).children.map_or(null_mut(), |c| c.as_ptr());
-            if ulccur.is_null() {
-                (*$n).last = null_mut();
-            } else {
-                while !(*ulccur).next.is_null() {
-                    (*ulccur).parent = $n;
-                    ulccur = (*ulccur).next;
+            if let Some(mut ulccur) = (*$n).children {
+                while let Some(next) = ulccur.next {
+                    ulccur.parent = $n;
+                    ulccur = next;
                 }
                 (*ulccur).parent = $n;
-                (*$n).last = ulccur;
+                (*$n).last = ulccur.as_ptr();
+            } else {
+                (*$n).last = null_mut();
             }
         }
     };
@@ -2319,7 +2315,7 @@ pub unsafe extern "C" fn xml_new_child(
         (*parent).last = cur;
     } else {
         prev = (*parent).last;
-        (*prev).next = cur;
+        (*prev).next = NodePtr::from_ptr(cur);
         (*cur).prev = prev;
         (*parent).last = cur;
     }
@@ -2835,7 +2831,7 @@ pub unsafe extern "C" fn xml_new_text_child(
         (*parent).last = cur;
     } else {
         prev = (*parent).last;
-        (*prev).next = cur;
+        (*prev).next = NodePtr::from_ptr(cur);
         (*cur).prev = prev;
         (*parent).last = cur;
     }
@@ -2952,12 +2948,12 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
     (*cur).set_doc((*old).doc);
     (*cur).parent = (*old).parent;
     (*cur).next = (*old).next;
-    if !(*cur).next.is_null() {
-        (*(*cur).next).prev = cur;
+    if let Some(mut next) = (*cur).next {
+        next.prev = cur;
     }
     (*cur).prev = (*old).prev;
     if !(*cur).prev.is_null() {
-        (*(*cur).prev).next = cur;
+        (*(*cur).prev).next = NodePtr::from_ptr(cur);
     }
     if !(*cur).parent.is_null() {
         if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
@@ -2973,7 +2969,7 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
             }
         }
     }
-    (*old).next = null_mut();
+    (*old).next = None;
     (*old).prev = null_mut();
     (*old).parent = null_mut();
     old
@@ -3060,7 +3056,6 @@ pub unsafe extern "C" fn xml_text_concat(
  * the children are freed too.
  */
 pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
-    let mut next: XmlNodePtr;
     let mut parent: XmlNodePtr;
     let mut dict: XmlDictPtr = null_mut();
     let mut depth: usize = 0;
@@ -3089,7 +3084,7 @@ pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
             depth += 1;
         }
 
-        next = (*cur).next;
+        let next = (*cur).next.map_or(null_mut(), |c| c.as_ptr());
         parent = (*cur).parent;
         if matches!((*cur).typ, XmlElementType::XmlDocumentNode)
             || matches!((*cur).typ, XmlElementType::XmlHTMLDocumentNode)
@@ -4503,8 +4498,8 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                 }
                                 depth -= 1;
                             }
-                            if !(*cur).next.is_null() {
-                                cur = (*cur).next;
+                            if let Some(next) = (*cur).next {
+                                cur = next.as_ptr();
                             } else {
                                 if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
                                     cur = (*cur).parent;
@@ -4560,8 +4555,8 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                             }
                             depth -= 1;
                         }
-                        if !(*cur).next.is_null() {
-                            cur = (*cur).next;
+                        if let Some(next) = (*cur).next {
+                            cur = next.as_ptr();
                         } else {
                             if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
                                 cur = (*cur).parent;
@@ -4689,25 +4684,23 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                      * This here skips XIncluded nodes and tries to handle
                      * broken sequences.
                      */
-                    if (*cur).next.is_null() {
-                        // goto leave_node;
-                        leave_node = true;
-                    } else {
-                        'lp: while {
-                            cur = (*cur).next;
-                            if matches!((*cur).typ, XmlElementType::XmlXIncludeEnd)
-                                || (*cur).doc == (*node).doc
-                            {
-                                break 'lp;
-                            }
-
-                            !(*cur).next.is_null()
-                        } {}
+                    if (*cur).next.is_some() {
+                        let mut next = (*cur).next;
+                        while let Some(now) = next.filter(|now| {
+                            !matches!(now.typ, XmlElementType::XmlXIncludeEnd)
+                                && now.doc != (*node).doc
+                        }) {
+                            cur = now.as_ptr();
+                            next = now.next;
+                        }
 
                         if (*cur).doc != (*node).doc {
                             // goto leave_node;
                             leave_node = true;
                         }
+                    } else {
+                        // goto leave_node;
+                        leave_node = true;
                     }
                 }
 
@@ -5015,8 +5008,8 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                         }
                         depth -= 1;
                     }
-                    if !(*cur).next.is_null() {
-                        cur = (*cur).next;
+                    if let Some(next) = (*cur).next {
+                        cur = next.as_ptr();
                     } else if let Some(children) = (*(*cur).parent)
                         .children
                         .filter(|_| matches!((*cur).typ, XmlElementType::XmlAttributeNode))
@@ -5313,8 +5306,8 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
             if cur == attr as _ {
                 break;
             }
-            if !(*cur).next.is_null() {
-                cur = (*cur).next;
+            if let Some(next) = (*cur).next {
+                cur = next.as_ptr();
             } else {
                 cur = (*cur).parent;
                 // goto next_sibling;
@@ -5567,8 +5560,8 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
                                     if node.is_null() {
                                         break;
                                     }
-                                    if !(*node).next.is_null() {
-                                        node = (*node).next;
+                                    if let Some(next) = (*node).next {
+                                        node = next.as_ptr();
                                     } else {
                                         node = (*node).parent;
                                         // goto next_sibling;
@@ -5636,8 +5629,8 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
                     if node.is_null() {
                         break;
                     }
-                    if !(*node).next.is_null() {
-                        node = (*node).next;
+                    if let Some(next) = (*node).next {
+                        node = next.as_ptr();
                     } else {
                         node = (*node).parent;
                         // goto next_sibling;
@@ -5664,8 +5657,8 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
             if node.is_null() {
                 break;
             }
-            if !(*node).next.is_null() {
-                node = (*node).next;
+            if let Some(next) = (*node).next {
+                node = next.as_ptr();
             } else {
                 node = (*node).parent;
                 // goto next_sibling;
@@ -5885,7 +5878,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         if !result_clone.is_null() {
                             (*clone).parent = parent_clone;
                             if !prev_clone.is_null() {
-                                (*prev_clone).next = clone;
+                                (*prev_clone).next = NodePtr::from_ptr(clone);
                                 (*clone).prev = prev_clone;
                             } else {
                                 (*parent_clone).children = NodePtr::from_ptr(clone);
@@ -5914,7 +5907,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         if !result_clone.is_null() {
                             (*clone).parent = parent_clone;
                             if !prev_clone.is_null() {
-                                (*prev_clone).next = clone;
+                                (*prev_clone).next = NodePtr::from_ptr(clone);
                                 (*clone).prev = prev_clone;
                             } else {
                                 (*parent_clone).properties = clone as _;
@@ -6302,9 +6295,9 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         }
                         depth -= 1;
                     }
-                    if !(*cur).next.is_null() {
+                    if let Some(next) = (*cur).next {
                         prev_clone = clone;
-                        cur = (*cur).next;
+                        cur = next.as_ptr();
                     } else if !matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
                         /*
                          * Set (*clone).last.

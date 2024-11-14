@@ -873,6 +873,8 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
  */
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: XmlNodePtr) -> i32 {
+    use crate::tree::NodePtr;
+
     let mut depth1: i32;
     let mut depth2: i32;
     let mut attr1: i32 = 0;
@@ -929,7 +931,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     if node1 == (*node2).prev {
         return 1;
     }
-    if node1 == (*node2).next {
+    if NodePtr::from_ptr(node1) == (*node2).next {
         return -1;
     }
 
@@ -1006,7 +1008,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     if node1 == (*node2).prev {
         return 1;
     }
-    if node1 == (*node2).next {
+    if NodePtr::from_ptr(node1) == (*node2).next {
         return -1;
     }
     /*
@@ -1028,12 +1030,12 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
         }
     }
 
-    cur = (*node1).next;
-    while !cur.is_null() {
-        if cur == node2 {
+    let mut cur = (*node1).next;
+    while let Some(now) = cur {
+        if now.as_ptr() == node2 {
             return 1;
         }
-        cur = (*cur).next;
+        cur = now.next;
     }
     -1 /* assume there is no sibling list corruption */
 }
@@ -1867,8 +1869,8 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
                 continue;
             }
         }
-        if !(*cur).next.is_null() {
-            cur = (*cur).next;
+        if let Some(next) = (*cur).next {
+            cur = next.as_ptr();
             continue;
         }
         loop {
@@ -1880,8 +1882,8 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
                 cur = null_mut();
                 break;
             }
-            if !(*cur).next.is_null() {
-                cur = (*cur).next;
+            if let Some(next) = (*cur).next {
+                cur = next.as_ptr();
                 break;
             }
 

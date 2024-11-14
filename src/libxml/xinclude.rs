@@ -326,7 +326,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
                         nb_fallback += 1;
                     }
                 }
-                child = (*child).next;
+                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if nb_fallback > 1 {
                 xml_xinclude_err(
@@ -1127,14 +1127,14 @@ unsafe extern "C" fn xml_xinclude_copy_node(
                 result = copy;
             }
             if !insert_last.is_null() {
-                (*insert_last).next = copy;
+                (*insert_last).next = NodePtr::from_ptr(copy);
                 (*copy).prev = insert_last;
             } else if !insert_parent.is_null() {
                 (*insert_parent).children = NodePtr::from_ptr(copy);
             }
             insert_last = copy;
-            while !(*insert_last).next.is_null() {
-                insert_last = (*insert_last).next;
+            while let Some(next) = (*insert_last).next {
+                insert_last = next.as_ptr();
             }
         }
 
@@ -1149,7 +1149,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
             return result;
         }
 
-        while (*cur).next.is_null() {
+        while (*cur).next.is_none() {
             if !insert_parent.is_null() {
                 (*insert_parent).last = insert_last;
             }
@@ -1161,7 +1161,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
             insert_parent = (*insert_parent).parent;
         }
 
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
     // error:
@@ -1517,11 +1517,11 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                 if last.is_null() {
                     list = copy;
                 } else {
-                    while !(*last).next.is_null() {
-                        last = (*last).next;
+                    while let Some(next) = (*last).next {
+                        last = next.as_ptr();
                     }
                     (*copy).prev = last;
-                    (*last).next = copy;
+                    (*last).next = NodePtr::from_ptr(copy);
                 }
                 last = copy;
             }
@@ -2011,7 +2011,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                             xml_free(cur_base as _);
                         }
                     }
-                    node = (*node).next;
+                    node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
                 }
                 xml_free(base as _);
             }
@@ -2503,7 +2503,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
                 ret = xml_xinclude_load_fallback(ctxt, children, refe);
                 break;
             }
-            children = (*children).next;
+            children = (*children).next.map_or(null_mut(), |n| n.as_ptr());
         }
     }
     if ret < 0 {
@@ -2644,7 +2644,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
             if (*tmp).typ == XmlElementType::XmlElementNode {
                 nb_elem += 1;
             }
-            tmp = (*tmp).next;
+            tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
         }
         if nb_elem > 1 {
             xml_xinclude_err(
@@ -2665,7 +2665,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
          */
         while !list.is_null() {
             end = list;
-            list = (*list).next;
+            list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
 
             (*cur).add_prev_sibling(end);
         }
@@ -2686,7 +2686,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
             let next = now.next;
             now.unlink();
             xml_free_node(now.as_ptr());
-            child = NodePtr::from_ptr(next);
+            child = next;
         }
         end = xml_new_doc_node((*cur).doc, (*cur).ns, (*cur).name, null_mut());
         if end.is_null() {
@@ -2708,7 +2708,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
          */
         while !list.is_null() {
             cur = list;
-            list = (*list).next;
+            list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
 
             (*end).add_prev_sibling(cur);
         }
@@ -2768,8 +2768,8 @@ unsafe extern "C" fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: Xml
                 if cur == tree {
                     break 'b;
                 }
-                if !(*cur).next.is_null() {
-                    cur = (*cur).next;
+                if let Some(next) = (*cur).next {
+                    cur = next.as_ptr();
                     break 'b;
                 }
                 cur = (*cur).parent;

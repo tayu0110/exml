@@ -64,8 +64,8 @@ use crate::{
     },
     private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     tree::{
-        xml_buf_content, xml_build_qname, XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlElementType,
-        XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_buf_content, xml_build_qname, NodePtr, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
+        XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
 };
@@ -1219,7 +1219,7 @@ unsafe extern "C" fn xml_xpath_debug_dump_node_list(
 
     while !cur.is_null() {
         tmp = cur;
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         xml_debug_dump_one_node(output, tmp, depth);
     }
 }
@@ -3528,7 +3528,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_ns(
                 (*(*(*cur).node_tab.add(i as usize))).typ,
                 XmlElementType::XmlNamespaceDecl
             )
-            && std::ptr::eq((*(*(*cur).node_tab.add(i as usize))).next, node)
+            && (*(*(*cur).node_tab.add(i as usize))).next == NodePtr::from_ptr(node)
             && xml_str_equal(
                 (*ns).prefix as _,
                 (*((*(*cur).node_tab.add(i as usize)) as XmlNsPtr)).prefix,
@@ -3822,7 +3822,7 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
     if node1 == (*node2).prev {
         return 1;
     }
-    if node1 == (*node2).next {
+    if NodePtr::from_ptr(node1) == (*node2).next {
         return -1;
     }
     /*
@@ -3878,7 +3878,7 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
     if node1 == (*node2).prev {
         return 1;
     }
-    if node1 == (*node2).next {
+    if NodePtr::from_ptr(node1) == (*node2).next {
         return -1;
     }
     /*
@@ -3900,12 +3900,12 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
         }
     }
 
-    cur = (*node1).next;
-    while !cur.is_null() {
-        if cur == node2 {
+    let mut cur = (*node1).next;
+    while let Some(now) = cur {
+        if Some(now) == NodePtr::from_ptr(node2) {
             return 1;
         }
-        cur = (*cur).next;
+        cur = now.next;
     }
     -1 /* assume there is no sibling list corruption */
 }
@@ -6373,8 +6373,8 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                             if (*cur).children.is_none() || depth >= max_depth {
                                 // ret =
                                 xml_stream_pop(patstream);
-                                while !(*cur).next.is_null() {
-                                    cur = (*cur).next;
+                                while let Some(next) = (*cur).next {
+                                    cur = next.as_ptr();
                                     if !matches!(
                                         (*cur).typ,
                                         XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
@@ -6414,8 +6414,8 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                     break 'main;
                 }
 
-                while !(*cur).next.is_null() {
-                    cur = (*cur).next;
+                while let Some(next) = (*cur).next {
+                    cur = next.as_ptr();
                     if !matches!(
                         (*cur).typ,
                         XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
@@ -6451,8 +6451,8 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                     // ret =
                     xml_stream_pop(patstream);
                 };
-                if !(*cur).next.is_null() {
-                    cur = (*cur).next;
+                if let Some(next) = (*cur).next {
+                    cur = next.as_ptr();
                     break 'inner;
                 }
                 !cur.is_null()
@@ -6770,7 +6770,7 @@ unsafe extern "C" fn xml_xpath_next_child_element(
                         return cur;
                     }
                     while {
-                        cur = (*cur).next;
+                        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                         !cur.is_null() && !matches!((*cur).typ, XmlElementType::XmlElementNode)
                     } {}
                     return cur;
@@ -6802,13 +6802,13 @@ unsafe extern "C" fn xml_xpath_next_child_element(
             return null_mut();
         }
     }
-    if !(*cur).next.is_null() {
-        if matches!((*(*cur).next).typ, XmlElementType::XmlElementNode) {
-            return (*cur).next;
+    if let Some(next) = (*cur).next {
+        if matches!(next.typ, XmlElementType::XmlElementNode) {
+            return next.as_ptr();
         }
-        cur = (*cur).next;
+        cur = next.as_ptr();
         while {
-            cur = (*cur).next;
+            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             !cur.is_null() && !matches!((*cur).typ, XmlElementType::XmlElementNode)
         } {}
         return cur;
@@ -10390,8 +10390,8 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
             break;
         }
 
-        if !(*tmp).next.is_null() {
-            tmp = (*tmp).next;
+        if let Some(next) = (*tmp).next {
+            tmp = next.as_ptr();
             continue;
         }
 
@@ -10404,8 +10404,8 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
                 tmp = null_mut();
                 break;
             }
-            if !(*tmp).next.is_null() {
-                tmp = (*tmp).next;
+            if let Some(next) = (*tmp).next {
+                tmp = next.as_ptr();
                 break;
             }
 
@@ -11788,7 +11788,7 @@ pub unsafe extern "C" fn xml_xpath_next_child(
     ) {
         return null_mut();
     }
-    (*cur).next
+    (*cur).next.map_or(null_mut(), |n| n.as_ptr())
 }
 
 /**
@@ -11846,8 +11846,8 @@ pub unsafe extern "C" fn xml_xpath_next_descendant(
         return null_mut();
     }
 
-    while !(*cur).next.is_null() {
-        cur = (*cur).next;
+    while let Some(next) = (*cur).next {
+        cur = next.as_ptr();
         if !matches!(
             (*cur).typ,
             XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
@@ -11864,8 +11864,8 @@ pub unsafe extern "C" fn xml_xpath_next_descendant(
         if cur == (*(*ctxt).context).node {
             return null_mut();
         }
-        if !(*cur).next.is_null() {
-            cur = (*cur).next;
+        if let Some(next) = (*cur).next {
+            cur = next.as_ptr();
             return cur;
         }
         if cur.is_null() {
@@ -12050,9 +12050,11 @@ pub unsafe extern "C" fn xml_xpath_next_following_sibling(
         return null_mut();
     }
     if cur.is_null() {
-        return (*(*(*ctxt).context).node).next;
+        return (*(*(*ctxt).context).node)
+            .next
+            .map_or(null_mut(), |n| n.as_ptr());
     }
-    (*cur).next
+    (*cur).next.map_or(null_mut(), |n| n.as_ptr())
 }
 
 /**
@@ -12102,8 +12104,8 @@ pub unsafe extern "C" fn xml_xpath_next_following(
     if cur.is_null() {
         return null_mut(); /* ERROR */
     }
-    if !(*cur).next.is_null() {
-        return (*cur).next;
+    if let Some(next) = (*cur).next {
+        return next.as_ptr();
     }
     loop {
         cur = (*cur).parent;
@@ -12113,8 +12115,8 @@ pub unsafe extern "C" fn xml_xpath_next_following(
         if cur == (*(*ctxt).context).doc as XmlNodePtr {
             return null_mut();
         }
-        if !(*cur).next.is_null() {
-            return (*cur).next;
+        if let Some(next) = (*cur).next {
+            return next.as_ptr();
         }
         if cur.is_null() {
             break;
@@ -12227,7 +12229,7 @@ pub unsafe extern "C" fn xml_xpath_next_attribute(
         }
         return (*(*(*ctxt).context).node).properties as XmlNodePtr;
     }
-    (*cur).next as XmlNodePtr
+    (*cur).next.map_or(null_mut(), |n| n.as_ptr())
 }
 
 /*

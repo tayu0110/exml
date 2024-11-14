@@ -482,40 +482,38 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 c"Node has no prev and not first of parent list\n".as_ptr(),
             );
         }
-    } else if (*(*node).prev).next != node {
+    } else if (*(*node).prev).next != NodePtr::from_ptr(node) {
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckWrongPrev,
             c"Node prev->next : back link wrong\n".as_ptr(),
         );
     }
-    if (*node).next.is_null() {
-        if !(*node).parent.is_null()
-            && (*node).typ != XmlElementType::XmlAttributeNode
-            && (*(*node).parent).last != node
-            && (*(*node).parent).typ == XmlElementType::XmlElementNode
-        {
-            xml_debug_err(
-                ctxt,
-                XmlParserErrors::XmlCheckNoNext,
-                c"Node has no next and not last of parent list\n".as_ptr(),
-            );
-        }
-    } else {
-        if (*(*node).next).prev != node {
+    if let Some(next) = (*node).next {
+        if next.prev != node {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongNext,
                 c"Node next->prev : forward link wrong\n".as_ptr(),
             );
         }
-        if (*(*node).next).parent != (*node).parent {
+        if next.parent != (*node).parent {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongParent,
                 c"Node next->prev : forward link wrong\n".as_ptr(),
             );
         }
+    } else if !(*node).parent.is_null()
+        && (*node).typ != XmlElementType::XmlAttributeNode
+        && (*(*node).parent).last != node
+        && (*(*node).parent).typ == XmlElementType::XmlElementNode
+    {
+        xml_debug_err(
+            ctxt,
+            XmlParserErrors::XmlCheckNoNext,
+            c"Node has no next and not last of parent list\n".as_ptr(),
+        );
     }
     if (*node).typ == XmlElementType::XmlElementNode {
         let mut ns: XmlNsPtr;
@@ -1357,7 +1355,7 @@ unsafe extern "C" fn xml_ctxt_dump_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
 unsafe extern "C" fn xml_ctxt_dump_node_list(ctxt: XmlDebugCtxtPtr, mut node: XmlNodePtr) {
     while !node.is_null() {
         xml_ctxt_dump_node(ctxt, node);
-        node = (*node).next;
+        node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
     }
 }
 
@@ -2137,7 +2135,7 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
         _ => unreachable!(),
     }
     while !list.is_null() {
-        list = (*list).next;
+        list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
         ret += 1;
     }
     ret
@@ -2417,7 +2415,7 @@ pub unsafe extern "C" fn xml_shell_list(
     }
     while !cur.is_null() {
         xml_ls_one_node((*ctxt).output, cur);
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     0
 }
@@ -2891,9 +2889,9 @@ pub unsafe extern "C" fn xml_shell_du(
             // deep first
             node = children.as_ptr();
             indent += 1;
-        } else if node != tree && !(*node).next.is_null() {
+        } else if let Some(next) = (*node).next.filter(|_| node != tree) {
             // then siblings
-            node = (*node).next;
+            node = next.as_ptr();
         } else if node != tree {
             // go up to parents->next if needed
             while node != tree {
@@ -2901,8 +2899,8 @@ pub unsafe extern "C" fn xml_shell_du(
                     node = (*node).parent;
                     indent -= 1;
                 }
-                if node != tree && !(*node).next.is_null() {
-                    node = (*node).next;
+                if let Some(next) = (*node).next.filter(|_| node != tree) {
+                    node = next.as_ptr();
                     break;
                 }
                 if (*node).parent.is_null() {
@@ -3104,17 +3102,17 @@ unsafe extern "C" fn xml_shell_grep(
         {
             // deep first
             node = children.as_ptr();
-        } else if !(*node).next.is_null() {
+        } else if let Some(next) = (*node).next {
             // then siblings
-            node = (*node).next;
+            node = next.as_ptr();
         } else {
             // go up to parents->next if needed
             while !node.is_null() {
                 if !(*node).parent.is_null() {
                     node = (*node).parent;
                 }
-                if !(*node).next.is_null() {
-                    node = (*node).next;
+                if let Some(next) = (*node).next {
+                    node = next.as_ptr();
                     break;
                 }
                 if (*node).parent.is_null() {

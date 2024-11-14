@@ -1593,7 +1593,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node_list(
         {
             xml_parse_xml_catalog_node(cur, prefer, parent, cgroup);
         }
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     /* TODO: sort the list according to REWRITE lengths and prefer value */
 }

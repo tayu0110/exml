@@ -1913,10 +1913,10 @@ unsafe fn xml_sax2_attribute_internal(
         tmp = (*ret).children;
         while !tmp.is_null() {
             (*tmp).parent = ret as XmlNodePtr;
-            if (*tmp).next.is_null() {
+            if (*tmp).next.is_none() {
                 (*ret).last = tmp;
             }
-            tmp = (*tmp).next;
+            tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
         }
     } else if !value.is_null() {
         (*ret).children = xml_new_doc_text((*ctxt).my_doc, value);
@@ -1995,7 +1995,7 @@ unsafe fn xml_sax2_attribute_internal(
                /* Don't create IDs containing entity references */
                !(*ret).children.is_null() &&
                matches!((*(*ret).children).typ, XmlElementType::XmlTextNode) &&
-               (*(*ret).children).next.is_null()
+               (*(*ret).children).next.is_none()
     {
         let content: *mut XmlChar = (*(*ret).children).content;
         /*
@@ -2622,7 +2622,7 @@ pub unsafe fn xml_sax2_start_element_ns(
      */
     if !(*ctxt).free_elems.is_null() {
         ret = (*ctxt).free_elems;
-        (*ctxt).free_elems = (*ret).next;
+        (*ctxt).free_elems = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
         (*ctxt).free_elems_nr -= 1;
         memset(ret as _, 0, size_of::<XmlNode>());
         (*ret).doc = (*ctxt).my_doc;
@@ -2879,7 +2879,7 @@ unsafe extern "C" fn xml_sax2_text_node(
      */
     let ret: XmlNodePtr = if !(*ctxt).free_elems.is_null() {
         let ret = (*ctxt).free_elems;
-        (*ctxt).free_elems = (*ret).next;
+        (*ctxt).free_elems = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
         (*ctxt).free_elems_nr -= 1;
         ret
     } else {
@@ -3120,10 +3120,10 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             while !tmp.is_null() {
                 (*tmp).doc = (*ret).doc;
                 (*tmp).parent = ret as XmlNodePtr;
-                if (*tmp).next.is_null() {
+                if (*tmp).next.is_none() {
                     (*ret).last = tmp;
                 }
-                tmp = (*tmp).next;
+                tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
             }
         }
     } else if !value.is_null() {
@@ -3245,7 +3245,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                /* Don't create IDs containing entity references */
                !(*ret).children.is_null() &&
                matches!((*(*ret).children).typ, XmlElementType::XmlTextNode) &&
-               (*(*ret).children).next.is_null()
+               (*(*ret).children).next.is_none()
     {
         let content: *mut XmlChar = (*(*ret).children).content;
         /*

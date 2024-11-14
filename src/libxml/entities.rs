@@ -35,8 +35,8 @@ use crate::{
         },
     },
     tree::{
-        xml_free_node_list, NodeCommon, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType,
-        XmlNode, XmlNodePtr,
+        xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
+        XmlElementType, XmlNode, XmlNodePtr,
     },
 };
 
@@ -133,11 +133,12 @@ impl NodeCommon for XmlEntity {
     fn set_last(&mut self, last: *mut XmlNode) {
         self.last.store(last, Ordering::Relaxed);
     }
-    fn next(&self) -> *mut XmlNode {
-        self.next.load(Ordering::Relaxed)
+    fn next(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.next.load(Ordering::Relaxed))
     }
-    fn set_next(&mut self, next: *mut XmlNode) {
-        self.next.store(next, Ordering::Relaxed);
+    fn set_next(&mut self, next: Option<NodePtr>) {
+        self.next
+            .store(next.map_or(null_mut(), |n| n.as_ptr()), Ordering::Relaxed);
     }
     fn prev(&self) -> *mut XmlNode {
         self.prev.load(Ordering::Relaxed)
@@ -539,7 +540,7 @@ pub unsafe extern "C" fn xml_add_doc_entity(
         (*dtd).children = ret as XmlNodePtr;
         (*dtd).last = ret as XmlNodePtr;
     } else {
-        (*(*dtd).last).next = ret as XmlNodePtr;
+        (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
         (*ret).prev.store((*dtd).last, Ordering::Relaxed);
         (*dtd).last = ret as XmlNodePtr;
     }
@@ -596,7 +597,7 @@ pub unsafe extern "C" fn xml_add_dtd_entity(
         (*dtd).children = ret as XmlNodePtr;
         (*dtd).last = ret as XmlNodePtr;
     } else {
-        (*(*dtd).last).next = ret as XmlNodePtr;
+        (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
         (*ret).prev = (*dtd).last.into();
         (*dtd).last = ret as XmlNodePtr;
     }

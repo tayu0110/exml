@@ -1275,7 +1275,7 @@ unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: i32) -> Xml
             }
         }
 
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     cur
 }

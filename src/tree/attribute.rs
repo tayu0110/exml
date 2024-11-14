@@ -11,9 +11,9 @@ use crate::{
 };
 
 use super::{
-    xml_free_prop, xml_new_prop_internal, xml_tree_err_memory, NodeCommon, XmlAttributePtr,
-    XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
-    __XML_REGISTER_CALLBACKS,
+    xml_free_prop, xml_new_prop_internal, xml_tree_err_memory, NodeCommon, NodePtr,
+    XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr,
+    XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 /// An attribute on an XML node.
@@ -76,7 +76,7 @@ impl XmlAttr {
              *   TODO: Do we really always want that?
              */
             if !self.children.is_null() {
-                if (*self.children).next.is_null()
+                if (*self.children).next.is_none()
                     && matches!(
                         (*self.children).typ,
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
@@ -123,11 +123,11 @@ impl NodeCommon for XmlAttr {
     fn set_last(&mut self, last: *mut XmlNode) {
         self.last = last;
     }
-    fn next(&self) -> *mut XmlNode {
-        self.next as *mut XmlNode
+    fn next(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.next as *mut XmlNode)
     }
-    fn set_next(&mut self, next: *mut XmlNode) {
-        self.next = next as *mut XmlAttr;
+    fn set_next(&mut self, next: Option<NodePtr>) {
+        self.next = next.map_or(null_mut(), |n| n.as_ptr()) as *mut XmlAttr;
     }
     fn prev(&self) -> *mut XmlNode {
         self.prev as *mut XmlNode
@@ -188,10 +188,10 @@ pub unsafe extern "C" fn xml_new_doc_prop(
         let mut tmp = (*cur).children;
         while !tmp.is_null() {
             (*tmp).parent = cur as _;
-            if (*tmp).next.is_null() {
+            if (*tmp).next.is_none() {
                 (*cur).last = tmp;
             }
-            tmp = (*tmp).next;
+            tmp = (*tmp).next.map_or(null_mut(), |c| c.as_ptr());
         }
     }
 

@@ -4410,7 +4410,7 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
                 tmp = (*ret).children;
                 while !tmp.is_null() {
                     (*tmp).doc = null_mut();
-                    tmp = (*tmp).next;
+                    tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
                 }
             }
         } else {
@@ -4548,7 +4548,7 @@ pub unsafe fn xml_io_parse_dtd(
                 tmp = (*ret).children;
                 while !tmp.is_null() {
                     (*tmp).doc = null_mut();
-                    tmp = (*tmp).next;
+                    tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
                 }
             }
         } else {
@@ -4831,8 +4831,7 @@ pub unsafe fn xml_parse_in_node_context(
      * the pseudo sibling.
      */
 
-    cur = (*fake).next;
-    (*fake).next = null_mut();
+    cur = (*fake).next.take().map_or(null_mut(), |n| n.as_ptr());
     (*node).last = fake;
 
     if !cur.is_null() {
@@ -4843,7 +4842,7 @@ pub unsafe fn xml_parse_in_node_context(
 
     while !cur.is_null() {
         (*cur).parent = null_mut();
-        cur = (*cur).next;
+        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
     (*fake).unlink();
@@ -5022,7 +5021,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         while !cur.is_null() {
             (*cur).set_doc(doc);
             (*cur).parent = null_mut();
-            cur = (*cur).next;
+            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
         (*(*new_doc).children).children = None;
     }
@@ -5246,7 +5245,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             *list = cur;
             while !cur.is_null() {
                 (*cur).parent = null_mut();
-                cur = (*cur).next;
+                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             }
             (*(*new_doc).children).children = None;
         }
@@ -5683,12 +5682,9 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         xml_hash_free((*ctxt).atts_special, None);
     }
     if !(*ctxt).free_elems.is_null() {
-        let mut cur: XmlNodePtr;
-        let mut next: XmlNodePtr;
-
-        cur = (*ctxt).free_elems;
+        let mut cur = (*ctxt).free_elems;
         while !cur.is_null() {
-            next = (*cur).next;
+            let next = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             xml_free(cur as _);
             cur = next;
         }

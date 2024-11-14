@@ -4429,7 +4429,7 @@ pub unsafe extern "C" fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr)
         if html_auto_close_tag(doc, (*elem).name, child) != 0 {
             return 1;
         }
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
     0
 }
@@ -5512,7 +5512,7 @@ pub unsafe extern "C" fn html_auto_close_tag(
         if html_auto_close_tag(_doc, name, child) != 0 {
             return 1;
         }
-        child = (*child).next;
+        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
     }
     0
 }
