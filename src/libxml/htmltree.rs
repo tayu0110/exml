@@ -350,7 +350,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                     break;
                 }
                 if xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0 {
-                    head = (*cur).parent;
+                    head = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
                     // goto found_meta;
                     found_meta = true;
                 }
@@ -1189,7 +1189,7 @@ pub unsafe fn html_node_dump_format_output(
     }
 
     let root: XmlNodePtr = cur;
-    parent = (*cur).parent;
+    parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     'main: loop {
         match (*cur).typ {
             XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
@@ -1198,7 +1198,7 @@ pub unsafe fn html_node_dump_format_output(
                 }
                 if let Some(children) = (*cur).children {
                     /* Always validate (*cur).parent when descending. */
-                    if (*cur).parent == parent {
+                    if (*cur).parent == NodePtr::from_ptr(parent) {
                         parent = cur;
                         cur = children.as_ptr();
                         continue;
@@ -1214,7 +1214,7 @@ pub unsafe fn html_node_dump_format_output(
                  * tree structure. Fall back to a recursive call to handle this
                  * case.
                  */
-                if (*cur).parent != parent && (*cur).children.is_some() {
+                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children.is_some() {
                     html_node_dump_format_output(buf, doc, cur, _encoding, format);
                     break 'to_break;
                 }
@@ -1388,7 +1388,7 @@ pub unsafe fn html_node_dump_format_output(
 
             cur = parent;
             /* (*cur).parent was validated when descending. */
-            parent = (*cur).parent;
+            parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
             if matches!(
                 (*cur).typ,

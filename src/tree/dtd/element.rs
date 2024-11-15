@@ -68,10 +68,10 @@ impl NodeCommon for XmlElement {
     fn set_prev(&mut self, prev: *mut XmlNode) {
         self.prev = prev;
     }
-    fn parent(&self) -> *mut XmlNode {
-        self.parent as *mut XmlNode
+    fn parent(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.parent as *mut XmlNode)
     }
-    fn set_parent(&mut self, parent: *mut XmlNode) {
-        self.parent = parent as *mut XmlDtd;
+    fn set_parent(&mut self, parent: Option<NodePtr>) {
+        self.parent = parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDtd;
     }
 }

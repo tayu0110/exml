@@ -40,8 +40,8 @@ pub trait NodeCommon {
     fn set_children(&mut self, children: *mut XmlNode);
     fn last(&self) -> *mut XmlNode;
     fn set_last(&mut self, last: *mut XmlNode);
-    fn parent(&self) -> *mut XmlNode;
-    fn set_parent(&mut self, parent: *mut XmlNode);
+    fn parent(&self) -> Option<NodePtr>;
+    fn set_parent(&mut self, parent: Option<NodePtr>);
     fn next(&self) -> Option<NodePtr>;
     fn set_next(&mut self, next: Option<NodePtr>);
     fn prev(&self) -> *mut XmlNode;
@@ -101,8 +101,8 @@ pub trait NodeCommon {
         /*
          * add the new element at the end of the children list.
          */
-        prev = (*cur).parent;
-        (*cur).parent = self as *mut Self as *mut XmlNode;
+        prev = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+        (*cur).parent = NodePtr::from_ptr(self as *mut Self as *mut XmlNode);
         if (*cur).doc != self.document() {
             (*cur).set_doc(self.document());
         }
@@ -251,21 +251,20 @@ pub trait NodeCommon {
                 }
             }
         }
-        if !self.parent().is_null() {
-            let parent = self.parent();
+        if let Some(mut parent) = self.parent() {
             if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
-                if (*parent).properties == self as *mut Self as *mut XmlAttr {
-                    (*parent).properties = (*(self as *mut Self as *mut XmlAttr)).next;
+                if parent.properties == self as *mut Self as *mut XmlAttr {
+                    parent.properties = (*(self as *mut Self as *mut XmlAttr)).next;
                 }
             } else {
-                if (*parent).children == NodePtr::from_ptr(self as *mut Self as *mut XmlNode) {
-                    (*parent).children = self.next();
+                if parent.children == NodePtr::from_ptr(self as *mut Self as *mut XmlNode) {
+                    parent.children = self.next();
                 }
-                if (*parent).last == self as *mut Self as *mut XmlNode {
-                    (*parent).last = self.prev();
+                if parent.last == self as *mut Self as *mut XmlNode {
+                    parent.last = self.prev();
                 }
             }
-            self.set_parent(null_mut());
+            self.set_parent(None);
         }
         if let Some(mut next) = self.next() {
             next.prev = self.prev();
@@ -282,15 +281,15 @@ pub trait NodeCommon {
 pub type XmlNodePtr = *mut XmlNode;
 #[repr(C)]
 pub struct XmlNode {
-    pub _private: *mut c_void,       /* application data */
-    pub typ: XmlElementType,         /* type number, must be second ! */
-    pub name: *const XmlChar,        /* the name of the node, or the entity */
-    pub children: Option<NodePtr>,   /* parent->childs link */
-    pub last: *mut XmlNode,          /* last child link */
-    pub(crate) parent: *mut XmlNode, /* child->parent link */
-    pub next: Option<NodePtr>,       /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,   /* previous sibling link  */
-    pub doc: *mut XmlDoc,            /* the containing document */
+    pub _private: *mut c_void,          /* application data */
+    pub typ: XmlElementType,            /* type number, must be second ! */
+    pub name: *const XmlChar,           /* the name of the node, or the entity */
+    pub children: Option<NodePtr>,      /* parent->childs link */
+    pub last: *mut XmlNode,             /* last child link */
+    pub(crate) parent: Option<NodePtr>, /* child->parent link */
+    pub next: Option<NodePtr>,          /* next sibling link  */
+    pub(crate) prev: *mut XmlNode,      /* previous sibling link  */
+    pub doc: *mut XmlDoc,               /* the containing document */
 
     /* End of common part */
     pub(crate) ns: *mut XmlNs, /* pointer to the associated namespace */
@@ -378,10 +377,11 @@ impl XmlNode {
             )
         {
             result = (*self.prev).get_line_no_internal(depth + 1);
-        } else if !self.parent.is_null()
-            && matches!((*self.parent).typ, XmlElementType::XmlElementNode)
+        } else if let Some(parent) = self
+            .parent
+            .filter(|p| matches!(p.typ, XmlElementType::XmlElementNode))
         {
-            result = (*self.parent).get_line_no_internal(depth + 1);
+            result = parent.get_line_no_internal(depth + 1);
         }
 
         result
@@ -484,7 +484,7 @@ impl XmlNode {
                         name = c"*".as_ptr() as _;
                     }
                 }
-                next = (*cur).parent;
+                next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
                 /*
                  * Thumbler index computation
@@ -534,7 +534,7 @@ impl XmlNode {
             } else if matches!((*cur).typ, XmlElementType::XmlCommentNode) {
                 sep = c"/".as_ptr() as _;
                 name = c"comment()".as_ptr() as _;
-                next = (*cur).parent;
+                next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
                 /*
                  * Thumbler index computation
@@ -566,7 +566,7 @@ impl XmlNode {
             ) {
                 sep = c"/".as_ptr() as _;
                 name = c"text()".as_ptr() as _;
-                next = (*cur).parent;
+                next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
                 /*
                  * Thumbler index computation
@@ -611,7 +611,7 @@ impl XmlNode {
                 *nametemp.last_mut().unwrap() = 0;
                 name = nametemp.as_ptr() as _;
 
-                next = (*cur).parent;
+                next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
                 /*
                  * Thumbler index computation
@@ -803,7 +803,7 @@ impl XmlNode {
                     }
                 }
             }
-            cur = (*cur).parent;
+            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
         }
         if !doc.is_null() && (*doc).url.is_some() {
             let url = CString::new((*doc).url.as_deref().unwrap()).unwrap();
@@ -972,7 +972,7 @@ impl XmlNode {
                         }
 
                         'lp: while {
-                            tmp = (*tmp).parent;
+                            tmp = (*tmp).parent.map_or(null_mut(), |p| p.as_ptr());
                             if tmp.is_null() {
                                 break 'lp;
                             }
@@ -1336,7 +1336,7 @@ impl XmlNode {
                     *ret.add(nbns as usize) = null_mut();
                 }
             }
-            node = (*node).parent;
+            node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
         }
         ret
     }
@@ -1357,7 +1357,7 @@ impl XmlNode {
             if !lang.is_null() {
                 return lang;
             }
-            cur = (*cur).parent;
+            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
         }
         null_mut()
     }
@@ -1387,7 +1387,7 @@ impl XmlNode {
                 }
                 xml_free(space as _);
             }
-            cur = (*cur).parent;
+            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
         }
         -1
     }
@@ -1402,8 +1402,10 @@ impl XmlNode {
         let mut ret: *mut XmlChar = null_mut();
         let mut ent: XmlEntityPtr;
 
-        let attr = !self.parent.is_null()
-            && matches!((*self.parent).typ, XmlElementType::XmlAttributeNode);
+        let attr = self
+            .parent
+            .filter(|p| matches!(p.typ, XmlElementType::XmlAttributeNode))
+            .is_some();
 
         while !node.is_null() {
             if matches!(
@@ -1712,7 +1714,7 @@ impl XmlNode {
                 (*prop).last = null_mut();
                 let mut tmp = (*prop).children;
                 while !tmp.is_null() {
-                    (*tmp).parent = prop as _;
+                    (*tmp).parent = NodePtr::from_ptr(prop as *mut XmlNode);
                     if (*tmp).next.is_none() {
                         (*prop).last = tmp;
                     }
@@ -1954,10 +1956,10 @@ impl XmlNode {
                     .flatten();
                 if let Some(mut ulccur) = self.children {
                     while let Some(next) = ulccur.next {
-                        ulccur.parent = self;
+                        ulccur.parent = NodePtr::from_ptr(self as *mut XmlNode);
                         ulccur = next;
                     }
-                    ulccur.parent = self;
+                    ulccur.parent = NodePtr::from_ptr(self as *mut XmlNode);
                     self.last = ulccur.as_ptr();
                 } else {
                     self.last = null_mut();
@@ -2029,10 +2031,10 @@ impl XmlNode {
                     .flatten();
                 if let Some(mut ulccur) = self.children {
                     while let Some(next) = ulccur.next {
-                        ulccur.parent = self;
+                        ulccur.parent = NodePtr::from_ptr(self as *mut XmlNode);
                         ulccur = next;
                     }
-                    ulccur.parent = self;
+                    ulccur.parent = NodePtr::from_ptr(self as *mut XmlNode);
                     self.last = ulccur.as_ptr();
                 } else {
                     self.last = null_mut();
@@ -2249,13 +2251,13 @@ impl XmlNode {
         }
 
         // Constant time is we can rely on the -> parent -> last to find the last sibling.
-        if !matches!(self.typ, XmlElementType::XmlAttributeNode)
-            && !self.parent.is_null()
-            && (*self.parent).children.is_some()
-            && !(*self.parent).last.is_null()
-            && (*(*self.parent).last).next.is_none()
-        {
-            cur = (*(*cur).parent).last;
+        if let Some(parent) = self.parent.filter(|p| {
+            !matches!(self.typ, XmlElementType::XmlAttributeNode)
+                && p.children.is_some()
+                && !p.last.is_null()
+                && (*p.last).next.is_none()
+        }) {
+            cur = parent.last;
         } else {
             while let Some(next) = (*cur).next {
                 cur = next.as_ptr();
@@ -2278,13 +2280,13 @@ impl XmlNode {
         if (*elem).doc != (*cur).doc {
             (*elem).set_doc((*cur).doc);
         }
-        let parent: XmlNodePtr = (*cur).parent;
+        let parent = (*cur).parent;
         (*elem).prev = cur;
         (*elem).next = None;
         (*elem).parent = parent;
         (*cur).next = NodePtr::from_ptr(elem);
-        if !parent.is_null() {
-            (*parent).last = elem;
+        if let Some(mut parent) = parent {
+            parent.last = elem;
         }
 
         elem
@@ -2359,8 +2361,8 @@ impl XmlNode {
         if !(*elem).prev.is_null() {
             (*(*elem).prev).next = NodePtr::from_ptr(elem);
         }
-        if !(*elem).parent.is_null() && (*(*elem).parent).children == (*elem).next {
-            (*(*elem).parent).children = NodePtr::from_ptr(elem);
+        if let Some(mut parent) = (*elem).parent.filter(|p| p.children == (*elem).next) {
+            parent.children = NodePtr::from_ptr(elem);
         }
         elem
     }
@@ -2420,8 +2422,8 @@ impl XmlNode {
         if let Some(mut next) = (*elem).next {
             next.prev = elem;
         }
-        if !(*elem).parent.is_null() && (*(*elem).parent).last == self as *mut XmlNode {
-            (*(*elem).parent).last = elem;
+        if let Some(mut parent) = (*elem).parent.filter(|p| p.last == self as *mut XmlNode) {
+            parent.last = elem;
         }
         elem
     }
@@ -2475,13 +2477,13 @@ impl XmlNode {
             (*cur).prev = prev;
         }
         while let Some(next) = (*cur).next {
-            (*cur).parent = self;
+            (*cur).parent = NodePtr::from_ptr(self as *mut XmlNode);
             if (*cur).doc != self.doc {
                 (*cur).set_doc(self.doc);
             }
             cur = next.as_ptr();
         }
-        (*cur).parent = self;
+        (*cur).parent = NodePtr::from_ptr(self as *mut XmlNode);
         /* the parent may not be linked to a doc ! */
         if (*cur).doc != self.doc {
             (*cur).set_doc(self.doc);
@@ -2823,7 +2825,7 @@ impl XmlNode {
                     }
                 }
             }
-            node = (*node).parent;
+            node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
         }
         null_mut()
     }
@@ -2914,7 +2916,7 @@ impl XmlNode {
                     }
                 }
             }
-            node = (*node).parent;
+            node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
         }
         null_mut()
     }
@@ -3092,14 +3094,14 @@ impl XmlNode {
             } else if node != self {
                 // go up to parents->next if needed
                 while node != self {
-                    if !(*node).parent.is_null() {
-                        node = (*node).parent;
+                    if (*node).parent.is_some() {
+                        node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                     }
                     if let Some(next) = (*node).next.filter(|_| node != self) {
                         node = next.as_ptr();
                         break;
                     }
-                    if (*node).parent.is_null() {
+                    if (*node).parent.is_none() {
                         node = null_mut();
                         break;
                     }
@@ -3156,10 +3158,10 @@ impl NodeCommon for XmlNode {
     fn set_prev(&mut self, prev: *mut XmlNode) {
         self.prev = prev;
     }
-    fn parent(&self) -> *mut XmlNode {
+    fn parent(&self) -> Option<NodePtr> {
         self.parent
     }
-    fn set_parent(&mut self, parent: *mut XmlNode) {
+    fn set_parent(&mut self, parent: Option<NodePtr>) {
         self.parent = parent;
     }
 }
@@ -3251,7 +3253,7 @@ unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) 
 
     /* check if an attribute with the same name exists */
     let attr = if (*prop).ns.is_null() {
-        (*(*cur).parent).has_ns_prop(
+        (*cur).parent.expect("Internal Error").has_ns_prop(
             CStr::from_ptr((*prop).name as *const i8)
                 .to_string_lossy()
                 .as_ref(),
@@ -3259,7 +3261,7 @@ unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) 
         )
     } else {
         let href = (*(*prop).ns).href;
-        (*(*cur).parent).has_ns_prop(
+        (*cur).parent.expect("Internal Error").has_ns_prop(
             CStr::from_ptr((*prop).name as *const i8)
                 .to_string_lossy()
                 .as_ref(),
@@ -3284,8 +3286,8 @@ unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) 
         (*prop).next = NodePtr::from_ptr(cur);
         (*cur).prev = prop;
     }
-    if (*prop).prev.is_null() && !(*prop).parent.is_null() {
-        (*(*prop).parent).properties = prop as _;
+    if let Some(mut parent) = (*prop).parent.filter(|_| (*prop).prev.is_null()) {
+        parent.properties = prop as _;
     }
     if !attr.is_null() && ((*attr).typ != XmlElementType::XmlAttributeDecl) {
         /* different instance, destroy it (attributes must be unique) */

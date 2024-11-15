@@ -3760,11 +3760,16 @@ unsafe extern "C" fn xml_relaxng_load_include(
         } else if let Some(next) = (*cur).next {
             cur = next.as_ptr();
         } else {
-            while (*cur).parent != node && (*(*cur).parent).next.is_none() {
-                cur = (*cur).parent;
+            while (*cur).parent != NodePtr::from_ptr(node) && (*cur).parent.unwrap().next.is_none()
+            {
+                cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
             }
-            cur = if (*cur).parent != node {
-                (*(*cur).parent).next.map_or(null_mut(), |n| n.as_ptr())
+            cur = if (*cur).parent != NodePtr::from_ptr(node) {
+                (*cur)
+                    .parent
+                    .unwrap()
+                    .next
+                    .map_or(null_mut(), |n| n.as_ptr())
             } else {
                 null_mut()
             };
@@ -3803,18 +3808,18 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                 if (*cur).ns.is_null()
                     || !xml_str_equal((*(*cur).ns).href, XML_RELAXNG_NS.as_ptr() as _)
                 {
-                    if !(*cur).parent.is_null()
-                        && (*(*cur).parent).typ == XmlElementType::XmlElementNode
-                        && (xml_str_equal((*(*cur).parent).name, c"name".as_ptr() as _)
-                            || xml_str_equal((*(*cur).parent).name, c"value".as_ptr() as _)
-                            || xml_str_equal((*(*cur).parent).name, c"param".as_ptr() as _))
-                    {
+                    if let Some(parent) = (*cur).parent.filter(|p| {
+                        p.typ == XmlElementType::XmlElementNode
+                            && (xml_str_equal(p.name, c"name".as_ptr() as _)
+                                || xml_str_equal(p.name, c"value".as_ptr() as _)
+                                || xml_str_equal(p.name, c"param".as_ptr() as _))
+                    }) {
                         xml_rng_perr(
                             ctxt,
                             cur,
                             XmlParserErrors::XmlRngpForeignElement,
                             c"element %s doesn't allow foreign elements\n".as_ptr() as _,
-                            (*(*cur).parent).name,
+                            parent.name,
                             null_mut(),
                         );
                     }
@@ -3828,13 +3833,13 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
 
                         ns = (*cur).get_prop("ns");
                         if ns.is_null() {
-                            tmp = (*cur).parent;
+                            tmp = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
                             while !tmp.is_null() && (*tmp).typ == XmlElementType::XmlElementNode {
                                 ns = (*tmp).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
                                 }
-                                tmp = (*tmp).parent;
+                                tmp = (*tmp).parent.map_or(null_mut(), |p| p.as_ptr());
                             }
                         }
                         let href: *mut XmlChar = (*cur).get_prop("href");
@@ -3990,13 +3995,13 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         }
                         ns = (*cur).get_prop("ns");
                         if ns.is_null() {
-                            tmp = (*cur).parent;
+                            tmp = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
                             while !tmp.is_null() && (*tmp).typ == XmlElementType::XmlElementNode {
                                 ns = (*tmp).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
                                 }
-                                tmp = (*tmp).parent;
+                                tmp = (*tmp).parent.map_or(null_mut(), |p| p.as_ptr());
                             }
                         }
                         let incl: XmlRelaxNGIncludePtr =
@@ -4086,16 +4091,15 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                          * and attribute elements
                          */
                         if (*cur).has_prop("ns").is_null() {
-                            let mut node: XmlNodePtr;
                             let mut ns: *mut XmlChar = null_mut();
 
-                            node = (*cur).parent;
+                            let mut node = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
                             while !node.is_null() && (*node).typ == XmlElementType::XmlElementNode {
                                 ns = (*node).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
                                 }
-                                node = (*node).parent;
+                                node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                             }
                             if ns.is_null() {
                                 (*cur).set_prop("ns", Some(""));
@@ -4179,15 +4183,19 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         /*
                          * 4.16
                          */
-                        if !(*cur).parent.is_null()
-                            && xml_str_equal((*(*cur).parent).name, c"anyName".as_ptr() as _)
+                        if (*cur)
+                            .parent
+                            .filter(|p| xml_str_equal(p.name, c"anyName".as_ptr() as _))
+                            .is_some()
                         {
                             (*ctxt).flags |= XML_RELAXNG_IN_ANYEXCEPT;
                             xml_relaxng_cleanup_tree(ctxt, cur);
                             (*ctxt).flags = oldflags;
                             break 'skip_children;
-                        } else if !(*cur).parent.is_null()
-                            && xml_str_equal((*(*cur).parent).name, c"nsName".as_ptr() as _)
+                        } else if (*cur)
+                            .parent
+                            .filter(|p| xml_str_equal(p.name, c"nsName".as_ptr() as _))
+                            .is_some()
                         {
                             (*ctxt).flags |= XML_RELAXNG_IN_NSEXCEPT;
                             xml_relaxng_cleanup_tree(ctxt, cur);
@@ -4258,9 +4266,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                          * of (*cur).parent's list, since it's never going to be re-serialized
                          * (bug 143738).
                          */
-                        if !(*cur).ns_def.is_null() && !(*cur).parent.is_null() {
+                        if !(*cur).ns_def.is_null() && (*cur).parent.is_some() {
                             let mut par_def: XmlNsPtr =
-                                addr_of_mut!((*(*cur).parent).ns_def) as XmlNsPtr;
+                                addr_of_mut!((*cur).parent.unwrap().ns_def) as XmlNsPtr;
                             while !(*par_def).next.is_null() {
                                 par_def = (*par_def).next;
                             }
@@ -4280,11 +4288,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 if IS_BLANK_NODE!(cur) {
-                    if !(*cur).parent.is_null()
-                        && (*(*cur).parent).typ == XmlElementType::XmlElementNode
+                    if let Some(parent) = (*cur)
+                        .parent
+                        .filter(|p| p.typ == XmlElementType::XmlElementNode)
                     {
-                        if !xml_str_equal((*(*cur).parent).name, c"value".as_ptr() as _)
-                            && !xml_str_equal((*(*cur).parent).name, c"param".as_ptr() as _)
+                        if !xml_str_equal(parent.name, c"value".as_ptr() as _)
+                            && !xml_str_equal(parent.name, c"param".as_ptr() as _)
                         {
                             delete = cur;
                         }
@@ -4320,7 +4329,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
         }
 
         loop {
-            cur = (*cur).parent;
+            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
             if cur.is_null() {
                 break;
             }
@@ -4837,13 +4846,13 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
         val = (*node).get_content();
         xml_relaxng_norm_ext_space(val);
         if xml_validate_ncname(val, 0) != 0 {
-            if !(*node).parent.is_null() {
+            if let Some(parent) = (*node).parent {
                 xml_rng_perr(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpElementName,
                     c"Element %s name '%s' is not an NCName\n".as_ptr() as _,
-                    (*(*node).parent).name,
+                    parent.name,
                     val,
                 );
             } else {
@@ -5032,7 +5041,7 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
             return escape;
         }
     }
-    node = (*node).parent;
+    node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
     while !node.is_null() && (*node).typ == XmlElementType::XmlElementNode {
         ret = (*node).get_prop("datatypeLibrary");
         if !ret.is_null() {
@@ -5047,7 +5056,7 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
             xml_free(ret as _);
             return escape;
         }
-        node = (*node).parent;
+        node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
     }
     null_mut()
 }
@@ -5738,7 +5747,7 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
                     if !ns.is_null() {
                         break;
                     }
-                    tmp = (*tmp).parent;
+                    tmp = (*tmp).parent.map_or(null_mut(), |p| p.as_ptr());
                 }
                 if !ns.is_null() {
                     (*root).set_prop(
@@ -6756,8 +6765,8 @@ unsafe extern "C" fn xml_relaxng_combine_start(
     cur = starts;
     while !cur.is_null() {
         if (*cur).node.is_null()
-            || (*(*cur).node).parent.is_null()
-            || !xml_str_equal((*(*(*cur).node).parent).name, c"start".as_ptr() as _)
+            || (*(*cur).node).parent.is_none()
+            || !xml_str_equal((*(*cur).node).parent.unwrap().name, c"start".as_ptr() as _)
         {
             combine = null_mut();
             xml_rng_perr(
@@ -6769,7 +6778,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                 null_mut(),
             );
         } else {
-            combine = (*(*(*cur).node).parent).get_prop("combine");
+            combine = (*(*cur).node).parent.unwrap().get_prop("combine");
         }
 
         if !combine.is_null() {
@@ -10454,7 +10463,7 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
                         VALID_ERR2!(
                             ctxt,
                             XmlRelaxNGValidErr::XmlRelaxngErrTextwrong,
-                            (*(*cur).parent).name
+                            (*cur).parent.unwrap().name
                         );
                     }
                 }
@@ -11839,7 +11848,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrDataelem,
-                        (*(*node).parent).name
+                        (*node).parent.unwrap().name
                     );
                     ret = -1;
                     break;
@@ -11890,7 +11899,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrValelem,
-                        (*(*node).parent).name
+                        (*node).parent.unwrap().name
                     );
                     ret = -1;
                     break;
@@ -11945,7 +11954,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrListelem,
-                        (*(*node).parent).name
+                        (*node).parent.unwrap().name
                     );
                     ret = -1;
                     break;
@@ -12263,7 +12272,7 @@ unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
             continue;
         }
         loop {
-            cur = (*cur).parent;
+            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
             if cur.is_null() {
                 break;
             }
@@ -12693,7 +12702,8 @@ pub unsafe extern "C" fn xml_relaxng_validate_full_element(
     if ctxt.is_null() || (*ctxt).pdef.is_null() || elem.is_null() {
         return -1;
     }
-    let state: XmlRelaxNGValidStatePtr = xml_relaxng_new_valid_state(ctxt, (*elem).parent);
+    let state: XmlRelaxNGValidStatePtr =
+        xml_relaxng_new_valid_state(ctxt, (*elem).parent.map_or(null_mut(), |p| p.as_ptr()));
     if state.is_null() {
         return -1;
     }

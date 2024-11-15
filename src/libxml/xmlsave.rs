@@ -41,8 +41,9 @@ use crate::{
     },
     private::{buf::xml_buf_set_allocation_scheme, save::xml_buf_attr_serialize_txt_content},
     tree::{
-        is_xhtml, XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr,
-        XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr, XmlNsPtr, XML_LOCAL_NAMESPACE,
+        is_xhtml, NodePtr, XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme,
+        XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
+        XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -492,7 +493,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
 
     let root: XmlNodePtr = cur;
-    parent = (*cur).parent;
+    parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     loop {
         match (*cur).typ {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
@@ -503,7 +504,10 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
             }
             XmlElementType::XmlDocumentFragNode => {
                 /* Always validate (*cur).parent when descending. */
-                if let Some(children) = (*cur).children.filter(|_| (*cur).parent == parent) {
+                if let Some(children) = (*cur)
+                    .children
+                    .filter(|_| (*cur).parent == NodePtr::from_ptr(parent))
+                {
                     parent = cur;
                     cur = children.as_ptr();
                     continue;
@@ -543,7 +547,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                  * tree structure. Fall back to a recursive call to handle this
                  * case.
                  */
-                if (*cur).parent != parent && (*cur).children.is_some() {
+                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children.is_some() {
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     (*buf).write_bytes(b"<");
@@ -765,7 +769,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
 
             cur = parent;
             /* (*cur).parent was validated when descending. */
-            parent = (*cur).parent;
+            parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
             if matches!((*cur).typ, XmlElementType::XmlElementNode) {
                 if (*ctxt).level > 0 {
@@ -895,7 +899,7 @@ unsafe extern "C" fn xml_ns_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr
  */
 #[cfg(feature = "html")]
 unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr) {
-    use crate::tree::{xml_free_node, xml_new_doc_text};
+    use crate::tree::{xml_free_node, xml_new_doc_text, XmlNode};
 
     use super::htmltree::html_is_boolean_attr;
 
@@ -932,7 +936,7 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
             }
             (*cur).children = xml_new_doc_text((*cur).doc, (*cur).name);
             if !(*cur).children.is_null() {
-                (*(*cur).children).parent = cur as _;
+                (*(*cur).children).parent = NodePtr::from_ptr(cur as *mut XmlNode);
             }
         }
         xml_attr_dump_output(ctxt, cur);
@@ -1084,7 +1088,10 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
  */
 #[cfg(feature = "html")]
 pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlNodePtr) {
-    use crate::libxml::{parser_internals::XML_STRING_TEXT, xmlstring::xml_strcasecmp};
+    use crate::{
+        libxml::{parser_internals::XML_STRING_TEXT, xmlstring::xml_strcasecmp},
+        tree::XmlNode,
+    };
 
     let format: i32 = (*ctxt).format;
     let mut addmeta: i32;
@@ -1100,7 +1107,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
     }
 
     let root: XmlNodePtr = cur;
-    parent = (*cur).parent;
+    parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     loop {
         match (*cur).typ {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
@@ -1114,7 +1121,10 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
             }
             XmlElementType::XmlDocumentFragNode => {
                 /* Always validate (*cur).parent when descending. */
-                if let Some(children) = (*cur).children.filter(|_| (*cur).parent == parent) {
+                if let Some(children) = (*cur)
+                    .children
+                    .filter(|_| (*cur).parent == NodePtr::from_ptr(parent))
+                {
                     parent = cur;
                     cur = children.as_ptr();
                     continue;
@@ -1156,7 +1166,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                  * tree structure. Fall back to a recursive call to handle this
                  * case.
                  */
-                if (*cur).parent != parent && (*cur).children.is_some() {
+                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children.is_some() {
                     xhtml_node_dump_output(ctxt, cur);
                     break;
                 }
@@ -1190,7 +1200,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 }
 
                 if !parent.is_null()
-                    && ((*parent).parent == (*cur).doc as _)
+                    && ((*parent).parent == NodePtr::from_ptr((*cur).doc as *mut XmlNode))
                     && xml_str_equal((*cur).name, c"head".as_ptr() as _)
                     && xml_str_equal((*parent).name, c"html".as_ptr() as _)
                 {
@@ -1431,7 +1441,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
 
             cur = parent;
             /* (*cur).parent was validated when descending. */
-            parent = (*cur).parent;
+            parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
             if matches!((*cur).typ, XmlElementType::XmlElementNode) {
                 if (*ctxt).level > 0 {

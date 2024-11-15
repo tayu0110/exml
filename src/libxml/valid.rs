@@ -5018,7 +5018,7 @@ pub unsafe extern "C" fn xml_validate_element(
             if (*elem).next.is_some() {
                 break;
             }
-            elem = (*elem).parent;
+            elem = (*elem).parent.map_or(null_mut(), |p| p.as_ptr());
         }
         elem = (*elem).next.map_or(null_mut(), |n| n.as_ptr());
     }
@@ -7954,7 +7954,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
 
     nb_valid_elements = 0;
     let ref_node: *mut XmlNode = if !prev.is_null() { prev } else { next };
-    let parent: *mut XmlNode = (*ref_node).parent;
+    let parent: *mut XmlNode = (*ref_node).parent.map_or(null_mut(), |p| p.as_ptr());
 
     /*
      * Retrieves the parent element declaration
@@ -7996,7 +7996,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         return -1;
     }
 
-    (*test_node).parent = parent;
+    (*test_node).parent = NodePtr::from_ptr(parent);
     (*test_node).prev = prev;
     (*test_node).next = NodePtr::from_ptr(next);
     let name: *const XmlChar = (*test_node).name;

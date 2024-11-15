@@ -2183,7 +2183,7 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
 
     if named == 0 && !item_node.is_null() {
         let elem = if (*item_node).typ == XmlElementType::XmlAttributeNode {
-            (*item_node).parent
+            (*item_node).parent.map_or(null_mut(), |p| p.as_ptr())
         } else {
             item_node
         };
@@ -2248,7 +2248,7 @@ unsafe extern "C" fn xml_schema_format_node_for_error(
          * Work on tree nodes.
          */
         if (*node).typ == XmlElementType::XmlAttributeNode {
-            let elem: XmlNodePtr = (*node).parent;
+            let elem: XmlNodePtr = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
 
             *msg = xml_strdup(c"Element '".as_ptr() as _);
             if !(*elem).ns.is_null() {
@@ -5081,7 +5081,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
         }
 
         loop {
-            cur = (*cur).parent;
+            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
             if cur.is_null() {
                 break;
             }
@@ -14638,7 +14638,15 @@ unsafe extern "C" fn xml_schema_parse_schema_top_level(
                     xml_schema_parse_notation(ctxt, schema, child);
                     child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
                 } else {
-                    xml_schema_pcontent_err(ctxt, XmlParserErrors::XmlSchemapS4sElemNotAllowed, null_mut(), (*child).parent, child, null_mut(), c"((include | import | redefine | annotation)*, (((simpleType | complexType | group | attributeGroup) | element | attribute | notation), annotation*)*)".as_ptr() as _);
+                    xml_schema_pcontent_err(
+                        ctxt,
+                        XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                        null_mut(),
+                        (*child).parent.map_or(null_mut(), |p| p.as_ptr()),
+                        child,
+                        null_mut(),
+                        c"((include | import | redefine | annotation)*, (((simpleType | complexType | group | attributeGroup) | element | attribute | notation), annotation*)*)".as_ptr() as _
+                    );
                     child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
                 }
                 while IS_SCHEMA!(child, c"annotation".as_ptr()) {
@@ -30230,7 +30238,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     node = next.as_ptr();
                     continue 'main;
                 } else {
-                    node = (*node).parent;
+                    node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                     break 'goto_leave_node;
                 }
             }
@@ -30408,7 +30416,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 node = next.as_ptr();
                 continue 'main;
             } else {
-                node = (*node).parent;
+                node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                 // goto leave_node;
                 continue 'leave_node;
             }

@@ -135,11 +135,11 @@ impl NodeCommon for XmlAttr {
     fn set_prev(&mut self, prev: *mut XmlNode) {
         self.prev = prev as *mut XmlAttr;
     }
-    fn parent(&self) -> *mut XmlNode {
-        self.parent
+    fn parent(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.parent)
     }
-    fn set_parent(&mut self, parent: *mut XmlNode) {
-        self.parent = parent;
+    fn set_parent(&mut self, parent: Option<NodePtr>) {
+        self.parent = parent.map_or(null_mut(), |p| p.as_ptr());
     }
 }
 
@@ -187,7 +187,7 @@ pub unsafe extern "C" fn xml_new_doc_prop(
 
         let mut tmp = (*cur).children;
         while !tmp.is_null() {
-            (*tmp).parent = cur as _;
+            (*tmp).parent = NodePtr::from_ptr(cur as *mut XmlNode);
             if (*tmp).next.is_none() {
                 (*cur).last = tmp;
             }

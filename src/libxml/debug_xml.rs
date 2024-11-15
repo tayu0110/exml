@@ -21,7 +21,7 @@ use crate::{
     tree::{
         xml_free_node_list, xml_validate_name, NodePtr, XmlAttrPtr, XmlAttributeDefault,
         XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
-        XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr, XmlNsPtr,
+        XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
     },
 };
 
@@ -293,7 +293,7 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
                 cur = (*cur).next;
             }
         }
-        node = (*node).parent;
+        node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
     }
     /* the xml namespace may be declared on the document node */
     if !node.is_null()
@@ -428,7 +428,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     let dict: XmlDictPtr;
     let doc: XmlDocPtr = (*node).doc;
 
-    if (*node).parent.is_null() {
+    if (*node).parent.is_none() {
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoParent,
@@ -455,9 +455,12 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             (*ctxt).dict = dict;
         }
     }
-    if !(*node).parent.is_null()
-        && (*node).doc != (*(*node).parent).doc
-        && !xml_str_equal((*node).name, c"pseudoroot".as_ptr() as _)
+    if (*node)
+        .parent
+        .filter(|p| {
+            (*node).doc != p.doc && !xml_str_equal((*node).name, c"pseudoroot".as_ptr() as _)
+        })
+        .is_some()
     {
         xml_debug_err(
             ctxt,
@@ -467,14 +470,21 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     }
     if (*node).prev.is_null() {
         if (*node).typ == XmlElementType::XmlAttributeNode {
-            if !(*node).parent.is_null() && node != (*(*node).parent).properties as XmlNodePtr {
+            if (*node)
+                .parent
+                .filter(|p| node != p.properties as *mut XmlNode)
+                .is_some()
+            {
                 xml_debug_err(
                     ctxt,
                     XmlParserErrors::XmlCheckNoPrev,
                     c"Attr has no prev and not first of attr list\n".as_ptr(),
                 );
             }
-        } else if !(*node).parent.is_null() && (*(*node).parent).children != NodePtr::from_ptr(node)
+        } else if (*node)
+            .parent
+            .filter(|p| p.children != NodePtr::from_ptr(node))
+            .is_some()
         {
             xml_debug_err(
                 ctxt,
@@ -504,10 +514,14 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 c"Node next->prev : forward link wrong\n".as_ptr(),
             );
         }
-    } else if !(*node).parent.is_null()
-        && (*node).typ != XmlElementType::XmlAttributeNode
-        && (*(*node).parent).last != node
-        && (*(*node).parent).typ == XmlElementType::XmlElementNode
+    } else if (*node)
+        .parent
+        .filter(|p| {
+            (*node).typ != XmlElementType::XmlAttributeNode
+                && p.last != node
+                && p.typ == XmlElementType::XmlElementNode
+        })
+        .is_some()
     {
         xml_debug_err(
             ctxt,
@@ -2895,15 +2909,15 @@ pub unsafe extern "C" fn xml_shell_du(
         } else if node != tree {
             // go up to parents->next if needed
             while node != tree {
-                if !(*node).parent.is_null() {
-                    node = (*node).parent;
+                if let Some(parent) = (*node).parent {
+                    node = parent.as_ptr();
                     indent -= 1;
                 }
                 if let Some(next) = (*node).next.filter(|_| node != tree) {
                     node = next.as_ptr();
                     break;
                 }
-                if (*node).parent.is_null() {
+                if (*node).parent.is_none() {
                     node = null_mut();
                     break;
                 }
@@ -3086,9 +3100,14 @@ unsafe extern "C" fn xml_shell_grep(
             fprintf(
                 (*ctxt).output,
                 c"%s : ".as_ptr(),
-                (*(*node).parent).get_node_path(),
+                (*node).parent.unwrap().get_node_path(),
             );
-            xml_shell_list(ctxt, null_mut(), (*node).parent, null_mut());
+            xml_shell_list(
+                ctxt,
+                null_mut(),
+                (*node).parent.map_or(null_mut(), |p| p.as_ptr()),
+                null_mut(),
+            );
         }
 
         // Browse the full subtree, deep first
@@ -3108,14 +3127,14 @@ unsafe extern "C" fn xml_shell_grep(
         } else {
             // go up to parents->next if needed
             while !node.is_null() {
-                if !(*node).parent.is_null() {
-                    node = (*node).parent;
+                if let Some(parent) = (*node).parent {
+                    node = parent.as_ptr();
                 }
                 if let Some(next) = (*node).next {
                     node = next.as_ptr();
                     break;
                 }
-                if (*node).parent.is_null() {
+                if (*node).parent.is_none() {
                     node = null_mut();
                     break;
                 }

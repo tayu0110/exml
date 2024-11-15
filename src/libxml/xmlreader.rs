@@ -1203,16 +1203,16 @@ unsafe extern "C" fn xml_text_reader_read_tree(reader: &mut XmlTextReader) -> i3
                 reader.node = next.as_ptr();
                 reader.state = XmlTextReaderState::Start;
                 // goto found_node;
-            } else if !(*reader.node).parent.is_null() {
+            } else if let Some(parent) = (*reader.node).parent {
                 if matches!(
-                    (*(*reader.node).parent).typ,
+                    parent.typ,
                     XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
                 ) {
                     reader.state = XmlTextReaderState::End;
                     return 0;
                 }
 
-                reader.node = (*reader.node).parent;
+                reader.node = parent.as_ptr();
                 reader.depth -= 1;
                 reader.state = XmlTextReaderState::Backtrack;
                 // goto found_node;
@@ -1501,7 +1501,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
     }
     loop {
         while let Some(children) = (*cur).children.filter(|children| {
-            children.parent == cur
+            children.parent == NodePtr::from_ptr(cur)
                 && !matches!(
                     (*cur).typ,
                     XmlElementType::XmlDTDNode | XmlElementType::XmlEntityRefNode
@@ -1512,7 +1512,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
         }
 
         next = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-        parent = (*cur).parent;
+        parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
         /* unroll to speed up freeing the document */
         if (*cur).typ != XmlElementType::XmlDTDNode {
@@ -1666,7 +1666,7 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
         .children
         .filter(|_| (*cur).typ != XmlElementType::XmlEntityRefNode)
     {
-        if children.parent == cur {
+        if children.parent == NodePtr::from_ptr(cur) {
             xml_text_reader_free_node_list(reader, children.as_ptr());
         }
         (*cur).children = None;
@@ -1979,7 +1979,7 @@ unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader)
             }
 
             loop {
-                node = (*node).parent;
+                node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                 if (*node).typ == XmlElementType::XmlElementNode {
                     let mut tmp: XmlNodePtr;
                     if reader.ent_nr == 0 {
@@ -2139,7 +2139,8 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                         ))
                     && ((*reader.ctxt).node.is_null()
                         || (*reader.ctxt).node == reader.node
-                        || (*reader.ctxt).node == (*reader.node).parent)
+                        || (*reader.ctxt).node
+                            == (*reader.node).parent.map_or(null_mut(), |p| p.as_ptr()))
                     && !matches!((*reader.ctxt).instate, XmlParserInputState::XmlParserEOF)
                 {
                     val = xml_text_reader_push_data(reader);
@@ -2237,7 +2238,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                 if reader.preserves > 0 && (*reader.node).extra & NODE_IS_SPRESERVED as u16 != 0 {
                     reader.preserves -= 1;
                 }
-                reader.node = (*reader.node).parent;
+                reader.node = (*reader.node).parent.map_or(null_mut(), |p| p.as_ptr());
                 if reader.node.is_null()
                     || matches!(
                         (*reader.node).typ,
@@ -2553,7 +2554,7 @@ unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNo
         return next.as_ptr();
     }
     'b: while {
-        cur = (*cur).parent;
+        cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
         if cur.is_null() {
             break 'b;
         }
@@ -4643,8 +4644,6 @@ pub unsafe extern "C" fn xml_text_reader_get_parser_column_number(
  */
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_preserve(reader: &mut XmlTextReader) -> XmlNodePtr {
-    let mut parent: XmlNodePtr;
-
     let cur = if !reader.curnode.is_null() {
         reader.curnode
     } else {
@@ -4663,12 +4662,12 @@ pub unsafe extern "C" fn xml_text_reader_preserve(reader: &mut XmlTextReader) ->
     }
     reader.preserves += 1;
 
-    parent = (*cur).parent;
-    while !parent.is_null() {
-        if (*parent).typ == XmlElementType::XmlElementNode {
-            (*parent).extra |= NODE_IS_PRESERVED as u16;
+    let mut parent = (*cur).parent;
+    while let Some(mut now) = parent {
+        if now.typ == XmlElementType::XmlElementNode {
+            now.extra |= NODE_IS_PRESERVED as u16;
         }
-        parent = (*parent).parent;
+        parent = now.parent;
     }
     cur
 }
@@ -4825,13 +4824,13 @@ unsafe extern "C" fn xml_text_reader_next_tree(reader: &mut XmlTextReader) -> i3
         return 1;
     }
 
-    if !(*reader.node).parent.is_null() {
-        if (*(*reader.node).parent).typ == XmlElementType::XmlDocumentNode {
+    if let Some(parent) = (*reader.node).parent {
+        if parent.typ == XmlElementType::XmlDocumentNode {
             reader.state = XmlTextReaderState::End;
             return 0;
         }
 
-        reader.node = (*reader.node).parent;
+        reader.node = parent.as_ptr();
         reader.depth -= 1;
         reader.state = XmlTextReaderState::Backtrack;
         /* Repeat process to move to sibling of parent node if present */

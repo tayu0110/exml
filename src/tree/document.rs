@@ -311,7 +311,7 @@ impl XmlDoc {
                                 (*ent).flags |= XML_ENT_PARSED as i32;
                                 temp = (*ent).children.load(Ordering::Relaxed);
                                 while !temp.is_null() {
-                                    (*temp).parent = ent as _;
+                                    (*temp).parent = NodePtr::from_ptr(ent as *mut XmlNode);
                                     (*ent).last.store(temp, Ordering::Relaxed);
                                     temp = (*temp).next.map_or(null_mut(), |n| n.as_ptr());
                                 }
@@ -604,7 +604,7 @@ impl XmlDoc {
                                 (*ent).flags |= XML_ENT_PARSED as i32;
                                 temp = (*ent).children.load(Ordering::Relaxed);
                                 while !temp.is_null() {
-                                    (*temp).parent = ent as _;
+                                    (*temp).parent = NodePtr::from_ptr(ent as *mut XmlNode);
                                     (*ent).last.store(temp, Ordering::Relaxed);
                                     temp = (*temp).next.map_or(null_mut(), |n| n.as_ptr());
                                 }
@@ -687,7 +687,7 @@ impl XmlDoc {
         }
         (*root).unlink();
         (*root).set_doc(self);
-        (*root).parent = self as *mut XmlDoc as *mut XmlNode;
+        (*root).parent = NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode);
         let mut old = self.children;
         while !old.is_null() {
             if matches!((*old).typ, XmlElementType::XmlElementNode) {
@@ -780,11 +780,11 @@ impl NodeCommon for XmlDoc {
     fn set_prev(&mut self, prev: *mut XmlNode) {
         self.prev = prev;
     }
-    fn parent(&self) -> *mut XmlNode {
-        self.parent
+    fn parent(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.parent)
     }
-    fn set_parent(&mut self, parent: *mut XmlNode) {
-        self.parent = parent;
+    fn set_parent(&mut self, parent: Option<NodePtr>) {
+        self.parent = parent.map_or(null_mut(), |p| p.as_ptr());
     }
 }
 

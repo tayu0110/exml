@@ -1912,7 +1912,7 @@ unsafe fn xml_sax2_attribute_internal(
         };
         tmp = (*ret).children;
         while !tmp.is_null() {
-            (*tmp).parent = ret as XmlNodePtr;
+            (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
             if (*tmp).next.is_none() {
                 (*ret).last = tmp;
             }
@@ -1922,7 +1922,7 @@ unsafe fn xml_sax2_attribute_internal(
         (*ret).children = xml_new_doc_text((*ctxt).my_doc, value);
         (*ret).last = (*ret).children;
         if !(*ret).children.is_null() {
-            (*(*ret).children).parent = ret as XmlNodePtr;
+            (*(*ret).children).parent = NodePtr::from_ptr(ret as *mut XmlNode);
         }
     }
 
@@ -3108,7 +3108,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             (*ret).last = tmp;
             if !tmp.is_null() {
                 (*tmp).doc = (*ret).doc;
-                (*tmp).parent = ret as XmlNodePtr;
+                (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
             }
         } else {
             (*ret).children = if (*ctxt).my_doc.is_null() {
@@ -3119,7 +3119,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             tmp = (*ret).children;
             while !tmp.is_null() {
                 (*tmp).doc = (*ret).doc;
-                (*tmp).parent = ret as XmlNodePtr;
+                (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
                 if (*tmp).next.is_none() {
                     (*ret).last = tmp;
                 }
@@ -3132,7 +3132,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
         (*ret).last = tmp;
         if !tmp.is_null() {
             (*tmp).doc = (*ret).doc;
-            (*tmp).parent = ret as XmlNodePtr;
+            (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
         }
     }
 
@@ -3427,7 +3427,7 @@ unsafe extern "C" fn xml_sax2_text(
         if !last_child.is_null() {
             (*(*ctxt).node).children = NodePtr::from_ptr(last_child);
             (*(*ctxt).node).last = last_child;
-            (*last_child).parent = (*ctxt).node;
+            (*last_child).parent = NodePtr::from_ptr((*ctxt).node);
             (*last_child).doc = (*(*ctxt).node).doc;
             (*ctxt).nodelen = len;
             (*ctxt).nodemem = len + 1;

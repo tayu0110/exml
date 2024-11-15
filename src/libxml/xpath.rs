@@ -896,12 +896,12 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     if matches!((*node1).typ, XmlElementType::XmlAttributeNode) {
         attr1 = 1;
         attr_node1 = node1;
-        node1 = (*node1).parent;
+        node1 = (*node1).parent.map_or(null_mut(), |p| p.as_ptr());
     }
     if matches!((*node2).typ, XmlElementType::XmlAttributeNode) {
         attr2 = 1;
         attr_node2 = node2;
-        node2 = (*node2).parent;
+        node2 = (*node2).parent.map_or(null_mut(), |p| p.as_ptr());
     }
     if node1 == node2 {
         if attr1 == attr2 {
@@ -959,23 +959,23 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
      */
     depth2 = 0;
     cur = node2;
-    while !(*cur).parent.is_null() {
-        if (*cur).parent == node1 {
+    while let Some(parent) = (*cur).parent {
+        if parent.as_ptr() == node1 {
             return 1;
         }
         depth2 += 1;
-        cur = (*cur).parent;
+        cur = parent.as_ptr();
     }
     let root: XmlNodePtr = cur;
 
     depth1 = 0;
     cur = node1;
-    while !(*cur).parent.is_null() {
-        if (*cur).parent == node2 {
+    while let Some(parent) = (*cur).parent {
+        if parent.as_ptr() == node2 {
             return -1;
         }
         depth1 += 1;
-        cur = (*cur).parent;
+        cur = parent.as_ptr();
     }
     /*
      * Distinct document (or distinct entities :-( ) case.
@@ -988,15 +988,15 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
      */
     while depth1 > depth2 {
         depth1 -= 1;
-        node1 = (*node1).parent;
+        node1 = (*node1).parent.map_or(null_mut(), |p| p.as_ptr());
     }
     while depth2 > depth1 {
         depth2 -= 1;
-        node2 = (*node2).parent;
+        node2 = (*node2).parent.map_or(null_mut(), |p| p.as_ptr());
     }
     while (*node1).parent != (*node2).parent {
-        node1 = (*node1).parent;
-        node2 = (*node2).parent;
+        node1 = (*node1).parent.map_or(null_mut(), |p| p.as_ptr());
+        node2 = (*node2).parent.map_or(null_mut(), |p| p.as_ptr());
         /* should not happen but just in case ... */
         if node1.is_null() || node2.is_null() {
             return -2;
@@ -1874,7 +1874,7 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
             continue;
         }
         loop {
-            cur = (*cur).parent;
+            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
             if cur.is_null() {
                 break;
             }

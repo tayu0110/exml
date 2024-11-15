@@ -137,9 +137,9 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
 
             /* this is a libxml hack! check xpath.c for details */
             if !parent.is_null() && matches!((*parent).typ, XmlElementType::XmlAttributeNode) {
-                ns.next = (*parent).parent as XmlNsPtr;
+                ns.next = (*parent).parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
             } else {
-                ns.next = parent as XmlNsPtr;
+                ns.next = parent as *mut XmlNs;
             }
 
             /*
@@ -1040,7 +1040,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
             }
             ns = (*ns).next;
         }
-        n = (*n).parent;
+        n = (*n).parent.map_or(null_mut(), |p| p.as_ptr());
     }
 
     // if the first node is not the default namespace node (a node with no
@@ -1405,7 +1405,9 @@ unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
     ns: *const XmlChar,
 ) -> XmlAttrPtr {
     let mut res: XmlAttrPtr;
-    while !cur.is_null() && xml_c14n_is_visible!(ctx, cur, (*cur).parent) == 0 {
+    while !cur.is_null()
+        && xml_c14n_is_visible!(ctx, cur, (*cur).parent.map_or(null_mut(), |p| p.as_ptr())) == 0
+    {
         res = (*cur).has_ns_prop(
             CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
             (!ns.is_null())
@@ -1416,7 +1418,7 @@ unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
             return res;
         }
 
-        cur = (*cur).parent;
+        cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     }
 
     null_mut()
@@ -1458,8 +1460,12 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     }
 
     /* go up the stack until we find a node that we rendered already */
-    cur = (*(*xml_base_attr).parent).parent;
-    while !cur.is_null() && xml_c14n_is_visible!(ctx, cur, (*cur).parent) == 0 {
+    cur = (*(*xml_base_attr).parent)
+        .parent
+        .map_or(null_mut(), |p| p.as_ptr());
+    while !cur.is_null()
+        && xml_c14n_is_visible!(ctx, cur, (*cur).parent.map_or(null_mut(), |p| p.as_ptr())) == 0
+    {
         attr = (*cur).has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
         if !attr.is_null() {
             /* get attr value */
@@ -1514,7 +1520,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
         }
 
         /* next */
-        cur = (*cur).parent;
+        cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     }
 
     /* check if result uri is empty or not */
@@ -1856,16 +1862,19 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
              * Handle xml attributes
              */
             if parent_visible != 0
-                && !(*cur).parent.is_null()
-                && xml_c14n_is_visible!(ctx, (*cur).parent, (*(*cur).parent).parent) == 0
+                && (*cur).parent.is_some()
+                && xml_c14n_is_visible!(
+                    ctx,
+                    (*cur).parent.map_or(null_mut(), |p| p.as_ptr()),
+                    (*cur)
+                        .parent
+                        .unwrap()
+                        .parent
+                        .map_or(null_mut(), |p| p.as_ptr())
+                ) == 0
             {
-                let mut tmp: XmlNodePtr;
-
-                /*
-                 * If XPath node-set is not specified then the parent is always
-                 * visible!
-                 */
-                tmp = (*cur).parent;
+                // If XPath node-set is not specified then the parent is always visible!
+                let mut tmp = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
                     attr = (*tmp).properties;
                     while !attr.is_null() {
@@ -1875,7 +1884,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
                         }
                         attr = (*attr).next;
                     }
-                    tmp = (*tmp).parent;
+                    tmp = (*tmp).parent.map_or(null_mut(), |p| p.as_ptr());
                 }
             }
         }
@@ -1980,7 +1989,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
                 if xml_lang_attr.is_null() {
                     xml_lang_attr = xml_c14n_find_hidden_parent_attr(
                         ctx,
-                        (*cur).parent,
+                        (*cur).parent.map_or(null_mut(), |p| p.as_ptr()),
                         c"lang".as_ptr() as _,
                         XML_XML_NAMESPACE.as_ptr() as _,
                     );
@@ -1991,7 +2000,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
                 if xml_space_attr.is_null() {
                     xml_space_attr = xml_c14n_find_hidden_parent_attr(
                         ctx,
-                        (*cur).parent,
+                        (*cur).parent.map_or(null_mut(), |p| p.as_ptr()),
                         c"space".as_ptr() as _,
                         XML_XML_NAMESPACE.as_ptr() as _,
                     );
@@ -2005,7 +2014,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
                     /* if we don't have base uri attribute, check if we have a "hidden" one above */
                     xml_base_attr = xml_c14n_find_hidden_parent_attr(
                         ctx,
-                        (*cur).parent,
+                        (*cur).parent.map_or(null_mut(), |p| p.as_ptr()),
                         c"base".as_ptr() as _,
                         XML_XML_NAMESPACE.as_ptr() as _,
                     );
@@ -2268,7 +2277,8 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
         return -1;
     }
 
-    let visible: i32 = xml_c14n_is_visible!(ctx, cur, (*cur).parent);
+    let visible: i32 =
+        xml_c14n_is_visible!(ctx, cur, (*cur).parent.map_or(null_mut(), |p| p.as_ptr()));
     match (*cur).typ {
         XmlElementType::XmlElementNode => {
             ret = xml_c14n_process_element_node(ctx, cur, visible);

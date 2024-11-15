@@ -1636,7 +1636,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 if matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
                                     break 'rollback;
                                 }
-                                node = (*node).parent;
+                                node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                                 if matches!(
                                     (*node).typ,
                                     XmlElementType::XmlDocumentNode
@@ -1738,7 +1738,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 ) {
                                     break 'rollback;
                                 }
-                                node = (*node).parent;
+                                node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                                 if node.is_null() {
                                     break 'rollback;
                                 }
@@ -1792,7 +1792,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 ) {
                                     break 'rollback;
                                 }
-                                node = (*node).parent;
+                                node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                                 while !node.is_null() {
                                     if matches!((*node).typ, XmlElementType::XmlElementNode)
                                         && *(*step).value.add(0) == *(*node).name.add(0)
@@ -1813,7 +1813,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                             break;
                                         }
                                     }
-                                    node = (*node).parent;
+                                    node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                                 }
                                 if node.is_null() {
                                     break 'rollback;

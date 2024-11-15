@@ -1537,7 +1537,7 @@ macro_rules! __xml_raise_error {
                             if node.is_null() || matches!((*node).typ, XmlElementType::XmlElementNode) {
                                 break;
                             }
-                            node = (*node).parent;
+                            node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                         }
                         if baseptr.is_null() && !node.is_null() && !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
                             baseptr = node;
@@ -1574,7 +1574,7 @@ macro_rules! __xml_raise_error {
                             let mut inclcount: c_int = 0;
                             while !prev.is_null() {
                                 if (*prev).prev.is_null() {
-                                    prev = (*prev).parent;
+                                    prev = (*prev).parent.map_or(null_mut(), |p| p.as_ptr());
                                 } else {
                                     prev = (*prev).prev;
                                     if matches!((*prev).typ, XmlElementType::XmlXIncludeStart) {

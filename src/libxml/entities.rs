@@ -146,11 +146,14 @@ impl NodeCommon for XmlEntity {
     fn set_prev(&mut self, prev: *mut XmlNode) {
         self.prev.store(prev, Ordering::Relaxed);
     }
-    fn parent(&self) -> *mut XmlNode {
-        self.parent.load(Ordering::Relaxed) as *mut XmlNode
+    fn parent(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.parent.load(Ordering::Relaxed) as *mut XmlNode)
     }
-    fn set_parent(&mut self, parent: *mut XmlNode) {
-        self.parent.store(parent as *mut XmlDtd, Ordering::Relaxed);
+    fn set_parent(&mut self, parent: Option<NodePtr>) {
+        self.parent.store(
+            parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDtd,
+            Ordering::Relaxed,
+        );
     }
 }
 
@@ -356,7 +359,8 @@ unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
 
     if !(*entity).children.load(Ordering::Relaxed).is_null()
         && (*entity).owner == 1
-        && entity == (*(*entity).children.load(Ordering::Relaxed)).parent as _
+        && NodePtr::from_ptr(entity as *mut XmlNode)
+            == (*(*entity).children.load(Ordering::Relaxed)).parent
     {
         xml_free_node_list((*entity).children.load(Ordering::Relaxed));
     }
