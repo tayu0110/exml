@@ -140,11 +140,12 @@ impl NodeCommon for XmlEntity {
         self.next
             .store(next.map_or(null_mut(), |n| n.as_ptr()), Ordering::Relaxed);
     }
-    fn prev(&self) -> *mut XmlNode {
-        self.prev.load(Ordering::Relaxed)
+    fn prev(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.prev.load(Ordering::Relaxed))
     }
-    fn set_prev(&mut self, prev: *mut XmlNode) {
-        self.prev.store(prev, Ordering::Relaxed);
+    fn set_prev(&mut self, prev: Option<NodePtr>) {
+        self.prev
+            .store(prev.map_or(null_mut(), |p| p.as_ptr()), Ordering::Relaxed);
     }
     fn parent(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.parent.load(Ordering::Relaxed) as *mut XmlNode)

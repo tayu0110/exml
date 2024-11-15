@@ -4835,7 +4835,7 @@ pub unsafe fn xml_parse_in_node_context(
     (*node).last = fake;
 
     if !cur.is_null() {
-        (*cur).prev = null_mut();
+        (*cur).prev = None;
     }
 
     *lst = cur;

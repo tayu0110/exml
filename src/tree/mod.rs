@@ -1621,7 +1621,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
                 if (*insert).last.is_null() {
                     (*insert).children = NodePtr::from_ptr(copy);
                 } else {
-                    (*copy).prev = (*insert).last;
+                    (*copy).prev = NodePtr::from_ptr((*insert).last);
                     (*(*insert).last).next = NodePtr::from_ptr(copy);
                 }
                 (*insert).last = copy;
@@ -1709,13 +1709,13 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
             return null_mut();
         }
         if ret.is_null() {
-            (*q).prev = null_mut();
+            (*q).prev = None;
             ret = q;
             p = q;
         } else if p != q {
             /* the test is required if xmlStaticCopyNode coalesced 2 text nodes */
             (*p).next = NodePtr::from_ptr(q);
-            (*q).prev = p;
+            (*q).prev = NodePtr::from_ptr(p);
             p = q;
         }
         node = (*node).next.map_or(null_mut(), |c| c.as_ptr());
@@ -1981,7 +1981,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
             (*p).next = NodePtr::from_ptr(q);
         }
 
-        (*q).prev = p;
+        (*q).prev = NodePtr::from_ptr(p);
         (*q).parent = NodePtr::from_ptr(ret as *mut XmlNode);
         (*q).next = None;
         (*ret).last = q;
@@ -2316,7 +2316,7 @@ pub unsafe extern "C" fn xml_new_child(
     } else {
         prev = (*parent).last;
         (*prev).next = NodePtr::from_ptr(cur);
-        (*cur).prev = prev;
+        (*cur).prev = NodePtr::from_ptr(prev);
         (*parent).last = cur;
     }
 
@@ -2832,7 +2832,7 @@ pub unsafe extern "C" fn xml_new_text_child(
     } else {
         prev = (*parent).last;
         (*prev).next = NodePtr::from_ptr(cur);
-        (*cur).prev = prev;
+        (*cur).prev = NodePtr::from_ptr(prev);
         (*parent).last = cur;
     }
 
@@ -2949,11 +2949,11 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
     (*cur).parent = (*old).parent;
     (*cur).next = (*old).next;
     if let Some(mut next) = (*cur).next {
-        next.prev = cur;
+        next.prev = NodePtr::from_ptr(cur);
     }
     (*cur).prev = (*old).prev;
-    if !(*cur).prev.is_null() {
-        (*(*cur).prev).next = NodePtr::from_ptr(cur);
+    if let Some(mut prev) = (*cur).prev {
+        prev.next = NodePtr::from_ptr(cur);
     }
     if let Some(mut parent) = (*cur).parent {
         if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
@@ -2970,7 +2970,7 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
         }
     }
     (*old).next = None;
-    (*old).prev = null_mut();
+    (*old).prev = None;
     (*old).parent = None;
     old
 }
@@ -5893,7 +5893,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                             (*clone).parent = NodePtr::from_ptr(parent_clone);
                             if !prev_clone.is_null() {
                                 (*prev_clone).next = NodePtr::from_ptr(clone);
-                                (*clone).prev = prev_clone;
+                                (*clone).prev = NodePtr::from_ptr(prev_clone);
                             } else {
                                 (*parent_clone).children = NodePtr::from_ptr(clone);
                             }
@@ -5922,7 +5922,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                             (*clone).parent = NodePtr::from_ptr(parent_clone);
                             if !prev_clone.is_null() {
                                 (*prev_clone).next = NodePtr::from_ptr(clone);
-                                (*clone).prev = prev_clone;
+                                (*clone).prev = NodePtr::from_ptr(prev_clone);
                             } else {
                                 (*parent_clone).properties = clone as _;
                             }

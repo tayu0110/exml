@@ -907,12 +907,12 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
         if attr1 == attr2 {
             /* not required, but we keep attributes in order */
             if attr1 != 0 {
-                cur = (*attr_node2).prev;
+                cur = (*attr_node2).prev.map_or(null_mut(), |p| p.as_ptr());
                 while !cur.is_null() {
                     if cur == attr_node1 {
                         return 1;
                     }
-                    cur = (*cur).prev;
+                    cur = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
                 }
                 return -1;
             }
@@ -928,7 +928,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     {
         return 1;
     }
-    if node1 == (*node2).prev {
+    if NodePtr::from_ptr(node1) == (*node2).prev {
         return 1;
     }
     if NodePtr::from_ptr(node1) == (*node2).next {
@@ -1005,7 +1005,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     /*
      * Find who's first.
      */
-    if node1 == (*node2).prev {
+    if NodePtr::from_ptr(node1) == (*node2).prev {
         return 1;
     }
     if NodePtr::from_ptr(node1) == (*node2).next {

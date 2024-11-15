@@ -129,11 +129,11 @@ impl NodeCommon for XmlAttr {
     fn set_next(&mut self, next: Option<NodePtr>) {
         self.next = next.map_or(null_mut(), |n| n.as_ptr()) as *mut XmlAttr;
     }
-    fn prev(&self) -> *mut XmlNode {
-        self.prev as *mut XmlNode
+    fn prev(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.prev as *mut XmlNode)
     }
-    fn set_prev(&mut self, prev: *mut XmlNode) {
-        self.prev = prev as *mut XmlAttr;
+    fn set_prev(&mut self, prev: Option<NodePtr>) {
+        self.prev = prev.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlAttr;
     }
     fn parent(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.parent)

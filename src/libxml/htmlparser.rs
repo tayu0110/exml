@@ -8875,7 +8875,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
     }
     last_child = (*(*ctxt).node).get_last_child();
     while !last_child.is_null() && (*last_child).typ == XmlElementType::XmlCommentNode {
-        last_child = (*last_child).prev;
+        last_child = (*last_child).prev.map_or(null_mut(), |p| p.as_ptr());
     }
     if last_child.is_null() {
         if (*(*ctxt).node).typ != XmlElementType::XmlElementNode

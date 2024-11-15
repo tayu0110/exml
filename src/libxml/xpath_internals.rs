@@ -3649,14 +3649,14 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                 /*
                  * Find nearest element node.
                  */
-                if !(*node1).prev.is_null() {
+                if (*node1).prev.is_some() {
                     loop {
-                        node1 = (*node1).prev;
+                        node1 = (*node1).prev.map_or(null_mut(), |p| p.as_ptr());
                         if matches!((*node1).typ, XmlElementType::XmlElementNode) {
                             precedence1 = 3; /* element in prev-sibl axis */
                             break;
                         }
-                        if (*node1).prev.is_null() {
+                        if (*node1).prev.is_none() {
                             precedence1 = 2; /* element is parent */
                             /*
                              * URGENT TODO: Are there any cases, where the
@@ -3705,14 +3705,14 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlPINode => {
                 misc_node2 = node2;
-                if !(*node2).prev.is_null() {
+                if (*node2).prev.is_some() {
                     loop {
-                        node2 = (*node2).prev;
+                        node2 = (*node2).prev.map_or(null_mut(), |p| p.as_ptr());
                         if matches!((*node2).typ, XmlElementType::XmlElementNode) {
                             precedence2 = 3; /* element in prev-sibl axis */
                             break;
                         }
-                        if (*node2).prev.is_null() {
+                        if (*node2).prev.is_none() {
                             precedence2 = 2; /* element is parent */
                             node2 = (*node2).parent.map_or(null_mut(), |p| p.as_ptr());
                             break;
@@ -3744,7 +3744,7 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                      * The ugly case; but normally there aren't many
                      * adjacent non-element nodes around.
                      */
-                    cur = (*misc_node2).prev;
+                    cur = (*misc_node2).prev.map_or(null_mut(), |p| p.as_ptr());
                     while !cur.is_null() {
                         if cur == misc_node1 {
                             return 1;
@@ -3752,7 +3752,7 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                         if matches!((*cur).typ, XmlElementType::XmlElementNode) {
                             return -1;
                         }
-                        cur = (*cur).prev;
+                        cur = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
                     }
                     return -1;
                 } else {
@@ -3819,7 +3819,7 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
 
     // turtle_comparison:
 
-    if node1 == (*node2).prev {
+    if NodePtr::from_ptr(node1) == (*node2).prev {
         return 1;
     }
     if NodePtr::from_ptr(node1) == (*node2).next {
@@ -3875,7 +3875,7 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
     /*
      * Find who's first.
      */
-    if node1 == (*node2).prev {
+    if NodePtr::from_ptr(node1) == (*node2).prev {
         return 1;
     }
     if NodePtr::from_ptr(node1) == (*node2).next {
@@ -6859,10 +6859,13 @@ unsafe extern "C" fn xml_xpath_next_preceding_internal(
     if matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
-    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDTDNode) {
-        cur = (*cur).prev;
+    if let Some(prev) = (*cur)
+        .prev
+        .filter(|p| matches!(p.typ, XmlElementType::XmlDTDNode))
+    {
+        cur = prev.as_ptr();
     }
-    while (*cur).prev.is_null() {
+    while (*cur).prev.is_none() {
         cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
         if cur.is_null() {
             return null_mut();
@@ -6875,7 +6878,7 @@ unsafe extern "C" fn xml_xpath_next_preceding_internal(
         }
         (*ctxt).ancestor = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     }
-    cur = (*cur).prev;
+    cur = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
     while !(*cur).last.is_null() {
         cur = (*cur).last;
     }
@@ -12303,12 +12306,15 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
     if cur.is_null() || matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
-    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDTDNode) {
-        cur = (*cur).prev;
+    if let Some(prev) = (*cur)
+        .prev
+        .filter(|p| matches!(p.typ, XmlElementType::XmlDTDNode))
+    {
+        cur = prev.as_ptr();
     }
     loop {
-        if !(*cur).prev.is_null() {
-            cur = (*cur).prev;
+        if let Some(prev) = (*cur).prev {
+            cur = prev.as_ptr();
             while !(*cur).last.is_null() {
                 cur = (*cur).last;
             }
@@ -12495,15 +12501,22 @@ pub unsafe extern "C" fn xml_xpath_next_preceding_sibling(
         return null_mut();
     }
     if cur.is_null() {
-        return (*(*(*ctxt).context).node).prev;
+        return (*(*(*ctxt).context).node)
+            .prev
+            .map_or(null_mut(), |p| p.as_ptr());
     }
-    if !(*cur).prev.is_null() && matches!((*(*cur).prev).typ, XmlElementType::XmlDTDNode) {
-        cur = (*cur).prev;
+    if let Some(prev) = (*cur)
+        .prev
+        .filter(|p| matches!(p.typ, XmlElementType::XmlDTDNode))
+    {
+        cur = prev.as_ptr();
         if cur.is_null() {
-            return (*(*(*ctxt).context).node).prev;
+            return (*(*(*ctxt).context).node)
+                .prev
+                .map_or(null_mut(), |p| p.as_ptr());
         }
     }
-    (*cur).prev
+    (*cur).prev.map_or(null_mut(), |p| p.as_ptr())
 }
 
 /*

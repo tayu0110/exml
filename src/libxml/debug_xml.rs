@@ -468,7 +468,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             c"Node doc differs from parent's one\n".as_ptr(),
         );
     }
-    if (*node).prev.is_null() {
+    if (*node).prev.is_none() {
         if (*node).typ == XmlElementType::XmlAttributeNode {
             if (*node)
                 .parent
@@ -492,7 +492,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 c"Node has no prev and not first of parent list\n".as_ptr(),
             );
         }
-    } else if (*(*node).prev).next != NodePtr::from_ptr(node) {
+    } else if (*node).prev.unwrap().next != NodePtr::from_ptr(node) {
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckWrongPrev,
@@ -500,7 +500,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         );
     }
     if let Some(next) = (*node).next {
-        if next.prev != node {
+        if next.prev != NodePtr::from_ptr(node) {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongNext,

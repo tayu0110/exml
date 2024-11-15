@@ -7976,7 +7976,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         null_mut()
     };
     let next_prev: *mut XmlNode = if !next.is_null() {
-        (*next).prev
+        (*next).prev.map_or(null_mut(), |p| p.as_ptr())
     } else {
         null_mut()
     };
@@ -7997,7 +7997,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     }
 
     (*test_node).parent = NodePtr::from_ptr(parent);
-    (*test_node).prev = prev;
+    (*test_node).prev = NodePtr::from_ptr(prev);
     (*test_node).next = NodePtr::from_ptr(next);
     let name: *const XmlChar = (*test_node).name;
 
@@ -8008,7 +8008,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     }
 
     if !next.is_null() {
-        (*next).prev = test_node;
+        (*next).prev = NodePtr::from_ptr(test_node);
     } else {
         (*parent).last = test_node;
     }
@@ -8045,7 +8045,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         (*prev).next = NodePtr::from_ptr(prev_next);
     }
     if !next.is_null() {
-        (*next).prev = next_prev;
+        (*next).prev = NodePtr::from_ptr(next_prev);
     }
     (*parent).children = NodePtr::from_ptr(parent_childs);
     (*parent).last = parent_last;

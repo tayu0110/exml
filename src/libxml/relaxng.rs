@@ -11203,11 +11203,14 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
      */
     cur = lastchg;
     while !cur.is_null() {
-        if cur == start || (*cur).prev.is_null() {
+        if cur == start {
             break;
         }
-        (*(*cur).prev).next = NodePtr::from_ptr(cur);
-        cur = (*cur).prev;
+        let Some(mut prev) = (*cur).prev else {
+            break;
+        };
+        prev.next = NodePtr::from_ptr(cur);
+        cur = prev.as_ptr();
     }
     if ret == 0 && (*ctxt).err_nr > err_nr {
         xml_relaxng_pop_errors(ctxt, err_nr);

@@ -1573,10 +1573,8 @@ macro_rules! __xml_raise_error {
                             let mut href: *mut c_char = null_mut();
                             let mut inclcount: c_int = 0;
                             while !prev.is_null() {
-                                if (*prev).prev.is_null() {
-                                    prev = (*prev).parent.map_or(null_mut(), |p| p.as_ptr());
-                                } else {
-                                    prev = (*prev).prev;
+                                if let Some(p) = (*prev).prev {
+                                    prev = p.as_ptr();
                                     if matches!((*prev).typ, XmlElementType::XmlXIncludeStart) {
                                         if inclcount > 0 {
                                             inclcount -= 1;
@@ -1589,6 +1587,8 @@ macro_rules! __xml_raise_error {
                                     } else if matches!((*prev).typ, XmlElementType::XmlXIncludeEnd) {
                                         inclcount += 1;
                                     }
+                                } else {
+                                    prev = (*prev).parent.map_or(null_mut(), |p| p.as_ptr());
                                 }
                             }
                             if !href.is_null() {

@@ -62,11 +62,11 @@ impl NodeCommon for XmlElement {
     fn set_next(&mut self, next: Option<NodePtr>) {
         self.next = next.map_or(null_mut(), |n| n.as_ptr());
     }
-    fn prev(&self) -> *mut XmlNode {
-        self.prev
+    fn prev(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.prev)
     }
-    fn set_prev(&mut self, prev: *mut XmlNode) {
-        self.prev = prev;
+    fn set_prev(&mut self, prev: Option<NodePtr>) {
+        self.prev = prev.map_or(null_mut(), |p| p.as_ptr());
     }
     fn parent(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.parent as *mut XmlNode)

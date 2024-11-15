@@ -2206,10 +2206,10 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                     if reader.preserves == 0
                         && f
                         && reader.ent_nr == 0
-                        && !(*reader.node).prev.is_null()
-                        && (*(*reader.node).prev).typ != XmlElementType::XmlDTDNode
+                        && (*reader.node).prev.is_some()
+                        && (*reader.node).prev.unwrap().typ != XmlElementType::XmlDTDNode
                     {
-                        let tmp: XmlNodePtr = (*reader.node).prev;
+                        let tmp: XmlNodePtr = (*reader.node).prev.unwrap().as_ptr();
                         if (*tmp).extra & NODE_IS_PRESERVED as u16 == 0 {
                             if oldnode == tmp {
                                 oldnode = null_mut();

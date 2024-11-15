@@ -1133,7 +1133,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
             }
             if !insert_last.is_null() {
                 (*insert_last).next = NodePtr::from_ptr(copy);
-                (*copy).prev = insert_last;
+                (*copy).prev = NodePtr::from_ptr(insert_last);
             } else if !insert_parent.is_null() {
                 (*insert_parent).children = NodePtr::from_ptr(copy);
             }
@@ -1525,7 +1525,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                     while let Some(next) = (*last).next {
                         last = next.as_ptr();
                     }
-                    (*copy).prev = last;
+                    (*copy).prev = NodePtr::from_ptr(last);
                     (*last).next = NodePtr::from_ptr(copy);
                 }
                 last = copy;

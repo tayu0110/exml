@@ -112,11 +112,11 @@ impl NodeCommon for XmlDtd {
     fn set_next(&mut self, next: Option<NodePtr>) {
         self.next = next.map_or(null_mut(), |n| n.as_ptr());
     }
-    fn prev(&self) -> *mut XmlNode {
-        self.prev
+    fn prev(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.prev)
     }
-    fn set_prev(&mut self, prev: *mut XmlNode) {
-        self.prev = prev;
+    fn set_prev(&mut self, prev: Option<NodePtr>) {
+        self.prev = prev.map_or(null_mut(), |p| p.as_ptr());
     }
     fn parent(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.parent as *mut XmlNode)
@@ -192,7 +192,7 @@ pub unsafe fn xml_create_int_subset(
             (*doc).last = cur as _;
         } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
             let prev = (*doc).children;
-            (*prev).prev = cur as _;
+            (*prev).prev = NodePtr::from_ptr(cur as *mut XmlNode);
             (*cur).next = prev;
             (*doc).children = cur as _;
         } else {
@@ -207,13 +207,13 @@ pub unsafe fn xml_create_int_subset(
                 (*doc).last = cur as _;
             } else {
                 (*cur).next = next;
-                (*cur).prev = (*next).prev;
+                (*cur).prev = (*next).prev.map_or(null_mut(), |p| p.as_ptr());
                 if (*cur).prev.is_null() {
                     (*doc).children = cur as _;
                 } else {
                     (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
                 }
-                (*next).prev = cur as _;
+                (*next).prev = NodePtr::from_ptr(cur as *mut XmlNode);
             }
         }
     }
