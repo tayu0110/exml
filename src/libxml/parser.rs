@@ -103,7 +103,7 @@ use crate::{
     },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
-        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, XmlAttrPtr,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr, XmlAttrPtr,
         XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties,
         XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
@@ -4832,7 +4832,7 @@ pub unsafe fn xml_parse_in_node_context(
      */
 
     cur = (*fake).next.take().map_or(null_mut(), |n| n.as_ptr());
-    (*node).last = fake;
+    (*node).last = NodePtr::from_ptr(fake);
 
     if !cur.is_null() {
         (*cur).prev = None;

@@ -1605,7 +1605,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         } else {
             (*ret).children = (*node).children;
         }
-        (*ret).last = (*ret).children.map_or(null_mut(), |c| c.as_ptr());
+        (*ret).last = (*ret).children;
     } else if let Some(children) = (*node).children.filter(|_| extended != 2) {
         let mut cur = children.as_ptr();
         let mut insert = ret;
@@ -1617,14 +1617,14 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
             }
 
             /* Check for coalesced text nodes */
-            if (*insert).last != copy {
-                if (*insert).last.is_null() {
-                    (*insert).children = NodePtr::from_ptr(copy);
+            if (*insert).last != NodePtr::from_ptr(copy) {
+                if let Some(mut last) = (*insert).last {
+                    (*copy).prev = Some(last);
+                    last.next = NodePtr::from_ptr(copy);
                 } else {
-                    (*copy).prev = NodePtr::from_ptr((*insert).last);
-                    (*(*insert).last).next = NodePtr::from_ptr(copy);
+                    (*insert).children = NodePtr::from_ptr(copy);
                 }
-                (*insert).last = copy;
+                (*insert).last = NodePtr::from_ptr(copy);
             }
 
             if let Some(children) = (*cur)
@@ -2070,9 +2070,9 @@ macro_rules! UPDATE_LAST_CHILD_AND_PARENT {
                     ulccur = next;
                 }
                 (*ulccur).parent = NodePtr::from_ptr($n);
-                (*$n).last = ulccur.as_ptr();
+                (*$n).last = Some(ulccur);
             } else {
-                (*$n).last = null_mut();
+                (*$n).last = None;
             }
         }
     };
@@ -2312,12 +2312,12 @@ pub unsafe extern "C" fn xml_new_child(
     (*cur).doc = (*parent).doc;
     if (*parent).children.is_none() {
         (*parent).children = NodePtr::from_ptr(cur);
-        (*parent).last = cur;
+        (*parent).last = NodePtr::from_ptr(cur);
     } else {
-        prev = (*parent).last;
+        prev = (*parent).last.map_or(null_mut(), |l| l.as_ptr());
         (*prev).next = NodePtr::from_ptr(cur);
         (*cur).prev = NodePtr::from_ptr(prev);
-        (*parent).last = cur;
+        (*parent).last = NodePtr::from_ptr(cur);
     }
 
     cur
@@ -2681,7 +2681,7 @@ pub unsafe extern "C" fn xml_new_reference(
          *  -George
          */
         (*cur).children = NodePtr::from_ptr(ent as *mut XmlNode);
-        (*cur).last = ent as _;
+        (*cur).last = NodePtr::from_ptr(ent as *mut XmlNode);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -2828,12 +2828,12 @@ pub unsafe extern "C" fn xml_new_text_child(
     (*cur).doc = (*parent).doc;
     if (*parent).children.is_none() {
         (*parent).children = NodePtr::from_ptr(cur);
-        (*parent).last = cur;
+        (*parent).last = NodePtr::from_ptr(cur);
     } else {
-        prev = (*parent).last;
+        prev = (*parent).last.map_or(null_mut(), |l| l.as_ptr());
         (*prev).next = NodePtr::from_ptr(cur);
         (*cur).prev = NodePtr::from_ptr(prev);
-        (*parent).last = cur;
+        (*parent).last = NodePtr::from_ptr(cur);
     }
 
     cur
@@ -2964,8 +2964,8 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
             if parent.children == NodePtr::from_ptr(old) {
                 parent.children = NodePtr::from_ptr(cur);
             }
-            if parent.last == old {
-                parent.last = cur;
+            if parent.last == NodePtr::from_ptr(old) {
+                parent.last = NodePtr::from_ptr(cur);
             }
         }
     }
@@ -4942,7 +4942,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                              */
                             (*cur).content = null_mut();
                             (*cur).children = None;
-                            (*cur).last = null_mut();
+                            (*cur).last = None;
                             if !(*dest_doc).int_subset.is_null()
                                 || !(*dest_doc).ext_subset.is_null()
                             {
@@ -4953,7 +4953,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                 if !ent.is_null() {
                                     (*cur).content = (*ent).content.load(Ordering::Relaxed);
                                     (*cur).children = NodePtr::from_ptr(ent as *mut XmlNode);
-                                    (*cur).last = ent as _;
+                                    (*cur).last = NodePtr::from_ptr(ent as *mut XmlNode);
                                 }
                             }
                             // goto leave_node;
@@ -5292,7 +5292,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
                  */
                 (*cur).content = null_mut();
                 (*cur).children = None;
-                (*cur).last = null_mut();
+                (*cur).last = None;
                 if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
                     /*
                      * Assign new entity-node if available.
@@ -5301,7 +5301,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
                     if !ent.is_null() {
                         (*cur).content = (*ent).content.load(Ordering::Relaxed);
                         (*cur).children = NodePtr::from_ptr(ent as *mut XmlNode);
-                        (*cur).last = ent as _;
+                        (*cur).last = NodePtr::from_ptr(ent as *mut XmlNode);
                     }
                 }
             }
@@ -5448,7 +5448,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
                  */
                 (*node).content = null_mut();
                 (*node).children = None;
-                (*node).last = null_mut();
+                (*node).last = None;
                 if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
                     /*
                      * Assign new entity-node if available.
@@ -5457,7 +5457,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
                     if !ent.is_null() {
                         (*node).content = (*ent).content.load(Ordering::Relaxed);
                         (*node).children = NodePtr::from_ptr(ent as *mut XmlNode);
-                        (*node).last = ent as _;
+                        (*node).last = NodePtr::from_ptr(ent as *mut XmlNode);
                     }
                 }
                 XML_TREE_ADOPT_STR!((*node).name, adopt_str, source_doc, dest_doc);
@@ -6096,7 +6096,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                 if !ent.is_null() {
                                     (*clone).content = (*ent).content.load(Ordering::Relaxed);
                                     (*clone).children = NodePtr::from_ptr(ent as *mut XmlNode);
-                                    (*clone).last = ent as _;
+                                    (*clone).last = NodePtr::from_ptr(ent as *mut XmlNode);
                                 }
                             }
                         } else {
@@ -6317,7 +6317,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                          * Set (*clone).last.
                          */
                         if let Some(mut parent) = (*clone).parent {
-                            parent.last = clone;
+                            parent.last = NodePtr::from_ptr(clone);
                         }
                         clone = (*clone).parent.map_or(null_mut(), |p| p.as_ptr());
                         if !clone.is_null() {

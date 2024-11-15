@@ -518,7 +518,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         .parent
         .filter(|p| {
             (*node).typ != XmlElementType::XmlAttributeNode
-                && p.last != node
+                && p.last != NodePtr::from_ptr(node)
                 && p.typ == XmlElementType::XmlElementNode
         })
         .is_some()
@@ -3186,7 +3186,7 @@ unsafe extern "C" fn xml_shell_set_content(
         if let Some(children) = (*node).children {
             xml_free_node_list(children.as_ptr());
             (*node).children = None;
-            (*node).last = null_mut();
+            (*node).last = None;
         }
         (*node).add_child_list(results);
     } else {

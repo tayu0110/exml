@@ -1256,7 +1256,7 @@ pub unsafe fn html_node_dump_format_output(
                         && !info.is_null()
                         && (*info).isinline == 0
                         && !matches!(children.typ, HTML_TEXT_NODE | HTML_ENTITY_REF_NODE)
-                        && (*cur).children != NodePtr::from_ptr((*cur).last)
+                        && (*cur).children != (*cur).last
                         && !(*cur).name.is_null()
                         && *(*cur).name.add(0) != b'p'
                     /* p, pre, param */
@@ -1405,8 +1405,11 @@ pub unsafe fn html_node_dump_format_output(
                 if format != 0
                     && !info.is_null()
                     && (*info).isinline == 0
-                    && !matches!((*(*cur).last).typ, HTML_TEXT_NODE | HTML_ENTITY_REF_NODE)
-                    && (*cur).children != NodePtr::from_ptr((*cur).last)
+                    && !matches!(
+                        (*cur).last.unwrap().typ,
+                        HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
+                    )
+                    && (*cur).children != (*cur).last
                     && !(*cur).name.is_null()
                     && *(*cur).name.add(0) != b'p'
                 /* p, pre, param */

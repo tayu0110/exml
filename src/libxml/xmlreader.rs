@@ -1984,7 +1984,7 @@ unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader)
                     let mut tmp: XmlNodePtr;
                     if reader.ent_nr == 0 {
                         while {
-                            tmp = (*node).last;
+                            tmp = (*node).last.map_or(null_mut(), |l| l.as_ptr());
                             !tmp.is_null()
                         } {
                             if (*tmp).extra & NODE_IS_PRESERVED as u16 == 0 {
@@ -2285,10 +2285,10 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                 if reader.preserves == 0
                     && f
                     && reader.ent_nr == 0
-                    && !(*reader.node).last.is_null()
-                    && (*(*reader.node).last).extra & NODE_IS_PRESERVED as u16 == 0
+                    && (*reader.node).last.is_some()
+                    && (*reader.node).last.unwrap().extra & NODE_IS_PRESERVED as u16 == 0
                 {
-                    let tmp: XmlNodePtr = (*reader.node).last;
+                    let tmp: XmlNodePtr = (*reader.node).last.unwrap().as_ptr();
                     (*tmp).unlink();
                     xml_text_reader_free_node(reader, tmp);
                 }

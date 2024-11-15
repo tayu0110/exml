@@ -3399,8 +3399,6 @@ unsafe extern "C" fn xml_sax2_text(
     len: i32,
     typ: XmlElementType,
 ) {
-    let mut last_child: XmlNodePtr;
-
     if ctxt.is_null() {
         return;
     }
@@ -3412,7 +3410,7 @@ unsafe extern "C" fn xml_sax2_text(
     if (*ctxt).node.is_null() {
         return;
     }
-    last_child = (*(*ctxt).node).last;
+    let mut last_child = (*(*ctxt).node).last.map_or(null_mut(), |l| l.as_ptr());
 
     /*
      * Here we needed an accelerator mechanism in case of very large
@@ -3426,7 +3424,7 @@ unsafe extern "C" fn xml_sax2_text(
         }
         if !last_child.is_null() {
             (*(*ctxt).node).children = NodePtr::from_ptr(last_child);
-            (*(*ctxt).node).last = last_child;
+            (*(*ctxt).node).last = NodePtr::from_ptr(last_child);
             (*last_child).parent = NodePtr::from_ptr((*ctxt).node);
             (*last_child).doc = (*(*ctxt).node).doc;
             (*ctxt).nodelen = len;

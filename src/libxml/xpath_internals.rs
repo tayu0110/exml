@@ -6879,8 +6879,8 @@ unsafe extern "C" fn xml_xpath_next_preceding_internal(
         (*ctxt).ancestor = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     }
     cur = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
-    while !(*cur).last.is_null() {
-        cur = (*cur).last;
+    while let Some(last) = (*cur).last {
+        cur = last.as_ptr();
     }
     cur
 }
@@ -12315,8 +12315,8 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
     loop {
         if let Some(prev) = (*cur).prev {
             cur = prev.as_ptr();
-            while !(*cur).last.is_null() {
-                cur = (*cur).last;
+            while let Some(last) = (*cur).last {
+                cur = last.as_ptr();
             }
             return cur;
         }
