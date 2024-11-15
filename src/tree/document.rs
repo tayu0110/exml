@@ -30,7 +30,7 @@ pub struct XmlDoc {
     pub(crate) _private: *mut c_void, /* application data */
     pub(crate) typ: XmlElementType,   /* XML_DOCUMENT_NODE, must be second ! */
     pub(crate) name: *mut i8,         /* name/filename/URI of the document */
-    pub children: *mut XmlNode,       /* the document tree */
+    pub children: Option<NodePtr>,    /* the document tree */
     pub(crate) last: *mut XmlNode,    /* last child link */
     pub(crate) parent: *mut XmlNode,  /* child->parent link */
     pub(crate) next: *mut XmlNode,    /* next sibling link  */
@@ -68,14 +68,12 @@ impl XmlDoc {
     /// Returns a pointer to the DTD structure or null_mut() if not found
     #[doc(alias = "xmlGetIntSubset")]
     pub unsafe fn get_int_subset(&self) -> XmlDtdPtr {
-        let mut cur: XmlNodePtr;
-
-        cur = self.children;
-        while !cur.is_null() {
-            if matches!((*cur).typ, XmlElementType::XmlDTDNode) {
-                return cur as _;
+        let mut cur = self.children;
+        while let Some(now) = cur {
+            if matches!(now.typ, XmlElementType::XmlDTDNode) {
+                return now.as_ptr() as *mut XmlDtd;
             }
-            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+            cur = now.next;
         }
         self.int_subset
     }
@@ -87,13 +85,13 @@ impl XmlDoc {
     #[doc(alias = "xmlDocGetRootElement")]
     pub unsafe fn get_root_element(&self) -> XmlNodePtr {
         let mut ret = self.children;
-        while !ret.is_null() {
-            if matches!((*ret).typ, XmlElementType::XmlElementNode) {
-                return ret;
+        while let Some(now) = ret {
+            if matches!(now.typ, XmlElementType::XmlElementNode) {
+                return now.as_ptr();
             }
-            ret = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
+            ret = now.next;
         }
-        ret
+        ret.map_or(null_mut(), |r| r.as_ptr())
     }
 
     /// Get the compression ratio for a document, ZLIB based.
@@ -689,23 +687,21 @@ impl XmlDoc {
         (*root).set_doc(self);
         (*root).parent = NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode);
         let mut old = self.children;
-        while !old.is_null() {
-            if matches!((*old).typ, XmlElementType::XmlElementNode) {
+        while let Some(now) = old {
+            if matches!(now.typ, XmlElementType::XmlElementNode) {
                 break;
             }
-            old = (*old).next.map_or(null_mut(), |n| n.as_ptr());
+            old = now.next;
         }
-        if old.is_null() {
-            if self.children.is_null() {
-                self.children = root;
-                self.last = root;
-            } else {
-                (*self.children).add_sibling(root);
-            }
+        if let Some(old) = old {
+            xml_replace_node(old.as_ptr(), root);
+        } else if let Some(mut children) = self.children {
+            children.add_sibling(root);
         } else {
-            xml_replace_node(old, root);
+            self.children = NodePtr::from_ptr(root);
+            self.last = root;
         }
-        old
+        old.map_or(null_mut(), |o| o.as_ptr())
     }
 
     /// Set the compression ratio for a document, ZLIB based.
@@ -756,10 +752,10 @@ impl NodeCommon for XmlDoc {
     fn name(&self) -> *const u8 {
         self.name as *const u8
     }
-    fn children(&self) -> *mut XmlNode {
+    fn children(&self) -> Option<NodePtr> {
         self.children
     }
-    fn set_children(&mut self, children: *mut XmlNode) {
+    fn set_children(&mut self, children: Option<NodePtr>) {
         self.children = children
     }
     fn last(&self) -> Option<NodePtr> {
@@ -794,7 +790,7 @@ impl Default for XmlDoc {
             _private: null_mut(),
             typ: XmlElementType::default(),
             name: null_mut(),
-            children: null_mut(),
+            children: None,
             last: null_mut(),
             parent: null_mut(),
             next: null_mut(),

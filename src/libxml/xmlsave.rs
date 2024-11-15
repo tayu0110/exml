@@ -1659,30 +1659,30 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                 }
             }
         }
-        if !(*cur).children.is_null() {
-            let mut child: XmlNodePtr = (*cur).children;
+        if let Some(children) = (*cur).children {
+            let mut child = Some(children);
 
-            while !child.is_null() {
+            while let Some(now) = child {
                 (*ctxt).level = 0;
                 #[cfg(feature = "html")]
                 {
                     if is_html {
-                        xhtml_node_dump_output(ctxt, child);
+                        xhtml_node_dump_output(ctxt, now.as_ptr());
                     } else {
-                        xml_node_dump_output_internal(ctxt, child);
+                        xml_node_dump_output_internal(ctxt, now.as_ptr());
                     }
                 }
                 #[cfg(not(feature = "html"))]
                 {
-                    xml_node_dump_output_internal(ctxt, child);
+                    xml_node_dump_output_internal(ctxt, now.as_ptr());
                 }
                 if !matches!(
-                    (*child).typ,
+                    now.typ,
                     XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
                 ) {
                     (*buf).write_bytes(b"\n");
                 }
-                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+                child = now.next;
             }
         }
     }

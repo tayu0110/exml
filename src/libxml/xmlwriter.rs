@@ -661,7 +661,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
             (*ctxt).my_doc = doc;
         }
         if !doc.is_null() {
-            if (*doc).children.is_null() {
+            if (*doc).children.is_none() {
                 (*doc).encoding = (*ctxt).encoding().map(|e| e.to_owned());
                 (*doc).standalone = (*ctxt).standalone;
             }

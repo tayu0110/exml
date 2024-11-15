@@ -111,11 +111,11 @@ impl NodeCommon for XmlAttr {
     fn name(&self) -> *const u8 {
         self.name
     }
-    fn children(&self) -> *mut XmlNode {
-        self.children
+    fn children(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.children)
     }
-    fn set_children(&mut self, children: *mut XmlNode) {
-        self.children = children
+    fn set_children(&mut self, children: Option<NodePtr>) {
+        self.children = children.map_or(null_mut(), |c| c.as_ptr())
     }
     fn last(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.last)

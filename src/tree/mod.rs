@@ -1170,8 +1170,8 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
         xml_free_dtd(int_subset);
     }
 
-    if !(*cur).children.is_null() {
-        xml_free_node_list((*cur).children);
+    if let Some(children) = (*cur).children {
+        xml_free_node_list(children.as_ptr());
     }
     if !(*cur).old_ns.is_null() {
         xml_free_ns_list((*cur).old_ns);
@@ -2029,7 +2029,7 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
     }
 
     (*ret).last = null_mut();
-    (*ret).children = null_mut();
+    (*ret).children = None;
     #[cfg(feature = "tree")]
     {
         if !(*doc).int_subset.is_null() {
@@ -2045,17 +2045,16 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
     if !(*doc).old_ns.is_null() {
         (*ret).old_ns = xml_copy_namespace_list((*doc).old_ns);
     }
-    if !(*doc).children.is_null() {
-        let mut tmp: XmlNodePtr;
-
-        (*ret).children = xml_static_copy_node_list((*doc).children, ret, ret as _);
+    if let Some(children) = (*doc).children {
+        (*ret).children =
+            NodePtr::from_ptr(xml_static_copy_node_list(children.as_ptr(), ret, ret as _));
         (*ret).last = null_mut();
-        tmp = (*ret).children;
-        while !tmp.is_null() {
-            if (*tmp).next.is_none() {
-                (*ret).last = tmp;
+        let mut tmp = (*ret).children;
+        while let Some(now) = tmp {
+            if now.next.is_none() {
+                (*ret).last = now.as_ptr();
             }
-            tmp = (*tmp).next.map_or(null_mut(), |c| c.as_ptr());
+            tmp = now.next;
         }
     }
     ret

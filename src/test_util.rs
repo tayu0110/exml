@@ -788,10 +788,10 @@ unsafe extern "C" fn get_api_dtd() -> XmlDtdPtr {
     if API_DTD.get().is_null() || (*API_DTD.get()).typ != XmlElementType::XmlDTDNode {
         get_api_doc();
         if !API_DOC.get().is_null()
-            && !(*API_DOC.get()).children.is_null()
-            && (*(*API_DOC.get()).children).typ == XmlElementType::XmlDTDNode
+            && (*API_DOC.get()).children.is_some()
+            && (*API_DOC.get()).children.unwrap().typ == XmlElementType::XmlDTDNode
         {
-            API_DTD.set((*API_DOC.get()).children as XmlDtdPtr);
+            API_DTD.set((*API_DOC.get()).children.unwrap().as_ptr() as XmlDtdPtr);
         }
     }
     API_DTD.get()
@@ -1305,11 +1305,12 @@ unsafe extern "C" fn get_api_root() -> XmlNodePtr {
     if (API_ROOT.get().is_null()) || (*API_ROOT.get()).typ != XmlElementType::XmlElementNode {
         get_api_doc();
         if !API_DOC.get().is_null()
-            && !(*API_DOC.get()).children.is_null()
-            && (*(*API_DOC.get()).children).next.is_some()
-            && (*(*API_DOC.get()).children).next.unwrap().typ == XmlElementType::XmlElementNode
+            && (*API_DOC.get()).children.is_some()
+            && (*API_DOC.get()).children.unwrap().next.is_some()
+            && (*API_DOC.get()).children.unwrap().next.unwrap().typ
+                == XmlElementType::XmlElementNode
         {
-            API_ROOT.set((*(*API_DOC.get()).children).next.unwrap().as_ptr());
+            API_ROOT.set((*API_DOC.get()).children.unwrap().next.unwrap().as_ptr());
         }
     }
     API_ROOT.get()

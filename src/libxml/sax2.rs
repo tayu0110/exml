@@ -2324,10 +2324,12 @@ pub unsafe fn xml_sax2_start_element(
         xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
         return;
     }
-    if (*(*ctxt).my_doc).children.is_null() {
+    if let Some(children) = (*(*ctxt).my_doc).children {
+        if parent.is_null() {
+            parent = children.as_ptr();
+        }
+    } else {
         (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
-    } else if parent.is_null() {
-        parent = (*(*ctxt).my_doc).children;
     }
     (*ctxt).nodemem = -1;
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {

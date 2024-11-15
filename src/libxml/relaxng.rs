@@ -3536,8 +3536,13 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
             let href: *mut XmlChar = null_mut();
             let inc: XmlRelaxNGDocumentPtr = (*tmp).psvi as _;
 
-            if (!inc.is_null() && !(*inc).doc.is_null() && !(*(*inc).doc).children.is_null())
-                && xml_str_equal((*(*(*inc).doc).children).name, c"grammar".as_ptr() as _)
+            if !inc.is_null()
+                && !(*inc).doc.is_null()
+                && (*(*inc).doc).children.is_some()
+                && xml_str_equal(
+                    (*(*inc).doc).children.unwrap().name,
+                    c"grammar".as_ptr() as _,
+                )
                 && xml_relaxng_remove_redefine(
                     _ctxt,
                     href,

@@ -36,8 +36,8 @@ use super::{
 pub trait NodeCommon {
     fn element_type(&self) -> XmlElementType;
     fn name(&self) -> *const u8;
-    fn children(&self) -> *mut XmlNode;
-    fn set_children(&mut self, children: *mut XmlNode);
+    fn children(&self) -> Option<NodePtr>;
+    fn set_children(&mut self, children: Option<NodePtr>);
     fn last(&self) -> Option<NodePtr>;
     fn set_last(&mut self, last: Option<NodePtr>);
     fn parent(&self) -> Option<NodePtr>;
@@ -172,8 +172,8 @@ pub trait NodeCommon {
                 (*lastattr).next = cur as _;
                 (*(cur as *mut XmlAttr)).prev = lastattr;
             }
-        } else if self.children().is_null() {
-            self.set_children(cur);
+        } else if self.children().is_none() {
+            self.set_children(NodePtr::from_ptr(cur));
             self.set_last(NodePtr::from_ptr(cur));
         } else {
             prev = self.last().map_or(null_mut(), |l| l.as_ptr());
@@ -752,7 +752,7 @@ impl XmlNode {
         }
         let mut cur = self as *const XmlNode;
         if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
-            cur = (*doc).children;
+            cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
             while !cur.is_null() && !(*cur).name.is_null() {
                 if !matches!((*cur).typ, XmlElementType::XmlElementNode) {
                     cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
@@ -3136,11 +3136,11 @@ impl NodeCommon for XmlNode {
     fn name(&self) -> *const u8 {
         self.name
     }
-    fn children(&self) -> *mut XmlNode {
-        self.children.map_or(null_mut(), |c| c.as_ptr())
+    fn children(&self) -> Option<NodePtr> {
+        self.children
     }
-    fn set_children(&mut self, children: *mut XmlNode) {
-        self.children = NodePtr::from_ptr(children);
+    fn set_children(&mut self, children: Option<NodePtr>) {
+        self.children = children;
     }
     fn last(&self) -> Option<NodePtr> {
         self.last

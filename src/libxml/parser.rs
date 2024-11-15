@@ -4966,7 +4966,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*ctxt).my_doc = new_doc;
     } else {
         (*ctxt).my_doc = new_doc;
-        (*(*new_doc).children).doc = doc;
+        (*new_doc).children.unwrap().doc = doc;
         /* Ensure that doc has XML spec namespace */
         (*(doc as *mut XmlNode)).search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap());
         (*new_doc).old_ns = (*doc).old_ns;
@@ -4983,10 +4983,9 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     (*ctxt).detect_sax2();
 
     if !doc.is_null() {
-        content = (*doc).children;
-        (*doc).children = null_mut();
+        content = (*doc).children.take().map_or(null_mut(), |c| c.as_ptr());
         xml_parse_content(ctxt);
-        (*doc).children = content;
+        (*doc).children = NodePtr::from_ptr(content);
     } else {
         xml_parse_content(ctxt);
     }
@@ -4995,7 +4994,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, null());
     }
-    if (*ctxt).node != (*new_doc).children {
+    if NodePtr::from_ptr((*ctxt).node) != (*new_doc).children {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, null());
     }
 
@@ -5014,7 +5013,9 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
          * Return the newly created nodeset after unlinking it from
          * they pseudo parent.
          */
-        let mut cur = (*(*new_doc).children)
+        let mut cur = (*new_doc)
+            .children
+            .unwrap()
             .children
             .map_or(null_mut(), |c| c.as_ptr());
         *lst = cur;
@@ -5023,7 +5024,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             (*cur).parent = None;
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        (*(*new_doc).children).children = None;
+        (*new_doc).children.unwrap().children = None;
     }
 
     if !sax.is_null() {
@@ -5131,7 +5132,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         return XmlParserErrors::XmlErrInternalError;
     }
     (*new_doc).add_child(new_root);
-    (*ctxt).node_push((*new_doc).children);
+    (*ctxt).node_push((*new_doc).children.map_or(null_mut(), |c| c.as_ptr()));
     if doc.is_null() {
         (*ctxt).my_doc = new_doc;
     } else {
@@ -5225,7 +5226,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, null());
     }
-    if (*ctxt).node != (*new_doc).children {
+    if NodePtr::from_ptr((*ctxt).node) != (*new_doc).children {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, null());
     }
 
@@ -5239,7 +5240,9 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     } else {
         if !list.is_null() {
             // Return the newly created nodeset after unlinking it from they pseudo parent.
-            let mut cur = (*(*new_doc).children)
+            let mut cur = (*new_doc)
+                .children
+                .unwrap()
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
             *list = cur;
@@ -5247,7 +5250,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
                 (*cur).parent = None;
                 cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             }
-            (*(*new_doc).children).children = None;
+            (*new_doc).children.unwrap().children = None;
         }
         ret = XmlParserErrors::XmlErrOK;
     }
@@ -10558,7 +10561,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         && (*ctxt).well_formed != 0
                         && !(*ctxt).my_doc.is_null()
                         && !(*ctxt).node.is_null()
-                        && (*ctxt).node == (*(*ctxt).my_doc).children
+                        && NodePtr::from_ptr((*ctxt).node) == (*(*ctxt).my_doc).children
                     {
                         (*ctxt).valid &=
                             xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);

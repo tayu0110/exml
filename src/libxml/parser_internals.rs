@@ -3887,7 +3887,9 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         (*ctxt).my_doc = new_doc;
     } else {
         (*ctxt).my_doc = (*oldctxt).my_doc;
-        content = (*(*ctxt).my_doc).children;
+        content = (*(*ctxt).my_doc)
+            .children
+            .map_or(null_mut(), |c| c.as_ptr());
         last = (*(*ctxt).my_doc).last;
     }
     let new_root: XmlNodePtr = xml_new_doc_node(
@@ -3905,10 +3907,14 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         }
         return XmlParserErrors::XmlErrInternalError;
     }
-    (*(*ctxt).my_doc).children = null_mut();
+    (*(*ctxt).my_doc).children = None;
     (*(*ctxt).my_doc).last = null_mut();
     (*(*ctxt).my_doc).add_child(new_root);
-    (*ctxt).node_push((*(*ctxt).my_doc).children);
+    (*ctxt).node_push(
+        (*(*ctxt).my_doc)
+            .children
+            .map_or(null_mut(), |c| c.as_ptr()),
+    );
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).depth = (*oldctxt).depth;
 
@@ -3930,7 +3936,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, null());
     }
-    if (*ctxt).node != (*(*ctxt).my_doc).children {
+    if NodePtr::from_ptr((*ctxt).node) != (*(*ctxt).my_doc).children {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, null());
     }
 
@@ -3946,7 +3952,9 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     if !lst.is_null() && matches!(ret, XmlParserErrors::XmlErrOK) {
         // Return the newly created nodeset after unlinking it from
         // they pseudo parent.
-        let mut cur = (*(*(*ctxt).my_doc).children)
+        let mut cur = (*(*ctxt).my_doc)
+            .children
+            .unwrap()
             .children
             .map_or(null_mut(), |c| c.as_ptr());
         *lst = cur;
@@ -3964,11 +3972,15 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             (*cur).parent = None;
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        (*(*(*ctxt).my_doc).children).children = None;
+        (*(*ctxt).my_doc).children.unwrap().children = None;
     }
     if !(*ctxt).my_doc.is_null() {
-        xml_free_node((*(*ctxt).my_doc).children);
-        (*(*ctxt).my_doc).children = content;
+        xml_free_node(
+            (*(*ctxt).my_doc)
+                .children
+                .map_or(null_mut(), |c| c.as_ptr()),
+        );
+        (*(*ctxt).my_doc).children = NodePtr::from_ptr(content);
         (*(*ctxt).my_doc).last = last;
     }
 
@@ -5272,7 +5284,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         && (*ctxt).well_formed != 0
         && !(*ctxt).my_doc.is_null()
         && !(*ctxt).node.is_null()
-        && (*ctxt).node == (*(*ctxt).my_doc).children
+        && NodePtr::from_ptr((*ctxt).node) == (*(*ctxt).my_doc).children
     {
         (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt), (*ctxt).my_doc);
     }

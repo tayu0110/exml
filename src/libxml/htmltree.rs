@@ -118,7 +118,7 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     (*cur).int_subset = null_mut();
     (*cur).doc = cur;
     (*cur).name = null_mut();
-    (*cur).children = null_mut();
+    (*cur).children = None;
     (*cur).ext_subset = null_mut();
     (*cur).old_ns = null_mut();
     (*cur).encoding = None;
@@ -157,7 +157,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
     if doc.is_null() {
         return None;
     }
-    cur = (*doc).children;
+    cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
 
     /*
      * Search the html
@@ -308,7 +308,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         String::new()
     };
 
-    cur = (*doc).children;
+    cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
 
     let mut found_head = false;
     let mut found_meta = false;

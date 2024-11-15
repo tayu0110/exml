@@ -2733,14 +2733,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         {
             let mut list: [*const XmlChar; 256] = [null(); 256];
 
-            if !(*doc).children.is_null() {
-                let mut node = (*doc).children;
-                while !node.is_null() && (*node).last.is_none() {
-                    node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
+            if let Some(children) = (*doc).children {
+                let mut node = Some(children);
+                while let Some(now) = node.filter(|n| n.last.is_none()) {
+                    node = now.next;
                 }
-                if !node.is_null() {
+                if let Some(node) = node {
                     let nb = xml_valid_get_valid_elements(
-                        (*node).last.map_or(null_mut(), |l| l.as_ptr()),
+                        node.last.map_or(null_mut(), |l| l.as_ptr()),
                         null_mut(),
                         list.as_mut_ptr(),
                         256,

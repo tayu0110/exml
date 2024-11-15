@@ -94,11 +94,11 @@ impl NodeCommon for XmlDtd {
     fn name(&self) -> *const u8 {
         self.name
     }
-    fn children(&self) -> *mut XmlNode {
-        self.children
+    fn children(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.children)
     }
-    fn set_children(&mut self, children: *mut XmlNode) {
-        self.children = children
+    fn set_children(&mut self, children: Option<NodePtr>) {
+        self.children = children.map_or(null_mut(), |c| c.as_ptr())
     }
     fn last(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.last)
@@ -187,34 +187,38 @@ pub unsafe fn xml_create_int_subset(
         (*doc).int_subset = cur;
         (*cur).parent = doc;
         (*cur).doc = doc;
-        if (*doc).children.is_null() {
-            (*doc).children = cur as _;
-            (*doc).last = cur as _;
-        } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
-            let prev = (*doc).children;
-            (*prev).prev = NodePtr::from_ptr(cur as *mut XmlNode);
-            (*cur).next = prev;
-            (*doc).children = cur as _;
-        } else {
-            let mut next = (*doc).children;
-            while !next.is_null() && !matches!((*next).typ, XmlElementType::XmlElementNode) {
-                next = (*next).next.map_or(null_mut(), |n| n.as_ptr());
-            }
-            if next.is_null() {
-                (*cur).prev = (*doc).last;
-                (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
-                (*cur).next = null_mut();
-                (*doc).last = cur as _;
+        if let Some(children) = (*doc).children {
+            if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
+                let mut prev = children;
+                prev.prev = NodePtr::from_ptr(cur as *mut XmlNode);
+                (*cur).next = prev.as_ptr();
+                (*doc).children = NodePtr::from_ptr(cur as *mut XmlNode);
             } else {
-                (*cur).next = next;
-                (*cur).prev = (*next).prev.map_or(null_mut(), |p| p.as_ptr());
-                if (*cur).prev.is_null() {
-                    (*doc).children = cur as _;
-                } else {
-                    (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
+                let mut next = Some(children);
+                while let Some(now) =
+                    next.filter(|n| !matches!(n.typ, XmlElementType::XmlElementNode))
+                {
+                    next = now.next;
                 }
-                (*next).prev = NodePtr::from_ptr(cur as *mut XmlNode);
+                if let Some(mut next) = next {
+                    (*cur).next = next.as_ptr();
+                    (*cur).prev = next.prev.map_or(null_mut(), |p| p.as_ptr());
+                    if (*cur).prev.is_null() {
+                        (*doc).children = NodePtr::from_ptr(cur as *mut XmlNode);
+                    } else {
+                        (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
+                    }
+                    next.prev = NodePtr::from_ptr(cur as *mut XmlNode);
+                } else {
+                    (*cur).prev = (*doc).last;
+                    (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
+                    (*cur).next = null_mut();
+                    (*doc).last = cur as _;
+                }
             }
+        } else {
+            (*doc).children = NodePtr::from_ptr(cur as *mut XmlNode);
+            (*doc).last = cur as _;
         }
     }
 

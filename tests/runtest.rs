@@ -4664,7 +4664,7 @@ unsafe extern "C" fn load_xpath_expr(
         return null_mut();
     }
 
-    node = (*doc).children;
+    node = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
     while !node.is_null() && !xml_str_equal((*node).name, c"XPath".as_ptr() as *const XmlChar) {
         node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
     }

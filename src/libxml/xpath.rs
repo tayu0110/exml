@@ -1854,12 +1854,11 @@ pub unsafe extern "C" fn xml_xpath_context_set_cache(
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
     let mut count: isize = 0;
-    let mut cur: XmlNodePtr;
 
     if doc.is_null() {
         return -1;
     }
-    cur = (*doc).children;
+    let mut cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         if matches!((*cur).typ, XmlElementType::XmlElementNode) {
             count += 1;

@@ -1153,12 +1153,12 @@ unsafe extern "C" fn xml_text_reader_read_tree(reader: &mut XmlTextReader) -> i3
     // next_node:
     'next_node: loop {
         if reader.node.is_null() {
-            if (*reader.doc).children.is_null() {
+            let Some(children) = (*reader.doc).children else {
                 reader.state = XmlTextReaderState::End;
                 return 0;
-            }
+            };
 
-            reader.node = (*reader.doc).children;
+            reader.node = children.as_ptr();
             reader.state = XmlTextReaderState::Start;
             // goto found_node;
         } else {
@@ -2074,7 +2074,9 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
         } {}
         if (*reader.ctxt).node.is_null() {
             if !(*reader.ctxt).my_doc.is_null() {
-                reader.node = (*(*reader.ctxt).my_doc).children;
+                reader.node = (*(*reader.ctxt).my_doc)
+                    .children
+                    .map_or(null_mut(), |c| c.as_ptr());
             }
             if reader.node.is_null() {
                 reader.mode = XmlTextReaderMode::XmlTextreaderModeError as i32;
@@ -2084,7 +2086,9 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
             reader.state = XmlTextReaderState::Element;
         } else {
             if !(*reader.ctxt).my_doc.is_null() {
-                reader.node = (*(*reader.ctxt).my_doc).children;
+                reader.node = (*(*reader.ctxt).my_doc)
+                    .children
+                    .map_or(null_mut(), |c| c.as_ptr());
             }
             if reader.node.is_null() {
                 reader.node = (*reader.ctxt).node_tab[0];
@@ -3692,8 +3696,8 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
         xml_free_dtd(int_subset);
     }
 
-    if !(*cur).children.is_null() {
-        xml_text_reader_free_node_list(reader, (*cur).children);
+    if let Some(children) = (*cur).children {
+        xml_text_reader_free_node_list(reader, children.as_ptr());
     }
 
     (*cur).version = None;
@@ -4791,12 +4795,12 @@ unsafe extern "C" fn xml_text_reader_next_tree(reader: &mut XmlTextReader) -> i3
     }
 
     if reader.node.is_null() {
-        if (*reader.doc).children.is_null() {
+        let Some(children) = (*reader.doc).children else {
             reader.state = XmlTextReaderState::End;
             return 0;
-        }
+        };
 
-        reader.node = (*reader.doc).children;
+        reader.node = children.as_ptr();
         reader.state = XmlTextReaderState::Start;
         return 1;
     }

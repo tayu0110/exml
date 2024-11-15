@@ -6870,7 +6870,7 @@ unsafe extern "C" fn xml_xpath_next_preceding_internal(
         if cur.is_null() {
             return null_mut();
         }
-        if cur == (*(*(*ctxt).context).doc).children {
+        if NodePtr::from_ptr(cur) == (*(*(*ctxt).context).doc).children {
             return null_mut();
         }
         if cur != (*ctxt).ancestor {
@@ -11771,7 +11771,9 @@ pub unsafe extern "C" fn xml_xpath_next_child(
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlHTMLDocumentNode => {
-                return (*((*(*ctxt).context).node as XmlDocPtr)).children;
+                return (*((*(*ctxt).context).node as XmlDocPtr))
+                    .children
+                    .map_or(null_mut(), |c| c.as_ptr());
             }
             XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
@@ -11824,7 +11826,9 @@ pub unsafe extern "C" fn xml_xpath_next_descendant(
         }
 
         if (*(*ctxt).context).node == (*(*ctxt).context).doc as XmlNodePtr {
-            return (*(*(*ctxt).context).doc).children;
+            return (*(*(*ctxt).context).doc)
+                .children
+                .map_or(null_mut(), |c| c.as_ptr());
         }
         return (*(*(*ctxt).context).node)
             .children
@@ -12325,7 +12329,7 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
         if cur.is_null() {
             return null_mut();
         }
-        if cur == (*(*(*ctxt).context).doc).children {
+        if NodePtr::from_ptr(cur) == (*(*(*ctxt).context).doc).children {
             return null_mut();
         }
         if xml_xpath_is_ancestor(cur, (*(*ctxt).context).node) == 0 {
@@ -12416,7 +12420,7 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
             _ => unreachable!(),
         }
     }
-    if cur == (*(*(*ctxt).context).doc).children {
+    if NodePtr::from_ptr(cur) == (*(*(*ctxt).context).doc).children {
         return (*(*ctxt).context).doc as XmlNodePtr;
     }
     if cur == (*(*ctxt).context).doc as XmlNodePtr {

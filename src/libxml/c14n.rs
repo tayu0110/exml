@@ -2580,8 +2580,8 @@ pub unsafe extern "C" fn xml_c14n_execute(
      * XML declaration, nor anything from within the document type
      * declaration.
      */
-    if !(*doc).children.is_null() {
-        ret = xml_c14n_process_node_list(ctx, (*doc).children);
+    if let Some(children) = (*doc).children {
+        ret = xml_c14n_process_node_list(ctx, children.as_ptr());
         if ret < 0 {
             xml_c14n_err_internal(c"processing docs children list".as_ptr() as _);
             xml_c14n_free_ctx(ctx);
