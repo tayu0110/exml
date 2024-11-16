@@ -2886,7 +2886,9 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
         }
         tmp = ret;
         while !tmp.is_null() {
-            if xml_str_equal(name, (*tmp).name) {
+            if Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref()
+                == (*tmp).name.as_deref()
+            {
                 xml_validity_error(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
@@ -2902,7 +2904,9 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
             tmp = (*tmp).next;
         }
         if tmp.is_null() {
-            cur = xml_create_enumeration(name);
+            cur = xml_create_enumeration(
+                Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref(),
+            );
             if cur.is_null() {
                 xml_free_enumeration(ret);
                 return null_mut();
@@ -2967,7 +2971,9 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
         }
         tmp = ret;
         while !tmp.is_null() {
-            if xml_str_equal(name, (*tmp).name) {
+            if Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref()
+                == (*tmp).name.as_deref()
+            {
                 xml_validity_error(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
@@ -2983,7 +2989,9 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
             tmp = (*tmp).next;
         }
         if tmp.is_null() {
-            cur = xml_create_enumeration(name);
+            cur = xml_create_enumeration(
+                Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref(),
+            );
             if xml_dict_owns((*ctxt).dict, name) == 0 {
                 xml_free(name as _);
             }

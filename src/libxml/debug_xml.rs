@@ -848,10 +848,11 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
             let mut cur: XmlEnumerationPtr = (*attr).tree;
 
             for indx in 0..5 {
+                let name = CString::new((*cur).name.as_deref().unwrap()).unwrap();
                 if indx != 0 {
-                    fprintf((*ctxt).output, c"|%s".as_ptr(), (*cur).name as *mut c_char);
+                    fprintf((*ctxt).output, c"|%s".as_ptr(), name.as_ptr());
                 } else {
-                    fprintf((*ctxt).output, c" (%s".as_ptr(), (*cur).name as *mut c_char);
+                    fprintf((*ctxt).output, c" (%s".as_ptr(), name.as_ptr());
                 }
                 cur = (*cur).next;
                 if cur.is_null() {
