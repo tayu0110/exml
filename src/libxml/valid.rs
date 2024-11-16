@@ -1443,7 +1443,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
         (*dtd).last = (*dtd).children;
     } else {
         (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev = (*dtd).last;
+        (*ret).prev = NodePtr::from_ptr((*dtd).last);
         (*dtd).last = ret as XmlNodePtr;
     }
     if !uqname.is_null() {
