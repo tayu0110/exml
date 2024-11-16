@@ -5843,7 +5843,14 @@ pub unsafe extern "C" fn xml_parse_external_subset(
         (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
     }
     if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).int_subset.is_null() {
-        xml_create_int_subset((*ctxt).my_doc, null(), external_id, system_id);
+        xml_create_int_subset(
+            (*ctxt).my_doc,
+            null(),
+            (!external_id.is_null())
+                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                .as_deref(),
+            system_id,
+        );
     }
 
     (*ctxt).instate = XmlParserInputState::XmlParserDTD;

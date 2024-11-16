@@ -155,7 +155,7 @@ impl NodeCommon for XmlDtd {
 pub unsafe fn xml_create_int_subset(
     doc: XmlDocPtr,
     name: *const XmlChar,
-    external_id: *const XmlChar,
+    external_id: Option<&str>,
     system_id: *const XmlChar,
 ) -> XmlDtdPtr {
     if !doc.is_null() && !(*doc).get_int_subset().is_null() {
@@ -182,13 +182,7 @@ pub unsafe fn xml_create_int_subset(
             return null_mut();
         }
     }
-    if !external_id.is_null() {
-        (*cur).external_id = Some(
-            CStr::from_ptr(external_id as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-    }
+    (*cur).external_id = external_id.map(|e| e.to_owned());
     if !system_id.is_null() {
         (*cur).system_id = xml_strdup(system_id);
         if (*cur).system_id.is_null() {

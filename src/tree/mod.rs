@@ -6697,50 +6697,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_create_int_subset() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let doc = gen_xml_doc_ptr(n_doc, 0);
-                            let name = gen_const_xml_char_ptr(n_name, 1);
-                            let external_id = gen_const_xml_char_ptr(n_external_id, 2);
-                            let system_id = gen_const_xml_char_ptr(n_system_id, 3);
-
-                            let ret_val = xml_create_int_subset(doc, name, external_id, system_id);
-                            desret_xml_dtd_ptr(ret_val);
-                            des_xml_doc_ptr(n_doc, doc, 0);
-                            des_const_xml_char_ptr(n_name, name, 1);
-                            des_const_xml_char_ptr(n_external_id, external_id, 2);
-                            des_const_xml_char_ptr(n_system_id, system_id, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlCreateIntSubset",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlCreateIntSubset()"
-                                );
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_name);
-                                eprint!(" {}", n_external_id);
-                                eprintln!(" {}", n_system_id);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_domwrap_clone_node() {
         unsafe {
             let mut leaks = 0;

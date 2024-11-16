@@ -314,8 +314,14 @@ pub unsafe fn xml_sax2_internal_subset(
         xml_free_dtd(dtd);
         (*(*ctxt).my_doc).int_subset = null_mut();
     }
-    (*(*ctxt).my_doc).int_subset =
-        xml_create_int_subset((*ctxt).my_doc, name, external_id, system_id);
+    (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
+        (*ctxt).my_doc,
+        name,
+        (!external_id.is_null())
+            .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+            .as_deref(),
+        system_id,
+    );
     if (*(*ctxt).my_doc).int_subset.is_null() {
         xml_sax2_err_memory(ctxt, c"xmlSAX2InternalSubset".as_ptr() as _);
     }

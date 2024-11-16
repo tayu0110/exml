@@ -131,7 +131,14 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     (*cur).properties =
         XmlDocProperties::XmlDocHTML as i32 | XmlDocProperties::XmlDocUserbuilt as i32;
     if !external_id.is_null() || !uri.is_null() {
-        xml_create_int_subset(cur, c"html".as_ptr() as _, external_id, uri);
+        xml_create_int_subset(
+            cur,
+            c"html".as_ptr() as _,
+            (!external_id.is_null())
+                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                .as_deref(),
+            uri,
+        );
     }
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     /* && xmlRegisterNodeDefaultValue() */
