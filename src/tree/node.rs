@@ -1706,18 +1706,18 @@ impl XmlNode {
                 xml_free_node_list(children.as_ptr());
             }
             (*prop).children = None;
-            (*prop).last = null_mut();
+            (*prop).last = None;
             (*prop).ns = ns;
             if let Some(value) = value {
                 let value = CString::new(value).unwrap();
                 (*prop).children =
                     NodePtr::from_ptr(xml_new_doc_text(self.doc, value.as_ptr() as *const u8));
-                (*prop).last = null_mut();
+                (*prop).last = None;
                 let mut tmp = (*prop).children;
                 while let Some(mut now) = tmp {
                     now.parent = NodePtr::from_ptr(prop as *mut XmlNode);
                     if now.next.is_none() {
-                        (*prop).last = now.as_ptr();
+                        (*prop).last = Some(now);
                     }
                     tmp = now.next;
                 }

@@ -24,7 +24,7 @@ pub struct XmlAttr {
     pub(crate) typ: XmlElementType,             /* XML_ATTRIBUTE_NODE, must be second ! */
     pub(crate) name: *const XmlChar,            /* the name of the property */
     pub(crate) children: Option<NodePtr>,       /* the value of the property */
-    pub(crate) last: *mut XmlNode,              /* NULL */
+    pub(crate) last: Option<NodePtr>,           /* NULL */
     pub(crate) parent: *mut XmlNode,            /* child->parent link */
     pub(crate) next: *mut XmlAttr,              /* next sibling link  */
     pub(crate) prev: *mut XmlAttr,              /* previous sibling link  */
@@ -118,10 +118,10 @@ impl NodeCommon for XmlAttr {
         self.children = children;
     }
     fn last(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.last)
+        self.last
     }
     fn set_last(&mut self, last: Option<NodePtr>) {
-        self.last = last.map_or(null_mut(), |l| l.as_ptr());
+        self.last = last;
     }
     fn next(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.next as *mut XmlNode)
@@ -181,13 +181,13 @@ pub unsafe extern "C" fn xml_new_doc_prop(
         (*cur).children = (!doc.is_null())
             .then(|| NodePtr::from_ptr((*doc).get_node_list(value)))
             .flatten();
-        (*cur).last = null_mut();
+        (*cur).last = None;
 
         let mut tmp = (*cur).children;
         while let Some(mut now) = tmp {
             now.parent = NodePtr::from_ptr(cur as *mut XmlNode);
             if now.next.is_none() {
-                (*cur).last = now.as_ptr();
+                (*cur).last = Some(now);
             }
             tmp = now.next;
         }

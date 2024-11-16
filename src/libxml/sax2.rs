@@ -1912,13 +1912,13 @@ unsafe fn xml_sax2_attribute_internal(
         while let Some(mut now) = tmp {
             now.parent = NodePtr::from_ptr(ret as *mut XmlNode);
             if now.next.is_none() {
-                (*ret).last = now.as_ptr();
+                (*ret).last = Some(now);
             }
             tmp = now.next;
         }
     } else if !value.is_null() {
         (*ret).children = NodePtr::from_ptr(xml_new_doc_text((*ctxt).my_doc, value));
-        (*ret).last = (*ret).children.map_or(null_mut(), |c| c.as_ptr());
+        (*ret).last = (*ret).children;
         if let Some(mut children) = (*ret).children {
             children.parent = NodePtr::from_ptr(ret as *mut XmlNode);
         }
@@ -3104,7 +3104,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
         if *valueend != 0 {
             let tmp = xml_sax2_text_node(ctxt, value, valueend.offset_from(value) as _);
             (*ret).children = NodePtr::from_ptr(tmp);
-            (*ret).last = tmp;
+            (*ret).last = NodePtr::from_ptr(tmp);
             if !tmp.is_null() {
                 (*tmp).doc = (*ret).doc;
                 (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
@@ -3123,7 +3123,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                 now.doc = (*ret).doc;
                 now.parent = NodePtr::from_ptr(ret as *mut XmlNode);
                 if now.next.is_none() {
-                    (*ret).last = now.as_ptr();
+                    (*ret).last = Some(now);
                 }
                 tmp = now.next;
             }
@@ -3131,7 +3131,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
     } else if !value.is_null() {
         let tmp: XmlNodePtr = xml_sax2_text_node(ctxt, value, valueend.offset_from(value) as _);
         (*ret).children = NodePtr::from_ptr(tmp);
-        (*ret).last = tmp;
+        (*ret).last = NodePtr::from_ptr(tmp);
         if !tmp.is_null() {
             (*tmp).doc = (*ret).doc;
             (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);

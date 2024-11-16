@@ -1244,12 +1244,12 @@ unsafe fn xml_new_prop_internal(
 
     if !value.is_null() {
         (*cur).children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
-        (*cur).last = null_mut();
+        (*cur).last = None;
         let mut tmp = (*cur).children;
         while let Some(mut now) = tmp {
             now.parent = NodePtr::from_ptr(cur as *mut XmlNode);
             if now.next.is_none() {
-                (*cur).last = now.as_ptr();
+                (*cur).last = Some(now);
             }
             tmp = now.next;
         }
@@ -1807,12 +1807,12 @@ unsafe extern "C" fn xml_copy_prop_internal(
             (*ret).doc,
             ret as _,
         ));
-        (*ret).last = null_mut();
+        (*ret).last = None;
         let mut tmp = (*ret).children;
         while let Some(now) = tmp {
             /* (*tmp).parent = ret; */
             if now.next.is_none() {
-                (*ret).last = now.as_ptr();
+                (*ret).last = Some(now);
             }
             tmp = now.next;
         }
