@@ -664,7 +664,9 @@ impl XmlNode {
                     *nametemp.last_mut().unwrap() = 0;
                     name = nametemp.as_ptr() as _;
                 }
-                next = (*(cur as XmlAttrPtr)).parent;
+                next = (*(cur as XmlAttrPtr))
+                    .parent
+                    .map_or(null_mut(), |p| p.as_ptr());
             } else {
                 xml_free(buf as _);
                 xml_free(buffer as _);

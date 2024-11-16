@@ -25,7 +25,7 @@ pub struct XmlAttr {
     pub(crate) name: *const XmlChar,            /* the name of the property */
     pub(crate) children: Option<NodePtr>,       /* the value of the property */
     pub(crate) last: Option<NodePtr>,           /* NULL */
-    pub(crate) parent: *mut XmlNode,            /* child->parent link */
+    pub(crate) parent: Option<NodePtr>,         /* child->parent link */
     pub(crate) next: *mut XmlAttr,              /* next sibling link  */
     pub(crate) prev: *mut XmlAttr,              /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,                /* the containing document */
@@ -43,12 +43,12 @@ impl XmlAttr {
     #[doc(alias = "xmlRemoveProp")]
     pub unsafe fn remove_prop(&mut self) -> i32 {
         let mut tmp: XmlAttrPtr;
-        if self.parent.is_null() {
+        let Some(mut parent) = self.parent else {
             return -1;
-        }
-        tmp = (*self.parent).properties;
+        };
+        tmp = parent.properties;
         if tmp == self {
-            (*self.parent).properties = self.next;
+            parent.properties = self.next;
             if !self.next.is_null() {
                 (*self.next).prev = null_mut();
             }
@@ -136,10 +136,10 @@ impl NodeCommon for XmlAttr {
         self.prev = prev.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlAttr;
     }
     fn parent(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.parent)
+        self.parent
     }
     fn set_parent(&mut self, parent: Option<NodePtr>) {
-        self.parent = parent.map_or(null_mut(), |p| p.as_ptr());
+        self.parent = parent;
     }
 }
 

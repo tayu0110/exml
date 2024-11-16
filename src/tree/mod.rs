@@ -1225,7 +1225,7 @@ unsafe fn xml_new_prop_internal(
     memset(cur as _, 0, size_of::<XmlAttr>());
     (*cur).typ = XmlElementType::XmlAttributeNode;
 
-    (*cur).parent = node;
+    (*cur).parent = NodePtr::from_ptr(node);
     if !node.is_null() {
         doc = (*node).doc;
         (*cur).doc = doc;
@@ -1742,8 +1742,8 @@ unsafe extern "C" fn xml_copy_prop_internal(
         ret = xml_new_doc_prop((*target).doc, (*cur).name, null_mut());
     } else if !doc.is_null() {
         ret = xml_new_doc_prop(doc, (*cur).name, null_mut());
-    } else if !(*cur).parent.is_null() {
-        ret = xml_new_doc_prop((*(*cur).parent).doc, (*cur).name, null_mut());
+    } else if let Some(parent) = (*cur).parent {
+        ret = xml_new_doc_prop(parent.doc, (*cur).name, null_mut());
     } else if let Some(children) = (*cur).children {
         ret = xml_new_doc_prop(children.doc, (*cur).name, null_mut());
     } else {
@@ -1752,7 +1752,7 @@ unsafe extern "C" fn xml_copy_prop_internal(
     if ret.is_null() {
         return null_mut();
     }
-    (*ret).parent = target;
+    (*ret).parent = NodePtr::from_ptr(target);
 
     if !(*cur).ns.is_null() && !target.is_null() {
         let prefix = (*(*cur).ns).prefix;
@@ -1765,7 +1765,10 @@ unsafe extern "C" fn xml_copy_prop_internal(
              * out of the new tree scope. Search it in the original tree
              * and add it at the top of the new tree
              */
-            ns = (*(*cur).parent).search_ns((*cur).doc, prefix.as_deref());
+            ns = (*cur)
+                .parent
+                .unwrap()
+                .search_ns((*cur).doc, prefix.as_deref());
             if !ns.is_null() {
                 let mut root: XmlNodePtr = target;
                 let mut pred: XmlNodePtr = null_mut();
@@ -1825,8 +1828,10 @@ unsafe extern "C" fn xml_copy_prop_internal(
         && !(*target).doc.is_null()
         && !(*cur).doc.is_null()
         && !(*(*cur).doc).ids.is_null()
-        && !(*cur).parent.is_null()
-        && xml_is_id((*cur).doc, (*cur).parent, cur) != 0
+        && (*cur)
+            .parent
+            .filter(|p| xml_is_id((*cur).doc, p.as_ptr(), cur) != 0)
+            .is_some()
     {
         let children = (*cur).children;
         let id: *mut XmlChar = children.map_or(null_mut(), |c| c.get_string((*cur).doc, 1));

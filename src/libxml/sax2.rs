@@ -3055,7 +3055,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
         memset(ret as _, 0, size_of::<XmlAttr>());
         (*ret).typ = XmlElementType::XmlAttributeNode;
 
-        (*ret).parent = (*ctxt).node;
+        (*ret).parent = NodePtr::from_ptr((*ctxt).node);
         (*ret).doc = (*ctxt).my_doc;
         (*ret).ns = namespace;
 

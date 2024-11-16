@@ -3022,11 +3022,7 @@ pub unsafe extern "C" fn xml_add_id(
         (*ret).attr = attr;
         (*ret).name = null_mut();
     }
-    (*ret).lineno = if (*attr).parent.is_null() {
-        -1
-    } else {
-        (*(*attr).parent).get_line_no() as _
-    };
+    (*ret).lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
 
     if xml_hash_add_entry(table, value, ret as _) < 0 {
         /*
@@ -3036,7 +3032,7 @@ pub unsafe extern "C" fn xml_add_id(
         if !ctxt.is_null() {
             xml_err_valid_node(
                 ctxt,
-                (*attr).parent,
+                (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
                 XmlParserErrors::XmlDTDIDRedefined,
                 c"ID %s already defined\n".as_ptr() as _,
                 value,
@@ -3367,11 +3363,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
         (*ret).name = null_mut();
         (*ret).attr = attr;
     }
-    (*ret).lineno = if (*attr).parent.is_null() {
-        -1
-    } else {
-        (*(*attr).parent).get_line_no() as _
-    };
+    (*ret).lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
 
     /* To add a reference :-
      * References are maintained as a list of references,
@@ -7434,7 +7426,7 @@ unsafe extern "C" fn xml_validate_ref(
         if id.is_null() {
             xml_err_valid_node(
                 ctxt,
-                (*attr).parent,
+                (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
                 XmlParserErrors::XmlDTDUnknownID,
                 c"IDREF attribute %s references an unknown ID \"%s\"\n".as_ptr() as _,
                 (*attr).name,
@@ -7466,7 +7458,7 @@ unsafe extern "C" fn xml_validate_ref(
             if id.is_null() {
                 xml_err_valid_node(
                     ctxt,
-                    (*attr).parent,
+                    (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
                     XmlParserErrors::XmlDTDUnknownID,
                     c"IDREFS attribute %s references an unknown ID \"%s\"\n".as_ptr() as _,
                     (*attr).name,

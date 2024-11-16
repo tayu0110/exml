@@ -11976,7 +11976,7 @@ pub unsafe extern "C" fn xml_xpath_next_parent(
             XmlElementType::XmlAttributeNode => {
                 let att: XmlAttrPtr = (*(*ctxt).context).node as XmlAttrPtr;
 
-                return (*att).parent;
+                return (*att).parent.map_or(null_mut(), |p| p.as_ptr());
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
@@ -12400,7 +12400,7 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
             XmlElementType::XmlAttributeNode => {
                 let tmp: XmlAttrPtr = (*(*ctxt).context).node as XmlAttrPtr;
 
-                return (*tmp).parent;
+                return (*tmp).parent.map_or(null_mut(), |p| p.as_ptr());
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
@@ -12457,7 +12457,7 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
         XmlElementType::XmlAttributeNode => {
             let att: XmlAttrPtr = cur as XmlAttrPtr;
 
-            (*att).parent
+            (*att).parent.map_or(null_mut(), |p| p.as_ptr())
         }
         XmlElementType::XmlNamespaceDecl => {
             let ns: XmlNsPtr = cur as XmlNsPtr;
@@ -12653,7 +12653,7 @@ unsafe extern "C" fn xml_xpath_get_elements_by_ids(
             attr = xml_get_id(doc, id);
             if !attr.is_null() {
                 if matches!((*attr).typ, XmlElementType::XmlAttributeNode) {
-                    elem = (*attr).parent;
+                    elem = (*attr).parent.map_or(null_mut(), |p| p.as_ptr());
                 } else if matches!((*attr).typ, XmlElementType::XmlElementNode) {
                     elem = attr as XmlNodePtr;
                 } else {

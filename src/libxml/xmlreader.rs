@@ -3618,10 +3618,10 @@ pub unsafe extern "C" fn xml_text_reader_value(reader: &mut XmlTextReader) -> *m
         XmlElementType::XmlAttributeNode => {
             let attr: XmlAttrPtr = node as XmlAttrPtr;
 
-            if !(*attr).parent.is_null() {
+            if let Some(parent) = (*attr).parent {
                 return (*attr)
                     .children
-                    .map_or(null_mut(), |c| c.get_string((*(*attr).parent).doc, 1));
+                    .map_or(null_mut(), |c| c.get_string(parent.doc, 1));
             } else {
                 return (*attr)
                     .children

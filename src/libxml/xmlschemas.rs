@@ -6949,7 +6949,7 @@ unsafe extern "C" fn xml_schema_pillegal_attr_err(
     xml_schema_format_node_for_error(
         addr_of_mut!(str_a),
         ctxt as XmlSchemaAbstractCtxtPtr,
-        (*attr).parent,
+        (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
     );
     xml_schema_err4(
         ctxt as XmlSchemaAbstractCtxtPtr,
@@ -7839,7 +7839,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     }
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
-        ns = (*(*attr).parent).search_ns((*attr).doc, None);
+        ns = (*attr).parent.unwrap().search_ns((*attr).doc, None);
         if !ns.is_null() && !(*ns).href.is_null() && *(*ns).href.add(0) != 0 {
             *uri = xml_dict_lookup((*ctxt).dict, (*ns).href, -1);
         } else if (*schema).flags & XML_SCHEMAS_INCLUDING_CONVERT_NS != 0 {
@@ -7860,7 +7860,7 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     *local = xml_split_qname3(value, addr_of_mut!(len));
     *local = xml_dict_lookup((*ctxt).dict, *local, -1);
     let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
-    ns = (*(*attr).parent).search_ns(
+    ns = (*attr).parent.unwrap().search_ns(
         (*attr).doc,
         Some(CStr::from_ptr(pref as *const i8).to_string_lossy()).as_deref(),
     );
@@ -8296,10 +8296,15 @@ unsafe extern "C" fn xml_schema_pcustom_attr_err(
             addr_of_mut!(des),
             null_mut(),
             owner_item,
-            (*attr).parent,
+            (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
         );
     } else if (*owner_des).is_null() {
-        xml_schema_format_item_for_report(owner_des, null_mut(), owner_item, (*attr).parent);
+        xml_schema_format_item_for_report(
+            owner_des,
+            null_mut(),
+            owner_item,
+            (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
+        );
         des = *owner_des;
     } else {
         des = *owner_des;
@@ -8516,7 +8521,7 @@ unsafe extern "C" fn xml_schema_pmutual_excl_attr_err(
         addr_of_mut!(des),
         null_mut(),
         owner_item as XmlSchemaBasicItemPtr,
-        (*attr).parent,
+        (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
     );
     xml_schema_perr_ext(
         ctxt,
@@ -10878,7 +10883,7 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
         let ns_list = if attr.is_null() {
             null_mut()
         } else {
-            (*(*attr).parent).get_ns_list((*attr).doc)
+            (*attr).parent.unwrap().get_ns_list((*attr).doc)
         };
         /*
          * Build an array of prefixes and namespaces.

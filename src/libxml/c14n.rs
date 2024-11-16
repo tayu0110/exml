@@ -1441,10 +1441,14 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     let mut tmp_str2: *mut XmlChar;
     let mut tmp_str_len: i32;
 
-    if ctx.is_null() || xml_base_attr.is_null() || (*xml_base_attr).parent.is_null() {
+    if ctx.is_null() || xml_base_attr.is_null() {
         xml_c14n_err_param(c"processing xml:base attribute".as_ptr() as _);
         return null_mut();
     }
+    let Some(parent) = (*xml_base_attr).parent else {
+        xml_c14n_err_param(c"processing xml:base attribute".as_ptr() as _);
+        return null_mut();
+    };
 
     /* start from current value */
     let mut res: *mut XmlChar = (*xml_base_attr)
@@ -1458,9 +1462,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     }
 
     /* go up the stack until we find a node that we rendered already */
-    cur = (*(*xml_base_attr).parent)
-        .parent
-        .map_or(null_mut(), |p| p.as_ptr());
+    cur = parent.parent.map_or(null_mut(), |p| p.as_ptr());
     while !cur.is_null()
         && xml_c14n_is_visible!(ctx, cur, (*cur).parent.map_or(null_mut(), |p| p.as_ptr())) == 0
     {

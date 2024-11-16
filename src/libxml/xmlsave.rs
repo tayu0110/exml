@@ -912,7 +912,7 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
         return;
     }
     let buf: XmlOutputBufferPtr = (*ctxt).buf;
-    let parent: XmlNodePtr = (*cur).parent;
+    let parent = (*cur).parent;
     while !cur.is_null() {
         if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"id".as_ptr() as _) {
             id = cur;
@@ -946,17 +946,20 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
      * C.8
      */
     if (!name.is_null() && id.is_null())
-        && (!parent.is_null()
-            && !(*parent).name.is_null()
-            && (xml_str_equal((*parent).name, c"a".as_ptr() as _)
-                || xml_str_equal((*parent).name, c"p".as_ptr() as _)
-                || xml_str_equal((*parent).name, c"div".as_ptr() as _)
-                || xml_str_equal((*parent).name, c"img".as_ptr() as _)
-                || xml_str_equal((*parent).name, c"map".as_ptr() as _)
-                || xml_str_equal((*parent).name, c"applet".as_ptr() as _)
-                || xml_str_equal((*parent).name, c"form".as_ptr() as _)
-                || xml_str_equal((*parent).name, c"frame".as_ptr() as _)
-                || xml_str_equal((*parent).name, c"iframe".as_ptr() as _)))
+        && parent
+            .filter(|p| {
+                !p.name.is_null()
+                    && (xml_str_equal(p.name, c"a".as_ptr() as _)
+                        || xml_str_equal(p.name, c"p".as_ptr() as _)
+                        || xml_str_equal(p.name, c"div".as_ptr() as _)
+                        || xml_str_equal(p.name, c"img".as_ptr() as _)
+                        || xml_str_equal(p.name, c"map".as_ptr() as _)
+                        || xml_str_equal(p.name, c"applet".as_ptr() as _)
+                        || xml_str_equal(p.name, c"form".as_ptr() as _)
+                        || xml_str_equal(p.name, c"frame".as_ptr() as _)
+                        || xml_str_equal(p.name, c"iframe".as_ptr() as _))
+            })
+            .is_some()
     {
         (*buf).write_bytes(b" id=\"");
         xml_attr_serialize_content(buf, name);

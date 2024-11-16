@@ -1104,13 +1104,17 @@ unsafe extern "C" fn html_attr_dump_output(
         if !value.is_null() {
             (*buf).write_str("=");
             if (*cur).ns.is_null()
-                && !(*cur).parent.is_null()
-                && (*(*cur).parent).ns.is_null()
-                && (xml_strcasecmp((*cur).name, c"href".as_ptr() as _) == 0
-                    || xml_strcasecmp((*cur).name, c"action".as_ptr() as _) == 0
-                    || xml_strcasecmp((*cur).name, c"src".as_ptr() as _) == 0
-                    || (xml_strcasecmp((*cur).name, c"name".as_ptr() as _) == 0
-                        && xml_strcasecmp((*(*cur).parent).name, c"a".as_ptr() as _) == 0))
+                && (*cur)
+                    .parent
+                    .filter(|p| {
+                        p.ns.is_null()
+                            && (xml_strcasecmp((*cur).name, c"href".as_ptr() as _) == 0
+                                || xml_strcasecmp((*cur).name, c"action".as_ptr() as _) == 0
+                                || xml_strcasecmp((*cur).name, c"src".as_ptr() as _) == 0
+                                || (xml_strcasecmp((*cur).name, c"name".as_ptr() as _) == 0
+                                    && xml_strcasecmp(p.name, c"a".as_ptr() as _) == 0))
+                    })
+                    .is_some()
             {
                 let mut tmp: *mut XmlChar = value;
 
