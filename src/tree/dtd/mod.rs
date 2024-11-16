@@ -3,7 +3,7 @@ mod element;
 mod enumeration;
 mod notation;
 
-use std::{ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
+use std::{os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
 pub use attribute::*;
 pub use element::*;
@@ -240,7 +240,7 @@ pub unsafe fn xml_new_dtd(
     doc: XmlDocPtr,
     name: *const XmlChar,
     external_id: Option<&str>,
-    system_id: *const XmlChar,
+    system_id: Option<&str>,
 ) -> XmlDtdPtr {
     if !doc.is_null() && !(*doc).ext_subset.is_null() {
         return null_mut();
@@ -262,13 +262,7 @@ pub unsafe fn xml_new_dtd(
         (*cur).name = xml_strdup(name);
     }
     (*cur).external_id = external_id.map(|e| e.to_owned());
-    if !system_id.is_null() {
-        (*cur).system_id = Some(
-            CStr::from_ptr(system_id as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-    }
+    (*cur).system_id = system_id.map(|s| s.to_owned());
     if !doc.is_null() {
         (*doc).ext_subset = cur;
     }

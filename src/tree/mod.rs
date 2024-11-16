@@ -1918,17 +1918,11 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     if dtd.is_null() {
         return null_mut();
     }
-    let system_id = (*dtd)
-        .system_id
-        .as_deref()
-        .map(|s| CString::new(s).unwrap());
     let ret: XmlDtdPtr = xml_new_dtd(
         null_mut(),
         (*dtd).name,
         (*dtd).external_id.as_deref(),
-        system_id
-            .as_ref()
-            .map_or(null_mut(), |s| s.as_ptr() as *const u8),
+        (*dtd).system_id.as_deref(),
     );
     if ret.is_null() {
         return null_mut();

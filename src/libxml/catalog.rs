@@ -3379,7 +3379,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
         doc,
         c"catalog".as_ptr() as _,
         Some("-//OASIS//DTD Entity Resolution XML Catalog V1.0//EN"),
-        c"http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd".as_ptr() as _,
+        Some("http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd"),
     );
 
     (*doc).add_child(dtd as _);
