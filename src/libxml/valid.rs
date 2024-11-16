@@ -2261,9 +2261,7 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
         if !(*attr).name.is_null() && xml_dict_owns(dict, (*attr).name) == 0 {
             xml_free((*attr).name as _);
         }
-        if !(*attr).prefix.is_null() && xml_dict_owns(dict, (*attr).prefix) == 0 {
-            xml_free((*attr).prefix as _);
-        }
+        (*attr).prefix = None;
         if !(*attr).default_value.is_null() && xml_dict_owns(dict, (*attr).default_value) == 0 {
             xml_free((*attr).default_value as _);
         }
@@ -2277,9 +2275,7 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
         if !(*attr).default_value.is_null() {
             xml_free((*attr).default_value as _);
         }
-        if !(*attr).prefix.is_null() {
-            xml_free((*attr).prefix as _);
-        }
+        (*attr).prefix = None;
     }
     xml_free(attr as _);
 }
@@ -2560,6 +2556,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlAttribute>());
+    std::ptr::write(&mut *ret, XmlAttribute::default());
     (*ret).typ = XmlElementType::XmlAttributeDecl;
 
     /*
@@ -2574,11 +2571,20 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
     (*ret).doc = (*dtd).doc;
     if !dict.is_null() {
         (*ret).name = xml_dict_lookup(dict, name, -1);
-        (*ret).prefix = xml_dict_lookup(dict, ns, -1);
+        let prefix = xml_dict_lookup(dict, ns, -1);
+        (*ret).prefix = (!prefix.is_null()).then(|| {
+            CStr::from_ptr(prefix as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
         (*ret).elem = xml_dict_lookup(dict, elem, -1);
     } else {
         (*ret).name = xml_strdup(name);
-        (*ret).prefix = xml_strdup(ns);
+        (*ret).prefix = (!ns.is_null()).then(|| {
+            CStr::from_ptr(ns as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
         (*ret).elem = xml_strdup(elem);
     }
     (*ret).def = def;
@@ -2595,7 +2601,17 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
      * Validity Check:
      * Search the DTD for previous declarations of the ATTLIST
      */
-    if xml_hash_add_entry3(table, (*ret).name, (*ret).prefix, (*ret).elem, ret as _) < 0 {
+    let prefix = (*ret).prefix.as_deref().map(|p| CString::new(p).unwrap());
+    if xml_hash_add_entry3(
+        table,
+        (*ret).name,
+        prefix
+            .as_ref()
+            .map_or(null_mut(), |p| p.as_ptr() as *const u8),
+        (*ret).elem,
+        ret as _,
+    ) < 0
+    {
         #[cfg(feature = "valid")]
         {
             /*
@@ -2646,7 +2662,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
          * processed first.
          */
         if xml_str_equal((*ret).name, c"xmlns".as_ptr() as _)
-            || (!(*ret).prefix.is_null() && xml_str_equal((*ret).prefix, c"xmlns".as_ptr() as _))
+            || (*ret).prefix.as_deref() == Some("xmlns")
         {
             (*ret).nexth = (*elem_def).attributes;
             (*elem_def).attributes = ret;
@@ -2655,8 +2671,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
 
             while !tmp.is_null()
                 && (xml_str_equal((*tmp).name, c"xmlns".as_ptr() as _)
-                    || (!(*ret).prefix.is_null()
-                        && xml_str_equal((*ret).prefix, c"xmlns".as_ptr() as _)))
+                    || (*ret).prefix.as_deref() == Some("xmlns"))
             {
                 if (*tmp).nexth.is_null() {
                     break;
@@ -2707,6 +2722,7 @@ extern "C" fn xml_copy_attribute(payload: *mut c_void, _name: *const XmlChar) ->
             return null_mut();
         }
         memset(cur as _, 0, size_of::<XmlAttribute>());
+        std::ptr::write(&mut *cur, XmlAttribute::default());
         (*cur).typ = XmlElementType::XmlAttributeDecl;
         (*cur).atype = (*attr).atype;
         (*cur).def = (*attr).def;
@@ -2717,9 +2733,7 @@ extern "C" fn xml_copy_attribute(payload: *mut c_void, _name: *const XmlChar) ->
         if !(*attr).name.is_null() {
             (*cur).name = xml_strdup((*attr).name);
         }
-        if !(*attr).prefix.is_null() {
-            (*cur).prefix = xml_strdup((*attr).prefix);
-        }
+        (*cur).prefix = (*attr).prefix.clone();
         if !(*attr).default_value.is_null() {
             (*cur).default_value = xml_strdup((*attr).default_value);
         }
@@ -2840,8 +2854,9 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttrib
     xml_buf_ccat(buf, c"<!ATTLIST ".as_ptr() as _);
     xml_buf_cat(buf, (*attr).elem);
     xml_buf_ccat(buf, c" ".as_ptr() as _);
-    if !(*attr).prefix.is_null() {
-        xml_buf_cat(buf, (*attr).prefix);
+    if let Some(prefix) = (*attr).prefix.as_deref() {
+        let prefix = CString::new(prefix).unwrap();
+        xml_buf_cat(buf, prefix.as_ptr() as *const u8);
         xml_buf_ccat(buf, c":".as_ptr() as _);
     }
     xml_buf_cat(buf, (*attr).name);
@@ -6620,7 +6635,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
             if matches!((*attr).def, XmlAttributeDefault::XmlAttributeRequired) {
                 let mut qualified: i32 = -1;
 
-                if (*attr).prefix.is_null() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
+                if (*attr).prefix.is_none() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
                     let mut ns: XmlNsPtr;
 
                     ns = (*elem).ns_def;
@@ -6630,7 +6645,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         }
                         ns = (*ns).next;
                     }
-                } else if xml_str_equal((*attr).prefix, c"xmlns".as_ptr() as _) {
+                } else if (*attr).prefix.as_deref() == Some("xmlns") {
                     let mut ns: XmlNsPtr;
 
                     ns = (*elem).ns_def;
@@ -6646,7 +6661,8 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     attrib = (*elem).properties;
                     while !attrib.is_null() {
                         if xml_str_equal((*attrib).name, (*attr).name) {
-                            if !(*attr).prefix.is_null() {
+                            if let Some(prefix) = (*attr).prefix.as_deref() {
+                                let prefix = CString::new(prefix).unwrap();
                                 let mut name_space: XmlNsPtr = (*attrib).ns;
 
                                 if name_space.is_null() {
@@ -6661,7 +6677,10 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                     if qualified < 0 {
                                         qualified = 0;
                                     }
-                                } else if !xml_str_equal((*name_space).prefix, (*attr).prefix) {
+                                } else if !xml_str_equal(
+                                    (*name_space).prefix,
+                                    prefix.as_ptr() as *const u8,
+                                ) {
                                     if qualified < 1 {
                                         qualified = 1;
                                     }
@@ -6682,7 +6701,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     }
                 }
                 if qualified == -1 {
-                    if (*attr).prefix.is_null() {
+                    if (*attr).prefix.is_none() {
                         xml_err_valid_node(
                             ctxt,
                             elem,
@@ -6694,35 +6713,38 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         );
                         ret = 0;
                     } else {
+                        let prefix = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
                         xml_err_valid_node(
                             ctxt,
                             elem,
                             XmlParserErrors::XmlDTDMissingAttribute,
                             c"Element %s does not carry attribute %s:%s\n".as_ptr() as _,
                             (*elem).name,
-                            (*attr).prefix,
+                            prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                             (*attr).name,
                         );
                         ret = 0;
                     }
                 } else if qualified == 0 {
+                    let prefix = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
                     xml_err_valid_warning(
                         ctxt,
                         elem,
                         XmlParserErrors::XmlDTDNoPrefix,
                         c"Element %s required attribute %s:%s has no prefix\n".as_ptr() as _,
                         (*elem).name,
-                        (*attr).prefix,
+                        prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                         (*attr).name,
                     );
                 } else if qualified == 1 {
+                    let prefix = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
                     xml_err_valid_warning(
                         ctxt,
                         elem,
                         XmlParserErrors::XmlDTDDifferentPrefix,
                         c"Element %s required attribute %s:%s has different prefix\n".as_ptr() as _,
                         (*elem).name,
-                        (*attr).prefix,
+                        prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                         (*attr).name,
                     );
                 }
@@ -6732,7 +6754,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                  * have the right value since this is not done as an
                  * attribute checking
                  */
-                if (*attr).prefix.is_null() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
+                if (*attr).prefix.is_none() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
                     let mut ns: XmlNsPtr;
 
                     ns = (*elem).ns_def;
@@ -6749,7 +6771,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         }
                         ns = (*ns).next;
                     }
-                } else if xml_str_equal((*attr).prefix, c"xmlns".as_ptr() as _) {
+                } else if (*attr).prefix.as_deref() == Some("xmlns") {
                     let mut ns: XmlNsPtr;
 
                     ns = (*elem).ns_def;

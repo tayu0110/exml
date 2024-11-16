@@ -1975,7 +1975,15 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
             ) as _;
         } else if matches!((*cur).typ, XmlElementType::XmlAttributeDecl) {
             let tmp: XmlAttributePtr = cur as _;
-            q = xml_get_dtd_qattr_desc(ret, (*tmp).elem, (*tmp).name, (*tmp).prefix) as _;
+            let prefix = (*tmp).prefix.as_deref().map(|p| CString::new(p).unwrap());
+            q = xml_get_dtd_qattr_desc(
+                ret,
+                (*tmp).elem,
+                (*tmp).name,
+                prefix
+                    .as_ref()
+                    .map_or(null_mut(), |p| p.as_ptr() as *const u8),
+            ) as _;
         } else if matches!((*cur).typ, XmlElementType::XmlCommentNode) {
             q = xml_copy_node(cur, 0);
         }

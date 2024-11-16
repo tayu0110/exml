@@ -11,7 +11,7 @@ use crate::{
 /// An Attribute declaration in a DTD.
 pub type XmlAttributePtr = *mut XmlAttribute;
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct XmlAttribute {
     pub(crate) _private: *mut c_void,     /* application data */
     pub(crate) typ: XmlElementType,       /* XML_ATTRIBUTE_DECL, must be second ! */
@@ -28,8 +28,31 @@ pub struct XmlAttribute {
     pub(crate) def: XmlAttributeDefault, /* the default */
     pub(crate) default_value: *const XmlChar, /* or the default value */
     pub(crate) tree: XmlEnumerationPtr,  /* or the enumeration tree if any */
-    pub(crate) prefix: *const XmlChar,   /* the namespace prefix if any */
+    pub(crate) prefix: Option<String>,   /* the namespace prefix if any */
     pub(crate) elem: *const XmlChar,     /* Element holding the attribute */
+}
+
+impl Default for XmlAttribute {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: XmlElementType::default(),
+            name: null_mut(),
+            children: None,
+            last: None,
+            parent: null_mut(),
+            next: None,
+            prev: None,
+            doc: null_mut(),
+            nexth: null_mut(),
+            atype: XmlAttributeType::XmlAttributeCDATA,
+            def: XmlAttributeDefault::XmlAttributeNone,
+            default_value: null_mut(),
+            tree: null_mut(),
+            prefix: None,
+            elem: null_mut(),
+        }
+    }
 }
 
 impl NodeCommon for XmlAttribute {

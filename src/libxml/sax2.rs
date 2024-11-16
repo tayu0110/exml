@@ -2106,25 +2106,27 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                 && (*ctxt).validate != 0
             {
                 while !attr.is_null() {
+                    let prefix = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
                     if !(*attr).default_value.is_null()
                         && xml_get_dtd_qattr_desc(
                             (*(*ctxt).my_doc).ext_subset,
                             (*attr).elem,
                             (*attr).name,
-                            (*attr).prefix,
+                            prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                         ) == attr
                         && xml_get_dtd_qattr_desc(
                             (*(*ctxt).my_doc).int_subset,
                             (*attr).elem,
                             (*attr).name,
-                            (*attr).prefix,
+                            prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                         )
                         .is_null()
                     {
                         let mut fulln: *mut XmlChar;
 
-                        if !(*attr).prefix.is_null() {
-                            fulln = xml_strdup((*attr).prefix);
+                        if let Some(prefix) = (*attr).prefix.as_deref() {
+                            let prefix = CString::new(prefix).unwrap();
+                            fulln = xml_strdup(prefix.as_ptr() as *const u8);
                             fulln = xml_strcat(fulln, c":".as_ptr() as _);
                             fulln = xml_strcat(fulln, (*attr).name);
                         } else {
@@ -2186,24 +2188,24 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                      *  - there isn't already an attribute definition
                      *    in the internal subset overriding it.
                      */
-                    if (!(*attr).prefix.is_null()
-                        && xml_str_equal((*attr).prefix, c"xmlns".as_ptr() as _))
-                        || ((*attr).prefix.is_null()
+                    if (*attr).prefix.as_deref() == Some("xmlns")
+                        || ((*attr).prefix.is_none()
                             && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _))
                         || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                     {
+                        let pre = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
                         let tst: XmlAttributePtr = xml_get_dtd_qattr_desc(
                             (*(*ctxt).my_doc).int_subset,
                             (*attr).elem,
                             (*attr).name,
-                            (*attr).prefix,
+                            pre.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                         );
                         if tst == attr || tst.is_null() {
                             let mut fname: [XmlChar; 50] = [0; 50];
 
                             let fulln: *mut XmlChar = xml_build_qname(
                                 (*attr).name,
-                                (*attr).prefix,
+                                pre.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                                 fname.as_mut_ptr() as _,
                                 50,
                             );
