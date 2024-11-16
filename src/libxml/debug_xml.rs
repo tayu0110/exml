@@ -692,12 +692,12 @@ unsafe extern "C" fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
         return;
     }
     xml_ctxt_dump_dtd_node(ctxt, dtd);
-    if (*dtd).children.is_null() {
-        fprintf((*ctxt).output, c"    DTD is empty\n".as_ptr());
-    } else {
+    if let Some(children) = (*dtd).children {
         (*ctxt).depth += 1;
-        xml_ctxt_dump_node_list(ctxt, (*dtd).children);
+        xml_ctxt_dump_node_list(ctxt, children.as_ptr());
         (*ctxt).depth -= 1;
+    } else {
+        fprintf((*ctxt).output, c"    DTD is empty\n".as_ptr());
     }
 }
 

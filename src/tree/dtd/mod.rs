@@ -27,15 +27,15 @@ use super::{
 pub type XmlDtdPtr = *mut XmlDtd;
 #[repr(C)]
 pub struct XmlDtd {
-    pub(crate) _private: *mut c_void,  /* application data */
-    pub(crate) typ: XmlElementType,    /* XML_DTD_NODE, must be second ! */
-    pub(crate) name: *const XmlChar,   /* Name of the DTD */
-    pub(crate) children: *mut XmlNode, /* the value of the property link */
-    pub(crate) last: *mut XmlNode,     /* last child link */
-    pub(crate) parent: *mut XmlDoc,    /* child->parent link */
-    pub(crate) next: *mut XmlNode,     /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,     /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,       /* the containing document */
+    pub(crate) _private: *mut c_void,     /* application data */
+    pub(crate) typ: XmlElementType,       /* XML_DTD_NODE, must be second ! */
+    pub(crate) name: *const XmlChar,      /* Name of the DTD */
+    pub(crate) children: Option<NodePtr>, /* the value of the property link */
+    pub(crate) last: *mut XmlNode,        /* last child link */
+    pub(crate) parent: *mut XmlDoc,       /* child->parent link */
+    pub(crate) next: *mut XmlNode,        /* next sibling link  */
+    pub(crate) prev: *mut XmlNode,        /* previous sibling link  */
+    pub(crate) doc: *mut XmlDoc,          /* the containing document */
 
     /* End of common part */
     pub(crate) notations: *mut c_void, /* Hash table for notations if any */
@@ -95,10 +95,10 @@ impl NodeCommon for XmlDtd {
         self.name
     }
     fn children(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.children)
+        self.children
     }
     fn set_children(&mut self, children: Option<NodePtr>) {
-        self.children = children.map_or(null_mut(), |c| c.as_ptr())
+        self.children = children;
     }
     fn last(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.last)

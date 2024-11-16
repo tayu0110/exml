@@ -869,7 +869,7 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     let level: i32 = (*ctxt).level;
     (*ctxt).format = 0;
     (*ctxt).level = -1;
-    cur = (*dtd).children;
+    cur = (*dtd).children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         xml_node_dump_output_internal(ctxt, cur);
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());

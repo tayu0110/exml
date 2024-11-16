@@ -1439,8 +1439,8 @@ pub unsafe extern "C" fn xml_add_element_decl(
     (*ret).parent = dtd;
     (*ret).doc = (*dtd).doc;
     if (*dtd).last.is_null() {
-        (*dtd).children = ret as XmlNodePtr;
-        (*dtd).last = (*dtd).children;
+        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*dtd).last = (*dtd).children.map_or(null_mut(), |c| c.as_ptr());
     } else {
         (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
         (*ret).prev = NodePtr::from_ptr((*dtd).last);
@@ -2667,7 +2667,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
      */
     (*ret).parent = dtd;
     if (*dtd).last.is_null() {
-        (*dtd).children = ret as XmlNodePtr;
+        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
         (*dtd).last = ret as XmlNodePtr;
     } else {
         (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);

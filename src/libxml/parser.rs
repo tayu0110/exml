@@ -4404,13 +4404,11 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
             ret = (*(*ctxt).my_doc).ext_subset;
             (*(*ctxt).my_doc).ext_subset = null_mut();
             if !ret.is_null() {
-                let mut tmp: XmlNodePtr;
-
                 (*ret).doc = null_mut();
-                tmp = (*ret).children;
-                while !tmp.is_null() {
-                    (*tmp).doc = null_mut();
-                    tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                let mut tmp = (*ret).children;
+                while let Some(mut now) = tmp {
+                    now.doc = null_mut();
+                    tmp = now.next;
                 }
             }
         } else {
@@ -4542,13 +4540,11 @@ pub unsafe fn xml_io_parse_dtd(
             ret = (*(*ctxt).my_doc).ext_subset;
             (*(*ctxt).my_doc).ext_subset = null_mut();
             if !ret.is_null() {
-                let mut tmp: XmlNodePtr;
-
                 (*ret).doc = null_mut();
-                tmp = (*ret).children;
-                while !tmp.is_null() {
-                    (*tmp).doc = null_mut();
-                    tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                let mut tmp = (*ret).children;
+                while let Some(mut now) = tmp {
+                    now.doc = null_mut();
+                    tmp = now.next;
                 }
             }
         } else {

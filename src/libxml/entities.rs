@@ -546,7 +546,7 @@ pub unsafe extern "C" fn xml_add_doc_entity(
     (*ret).parent.store(dtd as _, Ordering::Relaxed);
     (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
     if (*dtd).last.is_null() {
-        (*dtd).children = ret as XmlNodePtr;
+        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
         (*dtd).last = ret as XmlNodePtr;
     } else {
         (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
@@ -603,7 +603,7 @@ pub unsafe extern "C" fn xml_add_dtd_entity(
     (*ret).parent = dtd.into();
     (*ret).doc = (*dtd).doc.into();
     if (*dtd).last.is_null() {
-        (*dtd).children = ret as XmlNodePtr;
+        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
         (*dtd).last = ret as XmlNodePtr;
     } else {
         (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);

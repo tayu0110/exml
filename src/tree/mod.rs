@@ -1073,26 +1073,25 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
         xml_deregister_node_default_value(cur as _);
     }
 
-    if !(*cur).children.is_null() {
-        let mut c: XmlNodePtr = (*cur).children;
-
+    if let Some(children) = (*cur).children {
         /*
          * Cleanup all nodes which are not part of the specific lists
          * of notations, elements, attributes and entities.
          */
-        while !c.is_null() {
-            let next = (*c).next;
+        let mut c = Some(children);
+        while let Some(mut now) = c {
+            let next = now.next;
             if !matches!(
-                (*c).typ,
+                now.typ,
                 XmlElementType::XmlNotationNode
                     | XmlElementType::XmlElementDecl
                     | XmlElementType::XmlAttributeDecl
                     | XmlElementType::XmlEntityDecl
             ) {
-                (*c).unlink();
-                xml_free_node(c);
+                now.unlink();
+                xml_free_node(now.as_ptr());
             }
-            c = next.map_or(null_mut(), |c| c.as_ptr());
+            c = next;
         }
     }
     DICT_FREE!(dict, (*cur).name);
@@ -1908,7 +1907,6 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         },
     };
 
-    let mut cur: XmlNodePtr;
     let mut p: XmlNodePtr = null_mut();
     let mut q: XmlNodePtr;
 
@@ -1941,7 +1939,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         (*ret).pentities = xml_copy_entities_table((*dtd).pentities as _) as _;
     }
 
-    cur = (*dtd).children;
+    let mut cur = (*dtd).children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         q = null_mut();
 
@@ -1976,7 +1974,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         }
 
         if p.is_null() {
-            (*ret).children = q;
+            (*ret).children = NodePtr::from_ptr(q);
         } else {
             (*p).next = NodePtr::from_ptr(q);
         }
