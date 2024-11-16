@@ -2107,16 +2107,17 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
             {
                 while !attr.is_null() {
                     let prefix = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
+                    let elem = (*attr).elem.as_deref().map(|p| CString::new(p).unwrap());
                     if !(*attr).default_value.is_null()
                         && xml_get_dtd_qattr_desc(
                             (*(*ctxt).my_doc).ext_subset,
-                            (*attr).elem,
+                            elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
                             (*attr).name,
                             prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                         ) == attr
                         && xml_get_dtd_qattr_desc(
                             (*(*ctxt).my_doc).int_subset,
-                            (*attr).elem,
+                            elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
                             (*attr).name,
                             prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                         )
@@ -2160,7 +2161,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                                 c"standalone: attribute %s on %s defaulted from external subset\n"
                                     .as_ptr() as _,
                                 fulln as _,
-                                (*attr).elem as _,
+                                elem.as_ref().map_or(null(), |e| e.as_ptr()),
                             );
                         }
                         xml_free(fulln as _);
@@ -2194,9 +2195,10 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                         || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                     {
                         let pre = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
+                        let elem = (*attr).elem.as_deref().map(|p| CString::new(p).unwrap());
                         let tst: XmlAttributePtr = xml_get_dtd_qattr_desc(
                             (*(*ctxt).my_doc).int_subset,
-                            (*attr).elem,
+                            elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
                             (*attr).name,
                             pre.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
                         );

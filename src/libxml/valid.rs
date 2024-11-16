@@ -2255,9 +2255,7 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
         xml_free_enumeration((*attr).tree);
     }
     if !dict.is_null() {
-        if !(*attr).elem.is_null() && xml_dict_owns(dict, (*attr).elem) == 0 {
-            xml_free((*attr).elem as _);
-        }
+        (*attr).elem = None;
         if !(*attr).name.is_null() && xml_dict_owns(dict, (*attr).name) == 0 {
             xml_free((*attr).name as _);
         }
@@ -2266,9 +2264,7 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
             xml_free((*attr).default_value as _);
         }
     } else {
-        if !(*attr).elem.is_null() {
-            xml_free((*attr).elem as _);
-        }
+        (*attr).elem = None;
         if !(*attr).name.is_null() {
             xml_free((*attr).name as _);
         }
@@ -2577,7 +2573,12 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
                 .to_string_lossy()
                 .into_owned()
         });
-        (*ret).elem = xml_dict_lookup(dict, elem, -1);
+        let elem = xml_dict_lookup(dict, elem, -1);
+        (*ret).elem = (!elem.is_null()).then(|| {
+            CStr::from_ptr(elem as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
     } else {
         (*ret).name = xml_strdup(name);
         (*ret).prefix = (!ns.is_null()).then(|| {
@@ -2585,7 +2586,11 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
                 .to_string_lossy()
                 .into_owned()
         });
-        (*ret).elem = xml_strdup(elem);
+        (*ret).elem = (!elem.is_null()).then(|| {
+            CStr::from_ptr(elem as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
     }
     (*ret).def = def;
     (*ret).tree = tree;
@@ -2602,13 +2607,16 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
      * Search the DTD for previous declarations of the ATTLIST
      */
     let prefix = (*ret).prefix.as_deref().map(|p| CString::new(p).unwrap());
+    let ret_elem = (*ret).elem.as_deref().map(|e| CString::new(e).unwrap());
     if xml_hash_add_entry3(
         table,
         (*ret).name,
         prefix
             .as_ref()
             .map_or(null_mut(), |p| p.as_ptr() as *const u8),
-        (*ret).elem,
+        ret_elem
+            .as_ref()
+            .map_or(null(), |e| e.as_ptr() as *const u8),
         ret as _,
     ) < 0
     {
@@ -2727,9 +2735,7 @@ extern "C" fn xml_copy_attribute(payload: *mut c_void, _name: *const XmlChar) ->
         (*cur).atype = (*attr).atype;
         (*cur).def = (*attr).def;
         (*cur).tree = xml_copy_enumeration((*attr).tree);
-        if !(*attr).elem.is_null() {
-            (*cur).elem = xml_strdup((*attr).elem);
-        }
+        (*cur).elem = (*attr).elem.clone();
         if !(*attr).name.is_null() {
             (*cur).name = xml_strdup((*attr).name);
         }
@@ -2852,7 +2858,11 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttrib
         return;
     }
     xml_buf_ccat(buf, c"<!ATTLIST ".as_ptr() as _);
-    xml_buf_cat(buf, (*attr).elem);
+    let elem = (*attr).elem.as_deref().map(|e| CString::new(e).unwrap());
+    xml_buf_cat(
+        buf,
+        elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
+    );
     xml_buf_ccat(buf, c" ".as_ptr() as _);
     if let Some(prefix) = (*attr).prefix.as_deref() {
         let prefix = CString::new(prefix).unwrap();
@@ -4268,6 +4278,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
         return 1;
     }
 
+    let attr_elem = (*attr).elem.as_deref().map(|e| CString::new(e).unwrap());
     /* Attribute Default Legal */
     /* Enumeration */
     if !(*attr).default_value.is_null() {
@@ -4279,7 +4290,9 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                 XmlParserErrors::XmlDTDAttributeDefault,
                 c"Syntax of default value for attribute %s of %s is not valid\n".as_ptr() as _,
                 (*attr).name,
-                (*attr).elem,
+                attr_elem
+                    .as_ref()
+                    .map_or(null(), |e| e.as_ptr() as *const u8),
                 null_mut(),
             );
         }
@@ -4299,7 +4312,9 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
             XmlParserErrors::XmlDTDIDFixed,
             c"ID attribute %s of %s is not valid must be #IMPLIED or #REQUIRED\n".as_ptr() as _,
             (*attr).name,
-            (*attr).elem,
+            attr_elem
+                .as_ref()
+                .map_or(null(), |e| e.as_ptr() as *const u8),
             null_mut(),
         );
         ret = 0;
@@ -4310,7 +4325,12 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
         let mut nb_id: i32;
 
         /* the trick is that we parse DtD as their own internal subset */
-        let mut elem: XmlElementPtr = xml_get_dtd_element_desc((*doc).int_subset, (*attr).elem);
+        let mut elem: XmlElementPtr = xml_get_dtd_element_desc(
+            (*doc).int_subset,
+            attr_elem
+                .as_ref()
+                .map_or(null(), |e| e.as_ptr() as *const u8),
+        );
         if !elem.is_null() {
             nb_id = xml_scan_id_attribute_decl(null_mut(), elem, 0);
         } else {
@@ -4327,7 +4347,9 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                     table,
                     null_mut(),
                     null_mut(),
-                    (*attr).elem,
+                    attr_elem
+                        .as_ref()
+                        .map_or(null(), |e| e.as_ptr() as *const u8),
                     Some(xml_validate_attribute_id_callback),
                     addr_of_mut!(nb_id) as _,
                 );
@@ -4340,13 +4362,20 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                 XmlParserErrors::XmlDTDIDSubset,
                 c"Element %s has %d ID attribute defined in the internal subset : %s\n".as_ptr()
                     as _,
-                (*attr).elem,
+                attr_elem
+                    .as_ref()
+                    .map_or(null(), |e| e.as_ptr() as *const u8),
                 nb_id,
                 (*attr).name,
             );
         } else if !(*doc).ext_subset.is_null() {
             let mut ext_id: i32 = 0;
-            elem = xml_get_dtd_element_desc((*doc).ext_subset, (*attr).elem);
+            elem = xml_get_dtd_element_desc(
+                (*doc).ext_subset,
+                attr_elem
+                    .as_ref()
+                    .map_or(null(), |e| e.as_ptr() as *const u8),
+            );
             if !elem.is_null() {
                 ext_id = xml_scan_id_attribute_decl(null_mut(), elem, 0);
             }
@@ -4357,13 +4386,15 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                     XmlParserErrors::XmlDTDIDSubset,
                     c"Element %s has %d ID attribute defined in the external subset : %s\n".as_ptr()
                         as _,
-                    (*attr).elem,
+                    attr_elem
+                        .as_ref()
+                        .map_or(null(), |e| e.as_ptr() as *const u8),
                     ext_id,
                     (*attr).name,
                 );
             } else if ext_id + nb_id > 1 {
                 xml_err_valid_node(ctxt, attr as XmlNodePtr, XmlParserErrors::XmlDTDIDSubset, c"Element %s has ID attributes defined in the internal and external subset : %s\n".as_ptr() as _,
-		       (*attr).elem, (*attr).name, null_mut());
+		       attr_elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8), (*attr).name, null_mut());
             }
         }
     }
@@ -4389,7 +4420,9 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                     .as_ptr() as _,
                 (*attr).default_value,
                 (*attr).name,
-                (*attr).elem,
+                attr_elem
+                    .as_ref()
+                    .map_or(null(), |e| e.as_ptr() as *const u8),
             );
             ret = 0;
         }
@@ -4731,7 +4764,7 @@ extern "C" fn xml_validate_attribute_callback(
         }
         if matches!((*cur).atype, XmlAttributeType::XmlAttributeNotation) {
             doc = (*cur).doc;
-            if (*cur).elem.is_null() {
+            let Some(cur_elem) = (*cur).elem.as_deref().map(|e| CString::new(e).unwrap()) else {
                 xml_err_valid(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
@@ -4739,19 +4772,22 @@ extern "C" fn xml_validate_attribute_callback(
                     (*cur).name as *const c_char,
                 );
                 return;
-            }
+            };
 
             if !doc.is_null() {
-                elem = xml_get_dtd_element_desc((*doc).int_subset, (*cur).elem);
+                elem = xml_get_dtd_element_desc((*doc).int_subset, cur_elem.as_ptr() as *const u8);
             }
             if elem.is_null() && !doc.is_null() {
-                elem = xml_get_dtd_element_desc((*doc).ext_subset, (*cur).elem);
+                elem = xml_get_dtd_element_desc((*doc).ext_subset, cur_elem.as_ptr() as *const u8);
             }
             if elem.is_null()
                 && !(*cur).parent.is_null()
                 && matches!((*(*cur).parent).typ, XmlElementType::XmlDTDNode)
             {
-                elem = xml_get_dtd_element_desc((*cur).parent as XmlDtdPtr, (*cur).elem);
+                elem = xml_get_dtd_element_desc(
+                    (*cur).parent as XmlDtdPtr,
+                    cur_elem.as_ptr() as *const u8,
+                );
             }
             if elem.is_null() {
                 xml_err_valid_node(
@@ -4760,7 +4796,7 @@ extern "C" fn xml_validate_attribute_callback(
                     XmlParserErrors::XmlDTDUnknownElem,
                     c"attribute %s: could not find decl for element %s\n".as_ptr() as _,
                     (*cur).name,
-                    (*cur).elem,
+                    cur_elem.as_ptr() as *const u8,
                     null_mut(),
                 );
                 return;
@@ -4772,7 +4808,7 @@ extern "C" fn xml_validate_attribute_callback(
                     XmlParserErrors::XmlDTDEmptyNotation,
                     c"NOTATION attribute %s declared for EMPTY element %s\n".as_ptr() as _,
                     (*cur).name,
-                    (*cur).elem,
+                    cur_elem.as_ptr() as *const u8,
                     null_mut(),
                 );
                 (*ctxt).valid = 0;

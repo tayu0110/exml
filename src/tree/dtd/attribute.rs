@@ -29,7 +29,7 @@ pub struct XmlAttribute {
     pub(crate) default_value: *const XmlChar, /* or the default value */
     pub(crate) tree: XmlEnumerationPtr,  /* or the enumeration tree if any */
     pub(crate) prefix: Option<String>,   /* the namespace prefix if any */
-    pub(crate) elem: *const XmlChar,     /* Element holding the attribute */
+    pub(crate) elem: Option<String>,     /* Element holding the attribute */
 }
 
 impl Default for XmlAttribute {
@@ -50,7 +50,7 @@ impl Default for XmlAttribute {
             default_value: null_mut(),
             tree: null_mut(),
             prefix: None,
-            elem: null_mut(),
+            elem: None,
         }
     }
 }

@@ -796,13 +796,10 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
             c"Node attribute declaration has no name".as_ptr(),
         );
     }
-    if !(*attr).elem.is_null() {
+    if let Some(elem) = (*attr).elem.as_deref() {
         if (*ctxt).check == 0 {
-            fprintf(
-                (*ctxt).output,
-                c" for %s".as_ptr(),
-                (*attr).elem as *mut c_char,
-            );
+            let elem = CString::new(elem).unwrap();
+            fprintf((*ctxt).output, c" for %s".as_ptr(), elem.as_ptr());
         }
     } else {
         xml_debug_err(

@@ -1976,9 +1976,10 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         } else if matches!((*cur).typ, XmlElementType::XmlAttributeDecl) {
             let tmp: XmlAttributePtr = cur as _;
             let prefix = (*tmp).prefix.as_deref().map(|p| CString::new(p).unwrap());
+            let elem = (*tmp).elem.as_deref().map(|p| CString::new(p).unwrap());
             q = xml_get_dtd_qattr_desc(
                 ret,
-                (*tmp).elem,
+                elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
                 (*tmp).name,
                 prefix
                     .as_ref()
