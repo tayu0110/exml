@@ -8,7 +8,7 @@ pub type XmlNotationPtr = *mut XmlNotation;
 pub struct XmlNotation {
     pub(crate) name: *const XmlChar,      /* Notation name */
     pub(crate) public_id: Option<String>, /* Public identifier, if any */
-    pub(crate) system_id: *const XmlChar, /* System identifier, if any */
+    pub(crate) system_id: Option<String>, /* System identifier, if any */
 }
 
 impl Default for XmlNotation {
@@ -16,7 +16,7 @@ impl Default for XmlNotation {
         Self {
             name: null(),
             public_id: None,
-            system_id: null(),
+            system_id: None,
         }
     }
 }

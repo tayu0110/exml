@@ -382,9 +382,7 @@ unsafe extern "C" fn xml_free_notation(nota: XmlNotationPtr) {
         xml_free((*nota).name as _);
     }
     (*nota).public_id = None;
-    if !(*nota).system_id.is_null() {
-        xml_free((*nota).system_id as _);
-    }
+    (*nota).system_id = None;
     xml_free(nota as _);
 }
 
@@ -454,7 +452,11 @@ pub unsafe extern "C" fn xml_add_notation_decl(
      */
     (*ret).name = xml_strdup(name);
     if !system_id.is_null() {
-        (*ret).system_id = xml_strdup(system_id);
+        (*ret).system_id = Some(
+            CStr::from_ptr(system_id as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
     if !public_id.is_null() {
         (*ret).public_id = Some(
@@ -509,11 +511,7 @@ extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> 
             (*cur).name = null_mut();
         }
         (*cur).public_id = (*nota).public_id.clone();
-        if !(*nota).system_id.is_null() {
-            (*cur).system_id = xml_strdup((*nota).system_id);
-        } else {
-            (*cur).system_id = null_mut();
-        }
+        (*cur).system_id = (*nota).system_id.clone();
         cur as _
     }
 }
@@ -569,13 +567,15 @@ pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotatio
         let public_id = CString::new(public_id).unwrap();
         xml_buf_cat(buf, c" PUBLIC ".as_ptr() as _);
         xml_buf_write_quoted_string(buf, public_id.as_ptr() as *const u8);
-        if !(*nota).system_id.is_null() {
+        if let Some(system_id) = (*nota).system_id.as_deref() {
+            let system_id = CString::new(system_id).unwrap();
             xml_buf_cat(buf, c" ".as_ptr() as _);
-            xml_buf_write_quoted_string(buf, (*nota).system_id as _);
+            xml_buf_write_quoted_string(buf, system_id.as_ptr() as *const u8);
         }
     } else {
+        let system_id = CString::new((*nota).system_id.as_deref().unwrap()).unwrap();
         xml_buf_cat(buf, c" SYSTEM ".as_ptr() as _);
-        xml_buf_write_quoted_string(buf, (*nota).system_id as _);
+        xml_buf_write_quoted_string(buf, system_id.as_ptr() as *const u8);
     }
     xml_buf_cat(buf, c" >\n".as_ptr() as _);
 }
