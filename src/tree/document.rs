@@ -33,7 +33,7 @@ pub struct XmlDoc {
     pub children: Option<NodePtr>,      /* the document tree */
     pub(crate) last: Option<NodePtr>,   /* last child link */
     pub(crate) parent: Option<NodePtr>, /* child->parent link */
-    pub(crate) next: *mut XmlNode,      /* next sibling link  */
+    pub(crate) next: Option<NodePtr>,   /* next sibling link  */
     pub(crate) prev: *mut XmlNode,      /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,        /* autoreference to itself */
 
@@ -765,10 +765,10 @@ impl NodeCommon for XmlDoc {
         self.last = last;
     }
     fn next(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.next)
+        self.next
     }
     fn set_next(&mut self, next: Option<NodePtr>) {
-        self.next = next.map_or(null_mut(), |n| n.as_ptr());
+        self.next = next;
     }
     fn prev(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.prev)
@@ -793,7 +793,7 @@ impl Default for XmlDoc {
             children: None,
             last: None,
             parent: None,
-            next: null_mut(),
+            next: None,
             prev: null_mut(),
             doc: null_mut(),
             compression: 0,
