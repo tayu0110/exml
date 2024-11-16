@@ -27,15 +27,15 @@ use super::{
 pub type XmlDocPtr = *mut XmlDoc;
 #[repr(C)]
 pub struct XmlDoc {
-    pub(crate) _private: *mut c_void, /* application data */
-    pub(crate) typ: XmlElementType,   /* XML_DOCUMENT_NODE, must be second ! */
-    pub(crate) name: *mut i8,         /* name/filename/URI of the document */
-    pub children: Option<NodePtr>,    /* the document tree */
-    pub(crate) last: *mut XmlNode,    /* last child link */
-    pub(crate) parent: *mut XmlNode,  /* child->parent link */
-    pub(crate) next: *mut XmlNode,    /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,    /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,      /* autoreference to itself */
+    pub(crate) _private: *mut c_void,   /* application data */
+    pub(crate) typ: XmlElementType,     /* XML_DOCUMENT_NODE, must be second ! */
+    pub(crate) name: *mut i8,           /* name/filename/URI of the document */
+    pub children: Option<NodePtr>,      /* the document tree */
+    pub(crate) last: *mut XmlNode,      /* last child link */
+    pub(crate) parent: Option<NodePtr>, /* child->parent link */
+    pub(crate) next: *mut XmlNode,      /* next sibling link  */
+    pub(crate) prev: *mut XmlNode,      /* previous sibling link  */
+    pub(crate) doc: *mut XmlDoc,        /* autoreference to itself */
 
     /* End of common part */
     pub(crate) compression: i32, /* level of zlib compression */
@@ -777,10 +777,10 @@ impl NodeCommon for XmlDoc {
         self.prev = prev.map_or(null_mut(), |p| p.as_ptr());
     }
     fn parent(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.parent)
+        self.parent
     }
     fn set_parent(&mut self, parent: Option<NodePtr>) {
-        self.parent = parent.map_or(null_mut(), |p| p.as_ptr());
+        self.parent = parent;
     }
 }
 
@@ -792,7 +792,7 @@ impl Default for XmlDoc {
             name: null_mut(),
             children: None,
             last: null_mut(),
-            parent: null_mut(),
+            parent: None,
             next: null_mut(),
             prev: null_mut(),
             doc: null_mut(),
