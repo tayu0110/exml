@@ -2671,7 +2671,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
         (*dtd).last = ret as XmlNodePtr;
     } else {
         (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev = (*dtd).last;
+        (*ret).prev = NodePtr::from_ptr((*dtd).last);
         (*dtd).last = ret as XmlNodePtr;
     }
     ret

@@ -11,17 +11,17 @@ use crate::{
 /// An Attribute declaration in a DTD.
 pub type XmlAttributePtr = *mut XmlAttribute;
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct XmlAttribute {
-    pub(crate) _private: *mut c_void,  /* application data */
-    pub(crate) typ: XmlElementType,    /* XML_ATTRIBUTE_DECL, must be second ! */
-    pub(crate) name: *const XmlChar,   /* Attribute name */
-    pub(crate) children: *mut XmlNode, /* NULL */
-    pub(crate) last: *mut XmlNode,     /* NULL */
-    pub(crate) parent: *mut XmlDtd,    /* -> DTD */
-    pub(crate) next: *mut XmlNode,     /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,     /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,       /* the containing document */
+    pub(crate) _private: *mut c_void,     /* application data */
+    pub(crate) typ: XmlElementType,       /* XML_ATTRIBUTE_DECL, must be second ! */
+    pub(crate) name: *const XmlChar,      /* Attribute name */
+    pub(crate) children: Option<NodePtr>, /* NULL */
+    pub(crate) last: Option<NodePtr>,     /* NULL */
+    pub(crate) parent: *mut XmlDtd,       /* -> DTD */
+    pub(crate) next: Option<NodePtr>,     /* next sibling link  */
+    pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
+    pub(crate) doc: *mut XmlDoc,          /* the containing document */
 
     pub(crate) nexth: *mut XmlAttribute, /* next in hash table */
     pub(crate) atype: XmlAttributeType,  /* The attribute type */
@@ -43,28 +43,28 @@ impl NodeCommon for XmlAttribute {
         self.name
     }
     fn children(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.children)
+        self.children
     }
     fn set_children(&mut self, children: Option<NodePtr>) {
-        self.children = children.map_or(null_mut(), |c| c.as_ptr())
+        self.children = children;
     }
     fn last(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.last)
+        self.last
     }
     fn set_last(&mut self, last: Option<NodePtr>) {
-        self.last = last.map_or(null_mut(), |l| l.as_ptr());
+        self.last = last;
     }
     fn next(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.next)
+        self.next
     }
     fn set_next(&mut self, next: Option<NodePtr>) {
-        self.next = next.map_or(null_mut(), |n| n.as_ptr());
+        self.next = next;
     }
     fn prev(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.prev)
+        self.prev
     }
     fn set_prev(&mut self, prev: Option<NodePtr>) {
-        self.prev = prev.map_or(null_mut(), |p| p.as_ptr());
+        self.prev = prev;
     }
     fn parent(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.parent as *mut XmlNode)
