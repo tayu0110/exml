@@ -410,26 +410,26 @@ unsafe extern "C" fn xml_ns_list_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, mut cur:
  */
 unsafe extern "C" fn xml_attr_serialize_content(buf: XmlOutputBufferPtr, attr: XmlAttrPtr) {
     let mut children = (*attr).children;
-    while !children.is_null() {
-        match (*children).typ {
+    while let Some(now) = children {
+        match now.typ {
             XmlElementType::XmlTextNode => {
                 xml_buf_attr_serialize_txt_content(
                     (*buf).buffer.map_or(null_mut(), |buf| buf.as_ptr()),
                     (*attr).doc,
                     attr,
-                    (*children).content,
+                    now.content,
                 );
             }
             XmlElementType::XmlEntityRefNode => {
                 if let Some(mut buf) = (*buf).buffer {
                     buf.push_bytes(b"&");
-                    buf.push_cstr(CStr::from_ptr((*children).name as *const i8));
+                    buf.push_cstr(CStr::from_ptr(now.name as *const i8));
                     buf.push_bytes(b";");
                 }
             }
             _ => { /* should not happen unless we have a badly built tree */ }
         }
-        children = (*children).next.map_or(null_mut(), |n| n.as_ptr());
+        children = now.next;
     }
 }
 
@@ -926,17 +926,17 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
         {
             xml_lang = cur;
         } else if (*cur).ns.is_null()
-            && ((*cur).children.is_null()
-                || (*(*cur).children).content.is_null()
-                || *(*(*cur).children).content.add(0) == 0)
+            && (*cur)
+                .children
+                .map_or(true, |c| c.content.is_null() || *c.content.add(0) == 0)
             && html_is_boolean_attr((*cur).name) != 0
         {
-            if !(*cur).children.is_null() {
-                xml_free_node((*cur).children);
+            if let Some(children) = (*cur).children {
+                xml_free_node(children.as_ptr());
             }
-            (*cur).children = xml_new_doc_text((*cur).doc, (*cur).name);
-            if !(*cur).children.is_null() {
-                (*(*cur).children).parent = NodePtr::from_ptr(cur as *mut XmlNode);
+            (*cur).children = NodePtr::from_ptr(xml_new_doc_text((*cur).doc, (*cur).name));
+            if let Some(mut children) = (*cur).children {
+                children.parent = NodePtr::from_ptr(cur as *mut XmlNode);
             }
         }
         xml_attr_dump_output(ctxt, cur);

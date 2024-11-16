@@ -1903,26 +1903,24 @@ unsafe fn xml_sax2_attribute_internal(
     }
 
     if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
-        let mut tmp: XmlNodePtr;
-
         (*ret).children = if (*ctxt).my_doc.is_null() {
-            null_mut()
+            None
         } else {
-            (*(*ctxt).my_doc).get_node_list(value)
+            NodePtr::from_ptr((*(*ctxt).my_doc).get_node_list(value))
         };
-        tmp = (*ret).children;
-        while !tmp.is_null() {
-            (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
-            if (*tmp).next.is_none() {
-                (*ret).last = tmp;
+        let mut tmp = (*ret).children;
+        while let Some(mut now) = tmp {
+            now.parent = NodePtr::from_ptr(ret as *mut XmlNode);
+            if now.next.is_none() {
+                (*ret).last = now.as_ptr();
             }
-            tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+            tmp = now.next;
         }
     } else if !value.is_null() {
-        (*ret).children = xml_new_doc_text((*ctxt).my_doc, value);
-        (*ret).last = (*ret).children;
-        if !(*ret).children.is_null() {
-            (*(*ret).children).parent = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*ret).children = NodePtr::from_ptr(xml_new_doc_text((*ctxt).my_doc, value));
+        (*ret).last = (*ret).children.map_or(null_mut(), |c| c.as_ptr());
+        if let Some(mut children) = (*ret).children {
+            children.parent = NodePtr::from_ptr(ret as *mut XmlNode);
         }
     }
 
@@ -1989,15 +1987,16 @@ unsafe fn xml_sax2_attribute_internal(
                 value,
             );
         }
-    } else if (*ctxt).loadsubset & XML_SKIP_IDS as i32 == 0 &&
-	       (((*ctxt).replace_entities == 0 && (*ctxt).external != 2) ||
-	        ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0)) &&
-               /* Don't create IDs containing entity references */
-               !(*ret).children.is_null() &&
-               matches!((*(*ret).children).typ, XmlElementType::XmlTextNode) &&
-               (*(*ret).children).next.is_none()
+    } else if (*ctxt).loadsubset & XML_SKIP_IDS as i32 == 0
+        && (((*ctxt).replace_entities == 0 && (*ctxt).external != 2)
+            || ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0))
+            /* Don't create IDs containing entity references */
+        && (*ret)
+            .children
+            .filter(|c| matches!(c.typ, XmlElementType::XmlTextNode) && c.next.is_none())
+            .is_some()
     {
-        let content: *mut XmlChar = (*(*ret).children).content;
+        let content: *mut XmlChar = (*ret).children.unwrap().content;
         /*
          * when validating, the ID registration is done at the attribute
          * validation level. Otherwise we have to do specific handling here.
@@ -3097,16 +3096,14 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
     }
 
     if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
-        let mut tmp: XmlNodePtr;
-
         /*
          * We know that if there is an entity reference, then
          * the string has been dup'ed and terminates with 0
          * otherwise with ' or "
          */
         if *valueend != 0 {
-            tmp = xml_sax2_text_node(ctxt, value, valueend.offset_from(value) as _);
-            (*ret).children = tmp;
+            let tmp = xml_sax2_text_node(ctxt, value, valueend.offset_from(value) as _);
+            (*ret).children = NodePtr::from_ptr(tmp);
             (*ret).last = tmp;
             if !tmp.is_null() {
                 (*tmp).doc = (*ret).doc;
@@ -3114,23 +3111,26 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             }
         } else {
             (*ret).children = if (*ctxt).my_doc.is_null() {
-                null_mut()
+                None
             } else {
-                (*(*ctxt).my_doc).get_node_list_with_strlen(value, valueend.offset_from(value) as _)
+                NodePtr::from_ptr(
+                    (*(*ctxt).my_doc)
+                        .get_node_list_with_strlen(value, valueend.offset_from(value) as _),
+                )
             };
-            tmp = (*ret).children;
-            while !tmp.is_null() {
-                (*tmp).doc = (*ret).doc;
-                (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
-                if (*tmp).next.is_none() {
-                    (*ret).last = tmp;
+            let mut tmp = (*ret).children;
+            while let Some(mut now) = tmp {
+                now.doc = (*ret).doc;
+                now.parent = NodePtr::from_ptr(ret as *mut XmlNode);
+                if now.next.is_none() {
+                    (*ret).last = now.as_ptr();
                 }
-                tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                tmp = now.next;
             }
         }
     } else if !value.is_null() {
         let tmp: XmlNodePtr = xml_sax2_text_node(ctxt, value, valueend.offset_from(value) as _);
-        (*ret).children = tmp;
+        (*ret).children = NodePtr::from_ptr(tmp);
         (*ret).last = tmp;
         if !tmp.is_null() {
             (*tmp).doc = (*ret).doc;
@@ -3241,15 +3241,16 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                 );
             }
         }
-    } else if (*ctxt).loadsubset & XML_SKIP_IDS as i32 == 0 &&
-	       (((*ctxt).replace_entities == 0 && (*ctxt).external != 2) ||
-	        ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0)) &&
-               /* Don't create IDs containing entity references */
-               !(*ret).children.is_null() &&
-               matches!((*(*ret).children).typ, XmlElementType::XmlTextNode) &&
-               (*(*ret).children).next.is_none()
+    } else if (*ctxt).loadsubset & XML_SKIP_IDS as i32 == 0
+        && (((*ctxt).replace_entities == 0 && (*ctxt).external != 2)
+            || ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0))
+            /* Don't create IDs containing entity references */
+        && (*ret)
+            .children
+            .filter(|c| matches!(c.typ, XmlElementType::XmlTextNode) && c.next.is_none())
+            .is_some()
     {
-        let content: *mut XmlChar = (*(*ret).children).content;
+        let content: *mut XmlChar = (*ret).children.unwrap().content;
         /*
          * when validating, the ID registration is done at the attribute
          * validation level. Otherwise we have to do specific handling here.

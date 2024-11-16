@@ -220,11 +220,11 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             content = null_mut();
             http = 0;
             while !attr.is_null() {
-                if !(*attr).children.is_null()
-                    && matches!((*(*attr).children).typ, XmlElementType::XmlTextNode)
-                    && (*(*attr).children).next.is_none()
+                if let Some(children) = (*attr)
+                    .children
+                    .filter(|c| matches!(c.typ, XmlElementType::XmlTextNode) && c.next.is_none())
                 {
-                    value = (*(*attr).children).content;
+                    value = children.content;
                     if xml_strcasecmp((*attr).name, c"http-equiv".as_ptr() as _) == 0
                         && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
                     {
@@ -434,11 +434,11 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
             content = None;
             http = 0;
             while !attr.is_null() {
-                if !(*attr).children.is_null()
-                    && matches!((*(*attr).children).typ, XmlElementType::XmlTextNode)
-                    && (*(*attr).children).next.is_none()
+                if let Some(children) = (*attr)
+                    .children
+                    .filter(|c| matches!(c.typ, XmlElementType::XmlTextNode) && c.next.is_none())
                 {
-                    value = (*(*attr).children).content;
+                    value = children.content;
                     if xml_strcasecmp((*attr).name, c"http-equiv".as_ptr() as _) == 0
                         && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
                     {
@@ -1096,8 +1096,11 @@ unsafe extern "C" fn html_attr_dump_output(
     }
 
     (*buf).write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-    if !(*cur).children.is_null() && html_is_boolean_attr((*cur).name as _) == 0 {
-        value = (*(*cur).children).get_string(doc, 0);
+    if let Some(children) = (*cur)
+        .children
+        .filter(|_| html_is_boolean_attr((*cur).name as _) == 0)
+    {
+        value = children.get_string(doc, 0);
         if !value.is_null() {
             (*buf).write_str("=");
             if (*cur).ns.is_null()

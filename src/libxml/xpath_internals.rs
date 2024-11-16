@@ -10352,7 +10352,9 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
             return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
         }
         XmlElementType::XmlAttributeNode => {
-            tmp = (*(node as XmlAttrPtr)).children;
+            tmp = (*(node as XmlAttrPtr))
+                .children
+                .map_or(null_mut(), |c| c.as_ptr());
         }
         XmlElementType::XmlElementNode => {
             tmp = (*node).children.map_or(null_mut(), |c| c.as_ptr());

@@ -23,7 +23,7 @@ pub struct XmlAttr {
     pub(crate) _private: *mut c_void,           /* application data */
     pub(crate) typ: XmlElementType,             /* XML_ATTRIBUTE_NODE, must be second ! */
     pub(crate) name: *const XmlChar,            /* the name of the property */
-    pub(crate) children: *mut XmlNode,          /* the value of the property */
+    pub(crate) children: Option<NodePtr>,       /* the value of the property */
     pub(crate) last: *mut XmlNode,              /* NULL */
     pub(crate) parent: *mut XmlNode,            /* child->parent link */
     pub(crate) next: *mut XmlAttr,              /* next sibling link  */
@@ -75,19 +75,19 @@ impl XmlAttr {
              * Note that we return at least the empty string.
              *   TODO: Do we really always want that?
              */
-            if !self.children.is_null() {
-                if (*self.children).next.is_none()
+            if let Some(children) = self.children {
+                if children.next.is_none()
                     && matches!(
-                        (*self.children).typ,
+                        children.typ,
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     )
                 {
                     /*
                      * Optimization for the common case: only 1 text node.
                      */
-                    return xml_strdup((*self.children).content);
+                    return xml_strdup(children.content);
                 } else {
-                    let ret: *mut XmlChar = (*self.children).get_string(self.doc, 1);
+                    let ret: *mut XmlChar = children.get_string(self.doc, 1);
                     if !ret.is_null() {
                         return ret;
                     }
@@ -112,10 +112,10 @@ impl NodeCommon for XmlAttr {
         self.name
     }
     fn children(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.children)
+        self.children
     }
     fn set_children(&mut self, children: Option<NodePtr>) {
-        self.children = children.map_or(null_mut(), |c| c.as_ptr())
+        self.children = children;
     }
     fn last(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.last)
@@ -178,20 +178,18 @@ pub unsafe extern "C" fn xml_new_doc_prop(
     }
     (*cur).doc = doc;
     if !value.is_null() {
-        (*cur).children = if doc.is_null() {
-            null_mut()
-        } else {
-            (*doc).get_node_list(value)
-        };
+        (*cur).children = (!doc.is_null())
+            .then(|| NodePtr::from_ptr((*doc).get_node_list(value)))
+            .flatten();
         (*cur).last = null_mut();
 
         let mut tmp = (*cur).children;
-        while !tmp.is_null() {
-            (*tmp).parent = NodePtr::from_ptr(cur as *mut XmlNode);
-            if (*tmp).next.is_none() {
-                (*cur).last = tmp;
+        while let Some(mut now) = tmp {
+            now.parent = NodePtr::from_ptr(cur as *mut XmlNode);
+            if now.next.is_none() {
+                (*cur).last = now.as_ptr();
             }
-            tmp = (*tmp).next.map_or(null_mut(), |c| c.as_ptr());
+            tmp = now.next;
         }
     }
 

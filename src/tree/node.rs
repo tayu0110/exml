@@ -992,15 +992,15 @@ impl XmlNode {
             }
             XmlElementType::XmlAttributeNode => {
                 let attr: XmlAttrPtr = self as *const XmlNode as _;
-                let mut tmp: XmlNodePtr = (*attr).children;
+                let mut tmp = (*attr).children;
 
-                while !tmp.is_null() {
-                    if matches!((*tmp).typ, XmlElementType::XmlTextNode) {
-                        xml_buf_cat(buf, (*tmp).content);
+                while let Some(now) = tmp {
+                    if matches!(now.typ, XmlElementType::XmlTextNode) {
+                        xml_buf_cat(buf, now.content);
                     } else {
-                        (*tmp).get_content_to(buf);
+                        now.get_content_to(buf);
                     }
-                    tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                    tmp = now.next;
                 }
             }
             XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
@@ -1702,23 +1702,24 @@ impl XmlNode {
                 xml_remove_id(self.doc, prop);
                 (*prop).atype = Some(XmlAttributeType::XmlAttributeID);
             }
-            if !(*prop).children.is_null() {
-                xml_free_node_list((*prop).children);
+            if let Some(children) = (*prop).children {
+                xml_free_node_list(children.as_ptr());
             }
-            (*prop).children = null_mut();
+            (*prop).children = None;
             (*prop).last = null_mut();
             (*prop).ns = ns;
             if let Some(value) = value {
                 let value = CString::new(value).unwrap();
-                (*prop).children = xml_new_doc_text(self.doc, value.as_ptr() as *const u8);
+                (*prop).children =
+                    NodePtr::from_ptr(xml_new_doc_text(self.doc, value.as_ptr() as *const u8));
                 (*prop).last = null_mut();
                 let mut tmp = (*prop).children;
-                while !tmp.is_null() {
-                    (*tmp).parent = NodePtr::from_ptr(prop as *mut XmlNode);
-                    if (*tmp).next.is_none() {
-                        (*prop).last = tmp;
+                while let Some(mut now) = tmp {
+                    now.parent = NodePtr::from_ptr(prop as *mut XmlNode);
+                    if now.next.is_none() {
+                        (*prop).last = now.as_ptr();
                     }
-                    tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                    tmp = now.next;
                 }
             }
             if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
@@ -2120,8 +2121,8 @@ impl XmlNode {
                         );
                         (*prop).doc = doc;
                     }
-                    if !(*prop).children.is_null() {
-                        (*(*prop).children).set_doc_all_sibling(doc);
+                    if let Some(mut children) = (*prop).children {
+                        children.set_doc_all_sibling(doc);
                     }
 
                     // TODO: ID attributes should be also added to the new

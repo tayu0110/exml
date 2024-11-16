@@ -30284,11 +30284,9 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             (*attr).name,
                             ns_name,
                             0,
-                            if (*attr).children.is_null() {
-                                null_mut()
-                            } else {
-                                (*(*attr).children).get_string((*attr).doc, 1)
-                            },
+                            (*attr)
+                                .children
+                                .map_or(null_mut(), |c| c.get_string((*attr).doc, 1)),
                             1,
                         );
                         if ret == -1 {

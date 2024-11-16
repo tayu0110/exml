@@ -1394,9 +1394,9 @@ unsafe extern "C" fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr)
         fprintf((*ctxt).output, c"ATTRIBUTE ".as_ptr());
         xml_ctxt_dump_string(ctxt, (*attr).name);
         fprintf((*ctxt).output, c"\n".as_ptr());
-        if !(*attr).children.is_null() {
+        if let Some(children) = (*attr).children {
             (*ctxt).depth += 1;
-            xml_ctxt_dump_node_list(ctxt, (*attr).children);
+            xml_ctxt_dump_node_list(ctxt, children.as_ptr());
             (*ctxt).depth -= 1;
         }
     }
@@ -2125,7 +2125,9 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
                 .map_or(null_mut(), |c| c.as_ptr());
         }
         XmlElementType::XmlAttributeNode => {
-            list = (*(node as XmlAttrPtr)).children;
+            list = (*(node as XmlAttrPtr))
+                .children
+                .map_or(null_mut(), |c| c.as_ptr());
         }
         XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode

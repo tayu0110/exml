@@ -1243,15 +1243,15 @@ unsafe fn xml_new_prop_internal(
     }
 
     if !value.is_null() {
-        (*cur).children = xml_new_doc_text(doc, value);
+        (*cur).children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
         (*cur).last = null_mut();
         let mut tmp = (*cur).children;
-        while !tmp.is_null() {
-            (*tmp).parent = NodePtr::from_ptr(cur as *mut XmlNode);
-            if (*tmp).next.is_none() {
-                (*cur).last = tmp;
+        while let Some(mut now) = tmp {
+            now.parent = NodePtr::from_ptr(cur as *mut XmlNode);
+            if now.next.is_none() {
+                (*cur).last = now.as_ptr();
             }
-            tmp = (*tmp).next.map_or(null_mut(), |c| c.as_ptr());
+            tmp = now.next;
         }
     }
 
@@ -1328,8 +1328,8 @@ pub unsafe extern "C" fn xml_free_prop(cur: XmlAttrPtr) {
     if !(*cur).doc.is_null() && matches!((*cur).atype, Some(XmlAttributeType::XmlAttributeID)) {
         xml_remove_id((*cur).doc, cur);
     }
-    if !(*cur).children.is_null() {
-        xml_free_node_list((*cur).children);
+    if let Some(children) = (*cur).children {
+        xml_free_node_list(children.as_ptr());
     }
     DICT_FREE!(dict, (*cur).name);
     xml_free(cur as _);
@@ -1744,8 +1744,8 @@ unsafe extern "C" fn xml_copy_prop_internal(
         ret = xml_new_doc_prop(doc, (*cur).name, null_mut());
     } else if !(*cur).parent.is_null() {
         ret = xml_new_doc_prop((*(*cur).parent).doc, (*cur).name, null_mut());
-    } else if !(*cur).children.is_null() {
-        ret = xml_new_doc_prop((*(*cur).children).doc, (*cur).name, null_mut());
+    } else if let Some(children) = (*cur).children {
+        ret = xml_new_doc_prop(children.doc, (*cur).name, null_mut());
     } else {
         ret = xml_new_doc_prop(null_mut(), (*cur).name, null_mut());
     }
@@ -1801,18 +1801,20 @@ unsafe extern "C" fn xml_copy_prop_internal(
         (*ret).ns = null_mut();
     }
 
-    if !(*cur).children.is_null() {
-        let mut tmp: XmlNodePtr;
-
-        (*ret).children = xml_static_copy_node_list((*cur).children, (*ret).doc, ret as _);
+    if let Some(children) = (*cur).children {
+        (*ret).children = NodePtr::from_ptr(xml_static_copy_node_list(
+            children.as_ptr(),
+            (*ret).doc,
+            ret as _,
+        ));
         (*ret).last = null_mut();
-        tmp = (*ret).children;
-        while !tmp.is_null() {
+        let mut tmp = (*ret).children;
+        while let Some(now) = tmp {
             /* (*tmp).parent = ret; */
-            if (*tmp).next.is_none() {
-                (*ret).last = tmp;
+            if now.next.is_none() {
+                (*ret).last = now.as_ptr();
             }
-            tmp = (*tmp).next.map_or(null_mut(), |c| c.as_ptr());
+            tmp = now.next;
         }
     }
     /*
@@ -1827,11 +1829,7 @@ unsafe extern "C" fn xml_copy_prop_internal(
         && xml_is_id((*cur).doc, (*cur).parent, cur) != 0
     {
         let children = (*cur).children;
-        let id: *mut XmlChar = if children.is_null() {
-            null_mut()
-        } else {
-            (*children).get_string((*cur).doc, 1)
-        };
+        let id: *mut XmlChar = children.map_or(null_mut(), |c| c.get_string((*cur).doc, 1));
         if !id.is_null() {
             xml_add_id(null_mut(), (*target).doc, id, ret);
             xml_free(id as _);
@@ -5269,10 +5267,10 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
     /*
      * Walk content.
      */
-    if (*attr).children.is_null() {
+    let Some(children) = (*attr).children else {
         return 0;
-    }
-    cur = (*attr).children;
+    };
+    cur = children.as_ptr();
     if !cur.is_null() && matches!((*cur).typ, XmlElementType::XmlNamespaceDecl) {
         // goto internal_error;
         return -1;

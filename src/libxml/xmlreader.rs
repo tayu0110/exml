@@ -1615,8 +1615,8 @@ unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: Xm
         xml_deregister_node_default_value(cur as _);
     }
 
-    if !(*cur).children.is_null() {
-        xml_text_reader_free_node_list(reader, (*cur).children);
+    if let Some(children) = (*cur).children {
+        xml_text_reader_free_node_list(reader, children.as_ptr());
     }
 
     DICT_FREE!(dict, (*cur).name);
@@ -3335,11 +3335,11 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
             let attr: XmlAttrPtr = node as XmlAttrPtr;
             let mut ret: *const XmlChar;
 
-            if !(*attr).children.is_null()
-                && (*(*attr).children).typ == XmlElementType::XmlTextNode
-                && (*(*attr).children).next.is_none()
+            if let Some(children) = (*attr)
+                .children
+                .filter(|c| c.typ == XmlElementType::XmlTextNode && c.next.is_none())
             {
-                return (*(*attr).children).content;
+                return children.content;
             } else {
                 if reader.buffer.is_null() {
                     reader.buffer = xml_buf_create_size(100);
@@ -3619,17 +3619,13 @@ pub unsafe extern "C" fn xml_text_reader_value(reader: &mut XmlTextReader) -> *m
             let attr: XmlAttrPtr = node as XmlAttrPtr;
 
             if !(*attr).parent.is_null() {
-                return if (*attr).children.is_null() {
-                    null_mut()
-                } else {
-                    (*(*attr).children).get_string((*(*attr).parent).doc, 1)
-                };
+                return (*attr)
+                    .children
+                    .map_or(null_mut(), |c| c.get_string((*(*attr).parent).doc, 1));
             } else {
-                return if (*attr).children.is_null() {
-                    null_mut()
-                } else {
-                    (*(*attr).children).get_string(null_mut(), 1)
-                };
+                return (*attr)
+                    .children
+                    .map_or(null_mut(), |c| c.get_string(null_mut(), 1));
             }
         }
         XmlElementType::XmlTextNode
@@ -3822,11 +3818,9 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_no(
     }
     /* TODO walk the DTD if present */
 
-    let ret: *mut XmlChar = if (*cur).children.is_null() {
-        null_mut()
-    } else {
-        (*(*cur).children).get_string((*reader.node).doc, 1)
-    };
+    let ret: *mut XmlChar = (*cur)
+        .children
+        .map_or(null_mut(), |c| c.get_string((*reader.node).doc, 1));
     if ret.is_null() {
         return xml_strdup(c"".as_ptr() as _);
     }

@@ -3135,11 +3135,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
             } else if xml_str_equal((*cur).name, c"datatypeLibrary".as_ptr() as _) {
                 let uri: XmlURIPtr;
 
-                let val: *mut XmlChar = if (*cur).children.is_null() {
-                    null_mut()
-                } else {
-                    (*(*cur).children).get_string((*node).doc, 1)
-                };
+                let val: *mut XmlChar = (*cur)
+                    .children
+                    .map_or(null_mut(), |c| c.get_string((*node).doc, 1));
                 if !val.is_null() {
                     if *val.add(0) != 0 {
                         uri = xml_parse_uri(val as _);
@@ -10251,11 +10249,9 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             }
         }
         if !prop.is_null() {
-            value = if (*prop).children.is_null() {
-                null_mut()
-            } else {
-                (*(*prop).children).get_string((*prop).doc, 1)
-            };
+            value = (*prop)
+                .children
+                .map_or(null_mut(), |c| c.get_string((*prop).doc, 1));
             oldvalue = (*(*ctxt).state).value;
             oldseq = (*(*ctxt).state).seq;
             (*(*ctxt).state).seq = prop as _;
@@ -10291,11 +10287,9 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             }
         }
         if !prop.is_null() {
-            value = if (*prop).children.is_null() {
-                null_mut()
-            } else {
-                (*(*prop).children).get_string((*prop).doc, 1)
-            };
+            value = (*prop)
+                .children
+                .map_or(null_mut(), |c| c.get_string((*prop).doc, 1));
             oldvalue = (*(*ctxt).state).value;
             oldseq = (*(*ctxt).state).seq;
             (*(*ctxt).state).seq = prop as _;
