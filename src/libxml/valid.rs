@@ -381,9 +381,7 @@ unsafe extern "C" fn xml_free_notation(nota: XmlNotationPtr) {
     if !(*nota).name.is_null() {
         xml_free((*nota).name as _);
     }
-    if !(*nota).public_id.is_null() {
-        xml_free((*nota).public_id as _);
-    }
+    (*nota).public_id = None;
     if !(*nota).system_id.is_null() {
         xml_free((*nota).system_id as _);
     }
@@ -449,6 +447,7 @@ pub unsafe extern "C" fn xml_add_notation_decl(
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlNotation>());
+    std::ptr::write(&mut *ret, XmlNotation::default());
 
     /*
      * fill the structure.
@@ -458,7 +457,11 @@ pub unsafe extern "C" fn xml_add_notation_decl(
         (*ret).system_id = xml_strdup(system_id);
     }
     if !public_id.is_null() {
-        (*ret).public_id = xml_strdup(public_id);
+        (*ret).public_id = Some(
+            CStr::from_ptr(public_id as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
 
     /*
@@ -499,16 +502,13 @@ extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> 
             xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
             return null_mut();
         }
+        std::ptr::write(&mut *cur, XmlNotation::default());
         if !(*nota).name.is_null() {
             (*cur).name = xml_strdup((*nota).name);
         } else {
             (*cur).name = null_mut();
         }
-        if !(*nota).public_id.is_null() {
-            (*cur).public_id = xml_strdup((*nota).public_id);
-        } else {
-            (*cur).public_id = null_mut();
-        }
+        (*cur).public_id = (*nota).public_id.clone();
         if !(*nota).system_id.is_null() {
             (*cur).system_id = xml_strdup((*nota).system_id);
         } else {
@@ -565,9 +565,10 @@ pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotatio
     }
     xml_buf_cat(buf, c"<!NOTATION ".as_ptr() as _);
     xml_buf_cat(buf, (*nota).name as _);
-    if !(*nota).public_id.is_null() {
+    if let Some(public_id) = (*nota).public_id.as_deref() {
+        let public_id = CString::new(public_id).unwrap();
         xml_buf_cat(buf, c" PUBLIC ".as_ptr() as _);
-        xml_buf_write_quoted_string(buf, (*nota).public_id as _);
+        xml_buf_write_quoted_string(buf, public_id.as_ptr() as *const u8);
         if !(*nota).system_id.is_null() {
             xml_buf_cat(buf, c" ".as_ptr() as _);
             xml_buf_write_quoted_string(buf, (*nota).system_id as _);
