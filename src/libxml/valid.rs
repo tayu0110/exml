@@ -378,9 +378,7 @@ unsafe extern "C" fn xml_free_notation(nota: XmlNotationPtr) {
     if nota.is_null() {
         return;
     }
-    if !(*nota).name.is_null() {
-        xml_free((*nota).name as _);
-    }
+    (*nota).name = None;
     (*nota).public_id = None;
     (*nota).system_id = None;
     xml_free(nota as _);
@@ -450,7 +448,11 @@ pub unsafe extern "C" fn xml_add_notation_decl(
     /*
      * fill the structure.
      */
-    (*ret).name = xml_strdup(name);
+    (*ret).name = Some(
+        CStr::from_ptr(name as *const i8)
+            .to_string_lossy()
+            .into_owned(),
+    );
     if !system_id.is_null() {
         (*ret).system_id = Some(
             CStr::from_ptr(system_id as *const i8)
@@ -505,11 +507,7 @@ extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> 
             return null_mut();
         }
         std::ptr::write(&mut *cur, XmlNotation::default());
-        if !(*nota).name.is_null() {
-            (*cur).name = xml_strdup((*nota).name);
-        } else {
-            (*cur).name = null_mut();
-        }
+        (*cur).name = (*nota).name.clone();
         (*cur).public_id = (*nota).public_id.clone();
         (*cur).system_id = (*nota).system_id.clone();
         cur as _
@@ -562,7 +560,8 @@ pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotatio
         return;
     }
     xml_buf_cat(buf, c"<!NOTATION ".as_ptr() as _);
-    xml_buf_cat(buf, (*nota).name as _);
+    let name = CString::new((*nota).name.as_deref().unwrap()).unwrap();
+    xml_buf_cat(buf, name.as_ptr() as *const u8);
     if let Some(public_id) = (*nota).public_id.as_deref() {
         let public_id = CString::new(public_id).unwrap();
         xml_buf_cat(buf, c" PUBLIC ".as_ptr() as _);
