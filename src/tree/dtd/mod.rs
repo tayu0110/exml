@@ -34,7 +34,7 @@ pub struct XmlDtd {
     pub(crate) last: Option<NodePtr>,     /* last child link */
     pub(crate) parent: *mut XmlDoc,       /* child->parent link */
     pub(crate) next: Option<NodePtr>,     /* next sibling link  */
-    pub(crate) prev: *mut XmlNode,        /* previous sibling link  */
+    pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,          /* the containing document */
 
     /* End of common part */
@@ -113,10 +113,10 @@ impl NodeCommon for XmlDtd {
         self.next = next;
     }
     fn prev(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.prev)
+        self.prev
     }
     fn set_prev(&mut self, prev: Option<NodePtr>) {
-        self.prev = prev.map_or(null_mut(), |p| p.as_ptr());
+        self.prev = prev;
     }
     fn parent(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.parent as *mut XmlNode)
@@ -202,16 +202,16 @@ pub unsafe fn xml_create_int_subset(
                 }
                 if let Some(mut next) = next {
                     (*cur).next = Some(next);
-                    (*cur).prev = next.prev.map_or(null_mut(), |p| p.as_ptr());
-                    if (*cur).prev.is_null() {
-                        (*doc).children = NodePtr::from_ptr(cur as *mut XmlNode);
+                    (*cur).prev = next.prev;
+                    if let Some(mut prev) = (*cur).prev {
+                        prev.next = NodePtr::from_ptr(cur as *mut XmlNode);
                     } else {
-                        (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
+                        (*doc).children = NodePtr::from_ptr(cur as *mut XmlNode);
                     }
                     next.prev = NodePtr::from_ptr(cur as *mut XmlNode);
                 } else {
-                    (*cur).prev = (*doc).last.map_or(null_mut(), |p| p.as_ptr());
-                    (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
+                    (*cur).prev = (*doc).last;
+                    (*cur).prev.unwrap().next = NodePtr::from_ptr(cur as *mut XmlNode);
                     (*cur).next = None;
                     (*doc).last = NodePtr::from_ptr(cur as *mut XmlNode);
                 }
