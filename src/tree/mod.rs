@@ -1982,7 +1982,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         (*q).prev = NodePtr::from_ptr(p);
         (*q).parent = NodePtr::from_ptr(ret as *mut XmlNode);
         (*q).next = None;
-        (*ret).last = q;
+        (*ret).last = NodePtr::from_ptr(q);
         p = q;
         cur = (*cur).next.map_or(null_mut(), |c| c.as_ptr());
     }

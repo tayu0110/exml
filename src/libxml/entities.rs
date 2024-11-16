@@ -36,7 +36,7 @@ use crate::{
     },
     tree::{
         xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
-        XmlElementType, XmlNode, XmlNodePtr,
+        XmlElementType, XmlNode,
     },
 };
 
@@ -545,13 +545,13 @@ pub unsafe extern "C" fn xml_add_doc_entity(
      */
     (*ret).parent.store(dtd as _, Ordering::Relaxed);
     (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
-    if (*dtd).last.is_null() {
-        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*dtd).last = ret as XmlNodePtr;
+    if let Some(mut last) = (*dtd).last {
+        last.next = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*ret).prev.store(last.as_ptr(), Ordering::Relaxed);
+        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
     } else {
-        (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev.store((*dtd).last, Ordering::Relaxed);
-        (*dtd).last = ret as XmlNodePtr;
+        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
     }
     ret
 }
@@ -602,13 +602,13 @@ pub unsafe extern "C" fn xml_add_dtd_entity(
      */
     (*ret).parent = dtd.into();
     (*ret).doc = (*dtd).doc.into();
-    if (*dtd).last.is_null() {
-        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*dtd).last = ret as XmlNodePtr;
+    if let Some(mut last) = (*dtd).last {
+        last.next = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*ret).prev.store(last.as_ptr(), Ordering::Relaxed);
+        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
     } else {
-        (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev = (*dtd).last.into();
-        (*dtd).last = ret as XmlNodePtr;
+        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
     }
     ret
 }

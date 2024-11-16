@@ -1438,13 +1438,13 @@ pub unsafe extern "C" fn xml_add_element_decl(
      */
     (*ret).parent = dtd;
     (*ret).doc = (*dtd).doc;
-    if (*dtd).last.is_null() {
-        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*dtd).last = (*dtd).children.map_or(null_mut(), |c| c.as_ptr());
+    if let Some(mut last) = (*dtd).last {
+        last.next = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*ret).prev = Some(last);
+        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
     } else {
-        (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev = NodePtr::from_ptr((*dtd).last);
-        (*dtd).last = ret as XmlNodePtr;
+        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*dtd).last = (*dtd).children;
     }
     if !uqname.is_null() {
         xml_free(uqname as _);
@@ -2666,13 +2666,13 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
      * Link it to the DTD
      */
     (*ret).parent = dtd;
-    if (*dtd).last.is_null() {
-        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*dtd).last = ret as XmlNodePtr;
+    if let Some(mut last) = (*dtd).last {
+        last.next = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*ret).prev = Some(last);
+        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
     } else {
-        (*(*dtd).last).next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev = NodePtr::from_ptr((*dtd).last);
-        (*dtd).last = ret as XmlNodePtr;
+        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
+        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
     }
     ret
 }

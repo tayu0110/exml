@@ -31,7 +31,7 @@ pub struct XmlDtd {
     pub(crate) typ: XmlElementType,       /* XML_DTD_NODE, must be second ! */
     pub(crate) name: *const XmlChar,      /* Name of the DTD */
     pub(crate) children: Option<NodePtr>, /* the value of the property link */
-    pub(crate) last: *mut XmlNode,        /* last child link */
+    pub(crate) last: Option<NodePtr>,     /* last child link */
     pub(crate) parent: *mut XmlDoc,       /* child->parent link */
     pub(crate) next: *mut XmlNode,        /* next sibling link  */
     pub(crate) prev: *mut XmlNode,        /* previous sibling link  */
@@ -101,10 +101,10 @@ impl NodeCommon for XmlDtd {
         self.children = children;
     }
     fn last(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.last)
+        self.last
     }
     fn set_last(&mut self, last: Option<NodePtr>) {
-        self.last = last.map_or(null_mut(), |l| l.as_ptr());
+        self.last = last;
     }
     fn next(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.next)
