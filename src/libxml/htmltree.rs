@@ -1027,8 +1027,6 @@ unsafe extern "C" fn html_dtd_dump_output(
 ) {
     use std::ffi::CStr;
 
-    use crate::libxml::xmlstring::xml_strcmp;
-
     use crate::tree::XmlDtdPtr;
 
     let cur: XmlDtdPtr = (*doc).int_subset;
@@ -1046,18 +1044,22 @@ unsafe extern "C" fn html_dtd_dump_output(
             let external_id = CString::new(external_id).unwrap();
             buf.push_quoted_cstr(&external_id);
         }
-        if !(*cur).system_id.is_null() {
+        if let Some(system_id) = (*cur).system_id.as_deref() {
             (*buf).write_str(" ");
             if let Some(mut buf) = (*buf).buffer {
-                buf.push_quoted_cstr(CStr::from_ptr((*cur).system_id as *const i8));
+                let system_id = CString::new(system_id).unwrap();
+                buf.push_quoted_cstr(&system_id);
             }
         }
-    } else if !(*cur).system_id.is_null()
-        && xml_strcmp((*cur).system_id, c"about:legacy-compat".as_ptr() as _) != 0
+    } else if let Some(system_id) = (*cur)
+        .system_id
+        .as_deref()
+        .filter(|&s| s != "about:legacy-compat")
     {
         (*buf).write_str(" SYSTEM ");
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_cstr(CStr::from_ptr((*cur).system_id as *const i8));
+            let system_id = CString::new(system_id).unwrap();
+            buf.push_quoted_cstr(&system_id);
         }
     }
     (*buf).write_str(">\n");

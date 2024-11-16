@@ -663,12 +663,9 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
                 external_id.as_ptr(),
             );
         }
-        if !(*dtd).system_id.is_null() {
-            fprintf(
-                (*ctxt).output,
-                c", SYSTEM %s".as_ptr(),
-                (*dtd).system_id as *mut c_char,
-            );
+        if let Some(system_id) = (*dtd).system_id.as_deref() {
+            let system_id = CString::new(system_id).unwrap();
+            fprintf((*ctxt).output, c", SYSTEM %s".as_ptr(), system_id.as_ptr());
         }
         fprintf((*ctxt).output, c"\n".as_ptr());
     }

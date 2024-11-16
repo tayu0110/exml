@@ -4875,14 +4875,15 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         return 0;
     }
     if !(*doc).int_subset.is_null()
-        && (!(*(*doc).int_subset).system_id.is_null() || (*(*doc).int_subset).external_id.is_some())
+        && ((*(*doc).int_subset).system_id.is_some() || (*(*doc).int_subset).external_id.is_some())
         && (*doc).ext_subset.is_null()
     {
         let sys_id: *mut XmlChar;
-        if !(*(*doc).int_subset).system_id.is_null() {
+        if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
             let url = (*doc).url.as_deref().map(|u| CString::new(u).unwrap());
+            let system_id = CString::new(system_id).unwrap();
             sys_id = xml_build_uri(
-                (*(*doc).int_subset).system_id,
+                system_id.as_ptr() as *const u8,
                 url.map_or(null(), |u| u.as_ptr() as *const u8),
             );
             if sys_id.is_null() {
@@ -4890,7 +4891,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
                     c"Could not build URI for external subset \"%s\"\n".as_ptr() as _,
-                    (*(*doc).int_subset).system_id as *const c_char,
+                    system_id.as_ptr(),
                 );
                 return 0;
             }
@@ -4911,12 +4912,13 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
             xml_free(sys_id as _);
         }
         if (*doc).ext_subset.is_null() {
-            if !(*(*doc).int_subset).system_id.is_null() {
+            if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
+                let system_id = CString::new(system_id).unwrap();
                 xml_err_valid(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
                     c"Could not load the external subset \"%s\"\n".as_ptr() as _,
-                    (*(*doc).int_subset).system_id as *const c_char,
+                    system_id.as_ptr(),
                 );
             } else {
                 xml_err_valid(

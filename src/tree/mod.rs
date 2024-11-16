@@ -1095,7 +1095,7 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
         }
     }
     DICT_FREE!(dict, (*cur).name);
-    DICT_FREE!(dict, (*cur).system_id);
+    (*cur).system_id = None;
     (*cur).external_id = None;
     /* TODO !!! */
     if !(*cur).notations.is_null() {
@@ -1922,13 +1922,19 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         .external_id
         .as_deref()
         .map(|e| CString::new(e).unwrap());
+    let system_id = (*dtd)
+        .system_id
+        .as_deref()
+        .map(|s| CString::new(s).unwrap());
     let ret: XmlDtdPtr = xml_new_dtd(
         null_mut(),
         (*dtd).name,
         external_id
             .as_ref()
             .map_or(null_mut(), |e| e.as_ptr() as *const u8),
-        (*dtd).system_id,
+        system_id
+            .as_ref()
+            .map_or(null_mut(), |s| s.as_ptr() as *const u8),
     );
     if ret.is_null() {
         return null_mut();

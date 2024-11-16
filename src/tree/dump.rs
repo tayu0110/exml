@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    ffi::{CStr, CString},
+    ffi::CString,
     ptr::{null, null_mut},
     rc::Rc,
 };
@@ -402,12 +402,7 @@ impl XmlNode {
                 (*doc).get_int_subset()
             };
             if !dtd.is_null() {
-                let system_id = (!(*dtd).system_id.is_null()).then(|| {
-                    CStr::from_ptr((*dtd).system_id as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                });
-                is_html = is_xhtml(system_id.as_deref(), (*dtd).external_id.as_deref());
+                is_html = is_xhtml((*dtd).system_id.as_deref(), (*dtd).external_id.as_deref());
             }
 
             if is_html {

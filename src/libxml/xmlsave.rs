@@ -838,12 +838,14 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
         }
         (*buf).write_bytes(b" ");
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_cstr(CStr::from_ptr((*dtd).system_id as *const i8));
+            let system_id = CString::new((*dtd).system_id.as_deref().unwrap()).unwrap();
+            buf.push_quoted_cstr(&system_id);
         }
-    } else if !(*dtd).system_id.is_null() {
+    } else if let Some(system_id) = (*dtd).system_id.as_deref() {
         (*buf).write_bytes(b" SYSTEM ");
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_cstr(CStr::from_ptr((*dtd).system_id as *const i8));
+            let system_id = CString::new(system_id).unwrap();
+            buf.push_quoted_cstr(&system_id);
         }
     }
     if (*dtd).entities.is_null()
@@ -1649,12 +1651,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
             if (*ctxt).options & XmlSaveOption::XmlSaveNoXHTML as i32 == 0 {
                 dtd = (*cur).get_int_subset();
                 if !dtd.is_null() {
-                    let system_id = (!(*dtd).system_id.is_null()).then(|| {
-                        CStr::from_ptr((*dtd).system_id as *const i8)
-                            .to_string_lossy()
-                            .into_owned()
-                    });
-                    is_html = is_xhtml(system_id.as_deref(), (*dtd).external_id.as_deref());
+                    is_html = is_xhtml((*dtd).system_id.as_deref(), (*dtd).external_id.as_deref());
                 }
             }
         }

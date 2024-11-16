@@ -43,7 +43,7 @@ pub struct XmlDtd {
     pub(crate) attributes: *mut c_void, /* Hash table for attributes if any */
     pub(crate) entities: *mut c_void,  /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
-    pub(crate) system_id: *const XmlChar, /* URI for a SYSTEM or PUBLIC DTD */
+    pub(crate) system_id: Option<String>, /* URI for a SYSTEM or PUBLIC DTD */
     pub(crate) pentities: *mut c_void, /* Hash table for param entities if any */
 }
 
@@ -101,7 +101,7 @@ impl Default for XmlDtd {
             attributes: null_mut(),
             entities: null_mut(),
             external_id: None,
-            system_id: null_mut(),
+            system_id: None,
             pentities: null_mut(),
         }
     }
@@ -184,16 +184,11 @@ pub unsafe fn xml_create_int_subset(
     }
     (*cur).external_id = external_id.map(|e| e.to_owned());
     if !system_id.is_null() {
-        (*cur).system_id = xml_strdup(system_id);
-        if (*cur).system_id.is_null() {
-            xml_tree_err_memory(c"building internal subset".as_ptr() as _);
-            if !(*cur).name.is_null() {
-                xml_free((*cur).name as _);
-            }
-            (*cur).external_id = None;
-            xml_free(cur as _);
-            return null_mut();
-        }
+        (*cur).system_id = Some(
+            CStr::from_ptr(system_id as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
     if !doc.is_null() {
         (*doc).int_subset = cur;
@@ -280,7 +275,11 @@ pub unsafe fn xml_new_dtd(
         );
     }
     if !system_id.is_null() {
-        (*cur).system_id = xml_strdup(system_id);
+        (*cur).system_id = Some(
+            CStr::from_ptr(system_id as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
     if !doc.is_null() {
         (*doc).ext_subset = cur;
