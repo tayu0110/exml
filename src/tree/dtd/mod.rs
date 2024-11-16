@@ -239,7 +239,7 @@ pub unsafe fn xml_create_int_subset(
 pub unsafe fn xml_new_dtd(
     doc: XmlDocPtr,
     name: *const XmlChar,
-    external_id: *const XmlChar,
+    external_id: Option<&str>,
     system_id: *const XmlChar,
 ) -> XmlDtdPtr {
     if !doc.is_null() && !(*doc).ext_subset.is_null() {
@@ -261,13 +261,7 @@ pub unsafe fn xml_new_dtd(
     if !name.is_null() {
         (*cur).name = xml_strdup(name);
     }
-    if !external_id.is_null() {
-        (*cur).external_id = Some(
-            CStr::from_ptr(external_id as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-    }
+    (*cur).external_id = external_id.map(|e| e.to_owned());
     if !system_id.is_null() {
         (*cur).system_id = Some(
             CStr::from_ptr(system_id as *const i8)

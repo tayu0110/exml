@@ -373,7 +373,14 @@ pub unsafe fn xml_sax2_external_subset(
             return;
         }
 
-        xml_new_dtd((*ctxt).my_doc, name, external_id, system_id);
+        xml_new_dtd(
+            (*ctxt).my_doc,
+            name,
+            (!external_id.is_null())
+                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                .as_deref(),
+            system_id,
+        );
 
         /*
          * make sure we won't destroy the main document context

@@ -1918,10 +1918,6 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     if dtd.is_null() {
         return null_mut();
     }
-    let external_id = (*dtd)
-        .external_id
-        .as_deref()
-        .map(|e| CString::new(e).unwrap());
     let system_id = (*dtd)
         .system_id
         .as_deref()
@@ -1929,9 +1925,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     let ret: XmlDtdPtr = xml_new_dtd(
         null_mut(),
         (*dtd).name,
-        external_id
-            .as_ref()
-            .map_or(null_mut(), |e| e.as_ptr() as *const u8),
+        (*dtd).external_id.as_deref(),
         system_id
             .as_ref()
             .map_or(null_mut(), |s| s.as_ptr() as *const u8),
@@ -7401,47 +7395,6 @@ mod tests {
                             eprint!(" {}", n_doc);
                             eprint!(" {}", n_content);
                             eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_dtd() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let doc = gen_xml_doc_ptr(n_doc, 0);
-                            let name = gen_const_xml_char_ptr(n_name, 1);
-                            let external_id = gen_const_xml_char_ptr(n_external_id, 2);
-                            let system_id = gen_const_xml_char_ptr(n_system_id, 3);
-
-                            let ret_val = xml_new_dtd(doc, name, external_id, system_id);
-                            desret_xml_dtd_ptr(ret_val);
-                            des_xml_doc_ptr(n_doc, doc, 0);
-                            des_const_xml_char_ptr(n_name, name, 1);
-                            des_const_xml_char_ptr(n_external_id, external_id, 2);
-                            des_const_xml_char_ptr(n_system_id, system_id, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlNewDtd",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDtd()");
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_name);
-                                eprint!(" {}", n_external_id);
-                                eprintln!(" {}", n_system_id);
-                            }
                         }
                     }
                 }

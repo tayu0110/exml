@@ -802,7 +802,7 @@ pub(crate) unsafe extern "C" fn gen_xml_dtd_ptr(no: i32, _nr: i32) -> XmlDtdPtr 
         return xml_new_dtd(
             null_mut(),
             c"dtd".as_ptr() as _,
-            c"foo".as_ptr() as _,
+            Some("foo"),
             c"bar".as_ptr() as _,
         );
     }
