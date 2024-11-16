@@ -965,7 +965,7 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
         if cur.is_null() {
             return -1;
         }
-        target = xml_create_int_subset(doc, (*cur).name, None, null_mut());
+        target = xml_create_int_subset(doc, (*cur).name, None, None);
         if target.is_null() {
             return -1;
         }

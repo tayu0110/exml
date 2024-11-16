@@ -156,7 +156,7 @@ pub unsafe fn xml_create_int_subset(
     doc: XmlDocPtr,
     name: *const XmlChar,
     external_id: Option<&str>,
-    system_id: *const XmlChar,
+    system_id: Option<&str>,
 ) -> XmlDtdPtr {
     if !doc.is_null() && !(*doc).get_int_subset().is_null() {
         return null_mut();
@@ -183,13 +183,7 @@ pub unsafe fn xml_create_int_subset(
         }
     }
     (*cur).external_id = external_id.map(|e| e.to_owned());
-    if !system_id.is_null() {
-        (*cur).system_id = Some(
-            CStr::from_ptr(system_id as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-    }
+    (*cur).system_id = system_id.map(|e| e.to_owned());
     if !doc.is_null() {
         (*doc).int_subset = cur;
         (*cur).parent = doc;

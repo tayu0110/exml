@@ -137,7 +137,9 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
             (!external_id.is_null())
                 .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
                 .as_deref(),
-            uri,
+            (!uri.is_null())
+                .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                .as_deref(),
         );
     }
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0

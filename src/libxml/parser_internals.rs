@@ -5849,7 +5849,9 @@ pub unsafe extern "C" fn xml_parse_external_subset(
             (!external_id.is_null())
                 .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
                 .as_deref(),
-            system_id,
+            (!system_id.is_null())
+                .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
+                .as_deref(),
         );
     }
 

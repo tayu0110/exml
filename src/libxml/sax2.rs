@@ -320,7 +320,9 @@ pub unsafe fn xml_sax2_internal_subset(
         (!external_id.is_null())
             .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
             .as_deref(),
-        system_id,
+        (!system_id.is_null())
+            .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
+            .as_deref(),
     );
     if (*(*ctxt).my_doc).int_subset.is_null() {
         xml_sax2_err_memory(ctxt, c"xmlSAX2InternalSubset".as_ptr() as _);

@@ -10029,7 +10029,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
                 (*ctxt).my_doc,
                 c"html".as_ptr() as _,
                 Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
-                c"http://www.w3.org/TR/REC-html40/loose.dtd".as_ptr() as _,
+                Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
             );
         }
     }
@@ -11605,7 +11605,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 (*ctxt).my_doc,
                 c"html".as_ptr() as _,
                 Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
-                c"http://www.w3.org/TR/REC-html40/loose.dtd".as_ptr() as _,
+                Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
             );
         }
     }
