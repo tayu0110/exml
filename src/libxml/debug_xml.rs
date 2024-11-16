@@ -655,11 +655,12 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
         } else {
             fprintf((*ctxt).output, c"DTD".as_ptr());
         }
-        if !(*dtd).external_id.is_null() {
+        if let Some(external_id) = (*dtd).external_id.as_deref() {
+            let external_id = CString::new(external_id).unwrap();
             fprintf(
                 (*ctxt).output,
                 c", PUBLIC %s".as_ptr(),
-                (*dtd).external_id as *mut c_char,
+                external_id.as_ptr(),
             );
         }
         if !(*dtd).system_id.is_null() {

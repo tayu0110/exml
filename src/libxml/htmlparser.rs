@@ -8859,12 +8859,14 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
     if xml_str_equal((*ctxt).name, c"body".as_ptr() as _) && !(*ctxt).my_doc.is_null() {
         dtd = (*(*ctxt).my_doc).get_int_subset();
         if !dtd.is_null()
-            && !(*dtd).external_id.is_null()
-            && (xml_strcasecmp(
-                (*dtd).external_id,
-                c"-//W3C//DTD HTML 4.01//EN".as_ptr() as _,
-            ) == 0
-                || xml_strcasecmp((*dtd).external_id, c"-//W3C//DTD HTML 4//EN".as_ptr() as _) == 0)
+            && (*dtd)
+                .external_id
+                .as_deref()
+                .filter(|e| {
+                    let e = e.to_ascii_uppercase();
+                    e == "-//W3C//DTD HTML 4.01//EN" || e == "-//W3C//DTD HTML 4//EN"
+                })
+                .is_some()
         {
             return 1;
         }

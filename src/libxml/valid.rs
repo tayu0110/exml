@@ -4875,8 +4875,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         return 0;
     }
     if !(*doc).int_subset.is_null()
-        && (!(*(*doc).int_subset).system_id.is_null()
-            || !(*(*doc).int_subset).external_id.is_null())
+        && (!(*(*doc).int_subset).system_id.is_null() || (*(*doc).int_subset).external_id.is_some())
         && (*doc).ext_subset.is_null()
     {
         let sys_id: *mut XmlChar;
@@ -4898,8 +4897,16 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         } else {
             sys_id = null_mut();
         }
-        (*doc).ext_subset =
-            xml_parse_dtd((*(*doc).int_subset).external_id, sys_id as *const XmlChar);
+        let external_id = (*(*doc).int_subset)
+            .external_id
+            .as_deref()
+            .map(|e| CString::new(e).unwrap());
+        (*doc).ext_subset = xml_parse_dtd(
+            external_id
+                .as_ref()
+                .map_or(null_mut(), |e| e.as_ptr() as *const u8),
+            sys_id as *const XmlChar,
+        );
         if !sys_id.is_null() {
             xml_free(sys_id as _);
         }
@@ -4916,7 +4923,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
                     c"Could not load the external subset \"%s\"\n".as_ptr() as _,
-                    (*(*doc).int_subset).external_id as *const c_char,
+                    external_id.as_ref().map_or(null_mut(), |e| e.as_ptr()),
                 );
             }
             return 0;

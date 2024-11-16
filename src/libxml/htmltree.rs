@@ -1033,10 +1033,11 @@ unsafe extern "C" fn html_dtd_dump_output(
     (*buf).write_str("<!DOCTYPE ");
 
     (*buf).write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-    if !(*cur).external_id.is_null() {
+    if let Some(external_id) = (*cur).external_id.as_deref() {
         (*buf).write_str(" PUBLIC ");
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_cstr(CStr::from_ptr((*cur).external_id as *const i8));
+            let external_id = CString::new(external_id).unwrap();
+            buf.push_quoted_cstr(&external_id);
         }
         if !(*cur).system_id.is_null() {
             (*buf).write_str(" ");

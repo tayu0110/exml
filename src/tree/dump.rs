@@ -407,12 +407,7 @@ impl XmlNode {
                         .to_string_lossy()
                         .into_owned()
                 });
-                let external_id = (!(*dtd).external_id.is_null()).then(|| {
-                    CStr::from_ptr((*dtd).external_id as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                });
-                is_html = is_xhtml(system_id.as_deref(), external_id.as_deref());
+                is_html = is_xhtml(system_id.as_deref(), (*dtd).external_id.as_deref());
             }
 
             if is_html {

@@ -3,7 +3,7 @@ mod element;
 mod enumeration;
 mod notation;
 
-use std::{os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
+use std::{ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
 pub use attribute::*;
 pub use element::*;
@@ -42,7 +42,7 @@ pub struct XmlDtd {
     pub(crate) elements: *mut c_void,  /* Hash table for elements if any */
     pub(crate) attributes: *mut c_void, /* Hash table for attributes if any */
     pub(crate) entities: *mut c_void,  /* Hash table for entities if any */
-    pub(crate) external_id: *const XmlChar, /* External identifier for PUBLIC DTD */
+    pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
     pub(crate) system_id: *const XmlChar, /* URI for a SYSTEM or PUBLIC DTD */
     pub(crate) pentities: *mut c_void, /* Hash table for param entities if any */
 }
@@ -81,6 +81,29 @@ impl XmlDtd {
             /* return(xmlGetEntityFromTable(table, name)); */
         }
         null_mut()
+    }
+}
+
+impl Default for XmlDtd {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: XmlElementType::default(),
+            name: null_mut(),
+            children: None,
+            last: None,
+            parent: null_mut(),
+            next: None,
+            prev: None,
+            doc: null_mut(),
+            notations: null_mut(),
+            elements: null_mut(),
+            attributes: null_mut(),
+            entities: null_mut(),
+            external_id: None,
+            system_id: null_mut(),
+            pentities: null_mut(),
+        }
     }
 }
 
@@ -148,6 +171,7 @@ pub unsafe fn xml_create_int_subset(
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDtd>());
+    std::ptr::write(&mut *cur, XmlDtd::default());
     (*cur).typ = XmlElementType::XmlDTDNode;
 
     if !name.is_null() {
@@ -159,15 +183,11 @@ pub unsafe fn xml_create_int_subset(
         }
     }
     if !external_id.is_null() {
-        (*cur).external_id = xml_strdup(external_id);
-        if (*cur).external_id.is_null() {
-            xml_tree_err_memory(c"building internal subset".as_ptr() as _);
-            if !(*cur).name.is_null() {
-                xml_free((*cur).name as _);
-            }
-            xml_free(cur as _);
-            return null_mut();
-        }
+        (*cur).external_id = Some(
+            CStr::from_ptr(external_id as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
     if !system_id.is_null() {
         (*cur).system_id = xml_strdup(system_id);
@@ -176,9 +196,7 @@ pub unsafe fn xml_create_int_subset(
             if !(*cur).name.is_null() {
                 xml_free((*cur).name as _);
             }
-            if !(*cur).external_id.is_null() {
-                xml_free((*cur).external_id as _);
-            }
+            (*cur).external_id = None;
             xml_free(cur as _);
             return null_mut();
         }
@@ -254,13 +272,18 @@ pub unsafe fn xml_new_dtd(
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDtd>());
+    std::ptr::write(&mut *cur, XmlDtd::default());
     (*cur).typ = XmlElementType::XmlDTDNode;
 
     if !name.is_null() {
         (*cur).name = xml_strdup(name);
     }
     if !external_id.is_null() {
-        (*cur).external_id = xml_strdup(external_id);
+        (*cur).external_id = Some(
+            CStr::from_ptr(external_id as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
     if !system_id.is_null() {
         (*cur).system_id = xml_strdup(system_id);

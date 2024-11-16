@@ -994,7 +994,7 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
         /*
          * don't duplicate existing stuff when external subsets are the same
          */
-        if !xml_str_equal((*target).external_id, (*source).external_id)
+        if (*target).external_id != (*source).external_id
             && !xml_str_equal((*target).system_id, (*source).system_id)
         {
             xml_hash_scan(

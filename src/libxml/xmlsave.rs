@@ -830,10 +830,11 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     (*buf).write_bytes(b"<!DOCTYPE ");
 
     (*buf).write_str(CStr::from_ptr((*dtd).name as _).to_string_lossy().as_ref());
-    if !(*dtd).external_id.is_null() {
+    if let Some(external_id) = (*dtd).external_id.as_deref() {
         (*buf).write_bytes(b" PUBLIC ");
         if let Some(mut buf) = (*buf).buffer {
-            buf.push_quoted_cstr(CStr::from_ptr((*dtd).external_id as *const i8));
+            let external_id = CString::new(external_id).unwrap();
+            buf.push_quoted_cstr(external_id.as_c_str());
         }
         (*buf).write_bytes(b" ");
         if let Some(mut buf) = (*buf).buffer {
@@ -1653,12 +1654,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                             .to_string_lossy()
                             .into_owned()
                     });
-                    let external_id = (!(*dtd).external_id.is_null()).then(|| {
-                        CStr::from_ptr((*dtd).external_id as *const i8)
-                            .to_string_lossy()
-                            .into_owned()
-                    });
-                    is_html = is_xhtml(system_id.as_deref(), external_id.as_deref());
+                    is_html = is_xhtml(system_id.as_deref(), (*dtd).external_id.as_deref());
                 }
             }
         }
