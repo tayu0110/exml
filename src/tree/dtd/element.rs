@@ -1,4 +1,7 @@
-use std::{os::raw::c_void, ptr::null_mut};
+use std::{
+    os::raw::c_void,
+    ptr::{null, null_mut},
+};
 
 use crate::{
     libxml::{xmlregexp::XmlRegexpPtr, xmlstring::XmlChar},
@@ -27,11 +30,32 @@ pub struct XmlElement {
     pub(crate) etype: XmlElementTypeVal,      /* The type */
     pub(crate) content: XmlElementContentPtr, /* the allowed element content */
     pub(crate) attributes: XmlAttributePtr,   /* List of the declared attributes */
-    pub(crate) prefix: *const XmlChar,        /* the namespace prefix if any */
+    pub(crate) prefix: Option<String>,        /* the namespace prefix if any */
     #[cfg(feature = "regexp")]
     pub(crate) cont_model: XmlRegexpPtr, /* the validating regexp */
     #[cfg(not(feature = "regexp"))]
     pub(crate) cont_model: *mut c_void,
+}
+
+impl Default for XmlElement {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: XmlElementType::XmlInvalidNode,
+            name: null(),
+            children: None,
+            last: None,
+            parent: null_mut(),
+            next: None,
+            prev: None,
+            doc: null_mut(),
+            etype: XmlElementTypeVal::XmlElementTypeUndefined,
+            content: null_mut(),
+            attributes: null_mut(),
+            prefix: None,
+            cont_model: null_mut(),
+        }
+    }
 }
 
 impl NodeCommon for XmlElement {

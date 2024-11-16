@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    ffi::c_char,
+    ffi::{c_char, CStr},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -1093,9 +1093,7 @@ unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
     if !(*elem).name.is_null() {
         xml_free((*elem).name as _);
     }
-    if !(*elem).prefix.is_null() {
-        xml_free((*elem).prefix as _);
-    }
+    (*elem).prefix = None;
     #[cfg(feature = "regexp")]
     if !(*elem).cont_model.is_null() {
         xml_reg_free_regexp((*elem).cont_model);
@@ -1202,7 +1200,6 @@ pub unsafe extern "C" fn xml_add_element_decl(
     let mut ret: XmlElementPtr;
     let mut table: XmlElementTablePtr;
     let mut old_attributes: XmlAttributePtr = null_mut();
-    let mut ns: *mut XmlChar = null_mut();
 
     if dtd.is_null() {
         return null_mut();
@@ -1270,6 +1267,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
     /*
      * check if name is a QName
      */
+    let mut ns = null_mut();
     let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(ns));
     if !uqname.is_null() {
         name = uqname;
@@ -1363,6 +1361,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlElement>());
+        std::ptr::write(&mut *ret, XmlElement::default());
         (*ret).typ = XmlElementType::XmlElementDecl;
 
         /*
@@ -1380,7 +1379,11 @@ pub unsafe extern "C" fn xml_add_element_decl(
             xml_free(ret as _);
             return null_mut();
         }
-        (*ret).prefix = ns;
+        (*ret).prefix = (!ns.is_null()).then(|| {
+            CStr::from_ptr(ns as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
 
         /*
          * Validity Check:
@@ -1449,6 +1452,9 @@ pub unsafe extern "C" fn xml_add_element_decl(
     if !uqname.is_null() {
         xml_free(uqname as _);
     }
+    if !ns.is_null() {
+        xml_free(ns as _);
+    }
     ret
 }
 
@@ -1471,6 +1477,7 @@ extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *
             return null_mut();
         }
         memset(cur as _, 0, size_of::<XmlElement>());
+        std::ptr::write(&mut *cur, XmlElement::default());
         (*cur).typ = XmlElementType::XmlElementDecl;
         (*cur).etype = (*elem).etype;
         if !(*elem).name.is_null() {
@@ -1478,11 +1485,7 @@ extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *
         } else {
             (*cur).name = null_mut();
         }
-        if !(*elem).prefix.is_null() {
-            (*cur).prefix = xml_strdup((*elem).prefix);
-        } else {
-            (*cur).prefix = null_mut();
-        }
+        (*cur).prefix = (*elem).prefix.clone();
         (*cur).content = xml_copy_element_content((*elem).content);
         /* TODO : rebuild the attribute list on the copy */
         (*cur).attributes = null_mut();
@@ -1688,6 +1691,8 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElemen
  */
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
+    use std::ffi::CString;
+
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat};
 
     if buf.is_null() || elem.is_null() {
@@ -1696,8 +1701,9 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
     match (*elem).etype {
         XmlElementTypeVal::XmlElementTypeEmpty => {
             xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
-            if !(*elem).prefix.is_null() {
-                xml_buf_cat(buf, (*elem).prefix);
+            if let Some(prefix) = (*elem).prefix.as_deref() {
+                let prefix = CString::new(prefix).unwrap();
+                xml_buf_cat(buf, prefix.as_ptr() as *const u8);
                 xml_buf_ccat(buf, c":".as_ptr() as _);
             }
             xml_buf_cat(buf, (*elem).name);
@@ -1705,8 +1711,9 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
         }
         XmlElementTypeVal::XmlElementTypeAny => {
             xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
-            if !(*elem).prefix.is_null() {
-                xml_buf_cat(buf, (*elem).prefix);
+            if let Some(prefix) = (*elem).prefix.as_deref() {
+                let prefix = CString::new(prefix).unwrap();
+                xml_buf_cat(buf, prefix.as_ptr() as *const u8);
                 xml_buf_ccat(buf, c":".as_ptr() as _);
             }
             xml_buf_cat(buf, (*elem).name);
@@ -1714,8 +1721,9 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
         }
         XmlElementTypeVal::XmlElementTypeMixed => {
             xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
-            if !(*elem).prefix.is_null() {
-                xml_buf_cat(buf, (*elem).prefix);
+            if let Some(prefix) = (*elem).prefix.as_deref() {
+                let prefix = CString::new(prefix).unwrap();
+                xml_buf_cat(buf, prefix.as_ptr() as *const u8);
                 xml_buf_ccat(buf, c":".as_ptr() as _);
             }
             xml_buf_cat(buf, (*elem).name);
@@ -1725,8 +1733,9 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
         }
         XmlElementTypeVal::XmlElementTypeElement => {
             xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
-            if !(*elem).prefix.is_null() {
-                xml_buf_cat(buf, (*elem).prefix);
+            if let Some(prefix) = (*elem).prefix.as_deref() {
+                let prefix = CString::new(prefix).unwrap();
+                xml_buf_cat(buf, prefix.as_ptr() as *const u8);
                 xml_buf_ccat(buf, c":".as_ptr() as _);
             }
             xml_buf_cat(buf, (*elem).name);
@@ -2346,13 +2355,18 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
             return cur;
         }
         memset(cur as _, 0, size_of::<XmlElement>());
+        std::ptr::write(&mut *cur, XmlElement::default());
         (*cur).typ = XmlElementType::XmlElementDecl;
 
         /*
          * fill the structure.
          */
         (*cur).name = xml_strdup(name);
-        (*cur).prefix = xml_strdup(prefix);
+        (*cur).prefix = (!prefix.is_null()).then(|| {
+            CStr::from_ptr(prefix as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
         (*cur).etype = XmlElementTypeVal::XmlElementTypeUndefined;
 
         if xml_hash_add_entry2(table, name, prefix, cur as _) < 0 {
@@ -3903,7 +3917,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
     tst = xml_get_dtd_element_desc((*doc).int_subset, (*elem).name);
     if !tst.is_null()
         && tst != elem
-        && ((*tst).prefix == (*elem).prefix || xml_str_equal((*tst).prefix, (*elem).prefix))
+        && (*tst).prefix == (*elem).prefix
         && !matches!((*tst).etype, XmlElementTypeVal::XmlElementTypeUndefined)
     {
         xml_err_valid_node(
@@ -3920,7 +3934,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
     tst = xml_get_dtd_element_desc((*doc).ext_subset, (*elem).name);
     if !tst.is_null()
         && tst != elem
-        && ((*tst).prefix == (*elem).prefix || xml_str_equal((*tst).prefix, (*elem).prefix))
+        && (*tst).prefix == (*elem).prefix
         && !matches!((*tst).etype, XmlElementTypeVal::XmlElementTypeUndefined)
     {
         xml_err_valid_node(

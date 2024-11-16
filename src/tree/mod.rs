@@ -1902,6 +1902,8 @@ pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttr
  */
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
+    use std::ffi::CString;
+
     use crate::libxml::{
         entities::xml_copy_entities_table,
         valid::{
@@ -1963,7 +1965,14 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
             }
         } else if matches!((*cur).typ, XmlElementType::XmlElementDecl) {
             let tmp: XmlElementPtr = cur as _;
-            q = xml_get_dtd_qelement_desc(ret, (*tmp).name, (*tmp).prefix) as _;
+            let prefix = (*tmp).prefix.as_deref().map(|p| CString::new(p).unwrap());
+            q = xml_get_dtd_qelement_desc(
+                ret,
+                (*tmp).name,
+                prefix
+                    .as_ref()
+                    .map_or(null_mut(), |p| p.as_ptr() as *const u8),
+            ) as _;
         } else if matches!((*cur).typ, XmlElementType::XmlAttributeDecl) {
             let tmp: XmlAttributePtr = cur as _;
             q = xml_get_dtd_qattr_desc(ret, (*tmp).elem, (*tmp).name, (*tmp).prefix) as _;
