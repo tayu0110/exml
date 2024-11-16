@@ -31,7 +31,7 @@ pub struct XmlDoc {
     pub(crate) typ: XmlElementType,     /* XML_DOCUMENT_NODE, must be second ! */
     pub(crate) name: *mut i8,           /* name/filename/URI of the document */
     pub children: Option<NodePtr>,      /* the document tree */
-    pub(crate) last: *mut XmlNode,      /* last child link */
+    pub(crate) last: Option<NodePtr>,   /* last child link */
     pub(crate) parent: Option<NodePtr>, /* child->parent link */
     pub(crate) next: *mut XmlNode,      /* next sibling link  */
     pub(crate) prev: *mut XmlNode,      /* previous sibling link  */
@@ -699,7 +699,7 @@ impl XmlDoc {
             children.add_sibling(root);
         } else {
             self.children = NodePtr::from_ptr(root);
-            self.last = root;
+            self.last = NodePtr::from_ptr(root);
         }
         old.map_or(null_mut(), |o| o.as_ptr())
     }
@@ -759,10 +759,10 @@ impl NodeCommon for XmlDoc {
         self.children = children
     }
     fn last(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.last)
+        self.last
     }
     fn set_last(&mut self, last: Option<NodePtr>) {
-        self.last = last.map_or(null_mut(), |l| l.as_ptr());
+        self.last = last;
     }
     fn next(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.next)
@@ -791,7 +791,7 @@ impl Default for XmlDoc {
             typ: XmlElementType::default(),
             name: null_mut(),
             children: None,
-            last: null_mut(),
+            last: None,
             parent: None,
             next: null_mut(),
             prev: null_mut(),

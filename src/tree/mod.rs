@@ -2028,7 +2028,7 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
         return ret;
     }
 
-    (*ret).last = null_mut();
+    (*ret).last = None;
     (*ret).children = None;
     #[cfg(feature = "tree")]
     {
@@ -2048,11 +2048,11 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
     if let Some(children) = (*doc).children {
         (*ret).children =
             NodePtr::from_ptr(xml_static_copy_node_list(children.as_ptr(), ret, ret as _));
-        (*ret).last = null_mut();
+        (*ret).last = None;
         let mut tmp = (*ret).children;
         while let Some(now) = tmp {
             if now.next.is_none() {
-                (*ret).last = now.as_ptr();
+                (*ret).last = Some(now);
             }
             tmp = now.next;
         }

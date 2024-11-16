@@ -3890,7 +3890,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         content = (*(*ctxt).my_doc)
             .children
             .map_or(null_mut(), |c| c.as_ptr());
-        last = (*(*ctxt).my_doc).last;
+        last = (*(*ctxt).my_doc).last.map_or(null_mut(), |l| l.as_ptr());
     }
     let new_root: XmlNodePtr = xml_new_doc_node(
         (*ctxt).my_doc,
@@ -3908,7 +3908,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         return XmlParserErrors::XmlErrInternalError;
     }
     (*(*ctxt).my_doc).children = None;
-    (*(*ctxt).my_doc).last = null_mut();
+    (*(*ctxt).my_doc).last = None;
     (*(*ctxt).my_doc).add_child(new_root);
     (*ctxt).node_push(
         (*(*ctxt).my_doc)
@@ -3981,7 +3981,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
                 .map_or(null_mut(), |c| c.as_ptr()),
         );
         (*(*ctxt).my_doc).children = NodePtr::from_ptr(content);
-        (*(*ctxt).my_doc).last = last;
+        (*(*ctxt).my_doc).last = NodePtr::from_ptr(last);
     }
 
     /*

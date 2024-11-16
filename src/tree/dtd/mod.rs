@@ -210,15 +210,15 @@ pub unsafe fn xml_create_int_subset(
                     }
                     next.prev = NodePtr::from_ptr(cur as *mut XmlNode);
                 } else {
-                    (*cur).prev = (*doc).last;
+                    (*cur).prev = (*doc).last.map_or(null_mut(), |p| p.as_ptr());
                     (*(*cur).prev).next = NodePtr::from_ptr(cur as *mut XmlNode);
                     (*cur).next = null_mut();
-                    (*doc).last = cur as _;
+                    (*doc).last = NodePtr::from_ptr(cur as *mut XmlNode);
                 }
             }
         } else {
             (*doc).children = NodePtr::from_ptr(cur as *mut XmlNode);
-            (*doc).last = cur as _;
+            (*doc).last = NodePtr::from_ptr(cur as *mut XmlNode);
         }
     }
 
