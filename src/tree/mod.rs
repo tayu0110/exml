@@ -1966,9 +1966,10 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         } else if matches!((*cur).typ, XmlElementType::XmlElementDecl) {
             let tmp: XmlElementPtr = cur as _;
             let prefix = (*tmp).prefix.as_deref().map(|p| CString::new(p).unwrap());
+            let name = (*tmp).name().map(|n| CString::new(n.as_ref()).unwrap());
             q = xml_get_dtd_qelement_desc(
                 ret,
-                (*tmp).name,
+                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
                 prefix
                     .as_ref()
                     .map_or(null_mut(), |p| p.as_ptr() as *const u8),
@@ -3205,7 +3206,9 @@ pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
     if matches!((*cur).typ, XmlElementType::XmlEntityDecl) {
         let ent: XmlEntityPtr = cur as _;
         DICT_FREE!(dict, (*ent).system_id.load(Ordering::Relaxed));
+        (*ent).system_id.store(null_mut(), Ordering::Relaxed);
         DICT_FREE!(dict, (*ent).external_id.load(Ordering::Relaxed));
+        (*ent).external_id.store(null_mut(), Ordering::Relaxed);
     }
     if let Some(children) = (*cur)
         .children

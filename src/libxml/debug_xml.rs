@@ -716,10 +716,11 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
         );
         return;
     }
-    if !(*elem).name.is_null() {
+    if let Some(name) = (*elem).name.as_deref() {
         if (*ctxt).check == 0 {
+            let name = CString::new(name.as_str()).unwrap();
             fprintf((*ctxt).output, c"ELEMDECL(".as_ptr());
-            xml_ctxt_dump_string(ctxt, (*elem).name);
+            xml_ctxt_dump_string(ctxt, name.as_ptr() as *const u8);
             fprintf((*ctxt).output, c")".as_ptr());
         }
     } else {

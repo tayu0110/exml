@@ -1090,9 +1090,7 @@ unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
     }
     (*elem).unlink();
     xml_free_doc_element_content((*elem).doc, (*elem).content);
-    if !(*elem).name.is_null() {
-        xml_free((*elem).name as _);
-    }
+    (*elem).name = None;
     (*elem).prefix = None;
     #[cfg(feature = "regexp")]
     if !(*elem).cont_model.is_null() {
@@ -1193,7 +1191,7 @@ unsafe extern "C" fn xml_err_valid_node(
 pub unsafe extern "C" fn xml_add_element_decl(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
-    mut name: *const XmlChar,
+    name: *const XmlChar,
     typ: XmlElementTypeVal,
     content: XmlElementContentPtr,
 ) -> XmlElementPtr {
@@ -1208,6 +1206,8 @@ pub unsafe extern "C" fn xml_add_element_decl(
         return null_mut();
     }
 
+    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    let mut name = CString::new(name.as_ref()).unwrap();
     match typ {
         XmlElementTypeVal::XmlElementTypeEmpty => {
             if !content.is_null() {
@@ -1268,9 +1268,14 @@ pub unsafe extern "C" fn xml_add_element_decl(
      * check if name is a QName
      */
     let mut ns = null_mut();
-    let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(ns));
+    let uqname: *mut XmlChar = xml_split_qname2(name.as_ptr() as *const u8, addr_of_mut!(ns));
     if !uqname.is_null() {
-        name = uqname;
+        name = CString::new(
+            CStr::from_ptr(uqname as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        )
+        .unwrap();
     }
 
     /*
@@ -1305,11 +1310,20 @@ pub unsafe extern "C" fn xml_add_element_decl(
      * internal subset.
      */
     if !(*dtd).doc.is_null() && !(*(*dtd).doc).int_subset.is_null() {
-        ret = xml_hash_lookup2((*(*(*dtd).doc).int_subset).elements as _, name, ns) as _;
+        ret = xml_hash_lookup2(
+            (*(*(*dtd).doc).int_subset).elements as _,
+            name.as_ptr() as *const u8,
+            ns,
+        ) as _;
         if !ret.is_null() && matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             old_attributes = (*ret).attributes;
             (*ret).attributes = null_mut();
-            xml_hash_remove_entry2((*(*(*dtd).doc).int_subset).elements as _, name, ns, None);
+            xml_hash_remove_entry2(
+                (*(*(*dtd).doc).int_subset).elements as _,
+                name.as_ptr() as *const u8,
+                ns,
+                None,
+            );
             xml_free_element(ret);
         }
     }
@@ -1318,7 +1332,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
      * The element may already be present if one of its attribute
      * was registered first
      */
-    ret = xml_hash_lookup2(table, name, ns) as _;
+    ret = xml_hash_lookup2(table, name.as_ptr() as *const u8, ns) as _;
     if !ret.is_null() {
         if !matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             #[cfg(feature = "valid")]
@@ -1331,7 +1345,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
                     dtd as XmlNodePtr,
                     XmlParserErrors::XmlDTDElemRedefined,
                     c"Redefinition of element %s\n".as_ptr() as _,
-                    name,
+                    name.as_ptr() as *const u8,
                     null_mut(),
                     null_mut(),
                 );
@@ -1367,18 +1381,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
         /*
          * fill the structure.
          */
-        (*ret).name = xml_strdup(name);
-        if (*ret).name.is_null() {
-            xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
-            if !uqname.is_null() {
-                xml_free(uqname as _);
-            }
-            if !ns.is_null() {
-                xml_free(ns as _);
-            }
-            xml_free(ret as _);
-            return null_mut();
-        }
+        (*ret).name = Some(Box::new(name.to_string_lossy().into_owned()));
         (*ret).prefix = (!ns.is_null()).then(|| {
             CStr::from_ptr(ns as *const i8)
                 .to_string_lossy()
@@ -1389,7 +1392,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
          * Validity Check:
          * Insertion must not fail
          */
-        if xml_hash_add_entry2(table, name, ns, ret as _) != 0 {
+        if xml_hash_add_entry2(table, name.as_ptr() as *const u8, ns, ret as _) != 0 {
             #[cfg(feature = "valid")]
             {
                 /*
@@ -1400,7 +1403,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
                     dtd as XmlNodePtr,
                     XmlParserErrors::XmlDTDElemRedefined,
                     c"Redefinition of element %s\n".as_ptr() as _,
-                    name,
+                    name.as_ptr() as *const u8,
                     null_mut(),
                     null_mut(),
                 );
@@ -1480,11 +1483,7 @@ extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *
         std::ptr::write(&mut *cur, XmlElement::default());
         (*cur).typ = XmlElementType::XmlElementDecl;
         (*cur).etype = (*elem).etype;
-        if !(*elem).name.is_null() {
-            (*cur).name = xml_strdup((*elem).name);
-        } else {
-            (*cur).name = null_mut();
-        }
+        (*cur).name = (*elem).name.clone();
         (*cur).prefix = (*elem).prefix.clone();
         (*cur).content = xml_copy_element_content((*elem).content);
         /* TODO : rebuild the attribute list on the copy */
@@ -1698,6 +1697,10 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
     if buf.is_null() || elem.is_null() {
         return;
     }
+    let name = (*elem)
+        .name
+        .as_ref()
+        .map(|n| CString::new(n.as_str()).unwrap());
     match (*elem).etype {
         XmlElementTypeVal::XmlElementTypeEmpty => {
             xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
@@ -1706,7 +1709,10 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
                 xml_buf_cat(buf, prefix.as_ptr() as *const u8);
                 xml_buf_ccat(buf, c":".as_ptr() as _);
             }
-            xml_buf_cat(buf, (*elem).name);
+            xml_buf_cat(
+                buf,
+                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+            );
             xml_buf_ccat(buf, c" EMPTY>\n".as_ptr() as _);
         }
         XmlElementTypeVal::XmlElementTypeAny => {
@@ -1716,7 +1722,10 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
                 xml_buf_cat(buf, prefix.as_ptr() as *const u8);
                 xml_buf_ccat(buf, c":".as_ptr() as _);
             }
-            xml_buf_cat(buf, (*elem).name);
+            xml_buf_cat(
+                buf,
+                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+            );
             xml_buf_ccat(buf, c" ANY>\n".as_ptr() as _);
         }
         XmlElementTypeVal::XmlElementTypeMixed => {
@@ -1726,7 +1735,10 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
                 xml_buf_cat(buf, prefix.as_ptr() as *const u8);
                 xml_buf_ccat(buf, c":".as_ptr() as _);
             }
-            xml_buf_cat(buf, (*elem).name);
+            xml_buf_cat(
+                buf,
+                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+            );
             xml_buf_ccat(buf, c" ".as_ptr() as _);
             xml_dump_element_content(buf, (*elem).content);
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
@@ -1738,7 +1750,10 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
                 xml_buf_cat(buf, prefix.as_ptr() as *const u8);
                 xml_buf_ccat(buf, c":".as_ptr() as _);
             }
-            xml_buf_cat(buf, (*elem).name);
+            xml_buf_cat(
+                buf,
+                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+            );
             xml_buf_ccat(buf, c" ".as_ptr() as _);
             xml_dump_element_content(buf, (*elem).content);
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
@@ -2329,7 +2344,8 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
     if !uqname.is_null() {
         name = uqname;
     }
-    cur = xml_hash_lookup2(table, name, prefix) as _;
+    let name = CString::new(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()).unwrap();
+    cur = xml_hash_lookup2(table, name.as_ptr() as *const u8, prefix) as _;
     if cur.is_null() && create != 0 {
         cur = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
         if cur.is_null() {
@@ -2350,7 +2366,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
         /*
          * fill the structure.
          */
-        (*cur).name = xml_strdup(name);
+        (*cur).name = Some(Box::new(name.to_string_lossy().into_owned()));
         (*cur).prefix = (!prefix.is_null()).then(|| {
             CStr::from_ptr(prefix as *const i8)
                 .to_string_lossy()
@@ -2358,7 +2374,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
         });
         (*cur).etype = XmlElementTypeVal::XmlElementTypeUndefined;
 
-        if xml_hash_add_entry2(table, name, prefix, cur as _) < 0 {
+        if xml_hash_add_entry2(table, name.as_ptr() as *const u8, prefix, cur as _) < 0 {
             xml_verr_memory(ctxt, c"adding entry failed".as_ptr() as _);
             xml_free_element(cur);
             cur = null_mut();
@@ -2402,12 +2418,16 @@ unsafe extern "C" fn xml_scan_id_attribute_decl(
         if matches!((*cur).atype, XmlAttributeType::XmlAttributeID) {
             ret += 1;
             if ret > 1 && err != 0 {
+                let name = (*elem)
+                    .name
+                    .as_ref()
+                    .map(|n| CString::new(n.as_str()).unwrap());
                 xml_err_valid_node(
                     ctxt,
                     elem as XmlNodePtr,
                     XmlParserErrors::XmlDTDMultipleID,
                     c"Element %s has too many ID attributes defined : %s\n".as_ptr() as _,
-                    (*elem).name,
+                    name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
                     (*cur).name,
                     null_mut(),
                 );
@@ -3872,6 +3892,10 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                         if xml_str_equal((*next).name, name)
                             && xml_str_equal((*next).prefix, (*(*cur).c1).prefix)
                         {
+                            let elem_name = (*elem)
+                                .name
+                                .as_ref()
+                                .map(|n| CString::new(n.as_str()).unwrap());
                             if (*(*cur).c1).prefix.is_null() {
                                 xml_err_valid_node(
                                     ctxt,
@@ -3879,7 +3903,9 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                                     XmlParserErrors::XmlDTDContentError,
                                     c"Definition of %s has duplicate references of %s\n".as_ptr()
                                         as _,
-                                    (*elem).name,
+                                    elem_name
+                                        .as_ref()
+                                        .map_or(null(), |n| n.as_ptr() as *const u8),
                                     name,
                                     null_mut(),
                                 );
@@ -3890,7 +3916,9 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                                     XmlParserErrors::XmlDTDContentError,
                                     c"Definition of %s has duplicate references of %s:%s\n".as_ptr()
                                         as _,
-                                    (*elem).name,
+                                    elem_name
+                                        .as_ref()
+                                        .map_or(null(), |n| n.as_ptr() as *const u8),
                                     (*(*cur).c1).prefix,
                                     name,
                                 );
@@ -3911,13 +3939,19 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                     if xml_str_equal((*(*next).c1).name, name)
                         && xml_str_equal((*(*next).c1).prefix, (*(*cur).c1).prefix)
                     {
+                        let elem_name = (*elem)
+                            .name
+                            .as_ref()
+                            .map(|n| CString::new(n.as_str()).unwrap());
                         if (*(*cur).c1).prefix.is_null() {
                             xml_err_valid_node(
                                 ctxt,
                                 elem as XmlNodePtr,
                                 XmlParserErrors::XmlDTDContentError,
                                 c"Definition of %s has duplicate references to %s\n".as_ptr() as _,
-                                (*elem).name,
+                                elem_name
+                                    .as_ref()
+                                    .map_or(null(), |n| n.as_ptr() as *const u8),
                                 name,
                                 null_mut(),
                             );
@@ -3928,7 +3962,9 @@ pub unsafe extern "C" fn xml_validate_element_decl(
                                 XmlParserErrors::XmlDTDContentError,
                                 c"Definition of %s has duplicate references to %s:%s\n".as_ptr()
                                     as _,
-                                (*elem).name,
+                                elem_name
+                                    .as_ref()
+                                    .map_or(null(), |n| n.as_ptr() as *const u8),
                                 (*(*cur).c1).prefix,
                                 name,
                             );
@@ -3942,8 +3978,17 @@ pub unsafe extern "C" fn xml_validate_element_decl(
         }
     }
 
+    let elem_name = (*elem)
+        .name
+        .as_ref()
+        .map(|n| CString::new(n.as_str()).unwrap());
     /* VC: Unique Element Type Declaration */
-    tst = xml_get_dtd_element_desc((*doc).int_subset, (*elem).name);
+    tst = xml_get_dtd_element_desc(
+        (*doc).int_subset,
+        elem_name
+            .as_ref()
+            .map_or(null(), |n| n.as_ptr() as *const u8),
+    );
     if !tst.is_null()
         && tst != elem
         && (*tst).prefix == (*elem).prefix
@@ -3954,13 +3999,20 @@ pub unsafe extern "C" fn xml_validate_element_decl(
             elem as XmlNodePtr,
             XmlParserErrors::XmlDTDElemRedefined,
             c"Redefinition of element %s\n".as_ptr() as _,
-            (*elem).name,
+            elem_name
+                .as_ref()
+                .map_or(null(), |n| n.as_ptr() as *const u8),
             null_mut(),
             null_mut(),
         );
         ret = 0;
     }
-    tst = xml_get_dtd_element_desc((*doc).ext_subset, (*elem).name);
+    tst = xml_get_dtd_element_desc(
+        (*doc).ext_subset,
+        elem_name
+            .as_ref()
+            .map_or(null(), |n| n.as_ptr() as *const u8),
+    );
     if !tst.is_null()
         && tst != elem
         && (*tst).prefix == (*elem).prefix
@@ -3971,7 +4023,9 @@ pub unsafe extern "C" fn xml_validate_element_decl(
             elem as XmlNodePtr,
             XmlParserErrors::XmlDTDElemRedefined,
             c"Redefinition of element %s\n".as_ptr() as _,
-            (*elem).name,
+            elem_name
+                .as_ref()
+                .map_or(null(), |n| n.as_ptr() as *const u8),
             null_mut(),
             null_mut(),
         );
@@ -5953,7 +6007,10 @@ unsafe extern "C" fn xml_validate_element_content(
         return -1;
     }
     let cont: XmlElementContentPtr = (*elem_decl).content;
-    let name: *const XmlChar = (*elem_decl).name;
+    let name = (*elem_decl)
+        .name
+        .as_ref()
+        .map(|n| CString::new(n.as_str()).unwrap());
 
     #[cfg(feature = "regexp")]
     {
@@ -6208,14 +6265,14 @@ unsafe extern "C" fn xml_validate_element_content(
                     xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
                 }
 
-                if !name.is_null() {
+                if let Some(name) = name.as_deref() {
                     xml_err_valid_node(
                         ctxt,
                         parent,
                         XmlParserErrors::XmlDTDContentModel,
                         c"Element %s content does not follow the DTD, expecting %s, got %s\n"
                             .as_ptr() as _,
-                        name,
+                        name.as_ptr() as *const u8,
                         expr.as_mut_ptr() as _,
                         list.as_ptr() as _,
                     );
@@ -6231,13 +6288,13 @@ unsafe extern "C" fn xml_validate_element_content(
                         null_mut(),
                     );
                 }
-            } else if !name.is_null() {
+            } else if let Some(name) = name.as_deref() {
                 xml_err_valid_node(
                     ctxt,
                     parent,
                     XmlParserErrors::XmlDTDContentModel,
                     c"Element %s content does not follow the DTD\n".as_ptr() as _,
-                    name,
+                    name.as_ptr() as *const u8,
                     null_mut(),
                     null_mut(),
                 );
@@ -8444,20 +8501,28 @@ pub unsafe extern "C" fn xml_valid_build_content_model(
     }
 
     (*ctxt).am = xml_new_automata();
+    let name = (*elem)
+        .name
+        .as_ref()
+        .map(|n| CString::new(n.as_str()).unwrap());
     if (*ctxt).am.is_null() {
         xml_err_valid_node(
             ctxt,
             elem as XmlNodePtr,
             XmlParserErrors::XmlErrInternalError,
             c"Cannot create automata for element %s\n".as_ptr() as _,
-            (*elem).name,
+            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
             null_mut(),
             null_mut(),
         );
         return 0;
     }
     (*ctxt).state = xml_automata_get_init_state((*ctxt).am);
-    xml_valid_build_acontent_model((*elem).content, ctxt, (*elem).name);
+    xml_valid_build_acontent_model(
+        (*elem).content,
+        ctxt,
+        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+    );
     xml_automata_set_final_state((*ctxt).am, (*ctxt).state);
     (*elem).cont_model = xml_automata_compile((*ctxt).am);
     if xml_regexp_is_determinist((*elem).cont_model) != 1 {
@@ -8469,7 +8534,7 @@ pub unsafe extern "C" fn xml_valid_build_content_model(
             elem as XmlNodePtr,
             XmlParserErrors::XmlDTDContentNotDeterminist,
             c"Content model of %s is not deterministic: %s\n".as_ptr() as _,
-            (*elem).name,
+            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
             expr.as_ptr() as _,
             null_mut(),
         );

@@ -1,8 +1,9 @@
 use std::{
+    borrow::Cow,
     ffi::{CStr, CString},
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{null_mut, NonNull},
+    ptr::{null, null_mut, NonNull},
     sync::atomic::Ordering,
 };
 
@@ -35,7 +36,7 @@ use super::{
 
 pub trait NodeCommon {
     fn element_type(&self) -> XmlElementType;
-    fn name(&self) -> *const u8;
+    fn name(&self) -> Option<Cow<'_, str>>;
     fn children(&self) -> Option<NodePtr>;
     fn set_children(&mut self, children: Option<NodePtr>);
     fn last(&self) -> Option<NodePtr>;
@@ -81,7 +82,7 @@ pub trait NodeCommon {
         if matches!((*cur).typ, XmlElementType::XmlTextNode) {
             if matches!(self.element_type(), XmlElementType::XmlTextNode)
                 && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
-                && self.name() == (*cur).name
+                && self.name().map_or(null(), |c| c.as_ptr()) == (*cur).name
             {
                 (*(self as *mut Self as *mut XmlNode)).add_content((*cur).content);
                 xml_free_node(cur);
@@ -208,43 +209,52 @@ pub trait NodeCommon {
         }
         if matches!(self.element_type(), XmlElementType::XmlEntityDecl) {
             let doc = self.document();
+            let name = self.name().map(|n| CString::new(n.as_ref()).unwrap());
             if !doc.is_null() {
                 if !(*doc).int_subset.is_null() {
-                    if xml_hash_lookup((*(*doc).int_subset).entities as _, self.name())
-                        == self as *mut Self as *mut c_void
+                    if xml_hash_lookup(
+                        (*(*doc).int_subset).entities as _,
+                        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+                    ) == self as *mut Self as *mut c_void
                     {
                         xml_hash_remove_entry(
                             (*(*doc).int_subset).entities as _,
-                            self.name(),
+                            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
                             None,
                         );
                     }
-                    if xml_hash_lookup((*(*doc).int_subset).pentities as _, self.name())
-                        == self as *mut Self as *mut c_void
+                    if xml_hash_lookup(
+                        (*(*doc).int_subset).pentities as _,
+                        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+                    ) == self as *mut Self as *mut c_void
                     {
                         xml_hash_remove_entry(
                             (*(*doc).int_subset).pentities as _,
-                            self.name(),
+                            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
                             None,
                         );
                     }
                 }
                 if !(*doc).ext_subset.is_null() {
-                    if xml_hash_lookup((*(*doc).ext_subset).entities as _, self.name())
-                        == self as *mut Self as *mut c_void
+                    if xml_hash_lookup(
+                        (*(*doc).ext_subset).entities as _,
+                        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+                    ) == self as *mut Self as *mut c_void
                     {
                         xml_hash_remove_entry(
                             (*(*doc).ext_subset).entities as _,
-                            self.name(),
+                            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
                             None,
                         );
                     }
-                    if xml_hash_lookup((*(*doc).ext_subset).pentities as _, self.name())
-                        == self as *mut Self as *mut c_void
+                    if xml_hash_lookup(
+                        (*(*doc).ext_subset).pentities as _,
+                        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
+                    ) == self as *mut Self as *mut c_void
                     {
                         xml_hash_remove_entry(
                             (*(*doc).ext_subset).pentities as _,
-                            self.name(),
+                            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
                             None,
                         );
                     }
@@ -3136,8 +3146,9 @@ impl NodeCommon for XmlNode {
     fn element_type(&self) -> XmlElementType {
         self.typ
     }
-    fn name(&self) -> *const u8 {
-        self.name
+    fn name(&self) -> Option<Cow<'_, str>> {
+        (!self.name.is_null())
+            .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
     }
     fn children(&self) -> Option<NodePtr> {
         self.children

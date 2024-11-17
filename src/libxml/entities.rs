@@ -5,7 +5,8 @@
 
 use std::{
     any::type_name,
-    ffi::c_char,
+    borrow::Cow,
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -118,8 +119,9 @@ impl NodeCommon for XmlEntity {
     fn element_type(&self) -> XmlElementType {
         self.typ
     }
-    fn name(&self) -> *const u8 {
-        self.name.load(Ordering::Relaxed)
+    fn name(&self) -> Option<Cow<'_, str>> {
+        let name = self.name.load(Ordering::Relaxed);
+        (!name.is_null()).then(|| unsafe { CStr::from_ptr(name as *const i8).to_string_lossy() })
     }
     fn children(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.children.load(Ordering::Relaxed))
@@ -368,26 +370,33 @@ unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
             == (*(*entity).children.load(Ordering::Relaxed)).parent
     {
         xml_free_node_list((*entity).children.load(Ordering::Relaxed));
+        (*entity).children.store(null_mut(), Ordering::Relaxed);
     }
     if !(*entity).name.load(Ordering::Relaxed).is_null()
         && (dict.is_null() || xml_dict_owns(dict, (*entity).name.load(Ordering::Relaxed)) == 0)
     {
         xml_free((*entity).name.load(Ordering::Relaxed) as _);
+        (*entity).name.store(null_mut(), Ordering::Relaxed);
     }
     if !(*entity).external_id.load(Ordering::Relaxed).is_null() {
         xml_free((*entity).external_id.load(Ordering::Relaxed) as _);
+        (*entity).external_id.store(null_mut(), Ordering::Relaxed);
     }
     if !(*entity).system_id.load(Ordering::Relaxed).is_null() {
         xml_free((*entity).system_id.load(Ordering::Relaxed) as _);
+        (*entity).system_id.store(null_mut(), Ordering::Relaxed);
     }
     if !(*entity).uri.load(Ordering::Relaxed).is_null() {
         xml_free((*entity).uri.load(Ordering::Relaxed) as _);
+        (*entity).uri.store(null_mut(), Ordering::Relaxed);
     }
     if !(*entity).content.load(Ordering::Relaxed).is_null() {
         xml_free((*entity).content.load(Ordering::Relaxed) as _);
+        (*entity).content.store(null_mut(), Ordering::Relaxed);
     }
     if !(*entity).orig.load(Ordering::Relaxed).is_null() {
         xml_free((*entity).orig.load(Ordering::Relaxed) as _);
+        (*entity).orig.store(null_mut(), Ordering::Relaxed);
     }
     xml_free(entity as _);
 }
@@ -417,11 +426,12 @@ unsafe extern "C" fn xml_add_entity(
         dict = (*(*dtd).doc).dict;
     }
 
+    let name = CString::new(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()).unwrap();
     match XmlEntityType::try_from(typ) {
         Ok(XmlEntityType::XmlInternalGeneralEntity)
         | Ok(XmlEntityType::XmlExternalGeneralParsedEntity)
         | Ok(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-            predef = xml_get_predefined_entity(name);
+            predef = xml_get_predefined_entity(name.as_ptr() as *const u8);
             if !predef.is_null() {
                 let mut valid: i32 = 0;
 
@@ -458,7 +468,7 @@ unsafe extern "C" fn xml_add_entity(
                         XmlParserErrors::XmlErrEntityProcessing,
                         c"xmlAddEntity: invalid redeclaration of predefined entity '%s'".as_ptr()
                             as _,
-                        name,
+                        name.as_ptr() as *const u8,
                     );
                     return null_mut();
                 }
@@ -483,13 +493,20 @@ unsafe extern "C" fn xml_add_entity(
     if table.is_null() {
         return null_mut();
     }
-    let ret: XmlEntityPtr = xml_create_entity(dict, name, typ, external_id, system_id, content);
+    let ret: XmlEntityPtr = xml_create_entity(
+        dict,
+        name.as_ptr() as *const u8,
+        typ,
+        external_id,
+        system_id,
+        content,
+    );
     if ret.is_null() {
         return null_mut();
     }
     (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
 
-    if xml_hash_add_entry(table, name, ret as _) != 0 {
+    if xml_hash_add_entry(table, name.as_ptr() as *const u8, ret as _) != 0 {
         /*
          * entity was already defined at another level.
          */
@@ -2044,6 +2061,43 @@ mod tests {
     fn test_xml_new_entity() {
         unsafe {
             let mut leaks = 0;
+
+            let n_doc = 2;
+            let n_name = 2;
+            let n_type = 1;
+            let n_external_id = 0;
+            let n_system_id = 0;
+            let n_content = 0;
+            let mem_base = xml_mem_blocks();
+            let doc = gen_xml_doc_ptr(n_doc, 0);
+            let name = gen_const_xml_char_ptr(n_name, 1);
+            let typ = gen_int(n_type, 2);
+            let external_id = gen_const_xml_char_ptr(n_external_id, 3);
+            let system_id = gen_const_xml_char_ptr(n_system_id, 4);
+            let content = gen_const_xml_char_ptr(n_content, 5);
+
+            let ret_val = xml_new_entity(doc, name, typ, external_id, system_id, content);
+            desret_xml_entity_ptr(ret_val);
+            des_xml_doc_ptr(n_doc, doc, 0);
+            des_const_xml_char_ptr(n_name, name, 1);
+            des_int(n_type, typ, 2);
+            des_const_xml_char_ptr(n_external_id, external_id, 3);
+            des_const_xml_char_ptr(n_system_id, system_id, 4);
+            des_const_xml_char_ptr(n_content, content, 5);
+            reset_last_error();
+            if mem_base != xml_mem_blocks() {
+                leaks += 1;
+                eprint!(
+                    "Leak of {} blocks found in xmlNewEntity",
+                    xml_mem_blocks() - mem_base
+                );
+                eprint!(" {}", n_doc);
+                eprint!(" {}", n_name);
+                eprint!(" {}", n_type);
+                eprint!(" {}", n_external_id);
+                eprint!(" {}", n_system_id);
+                eprintln!(" {}", n_content);
+            }
 
             for n_doc in 0..GEN_NB_XML_DOC_PTR {
                 for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {

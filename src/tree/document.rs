@@ -1,4 +1,4 @@
-use std::{os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
+use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
 use libc::memset;
 
@@ -749,8 +749,9 @@ impl NodeCommon for XmlDoc {
     fn element_type(&self) -> XmlElementType {
         self.typ
     }
-    fn name(&self) -> *const u8 {
-        self.name as *const u8
+    fn name(&self) -> Option<Cow<'_, str>> {
+        (!self.name.is_null())
+            .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
     }
     fn children(&self) -> Option<NodePtr> {
         self.children

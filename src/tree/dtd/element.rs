@@ -1,10 +1,7 @@
-use std::{
-    os::raw::c_void,
-    ptr::{null, null_mut},
-};
+use std::{borrow::Cow, os::raw::c_void, ptr::null_mut};
 
 use crate::{
-    libxml::{xmlregexp::XmlRegexpPtr, xmlstring::XmlChar},
+    libxml::xmlregexp::XmlRegexpPtr,
     tree::{
         NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementContentPtr, XmlElementType,
         XmlElementTypeVal, XmlNode,
@@ -17,9 +14,14 @@ use super::XmlAttributePtr;
 pub type XmlElementPtr = *mut XmlElement;
 #[repr(C)]
 pub struct XmlElement {
-    pub(crate) _private: *mut c_void,     /* application data */
-    pub(crate) typ: XmlElementType,       /* XML_ELEMENT_DECL, must be second ! */
-    pub(crate) name: *const XmlChar,      /* Element name */
+    pub(crate) _private: *mut c_void, /* application data */
+    pub(crate) typ: XmlElementType,   /* XML_ELEMENT_DECL, must be second ! */
+    // In current implementation, this field may be used as `XmlNode::name`,
+    // so the size of string type must be equal to pointer size.
+    // `Option<Box<T>>` is equal to pointer size by NULL pointer optimization if `T` is `Sized`.
+    // ref: https://doc.rust-lang.org/std/option/index.html#representation
+    #[allow(clippy::box_collection)]
+    pub(crate) name: Option<Box<String>>, /* Element name */
     pub(crate) children: Option<NodePtr>, /* NULL */
     pub(crate) last: Option<NodePtr>,     /* NULL */
     pub(crate) parent: *mut XmlDtd,       /* -> DTD */
@@ -42,7 +44,7 @@ impl Default for XmlElement {
         Self {
             _private: null_mut(),
             typ: XmlElementType::XmlInvalidNode,
-            name: null(),
+            name: None,
             children: None,
             last: None,
             parent: null_mut(),
@@ -65,8 +67,8 @@ impl NodeCommon for XmlElement {
     fn element_type(&self) -> XmlElementType {
         self.typ
     }
-    fn name(&self) -> *const u8 {
-        self.name
+    fn name(&self) -> Option<Cow<'_, str>> {
+        self.name.as_deref().map(|n| Cow::Borrowed(n.as_str()))
     }
     fn children(&self) -> Option<NodePtr> {
         self.children
