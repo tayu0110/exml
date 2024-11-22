@@ -17,6 +17,7 @@ use crate::{
     buf::XmlBufRef,
     encoding::{floor_char_boundary, xml_encoding_err, EncodingError, XmlCharEncodingHandler},
     error::XmlParserErrors,
+    globals::GLOBAL_STATE,
     io::{xml_io_http_close_put, xml_io_http_dflt_open_w, xml_io_http_match, xml_io_http_write},
     libxml::uri::unescape_url,
     tree::XmlBufferAllocationScheme,
@@ -226,6 +227,29 @@ impl XmlOutputBuffer {
         ret.context = null_mut();
         ret.written = 0;
         Some(ret)
+    }
+
+    /// Create a buffered  output for the progressive saving of a file.
+    ///
+    /// If filename is `"-"` then we use stdout as the output.
+    ///
+    /// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+    /// by default if found at compile-time.  
+    /// However, this crate does not support now.
+    ///
+    /// If the resource indicated by `uri` is found, return the new output buffer.  
+    /// Otherwise, return `None`.
+    #[doc(alias = "xmlOutputBufferCreateFilename")]
+    pub unsafe fn from_uri(
+        uri: &str,
+        encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
+        compression: i32,
+    ) -> Option<Self> {
+        if let Some(f) = GLOBAL_STATE.with_borrow(|state| state.output_buffer_create_filename_value)
+        {
+            return f(uri, encoder, compression);
+        }
+        __xml_output_buffer_create_filename(uri, encoder, compression)
     }
 
     /// Write the content of the array in the output I/O buffer.  

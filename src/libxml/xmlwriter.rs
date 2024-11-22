@@ -27,7 +27,7 @@ use crate::{
     encoding::find_encoding_handler,
     error::XmlParserErrors,
     globals::GenericErrorContext,
-    io::{xml_output_buffer_create_filename, xml_output_buffer_create_io, XmlOutputBuffer},
+    io::{xml_output_buffer_create_io, XmlOutputBuffer},
     libxml::{
         entities::xml_encode_special_chars,
         globals::{xml_free, xml_malloc},
@@ -342,7 +342,7 @@ pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
 /// Returns the new xmlTextWriterPtr or NULL in case of error
 #[doc(alias = "xmlNewTextWriterFilename")]
 pub unsafe fn xml_new_text_writer_filename(uri: &str, compression: i32) -> XmlTextWriterPtr {
-    let Some(out) = xml_output_buffer_create_filename(uri, None, compression) else {
+    let Some(out) = XmlOutputBuffer::from_uri(uri, None, compression) else {
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlIOEIO,

@@ -18,7 +18,7 @@ use libc::{memcpy, memset};
 use crate::{
     __xml_raise_error,
     error::XmlParserErrors,
-    io::{xml_output_buffer_create_filename, XmlOutputBuffer},
+    io::XmlOutputBuffer,
     private::buf::xml_buf_write_quoted_string,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
@@ -346,7 +346,7 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
 
     // save the content to a temp buffer, use default UTF8 encoding.
     let filename = CStr::from_ptr(filename).to_string_lossy();
-    let Some(buf) = xml_output_buffer_create_filename(filename.as_ref(), None, compression) else {
+    let Some(buf) = XmlOutputBuffer::from_uri(filename.as_ref(), None, compression) else {
         xml_c14n_err_internal(c"creating temporary filename".as_ptr() as _);
         return -1;
     };

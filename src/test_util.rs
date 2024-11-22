@@ -1548,10 +1548,8 @@ pub(crate) fn des_void_ptr(_no: i32, _val: *mut c_void, _nr: i32) {}
 
 #[cfg(feature = "output")]
 pub(crate) unsafe fn gen_xml_output_buffer_ptr(no: i32, _nr: i32) -> Option<XmlOutputBuffer> {
-    use crate::io::xml_output_buffer_create_filename;
-
     if no == 0 {
-        return xml_output_buffer_create_filename("test.out", None, 0);
+        return XmlOutputBuffer::from_uri("test.out", None, 0);
     }
     None
 }

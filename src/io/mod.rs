@@ -37,7 +37,7 @@ use crate::{
     buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncodingHandler},
     error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error},
-    globals::{GenericError, StructuredError, GLOBAL_STATE},
+    globals::{GenericError, StructuredError},
     libxml::{
         catalog::{
             xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
@@ -636,26 +636,6 @@ pub unsafe fn xml_alloc_output_buffer(
     ret.context = null_mut();
     ret.written = 0;
     Some(ret)
-}
-
-/// Create a buffered  output for the progressive saving of a file
-/// If filename is `"-"` then we use stdout as the output.
-/// Automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.
-/// TODO: currently if compression is set, the library only support writing to a local file.
-///
-/// Returns the new output or NULL
-#[doc(alias = "xmlOutputBufferCreateFilename")]
-#[cfg(feature = "output")]
-pub unsafe fn xml_output_buffer_create_filename(
-    uri: &str,
-    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-    compression: i32,
-) -> Option<XmlOutputBuffer> {
-    if let Some(f) = GLOBAL_STATE.with_borrow(|state| state.output_buffer_create_filename_value) {
-        return f(uri, encoder, compression);
-    }
-    __xml_output_buffer_create_filename(uri, encoder, compression)
 }
 
 /// Create a buffered output for the progressive saving to a FILE *

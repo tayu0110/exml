@@ -22,8 +22,8 @@ use crate::{
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::{
-        xml_output_buffer_create_filename, xml_output_buffer_create_io, XmlOutputBuffer,
-        XmlOutputCloseCallback, XmlOutputWriteCallback,
+        xml_output_buffer_create_io, XmlOutputBuffer, XmlOutputCloseCallback,
+        XmlOutputWriteCallback,
     },
     libxml::{
         entities::{xml_dump_entity_decl, XmlEntityPtr},
@@ -1737,9 +1737,7 @@ pub unsafe fn xml_save_to_filename(
     if ret.is_null() {
         return null_mut();
     }
-    let Some(buf) =
-        xml_output_buffer_create_filename(filename, (*ret).handler.clone(), compression)
-    else {
+    let Some(buf) = XmlOutputBuffer::from_uri(filename, (*ret).handler.clone(), compression) else {
         xml_free_save_ctxt(ret);
         return null_mut();
     };

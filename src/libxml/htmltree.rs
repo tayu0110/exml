@@ -635,7 +635,6 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
 
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
-        io::xml_output_buffer_create_filename,
         libxml::parser::xml_init_parser,
     };
 
@@ -669,7 +668,7 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
 
     // save the content to a temp buffer.
     let filename = CStr::from_ptr(filename).to_string_lossy();
-    let Some(mut buf) = xml_output_buffer_create_filename(
+    let Some(mut buf) = XmlOutputBuffer::from_uri(
         filename.as_ref(),
         handler.map(|e| Rc::new(RefCell::new(e))),
         (*cur).compression,
@@ -857,7 +856,6 @@ pub unsafe fn html_save_file_format(
 
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
-        io::xml_output_buffer_create_filename,
         libxml::parser::xml_init_parser,
     };
 
@@ -897,7 +895,7 @@ pub unsafe fn html_save_file_format(
 
     // save the content to a temp buffer.
     let Some(mut buf) =
-        xml_output_buffer_create_filename(filename, handler.map(|e| Rc::new(RefCell::new(e))), 0)
+        XmlOutputBuffer::from_uri(filename, handler.map(|e| Rc::new(RefCell::new(e))), 0)
     else {
         return 0;
     };

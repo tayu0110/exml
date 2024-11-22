@@ -11,10 +11,7 @@ use crate::{
     buf::XmlBufRef,
     encoding::find_encoding_handler,
     error::XmlParserErrors,
-    io::{
-        xml_alloc_output_buffer, xml_output_buffer_create_file, xml_output_buffer_create_filename,
-        XmlOutputBuffer,
-    },
+    io::{xml_alloc_output_buffer, xml_output_buffer_create_file, XmlOutputBuffer},
     libxml::{
         htmltree::html_node_dump_output,
         parser::xml_init_parser,
@@ -250,7 +247,7 @@ impl XmlDoc {
         };
 
         // save the content to a temp buffer.
-        let Some(buf) = xml_output_buffer_create_filename(
+        let Some(buf) = XmlOutputBuffer::from_uri(
             filename,
             handler.map(|e| Rc::new(RefCell::new(e))),
             self.compression,
