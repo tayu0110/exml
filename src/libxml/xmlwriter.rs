@@ -325,10 +325,7 @@ pub unsafe extern "C" fn xml_new_text_writer(out: XmlOutputBufferPtr) -> XmlText
 ///
 /// Returns the new xmlTextWriterPtr or NULL in case of error
 #[doc(alias = "xmlNewTextWriterFilename")]
-pub unsafe extern "C" fn xml_new_text_writer_filename(
-    uri: *const c_char,
-    compression: i32,
-) -> XmlTextWriterPtr {
+pub unsafe fn xml_new_text_writer_filename(uri: &str, compression: i32) -> XmlTextWriterPtr {
     let out: XmlOutputBufferPtr = xml_output_buffer_create_filename(uri, None, compression);
     if out.is_null() {
         xml_writer_err_msg(
@@ -4019,76 +4016,6 @@ mod tests {
             }
         }
     }
-
-    #[test]
-    fn test_xml_new_text_writer_filename() {
-        #[cfg(feature = "writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_uri in 0..GEN_NB_FILEOUTPUT {
-                for n_compression in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let uri = gen_fileoutput(n_uri, 0);
-                    let compression = gen_int(n_compression, 1);
-
-                    let ret_val = xml_new_text_writer_filename(uri, compression);
-                    desret_xml_text_writer_ptr(ret_val);
-                    des_fileoutput(n_uri, uri, 0);
-                    des_int(n_compression, compression, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewTextWriterFilename",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNewTextWriterFilename()"
-                        );
-                        eprint!(" {}", n_uri);
-                        eprintln!(" {}", n_compression);
-                    }
-                }
-            }
-        }
-    }
-
-    // #[test]
-    // fn test_xml_new_text_writer_memory() {
-    //     #[cfg(feature = "writer")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-    //             for n_compression in 0..GEN_NB_INT {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let buf = gen_xml_buffer_ptr(n_buf, 0);
-    //                 let compression = gen_int(n_compression, 1);
-
-    //                 let ret_val = xml_new_text_writer_memory(buf, compression);
-    //                 desret_xml_text_writer_ptr(ret_val);
-    //                 des_xml_buffer_ptr(n_buf, buf, 0);
-    //                 des_int(n_compression, compression, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlNewTextWriterMemory",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlNewTextWriterMemory()"
-    //                     );
-    //                     eprint!(" {}", n_buf);
-    //                     eprintln!(" {}", n_compression);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 
     #[test]
     fn test_xml_new_text_writer_push_parser() {

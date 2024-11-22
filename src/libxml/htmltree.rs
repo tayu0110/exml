@@ -669,8 +669,9 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
     /*
      * save the content to a temp buffer.
      */
+    let filename = CStr::from_ptr(filename).to_string_lossy();
     let buf: XmlOutputBufferPtr = xml_output_buffer_create_filename(
-        filename,
+        filename.as_ref(),
         handler.map(|e| Rc::new(RefCell::new(e))),
         (*cur).compression,
     );
@@ -841,11 +842,7 @@ pub unsafe extern "C" fn html_node_dump_file_format(
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFileEnc")]
 #[cfg(feature = "output")]
-pub unsafe fn html_save_file_enc(
-    filename: *const c_char,
-    cur: XmlDocPtr,
-    encoding: Option<&str>,
-) -> i32 {
+pub unsafe fn html_save_file_enc(filename: &str, cur: XmlDocPtr, encoding: Option<&str>) -> i32 {
     html_save_file_format(filename, cur, encoding, 1)
 }
 
@@ -855,7 +852,7 @@ pub unsafe fn html_save_file_enc(
 #[doc(alias = "htmlSaveFileFormat")]
 #[cfg(feature = "output")]
 pub unsafe fn html_save_file_format(
-    filename: *const c_char,
+    filename: &str,
     cur: XmlDocPtr,
     encoding: Option<&str>,
     format: i32,
@@ -868,7 +865,7 @@ pub unsafe fn html_save_file_format(
         libxml::parser::xml_init_parser,
     };
 
-    if cur.is_null() || filename.is_null() {
+    if cur.is_null() {
         return -1;
     }
 
@@ -902,9 +899,7 @@ pub unsafe fn html_save_file_format(
         }
     };
 
-    /*
-     * save the content to a temp buffer.
-     */
+    // save the content to a temp buffer.
     let buf: XmlOutputBufferPtr =
         xml_output_buffer_create_filename(filename, handler.map(|e| Rc::new(RefCell::new(e))), 0);
     if buf.is_null() {

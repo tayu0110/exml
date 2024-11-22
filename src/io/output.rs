@@ -1,6 +1,7 @@
 use std::{
+    borrow::Cow,
     cell::RefCell,
-    ffi::{c_void, CStr},
+    ffi::{c_void, CString},
     ptr::{null, null_mut},
     rc::Rc,
     str::from_utf8,
@@ -10,6 +11,8 @@ use std::{
     },
 };
 
+use url::Url;
+
 use crate::{
     buf::XmlBufRef,
     encoding::{floor_char_boundary, xml_encoding_err, EncodingError, XmlCharEncodingHandler},
@@ -18,11 +21,7 @@ use crate::{
         xml_alloc_output_buffer_internal, xml_io_http_close_put, xml_io_http_dflt_open_w,
         xml_io_http_match, xml_io_http_write,
     },
-    libxml::{
-        globals::xml_free,
-        uri::{xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
-        xmlstring::xml_str_equal,
-    },
+    libxml::uri::unescape_url,
 };
 
 use super::{
@@ -704,31 +703,22 @@ pub fn xml_register_output_callbacks(
 }
 
 pub(crate) unsafe fn __xml_output_buffer_create_filename(
-    uri: *const i8,
+    uri: &str,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     _compression: i32,
 ) -> XmlOutputBufferPtr {
     let ret: XmlOutputBufferPtr;
     let mut context: *mut c_void = null_mut();
-    let mut unescaped: *mut i8 = null_mut();
 
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         xml_register_default_output_callbacks();
     }
 
-    if uri.is_null() {
-        return null_mut();
-    }
-
-    let puri: XmlURIPtr = xml_parse_uri(uri);
-    if !puri.is_null() {
-        // try to limit the damages of the URI unescaping code.
-        if (*puri).scheme.is_null() || xml_str_equal((*puri).scheme as _, c"file".as_ptr() as _) {
-            unescaped = xml_uri_unescape_string(uri, 0, null_mut());
-        }
-        xml_free_uri(puri);
-    }
+    let unescaped = Url::parse(uri)
+        .ok()
+        .filter(|url| url.scheme() == "file")
+        .and_then(|_| unescape_url(uri).ok());
 
     let num_callbacks = XML_OUTPUT_CALLBACK_NR.load(Ordering::Acquire);
     let callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
@@ -736,18 +726,16 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     // Try to find one of the output accept method accepting that scheme
     // Go in reverse to give precedence to user defined handlers.
     // try with an unescaped version of the URI
-    if !unescaped.is_null() {
+    if let Some(Cow::Owned(unescaped)) = unescaped {
         for i in (0..num_callbacks).rev() {
             if callbacks[i]
                 .matchcallback
-                .filter(|callback| {
-                    callback(CStr::from_ptr(unescaped).to_string_lossy().as_ref()) != 0
-                })
+                .filter(|callback| callback(&unescaped) != 0)
                 .is_some()
             {
-                context = (callbacks[i].opencallback.unwrap())(unescaped);
+                let unescaped = CString::new(unescaped.as_str()).unwrap();
+                context = (callbacks[i].opencallback.unwrap())(unescaped.as_ptr());
                 if !context.is_null() {
-                    xml_free(unescaped as _);
                     // Allocate the Output buffer front-end.
                     ret = xml_alloc_output_buffer_internal(encoder);
                     if !ret.is_null() {
@@ -759,7 +747,6 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                 }
             }
         }
-        xml_free(unescaped as _);
     }
 
     // If this failed try with a non-escaped URI this may be a strange filename
@@ -767,10 +754,11 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
         for i in (0..num_callbacks).rev() {
             if callbacks[i]
                 .matchcallback
-                .filter(|callback| callback(CStr::from_ptr(uri).to_string_lossy().as_ref()) != 0)
+                .filter(|callback| callback(uri) != 0)
                 .is_some()
             {
-                context = (callbacks[i].opencallback.unwrap())(uri);
+                let uri = CString::new(uri).unwrap();
+                context = (callbacks[i].opencallback.unwrap())(uri.as_ptr());
                 if !context.is_null() {
                     // Allocate the Output buffer front-end.
                     ret = xml_alloc_output_buffer_internal(encoder);

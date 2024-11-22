@@ -1794,7 +1794,7 @@ unsafe fn old_parse_test(
         Some(".res"),
     );
     let ctemp = CString::new(temp.as_str()).unwrap();
-    (*doc).save_file(ctemp.as_ptr());
+    (*doc).save_file(temp.as_str());
     if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
@@ -1814,7 +1814,7 @@ unsafe fn old_parse_test(
     if doc.is_null() {
         return 1;
     }
-    (*doc).save_file(ctemp.as_ptr());
+    (*doc).save_file(temp.as_str());
     if compare_files(temp.as_str(), result.unwrap()) != 0 {
         res = 1;
     }
@@ -2518,8 +2518,7 @@ unsafe fn noent_parse_test(
         TEMP_DIRECTORY.get().cloned().as_deref(),
         Some(".res"),
     );
-    let ctemp = CString::new(temp.as_str()).unwrap();
-    (*doc).save_file(ctemp.as_ptr());
+    (*doc).save_file(temp.as_str());
     if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
@@ -2532,7 +2531,7 @@ unsafe fn noent_parse_test(
     if doc.is_null() {
         return 1;
     }
-    (*doc).save_file(ctemp.as_ptr());
+    (*doc).save_file(temp.as_str());
     if compare_files(temp.as_str(), result.unwrap()) != 0 {
         res = 1;
     }

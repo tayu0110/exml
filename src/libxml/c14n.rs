@@ -332,7 +332,9 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
     /*
      * save the content to a temp buffer, use default UTF8 encoding.
      */
-    let buf: XmlOutputBufferPtr = xml_output_buffer_create_filename(filename, None, compression);
+    let filename = CStr::from_ptr(filename).to_string_lossy();
+    let buf: XmlOutputBufferPtr =
+        xml_output_buffer_create_filename(filename.as_ref(), None, compression);
     if buf.is_null() {
         xml_c14n_err_internal(c"creating temporary filename".as_ptr() as _);
         return -1;

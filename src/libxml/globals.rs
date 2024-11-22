@@ -20,7 +20,7 @@ use crate::{
     encoding::XmlCharEncodingHandler,
     error::{parser_error, parser_warning, XmlError},
     globals::reset_last_error,
-    io::{XmlOutputBufferPtr, __xml_output_buffer_create_filename},
+    io::XmlOutputBufferPtr,
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSAXLocator},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
@@ -462,22 +462,22 @@ pub unsafe extern "C" fn xml_thr_def_deregister_node_default(
     old
 }
 
-pub unsafe fn xml_thr_def_output_buffer_create_filename_default(
-    func: XmlOutputBufferCreateFilenameFunc,
-) -> Option<XmlOutputBufferCreateFilenameFunc> {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    let mut old = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
-    #[cfg(feature = "output")]
-    {
-        if old.is_none() {
-            old = Some(__xml_output_buffer_create_filename);
-        }
-    }
-    XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = Some(func);
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+// pub unsafe fn xml_thr_def_output_buffer_create_filename_default(
+//     func: XmlOutputBufferCreateFilenameFunc,
+// ) -> Option<XmlOutputBufferCreateFilenameFunc> {
+//     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
+//     let mut old = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
+//     #[cfg(feature = "output")]
+//     {
+//         if old.is_none() {
+//             old = Some(__xml_output_buffer_create_filename);
+//         }
+//     }
+//     XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = Some(func);
+//     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
-    old
-}
+//     old
+// }
 
 // Helpful Macro
 #[doc(hidden)]

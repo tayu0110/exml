@@ -2440,9 +2440,9 @@ pub unsafe extern "C" fn xml_shell_cat(
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlShellWrite")]
 #[cfg(all(feature = "xpath", feature = "output"))]
-pub unsafe extern "C" fn xml_shell_write(
+pub unsafe fn xml_shell_write(
     ctxt: XmlShellCtxtPtr,
-    filename: *mut c_char,
+    filename: &str,
     node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
@@ -2453,26 +2453,21 @@ pub unsafe extern "C" fn xml_shell_write(
     if node.is_null() {
         return -1;
     }
-    if filename.is_null() || *filename.add(0) == 0 {
+    if filename.is_empty() {
         return -1;
     }
+    let cfilename = CString::new(filename).unwrap();
     match (*node).typ {
         XmlElementType::XmlDocumentNode => {
-            if (*ctxt).doc.is_null() || (*(*ctxt).doc).save_file(filename as *mut c_char) < -1 {
-                generic_error!(
-                    "Failed to write to {}\n",
-                    CStr::from_ptr(filename as *const i8).to_string_lossy()
-                );
+            if (*ctxt).doc.is_null() || (*(*ctxt).doc).save_file(filename) < -1 {
+                generic_error!("Failed to write to {filename}\n");
                 return -1;
             }
         }
         XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "html")]
-            if html_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
-                generic_error!(
-                    "Failed to write to {}\n",
-                    CStr::from_ptr(filename as *const i8).to_string_lossy()
-                );
+            if html_save_file(cfilename.as_ptr(), (*ctxt).doc) < 0 {
+                generic_error!("Failed to write to {filename}\n");
                 return -1;
             }
             #[cfg(not(feature = "html"))]
@@ -2485,12 +2480,9 @@ pub unsafe extern "C" fn xml_shell_write(
             }
         }
         _ => {
-            let f: *mut FILE = fopen(filename as *mut c_char, c"w".as_ptr());
+            let f: *mut FILE = fopen(cfilename.as_ptr(), c"w".as_ptr());
             if f.is_null() {
-                generic_error!(
-                    "Failed to write to {}\n",
-                    CStr::from_ptr(filename as *const i8).to_string_lossy()
-                );
+                generic_error!("Failed to write to {filename}\n");
                 return -1;
             }
             (*node).dump_file(f, (*ctxt).doc);
@@ -2525,7 +2517,9 @@ pub unsafe extern "C" fn xml_shell_save(
     }
     match (*(*ctxt).doc).typ {
         XmlElementType::XmlDocumentNode => {
-            if (*ctxt).doc.is_null() || (*(*ctxt).doc).save_file(filename as *mut c_char) < 0 {
+            if (*ctxt).doc.is_null()
+                || (*(*ctxt).doc).save_file(CStr::from_ptr(filename).to_string_lossy().as_ref()) < 0
+            {
                 generic_error!(
                     "Failed to save to {}\n",
                     CStr::from_ptr(filename as *const i8).to_string_lossy()
@@ -3370,7 +3364,12 @@ pub unsafe extern "C" fn xml_shell(
             if arg[0] == 0 {
                 generic_error!("Write command requires a filename argument\n");
             } else {
-                xml_shell_write(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
+                xml_shell_write(
+                    ctxt,
+                    CStr::from_ptr(arg.as_ptr()).to_string_lossy().as_ref(),
+                    (*ctxt).node,
+                    null_mut(),
+                );
             }
         } else if strcmp(command.as_ptr(), c"grep".as_ptr()) == 0 {
             xml_shell_grep(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
@@ -4920,48 +4919,6 @@ mod tests {
                                 );
                                 eprint!(" {}", n_ctxt);
                                 eprint!(" {}", n_dtd);
-                                eprint!(" {}", n_node);
-                                eprintln!(" {}", n_node2);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_shell_write() {
-        #[cfg(all(feature = "libxml_debug", feature = "xpath", feature = "output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_SHELL_CTXT_PTR {
-                for n_filename in 0..GEN_NB_CHAR_PTR {
-                    for n_node in 0..GEN_NB_XML_NODE_PTR {
-                        for n_node2 in 0..GEN_NB_XML_NODE_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_shell_ctxt_ptr(n_ctxt, 0);
-                            let filename = gen_char_ptr(n_filename, 1);
-                            let node = gen_xml_node_ptr(n_node, 2);
-                            let node2 = gen_xml_node_ptr(n_node2, 3);
-
-                            let ret_val = xml_shell_write(ctxt, filename, node, node2);
-                            desret_int(ret_val);
-                            des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_char_ptr(n_filename, filename, 1);
-                            des_xml_node_ptr(n_node, node, 2);
-                            des_xml_node_ptr(n_node2, node2, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlShellWrite",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlShellWrite()");
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_filename);
                                 eprint!(" {}", n_node);
                                 eprintln!(" {}", n_node2);
                             }

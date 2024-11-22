@@ -223,7 +223,7 @@ impl XmlDoc {
     #[doc(alias = "xmlSaveFormatFileEnc")]
     pub unsafe fn save_format_file_enc(
         &mut self,
-        filename: *const i8,
+        filename: &str,
         encoding: Option<&str>,
         format: i32,
     ) -> i32 {
@@ -275,7 +275,7 @@ impl XmlDoc {
     ///
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlSaveFormatFile")]
-    pub unsafe fn save_format_file(&mut self, filename: *const i8, format: i32) -> i32 {
+    pub unsafe fn save_format_file(&mut self, filename: &str, format: i32) -> i32 {
         self.save_format_file_enc(filename, None, format)
     }
 
@@ -283,7 +283,7 @@ impl XmlDoc {
     ///
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlSaveFileEnc")]
-    pub unsafe fn save_file_enc(&mut self, filename: *const i8, encoding: Option<&str>) -> i32 {
+    pub unsafe fn save_file_enc(&mut self, filename: &str, encoding: Option<&str>) -> i32 {
         self.save_format_file_enc(filename, encoding, 0)
     }
 
@@ -292,7 +292,7 @@ impl XmlDoc {
     /// If `filename` is "-" the stdout file is used.  
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlSaveFile")]
-    pub unsafe fn save_file(&mut self, filename: *const i8) -> i32 {
+    pub unsafe fn save_file(&mut self, filename: &str) -> i32 {
         self.save_format_file_enc(filename, None, 0)
     }
 

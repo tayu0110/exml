@@ -667,12 +667,11 @@ pub unsafe fn xml_alloc_output_buffer(
 #[doc(alias = "xmlOutputBufferCreateFilename")]
 #[cfg(feature = "output")]
 pub unsafe fn xml_output_buffer_create_filename(
-    uri: *const c_char,
+    uri: &str,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-    compression: c_int,
+    compression: i32,
 ) -> XmlOutputBufferPtr {
     if let Some(f) = GLOBAL_STATE.with_borrow(|state| state.output_buffer_create_filename_value) {
-        let uri = CStr::from_ptr(uri).to_str().unwrap();
         return f(uri, encoder, compression);
     }
     __xml_output_buffer_create_filename(uri, encoder, compression)

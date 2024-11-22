@@ -349,7 +349,7 @@ pub(crate) unsafe extern "C" fn gen_xml_text_writer_ptr(no: i32, _nr: i32) -> Xm
     use crate::libxml::xmlwriter::xml_new_text_writer_filename;
 
     if no == 0 {
-        return xml_new_text_writer_filename(c"test.out".as_ptr() as _, 0);
+        return xml_new_text_writer_filename("test.out", 0);
     }
     null_mut()
 }
@@ -1551,7 +1551,7 @@ pub(crate) unsafe extern "C" fn gen_xml_output_buffer_ptr(no: i32, _nr: i32) -> 
     use crate::io::xml_output_buffer_create_filename;
 
     if no == 0 {
-        return xml_output_buffer_create_filename(c"test.out".as_ptr() as _, None, 0);
+        return xml_output_buffer_create_filename("test.out", None, 0);
     }
     null_mut()
 }

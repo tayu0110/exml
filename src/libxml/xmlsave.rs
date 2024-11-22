@@ -1657,7 +1657,7 @@ unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSave
 /// Returns a new serialization context or NULL in case of error.
 #[doc(alias = "xmlSaveToFilename")]
 pub unsafe fn xml_save_to_filename(
-    filename: *const c_char,
+    filename: &str,
     encoding: Option<&str>,
     options: i32,
 ) -> XmlSaveCtxtPtr {

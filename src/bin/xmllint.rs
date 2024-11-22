@@ -2790,23 +2790,17 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                             .map_or(c"-".as_ptr(), |o| o.as_ptr());
                         html_save_file(o, doc);
                     } else if let Some(encoding) = ENCODING.lock().unwrap().as_ref() {
-                        let o = OUTPUT
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(c"-".as_ptr(), |o| o.as_ptr());
+                        let o = OUTPUT.lock().unwrap();
+                        let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
                         if FORMAT == 1 {
-                            html_save_file_format(o, doc, Some(encoding.as_str()), 1);
+                            html_save_file_format(o.as_ref(), doc, Some(encoding.as_str()), 1);
                         } else {
-                            html_save_file_format(o, doc, Some(encoding.as_str()), 0);
+                            html_save_file_format(o.as_ref(), doc, Some(encoding.as_str()), 0);
                         }
                     } else if FORMAT == 1 {
-                        let o = OUTPUT
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        html_save_file_format(o, doc, None, 1);
+                        let o = OUTPUT.lock().unwrap();
+                        let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
+                        html_save_file_format(o.as_ref(), doc, None, 1);
                     } else {
                         let out: *mut FILE = OUTPUT
                             .lock()
@@ -2936,28 +2930,19 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     xml_free(result as _);
                 }
             } else if COMPRESS != 0 {
-                let o = OUTPUT
-                    .lock()
-                    .unwrap()
-                    .as_ref()
-                    .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                (*doc).save_file(o);
+                let o = OUTPUT.lock().unwrap();
+                let o = o.as_deref().unwrap_or(c"-");
+                (*doc).save_file(o.to_string_lossy().as_ref());
             } else if OLDOUT != 0 {
                 if let Some(encoding) = ENCODING.lock().unwrap().as_ref() {
                     if FORMAT == 1 {
-                        let o = OUTPUT
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        ret = (*doc).save_format_file_enc(o, Some(encoding.as_str()), 1);
+                        let o = OUTPUT.lock().unwrap();
+                        let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
+                        ret = (*doc).save_format_file_enc(o.as_ref(), Some(encoding.as_str()), 1);
                     } else {
-                        let o = OUTPUT
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        ret = (*doc).save_file_enc(o, Some(encoding.as_str()));
+                        let o = OUTPUT.lock().unwrap();
+                        let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
+                        ret = (*doc).save_file_enc(o.as_ref(), Some(encoding.as_str()));
                     }
                     if ret < 0 {
                         let lock = OUTPUT.lock().unwrap();
@@ -2966,12 +2951,9 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
                 } else if FORMAT == 1 {
-                    let o = OUTPUT
-                        .lock()
-                        .unwrap()
-                        .as_ref()
-                        .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                    ret = (*doc).save_format_file(o, 1);
+                    let o = OUTPUT.lock().unwrap();
+                    let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
+                    ret = (*doc).save_format_file(o.as_ref(), 1);
                     if ret < 0 {
                         let lock = OUTPUT.lock().unwrap();
                         let o = lock.as_ref().map_or(c"-", |o| o.as_c_str());
@@ -3017,7 +2999,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
                 if let Some(o) = OUTPUT.lock().unwrap().as_ref() {
                     ctxt = xml_save_to_filename(
-                        o.as_ptr(),
+                        o.to_string_lossy().as_ref(),
                         ENCODING.lock().unwrap().as_deref(),
                         save_opts,
                     );
