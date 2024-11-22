@@ -801,6 +801,7 @@ impl XmlParserErrors {
 
 pub const XML_MAX_ERRORS: usize = 100;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! XML_GET_VAR_STR {
     ( $msg:expr, $str:expr, $( $args:expr ),* ) => {

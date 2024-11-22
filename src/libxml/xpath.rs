@@ -490,6 +490,7 @@ pub static mut XML_XPATH_NINF: f64 = 0.0;
 /// Implement a functionality similar to the DOM NodeList.length.
 ///
 /// Returns the number of nodes in the node-set.
+#[doc(hidden)]
 #[doc(alias = "xmlXPathNodeSetGetLength")]
 #[cfg(feature = "xpath")]
 #[macro_export]
@@ -507,6 +508,7 @@ macro_rules! xml_xpath_node_set_get_length {
 ///
 /// Returns the xmlNodePtr at the given @index in @ns or NULL if
 /// @index is out of range (0 to length-1)
+#[doc(hidden)]
 #[doc(alias = "xmlXPathNodeSetItem")]
 #[cfg(feature = "xpath")]
 #[macro_export]
@@ -523,6 +525,7 @@ macro_rules! xml_xpath_node_set_item {
 /// Checks whether @ns is empty or not.
 ///
 /// Returns %TRUE if @ns is an empty node-set.
+#[doc(hidden)]
 #[doc(alias = "xmlXPathNodeSetIsEmpty")]
 #[cfg(feature = "xpath")]
 #[macro_export]

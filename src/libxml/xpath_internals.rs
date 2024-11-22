@@ -321,6 +321,7 @@ macro_rules! xml_xpath_stack_is_node_set {
 // }
 
 /// Macro to return from the function if an XPath error was detected.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! CHECK_ERROR {
     ($ctxt:expr) => {
@@ -340,6 +341,7 @@ macro_rules! CHECK_ERROR0 {
 }
 
 /// Macro to raise an XPath error and return.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! XP_ERROR {
     ($ctxt:expr, $x:expr) => {{
@@ -357,6 +359,7 @@ macro_rules! XP_ERROR0 {
 }
 
 /// Macro to check that the value on top of the XPath stack is of a given type.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! CHECK_TYPE {
     ($ctxt:expr, $typeval:expr) => {
@@ -380,6 +383,7 @@ macro_rules! CHECK_TYPE0 {
 }
 
 /// Macro to check that the number of args passed to an XPath function matches.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! CHECK_ARITY {
     ($ctxt:expr, $nargs:expr, $x:expr) => {

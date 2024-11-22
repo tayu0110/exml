@@ -539,6 +539,7 @@ pub unsafe extern "C" fn xml_strcat(cur: *mut XmlChar, add: *const XmlChar) -> *
 /// Formats @msg and places result into @buf.
 ///
 /// Returns the number of characters written to @buf or -1 if an error occurs.
+#[doc(hidden)]
 #[doc(alias = "xmlStrPrintf")]
 #[macro_export]
 macro_rules! xml_str_printf {

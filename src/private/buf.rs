@@ -83,6 +83,7 @@ mod legacy {
      * Macro for compatibility with xmlBuffer to be used after an xmlBuf
      * is updated. This makes sure the compat fields are updated too.
      */
+    #[doc(hidden)]
     #[macro_export]
     macro_rules! UPDATE_COMPAT {
         ($buf:expr) => {
@@ -104,6 +105,7 @@ mod legacy {
      * entry points, it checks that the compat fields have not been modified
      * by direct call to xmlBuffer function from code compiled before 2.9.0 .
      */
+    #[doc(hidden)]
     #[macro_export]
     macro_rules! CHECK_COMPAT {
         ($buf:expr) => {

@@ -480,6 +480,7 @@ pub unsafe fn xml_thr_def_output_buffer_create_filename_default(
 }
 
 // Helpful Macro
+#[doc(hidden)]
 #[macro_export]
 #[cfg(feature = "thread")]
 macro_rules! IS_MAIN_THREAD {
@@ -487,6 +488,7 @@ macro_rules! IS_MAIN_THREAD {
         $crate::libxml::threads::xml_is_main_thread()
     };
 }
+#[doc(hidden)]
 #[macro_export]
 #[cfg(not(feature = "thread"))]
 macro_rules! IS_MAIN_THREAD {
