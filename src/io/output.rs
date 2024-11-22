@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
-    ffi::c_void,
-    ptr::null,
+    ffi::{c_void, CStr},
+    ptr::{null, null_mut},
     rc::Rc,
     str::from_utf8,
     sync::{
@@ -14,7 +14,15 @@ use crate::{
     buf::XmlBufRef,
     encoding::{floor_char_boundary, xml_encoding_err, EncodingError, XmlCharEncodingHandler},
     error::XmlParserErrors,
-    io::{xml_io_http_close_put, xml_io_http_dflt_open_w, xml_io_http_match, xml_io_http_write},
+    io::{
+        xml_alloc_output_buffer_internal, xml_io_http_close_put, xml_io_http_dflt_open_w,
+        xml_io_http_match, xml_io_http_write,
+    },
+    libxml::{
+        globals::xml_free,
+        uri::{xml_free_uri, xml_parse_uri, xml_uri_unescape_string, XmlURIPtr},
+        xmlstring::xml_str_equal,
+    },
 };
 
 use super::{
@@ -668,22 +676,6 @@ pub unsafe extern "C" fn xml_register_default_output_callbacks() {
         );
     }
 
-    /*********************************
-     No way a-priori to distinguish between gzipped files from
-     uncompressed ones except opening if existing then closing
-     and saving with same compression ratio ... a pain.
-
-    #ifdef LIBXML_ZLIB_ENABLED
-        xmlRegisterOutputCallbacks(xmlGzfileMatch, xmlGzfileOpen,
-                               xmlGzfileWrite, xmlGzfileClose);
-    #endif
-
-     Nor FTP PUT ....
-    #ifdef LIBXML_FTP_ENABLED
-        xmlRegisterOutputCallbacks(xmlIOFTPMatch, xmlIOFTPOpen,
-                               xmlIOFTPWrite, xmlIOFTPClose);
-    #endif
-     **********************************/
     XML_OUTPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
 }
 
@@ -709,4 +701,89 @@ pub fn xml_register_output_callbacks(
     XML_OUTPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
     XML_OUTPUT_CALLBACK_NR.store(num_callbacks + 1, Ordering::Release);
     num_callbacks as _
+}
+
+pub(crate) unsafe fn __xml_output_buffer_create_filename(
+    uri: *const i8,
+    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
+    _compression: i32,
+) -> XmlOutputBufferPtr {
+    let ret: XmlOutputBufferPtr;
+    let mut context: *mut c_void = null_mut();
+    let mut unescaped: *mut i8 = null_mut();
+
+    let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
+    if !is_initialized {
+        xml_register_default_output_callbacks();
+    }
+
+    if uri.is_null() {
+        return null_mut();
+    }
+
+    let puri: XmlURIPtr = xml_parse_uri(uri);
+    if !puri.is_null() {
+        // try to limit the damages of the URI unescaping code.
+        if (*puri).scheme.is_null() || xml_str_equal((*puri).scheme as _, c"file".as_ptr() as _) {
+            unescaped = xml_uri_unescape_string(uri, 0, null_mut());
+        }
+        xml_free_uri(puri);
+    }
+
+    let num_callbacks = XML_OUTPUT_CALLBACK_NR.load(Ordering::Acquire);
+    let callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
+
+    // Try to find one of the output accept method accepting that scheme
+    // Go in reverse to give precedence to user defined handlers.
+    // try with an unescaped version of the URI
+    if !unescaped.is_null() {
+        for i in (0..num_callbacks).rev() {
+            if callbacks[i]
+                .matchcallback
+                .filter(|callback| {
+                    callback(CStr::from_ptr(unescaped).to_string_lossy().as_ref()) != 0
+                })
+                .is_some()
+            {
+                context = (callbacks[i].opencallback.unwrap())(unescaped);
+                if !context.is_null() {
+                    xml_free(unescaped as _);
+                    // Allocate the Output buffer front-end.
+                    ret = xml_alloc_output_buffer_internal(encoder);
+                    if !ret.is_null() {
+                        (*ret).context = context;
+                        (*ret).writecallback = callbacks[i].writecallback;
+                        (*ret).closecallback = callbacks[i].closecallback;
+                    }
+                    return ret;
+                }
+            }
+        }
+        xml_free(unescaped as _);
+    }
+
+    // If this failed try with a non-escaped URI this may be a strange filename
+    if context.is_null() {
+        for i in (0..num_callbacks).rev() {
+            if callbacks[i]
+                .matchcallback
+                .filter(|callback| callback(CStr::from_ptr(uri).to_string_lossy().as_ref()) != 0)
+                .is_some()
+            {
+                context = (callbacks[i].opencallback.unwrap())(uri);
+                if !context.is_null() {
+                    // Allocate the Output buffer front-end.
+                    ret = xml_alloc_output_buffer_internal(encoder);
+                    if !ret.is_null() {
+                        (*ret).context = context;
+                        (*ret).writecallback = callbacks[i].writecallback;
+                        (*ret).closecallback = callbacks[i].closecallback;
+                    }
+                    return ret;
+                }
+            }
+        }
+    }
+
+    null_mut()
 }
