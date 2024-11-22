@@ -537,7 +537,9 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         find_encoding_handler("ascii")
     };
 
-    let Some(mut buf) = XmlOutputBuffer::from_wrapped_encoder(handler.map(|e| Rc::new(RefCell::new(e)))) else {
+    let Some(mut buf) =
+        XmlOutputBuffer::from_wrapped_encoder(handler.map(|e| Rc::new(RefCell::new(e))))
+    else {
         *mem = null_mut();
         *size = 0;
         return;
@@ -580,7 +582,6 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
 pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
-        io::xml_output_buffer_create_file,
         libxml::parser::xml_init_parser,
     };
 
@@ -612,7 +613,7 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
         find_encoding_handler("ascii")
     };
 
-    let Some(mut buf) = xml_output_buffer_create_file(f, handler) else {
+    let Some(mut buf) = XmlOutputBuffer::from_writer(f, handler) else {
         return -1;
     };
     html_doc_content_dump_output(&mut buf, cur, null_mut());
@@ -787,7 +788,6 @@ pub unsafe extern "C" fn html_node_dump_file_format(
 
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
-        io::xml_output_buffer_create_file,
         libxml::parser::xml_init_parser,
     };
 
@@ -818,7 +818,7 @@ pub unsafe extern "C" fn html_node_dump_file_format(
     /*
      * save the content to a temp buffer.
      */
-    let Some(mut buf) = xml_output_buffer_create_file(out, handler) else {
+    let Some(mut buf) = XmlOutputBuffer::from_writer(out, handler) else {
         return 0;
     };
 

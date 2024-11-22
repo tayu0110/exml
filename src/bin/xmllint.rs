@@ -2260,7 +2260,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     use std::{cell::RefCell, rc::Rc};
 
     use exml::{
-        io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
+        io::{xml_output_buffer_close, XmlOutputBuffer, XmlOutputBufferPtr},
         libxml::xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
         tree::XmlNodePtr,
     };
@@ -2280,7 +2280,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     extern "C" {
                         static stdout: *mut FILE;
                     }
-                    let Some(buf) = xml_output_buffer_create_file(stdout, None) else {
+                    let Some(buf) = XmlOutputBuffer::from_writer(stdout, None) else {
                         eprintln!("Out of memory for XPath");
                         PROGRESULT = XmllintReturnCode::ErrMem;
                         return;

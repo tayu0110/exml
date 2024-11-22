@@ -11,6 +11,7 @@ use std::{
     },
 };
 
+use libc::FILE;
 use url::Url;
 
 use crate::{
@@ -24,8 +25,8 @@ use crate::{
 };
 
 use super::{
-    xml_escape_content, xml_file_close, xml_file_match, xml_file_open_w, xml_file_write, xml_ioerr,
-    MINLEN,
+    xml_escape_content, xml_file_close, xml_file_flush, xml_file_match, xml_file_open_w,
+    xml_file_write, xml_ioerr, MINLEN,
 };
 
 /// Callback used in the I/O Output API to detect if the current handler
@@ -261,6 +262,32 @@ impl XmlOutputBuffer {
             return f(uri, encoder, compression);
         }
         __xml_output_buffer_create_filename(uri, encoder, compression)
+    }
+
+    /// Create a buffered output for the progressive saving to a *mut FILE buffered C I/O.
+    ///
+    /// Returns the new parser output or NULL
+    #[doc(alias = "xmlOutputBufferCreateFile")]
+    pub unsafe fn from_writer(
+        file: *mut FILE,
+        encoder: Option<XmlCharEncodingHandler>,
+    ) -> Option<XmlOutputBuffer> {
+        if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
+            xml_register_default_output_callbacks();
+        }
+
+        if file.is_null() {
+            return None;
+        }
+
+        XmlOutputBuffer::from_wrapped_encoder(encoder.map(|e| Rc::new(RefCell::new(e)))).map(
+            |mut buf| {
+                buf.context = file as _;
+                buf.writecallback = Some(xml_file_write);
+                buf.closecallback = Some(xml_file_flush);
+                buf
+            },
+        )
     }
 
     /// Write the content of the array in the output I/O buffer.  

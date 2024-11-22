@@ -11,7 +11,7 @@ use crate::{
     buf::XmlBufRef,
     encoding::find_encoding_handler,
     error::XmlParserErrors,
-    io::{xml_output_buffer_create_file, XmlOutputBuffer},
+    io::XmlOutputBuffer,
     libxml::{
         htmltree::html_node_dump_output,
         parser::xml_init_parser,
@@ -183,7 +183,7 @@ impl XmlDoc {
             None
         };
         let Some(buf) =
-            xml_output_buffer_create_file(f, handler).map(|buf| Rc::new(RefCell::new(buf)))
+            XmlOutputBuffer::from_writer(f, handler).map(|buf| Rc::new(RefCell::new(buf)))
         else {
             return -1;
         };
@@ -442,7 +442,7 @@ impl XmlNode {
     pub unsafe fn dump_file(&mut self, f: *mut FILE, doc: XmlDocPtr) {
         xml_init_parser();
 
-        let Some(mut outbuf) = xml_output_buffer_create_file(f, None) else {
+        let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
             return;
         };
         if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {

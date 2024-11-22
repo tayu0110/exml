@@ -581,34 +581,6 @@ unsafe extern "C" fn xml_io_http_close_put(ctxt: *mut c_void) -> c_int {
     xml_io_http_close_write(ctxt, c"PUT".as_ptr() as _)
 }
 
-/// Create a buffered output for the progressive saving to a FILE *
-/// buffered C I/O
-///
-/// Returns the new parser output or NULL
-#[doc(alias = "xmlOutputBufferCreateFile")]
-#[cfg(feature = "output")]
-pub unsafe fn xml_output_buffer_create_file(
-    file: *mut FILE,
-    encoder: Option<XmlCharEncodingHandler>,
-) -> Option<XmlOutputBuffer> {
-    if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-        xml_register_default_output_callbacks();
-    }
-
-    if file.is_null() {
-        return None;
-    }
-
-    XmlOutputBuffer::from_wrapped_encoder(encoder.map(|e| Rc::new(RefCell::new(e)))).map(
-        |mut buf| {
-            buf.context = file as _;
-            buf.writecallback = Some(xml_file_write);
-            buf.closecallback = Some(xml_file_flush);
-            buf
-        },
-    )
-}
-
 /// Write `len` bytes from `buffer` to the I/O channel.
 ///
 /// Returns the number of bytes written
